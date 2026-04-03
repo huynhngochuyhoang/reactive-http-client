@@ -104,7 +104,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             responseSpec = ((WebClient.RequestHeadersSpec<?>) requestSpec).retrieve();
         }
 
-        responseSpec.onStatus(
+        responseSpec = responseSpec.onStatus(
                 status -> status.isError(),
                 clientResponse -> errorDecoder.decode(clientResponse)
                         .flatMap(Mono::error)
