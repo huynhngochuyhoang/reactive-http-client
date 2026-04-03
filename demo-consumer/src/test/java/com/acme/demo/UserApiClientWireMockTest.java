@@ -179,4 +179,31 @@ class UserApiClientWireMockTest {
                 })
                 .verifyComplete();
     }
+
+    // -------------------------------------------------------------------------
+    // GET /users/search  (List<String> query param → multi-value)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void searchByIds_listQueryParam_expandsToRepeatedKeys() {
+        wireMock.stubFor(get(urlPathEqualTo("/users/search"))
+                .withQueryParam("ids", equalTo("1"))
+                .withQueryParam("ids", equalTo("2"))
+                .withQueryParam("ids", equalTo("3"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [
+                                  {"id":"1","name":"Alice","email":"a@example.com"},
+                                  {"id":"2","name":"Bob","email":"b@example.com"},
+                                  {"id":"3","name":"Charlie","email":"c@example.com"}
+                                ]
+                                """)));
+
+        StepVerifier.create(
+                userApiClient.searchByIds(java.util.List.of("1", "2", "3")).collectList())
+                .assertNext(list -> Assertions.assertEquals(3, list.size()))
+                .verifyComplete();
+    }
 }

@@ -87,7 +87,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 .method(HttpMethod.valueOf(meta.getHttpMethod()))
                 .uri(uriBuilder -> {
                     var ub = uriBuilder.path(meta.getPathTemplate());
-                    resolved.queryParams().forEach((k, v) -> ub.queryParam(k, String.valueOf(v)));
+                    resolved.queryParams().forEach((k, values) ->
+                            values.forEach(v -> ub.queryParam(k, String.valueOf(v))));
                     return ub.build(resolved.pathVars());
                 })
                 .accept(MediaType.APPLICATION_JSON);

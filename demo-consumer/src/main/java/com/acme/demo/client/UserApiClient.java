@@ -33,6 +33,13 @@ public interface UserApiClient {
     Flux<UserDto> listUsers(@QueryParam("role") String role);
 
     /**
+     * Searches users by multiple IDs supplied as a multi-value query parameter.
+     * Produces: {@code GET /users/search?ids=1&ids=2&ids=3}
+     */
+    @GET("/users/search")
+    Flux<UserDto> searchByIds(@QueryParam("ids") java.util.List<String> ids);
+
+    /**
      * Creates a new user.
      *
      * @param request request body
