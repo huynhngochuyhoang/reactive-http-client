@@ -1,5 +1,6 @@
 package com.acme.httpstarter.core;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,6 +30,9 @@ public class MethodMetadata {
 
     /** The inner type argument of Mono<T> / Flux<T>. */
     private Type responseType;
+    private Method method;
+    private boolean httpExchangeLoggingEnabled;
+    private Class<? extends HttpExchangeLogger> httpExchangeLoggerClass;
 
     // ---- getters / setters ----
 
@@ -53,4 +57,17 @@ public class MethodMetadata {
 
     public Type getResponseType() { return responseType; }
     public void setResponseType(Type responseType) { this.responseType = responseType; }
+
+    public Method getMethod() { return method; }
+    public void setMethod(Method method) { this.method = method; }
+
+    public boolean isHttpExchangeLoggingEnabled() { return httpExchangeLoggingEnabled; }
+    public void setHttpExchangeLoggingEnabled(boolean httpExchangeLoggingEnabled) {
+        this.httpExchangeLoggingEnabled = httpExchangeLoggingEnabled;
+    }
+
+    public Class<? extends HttpExchangeLogger> getHttpExchangeLoggerClass() { return httpExchangeLoggerClass; }
+    public void setHttpExchangeLoggerClass(Class<? extends HttpExchangeLogger> httpExchangeLoggerClass) {
+        this.httpExchangeLoggerClass = httpExchangeLoggerClass;
+    }
 }
