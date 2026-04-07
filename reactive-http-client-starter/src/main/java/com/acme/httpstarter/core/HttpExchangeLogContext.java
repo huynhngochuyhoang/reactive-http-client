@@ -5,6 +5,9 @@ import java.util.Map;
 
 /**
  * Snapshot of one upstream HTTP exchange for logging/metrics use cases.
+ *
+ * <p>For {@code Flux<T>} responses, {@code responseBody} is {@code null} because
+ * the stream may contain multiple elements; use status/headers/duration instead.
  */
 public record HttpExchangeLogContext(
         String clientName,
