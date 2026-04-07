@@ -55,6 +55,7 @@ public class MyApp {
 public interface UserApiClient {
 
     @GET("/users/{id}")
+    @LogHttpExchange
     Mono<UserDto> getUser(
         @PathVar("id") String id,
         @QueryParam("expand") String expand   // null → omitted from URL
@@ -171,6 +172,7 @@ The integration tests in `UserApiClientWireMockTest` spin up a WireMock server o
 | Annotation | Target | Description |
 |---|---|---|
 | `@ReactiveHttpClient(name, baseUrl)` | Interface | Declares a reactive HTTP client interface |
+| `@LogHttpExchange(logger = ...)` | Method | Logs request/response; allows custom logger implementation |
 | `@GET(path)` | Method | HTTP GET |
 | `@POST(path)` | Method | HTTP POST |
 | `@PUT(path)` | Method | HTTP PUT |
@@ -179,6 +181,27 @@ The integration tests in `UserApiClientWireMockTest` spin up a WireMock server o
 | `@QueryParam(name)` | Parameter | Appended to the query string (null → omitted) |
 | `@HeaderParam(name)` | Parameter | Added as a request header (null → omitted) |
 | `@Body` | Parameter | Serialised as the JSON request body |
+
+### Custom request/response logging hook
+
+`@LogHttpExchange` uses `DefaultHttpExchangeLogger` by default.  
+To inspect upstream headers, collect metrics, or forward observability events, provide a custom logger:
+
+```java
+public class UpstreamMetricsLogger implements HttpExchangeLogger {
+    @Override
+    public void log(HttpExchangeLogContext context) {
+        // use context.responseHeaders(), context.responseStatus(), context.durationMs(), ...
+    }
+}
+
+@ReactiveHttpClient(name = "user-service")
+public interface UserApiClient {
+    @GET("/users/{id}")
+    @LogHttpExchange(logger = UpstreamMetricsLogger.class)
+    Mono<UserDto> getUser(@PathVar("id") String id, @QueryParam("expand") String expand);
+}
+```
 
 ---
 

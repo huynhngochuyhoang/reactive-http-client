@@ -4,8 +4,11 @@ import com.acme.httpstarter.config.ReactiveHttpClientProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -14,6 +17,11 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * JDK dynamic-proxy {@link InvocationHandler} that translates annotated interface
@@ -38,6 +46,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final DefaultErrorDecoder errorDecoder;
     private final ReactiveHttpClientProperties.ClientConfig clientConfig;
     private final String clientName;
+    private final ApplicationContext applicationContext;
+    private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> loggerCache = new ConcurrentHashMap<>();
 
     // Resilience4j registries – may be null when resilience4j is not on the classpath
     private final Object circuitBreakerRegistry;
@@ -51,6 +61,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             DefaultErrorDecoder errorDecoder,
             ReactiveHttpClientProperties.ClientConfig clientConfig,
             String clientName,
+            ApplicationContext applicationContext,
             Object circuitBreakerRegistry,
             Object retryRegistry,
             Object bulkheadRegistry) {
@@ -60,6 +71,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         this.errorDecoder = errorDecoder;
         this.clientConfig = clientConfig;
         this.clientName = clientName;
+        this.applicationContext = applicationContext;
         this.circuitBreakerRegistry = circuitBreakerRegistry;
         this.retryRegistry = retryRegistry;
         this.bulkheadRegistry = bulkheadRegistry;
@@ -82,6 +94,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         RequestArgumentResolver.ResolvedArgs resolved = argumentResolver.resolve(meta, args);
 
         long start = System.currentTimeMillis();
+        HttpExchangeLogger exchangeLogger = resolveExchangeLogger(meta);
 
         WebClient.RequestBodySpec requestSpec = webClient
                 .method(HttpMethod.valueOf(meta.getHttpMethod()))
@@ -95,32 +108,60 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         resolved.headers().forEach(requestSpec::header);
 
-        WebClient.ResponseSpec responseSpec;
+        WebClient.RequestHeadersSpec<?> requestHeadersSpec;
         if (resolved.body() != null) {
-            responseSpec = requestSpec
+            requestHeadersSpec = requestSpec
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(resolved.body())
-                    .retrieve();
+                    .bodyValue(resolved.body());
         } else {
-            responseSpec = ((WebClient.RequestHeadersSpec<?>) requestSpec).retrieve();
+            requestHeadersSpec = requestSpec;
         }
 
-        responseSpec = responseSpec.onStatus(
-                status -> status.isError(),
-                clientResponse -> errorDecoder.decode(clientResponse)
-                        .flatMap(Mono::error)
-        );
+        AtomicReference<HttpStatusCode> responseStatus = new AtomicReference<>();
+        AtomicReference<Map<String, List<String>>> responseHeaders = new AtomicReference<>(Map.of());
 
         if (meta.isReturnsFlux()) {
-            Flux<?> flux = buildFlux(responseSpec, meta.getResponseType());
+            Flux<?> flux = requestHeadersSpec.exchangeToFlux(clientResponse -> {
+                responseStatus.set(clientResponse.statusCode());
+                responseHeaders.set(copyHeaders(clientResponse));
+
+                if (clientResponse.statusCode().isError()) {
+                    return errorDecoder.decode(clientResponse).flatMapMany(Mono::error);
+                }
+                return buildFlux(clientResponse, meta.getResponseType());
+            });
             flux = applyResilienceFlux(flux, meta);
-            logRequest(meta, start);
+            if (exchangeLogger != null) {
+                flux = flux
+                        .doOnComplete(() -> logExchange(
+                                exchangeLogger, meta, resolved, start, responseStatus.get(), responseHeaders.get(), null, null))
+                        .doOnError(error -> logExchange(
+                                exchangeLogger, meta, resolved, start, responseStatus.get(), responseHeaders.get(), null, error));
+            } else {
+                logRequest(meta, start);
+            }
             return flux;
         }
 
-        Mono<?> mono = buildMono(responseSpec, meta.getResponseType());
+        Mono<?> mono = requestHeadersSpec.exchangeToMono(clientResponse -> {
+            responseStatus.set(clientResponse.statusCode());
+            responseHeaders.set(copyHeaders(clientResponse));
+
+            if (clientResponse.statusCode().isError()) {
+                return errorDecoder.decode(clientResponse).flatMap(Mono::error);
+            }
+            return buildMono(clientResponse, meta.getResponseType());
+        });
         mono = applyResilienceMono(mono, meta);
-        logRequest(meta, start);
+        if (exchangeLogger != null) {
+            mono = mono
+                    .doOnSuccess(body -> logExchange(
+                            exchangeLogger, meta, resolved, start, responseStatus.get(), responseHeaders.get(), body, null))
+                    .doOnError(error -> logExchange(
+                            exchangeLogger, meta, resolved, start, responseStatus.get(), responseHeaders.get(), null, error));
+        } else {
+            logRequest(meta, start);
+        }
         return mono;
     }
 
@@ -129,19 +170,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     // -------------------------------------------------------------------------
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private Mono<?> buildMono(WebClient.ResponseSpec responseSpec, Type responseType) {
+    private Mono<?> buildMono(ClientResponse response, Type responseType) {
         if (responseType == null || responseType == Void.class) {
-            return responseSpec.bodyToMono(Void.class);
+            return response.bodyToMono(Void.class);
         }
-        return responseSpec.bodyToMono(ParameterizedTypeReference.forType(responseType));
+        return response.bodyToMono(ParameterizedTypeReference.forType(responseType));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private Flux<?> buildFlux(WebClient.ResponseSpec responseSpec, Type responseType) {
+    private Flux<?> buildFlux(ClientResponse response, Type responseType) {
         if (responseType == null) {
-            return responseSpec.bodyToFlux(Object.class);
+            return response.bodyToFlux(Object.class);
         }
-        return responseSpec.bodyToFlux(ParameterizedTypeReference.forType(responseType));
+        return response.bodyToFlux(ParameterizedTypeReference.forType(responseType));
     }
 
     private Mono<?> applyResilienceMono(Mono<?> mono, MethodMetadata meta) {
@@ -340,4 +381,61 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     System.currentTimeMillis() - startMs);
         }
     }
+
+    private HttpExchangeLogger resolveExchangeLogger(MethodMetadata meta) {
+        if (!meta.isHttpExchangeLoggingEnabled() || meta.getHttpExchangeLoggerClass() == null) {
+            return null;
+        }
+
+        return loggerCache.computeIfAbsent(meta.getHttpExchangeLoggerClass(), clazz -> {
+            HttpExchangeLogger bean = applicationContext.getBeanProvider(clazz).getIfAvailable();
+            if (bean != null) {
+                return bean;
+            }
+            try {
+                return clazz.getDeclaredConstructor().newInstance();
+            } catch (Exception e) {
+                throw new IllegalStateException(
+                        "Cannot instantiate HttpExchangeLogger: " + clazz.getName(), e);
+            }
+        });
+    }
+
+    private void logExchange(
+            HttpExchangeLogger exchangeLogger,
+            MethodMetadata meta,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            long startMs,
+            HttpStatusCode statusCode,
+            Map<String, List<String>> responseHeaders,
+            Object responseBody,
+            Throwable error) {
+        exchangeLogger.log(new HttpExchangeLogContext(
+                clientName,
+                meta.getHttpMethod(),
+                meta.getPathTemplate(),
+                Map.copyOf(resolved.pathVars()),
+                copyQueryParams(resolved.queryParams()),
+                Map.copyOf(resolved.headers()),
+                resolved.body(),
+                statusCode != null ? statusCode.value() : null,
+                responseHeaders == null ? Map.of() : responseHeaders,
+                responseBody,
+                System.currentTimeMillis() - startMs,
+                error
+        ));
+    }
+
+    private Map<String, List<Object>> copyQueryParams(Map<String, List<Object>> source) {
+        Map<String, List<Object>> copied = new LinkedHashMap<>();
+        source.forEach((key, values) -> copied.put(key, List.copyOf(values)));
+        return copied;
+    }
+
+    private Map<String, List<String>> copyHeaders(ClientResponse response) {
+        Map<String, List<String>> copied = new LinkedHashMap<>();
+        response.headers().asHttpHeaders().forEach((key, values) -> copied.put(key, List.copyOf(values)));
+        return copied;
+    }
+
 }

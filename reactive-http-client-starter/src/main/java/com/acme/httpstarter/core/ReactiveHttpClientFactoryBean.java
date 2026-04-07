@@ -82,6 +82,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 errorDecoder,
                 config,
                 clientName,
+                applicationContext,
                 circuitBreakerRegistry,
                 retryRegistry,
                 bulkheadRegistry
