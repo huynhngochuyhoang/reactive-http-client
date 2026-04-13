@@ -5,8 +5,11 @@ import com.acme.demo.dto.CreateUserRequest;
 import com.acme.demo.dto.UserDto;
 import com.acme.httpstarter.enable.EnableReactiveHttpClients;
 import com.acme.httpstarter.exception.HttpClientException;
+import com.acme.httpstarter.observability.HttpClientObserver;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,9 +18,9 @@ import org.springframework.test.context.DynamicPropertySource;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import java.util.List;
-
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Integration test for {@link UserApiClient} using WireMock as the upstream stub.
@@ -57,6 +60,12 @@ class UserApiClientWireMockTest {
 
     @Autowired
     private UserApiClient userApiClient;
+
+    @Autowired(required = false)
+    private MeterRegistry meterRegistry;
+
+    @Autowired(required = false)
+    private HttpClientObserver httpClientObserver;
 
     // -------------------------------------------------------------------------
     // GET /users/{id}
@@ -205,5 +214,111 @@ class UserApiClientWireMockTest {
                 userApiClient.searchByIds(java.util.List.of("1", "2", "3")).collectList())
                 .assertNext(list -> Assertions.assertEquals(3, list.size()))
                 .verifyComplete();
+    }
+
+    // -------------------------------------------------------------------------
+    // Observability – Micrometer metrics
+    // -------------------------------------------------------------------------
+
+    @Test
+    void micrometer_observerBeanIsRegistered() {
+        // When spring-boot-starter-actuator is on the classpath the auto-configuration
+        // registers a MeterRegistry and, consequently, a MicrometerHttpClientObserver.
+        assertThat(meterRegistry).as("MeterRegistry should be present (actuator on classpath)").isNotNull();
+        assertThat(httpClientObserver).as("HttpClientObserver should be auto-configured").isNotNull();
+    }
+
+    @Test
+    void micrometer_recordsTimerMetricOnSuccess() {
+        assumeTrue(meterRegistry != null, "MeterRegistry not available – skipping observability test");
+
+        wireMock.stubFor(get(urlPathEqualTo("/users/10"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"id\":\"10\",\"name\":\"Metrics\",\"email\":\"m@example.com\"}")));
+
+        // Execute the request so that the observer fires
+        StepVerifier.create(userApiClient.getUser("10", null))
+                .assertNext(u -> assertThat(u.getId()).isEqualTo("10"))
+                .verifyComplete();
+
+        // The timer should be registered with the expected tags
+        Timer timer = meterRegistry.find("http.client.requests")
+                .tag("client.name", "user-service")
+                .tag("api.name", "user.getById")
+                .tag("http.method", "GET")
+                .tag("outcome", "SUCCESS")
+                .timer();
+        assertThat(timer).as("Timer 'http.client.requests' should be recorded").isNotNull();
+        assertThat(timer.count()).as("Timer should have at least one record").isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void micrometer_recordsTimerMetricOnClientError() {
+        assumeTrue(meterRegistry != null, "MeterRegistry not available – skipping observability test");
+
+        wireMock.stubFor(get(urlPathEqualTo("/users/404"))
+                .willReturn(aResponse().withStatus(404).withBody("Not Found")));
+
+        StepVerifier.create(userApiClient.getUser("404", null))
+                .expectError(HttpClientException.class)
+                .verify();
+
+        Timer timer = meterRegistry.find("http.client.requests")
+                .tag("client.name", "user-service")
+                .tag("api.name", "user.getById")
+                .tag("http.method", "GET")
+                .tag("outcome", "CLIENT_ERROR")
+                .timer();
+        assertThat(timer).as("Timer with CLIENT_ERROR outcome should be recorded").isNotNull();
+    }
+
+    @Test
+    void micrometer_usesMethodNameWhenApiNameAnnotationMissing() {
+        assumeTrue(meterRegistry != null, "MeterRegistry not available – skipping observability test");
+
+        wireMock.stubFor(get(urlPathEqualTo("/users"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [
+                                  {"id":"1","name":"Alice","email":"a@example.com"}
+                                ]
+                                """)));
+
+        StepVerifier.create(userApiClient.listUsers(null).collectList())
+                .assertNext(list -> assertThat(list).hasSize(1))
+                .verifyComplete();
+
+        Timer timer = meterRegistry.find("http.client.requests")
+                .tag("client.name", "user-service")
+                .tag("api.name", "listUsers")
+                .tag("http.method", "GET")
+                .tag("outcome", "SUCCESS")
+                .timer();
+        assertThat(timer).as("Timer should use Java method name when @ApiName is absent").isNotNull();
+    }
+
+    @Test
+    void micrometer_recordsRedirectionOutcomeFor3xx() {
+        assumeTrue(meterRegistry != null, "MeterRegistry not available – skipping observability test");
+
+        wireMock.stubFor(delete(urlPathEqualTo("/users/302"))
+                .willReturn(aResponse()
+                        .withStatus(302)
+                        .withHeader("Location", "/users/42")));
+
+        StepVerifier.create(userApiClient.deleteUser("302"))
+                .verifyComplete();
+
+        Timer timer = meterRegistry.find("http.client.requests")
+                .tag("client.name", "user-service")
+                .tag("api.name", "deleteUser")
+                .tag("http.method", "DELETE")
+                .tag("outcome", "REDIRECTION")
+                .timer();
+        assertThat(timer).as("Timer with REDIRECTION outcome should be recorded").isNotNull();
     }
 }

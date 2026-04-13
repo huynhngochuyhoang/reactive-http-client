@@ -21,6 +21,7 @@ public interface UserApiClient {
      * @param expand optional comma-separated list of fields to expand (query parameter)
      */
     @GET("/users/{id}")
+    @ApiName("user.getById")
     Mono<UserDto> getUser(
             @PathVar("id") String id,
             @QueryParam("expand") String expand

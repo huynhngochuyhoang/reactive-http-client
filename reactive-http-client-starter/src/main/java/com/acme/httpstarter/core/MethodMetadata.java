@@ -31,6 +31,7 @@ public class MethodMetadata {
     /** The inner type argument of Mono<T> / Flux<T>. */
     private Type responseType;
     private Method method;
+    private String apiName;
     private boolean httpExchangeLoggingEnabled;
     private Class<? extends HttpExchangeLogger> httpExchangeLoggerClass;
 
@@ -60,6 +61,9 @@ public class MethodMetadata {
 
     public Method getMethod() { return method; }
     public void setMethod(Method method) { this.method = method; }
+
+    public String getApiName() { return apiName; }
+    public void setApiName(String apiName) { this.apiName = apiName; }
 
     public boolean isHttpExchangeLoggingEnabled() { return httpExchangeLoggingEnabled; }
     public void setHttpExchangeLoggingEnabled(boolean httpExchangeLoggingEnabled) {

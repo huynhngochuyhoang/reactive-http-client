@@ -1,8 +1,24 @@
 server:
   port: 8080
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metrics
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
 acme:
   http:
+    observability:
+      enabled: true
+      metric-name: http.client.requests
+      include-url-path: true
+      log-request-body: false
+      log-response-body: false
     clients:
       user-service:
         base-url: https://jsonplaceholder.typicode.com

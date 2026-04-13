@@ -2,6 +2,7 @@ package com.acme.httpstarter.core;
 
 import com.acme.httpstarter.annotation.ReactiveHttpClient;
 import com.acme.httpstarter.config.ReactiveHttpClientProperties;
+import com.acme.httpstarter.observability.HttpClientObserver;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import org.slf4j.Logger;
@@ -75,6 +76,10 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         Object retryRegistry = resolveSafely("io.github.resilience4j.retry.RetryRegistry");
         Object bulkheadRegistry = resolveSafely("io.github.resilience4j.bulkhead.BulkheadRegistry");
 
+        HttpClientObserver observer = applicationContext
+                .getBeanProvider(HttpClientObserver.class)
+                .getIfAvailable();
+
         ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                 webClient,
                 metadataCache,
@@ -85,7 +90,9 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 applicationContext,
                 circuitBreakerRegistry,
                 retryRegistry,
-                bulkheadRegistry
+                bulkheadRegistry,
+                observer,
+                properties.getObservability()
         );
 
         log.info("Creating reactive HTTP client proxy for [{}] → {}", clientName, baseUrl);

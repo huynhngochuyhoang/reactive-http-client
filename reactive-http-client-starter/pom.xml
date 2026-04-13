@@ -61,6 +61,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Micrometer – optional; bring your own MeterRegistry / ObservationRegistry in consuming app -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Logging API (SLF4J) -->
         <dependency>
             <groupId>org.slf4j</groupId>

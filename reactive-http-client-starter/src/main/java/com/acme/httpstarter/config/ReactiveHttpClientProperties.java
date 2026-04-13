@@ -89,4 +89,63 @@ public class ReactiveHttpClientProperties {
         public long getTimeoutMs() { return timeoutMs; }
         public void setTimeoutMs(long timeoutMs) { this.timeoutMs = timeoutMs; }
     }
+
+    // ---- observability / metrics sub-config ----
+
+    /**
+     * Global observability settings (Micrometer metrics + tracing).
+     * <p>
+     * Example {@code application.yml}:
+     * <pre>{@code
+     * acme:
+     *   http:
+     *     observability:
+     *       enabled: true
+     *       metric-name: http.client.requests
+     *       include-url-path: true
+     *       log-request-body: false
+     * }</pre>
+     */
+    public static class ObservabilityConfig {
+
+        /** Master switch – set to {@code false} to disable all metrics/tracing. */
+        private boolean enabled = true;
+
+        /** Micrometer timer/counter name (default: {@code http.client.requests}). */
+        private String metricName = "http.client.requests";
+
+        /**
+         * Include the raw URL path as a tag.
+         * Disable for high-cardinality path templates with many distinct IDs.
+         */
+        private boolean includeUrlPath = true;
+
+        /** Log request body in span events (caution: PII / large payloads). */
+        private boolean logRequestBody = false;
+
+        /** Log response body in span events (caution: PII / large payloads). */
+        private boolean logResponseBody = false;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+        public String getMetricName() { return metricName; }
+        public void setMetricName(String metricName) { this.metricName = metricName; }
+
+        public boolean isIncludeUrlPath() { return includeUrlPath; }
+        public void setIncludeUrlPath(boolean includeUrlPath) { this.includeUrlPath = includeUrlPath; }
+
+        public boolean isLogRequestBody() { return logRequestBody; }
+        public void setLogRequestBody(boolean logRequestBody) { this.logRequestBody = logRequestBody; }
+
+        public boolean isLogResponseBody() { return logResponseBody; }
+        public void setLogResponseBody(boolean logResponseBody) { this.logResponseBody = logResponseBody; }
+    }
+
+    // ---- global observability config (not per-client) ----
+
+    private ObservabilityConfig observability = new ObservabilityConfig();
+
+    public ObservabilityConfig getObservability() { return observability; }
+    public void setObservability(ObservabilityConfig observability) { this.observability = observability; }
 }
