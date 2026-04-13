@@ -57,7 +57,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final Object bulkheadRegistry;
 
     // Observability – resolved lazily on first request to avoid ordering issues during
-    // context initialisation (the observer bean may not yet exist when this handler is constructed)
+    // context initialization (the observer bean may not yet exist when this handler is constructed)
     private final ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig;
     private volatile HttpClientObserver resolvedObserver;
     private volatile boolean observerResolved = false;
