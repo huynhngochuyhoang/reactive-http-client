@@ -96,6 +96,8 @@ acme:
         base-url: https://api.example.com
         connect-timeout-ms: 2000
         read-timeout-ms: 5000
+        codec-max-in-memory-size-mb: 2      # default 2MB; <=0 falls back to default
+        compression-enabled: false          # default false
         log-body: false                    # set true to log response status (caution: PII)
         resilience:
           enabled: true
@@ -147,7 +149,7 @@ public class UserService {
 
 ### Prerequisites
 
-- JDK 21+
+- JDK 17+
 - Maven 3.8+
 
 ### Build the entire project (from the root directory)

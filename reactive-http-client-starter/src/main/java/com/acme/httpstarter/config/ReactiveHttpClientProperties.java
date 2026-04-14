@@ -17,6 +17,8 @@ import java.util.Map;
  *         base-url: https://api.example.com
  *         connect-timeout-ms: 2000
  *         read-timeout-ms: 3000
+ *         codec-max-in-memory-size-mb: 2
+ *         compression-enabled: false
  *         log-body: false
  *         resilience:
  *           enabled: true
@@ -41,6 +43,8 @@ public class ReactiveHttpClientProperties {
         private String baseUrl;
         private int connectTimeoutMs = 2000;
         private int readTimeoutMs = 5000;
+        private int codecMaxInMemorySizeMb = 2;
+        private boolean compressionEnabled = false;
         private boolean logBody = false;
         private ResilienceConfig resilience = new ResilienceConfig();
 
@@ -52,6 +56,12 @@ public class ReactiveHttpClientProperties {
 
         public int getReadTimeoutMs() { return readTimeoutMs; }
         public void setReadTimeoutMs(int readTimeoutMs) { this.readTimeoutMs = readTimeoutMs; }
+
+        public int getCodecMaxInMemorySizeMb() { return codecMaxInMemorySizeMb; }
+        public void setCodecMaxInMemorySizeMb(int codecMaxInMemorySizeMb) { this.codecMaxInMemorySizeMb = codecMaxInMemorySizeMb; }
+
+        public boolean isCompressionEnabled() { return compressionEnabled; }
+        public void setCompressionEnabled(boolean compressionEnabled) { this.compressionEnabled = compressionEnabled; }
 
         public boolean isLogBody() { return logBody; }
         public void setLogBody(boolean logBody) { this.logBody = logBody; }
