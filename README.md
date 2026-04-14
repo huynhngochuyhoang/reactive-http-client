@@ -1,4 +1,4 @@
-# generic-http-client
+# reactive-http-client
 
 A **Spring Boot Starter** that provides a declarative, annotation-driven HTTP client layer for Spring WebFlux (reactive) applications, with built-in **Resilience4j** support for circuit-breaking, retries, bulkheads and timeouts.
 
@@ -9,7 +9,6 @@ A **Spring Boot Starter** that provides a declarative, annotation-driven HTTP cl
 | Module | Description |
 |---|---|
 | `reactive-http-client-starter` | Spring Boot auto-configuration, annotations and core proxy engine |
-| `demo-consumer` | Spring Boot demo application that uses the starter with WireMock tests |
 
 ---
 
@@ -32,7 +31,7 @@ A **Spring Boot Starter** that provides a declarative, annotation-driven HTTP cl
 
 ```xml
 <dependency>
-    <groupId>com.acme</groupId>
+    <groupId>io.github.huynhngochuyhoang</groupId>
     <artifactId>reactive-http-client-starter</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
@@ -138,7 +137,7 @@ public class UserService {
 
 ---
 
-## Running the demo-consumer
+## Build and Test
 
 ### Prerequisites
 
@@ -151,22 +150,13 @@ public class UserService {
 mvn clean install -DskipTests
 ```
 
-### Run the demo application
-
-```bash
-cd demo-consumer
-mvn spring-boot:run
-```
-
-The application starts on **port 8080** and is pre-configured to talk to `https://jsonplaceholder.typicode.com` as the upstream `user-service`.
-
-### Run the tests (WireMock)
+### Run the tests
 
 ```bash
 mvn test
 ```
 
-The integration tests in `UserApiClientWireMockTest` spin up a WireMock server on a random port, override `acme.http.clients.user-service.base-url` via `@DynamicPropertySource`, and verify the full request/response cycle using `StepVerifier`.
+This command runs tests for all modules in the repository.
 
 ---
 
@@ -229,7 +219,7 @@ userApiClient.getUser("unknown", null)
 ## Project Structure
 
 ```text
-generic-http-client/
+reactive-http-client/
 ├── pom.xml                                          # root multi-module POM
 ├── reactive-http-client-starter/
 │   ├── pom.xml
@@ -242,16 +232,6 @@ generic-http-client/
 │       │                     #   ArgumentResolver, UriTemplateExpander, ErrorDecoder
 │       ├── observability/    # HttpClientObserver, MicrometerHttpClientObserver
 │       └── exception/        # HttpClientException, RemoteServiceException
-└── demo-consumer/
-    ├── pom.xml
-    └── src/
-        ├── main/java/com/acme/demo/
-        │   ├── DemoConsumerApplication.java
-        │   ├── client/UserApiClient.java
-        │   ├── dto/           # UserDto, CreateUserRequest
-        │   └── service/       # UserService
-        └── test/java/com/acme/demo/
-            └── UserApiClientWireMockTest.java
 ```
 
 ---

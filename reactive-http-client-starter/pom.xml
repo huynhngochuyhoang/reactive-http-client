@@ -5,8 +5,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.acme</groupId>
-        <artifactId>generic-http-client</artifactId>
+        <groupId>io.github.huynhngochuyhoang</groupId>
+        <artifactId>reactive-http-client</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
