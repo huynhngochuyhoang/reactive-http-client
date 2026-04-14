@@ -8,6 +8,7 @@ import reactor.core.publisher.Mono;
 import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,6 +36,8 @@ class HeaderParamMapSupportTest {
         assertEquals("trace-123", resolved.headers().get("X-Trace-Id"));
         assertEquals("tenant-a", resolved.headers().get("X-Tenant"));
         assertFalse(resolved.headers().containsKey(""));
+        assertFalse(resolved.headers().containsKey("X-Null"));
+        assertTrue(resolved.headers().keySet().stream().noneMatch(Objects::isNull));
     }
 
     @Test
