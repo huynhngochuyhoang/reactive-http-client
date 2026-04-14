@@ -142,7 +142,7 @@ public class UserService {
 
 ### Prerequisites
 
-- JDK 17+
+- JDK 21+
 - Maven 3.8+
 
 ### Build the entire project (from the root directory)
