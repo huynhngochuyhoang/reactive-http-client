@@ -72,6 +72,12 @@ public interface UserApiClient {
         @HeaderParam("X-Tenant") String tenant
     );
 
+    @GET("/users/{id}")
+    Mono<UserDto> getUserWithHeaders(
+        @PathVar("id") String id,
+        @HeaderParam Map<String, String> headers
+    );
+
     @PUT("/users/{id}")
     Mono<UserDto> updateUser(@PathVar("id") String id, @Body UserDto body);
 
@@ -173,7 +179,7 @@ This command runs tests for all modules in the repository.
 | `@DELETE(path)` | Method | HTTP DELETE |
 | `@PathVar(name)` | Parameter | Substituted into the path template |
 | `@QueryParam(name)` | Parameter | Appended to the query string (null → omitted) |
-| `@HeaderParam(name)` | Parameter | Added as a request header (null → omitted) |
+| `@HeaderParam(name)` | Parameter | Added as a request header (null → omitted). For `Map` parameters, each map entry is added as a header (`value` optional). |
 | `@Body` | Parameter | Serialised as the JSON request body |
 
 ### Custom request/response logging hook

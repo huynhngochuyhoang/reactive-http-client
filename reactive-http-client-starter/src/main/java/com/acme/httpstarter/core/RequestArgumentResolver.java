@@ -44,6 +44,18 @@ public class RequestArgumentResolver {
                 headers.put(entry.getValue(), String.valueOf(args[idx]));
             }
         }
+        for (Integer idx : meta.getHeaderMapParams()) {
+            if (args != null && idx < args.length && args[idx] instanceof Map<?, ?> headerMap) {
+                for (Map.Entry<?, ?> headerEntry : headerMap.entrySet()) {
+                    if (headerEntry.getKey() != null && headerEntry.getValue() != null) {
+                        String key = String.valueOf(headerEntry.getKey());
+                        if (!key.isBlank()) {
+                            headers.put(key, String.valueOf(headerEntry.getValue()));
+                        }
+                    }
+                }
+            }
+        }
 
         if (meta.getBodyIndex() >= 0 && args != null && meta.getBodyIndex() < args.length) {
             body = args[meta.getBodyIndex()];

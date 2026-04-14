@@ -8,6 +8,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -43,6 +44,7 @@ public class MethodMetadataCache {
 
         // ---- Parameters ----
         Annotation[][] paramAnnotations = method.getParameterAnnotations();
+        Class<?>[] parameterTypes = method.getParameterTypes();
         for (int i = 0; i < paramAnnotations.length; i++) {
             for (Annotation ann : paramAnnotations[i]) {
                 if (ann instanceof PathVar pv) {
@@ -50,7 +52,14 @@ public class MethodMetadataCache {
                 } else if (ann instanceof QueryParam qp) {
                     meta.getQueryParams().put(i, qp.value());
                 } else if (ann instanceof HeaderParam hp) {
-                    meta.getHeaderParams().put(i, hp.value());
+                    if (Map.class.isAssignableFrom(parameterTypes[i])) {
+                        meta.getHeaderMapParams().add(i);
+                    } else {
+                        if (hp.value() == null || hp.value().isBlank()) {
+                            throw new IllegalArgumentException("@HeaderParam value must not be blank for non-Map parameter: " + method);
+                        }
+                        meta.getHeaderParams().put(i, hp.value());
+                    }
                 } else if (ann instanceof Body) {
                     meta.setBodyIndex(i);
                 }

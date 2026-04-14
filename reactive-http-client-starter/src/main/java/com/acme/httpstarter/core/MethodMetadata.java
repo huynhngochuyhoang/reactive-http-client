@@ -3,7 +3,9 @@ package com.acme.httpstarter.core;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Parsed metadata for a single method on a {@code @ReactiveHttpClient} interface.
@@ -21,6 +23,8 @@ public class MethodMetadata {
 
     /** index → header name */
     private final Map<Integer, String> headerParams = new HashMap<>();
+    /** parameter indexes of map-based headers */
+    private final Set<Integer> headerMapParams = new HashSet<>();
 
     /** parameter index of the @Body argument, or -1 if absent */
     private int bodyIndex = -1;
@@ -46,6 +50,7 @@ public class MethodMetadata {
     public Map<Integer, String> getPathVars() { return pathVars; }
     public Map<Integer, String> getQueryParams() { return queryParams; }
     public Map<Integer, String> getHeaderParams() { return headerParams; }
+    public Set<Integer> getHeaderMapParams() { return headerMapParams; }
 
     public int getBodyIndex() { return bodyIndex; }
     public void setBodyIndex(int bodyIndex) { this.bodyIndex = bodyIndex; }
