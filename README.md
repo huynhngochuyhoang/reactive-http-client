@@ -90,7 +90,7 @@ public interface UserApiClient {
 ### 4. Configure in `application.yml`
 
 ```yaml
-acme:
+reactive:
   http:
     clients:
       user-service:                        # matches @ReactiveHttpClient(name = "user-service")
@@ -301,7 +301,7 @@ reactive-http-client/
 ├── pom.xml                                          # root multi-module POM
 ├── reactive-http-client-starter/
 │   ├── pom.xml
-│   └── src/main/java/com/acme/httpstarter/
+│   └── src/main/java/io/github/huynhngochuyhoang/httpstarter/
 │       ├── annotation/       # @ReactiveHttpClient, @GET, @POST, @PUT, @DELETE,
 │       │                     #   @PathVar, @QueryParam, @HeaderParam, @Body
 │       ├── enable/           # @EnableReactiveHttpClients
@@ -341,7 +341,7 @@ Configure resilience **per client** in `application.yml`.
 This keeps all policy settings in one place and avoids scattered annotations.
 
 ```yaml
-acme:
+reactive:
   http:
     clients:
       user-service:
@@ -531,7 +531,7 @@ registers a `MicrometerHttpClientObserver` bean that fires after each request.
 ### Configuration Reference
 
 ```yaml
-acme:
+reactive:
   http:
     observability:
       enabled: true              # master switch (default: true)

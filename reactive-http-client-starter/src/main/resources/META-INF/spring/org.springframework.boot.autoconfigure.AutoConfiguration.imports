@@ -1,1 +1,1 @@
-com.acme.httpstarter.config.ReactiveHttpClientAutoConfiguration
+io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientAutoConfiguration
