@@ -205,7 +205,7 @@ Add these repository secrets:
 
 Publishing is implemented in:
 
-`/home/runner/work/reactive-http-client/reactive-http-client/.github/workflows/publish-maven-central.yml`
+`.github/workflows/publish-maven-central.yml`
 
 Behavior:
 
