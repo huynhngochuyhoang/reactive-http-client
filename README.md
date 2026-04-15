@@ -169,6 +169,74 @@ This command runs tests for all modules in the repository.
 
 ---
 
+## Publish to Maven Central (Current Central Portal Flow)
+
+This project is configured for **Sonatype Central Portal** publishing (modern flow), not the legacy OSSRH/Nexus staging endpoints.
+
+### Central Portal vs Legacy OSSRH (What changed)
+
+| Topic | Legacy OSSRH / Nexus Staging | Central Portal (current) |
+|---|---|---|
+| Primary endpoint model | `oss.sonatype.org` / `s01.oss.sonatype.org` staging repos | `central.sonatype.com` portal + publisher API |
+| Maven publishing approach | `maven-deploy-plugin` + `nexus-staging-maven-plugin` | `org.sonatype.central:central-publishing-maven-plugin` |
+| Credentials | OSSRH user/password (or token) | Central Portal user token (`username` + `token`) |
+| First-time setup | JIRA ticket workflow (historically common) | Namespace claim in Central Portal UI |
+
+> GitHub Actions docs now explicitly warn older examples are OSSRH legacy and point to Central Portal publishing guidance.
+
+### One-time setup in Sonatype Central Portal
+
+1. Create/sign in to your account in Sonatype Central Portal.
+2. Claim/verify your namespace (groupId ownership).  
+   For this repo, `io.github.huynhngochuyhoang` should map to your GitHub identity/namespace claim in the portal.
+3. Create a **user token** in the portal (token username + token password).
+4. Create/export a GPG key pair used for artifact signing.
+
+### GitHub repository secrets required
+
+Add these repository secrets:
+
+- `MAVEN_CENTRAL_USERNAME` (Central Portal token username)
+- `MAVEN_CENTRAL_TOKEN` (Central Portal token password)
+- `MAVEN_GPG_PRIVATE_KEY` (ASCII-armored private key, including BEGIN/END lines)
+- `MAVEN_GPG_PASSPHRASE` (passphrase for the private key)
+
+### Release workflow
+
+Publishing is implemented in:
+
+`/home/runner/work/reactive-http-client/reactive-http-client/.github/workflows/publish-maven-central.yml`
+
+Behavior:
+
+1. Trigger on GitHub Release `published` (or manual `workflow_dispatch`).
+2. Run `mvn verify`.
+3. Import GPG key via `actions/setup-java`.
+4. Run `mvn -Prelease deploy` using the Central Portal publishing plugin.
+
+### Local release dry-run checklist
+
+```bash
+# from repository root
+mvn clean verify
+mvn -Prelease -DskipTests package
+```
+
+If those pass, publish by creating a GitHub Release for a non-`-SNAPSHOT` version tag.
+
+### Maven requirements this project satisfies
+
+- Sources JAR and Javadoc JAR are attached.
+- Artifacts are signed with GPG in `release` profile.
+- Required POM metadata is present: `name`, `description`, `url`, `licenses`, `developers`, `scm`.
+
+### Security note (modern GPG practice)
+
+Do not commit keys/passphrases or place plaintext secrets in `pom.xml`.  
+Use CI secrets + ephemeral import (as done by `actions/setup-java`) and keep local secrets in your secure keychain / `gpg-agent`.
+
+---
+
 ## Annotation Reference
 
 | Annotation | Target | Description |
