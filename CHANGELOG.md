@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in addition to the existing `getStatusCode()` and `getResponseBody()` methods.
   All existing constructors and method signatures are **backward-compatible**.
 
+### Fixed
+
+- Fixed an issue where `X-Correlation-Id` was not forwarded on outbound reactive
+  HTTP client calls.
+
 ---
 
 ## [1.0.0] – 2025-04-10
