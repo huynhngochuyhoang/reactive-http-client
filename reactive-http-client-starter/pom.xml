@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.huynhngochuyhoang</groupId>
         <artifactId>reactive-http-client</artifactId>
-        <version>1.0.0</version>
+        <version>1.1.0</version>
     </parent>
 
     <artifactId>reactive-http-client-starter</artifactId>

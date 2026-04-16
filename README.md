@@ -33,7 +33,7 @@ A **Spring Boot Starter** that provides a declarative, annotation-driven HTTP cl
 <dependency>
     <groupId>io.github.huynhngochuyhoang</groupId>
     <artifactId>reactive-http-client-starter</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
