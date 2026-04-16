@@ -9,8 +9,6 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
-
 /**
  * {@link WebFilter} that captures the inbound {@code X-Correlation-Id} header
  * and stores it in the Reactor {@link reactor.util.context.Context} so it can be
@@ -34,9 +32,8 @@ public class CorrelationIdWebFilter implements WebFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        List<String> values = exchange.getRequest().getHeaders().get(CORRELATION_ID_HEADER);
-        if (values != null && !values.isEmpty()) {
-            String correlationId = values.get(0);
+        String correlationId = exchange.getRequest().getHeaders().getFirst(CORRELATION_ID_HEADER);
+        if (correlationId != null) {
             return chain.filter(exchange)
                     .contextWrite(ctx -> ctx.put(CORRELATION_ID_CONTEXT_KEY, correlationId));
         }

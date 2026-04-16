@@ -59,7 +59,7 @@ class CorrelationIdWebFilterTest {
     }
 
     @Test
-    void shouldPassThroughChainUnaffectedWhenHeaderAbsent() {
+    void shouldInvokeChainWhenHeaderAbsent() {
         MockServerHttpRequest request = MockServerHttpRequest.get("/test").build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
