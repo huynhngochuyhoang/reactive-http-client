@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
  *   <tr>
  *     <td>{@code http.client.requests} (configurable)</td>
  *     <td>Timer (also exposes count + sum)</td>
- *     <td>client.name, api.name, http.method, uri, http.status_code, outcome, exception</td>
+ *     <td>client.name, api.name, http.method, uri, http.status_code, outcome, exception, error.category</td>
  *   </tr>
  * </table>
  *
@@ -35,6 +35,8 @@ import java.util.concurrent.TimeUnit;
  *       when the response was never received.</li>
  *   <li><b>outcome</b> – one of SUCCESS, CLIENT_ERROR, SERVER_ERROR, UNKNOWN.</li>
  *   <li><b>exception</b> – simple class name of the error, or {@code none}.</li>
+ *   <li><b>error.category</b> – one of {@code RATE_LIMITED}, {@code CLIENT_ERROR}, {@code SERVER_ERROR},
+ *       {@code TIMEOUT}, {@code CANCELLED}, {@code UNKNOWN}, or {@code none} for successful calls.</li>
  * </ul>
  *
  * <p>This bean is auto-configured by
@@ -102,6 +104,9 @@ public class MicrometerHttpClientObserver implements HttpClientObserver {
         String exception = event.getError() != null
                 ? event.getError().getClass().getSimpleName()
                 : "none";
+        String errorCategory = event.getErrorCategory() != null
+                ? event.getErrorCategory().name()
+                : "none";
 
         return Tags.of(
                 Tag.of("client.name", event.getClientName()),
@@ -110,7 +115,8 @@ public class MicrometerHttpClientObserver implements HttpClientObserver {
                 Tag.of("uri", uri),
                 Tag.of("http.status_code", statusCode),
                 Tag.of("outcome", outcome),
-                Tag.of("exception", exception)
+                Tag.of("exception", exception),
+                Tag.of("error.category", errorCategory)
         );
     }
 

@@ -279,25 +279,184 @@ public interface UserApiClient {
 
 ## Error Handling
 
-| HTTP Status | Exception | Description |
-|---|---|---|
-| 4xx | `HttpClientException` | Contains `statusCode` and `responseBody` |
-| 5xx | `RemoteServiceException` | Contains `statusCode` and `responseBody` |
+Every HTTP error is translated by `DefaultErrorDecoder` into a typed exception with a consistent contract.
+
+### Exception types and `ErrorCategory`
+
+| HTTP Status | Exception | `ErrorCategory` | Description |
+|---|---|---|---|
+| 429 | `HttpClientException` | `RATE_LIMITED` | Too many requests; back off and retry |
+| Other 4xx | `HttpClientException` | `CLIENT_ERROR` | Request problem (bad input, not found, unauthorized, …) |
+| 5xx | `RemoteServiceException` | `SERVER_ERROR` | Transient or persistent upstream failure |
+| Timeout | `java.util.concurrent.TimeoutException` | – | No response within configured timeout |
+
+Both `HttpClientException` and `RemoteServiceException` expose:
+
+| Method | Description |
+|---|---|
+| `getStatusCode()` | Raw HTTP status code (e.g., `404`, `503`) |
+| `getResponseBody()` | Raw response body string (may be empty) |
+| `getErrorCategory()` | High-level `ErrorCategory` enum value |
+| `getMessage()` | Human-readable summary (`"HTTP client error 404: …"`) |
+| `getCause()` | Underlying cause if set (available via constructors that accept `Throwable`) |
+
+### Handling specific categories
 
 ```java
-userApiClient.getUser("unknown", null)
-    .onErrorResume(HttpClientException.class, ex -> {
-        log.warn("Client error {}: {}", ex.getStatusCode(), ex.getResponseBody());
+// Handle by category (recommended – avoids hard-coding status codes)
+userApiClient.getUser(id, null)
+    .onErrorResume(HttpClientException.class, ex -> switch (ex.getErrorCategory()) {
+        case RATE_LIMITED -> {
+            log.warn("Rate limited – backing off");
+            yield Mono.error(new RateLimitException(ex));
+        }
+        case CLIENT_ERROR -> {
+            log.warn("Client error {}: {}", ex.getStatusCode(), ex.getResponseBody());
+            yield Mono.empty();
+        }
+        default -> Mono.error(ex);
+    })
+    .onErrorResume(RemoteServiceException.class, ex -> {
+        log.error("Remote service {} error: {}", ex.getStatusCode(), ex.getResponseBody());
+        return fallback();
+    });
+```
+
+### Handling timeouts
+
+```java
+userApiClient.getUser(id, null)
+    .onErrorResume(java.util.concurrent.TimeoutException.class, ex -> {
+        log.warn("Request timed out for user {}", id);
         return Mono.empty();
     });
 ```
 
+### Handling cancellation
+
+```java
+// Reactor propagates CancellationException; subscribe-side cancellation via dispose()
+Disposable subscription = userApiClient.getUser(id, null)
+    .subscribe(
+        user -> process(user),
+        err  -> handleError(err)
+    );
+
+// Cancel from another thread/signal
+subscription.dispose();
+```
+
 ---
+
+## Advanced Usage Patterns
+
+### Timeout configuration (three levels of precedence)
+
+Timeout resolution priority (highest → lowest):
+
+1. **`@TimeoutMs` on the method** – overrides everything for that single API method.
+2. **`read-timeout-ms` per client** (in `application.yml`).
+3. **`resilience.timeout-ms`** per client (used when `read-timeout-ms` is `0`).
+
+```java
+@ReactiveHttpClient(name = "payment-service")
+public interface PaymentApiClient {
+
+    // Uses client-level read-timeout-ms (default 5 000 ms)
+    @GET("/payments/{id}")
+    Mono<PaymentDto> getPayment(@PathVar("id") String id);
+
+    // Explicit 2 000 ms override for this critical path
+    @GET("/payments/status/{id}")
+    @TimeoutMs(2000)
+    Mono<PaymentStatusDto> getPaymentStatus(@PathVar("id") String id);
+
+    // Disable timeout for this long-running export (0 = no timeout)
+    @GET("/payments/export")
+    @TimeoutMs(0)
+    Flux<PaymentDto> exportPayments();
+}
+```
+
+### Retry with back-off (Resilience4j)
+
+```java
+// application.yml – enable retry only for specific client
+reactive:
+  http:
+    clients:
+      payment-service:
+        base-url: https://payments.example.com
+        read-timeout-ms: 5000
+        resilience:
+          enabled: true
+          retry: payment-service
+
+resilience4j:
+  retry:
+    instances:
+      payment-service:
+        max-attempts: 3
+        wait-duration: 300ms
+        retry-exceptions:
+          - java.util.concurrent.TimeoutException
+          - io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException
+```
+
+> **Note:** By default, retries are applied only to `GET` and `HEAD` requests to avoid
+> accidentally re-submitting non-idempotent writes. Use service-layer `@Retry` annotations
+> for POST/PUT/DELETE.
+
+### Error recovery and fallback
+
+```java
+@Service
+public class ProductService {
+
+    private final ProductApiClient client;
+
+    public Mono<ProductDto> getProductWithFallback(String id) {
+        return client.getProduct(id)
+            .onErrorResume(RemoteServiceException.class, ex ->
+                // Serve stale data from cache on 5xx
+                cache.get(id).defaultIfEmpty(ProductDto.unknown(id)))
+            .onErrorResume(HttpClientException.class, ex ->
+                ex.getErrorCategory() == ErrorCategory.RATE_LIMITED
+                    ? Mono.error(new RateLimitException("Product service rate-limited"))
+                    : Mono.error(ex));
+    }
+}
+```
+
+### Propagating context (correlation IDs)
+
+The starter automatically forwards `X-Correlation-Id` from MDC.  
+To propagate additional context headers dynamically, use `@HeaderParam Map<String, String>`:
+
+```java
+@ReactiveHttpClient(name = "order-service")
+public interface OrderApiClient {
+
+    @POST("/orders")
+    Mono<OrderDto> createOrder(
+        @Body CreateOrderRequest body,
+        @HeaderParam Map<String, String> contextHeaders  // forwarded as-is
+    );
+}
+
+// In your service:
+Map<String, String> headers = Map.of(
+    "X-Tenant-Id",   tenantId,
+    "X-Request-Id",  requestId
+);
+orderApiClient.createOrder(request, headers);
+```
 
 ## Project Structure
 
 ```text
 reactive-http-client/
+├── CHANGELOG.md
 ├── pom.xml                                          # root multi-module POM
 ├── reactive-http-client-starter/
 │   ├── pom.xml
@@ -309,7 +468,8 @@ reactive-http-client/
 │       ├── core/             # FactoryBean, InvocationHandler, MetadataCache,
 │       │                     #   ArgumentResolver, UriTemplateExpander, ErrorDecoder
 │       ├── observability/    # HttpClientObserver, MicrometerHttpClientObserver
-│       └── exception/        # HttpClientException, RemoteServiceException
+│       └── exception/        # HttpClientException, RemoteServiceException,
+│                             #   ErrorCategory
 ```
 
 ---
@@ -527,6 +687,7 @@ registers a `MicrometerHttpClientObserver` bean that fires after each request.
 | `http.status_code` | `200`, `404`, `500` | HTTP response status, or `CLIENT_ERROR` / `UNKNOWN` on network failure |
 | `outcome` | `SUCCESS`, `CLIENT_ERROR`, `SERVER_ERROR`, `UNKNOWN` | Derived from status code |
 | `exception` | `none`, `HttpClientException` | Simple class name of the error, or `none` |
+| `error.category` | `none`, `RATE_LIMITED`, `TIMEOUT`, `SERVER_ERROR` | Normalized failure category from `ErrorCategory` (`none` for success) |
 
 ### Configuration Reference
 
