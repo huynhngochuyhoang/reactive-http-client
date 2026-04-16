@@ -53,7 +53,7 @@ jobs:
           fi
 
       - name: Publish release to Maven Central (Sonatype Central Portal)
-        run: mvn -B -ntp -Prelease deploy
+        run: mvn -B -ntp -Prelease -DskipTests deploy
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}

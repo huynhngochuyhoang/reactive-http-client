@@ -105,7 +105,7 @@ reactive:
           circuit-breaker: user-service    # Resilience4j instance name
           retry: user-service
           bulkhead: user-service
-          timeout-ms: 3000
+          timeout-ms: 0                    # default 0 (disabled)
 
 # Optional: Resilience4j fine-tuning
 resilience4j:
@@ -332,7 +332,7 @@ raw WebClient call
   → circuit-breaker (fail-fast if open)
   → retry (for GET/HEAD by default)
   → bulkhead (limit concurrent calls)
-  → timeout (method-level `@TimeoutMs`, else resilience timeout-ms, else client read-timeout-ms)
+  → timeout (method-level `@TimeoutMs`, else client read-timeout-ms, else resilience timeout-ms)
 ```
 
 ### Starter-level Configuration (Recommended)

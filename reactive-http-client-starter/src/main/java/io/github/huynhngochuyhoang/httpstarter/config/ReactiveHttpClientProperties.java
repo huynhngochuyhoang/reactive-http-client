@@ -25,7 +25,7 @@ import java.util.Map;
  *           circuit-breaker: default
  *           retry: default
  *           bulkhead: default
- *           timeout-ms: 3000
+         *           timeout-ms: 0
  * }</pre>
  */
 @ConfigurationProperties(prefix = "reactive.http")
@@ -82,7 +82,7 @@ public class ReactiveHttpClientProperties {
         /** Name of the Resilience4j Bulkhead instance. */
         private String bulkhead = "default";
         /** Request timeout in milliseconds (0 = disabled). */
-        private long timeoutMs = 3000;
+        private long timeoutMs = 0;
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
