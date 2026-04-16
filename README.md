@@ -687,6 +687,7 @@ registers a `MicrometerHttpClientObserver` bean that fires after each request.
 | `http.status_code` | `200`, `404`, `500` | HTTP response status, or `CLIENT_ERROR` / `UNKNOWN` on network failure |
 | `outcome` | `SUCCESS`, `CLIENT_ERROR`, `SERVER_ERROR`, `UNKNOWN` | Derived from status code |
 | `exception` | `none`, `HttpClientException` | Simple class name of the error, or `none` |
+| `error.category` | `none`, `RATE_LIMITED`, `TIMEOUT`, `SERVER_ERROR` | Normalized failure category from `ErrorCategory` (`none` for success) |
 
 ### Configuration Reference
 

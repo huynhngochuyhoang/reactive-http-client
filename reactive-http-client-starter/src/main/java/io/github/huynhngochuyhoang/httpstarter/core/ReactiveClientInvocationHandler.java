@@ -1,6 +1,9 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
+import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
+import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.slf4j.Logger;
@@ -22,7 +25,9 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -552,12 +557,45 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     statusCode != null ? statusCode.value() : null,
                     System.currentTimeMillis() - startMs,
                     error,
+                    resolveErrorCategory(statusCode, error),
                     logBody ? resolved.body() : null,
                     logRespBody ? responseBody : null
             ));
         } catch (Exception e) {
             log.warn("HttpClientObserver threw an exception – ignoring: {}", e.getMessage());
         }
+    }
+
+    private ErrorCategory resolveErrorCategory(HttpStatusCode statusCode, Throwable error) {
+        if (error instanceof HttpClientException httpClientException) {
+            return httpClientException.getErrorCategory();
+        }
+        if (error instanceof RemoteServiceException remoteServiceException) {
+            return remoteServiceException.getErrorCategory();
+        }
+        if (error instanceof TimeoutException) {
+            return ErrorCategory.TIMEOUT;
+        }
+        if (error instanceof CancellationException) {
+            return ErrorCategory.CANCELLED;
+        }
+        if (statusCode != null) {
+            int code = statusCode.value();
+            if (code == 429) {
+                return ErrorCategory.RATE_LIMITED;
+            }
+            if (code >= 400 && code < 500) {
+                return ErrorCategory.CLIENT_ERROR;
+            }
+            if (code >= 500) {
+                return ErrorCategory.SERVER_ERROR;
+            }
+            return null;
+        }
+        if (error != null) {
+            return ErrorCategory.UNKNOWN;
+        }
+        return null;
     }
 
 }

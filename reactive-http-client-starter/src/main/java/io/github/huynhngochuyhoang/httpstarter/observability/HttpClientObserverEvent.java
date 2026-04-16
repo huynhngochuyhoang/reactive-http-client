@@ -1,5 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.observability;
 
+import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
+
 /**
  * Immutable data class carrying all observable data for a single HTTP exchange.
  *
@@ -15,6 +17,7 @@ public final class HttpClientObserverEvent {
     private final Integer statusCode;
     private final long durationMs;
     private final Throwable error;
+    private final ErrorCategory errorCategory;
     private final Object requestBody;
     private final Object responseBody;
 
@@ -28,6 +31,20 @@ public final class HttpClientObserverEvent {
             Throwable error,
             Object requestBody,
             Object responseBody) {
+        this(clientName, apiName, httpMethod, uriPath, statusCode, durationMs, error, null, requestBody, responseBody);
+    }
+
+    public HttpClientObserverEvent(
+            String clientName,
+            String apiName,
+            String httpMethod,
+            String uriPath,
+            Integer statusCode,
+            long durationMs,
+            Throwable error,
+            ErrorCategory errorCategory,
+            Object requestBody,
+            Object responseBody) {
         this.clientName = clientName;
         this.apiName = apiName;
         this.httpMethod = httpMethod;
@@ -35,6 +52,7 @@ public final class HttpClientObserverEvent {
         this.statusCode = statusCode;
         this.durationMs = durationMs;
         this.error = error;
+        this.errorCategory = errorCategory;
         this.requestBody = requestBody;
         this.responseBody = responseBody;
     }
@@ -64,6 +82,9 @@ public final class HttpClientObserverEvent {
     /** Non-null when the exchange ended with an error (network failure, timeout, error-decoded exception, …). */
     public Throwable getError() { return error; }
 
+    /** High-level error category when available; {@code null} for successful calls. */
+    public ErrorCategory getErrorCategory() { return errorCategory; }
+
     /** The serialised request body (may be {@code null} for GET/DELETE). */
     public Object getRequestBody() { return requestBody; }
 
@@ -83,6 +104,7 @@ public final class HttpClientObserverEvent {
                 ", statusCode=" + statusCode +
                 ", durationMs=" + durationMs +
                 ", error=" + (error != null ? error.getClass().getSimpleName() : "none") +
+                ", errorCategory=" + (errorCategory != null ? errorCategory.name() : "none") +
                 '}';
     }
 }
