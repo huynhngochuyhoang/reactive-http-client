@@ -9,7 +9,7 @@ Spring Boot starter để tạo **declarative reactive HTTP client** (WebFlux) t
 - error decoding
 - Resilience4j hooks (optional)
 - Micrometer observability (optional)
-- correlation-id propagation
+- Correlation ID propagation
 
 ---
 
@@ -43,12 +43,12 @@ Spring Boot starter để tạo **declarative reactive HTTP client** (WebFlux) t
 
 ## 2) Quick Start (nhìn vào là chạy được)
 
-## Yêu cầu
+### 2.1 Yêu cầu
 - Java 17+
 - Spring Boot 3.x
 - Maven 3.8+
 
-## Bước 1: Thêm dependency starter
+### 2.2 Bước 1: Thêm dependency starter
 
 ```xml
 <dependency>
@@ -60,7 +60,7 @@ Spring Boot starter để tạo **declarative reactive HTTP client** (WebFlux) t
 
 Trong app WebFlux, cần có `spring-boot-starter-webflux`.
 
-## Bước 2: Enable scanning
+### 2.3 Bước 2: Enable scanning
 
 ```java
 @SpringBootApplication
@@ -72,7 +72,7 @@ public class MyApp {
 }
 ```
 
-## Bước 3: Khai báo client interface
+### 2.4 Bước 3: Khai báo client interface
 
 ```java
 @ReactiveHttpClient(name = "user-service")
@@ -94,7 +94,7 @@ public interface UserApiClient {
 }
 ```
 
-## Bước 4: Cấu hình `application.yml`
+### 2.5 Bước 4: Cấu hình `application.yml`
 
 ```yaml
 reactive:
@@ -115,7 +115,7 @@ reactive:
           timeout-ms: 0
 ```
 
-## Bước 5: Inject và dùng
+### 2.6 Bước 5: Inject và dùng
 
 ```java
 @Service
