@@ -127,6 +127,7 @@ reactive:
 
 Each external client can map to its own `AuthProvider` bean via `auth-provider`.
 The provider returns an `AuthContext` that can inject headers and query params automatically via WebClient filter.
+For body-signing use cases (e.g. HMAC), providers can read `request.requestBody()` from `AuthRequest`.
 
 ```java
 @Bean("userServiceAuthProvider")
@@ -135,6 +136,18 @@ AuthProvider userServiceAuthProvider(TokenService tokenService) {
             .map(token -> AuthContext.builder()
                     .header("Authorization", "Bearer " + token)
                     .build());
+}
+```
+
+```java
+@Bean("hmacAuthProvider")
+AuthProvider hmacAuthProvider(HmacSigner signer) {
+    return request -> Mono.fromSupplier(() -> {
+        String signature = signer.sign(request.requestBody());
+        return AuthContext.builder()
+                .header("X-Signature", signature)
+                .build();
+    });
 }
 ```
 
