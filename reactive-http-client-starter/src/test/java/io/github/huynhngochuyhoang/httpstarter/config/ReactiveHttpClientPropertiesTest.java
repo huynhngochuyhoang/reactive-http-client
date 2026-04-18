@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class ReactiveHttpClientPropertiesTest {
 
@@ -18,5 +19,6 @@ class ReactiveHttpClientPropertiesTest {
         assertEquals(2, config.getCodecMaxInMemorySizeMb());
         assertFalse(config.isCompressionEnabled());
         assertFalse(config.isLogBody());
+        assertNull(config.getAuthProvider());
     }
 }

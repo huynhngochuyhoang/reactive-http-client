@@ -10,6 +10,7 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 - optional Resilience4j integration
 - optional Micrometer observability
 - correlation ID propagation
+- outbound auth strategy per client (OAuth2/API key/HMAC/custom)
 
 ---
 
@@ -34,7 +35,7 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 
 #### Must be handled at the application level for production
 
-1. **Outbound auth standardization**: shared OAuth2/JWT/API key strategy instead of per-service custom logic
+1. **Outbound auth standardization**: configure `AuthProvider` strategy per external client (OAuth2/JWT/API key/HMAC/custom)
 2. **Network hardening policy**: clear proxy, SSL/mTLS, and connection pool tuning rules by environment
 3. **PII-safe logging policy**: redaction/masking strategy when body logging is enabled
 4. **Production runbook**: clear response playbook for rising errors/timeouts/circuit-open events
@@ -108,6 +109,7 @@ reactive:
     clients:
       user-service:
         base-url: https://api.example.com
+        auth-provider: userServiceAuthProvider
         connect-timeout-ms: 2000
         read-timeout-ms: 5000
         codec-max-in-memory-size-mb: 2
@@ -119,6 +121,21 @@ reactive:
           retry: user-service
           bulkhead: user-service
           timeout-ms: 0
+```
+
+### 2.5.1 Outbound auth provider (per client)
+
+Each external client can map to its own `AuthProvider` bean via `auth-provider`.
+The provider returns an `AuthContext` that can inject headers and query params automatically via WebClient filter.
+
+```java
+@Bean("userServiceAuthProvider")
+AuthProvider userServiceAuthProvider(TokenService tokenService) {
+    return request -> tokenService.getAccessToken()
+            .map(token -> AuthContext.builder()
+                    .header("Authorization", "Bearer " + token)
+                    .build());
+}
 ```
 
 ### 2.6 Inject and use

@@ -1,6 +1,8 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
@@ -13,6 +15,7 @@ import org.springframework.context.ApplicationContextAware;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.lang.NonNull;
 import org.springframework.util.StringUtils;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -63,7 +66,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                             + "or use @ReactiveHttpClient(name=\"" + clientName + "\", baseUrl=\"...\")");
         }
 
-        WebClient webClient = buildWebClient(baseUrl, config);
+        AuthProvider authProvider = resolveAuthProvider(clientName, config);
+        WebClient webClient = buildWebClient(baseUrl, config, clientName, authProvider);
 
         MethodMetadataCache metadataCache = applicationContext
                 .getBeanProvider(MethodMetadataCache.class)
@@ -136,7 +140,10 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     // Internal helpers
     // -------------------------------------------------------------------------
 
-    private WebClient buildWebClient(String baseUrl, ReactiveHttpClientProperties.ClientConfig config) {
+    private WebClient buildWebClient(String baseUrl,
+                                     ReactiveHttpClientProperties.ClientConfig config,
+                                     String clientName,
+                                     AuthProvider authProvider) {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, config.getConnectTimeoutMs())
                 .compress(config.isCompressionEnabled());
@@ -150,6 +157,10 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(resolveCodecMaxInMemorySizeBytes(config)))
                 .filter(correlationIdFilter());
+
+        if (authProvider != null) {
+            configured = configured.filter(new OutboundAuthFilter(clientName, authProvider));
+        }
 
         if (config.isLogBody()) {
             configured = configured.filter(loggingFilter());
@@ -189,6 +200,18 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             return applicationContext.getBeanProvider(clazz).getIfAvailable();
         } catch (ClassNotFoundException ignored) {
             return null;
+        }
+    }
+
+    private AuthProvider resolveAuthProvider(String clientName, ReactiveHttpClientProperties.ClientConfig config) {
+        if (config == null || !StringUtils.hasText(config.getAuthProvider())) {
+            return null;
+        }
+        try {
+            return applicationContext.getBean(config.getAuthProvider(), AuthProvider.class);
+        } catch (NoSuchBeanDefinitionException ex) {
+            throw new IllegalStateException(
+                    "No AuthProvider bean named '" + config.getAuthProvider() + "' configured for client '" + clientName + "'", ex);
         }
     }
 }
