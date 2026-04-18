@@ -20,6 +20,7 @@ import java.util.Map;
  *         codec-max-in-memory-size-mb: 2
  *         compression-enabled: false
  *         log-body: false
+ *         auth-provider: userServiceAuthProvider
  *         resilience:
  *           enabled: false
  *           circuit-breaker: default
@@ -46,6 +47,11 @@ public class ReactiveHttpClientProperties {
         private int codecMaxInMemorySizeMb = 2;
         private boolean compressionEnabled = false;
         private boolean logBody = false;
+        /**
+         * Bean name of {@code AuthProvider} to use for this client.
+         * Empty means no automatic auth injection.
+         */
+        private String authProvider;
         private ResilienceConfig resilience = new ResilienceConfig();
 
         public String getBaseUrl() { return baseUrl; }
@@ -65,6 +71,9 @@ public class ReactiveHttpClientProperties {
 
         public boolean isLogBody() { return logBody; }
         public void setLogBody(boolean logBody) { this.logBody = logBody; }
+
+        public String getAuthProvider() { return authProvider; }
+        public void setAuthProvider(String authProvider) { this.authProvider = authProvider; }
 
         public ResilienceConfig getResilience() { return resilience; }
         public void setResilience(ResilienceConfig resilience) { this.resilience = resilience; }

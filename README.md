@@ -10,6 +10,7 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 - optional Resilience4j integration
 - optional Micrometer observability
 - correlation ID propagation
+- outbound auth strategy per client (OAuth2/API key/HMAC/custom)
 
 ---
 
@@ -26,7 +27,7 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 | Timeout / error contract | ✅ Good | Error categorization and timeout precedence are defined |
 | Resilience (CB/Retry/Bulkhead) | ✅ Good (opt-in) | Integrated; retry defaults to GET/HEAD |
 | Metrics/tracing hooks | ✅ Good (opt-in) | Micrometer observer and stable tags are available |
-| Enterprise security/auth | ⚠️ Partial gap | No built-in auth/token refresh/mTLS/proxy policy layer |
+| Enterprise security/auth | ⚠️ Partial gap | Built-in outbound auth + token refresh helper available; mTLS/proxy policy remains app-level |
 | Operational hardening (governance) | ⚠️ Partial gap | More production guardrails/runbook guidance needed |
 | Integration/contract testing sample | ⚠️ Gap | Starter currently focuses on unit-level test coverage |
 
@@ -34,7 +35,7 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 
 #### Must be handled at the application level for production
 
-1. **Outbound auth standardization**: shared OAuth2/JWT/API key strategy instead of per-service custom logic
+1. **Outbound auth standardization**: use built-in `RefreshingBearerAuthProvider` for bearer token rotation/refresh, or custom `AuthProvider` for OAuth2/JWT/API key/HMAC
 2. **Network hardening policy**: clear proxy, SSL/mTLS, and connection pool tuning rules by environment
 3. **PII-safe logging policy**: redaction/masking strategy when body logging is enabled
 4. **Production runbook**: clear response playbook for rising errors/timeouts/circuit-open events
@@ -108,6 +109,7 @@ reactive:
     clients:
       user-service:
         base-url: https://api.example.com
+        auth-provider: userServiceAuthProvider
         connect-timeout-ms: 2000
         read-timeout-ms: 5000
         codec-max-in-memory-size-mb: 2
@@ -119,6 +121,55 @@ reactive:
           retry: user-service
           bulkhead: user-service
           timeout-ms: 0
+```
+
+### 2.5.1 Outbound auth provider (per client)
+
+Each external client can map to its own `AuthProvider` bean via `auth-provider`.
+The provider returns an `AuthContext` that can inject headers and query params automatically via WebClient filter.
+For body-signing use cases (e.g. HMAC), providers can read `request.requestBody()` from `AuthRequest`.
+For bearer-token flows, use built-in `RefreshingBearerAuthProvider` + `AccessTokenProvider` to standardize token cache/rotation.
+
+```java
+@Bean("userServiceAuthProvider")
+AuthProvider userServiceAuthProvider(TokenService tokenService) {
+    return request -> tokenService.getAccessToken()
+            .map(token -> AuthContext.builder()
+                    .header("Authorization", "Bearer " + token)
+                    .build());
+}
+```
+
+```java
+@Bean("oauthAuthProvider")
+AuthProvider oauthAuthProvider(OAuthTokenClient tokenClient) {
+    return new RefreshingBearerAuthProvider(
+            () -> tokenClient.issueToken()
+                    .map(resp -> new AccessToken(
+                            resp.accessToken(),
+                            Instant.now().plusSeconds(resp.expiresInSeconds())
+                    )),
+            Duration.ofSeconds(60) // refresh before expiry
+    );
+}
+```
+
+`RefreshingBearerAuthProvider` behavior:
+- caches the latest token value
+- refreshes when token enters the refresh window (`expiresAt - refreshSkew`)
+- deduplicates concurrent refresh calls (single in-flight token fetch)
+- supports non-expiring tokens by returning `expiresAt = null`
+
+```java
+@Bean("hmacAuthProvider")
+AuthProvider hmacAuthProvider(HmacSigner signer) {
+    return request -> Mono.fromSupplier(() -> {
+        String signature = signer.sign(request.requestBody());
+        return AuthContext.builder()
+                .header("X-Signature", signature)
+                .build();
+    });
+}
 ```
 
 ### 2.6 Inject and use
@@ -244,7 +295,7 @@ reactive:
 - [ ] Retry policy is valid (no unsafe retry for non-idempotent writes).
 - [ ] Dashboard + alerts are in place (latency, error rate, circuit-open, timeout).
 - [ ] Correlation ID is propagated end-to-end.
-- [ ] Outbound auth is standardized (including token rotation/refresh strategy).
+- [x] Outbound auth is standardized (including token rotation/refresh strategy).
 - [ ] No PII/secret leakage in logs.
 - [ ] Integration tests cover timeout, 4xx/5xx, retry, and fallback scenarios.
 - [ ] Operational runbook exists for upstream degradation incidents.

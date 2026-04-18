@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
@@ -146,6 +147,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return ub.build(resolved.pathVars());
                 })
                 .accept(MediaType.APPLICATION_JSON);
+
+        if (resolved.body() != null) {
+            requestSpec = requestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, resolved.body());
+        }
 
         resolved.headers().forEach(requestSpec::header);
 

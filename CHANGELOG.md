@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Built-in outbound bearer auth refresh strategy:
+  - `AccessToken` model and `AccessTokenProvider` abstraction.
+  - `RefreshingBearerAuthProvider` with cached token reuse, refresh-before-expiry window, and single in-flight refresh deduplication.
+- Unit tests for token reuse, refresh trigger, concurrent refresh deduplication, and expired-token rejection.
+
 ---
 
 ## [1.1.0] – 2026-04-16
