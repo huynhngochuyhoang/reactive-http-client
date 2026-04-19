@@ -174,10 +174,6 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     }
                 })
                 .compress(config.isCompressionEnabled());
-        if (resolvedNetworkConfig.getReadTimeoutMs() > 0) {
-            httpClient = httpClient.responseTimeout(Duration.ofMillis(resolvedNetworkConfig.getReadTimeoutMs()));
-        }
-
         WebClient.Builder builder = applicationContext
                 .getBeanProvider(WebClient.Builder.class)
                 .getIfAvailable(WebClient::builder);

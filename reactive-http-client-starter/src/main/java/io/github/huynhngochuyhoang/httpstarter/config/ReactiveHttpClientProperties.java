@@ -12,7 +12,6 @@ import java.util.Map;
  * <pre>{@code
  * reactive:
  *   http:
- *     clients:
  *     network:
  *       connect-timeout-ms: 2000
  *       read-timeout-ms: 5000
