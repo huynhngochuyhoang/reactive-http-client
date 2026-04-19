@@ -36,7 +36,7 @@ class HttpEdgeCasesTest {
     // -------------------------------------------------------------------------
 
     /**
-     * When the upstream never responds and the client read-timeout is configured,
+     * When the upstream never responds and the resilience timeout is configured,
      * the Mono must terminate with a {@link TimeoutException}.
      */
     @Test
@@ -49,7 +49,7 @@ class HttpEdgeCasesTest {
                 .build();
 
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
-        config.setReadTimeoutMs(500); // 500 ms – will be advanced virtually
+        config.setResilience(resilienceConfig(true, 500)); // 500 ms – will be advanced virtually
 
         ReactiveClientInvocationHandler handler = createHandler(webClient, config);
 
@@ -62,7 +62,7 @@ class HttpEdgeCasesTest {
     }
 
     /**
-     * When @TimeoutMs is set on the method, it takes priority over client-level config.
+     * When @TimeoutMs is set on the method, it takes priority over resilience timeout config.
      */
     @Test
     void shouldRespectMethodLevelTimeoutOverride() {
@@ -71,9 +71,9 @@ class HttpEdgeCasesTest {
                 .exchangeFunction(request -> Mono.never())
                 .build();
 
-        // Client-level 5000 ms, but method overrides to 200 ms.
+        // Resilience timeout 5000 ms, but method overrides to 200 ms.
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
-        config.setReadTimeoutMs(5000);
+        config.setResilience(resilienceConfig(true, 5000));
 
         ReactiveClientInvocationHandler handler = createHandler(webClient, config);
 
@@ -100,7 +100,7 @@ class HttpEdgeCasesTest {
                 .build();
 
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
-        config.setReadTimeoutMs(0); // no timeout – only cancellation ends this
+        config.setResilience(resilienceConfig(false, 0)); // no timeout – only cancellation ends this
 
         ReactiveClientInvocationHandler handler = createHandler(webClient, config);
 
@@ -163,6 +163,13 @@ class HttpEdgeCasesTest {
         );
     }
 
+    private static ReactiveHttpClientProperties.ResilienceConfig resilienceConfig(boolean enabled, long timeoutMs) {
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(enabled);
+        resilience.setTimeoutMs(timeoutMs);
+        return resilience;
+    }
+
     @SuppressWarnings("unchecked")
     private static Mono<String> invokeGetUsers(ReactiveClientInvocationHandler handler) {
         try {
@@ -196,4 +203,3 @@ class HttpEdgeCasesTest {
         Mono<String> getUsers();
     }
 }
-

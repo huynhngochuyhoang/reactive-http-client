@@ -306,11 +306,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (clientConfig == null) {
             return 0;
         }
-        // Prefer the client-level read timeout when available.
-        if (clientConfig.getReadTimeoutMs() > 0) {
-            return clientConfig.getReadTimeoutMs();
-        }
-        // Fall back to resilience timeout when client timeout is not configured.
+        // Fall back to resilience timeout when method timeout is not configured.
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience != null && resilience.isEnabled() && resilience.getTimeoutMs() > 0) {
             return resilience.getTimeoutMs();

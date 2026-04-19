@@ -70,10 +70,13 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
 
     private static ReactiveClientInvocationHandler createHandler(
             WebClient webClient,
-            int readTimeoutMs,
+            int resilienceTimeoutMs,
             HttpClientObserver observer) {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
-        config.setReadTimeoutMs(readTimeoutMs);
+        ReactiveHttpClientProperties.ResilienceConfig resilienceConfig = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilienceConfig.setEnabled(true);
+        resilienceConfig.setTimeoutMs(resilienceTimeoutMs);
+        config.setResilience(resilienceConfig);
 
         return new ReactiveClientInvocationHandler(
                 webClient,
@@ -106,4 +109,3 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         Mono<String> call();
     }
 }
-

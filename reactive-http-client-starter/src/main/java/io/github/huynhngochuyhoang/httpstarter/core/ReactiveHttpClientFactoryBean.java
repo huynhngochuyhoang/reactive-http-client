@@ -7,6 +7,8 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.FactoryBean;
@@ -19,9 +21,12 @@ import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.netty.resources.ConnectionProvider;
 import reactor.netty.http.client.HttpClient;
 
 import java.lang.reflect.Proxy;
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Spring {@link FactoryBean} that creates a JDK dynamic proxy for a given
@@ -67,7 +72,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         }
 
         AuthProvider authProvider = resolveAuthProvider(clientName, config);
-        WebClient webClient = buildWebClient(baseUrl, config, clientName, authProvider);
+        WebClient webClient = buildWebClient(baseUrl, config, properties.getNetwork(), clientName, authProvider);
 
         MethodMetadataCache metadataCache = applicationContext
                 .getBeanProvider(MethodMetadataCache.class)
@@ -142,11 +147,36 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
 
     private WebClient buildWebClient(String baseUrl,
                                      ReactiveHttpClientProperties.ClientConfig config,
+                                     ReactiveHttpClientProperties.NetworkConfig networkConfig,
                                      String clientName,
                                      AuthProvider authProvider) {
-        HttpClient httpClient = HttpClient.create()
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, config.getConnectTimeoutMs())
+        ReactiveHttpClientProperties.NetworkConfig resolvedNetworkConfig = networkConfig != null
+                ? networkConfig
+                : new ReactiveHttpClientProperties.NetworkConfig();
+        ReactiveHttpClientProperties.ConnectionPoolConfig pool = resolvedNetworkConfig.getConnectionPool() != null
+                ? resolvedNetworkConfig.getConnectionPool()
+                : new ReactiveHttpClientProperties.ConnectionPoolConfig();
+        ConnectionProvider connectionProvider = ConnectionProvider.builder("reactive-http-client-" + clientName)
+                .maxConnections(Math.max(1, pool.getMaxConnections()))
+                .pendingAcquireTimeout(Duration.ofMillis(Math.max(0, pool.getPendingAcquireTimeoutMs())))
+                .build();
+
+        HttpClient httpClient = HttpClient.create(connectionProvider)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, resolvedNetworkConfig.getConnectTimeoutMs())
+                .doOnConnected(connection -> {
+                    if (resolvedNetworkConfig.getReadTimeoutMs() > 0) {
+                        connection.addHandlerLast(new ReadTimeoutHandler(
+                                resolvedNetworkConfig.getReadTimeoutMs(), TimeUnit.MILLISECONDS));
+                    }
+                    if (resolvedNetworkConfig.getWriteTimeoutMs() > 0) {
+                        connection.addHandlerLast(new WriteTimeoutHandler(
+                                resolvedNetworkConfig.getWriteTimeoutMs(), TimeUnit.MILLISECONDS));
+                    }
+                })
                 .compress(config.isCompressionEnabled());
+        if (resolvedNetworkConfig.getReadTimeoutMs() > 0) {
+            httpClient = httpClient.responseTimeout(Duration.ofMillis(resolvedNetworkConfig.getReadTimeoutMs()));
+        }
 
         WebClient.Builder builder = applicationContext
                 .getBeanProvider(WebClient.Builder.class)

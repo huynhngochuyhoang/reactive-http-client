@@ -106,12 +106,17 @@ public interface UserApiClient {
 ```yaml
 reactive:
   http:
+    network:
+      connect-timeout-ms: 2000
+      read-timeout-ms: 5000
+      write-timeout-ms: 5000
+      connection-pool:
+        max-connections: 200
+        pending-acquire-timeout-ms: 5000
     clients:
       user-service:
         base-url: https://api.example.com
         auth-provider: userServiceAuthProvider
-        connect-timeout-ms: 2000
-        read-timeout-ms: 5000
         codec-max-in-memory-size-mb: 2
         compression-enabled: false
         log-body: false
@@ -200,7 +205,7 @@ Each proxy invocation follows this pipeline:
    - 4xx -> `HttpClientException`
    - 5xx -> `RemoteServiceException`
 5. Apply resilience (if enabled): circuit-breaker -> retry -> bulkhead.
-6. Apply timeout (priority: `@TimeoutMs` > `read-timeout-ms` > `resilience.timeout-ms`).
+6. Apply request timeout (priority: `@TimeoutMs` > `resilience.timeout-ms`).
 7. Emit observability event (if observer is configured).
 
 ---
@@ -291,7 +296,7 @@ reactive:
 
 ## 8) Production safety checklist
 
-- [ ] Every client has explicit `base-url`, timeout, and resilience settings aligned with SLA.
+- [ ] Every client has explicit `base-url` and resilience settings aligned with SLA; global network policy is set for connect/read/write timeout and pool.
 - [ ] Retry policy is valid (no unsafe retry for non-idempotent writes).
 - [ ] Dashboard + alerts are in place (latency, error rate, circuit-open, timeout).
 - [ ] Correlation ID is propagated end-to-end.

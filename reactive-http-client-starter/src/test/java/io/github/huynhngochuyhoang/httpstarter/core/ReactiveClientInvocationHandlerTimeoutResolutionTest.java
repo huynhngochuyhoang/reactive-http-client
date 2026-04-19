@@ -13,8 +13,8 @@ import static org.mockito.Mockito.mock;
 class ReactiveClientInvocationHandlerTimeoutResolutionTest {
 
     @Test
-    void shouldPreferMethodTimeoutOverClientAndResilienceTimeout() throws Exception {
-        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(5000, true, 3000);
+    void shouldPreferMethodTimeoutOverResilienceTimeout() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(true, 3000);
         ReactiveClientInvocationHandler handler = createHandler(clientConfig);
         MethodMetadata meta = new MethodMetadata();
         meta.setTimeoutMs(1200);
@@ -23,26 +23,25 @@ class ReactiveClientInvocationHandlerTimeoutResolutionTest {
     }
 
     @Test
-    void shouldPreferClientReadTimeoutOverResilienceTimeout() throws Exception {
-        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(5000, true, 3000);
-        ReactiveClientInvocationHandler handler = createHandler(clientConfig);
-        MethodMetadata meta = new MethodMetadata();
-
-        assertEquals(5000, resolveTimeoutMs(handler, meta));
-    }
-
-    @Test
-    void shouldFallbackToResilienceTimeoutWhenClientReadTimeoutIsDisabled() throws Exception {
-        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(0, true, 3000);
+    void shouldUseResilienceTimeoutWhenMethodTimeoutNotConfigured() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(true, 3000);
         ReactiveClientInvocationHandler handler = createHandler(clientConfig);
         MethodMetadata meta = new MethodMetadata();
 
         assertEquals(3000, resolveTimeoutMs(handler, meta));
     }
 
-    private static ReactiveHttpClientProperties.ClientConfig clientConfig(int readTimeoutMs, boolean resilienceEnabled, long resilienceTimeoutMs) {
+    @Test
+    void shouldReturnZeroWhenNoMethodAndResilienceTimeoutNotConfigured() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(false, 3000);
+        ReactiveClientInvocationHandler handler = createHandler(clientConfig);
+        MethodMetadata meta = new MethodMetadata();
+
+        assertEquals(0, resolveTimeoutMs(handler, meta));
+    }
+
+    private static ReactiveHttpClientProperties.ClientConfig clientConfig(boolean resilienceEnabled, long resilienceTimeoutMs) {
         ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
-        clientConfig.setReadTimeoutMs(readTimeoutMs);
 
         ReactiveHttpClientProperties.ResilienceConfig resilienceConfig = new ReactiveHttpClientProperties.ResilienceConfig();
         resilienceConfig.setEnabled(resilienceEnabled);
