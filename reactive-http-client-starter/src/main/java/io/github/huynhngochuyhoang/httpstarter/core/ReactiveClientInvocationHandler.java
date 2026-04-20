@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.codec.DecodingException;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -20,6 +21,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -58,6 +60,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final String clientName;
     private final ApplicationContext applicationContext;
     private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> loggerCache = new ConcurrentHashMap<>();
+    private final java.util.Set<String> resilienceWarningKeys = ConcurrentHashMap.newKeySet();
 
     // Resilience4j registries – may be null when resilience4j is not on the classpath
     private final Object circuitBreakerRegistry;
@@ -123,9 +126,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        // Delegate Object methods to the handler itself
         if (method.getDeclaringClass() == Object.class) {
-            return method.invoke(this, args);
+            return switch (method.getName()) {
+                case "equals" -> proxy == (args != null && args.length > 0 ? args[0] : null);
+                case "hashCode" -> System.identityHashCode(proxy != null ? proxy : this);
+                case "toString" -> "ReactiveHttpClientProxy(" + clientName + ")";
+                default -> method.invoke(this, args);
+            };
         }
 
         MethodMetadata meta = metadataCache.get(method);
@@ -147,8 +154,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     resolved.queryParams().forEach((k, values) ->
                             values.forEach(v -> ub.queryParam(k, String.valueOf(v))));
                     return ub.build(resolved.pathVars());
-                })
-                .accept(MediaType.APPLICATION_JSON);
+                });
+
+        boolean hasAcceptHeader = hasHeaderIgnoreCase(resolved.headers(), HttpHeaders.ACCEPT);
+        boolean hasContentTypeHeader = hasHeaderIgnoreCase(resolved.headers(), HttpHeaders.CONTENT_TYPE);
+        if (!hasAcceptHeader) {
+            requestSpec = requestSpec.accept(MediaType.APPLICATION_JSON);
+        }
 
         if (resolved.body() != null) {
             requestSpec = requestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, resolved.body());
@@ -158,15 +170,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         WebClient.RequestHeadersSpec<?> requestHeadersSpec;
         if (resolved.body() != null) {
-            requestHeadersSpec = requestSpec
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(resolved.body());
+            WebClient.RequestBodySpec requestWithBodySpec = requestSpec;
+            if (!hasContentTypeHeader) {
+                requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_JSON);
+            }
+            requestHeadersSpec = requestWithBodySpec.bodyValue(resolved.body());
         } else {
             requestHeadersSpec = requestSpec;
         }
 
         AtomicReference<HttpStatusCode> responseStatus = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> responseHeaders = new AtomicReference<>(Map.of());
+        AtomicReference<Throwable> terminalError = new AtomicReference<>();
+        AtomicReference<Object> terminalBody = new AtomicReference<>();
 
         // Resolve observer once per invocation to avoid repeated volatile reads
         HttpClientObserver observer = getObserver();
@@ -177,25 +193,32 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 responseHeaders.set(copyHeaders(clientResponse));
 
                 if (clientResponse.statusCode().isError()) {
-                    return errorDecoder.decode(clientResponse).flatMapMany(Mono::error);
+                    return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
                 }
                 return buildFlux(clientResponse, meta.getResponseType());
+            }).doOnSubscribe(subscription -> {
+                responseStatus.set(null);
+                responseHeaders.set(Map.of());
+                terminalError.set(null);
             });
             flux = applyResilienceFlux(flux, meta);
             flux = applyTimeoutFlux(flux, meta);
-            if (exchangeLogger != null) {
-                flux = flux
-                        .doOnComplete(() -> logExchange(
-                                exchangeLogger, meta, resolved, start, responseStatus.get(), responseHeaders.get(), null, null))
-                        .doOnError(error -> logExchange(
-                                exchangeLogger, meta, resolved, start, responseStatus.get(), responseHeaders.get(), null, error));
-            } else {
+            if (exchangeLogger == null) {
                 logRequest(meta, start);
             }
-            if (observer != null) {
+            if (exchangeLogger != null || observer != null) {
                 flux = flux
-                        .doOnComplete(() -> notifyObserver(observer, meta, resolved, start, responseStatus.get(), null, null))
-                        .doOnError(error -> notifyObserver(observer, meta, resolved, start, responseStatus.get(), error, null));
+                        .doOnError(terminalError::set)
+                        .doFinally(signalType -> {
+                            Throwable error = terminalErrorForSignal(signalType, terminalError.get());
+                            if (exchangeLogger != null) {
+                                logExchange(exchangeLogger, meta, resolved, start,
+                                        responseStatus.get(), responseHeaders.get(), null, error);
+                            }
+                            if (observer != null) {
+                                notifyObserver(observer, meta, resolved, start, responseStatus.get(), error, null);
+                            }
+                        });
             }
             return flux;
         }
@@ -205,25 +228,35 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             responseHeaders.set(copyHeaders(clientResponse));
 
             if (clientResponse.statusCode().isError()) {
-                return errorDecoder.decode(clientResponse).flatMap(Mono::error);
+                return decodeErrorResponse(clientResponse).flatMap(Mono::error);
             }
             return buildMono(clientResponse, meta.getResponseType());
+        }).doOnSubscribe(subscription -> {
+            responseStatus.set(null);
+            responseHeaders.set(Map.of());
+            terminalError.set(null);
+            terminalBody.set(null);
         });
         mono = applyResilienceMono(mono, meta);
         mono = applyTimeoutMono(mono, meta);
-        if (exchangeLogger != null) {
-            mono = mono
-                    .doOnSuccess(body -> logExchange(
-                            exchangeLogger, meta, resolved, start, responseStatus.get(), responseHeaders.get(), body, null))
-                    .doOnError(error -> logExchange(
-                            exchangeLogger, meta, resolved, start, responseStatus.get(), responseHeaders.get(), null, error));
-        } else {
+        if (exchangeLogger == null) {
             logRequest(meta, start);
         }
-        if (observer != null) {
+        if (exchangeLogger != null || observer != null) {
             mono = mono
-                    .doOnSuccess(body -> notifyObserver(observer, meta, resolved, start, responseStatus.get(), null, body))
-                    .doOnError(error -> notifyObserver(observer, meta, resolved, start, responseStatus.get(), error, null));
+                    .doOnSuccess(terminalBody::set)
+                    .doOnError(terminalError::set)
+                    .doFinally(signalType -> {
+                        Throwable error = terminalErrorForSignal(signalType, terminalError.get());
+                        Object body = terminalBody.get();
+                        if (exchangeLogger != null) {
+                            logExchange(exchangeLogger, meta, resolved, start,
+                                    responseStatus.get(), responseHeaders.get(), body, error);
+                        }
+                        if (observer != null) {
+                            notifyObserver(observer, meta, resolved, start, responseStatus.get(), error, body);
+                        }
+                    });
         }
         return mono;
     }
@@ -232,15 +265,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     // Private helpers
     // -------------------------------------------------------------------------
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
     private Mono<?> buildMono(ClientResponse response, Type responseType) {
-        if (responseType == null || responseType == Void.class) {
+        if (responseType == null || Void.class.equals(responseType)) {
             return response.bodyToMono(Void.class);
         }
         return response.bodyToMono(ParameterizedTypeReference.forType(responseType));
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
     private Flux<?> buildFlux(ClientResponse response, Type responseType) {
         if (responseType == null) {
             return response.bodyToFlux(Object.class);
@@ -253,11 +284,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null || !resilience.isEnabled()) return mono;
 
-        mono = applyCircuitBreakerMono(mono, resilience);
-        // Retry only idempotent methods by default; opt-in for others via config
-        if ("GET".equals(meta.getHttpMethod()) || "HEAD".equals(meta.getHttpMethod())) {
+        if (isRetryableMethod(meta.getHttpMethod())) {
             mono = applyRetryMono(mono, resilience);
         }
+        mono = applyCircuitBreakerMono(mono, resilience);
         mono = applyBulkheadMono(mono, resilience);
         return mono;
     }
@@ -267,10 +297,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null || !resilience.isEnabled()) return flux;
 
-        flux = applyCircuitBreakerFlux(flux, resilience);
-        if ("GET".equals(meta.getHttpMethod())) {
+        if (isRetryableMethod(meta.getHttpMethod())) {
             flux = applyRetryFlux(flux, resilience);
         }
+        flux = applyCircuitBreakerFlux(flux, resilience);
         flux = applyBulkheadFlux(flux, resilience);
         return flux;
     }
@@ -333,11 +363,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Object operator = operatorClass
                     .getMethod("of", cbClass)
                     .invoke(null, cb);
-            return (Mono<?>) mono.getClass()
+            return (Mono<?>) Mono.class
                     .getMethod("transformDeferred", java.util.function.Function.class)
                     .invoke(mono, operator);
         } catch (Exception e) {
-            log.debug("Circuit breaker not applied ({}): {}", cfg.getCircuitBreaker(), e.getMessage());
+            logResilienceOperatorFailure("circuitBreaker", cfg.getCircuitBreaker(), e);
             return mono;
         }
     }
@@ -359,11 +389,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Object operator = operatorClass
                     .getMethod("of", cbClass)
                     .invoke(null, cb);
-            return (Flux<?>) flux.getClass()
+            return (Flux<?>) Flux.class
                     .getMethod("transformDeferred", java.util.function.Function.class)
                     .invoke(flux, operator);
         } catch (Exception e) {
-            log.debug("Circuit breaker not applied ({}): {}", cfg.getCircuitBreaker(), e.getMessage());
+            logResilienceOperatorFailure("circuitBreaker", cfg.getCircuitBreaker(), e);
             return flux;
         }
     }
@@ -385,11 +415,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Object operator = operatorClass
                     .getMethod("of", retryClass)
                     .invoke(null, retry);
-            return (Mono<?>) mono.getClass()
+            return (Mono<?>) Mono.class
                     .getMethod("transformDeferred", java.util.function.Function.class)
                     .invoke(mono, operator);
         } catch (Exception e) {
-            log.debug("Retry not applied ({}): {}", cfg.getRetry(), e.getMessage());
+            logResilienceOperatorFailure("retry", cfg.getRetry(), e);
             return mono;
         }
     }
@@ -411,11 +441,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Object operator = operatorClass
                     .getMethod("of", retryClass)
                     .invoke(null, retry);
-            return (Flux<?>) flux.getClass()
+            return (Flux<?>) Flux.class
                     .getMethod("transformDeferred", java.util.function.Function.class)
                     .invoke(flux, operator);
         } catch (Exception e) {
-            log.debug("Retry not applied ({}): {}", cfg.getRetry(), e.getMessage());
+            logResilienceOperatorFailure("retry", cfg.getRetry(), e);
             return flux;
         }
     }
@@ -437,11 +467,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Object operator = operatorClass
                     .getMethod("of", bhClass)
                     .invoke(null, bh);
-            return (Mono<?>) mono.getClass()
+            return (Mono<?>) Mono.class
                     .getMethod("transformDeferred", java.util.function.Function.class)
                     .invoke(mono, operator);
         } catch (Exception e) {
-            log.debug("Bulkhead not applied ({}): {}", cfg.getBulkhead(), e.getMessage());
+            logResilienceOperatorFailure("bulkhead", cfg.getBulkhead(), e);
             return mono;
         }
     }
@@ -463,13 +493,49 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Object operator = operatorClass
                     .getMethod("of", bhClass)
                     .invoke(null, bh);
-            return (Flux<?>) flux.getClass()
+            return (Flux<?>) Flux.class
                     .getMethod("transformDeferred", java.util.function.Function.class)
                     .invoke(flux, operator);
         } catch (Exception e) {
-            log.debug("Bulkhead not applied ({}): {}", cfg.getBulkhead(), e.getMessage());
+            logResilienceOperatorFailure("bulkhead", cfg.getBulkhead(), e);
             return flux;
         }
+    }
+
+    private Mono<? extends Throwable> decodeErrorResponse(ClientResponse response) {
+        return errorDecoder.decode(response)
+                .onErrorResume(decodeError -> response.releaseBody()
+                        .onErrorResume(releaseError -> Mono.empty())
+                        .then(Mono.error(decodeError)));
+    }
+
+    private boolean hasHeaderIgnoreCase(Map<String, String> headers, String headerName) {
+        return headers.keySet().stream().anyMatch(name -> headerName.equalsIgnoreCase(name));
+    }
+
+    private boolean isRetryableMethod(String method) {
+        return "GET".equals(method) || "HEAD".equals(method);
+    }
+
+    private Throwable terminalErrorForSignal(SignalType signalType, Throwable terminalError) {
+        if (terminalError != null) {
+            return terminalError;
+        }
+        if (signalType == SignalType.CANCEL) {
+            return new CancellationException("Request was cancelled");
+        }
+        return null;
+    }
+
+    private void logResilienceOperatorFailure(String operatorType, String instanceName, Exception error) {
+        String key = operatorType + ":" + instanceName;
+        if (resilienceWarningKeys.add(key)) {
+            log.warn("Resilience4j {} operator could not be applied (instance='{}'). Requests will proceed without this protection. Cause: {}",
+                    operatorType, instanceName, error.getMessage());
+            return;
+        }
+        log.debug("Resilience4j {} operator not applied (instance='{}'): {}",
+                operatorType, instanceName, error.getMessage());
     }
 
     private void logRequest(MethodMetadata meta, long startMs) {

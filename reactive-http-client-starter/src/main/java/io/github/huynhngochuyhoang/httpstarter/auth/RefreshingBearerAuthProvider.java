@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * This provider caches the latest token and refreshes it when it is close to expiry.
  * Concurrent refresh attempts are deduplicated so only one upstream token call is in-flight.
  */
-public final class RefreshingBearerAuthProvider implements AuthProvider {
+public final class RefreshingBearerAuthProvider implements InvalidatableAuthProvider {
 
     private static final Duration DEFAULT_REFRESH_SKEW = Duration.ofSeconds(30);
 
@@ -52,6 +52,15 @@ public final class RefreshingBearerAuthProvider implements AuthProvider {
                 .map(tokenValue -> AuthContext.builder()
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenValue)
                         .build());
+    }
+
+    @Override
+    public Mono<Void> invalidate() {
+        synchronized (this) {
+            cachedToken = null;
+            inFlightRefresh = null;
+        }
+        return Mono.empty();
     }
 
     private Mono<String> resolveTokenValue() {

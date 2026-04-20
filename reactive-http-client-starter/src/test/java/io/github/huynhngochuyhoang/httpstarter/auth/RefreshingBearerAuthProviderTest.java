@@ -124,6 +124,32 @@ class RefreshingBearerAuthProviderTest {
                 .verify();
     }
 
+    @Test
+    void shouldRefreshAgainAfterInvalidate() {
+        AtomicInteger calls = new AtomicInteger();
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        Clock fixedClock = Clock.fixed(now, ZoneOffset.UTC);
+        RefreshingBearerAuthProvider provider = new RefreshingBearerAuthProvider(
+                () -> Mono.fromSupplier(() -> {
+                    int call = calls.incrementAndGet();
+                    return new AccessToken("token-" + call, now.plusSeconds(120));
+                }),
+                Duration.ofSeconds(30),
+                fixedClock
+        );
+
+        StepVerifier.create(provider.getAuth(sampleRequest()))
+                .assertNext(auth -> assertEquals("Bearer token-1", auth.getHeaders().get("Authorization")))
+                .verifyComplete();
+
+        StepVerifier.create(provider.invalidate()).verifyComplete();
+
+        StepVerifier.create(provider.getAuth(sampleRequest()))
+                .assertNext(auth -> assertEquals("Bearer token-2", auth.getHeaders().get("Authorization")))
+                .verifyComplete();
+        assertEquals(2, calls.get());
+    }
+
     private static AuthRequest sampleRequest() {
         ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.test.local/resource")).build();
         return new AuthRequest("sample-client", request);

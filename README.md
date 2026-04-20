@@ -164,6 +164,7 @@ AuthProvider oauthAuthProvider(OAuthTokenClient tokenClient) {
 - caches the latest token value
 - refreshes when token enters the refresh window (`expiresAt - refreshSkew`)
 - deduplicates concurrent refresh calls (single in-flight token fetch)
+- supports cache invalidation (used by outbound auth filter to refresh and retry once on HTTP 401)
 - supports non-expiring tokens by returning `expiresAt = null`
 
 ```java
@@ -205,7 +206,7 @@ Each proxy invocation follows this pipeline:
 4. Decode errors:
    - 4xx -> `HttpClientException`
    - 5xx -> `RemoteServiceException`
-5. Apply resilience (if enabled): circuit-breaker -> retry -> bulkhead.
+5. Apply resilience (if enabled): retry -> circuit-breaker -> bulkhead.
 6. Apply request timeout (priority: `@TimeoutMs` > `resilience.timeout-ms`).
 7. Emit observability event (if observer is configured).
 

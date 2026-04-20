@@ -12,6 +12,7 @@ import reactor.test.StepVerifier;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -109,5 +110,43 @@ class OutboundAuthFilterTest {
                     assertTrue(error.getCause() instanceof IllegalStateException);
                 })
                 .verify();
+    }
+
+    @Test
+    void shouldInvalidateAndRetryOnceOnUnauthorized() {
+        AtomicInteger tokenCalls = new AtomicInteger();
+        AtomicInteger invalidateCalls = new AtomicInteger();
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(AuthRequest request) {
+                int call = tokenCalls.incrementAndGet();
+                return Mono.just(AuthContext.builder()
+                        .header("Authorization", "Bearer token-" + call)
+                        .build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                invalidateCalls.incrementAndGet();
+                return Mono.empty();
+            }
+        };
+
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.test.local/users")).build();
+
+        Mono<ClientResponse> response = filter.filter(request, req -> {
+            String auth = req.headers().getFirst("Authorization");
+            if ("Bearer token-1".equals(auth)) {
+                return Mono.just(ClientResponse.create(HttpStatus.UNAUTHORIZED).body("unauthorized").build());
+            }
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        });
+
+        StepVerifier.create(response)
+                .assertNext(clientResponse -> assertEquals(HttpStatus.OK.value(), clientResponse.statusCode().value()))
+                .verifyComplete();
+        assertEquals(2, tokenCalls.get());
+        assertEquals(1, invalidateCalls.get());
     }
 }
