@@ -14,38 +14,28 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 
 ---
 
-## 1) Current starter status (v1.5.0)
+## 1) Support level vs Spring `@HttpExchange` (current starter)
 
-### Quick assessment
+### Overall assessment
 
-**Current level:** ready for v1.5.0 release, production-ready for most service-to-service workloads.  
-**Condition:** core transport/auth/resilience capabilities are built in and stable; teams still need app-level governance and runbooks.
+**Support level:** the starter is a **higher-level opinionated layer** on top of WebFlux, while Spring `@HttpExchange` is a **lower-level declarative HTTP interface**.  
+**Current fit:** if you only need declarative HTTP mapping, `@HttpExchange` is enough; if you need built-in cross-cutting concerns (resilience, auth strategy, observability, network policy), this starter provides broader support out of the box.
 
-| Area | Status | Notes |
+| Capability | This starter | Spring `@HttpExchange` |
 |---|---|---|
-| Core client proxy + annotation model | ✅ Good | Clear proxy/metadata-cache architecture with test coverage |
-| Timeout / error contract | ✅ Good | Error categorization and timeout precedence are defined |
-| Resilience (CB/Retry/Bulkhead) | ✅ Good (opt-in) | Integrated; retry defaults to GET/HEAD |
-| Metrics/tracing hooks | ✅ Good (opt-in) | Micrometer observer and stable tags are available |
-| Enterprise security/auth | ✅ Good (extensible) | Per-client `AuthProvider` and built-in `RefreshingBearerAuthProvider` for token cache/refresh |
-| Network policy and pooling | ✅ Good | Global `reactive.http.network` defaults and shared connection-pool controls are supported |
-| Operational hardening (governance) | ⚠️ Partial gap | More production guardrails/runbook guidance still needed |
-| Integration/contract testing sample | ⚠️ Gap | Starter currently focuses on unit-level test coverage |
+| Declarative interface | `@ReactiveHttpClient` + `@GET/@POST/...` | `@HttpExchange` + method annotations |
+| Client-level config model | `reactive.http.clients.<name>` and global `reactive.http.network` | No equivalent built-in config namespace |
+| Timeout precedence model | Method-level `@TimeoutMs` over config timeout | No built-in timeout precedence contract |
+| Error classification contract | Built-in `HttpClientException` / `RemoteServiceException` + categories | No built-in domain error categorization |
+| Resilience4j integration | Built-in opt-in (retry/circuit-breaker/bulkhead) per client | Not built-in; app wires resilience manually |
+| Outbound auth strategy | Per-client `AuthProvider` + built-in token refresh provider | Not built-in; app implements filters/interceptors |
+| Correlation ID propagation | Built-in support | App-level implementation |
+| Micrometer observability contract | Built-in observer with stable tags | Basic instrumentation is app/framework-dependent |
 
-### Remaining gaps
+### Practical conclusion
 
-#### Must be handled at the application level for production
-
-1. **Outbound auth standardization**: use built-in `RefreshingBearerAuthProvider` for bearer token rotation/refresh, or custom `AuthProvider` for OAuth2/JWT/API key/HMAC
-2. **Environment network hardening policy**: enforce proxy and SSL/mTLS policies by environment (starter now provides global timeout/pool knobs)
-3. **PII-safe logging policy**: redaction/masking strategy when body logging is enabled
-4. **Production runbook**: clear response playbook for rising errors/timeouts/circuit-open events
-
-#### Recommended starter roadmap additions
-
-5. **Integration sample**: reference app + mock upstream for validating retry/timeout/metrics behavior
-
-> Note: these gaps do not block production usage, but they matter for large-scale and secure operations.
+- Choose **Spring `@HttpExchange`** when you want minimal abstraction and full manual control.
+- Choose this **starter** when you want a ready-to-use platform for outbound HTTP governance with consistent policies across clients.
 
 ---
 
