@@ -15,6 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] – 2026-04-20
+
+### Added
+
+- Added `ErrorCategory.AUTH_PROVIDER_ERROR` for outbound authentication provider failures.
+- Added `AuthProviderException` to normalize errors raised by `AuthProvider`.
+- Added test coverage for auth-provider failure wrapping and observability error category emission.
+
+### Changed
+
+- Updated `OutboundAuthFilter` to map auth-provider failures to `AuthProviderException` without double wrapping.
+- Updated `ReactiveClientInvocationHandler` to classify `AuthProviderException` as `AUTH_PROVIDER_ERROR`.
+- Updated observability docs/tag semantics to include `AUTH_PROVIDER_ERROR`.
+
+---
+
 ## [1.2.0] – 2026-04-19
 
 ### Added
@@ -108,7 +124,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.  
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/huynhngochuyhoang/reactive-http-client/releases/tag/v1.0.0
