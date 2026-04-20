@@ -146,7 +146,7 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
     void shouldNotObserveResponseDecodeErrorCategoryWhenNoResponseStatusAvailable() {
         WebClient webClient = WebClient.builder()
                 .baseUrl("http://test.local")
-                .exchangeFunction(request -> Mono.error(new DecodingException("request encoding failed")))
+                .exchangeFunction(request -> Mono.error(new DecodingException("decode error without response status")))
                 .build();
 
         AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();

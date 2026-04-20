@@ -599,9 +599,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             if (code >= 500) {
                 return ErrorCategory.SERVER_ERROR;
             }
-            if (error == null) {
-                return null;
-            }
         }
         if (error != null) {
             return ErrorCategory.UNKNOWN;
