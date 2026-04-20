@@ -10,7 +10,7 @@ import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.codec.CodecException;
+import org.springframework.core.codec.DecodingException;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
@@ -585,7 +585,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (error instanceof AuthProviderException) {
             return ErrorCategory.AUTH_PROVIDER_ERROR;
         }
-        if (isResponseDecodeError(error)) {
+        if (isResponseDecodeError(statusCode, error)) {
             return ErrorCategory.RESPONSE_DECODE_ERROR;
         }
         if (statusCode != null) {
@@ -609,10 +609,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return null;
     }
 
-    private boolean isResponseDecodeError(Throwable error) {
+    private boolean isResponseDecodeError(HttpStatusCode statusCode, Throwable error) {
+        if (statusCode == null || statusCode.isError()) {
+            return false;
+        }
         Throwable current = error;
         while (current != null) {
-            if (current instanceof CodecException) {
+            if (current instanceof DecodingException) {
                 return true;
             }
             current = current.getCause();
