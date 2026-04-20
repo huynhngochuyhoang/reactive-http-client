@@ -36,7 +36,8 @@ import java.util.concurrent.TimeUnit;
  *   <li><b>outcome</b> – one of SUCCESS, CLIENT_ERROR, SERVER_ERROR, UNKNOWN.</li>
  *   <li><b>exception</b> – simple class name of the error, or {@code none}.</li>
  *   <li><b>error.category</b> – one of {@code RATE_LIMITED}, {@code CLIENT_ERROR}, {@code SERVER_ERROR},
- *       {@code TIMEOUT}, {@code CANCELLED}, {@code UNKNOWN}, or {@code none} for successful calls.</li>
+ *       {@code TIMEOUT}, {@code CANCELLED}, {@code AUTH_PROVIDER_ERROR}, {@code UNKNOWN},
+ *       or {@code none} for successful calls.</li>
  * </ul>
  *
  * <p>This bean is auto-configured by

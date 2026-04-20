@@ -1,8 +1,11 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
@@ -66,6 +69,27 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         HttpClientObserverEvent event = observed.get();
         assertNotNull(event);
         assertEquals(ErrorCategory.TIMEOUT, event.getErrorCategory());
+    }
+
+    @Test
+    void shouldObserveAuthProviderErrorCategoryWhenAuthProviderFails() {
+        AuthProvider authProvider = request -> Mono.error(new IllegalStateException("auth provider down"));
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(new OutboundAuthFilter("test-client", authProvider))
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK).build()))
+                .build();
+
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set);
+
+        StepVerifier.create(invoke(handler))
+                .expectError(AuthProviderException.class)
+                .verify();
+
+        HttpClientObserverEvent event = observed.get();
+        assertNotNull(event);
+        assertEquals(ErrorCategory.AUTH_PROVIDER_ERROR, event.getErrorCategory());
     }
 
     private static ReactiveClientInvocationHandler createHandler(

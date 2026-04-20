@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
@@ -27,6 +28,9 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
             ClientRequest request, ExchangeFunction next) {
         Object requestBody = request.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE).orElse(null);
         return authProvider.getAuth(new AuthRequest(clientName, request, requestBody))
+                .onErrorMap(error -> error instanceof AuthProviderException
+                        ? error
+                        : new AuthProviderException(clientName, error))
                 .defaultIfEmpty(AuthContext.empty())
                 .map(authContext -> applyAuth(request, authContext))
                 .flatMap(next::exchange);

@@ -47,6 +47,12 @@ public enum ErrorCategory {
     CANCELLED,
 
     /**
+     * The configured auth provider failed while preparing outbound authentication
+     * (e.g. token fetch/signing error).
+     */
+    AUTH_PROVIDER_ERROR,
+
+    /**
      * An unexpected or unclassified error occurred (e.g. network failure, codec error).
      */
     UNKNOWN

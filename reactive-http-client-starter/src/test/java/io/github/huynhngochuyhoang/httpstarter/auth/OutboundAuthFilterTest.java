@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OutboundAuthFilterTest {
 
@@ -93,5 +95,19 @@ class OutboundAuthFilterTest {
         StepVerifier.create(response).expectNextCount(1).verifyComplete();
         assertEquals(payload, capturedBody.get());
         assertEquals("hmac-signature", capturedRequest.get().headers().getFirst("X-Signature"));
+    }
+
+    @Test
+    void shouldWrapAuthProviderFailure() {
+        AuthProvider authProvider = request -> Mono.error(new IllegalStateException("token endpoint down"));
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.test.local/users")).build();
+
+        StepVerifier.create(filter.filter(request, req -> Mono.just(ClientResponse.create(HttpStatus.OK).build())))
+                .expectErrorSatisfies(error -> {
+                    assertTrue(error instanceof AuthProviderException);
+                    assertTrue(error.getCause() instanceof IllegalStateException);
+                })
+                .verify();
     }
 }

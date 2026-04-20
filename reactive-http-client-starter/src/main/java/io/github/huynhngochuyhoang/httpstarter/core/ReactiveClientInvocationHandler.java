@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
@@ -579,6 +580,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
         if (error instanceof CancellationException) {
             return ErrorCategory.CANCELLED;
+        }
+        if (error instanceof AuthProviderException) {
+            return ErrorCategory.AUTH_PROVIDER_ERROR;
         }
         if (statusCode != null) {
             int code = statusCode.value();
