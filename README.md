@@ -14,12 +14,12 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 
 ---
 
-## 1) Current production readiness
+## 1) Current starter status (v1.5.0)
 
 ### Quick assessment
 
-**Current level:** production-ready for most service-to-service workloads.  
-**Condition:** core transport/auth/resilience capabilities are built in; teams still need app-level governance and runbooks.
+**Current level:** ready for v1.5.0 release, production-ready for most service-to-service workloads.  
+**Condition:** core transport/auth/resilience capabilities are built in and stable; teams still need app-level governance and runbooks.
 
 | Area | Status | Notes |
 |---|---|---|
@@ -62,7 +62,7 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-starter</artifactId>
-  <version>1.2.0</version>
+  <version>1.5.0</version>
 </dependency>
 ```
 
