@@ -54,11 +54,12 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
             return Mono.just(response);
         }
 
-        return invalidatable.invalidate()
-                .onErrorMap(error -> error instanceof AuthProviderException
-                        ? error
-                        : new AuthProviderException(clientName, error))
-                .then(response.releaseBody())
+        return response.releaseBody()
+                .onErrorResume(error -> Mono.empty())
+                .then(invalidatable.invalidate()
+                        .onErrorMap(error -> error instanceof AuthProviderException
+                                ? error
+                                : new AuthProviderException(clientName, error)))
                 .then(resolveAuthorizedRequest(originalRequest, authRequest))
                 .flatMap(next::exchange);
     }

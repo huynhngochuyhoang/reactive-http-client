@@ -96,7 +96,9 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
             Throwable cause = lastRefreshFailure != null
                     ? lastRefreshFailure
                     : new IllegalStateException("token refresh in cooldown");
-            return Mono.error(new AuthProviderException(clientName, cause));
+            return Mono.error(cause instanceof AuthProviderException
+                    ? cause
+                    : new AuthProviderException(clientName, cause));
         }
 
         Mono<CachedAccessToken> currentRefresh = inFlightRefresh;

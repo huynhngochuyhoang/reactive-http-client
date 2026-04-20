@@ -236,8 +236,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         try {
             return new Resilience4jOperatorApplier(circuitBreakerRegistry, retryRegistry, bulkheadRegistry);
         } catch (Throwable error) {
-            log.warn("Resilience4j operator applier could not be initialized. Falling back to no-op resilience: {}",
-                    error.getMessage());
+            log.warn("Resilience4j operator applier could not be initialized. Falling back to no-op resilience.",
+                    error);
             return new NoopResilienceOperatorApplier();
         }
     }

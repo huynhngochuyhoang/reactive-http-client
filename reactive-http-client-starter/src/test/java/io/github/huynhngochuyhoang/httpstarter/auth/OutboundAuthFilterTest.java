@@ -12,11 +12,14 @@ import reactor.test.StepVerifier;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class OutboundAuthFilterTest {
 
@@ -169,6 +172,36 @@ class OutboundAuthFilterTest {
                 .assertNext(clientResponse -> assertEquals(HttpStatus.OK.value(), clientResponse.statusCode().value()))
                 .verifyComplete();
         assertEquals(2, tokenCalls.get());
+        assertEquals(1, invalidateCalls.get());
+    }
+
+    @Test
+    void shouldReleaseUnauthorizedBodyEvenWhenInvalidateFails() {
+        AtomicInteger invalidateCalls = new AtomicInteger();
+        AtomicBoolean released = new AtomicBoolean(false);
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(AuthRequest request) {
+                return Mono.just(AuthContext.builder().header("Authorization", "Bearer token-1").build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                invalidateCalls.incrementAndGet();
+                return Mono.error(new IllegalStateException("invalidate failed"));
+            }
+        };
+        ClientResponse unauthorized = mock(ClientResponse.class);
+        when(unauthorized.statusCode()).thenReturn(HttpStatus.UNAUTHORIZED);
+        when(unauthorized.releaseBody()).thenAnswer(invocation -> Mono.fromRunnable(() -> released.set(true)));
+
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.test.local/users")).build();
+
+        StepVerifier.create(filter.filter(request, req -> Mono.just(unauthorized)))
+                .expectError(AuthProviderException.class)
+                .verify();
+        assertTrue(released.get());
         assertEquals(1, invalidateCalls.get());
     }
 }

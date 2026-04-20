@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.PUT;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -15,6 +16,7 @@ import reactor.test.StepVerifier;
 
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -77,6 +79,10 @@ class ReactiveClientInvocationHandlerRetryMethodsTest {
         when(appCtx.getBeanProvider(io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver.class))
                 .thenReturn(observerProvider);
         when(observerProvider.getIfAvailable()).thenReturn(null);
+        RetryConfig retryConfig = RetryConfig.custom()
+                .maxAttempts(2)
+                .waitDuration(Duration.ZERO)
+                .build();
 
         return new ReactiveClientInvocationHandler(
                 webClient,
@@ -86,7 +92,7 @@ class ReactiveClientInvocationHandlerRetryMethodsTest {
                 config,
                 "test-client",
                 appCtx,
-                new Resilience4jOperatorApplier(null, RetryRegistry.ofDefaults(), null),
+                new Resilience4jOperatorApplier(null, RetryRegistry.of(retryConfig), null),
                 null,
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );

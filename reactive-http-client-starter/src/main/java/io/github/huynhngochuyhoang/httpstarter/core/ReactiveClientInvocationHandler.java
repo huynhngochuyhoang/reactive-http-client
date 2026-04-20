@@ -103,9 +103,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     /**
      * Returns the {@link HttpClientObserver} to use for this handler.
-     * Resolved lazily from the {@link ApplicationContext} on first call so that
-     * auto-configured observer beans that are initialised after this handler is
-     * constructed are still picked up.
+     * The provider is queried for each invocation so late-registered observer beans
+     * are still visible after this handler has been constructed.
      */
     private HttpClientObserver getObserver() {
         HttpClientObserver observer = observerProvider.getIfAvailable();
@@ -145,12 +144,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 });
 
         boolean hasAcceptHeader = hasHeaderIgnoreCase(resolved.headers(), HttpHeaders.ACCEPT);
-        boolean hasContentTypeHeader = hasHeaderIgnoreCase(resolved.headers(), HttpHeaders.CONTENT_TYPE);
+        String contentTypeHeader = getHeaderIgnoreCase(resolved.headers(), HttpHeaders.CONTENT_TYPE);
+        boolean hasContentTypeHeader = contentTypeHeader != null;
         if (!hasAcceptHeader) {
             requestSpec = requestSpec.accept(MediaType.APPLICATION_JSON);
         }
 
-        SerializedRequestBody serializedRequestBody = serializeRequestBodyForAuth(resolved.body(), hasContentTypeHeader);
+        SerializedRequestBody serializedRequestBody = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader);
         if (serializedRequestBody.originalBody() != null) {
             requestSpec = requestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, serializedRequestBody.originalBody());
         }
@@ -407,7 +407,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private boolean hasHeaderIgnoreCase(Map<String, String> headers, String headerName) {
-        return headers.keySet().stream().anyMatch(name -> headerName.equalsIgnoreCase(name));
+        return getHeaderIgnoreCase(headers, headerName) != null;
+    }
+
+    private String getHeaderIgnoreCase(Map<String, String> headers, String headerName) {
+        return headers.entrySet().stream()
+                .filter(entry -> headerName.equalsIgnoreCase(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean isRetryableMethod(String method) {
@@ -418,7 +426,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return method != null && resilience.getRetryMethods().contains(method.toUpperCase(Locale.ROOT));
     }
 
-    private SerializedRequestBody serializeRequestBodyForAuth(Object body, boolean hasContentTypeHeader) {
+    private SerializedRequestBody serializeRequestBodyForAuth(Object body, String contentTypeHeader) {
         if (body == null) {
             return new SerializedRequestBody(null, null, null);
         }
@@ -428,7 +436,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (body instanceof String text) {
             return new SerializedRequestBody(body, text, text.getBytes(StandardCharsets.UTF_8));
         }
-        if (hasContentTypeHeader || objectMapper == null) {
+        if (!shouldProvideJsonRawBody(contentTypeHeader) || objectMapper == null) {
             return new SerializedRequestBody(body, body, null);
         }
         try {
@@ -436,6 +444,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return new SerializedRequestBody(body, json, json);
         } catch (JsonProcessingException e) {
             throw new AuthProviderException(clientName, e);
+        }
+    }
+
+    private boolean shouldProvideJsonRawBody(String contentTypeHeader) {
+        if (contentTypeHeader == null || contentTypeHeader.isBlank()) {
+            return true;
+        }
+        try {
+            MediaType mediaType = MediaType.parseMediaType(contentTypeHeader);
+            return MediaType.APPLICATION_JSON.isCompatibleWith(mediaType)
+                    || mediaType.getSubtype().toLowerCase(Locale.ROOT).endsWith("+json");
+        } catch (Exception ignored) {
+            return false;
         }
     }
 

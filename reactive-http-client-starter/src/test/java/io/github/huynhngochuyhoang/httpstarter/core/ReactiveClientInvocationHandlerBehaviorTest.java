@@ -4,8 +4,10 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.Body;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.HeaderParam;
 import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
@@ -19,10 +21,13 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -95,6 +100,29 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         assertTrue(proxy1.toString().contains("test-client"));
     }
 
+    @Test
+    void shouldProvideRawBodyForJsonContentTypeEvenWhenHeaderExplicitlyProvided() {
+        AtomicReference<byte[]> capturedRawBody = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    capturedRawBody.set((byte[]) request.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE).orElse(null));
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build());
+                })
+                .build();
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+        StepVerifier.create(invokePostJson(handler, "application/json", Map.of("id", 1)))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertNotNull(capturedRawBody.get());
+        assertTrue(new String(capturedRawBody.get(), StandardCharsets.UTF_8).contains("\"id\":1"));
+    }
+
     @SuppressWarnings("unchecked")
     private static Mono<String> invokeGet(ReactiveClientInvocationHandler handler, String accept) {
         try {
@@ -109,6 +137,16 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     private static Mono<String> invokePost(ReactiveClientInvocationHandler handler, String contentType, String body) {
         try {
             var method = ClientWithBodyHeaders.class.getMethod("post", String.class, String.class);
+            return (Mono<String>) handler.invoke(null, method, new Object[]{contentType, body});
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Mono<String> invokePostJson(ReactiveClientInvocationHandler handler, String contentType, Map<String, Object> body) {
+        try {
+            var method = ClientWithJsonBodyHeaders.class.getMethod("post", String.class, Map.class);
             return (Mono<String>) handler.invoke(null, method, new Object[]{contentType, body});
         } catch (Throwable t) {
             return Mono.error(t);
@@ -131,7 +169,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 "test-client",
                 appCtx,
                 new NoopResilienceOperatorApplier(),
-                null,
+                new ObjectMapper(),
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );
     }
@@ -144,5 +182,10 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     interface ClientWithBodyHeaders {
         @POST("/body")
         Mono<String> post(@HeaderParam("Content-Type") String contentType, @Body String body);
+    }
+
+    interface ClientWithJsonBodyHeaders {
+        @POST("/body")
+        Mono<String> post(@HeaderParam("Content-Type") String contentType, @Body Map<String, Object> body);
     }
 }
