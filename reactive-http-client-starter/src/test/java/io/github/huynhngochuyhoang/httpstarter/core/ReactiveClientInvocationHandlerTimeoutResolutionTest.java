@@ -59,9 +59,7 @@ class ReactiveClientInvocationHandlerTimeoutResolutionTest {
                 clientConfig,
                 "test-client",
                 mock(ApplicationContext.class),
-                null,
-                null,
-                null,
+                new NoopResilienceOperatorApplier(),
                 null,
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );

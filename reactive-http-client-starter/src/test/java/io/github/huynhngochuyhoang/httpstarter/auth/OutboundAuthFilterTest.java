@@ -12,10 +12,14 @@ import reactor.test.StepVerifier;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class OutboundAuthFilterTest {
 
@@ -98,6 +102,28 @@ class OutboundAuthFilterTest {
     }
 
     @Test
+    void shouldPreferRawBodyBytesForAuthSigningWhenPresent() {
+        AtomicReference<Object> capturedBody = new AtomicReference<>();
+        AuthProvider authProvider = request -> {
+            capturedBody.set(request.requestBody());
+            return Mono.just(AuthContext.empty());
+        };
+
+        OutboundAuthFilter filter = new OutboundAuthFilter("hmac-service", authProvider);
+        byte[] raw = "{\"id\":1001}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        ClientRequest request = ClientRequest.create(HttpMethod.POST, URI.create("https://api.test.local/payments"))
+                .attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, java.util.Map.of("id", 1001))
+                .attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, raw)
+                .build();
+
+        StepVerifier.create(filter.filter(request, req -> Mono.just(ClientResponse.create(HttpStatus.OK).build())))
+                .expectNextCount(1)
+                .verifyComplete();
+        assertTrue(capturedBody.get() instanceof byte[]);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(raw, (byte[]) capturedBody.get());
+    }
+
+    @Test
     void shouldWrapAuthProviderFailure() {
         AuthProvider authProvider = request -> Mono.error(new IllegalStateException("token endpoint down"));
         OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
@@ -109,5 +135,73 @@ class OutboundAuthFilterTest {
                     assertTrue(error.getCause() instanceof IllegalStateException);
                 })
                 .verify();
+    }
+
+    @Test
+    void shouldInvalidateAndRetryOnceOnUnauthorized() {
+        AtomicInteger tokenCalls = new AtomicInteger();
+        AtomicInteger invalidateCalls = new AtomicInteger();
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(AuthRequest request) {
+                int call = tokenCalls.incrementAndGet();
+                return Mono.just(AuthContext.builder()
+                        .header("Authorization", "Bearer token-" + call)
+                        .build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                invalidateCalls.incrementAndGet();
+                return Mono.empty();
+            }
+        };
+
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.test.local/users")).build();
+
+        Mono<ClientResponse> response = filter.filter(request, req -> {
+            String auth = req.headers().getFirst("Authorization");
+            if ("Bearer token-1".equals(auth)) {
+                return Mono.just(ClientResponse.create(HttpStatus.UNAUTHORIZED).body("unauthorized").build());
+            }
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        });
+
+        StepVerifier.create(response)
+                .assertNext(clientResponse -> assertEquals(HttpStatus.OK.value(), clientResponse.statusCode().value()))
+                .verifyComplete();
+        assertEquals(2, tokenCalls.get());
+        assertEquals(1, invalidateCalls.get());
+    }
+
+    @Test
+    void shouldReleaseUnauthorizedBodyEvenWhenInvalidateFails() {
+        AtomicInteger invalidateCalls = new AtomicInteger();
+        AtomicBoolean released = new AtomicBoolean(false);
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(AuthRequest request) {
+                return Mono.just(AuthContext.builder().header("Authorization", "Bearer token-1").build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                invalidateCalls.incrementAndGet();
+                return Mono.error(new IllegalStateException("invalidate failed"));
+            }
+        };
+        ClientResponse unauthorized = mock(ClientResponse.class);
+        when(unauthorized.statusCode()).thenReturn(HttpStatus.UNAUTHORIZED);
+        when(unauthorized.releaseBody()).thenAnswer(invocation -> Mono.fromRunnable(() -> released.set(true)));
+
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.test.local/users")).build();
+
+        StepVerifier.create(filter.filter(request, req -> Mono.just(unauthorized)))
+                .expectError(AuthProviderException.class)
+                .verify();
+        assertTrue(released.get());
+        assertEquals(1, invalidateCalls.get());
     }
 }

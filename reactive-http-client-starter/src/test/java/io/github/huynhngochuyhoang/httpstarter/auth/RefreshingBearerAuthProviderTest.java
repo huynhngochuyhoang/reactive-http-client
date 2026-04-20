@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RefreshingBearerAuthProviderTest {
 
@@ -30,6 +31,7 @@ class RefreshingBearerAuthProviderTest {
                     return new AccessToken("token-1", now.plusSeconds(120));
                 }),
                 Duration.ofSeconds(30),
+                Duration.ZERO,
                 fixedClock
         );
 
@@ -61,6 +63,7 @@ class RefreshingBearerAuthProviderTest {
                     return new AccessToken("token-new", now.plusSeconds(120));
                 }),
                 Duration.ofSeconds(30),
+                Duration.ZERO,
                 clock
         );
 
@@ -90,6 +93,7 @@ class RefreshingBearerAuthProviderTest {
                     return sink.asMono();
                 },
                 Duration.ofSeconds(30),
+                Duration.ZERO,
                 fixedClock
         );
 
@@ -114,14 +118,77 @@ class RefreshingBearerAuthProviderTest {
         RefreshingBearerAuthProvider provider = new RefreshingBearerAuthProvider(
                 () -> Mono.just(new AccessToken("expired", now.minusSeconds(1))),
                 Duration.ofSeconds(30),
+                Duration.ZERO,
                 fixedClock
         );
 
         StepVerifier.create(provider.getAuth(sampleRequest()))
                 .expectErrorMatches(error ->
-                        error instanceof IllegalStateException
-                                && error.getMessage().contains("already expired"))
+                        error instanceof io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException
+                                && error.getCause() instanceof IllegalStateException
+                                && error.getCause().getMessage().contains("already expired"))
                 .verify();
+    }
+
+    @Test
+    void shouldRefreshAgainAfterInvalidate() {
+        AtomicInteger calls = new AtomicInteger();
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        Clock fixedClock = Clock.fixed(now, ZoneOffset.UTC);
+        RefreshingBearerAuthProvider provider = new RefreshingBearerAuthProvider(
+                () -> Mono.fromSupplier(() -> {
+                    int call = calls.incrementAndGet();
+                    return new AccessToken("token-" + call, now.plusSeconds(120));
+                }),
+                Duration.ofSeconds(30),
+                Duration.ZERO,
+                fixedClock
+        );
+
+        StepVerifier.create(provider.getAuth(sampleRequest()))
+                .assertNext(auth -> assertEquals("Bearer token-1", auth.getHeaders().get("Authorization")))
+                .verifyComplete();
+
+        StepVerifier.create(provider.invalidate()).verifyComplete();
+
+        StepVerifier.create(provider.getAuth(sampleRequest()))
+                .assertNext(auth -> assertEquals("Bearer token-2", auth.getHeaders().get("Authorization")))
+                .verifyComplete();
+        assertEquals(2, calls.get());
+    }
+
+    @Test
+    void shouldApplyCooldownAfterRefreshFailure() {
+        AtomicInteger calls = new AtomicInteger();
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        TestClock clock = new TestClock(now);
+        RefreshingBearerAuthProvider provider = new RefreshingBearerAuthProvider(
+                () -> Mono.defer(() -> {
+                    calls.incrementAndGet();
+                    return Mono.error(new IllegalStateException("token endpoint down"));
+                }),
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(10),
+                clock
+        );
+
+        StepVerifier.create(provider.getAuth(sampleRequest()))
+                .expectError(io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException.class)
+                .verify();
+        StepVerifier.create(provider.getAuth(sampleRequest()))
+                .expectErrorSatisfies(error -> {
+                    assertTrue(error instanceof io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException);
+                    assertTrue(error.getCause() instanceof io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException
+                            || error.getCause() instanceof IllegalStateException);
+                })
+                .verify();
+        assertEquals(1, calls.get());
+
+        clock.set(now.plusSeconds(11));
+        StepVerifier.create(provider.getAuth(sampleRequest()))
+                .expectError(io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException.class)
+                .verify();
+        assertEquals(2, calls.get());
     }
 
     private static AuthRequest sampleRequest() {

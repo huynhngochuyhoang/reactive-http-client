@@ -142,9 +142,7 @@ class CorrelationIdPropagationTest {
                 new ReactiveHttpClientProperties.ClientConfig(),
                 "test-client",
                 appCtx,
-                null,
-                null,
-                null,
+                new NoopResilienceOperatorApplier(),
                 null,
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );

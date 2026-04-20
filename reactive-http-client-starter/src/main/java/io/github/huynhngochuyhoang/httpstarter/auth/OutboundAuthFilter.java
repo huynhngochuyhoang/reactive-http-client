@@ -3,6 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.auth;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.reactive.function.client.ClientRequest;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 import reactor.core.publisher.Mono;
@@ -26,13 +27,40 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
     @Override
     public Mono<org.springframework.web.reactive.function.client.ClientResponse> filter(
             ClientRequest request, ExchangeFunction next) {
-        Object requestBody = request.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE).orElse(null);
-        return authProvider.getAuth(new AuthRequest(clientName, request, requestBody))
+        Object requestBody = request.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE)
+                .or(() -> request.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE))
+                .orElse(null);
+        AuthRequest authRequest = new AuthRequest(clientName, request, requestBody);
+        return resolveAuthorizedRequest(request, authRequest)
+                .flatMap(next::exchange)
+                .flatMap(response -> retryOnceOnUnauthorized(response, request, authRequest, next));
+    }
+
+    private Mono<ClientRequest> resolveAuthorizedRequest(ClientRequest request, AuthRequest authRequest) {
+        return authProvider.getAuth(authRequest)
                 .onErrorMap(error -> error instanceof AuthProviderException
                         ? error
                         : new AuthProviderException(clientName, error))
                 .defaultIfEmpty(AuthContext.empty())
-                .map(authContext -> applyAuth(request, authContext))
+                .map(authContext -> applyAuth(request, authContext));
+    }
+
+    private Mono<ClientResponse> retryOnceOnUnauthorized(
+            ClientResponse response,
+            ClientRequest originalRequest,
+            AuthRequest authRequest,
+            ExchangeFunction next) {
+        if (response.statusCode().value() != 401 || !(authProvider instanceof InvalidatableAuthProvider invalidatable)) {
+            return Mono.just(response);
+        }
+
+        return response.releaseBody()
+                .onErrorResume(error -> Mono.empty())
+                .then(invalidatable.invalidate()
+                        .onErrorMap(error -> error instanceof AuthProviderException
+                                ? error
+                                : new AuthProviderException(clientName, error)))
+                .then(resolveAuthorizedRequest(originalRequest, authRequest))
                 .flatMap(next::exchange);
     }
 

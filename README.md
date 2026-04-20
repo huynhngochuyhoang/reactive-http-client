@@ -125,6 +125,7 @@ reactive:
           enabled: true
           circuit-breaker: user-service
           retry: user-service
+          retry-methods: [GET, HEAD]
           bulkhead: user-service
           timeout-ms: 0
 ```
@@ -133,7 +134,8 @@ reactive:
 
 Each external client can map to its own `AuthProvider` bean via `auth-provider`.
 The provider returns an `AuthContext` that can inject headers and query params automatically via WebClient filter.
-For body-signing use cases (e.g. HMAC), providers can read `request.requestBody()` from `AuthRequest`.
+For body-signing use cases (e.g. HMAC), providers should sign the raw payload bytes when available
+(`request.request().attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE)`), and only fall back to `request.requestBody()` when raw bytes are absent.
 For bearer-token flows, use built-in `RefreshingBearerAuthProvider` + `AccessTokenProvider` to standardize token cache/rotation.
 
 ```java
@@ -164,13 +166,17 @@ AuthProvider oauthAuthProvider(OAuthTokenClient tokenClient) {
 - caches the latest token value
 - refreshes when token enters the refresh window (`expiresAt - refreshSkew`)
 - deduplicates concurrent refresh calls (single in-flight token fetch)
+- supports cache invalidation (used by outbound auth filter to refresh and retry once on HTTP 401)
 - supports non-expiring tokens by returning `expiresAt = null`
 
 ```java
 @Bean("hmacAuthProvider")
 AuthProvider hmacAuthProvider(HmacSigner signer) {
     return request -> Mono.fromSupplier(() -> {
-        String signature = signer.sign(request.requestBody());
+        byte[] payload = request.request().attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE)
+                .map(byte[].class::cast)
+                .orElseGet(() -> java.util.Objects.toString(request.requestBody(), "").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String signature = signer.sign(payload);
         return AuthContext.builder()
                 .header("X-Signature", signature)
                 .build();
@@ -205,7 +211,7 @@ Each proxy invocation follows this pipeline:
 4. Decode errors:
    - 4xx -> `HttpClientException`
    - 5xx -> `RemoteServiceException`
-5. Apply resilience (if enabled): circuit-breaker -> retry -> bulkhead.
+5. Apply resilience (if enabled): retry -> circuit-breaker -> bulkhead.
 6. Apply request timeout (priority: `@TimeoutMs` > `resilience.timeout-ms`).
 7. Emit observability event (if observer is configured).
 
@@ -248,7 +254,19 @@ Both main exception types expose:
 ## 6) Resilience4j integration
 
 The starter supports client-level Resilience4j configuration.
-By default, retry is applied only to **GET/HEAD** (idempotent-safe default).
+Retryable HTTP verbs are configurable via `reactive.http.clients.<name>.resilience.retry-methods`
+(default: **GET/HEAD**).
+
+```yaml
+reactive:
+  http:
+    clients:
+      user-service:
+        resilience:
+          enabled: true
+          retry: user-service
+          retry-methods: [GET, HEAD, PUT]
+```
 
 If you need per-business-method policies or fallback methods, add Resilience4j annotations at the service layer.
 

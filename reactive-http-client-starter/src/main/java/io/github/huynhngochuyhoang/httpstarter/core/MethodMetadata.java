@@ -12,6 +12,8 @@ import java.util.Set;
  */
 public class MethodMetadata {
 
+    public static final long TIMEOUT_NOT_SET = -1L;
+
     private String httpMethod;
     private String pathTemplate;
 
@@ -36,8 +38,8 @@ public class MethodMetadata {
     private Type responseType;
     private Method method;
     private String apiName;
-    /** Method-level timeout override in milliseconds: -1 means not configured. */
-    private long timeoutMs = -1;
+    /** Method-level timeout override in milliseconds: {@link #TIMEOUT_NOT_SET} means not configured. */
+    private long timeoutMs = TIMEOUT_NOT_SET;
     private boolean httpExchangeLoggingEnabled;
     private Class<? extends HttpExchangeLogger> httpExchangeLoggerClass;
 

@@ -10,6 +10,7 @@ import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.codec.DecodingException;
 import org.springframework.http.HttpHeaders;
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
 
@@ -170,6 +172,10 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         resilienceConfig.setEnabled(true);
         resilienceConfig.setTimeoutMs(resilienceTimeoutMs);
         config.setResilience(resilienceConfig);
+        ApplicationContext applicationContext = mock(ApplicationContext.class);
+        ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
+        when(applicationContext.getBeanProvider(HttpClientObserver.class)).thenReturn(observerProvider);
+        when(observerProvider.getIfAvailable()).thenReturn(observer);
 
         return new ReactiveClientInvocationHandler(
                 webClient,
@@ -178,11 +184,9 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
                 new DefaultErrorDecoder(),
                 config,
                 "test-client",
-                mock(ApplicationContext.class),
+                applicationContext,
+                new NoopResilienceOperatorApplier(),
                 null,
-                null,
-                null,
-                observer,
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );
     }

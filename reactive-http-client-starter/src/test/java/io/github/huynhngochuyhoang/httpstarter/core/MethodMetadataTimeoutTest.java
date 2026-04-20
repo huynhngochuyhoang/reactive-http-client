@@ -27,7 +27,7 @@ class MethodMetadataTimeoutTest {
 
         MethodMetadata metadata = new MethodMetadataCache().get(method);
 
-        assertEquals(-1, metadata.getTimeoutMs());
+        assertEquals(MethodMetadata.TIMEOUT_NOT_SET, metadata.getTimeoutMs());
     }
 
     @Test

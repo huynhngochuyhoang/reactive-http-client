@@ -3,7 +3,11 @@ package io.github.huynhngochuyhoang.httpstarter.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * Configuration properties for all reactive HTTP clients.
@@ -30,6 +34,7 @@ import java.util.Map;
  *           enabled: false
  *           circuit-breaker: default
  *           retry: default
+ *           retry-methods: [GET, HEAD]
  *           bulkhead: default
  *           timeout-ms: 0
  * }</pre>
@@ -123,6 +128,11 @@ public class ReactiveHttpClientProperties {
         private String circuitBreaker = "default";
         /** Name of the Resilience4j Retry instance. */
         private String retry = "default";
+        /**
+         * HTTP methods eligible for retry.
+         * Defaults to idempotent-safe methods.
+         */
+        private Set<String> retryMethods = new LinkedHashSet<>(Set.of("GET", "HEAD"));
         /** Name of the Resilience4j Bulkhead instance. */
         private String bulkhead = "default";
         /** Request timeout in milliseconds (0 = disabled). */
@@ -136,6 +146,22 @@ public class ReactiveHttpClientProperties {
 
         public String getRetry() { return retry; }
         public void setRetry(String retry) { this.retry = retry; }
+
+        public Set<String> getRetryMethods() { return retryMethods; }
+        public void setRetryMethods(Set<String> retryMethods) {
+            if (retryMethods == null || retryMethods.isEmpty()) {
+                this.retryMethods = new LinkedHashSet<>();
+                return;
+            }
+            LinkedHashSet<String> normalized = new LinkedHashSet<>();
+            retryMethods.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(value -> !value.isEmpty())
+                    .map(value -> value.toUpperCase(Locale.ROOT))
+                    .forEach(normalized::add);
+            this.retryMethods = normalized;
+        }
 
         public String getBulkhead() { return bulkhead; }
         public void setBulkhead(String bulkhead) { this.bulkhead = bulkhead; }

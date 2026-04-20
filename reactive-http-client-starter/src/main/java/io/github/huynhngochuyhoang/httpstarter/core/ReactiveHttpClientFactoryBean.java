@@ -5,7 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
-import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
@@ -85,10 +85,9 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         Object circuitBreakerRegistry = resolveSafely("io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry");
         Object retryRegistry = resolveSafely("io.github.resilience4j.retry.RetryRegistry");
         Object bulkheadRegistry = resolveSafely("io.github.resilience4j.bulkhead.BulkheadRegistry");
-
-        HttpClientObserver observer = applicationContext
-                .getBeanProvider(HttpClientObserver.class)
-                .getIfAvailable();
+        ResilienceOperatorApplier resilienceOperatorApplier = resolveResilienceOperatorApplier(
+                circuitBreakerRegistry, retryRegistry, bulkheadRegistry);
+        ObjectMapper objectMapper = applicationContext.getBeanProvider(ObjectMapper.class).getIfAvailable();
 
         ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                 webClient,
@@ -98,10 +97,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 config,
                 clientName,
                 applicationContext,
-                circuitBreakerRegistry,
-                retryRegistry,
-                bulkheadRegistry,
-                observer,
+                resilienceOperatorApplier,
+                objectMapper,
                 properties.getObservability()
         );
 
@@ -226,6 +223,22 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             return applicationContext.getBeanProvider(clazz).getIfAvailable();
         } catch (ClassNotFoundException ignored) {
             return null;
+        }
+    }
+
+    private ResilienceOperatorApplier resolveResilienceOperatorApplier(
+            Object circuitBreakerRegistry,
+            Object retryRegistry,
+            Object bulkheadRegistry) {
+        if (circuitBreakerRegistry == null && retryRegistry == null && bulkheadRegistry == null) {
+            return new NoopResilienceOperatorApplier();
+        }
+        try {
+            return new Resilience4jOperatorApplier(circuitBreakerRegistry, retryRegistry, bulkheadRegistry);
+        } catch (Throwable error) {
+            log.warn("Resilience4j operator applier could not be initialized. Falling back to no-op resilience.",
+                    error);
+            return new NoopResilienceOperatorApplier();
         }
     }
 
