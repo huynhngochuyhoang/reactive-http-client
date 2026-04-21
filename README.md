@@ -120,6 +120,9 @@ reactive:
           timeout-ms: 0
 ```
 
+`reactive.http.network.read-timeout-ms` configures Reactor Netty **response timeout** (request-level timeout), not channel idle-read timeout.
+Method-level `@TimeoutMs` still has highest precedence and can override/disable this timeout per API.
+
 ### 2.5.1 Outbound auth provider (per client)
 
 Each external client can map to its own `AuthProvider` bean via `auth-provider`.

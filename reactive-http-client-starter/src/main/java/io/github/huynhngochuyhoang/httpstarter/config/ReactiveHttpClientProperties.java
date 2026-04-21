@@ -55,6 +55,11 @@ public class ReactiveHttpClientProperties {
 
     public static class NetworkConfig {
         private int connectTimeoutMs = 2000;
+        /**
+         * Reactor Netty response timeout in milliseconds.
+         * <p>
+         * This is a per-request response timeout (time-to-first/next response signal), not a channel idle-read timeout.
+         */
         private int readTimeoutMs = 5000;
         private int writeTimeoutMs = 5000;
         private ConnectionPoolConfig connectionPool = new ConnectionPoolConfig();

@@ -159,6 +159,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
 
         HttpClient httpClient = HttpClient.create(connectionProvider)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, resolvedNetworkConfig.getConnectTimeoutMs())
+                // Global default response timeout. Per-method @TimeoutMs is applied per request in invocation handler.
                 .responseTimeout(resolvedNetworkConfig.getReadTimeoutMs() > 0
                         ? Duration.ofMillis(resolvedNetworkConfig.getReadTimeoutMs())
                         : null)
