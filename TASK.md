@@ -1,4 +1,4 @@
-# Code Review Task List ? `reactive-http-client-starter`
+# Code Review Task List - `reactive-http-client-starter`
 
 > Polished Spring Boot starter for declarative reactive HTTP clients over WebFlux.
 > Solid tests (15 classes), coherent observability, gracefully optional Resilience4j.
@@ -6,7 +6,7 @@
 
 ---
 
-## ? Critical ? Security & Data Leakage
+## Critical - Security & Data Leakage
 
 - [ ] **C1. Redact sensitive headers and bodies in `DefaultHttpExchangeLogger`**
   - **Where:** `DefaultHttpExchangeLogger.java:20-29`
@@ -30,7 +30,7 @@
 
 ---
 
-## ? High ? Correctness Bugs
+## High - Correctness Bugs
 
 - [ ] **H1. Fix URL encoding of auth-provider query params**
   - **Where:** `OutboundAuthFilter.java:79-88`
@@ -80,7 +80,7 @@
 
 ---
 
-## ? Medium ? Design Problems
+## Medium - Design Problems
 
 - [ ] **M1. Freeze `MethodMetadata` collections after parsing**
   - **Where:** `MethodMetadata.java:54-57`
@@ -134,7 +134,7 @@
 
 ---
 
-## ? Low ? Style & Minor Issues
+## Low - Style & Minor Issues
 
 - [ ] **L1.** `getObserver()` reduces to `observerProvider.getIfAvailable()` ? remove redundant null check. *(`ReactiveClientInvocationHandler.java:117`)*
 - [ ] **L2.** `resilienceWarningKeys` declared as `java.util.Set<String>` despite `Set` already imported. *(`ReactiveClientInvocationHandler.java:74`)*
@@ -149,7 +149,7 @@
 
 ---
 
-## ? Test Coverage Gaps
+## Test Coverage Gaps
 
 - [ ] **T1.** `@PATCH` verb (after H6)
 - [ ] **T2.** `@Body` with `byte[]`, `String`, and custom content types
@@ -161,13 +161,13 @@
 
 ---
 
-## ? Priority Order
+## Priority Order
 
 Biggest risk reduction by addressing in this order:
 
-1. **C1 + C2** ? redact headers / stop embedding bodies in exceptions
-2. **H1** ? URL-encoding bug can produce silently wrong HMAC signatures
-3. **H2 + H4** ? hard-to-debug silent failures for common user mistakes
-4. **H6** ? `PATCH` support
-5. **H7** ? auth invalidation race
-6. **M1 + M2 + M3** ? thread safety of cached metadata and correctness of observability timers
+1. **C1 + C2** redact headers / stop embedding bodies in exceptions
+2. **H1** URL-encoding bug can produce silently wrong HMAC signatures
+3. **H2 + H4** hard-to-debug silent failures for common user mistakes
+4. **H6** `PATCH` support
+5. **H7** auth invalidation race
+6. **M1 + M2 + M3** thread safety of cached metadata and correctness of observability timers
