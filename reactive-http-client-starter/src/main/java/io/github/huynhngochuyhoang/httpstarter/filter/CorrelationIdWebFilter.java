@@ -29,6 +29,11 @@ public class CorrelationIdWebFilter implements WebFilter {
 
     /** HTTP header name for the correlation ID. */
     public static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
+    private static final String[] MDC_FALLBACK_KEYS = {
+            CORRELATION_ID_CONTEXT_KEY,
+            CORRELATION_ID_HEADER,
+            "traceId"
+    };
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
@@ -53,15 +58,29 @@ public class CorrelationIdWebFilter implements WebFilter {
             String correlationId = ctx.getOrDefault(CORRELATION_ID_CONTEXT_KEY, null);
             if (correlationId == null) {
                 // Fall back to MDC for backward compatibility
-                correlationId = MDC.get(CORRELATION_ID_CONTEXT_KEY);
+                correlationId = resolveFromMdc();
             }
             if (StringUtils.hasText(correlationId)) {
+                if (StringUtils.hasText(request.headers().getFirst(CORRELATION_ID_HEADER))) {
+                    return next.exchange(request);
+                }
+                String resolvedCorrelationId = correlationId;
                 ClientRequest newRequest = ClientRequest.from(request)
-                        .header(CORRELATION_ID_HEADER, correlationId)
+                        .headers(headers -> headers.set(CORRELATION_ID_HEADER, resolvedCorrelationId))
                         .build();
                 return next.exchange(newRequest);
             }
             return next.exchange(request);
         });
+    }
+
+    private static String resolveFromMdc() {
+        for (String key : MDC_FALLBACK_KEYS) {
+            String value = MDC.get(key);
+            if (StringUtils.hasText(value)) {
+                return value;
+            }
+        }
+        return null;
     }
 }

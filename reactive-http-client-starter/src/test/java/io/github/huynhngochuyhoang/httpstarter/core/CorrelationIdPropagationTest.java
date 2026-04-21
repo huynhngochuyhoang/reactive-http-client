@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
+import io.github.huynhngochuyhoang.httpstarter.annotation.HeaderParam;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
@@ -123,6 +124,69 @@ class CorrelationIdPropagationTest {
         }
     }
 
+    @Test
+    void shouldUseConventionalTraceIdMdcKeyAsFallback() {
+        AtomicReference<String> capturedHeader = new AtomicReference<>();
+
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(CorrelationIdWebFilter.exchangeFilter())
+                .exchangeFunction(request -> {
+                    capturedHeader.set(request.headers().getFirst(CorrelationIdWebFilter.CORRELATION_ID_HEADER));
+                    ClientResponse ok = ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build();
+                    return Mono.just(ok);
+                })
+                .build();
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        org.slf4j.MDC.put("traceId", "trace-id-value");
+        try {
+            Mono<String> result = invokeGetUsers(handler);
+
+            StepVerifier.create(result)
+                    .expectNextMatches(body -> "ok".equals(body))
+                    .verifyComplete();
+
+            assertEquals("trace-id-value", capturedHeader.get());
+        } finally {
+            org.slf4j.MDC.remove("traceId");
+        }
+    }
+
+    @Test
+    void shouldNotDuplicateCorrelationIdWhenRequestAlreadyHasHeader() {
+        AtomicReference<java.util.List<String>> capturedHeaders = new AtomicReference<>();
+
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(CorrelationIdWebFilter.exchangeFilter())
+                .exchangeFunction(request -> {
+                    capturedHeaders.set(request.headers().get(CorrelationIdWebFilter.CORRELATION_ID_HEADER));
+                    ClientResponse ok = ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build();
+                    return Mono.just(ok);
+                })
+                .build();
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        Mono<String> result = invokeGetUsersWithHeader(handler, "preset-id")
+                .contextWrite(Context.of(CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY, "ctx-id"));
+
+        StepVerifier.create(result)
+                .expectNextMatches(body -> "ok".equals(body))
+                .verifyComplete();
+
+        assertEquals(1, capturedHeaders.get().size());
+        assertEquals("preset-id", capturedHeaders.get().get(0));
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -158,8 +222,21 @@ class CorrelationIdPropagationTest {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private static Mono<String> invokeGetUsersWithHeader(ReactiveClientInvocationHandler handler, String correlationId) {
+        try {
+            java.lang.reflect.Method method = CorrelationTestClient.class.getMethod("getUsersWithHeader", String.class);
+            return (Mono<String>) handler.invoke(null, method, new Object[]{correlationId});
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
     interface CorrelationTestClient {
         @GET("/users")
         Mono<String> getUsers();
+
+        @GET("/users")
+        Mono<String> getUsersWithHeader(@HeaderParam("X-Correlation-Id") String correlationId);
     }
 }

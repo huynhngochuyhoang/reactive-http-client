@@ -94,4 +94,32 @@ class MicrometerHttpClientObserverTest {
         assertNotNull(timer);
         assertEquals(1, timer.count(), 0.0d);
     }
+
+    @Test
+    void shouldDefaultClientNameTagToUnknownWhenNull() {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(
+                meterRegistry,
+                new ReactiveHttpClientProperties.ObservabilityConfig()
+        );
+
+        observer.record(new HttpClientObserverEvent(
+                null,
+                "user.get",
+                "GET",
+                "/users/{id}",
+                200,
+                8,
+                null,
+                null,
+                null,
+                "ok"
+        ));
+
+        Timer timer = meterRegistry.find("http.client.requests")
+                .tag("client.name", "UNKNOWN")
+                .timer();
+        assertNotNull(timer);
+        assertEquals(1, timer.count(), 0.0d);
+    }
 }

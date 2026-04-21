@@ -7,6 +7,11 @@ public class AuthProviderException extends RuntimeException {
 
     private final String clientName;
 
+    public AuthProviderException(String clientName, String message) {
+        super(message);
+        this.clientName = clientName;
+    }
+
     public AuthProviderException(String clientName, Throwable cause) {
         super("Auth provider failed for client '" + clientName + "'", cause);
         this.clientName = clientName;

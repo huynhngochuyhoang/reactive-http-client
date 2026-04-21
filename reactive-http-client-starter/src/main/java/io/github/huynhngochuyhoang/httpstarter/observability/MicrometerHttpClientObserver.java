@@ -111,7 +111,7 @@ public class MicrometerHttpClientObserver implements HttpClientObserver {
                 : "none";
 
         return Tags.of(
-                Tag.of("client.name", event.getClientName()),
+                Tag.of("client.name", event.getClientName() != null ? event.getClientName() : "UNKNOWN"),
                 Tag.of("api.name", event.getApiName() != null ? event.getApiName() : "UNKNOWN"),
                 Tag.of("http.method", event.getHttpMethod() != null ? event.getHttpMethod() : "UNKNOWN"),
                 Tag.of("uri", uri),

@@ -21,6 +21,11 @@ public final class HttpClientObserverEvent {
     private final Object requestBody;
     private final Object responseBody;
 
+    /**
+     * @deprecated Use {@link #HttpClientObserverEvent(String, String, String, String, Integer, long, Throwable, ErrorCategory, Object, Object)}
+     * to provide {@link ErrorCategory} explicitly.
+     */
+    @Deprecated(since = "1.5.1", forRemoval = false)
     public HttpClientObserverEvent(
             String clientName,
             String apiName,
@@ -88,7 +93,10 @@ public final class HttpClientObserverEvent {
     /** The serialised request body (may be {@code null} for GET/DELETE). */
     public Object getRequestBody() { return requestBody; }
 
-    /** The deserialised response body (may be {@code null} for empty or error responses). */
+    /**
+     * The deserialised response body (may be {@code null} for empty or error responses).
+     * For {@code Flux<T>} responses this field is always {@code null}.
+     */
     public Object getResponseBody() { return responseBody; }
 
     /** {@code true} when {@link #getError()} is non-null. */

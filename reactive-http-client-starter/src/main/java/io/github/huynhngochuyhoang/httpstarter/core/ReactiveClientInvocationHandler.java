@@ -72,7 +72,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final String clientName;
     private final ApplicationContext applicationContext;
     private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> loggerCache = new ConcurrentHashMap<>();
-    private final java.util.Set<String> resilienceWarningKeys = ConcurrentHashMap.newKeySet();
+    private final Set<String> resilienceWarningKeys = ConcurrentHashMap.newKeySet();
 
     private final ResilienceOperatorApplier resilienceOperatorApplier;
     private final ObjectMapper objectMapper;
@@ -114,8 +114,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
      * are still visible after this handler has been constructed.
      */
     private HttpClientObserver getObserver() {
-        HttpClientObserver observer = observerProvider.getIfAvailable();
-        return observer != null ? observer : null;
+        return observerProvider.getIfAvailable();
     }
 
     @Override
@@ -445,11 +444,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private String getHeaderIgnoreCase(Map<String, String> headers, String headerName) {
-        return headers.entrySet().stream()
-                .filter(entry -> headerName.equalsIgnoreCase(entry.getKey()))
-                .map(Map.Entry::getValue)
-                .findFirst()
-                .orElse(null);
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            if (headerName.equalsIgnoreCase(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     private boolean isRetryableMethod(String method) {

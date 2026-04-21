@@ -82,7 +82,7 @@
 
 ## Medium - Design Problems
 
-- [ ] **M1. Freeze `MethodMetadata` collections after parsing**
+- [x] **M1. Freeze `MethodMetadata` collections after parsing**
   - **Where:** `MethodMetadata.java:54-57`
   - **Issue:** Returns direct references to private `HashMap`/`HashSet`. Callers could mutate cached entries.
   - **Fix:** At the end of `MethodMetadataCache.parse()` wrap with `Map.copyOf(...)` / `Set.copyOf(...)` or `Collections.unmodifiableMap(...)`.
@@ -112,12 +112,12 @@
   - **Issue:** Not used in the main invocation path; likely dead code or a utility.
   - **Fix:** Delete if dead, or document as public API and add load-bearing tests.
 
-- [ ] **M7. Prevent duplicate `X-Correlation-Id` on outbound request**
+- [x] **M7. Prevent duplicate `X-Correlation-Id` on outbound request**
   - **Where:** `CorrelationIdWebFilter.java:59-61`
   - **Issue:** `ClientRequest.Builder.header(...)` appends rather than replaces; pre-set headers result in duplicates.
   - **Fix:** Check-and-skip if present, or use `.headers(h -> h.set(...))` to overwrite deterministically.
 
-- [ ] **M8. Use conventional MDC keys for correlation ID fallback**
+- [x] **M8. Use conventional MDC keys for correlation ID fallback**
   - **Where:** `CorrelationIdWebFilter.java:28`, `:56`
   - **Issue:** MDC key `"correlationId"` rarely matches what tracing frameworks set (`traceId`, `X-Correlation-Id`).
   - **Fix:** Try multiple conventional keys in MDC, or document explicitly.
@@ -136,15 +136,15 @@
 
 ## Low - Style & Minor Issues
 
-- [ ] **L1.** `getObserver()` reduces to `observerProvider.getIfAvailable()` ? remove redundant null check. *(`ReactiveClientInvocationHandler.java:117`)*
-- [ ] **L2.** `resilienceWarningKeys` declared as `java.util.Set<String>` despite `Set` already imported. *(`ReactiveClientInvocationHandler.java:74`)*
-- [ ] **L3.** Replace Stream-based `getHeaderIgnoreCase` with a simple loop (called twice per request). *(`ReactiveClientInvocationHandler.java:443-449`)*
-- [ ] **L4.** `Class.forName` uses default classloader; prefer `ClassUtils.resolveClassName(name, null)` for container safety. *(`ReactiveHttpClientsRegistrar.java:59`)*
-- [ ] **L5.** Document on `HttpClientObserverEvent.getResponseBody()` that Flux responses always pass `null`.
-- [ ] **L6.** Deprecate the older `HttpClientObserverEvent` constructor that leaves `errorCategory` null.
+- [x] **L1.** `getObserver()` reduces to `observerProvider.getIfAvailable()` ? remove redundant null check. *(`ReactiveClientInvocationHandler.java:117`)*
+- [x] **L2.** `resilienceWarningKeys` declared as `java.util.Set<String>` despite `Set` already imported. *(`ReactiveClientInvocationHandler.java:74`)*
+- [x] **L3.** Replace Stream-based `getHeaderIgnoreCase` with a simple loop (called twice per request). *(`ReactiveClientInvocationHandler.java:443-449`)*
+- [x] **L4.** `Class.forName` uses default classloader; prefer `ClassUtils.resolveClassName(name, null)` for container safety. *(`ReactiveHttpClientsRegistrar.java:59`)*
+- [x] **L5.** Document on `HttpClientObserverEvent.getResponseBody()` that Flux responses always pass `null`.
+- [x] **L6.** Deprecate the older `HttpClientObserverEvent` constructor that leaves `errorCategory` null.
 - [ ] **L7.** `@ReactiveHttpClient` meta-annotated with `@Component` but registered via registrar ? verify skip-if-present guard handles both orderings.
-- [ ] **L8.** `MicrometerHttpClientObserver.buildTags`: default `clientName` to `"UNKNOWN"` on null, matching `apiName`/`httpMethod`.
-- [ ] **L9.** `AuthProviderException`: add a message-overload constructor for richer diagnostics.
+- [x] **L8.** `MicrometerHttpClientObserver.buildTags`: default `clientName` to `"UNKNOWN"` on null, matching `apiName`/`httpMethod`.
+- [x] **L9.** `AuthProviderException`: add a message-overload constructor for richer diagnostics.
 - [ ] **L10.** Enrich `DefaultErrorDecoder` exceptions with request URL/method for debugging.
 
 ---

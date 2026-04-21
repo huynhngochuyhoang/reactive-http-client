@@ -113,6 +113,7 @@ public class MethodMetadataCache {
             meta.setTimeoutMs(timeoutMs.value());
         }
 
+        meta.freezeCollections();
         return meta;
     }
 }

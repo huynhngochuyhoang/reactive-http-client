@@ -29,6 +29,17 @@ class MethodMetadataValidationTest {
         assertEquals("/items/1", metadata.getPathTemplate());
     }
 
+    @Test
+    void shouldFreezeMetadataCollectionsAfterParsing() throws Exception {
+        Method method = PatchClient.class.getMethod("patch");
+        MethodMetadata metadata = new MethodMetadataCache().get(method);
+
+        assertThrows(UnsupportedOperationException.class, () -> metadata.getPathVars().put(0, "id"));
+        assertThrows(UnsupportedOperationException.class, () -> metadata.getQueryParams().put(0, "q"));
+        assertThrows(UnsupportedOperationException.class, () -> metadata.getHeaderParams().put(0, "X-Test"));
+        assertThrows(UnsupportedOperationException.class, () -> metadata.getHeaderMapParams().add(0));
+    }
+
     interface InvalidReturnTypeClient {
         @GET("/items")
         String call();

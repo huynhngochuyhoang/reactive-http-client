@@ -56,9 +56,9 @@ public class ReactiveHttpClientsRegistrar implements ImportBeanDefinitionRegistr
             for (BeanDefinition candidate : scanner.findCandidateComponents(basePackage)) {
                 String interfaceClassName = candidate.getBeanClassName();
                 try {
-                    Class<?> interfaceClass = Class.forName(interfaceClassName);
+                    Class<?> interfaceClass = ClassUtils.resolveClassName(interfaceClassName, null);
                     registerFactoryBean(interfaceClass, registry);
-                } catch (ClassNotFoundException e) {
+                } catch (IllegalArgumentException e) {
                     throw new IllegalStateException(
                             "Could not load @ReactiveHttpClient interface: " + interfaceClassName, e);
                 }
