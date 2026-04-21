@@ -236,6 +236,8 @@ Each proxy invocation follows this pipeline:
 | 5xx | `RemoteServiceException` | `SERVER_ERROR` |
 | 2xx but response decode/deserialization fails (`bodyToMono`/`bodyToFlux`) | Codec/decoding error | `RESPONSE_DECODE_ERROR` (observability) |
 | Timeout | `TimeoutException` | `—` (normalized as `TIMEOUT` in observability) |
+| Connect failure | `ConnectException` | `CONNECT_ERROR` (observability) |
+| DNS resolution failure | `UnknownHostException` | `UNKNOWN_HOST` (observability) |
 
 Both main exception types expose:
 - `getStatusCode()`

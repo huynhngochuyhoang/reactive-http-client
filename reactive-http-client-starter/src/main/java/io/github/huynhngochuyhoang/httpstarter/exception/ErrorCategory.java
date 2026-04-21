@@ -59,7 +59,17 @@ public enum ErrorCategory {
     RESPONSE_DECODE_ERROR,
 
     /**
-     * An unexpected or unclassified error occurred (e.g. network failure).
+     * Failed to establish a TCP connection to the remote host (e.g. connection refused).
+     */
+    CONNECT_ERROR,
+
+    /**
+     * DNS resolution failed for the target host.
+     */
+    UNKNOWN_HOST,
+
+    /**
+     * An unexpected or unclassified error occurred.
      */
     UNKNOWN
 }

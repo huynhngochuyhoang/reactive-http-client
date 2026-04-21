@@ -29,6 +29,8 @@ import reactor.netty.http.client.HttpClientRequest;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
+import java.net.ConnectException;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -619,6 +621,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (error instanceof AuthProviderException) {
             return ErrorCategory.AUTH_PROVIDER_ERROR;
         }
+        if (isCausedBy(error, UnknownHostException.class)) {
+            return ErrorCategory.UNKNOWN_HOST;
+        }
+        if (isCausedBy(error, ConnectException.class)) {
+            return ErrorCategory.CONNECT_ERROR;
+        }
         if (isResponseDecodeError(statusCode, error)) {
             return ErrorCategory.RESPONSE_DECODE_ERROR;
         }
@@ -644,6 +652,17 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         Throwable current = error;
         while (current != null) {
             if (current instanceof DecodingException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isCausedBy(Throwable error, Class<? extends Throwable> type) {
+        Throwable current = error;
+        while (current != null) {
+            if (type.isInstance(current)) {
                 return true;
             }
             current = current.getCause();
