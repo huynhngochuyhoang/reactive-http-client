@@ -621,11 +621,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (error instanceof AuthProviderException) {
             return ErrorCategory.AUTH_PROVIDER_ERROR;
         }
-        if (isCausedBy(error, ConnectException.class)) {
-            return ErrorCategory.CONNECT_ERROR;
-        }
-        if (isCausedBy(error, UnknownHostException.class)) {
+        Throwable rootCause = getRootCause(error);
+        if (rootCause instanceof UnknownHostException) {
             return ErrorCategory.UNKNOWN_HOST;
+        }
+        if (rootCause instanceof ConnectException) {
+            return ErrorCategory.CONNECT_ERROR;
         }
         if (isResponseDecodeError(statusCode, error)) {
             return ErrorCategory.RESPONSE_DECODE_ERROR;
@@ -659,15 +660,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return false;
     }
 
-    private boolean isCausedBy(Throwable error, Class<? extends Throwable> type) {
+    private Throwable getRootCause(Throwable error) {
         Throwable current = error;
-        while (current != null) {
-            if (type.isInstance(current)) {
-                return true;
-            }
+        while (current != null && current.getCause() != null) {
             current = current.getCause();
         }
-        return false;
+        return current;
     }
 
     private record SerializedRequestBody(Object originalBody, Object bodyToWrite, byte[] rawBody) {}
