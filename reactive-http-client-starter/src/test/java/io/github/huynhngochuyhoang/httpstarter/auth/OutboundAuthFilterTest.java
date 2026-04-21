@@ -204,4 +204,38 @@ class OutboundAuthFilterTest {
         assertTrue(released.get());
         assertEquals(1, invalidateCalls.get());
     }
+
+    @Test
+    void shouldEncodeAuthQueryParamsWithReservedCharacters() {
+        AuthProvider authProvider = request -> Mono.just(AuthContext.builder()
+                .queryParam("sig", "a+b&c=d/e ?")
+                .build());
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.test.local/users")).build();
+
+        AtomicReference<ClientRequest> capturedRequest = new AtomicReference<>();
+        StepVerifier.create(filter.filter(request, req -> {
+                    capturedRequest.set(req);
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+                }))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        String query = capturedRequest.get().url().getRawQuery();
+        assertTrue(query.contains("sig=a%2Bb%26c%3Dd%2Fe%20%3F"));
+    }
+
+    @Test
+    void shouldRejectAuthHeaderValuesWithCrLfCharacters() {
+        AuthProvider authProvider = request -> Mono.just(AuthContext.builder()
+                .header("Authorization", "Bearer token\r\nX-Evil: 1")
+                .build());
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.test.local/users")).build();
+
+        StepVerifier.create(filter.filter(request, req -> Mono.just(ClientResponse.create(HttpStatus.OK).build())))
+                .expectErrorMatches(error -> error instanceof IllegalArgumentException
+                        && error.getMessage().contains("Invalid auth header value"))
+                .verify();
+    }
 }

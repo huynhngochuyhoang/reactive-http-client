@@ -7,6 +7,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
+import io.netty.handler.timeout.ReadTimeoutException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.junit.jupiter.api.Test;
@@ -201,6 +202,25 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         HttpClientObserverEvent event = observed.get();
         assertNotNull(event);
         assertEquals(ErrorCategory.UNKNOWN_HOST, event.getErrorCategory());
+    }
+
+    @Test
+    void shouldObserveTimeoutCategoryWhenNettyReadTimeoutExceptionOccurs() {
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> Mono.error(ReadTimeoutException.INSTANCE))
+                .build();
+
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set);
+
+        StepVerifier.create(invoke(handler))
+                .expectError(ReadTimeoutException.class)
+                .verify();
+
+        HttpClientObserverEvent event = observed.get();
+        assertNotNull(event);
+        assertEquals(ErrorCategory.TIMEOUT, event.getErrorCategory());
     }
 
     private static ReactiveClientInvocationHandler createHandler(

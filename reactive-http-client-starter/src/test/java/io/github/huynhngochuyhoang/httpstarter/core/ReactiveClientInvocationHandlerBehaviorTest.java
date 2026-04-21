@@ -123,6 +123,18 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         assertTrue(new String(capturedRawBody.get(), StandardCharsets.UTF_8).contains("\"id\":1"));
     }
 
+    @Test
+    void shouldSupportDefaultMethodsOnReactiveClientInterfaces() {
+        ReactiveClientInvocationHandler handler = createHandler(WebClient.builder().baseUrl("http://test.local").build());
+        ClientWithDefaultMethod proxy = (ClientWithDefaultMethod) Proxy.newProxyInstance(
+                ClientWithDefaultMethod.class.getClassLoader(),
+                new Class<?>[]{ClientWithDefaultMethod.class},
+                handler
+        );
+
+        assertEquals("prefix-value", proxy.helper("value"));
+    }
+
     @SuppressWarnings("unchecked")
     private static Mono<String> invokeGet(ReactiveClientInvocationHandler handler, String accept) {
         try {
@@ -187,5 +199,11 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     interface ClientWithJsonBodyHeaders {
         @POST("/body")
         Mono<String> post(@HeaderParam("Content-Type") String contentType, @Body Map<String, Object> body);
+    }
+
+    interface ClientWithDefaultMethod {
+        default String helper(String value) {
+            return "prefix-" + value;
+        }
     }
 }

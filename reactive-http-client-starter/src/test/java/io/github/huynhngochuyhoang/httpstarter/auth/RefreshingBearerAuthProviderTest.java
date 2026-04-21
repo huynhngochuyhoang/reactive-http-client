@@ -13,8 +13,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RefreshingBearerAuthProviderTest {
@@ -188,6 +190,46 @@ class RefreshingBearerAuthProviderTest {
         StepVerifier.create(provider.getAuth(sampleRequest()))
                 .expectError(io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException.class)
                 .verify();
+        assertEquals(2, calls.get());
+    }
+
+    @Test
+    void shouldNotReuseInvalidatedInFlightRefreshResult() {
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        Clock fixedClock = Clock.fixed(now, ZoneOffset.UTC);
+        AtomicInteger calls = new AtomicInteger();
+        AtomicReference<Sinks.One<AccessToken>> firstSinkRef = new AtomicReference<>();
+
+        RefreshingBearerAuthProvider provider = new RefreshingBearerAuthProvider(
+                () -> Mono.defer(() -> {
+                    int call = calls.incrementAndGet();
+                    if (call == 1) {
+                        Sinks.One<AccessToken> sink = Sinks.one();
+                        firstSinkRef.set(sink);
+                        return sink.asMono();
+                    }
+                    return Mono.just(new AccessToken("fresh-token", now.plusSeconds(120)));
+                }),
+                Duration.ofSeconds(30),
+                Duration.ZERO,
+                fixedClock
+        );
+
+        Mono<AuthContext> firstAttempt = provider.getAuth(sampleRequest());
+        firstAttempt.subscribe();
+        assertNotNull(firstSinkRef.get());
+        StepVerifier.create(provider.invalidate()).verifyComplete();
+        StepVerifier.create(provider.getAuth(sampleRequest()))
+                .assertNext(auth -> assertEquals("Bearer fresh-token", auth.getHeaders().get("Authorization")))
+                .verifyComplete();
+        firstSinkRef.get().tryEmitValue(new AccessToken("stale-token", now.plusSeconds(120)));
+
+        StepVerifier.create(firstAttempt)
+                .assertNext(auth -> assertEquals("Bearer stale-token", auth.getHeaders().get("Authorization")))
+                .verifyComplete();
+        StepVerifier.create(provider.getAuth(sampleRequest()))
+                .assertNext(auth -> assertEquals("Bearer fresh-token", auth.getHeaders().get("Authorization")))
+                .verifyComplete();
         assertEquals(2, calls.get());
     }
 

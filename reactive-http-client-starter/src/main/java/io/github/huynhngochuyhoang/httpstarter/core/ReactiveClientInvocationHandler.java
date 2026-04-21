@@ -24,6 +24,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
+import io.netty.handler.timeout.ReadTimeoutException;
 import reactor.netty.http.client.HttpClientRequest;
 
 import java.lang.reflect.InvocationHandler;
@@ -127,12 +128,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 default -> method.invoke(this, args);
             };
         }
+        if (method.isDefault()) {
+            return InvocationHandler.invokeDefault(proxy, method, args != null ? args : new Object[0]);
+        }
 
         MethodMetadata meta = metadataCache.get(method);
 
         if (meta.getHttpMethod() == null) {
             throw new UnsupportedOperationException(
-                    "Method " + method.getName() + " has no HTTP verb annotation (@GET, @POST, @PUT, @DELETE)");
+                    "Method " + method.getName() + " has no HTTP verb annotation (@GET, @POST, @PUT, @DELETE, @PATCH)");
         }
 
         RequestArgumentResolver.ResolvedArgs resolved = argumentResolver.resolve(meta, args);
@@ -615,7 +619,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (error instanceof RemoteServiceException remoteServiceException) {
             return remoteServiceException.getErrorCategory();
         }
-        if (error instanceof TimeoutException) {
+        if (error instanceof TimeoutException || error instanceof ReadTimeoutException) {
             return ErrorCategory.TIMEOUT;
         }
         if (error instanceof CancellationException) {

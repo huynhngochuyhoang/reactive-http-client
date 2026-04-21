@@ -66,5 +66,32 @@ class MicrometerHttpClientObserverTest {
         assertNotNull(timer);
         assertEquals(1, timer.count(), 0.0d);
     }
-}
 
+    @Test
+    void shouldUseNoneHttpStatusCodeWhenRequestFailsBeforeResponse() {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(
+                meterRegistry,
+                new ReactiveHttpClientProperties.ObservabilityConfig()
+        );
+
+        observer.record(new HttpClientObserverEvent(
+                "user-service",
+                "user.get",
+                "GET",
+                "/users/{id}",
+                null,
+                15,
+                new RuntimeException("connect failed"),
+                ErrorCategory.CONNECT_ERROR,
+                null,
+                null
+        ));
+
+        Timer timer = meterRegistry.find("http.client.requests")
+                .tag("http.status_code", "NONE")
+                .timer();
+        assertNotNull(timer);
+        assertEquals(1, timer.count(), 0.0d);
+    }
+}

@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
  *   <li><b>http.method</b> – uppercase HTTP verb (GET, POST, …).</li>
  *   <li><b>uri</b> – path template (e.g. {@code /users/{id}}) when
  *       {@code reactive.http.observability.include-url-path=true} (default); {@code NONE} otherwise.</li>
- *   <li><b>http.status_code</b> – numeric status (200, 404, …) or {@code CLIENT_ERROR} / {@code SERVER_ERROR}
+ *   <li><b>http.status_code</b> – numeric status (200, 404, …) or {@code NONE}
  *       when the response was never received.</li>
  *   <li><b>outcome</b> – one of SUCCESS, REDIRECTION, CLIENT_ERROR, SERVER_ERROR, UNKNOWN.</li>
  *   <li><b>exception</b> – simple class name of the error, or {@code none}.</li>
@@ -100,7 +100,7 @@ public class MicrometerHttpClientObserver implements HttpClientObserver {
 
         String statusCode = event.getStatusCode() != null
                 ? String.valueOf(event.getStatusCode())
-                : (event.isError() ? "CLIENT_ERROR" : "UNKNOWN");
+                : "NONE";
 
         String outcome = deriveOutcome(event);
         String exception = event.getError() != null

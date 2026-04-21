@@ -40,6 +40,9 @@ public class MethodMetadataCache {
         } else if (method.isAnnotationPresent(DELETE.class)) {
             meta.setHttpMethod("DELETE");
             meta.setPathTemplate(method.getAnnotation(DELETE.class).value());
+        } else if (method.isAnnotationPresent(PATCH.class)) {
+            meta.setHttpMethod("PATCH");
+            meta.setPathTemplate(method.getAnnotation(PATCH.class).value());
         }
 
         // ---- Parameters ----
@@ -53,6 +56,10 @@ public class MethodMetadataCache {
                     meta.getQueryParams().put(i, qp.value());
                 } else if (ann instanceof HeaderParam hp) {
                     if (Map.class.isAssignableFrom(parameterTypes[i])) {
+                        if (hp.value() != null && !hp.value().isBlank()) {
+                            throw new IllegalArgumentException(
+                                    "@HeaderParam value must be blank for Map parameter at index " + i + " in method: " + method);
+                        }
                         meta.getHeaderMapParams().add(i);
                     } else {
                         if (hp.value() == null || hp.value().isBlank()) {
@@ -68,6 +75,13 @@ public class MethodMetadataCache {
         }
 
         // ---- Return type ----
+        Class<?> declaredReturnType = method.getReturnType();
+        meta.setReturnsMono(Mono.class.isAssignableFrom(declaredReturnType));
+        meta.setReturnsFlux(Flux.class.isAssignableFrom(declaredReturnType));
+        if (!meta.isReturnsMono() && !meta.isReturnsFlux()) {
+            throw new IllegalStateException("Method " + method + " must return Mono<T> or Flux<T>");
+        }
+
         Type returnType = method.getGenericReturnType();
         if (returnType instanceof ParameterizedType pt) {
             Class<?> rawType = (Class<?>) pt.getRawType();

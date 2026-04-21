@@ -23,7 +23,7 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 
 | Capability | This starter | Spring `@HttpExchange` |
 |---|---|---|
-| Declarative interface | `@ReactiveHttpClient` + `@GET/@POST/...` | `@HttpExchange` + method annotations |
+| Declarative interface | `@ReactiveHttpClient` + `@GET/@POST/@PUT/@DELETE/@PATCH` | `@HttpExchange` + method annotations |
 | Client-level config model | `reactive.http.clients.<name>` and global `reactive.http.network` | No equivalent built-in config namespace |
 | Timeout precedence model | Method-level `@TimeoutMs` over config timeout | No built-in timeout precedence contract |
 | Error classification contract | Built-in `HttpClientException` / `RemoteServiceException` + categories | No built-in domain error categorization |
@@ -215,7 +215,7 @@ Each proxy invocation follows this pipeline:
 | Annotation | Target | Description |
 |---|---|---|
 | `@ReactiveHttpClient(name, baseUrl)` | Interface | Declares an HTTP client |
-| `@GET/@POST/@PUT/@DELETE(path)` | Method | HTTP verb + path |
+| `@GET/@POST/@PUT/@DELETE/@PATCH(path)` | Method | HTTP verb + path |
 | `@PathVar(name)` | Parameter | Path variable |
 | `@QueryParam(name)` | Parameter | Query parameter |
 | `@HeaderParam(name)` | Parameter | Header parameter |
