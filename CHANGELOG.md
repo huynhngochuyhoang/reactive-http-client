@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.1] – 2026-04-21
+
+### Fixed
+
+- Restored API-level timeout precedence so method `@TimeoutMs` overrides global network timeout per request.
+- Supported explicit timeout disable with `@TimeoutMs(0)` even when global `read-timeout-ms` is configured.
+
+### Changed
+
+- Clarified `reactive.http.network.read-timeout-ms` semantics as Reactor Netty response timeout in code/docs.
+
+---
+
 ## [1.4.0] – 2026-04-20
 
 ### Added
@@ -130,7 +143,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.  
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.5.0...v1.5.1
 [1.4.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.1.0...v1.2.0
