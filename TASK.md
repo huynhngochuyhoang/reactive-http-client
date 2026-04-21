@@ -87,7 +87,7 @@
   - **Issue:** Returns direct references to private `HashMap`/`HashSet`. Callers could mutate cached entries.
   - **Fix:** At the end of `MethodMetadataCache.parse()` wrap with `Map.copyOf(...)` / `Set.copyOf(...)` or `Collections.unmodifiableMap(...)`.
 
-- [ ] **M2. Move body serialization off the subscriber thread**
+- [x] **M2. Move body serialization off the subscriber thread**
   - **Where:** `ReactiveClientInvocationHandler.java:159`
   - **Issue:** `objectMapper.writeValueAsBytes(body)` runs synchronously inside `invoke()`; blocks event loop for large bodies.
   - **Fix:** Wrap in `Mono.fromCallable(...).subscribeOn(Schedulers.boundedElastic())`. Skip serialization entirely when no auth provider is configured.

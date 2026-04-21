@@ -20,12 +20,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 import io.netty.handler.timeout.ReadTimeoutException;
+import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClientRequest;
 
 import java.lang.reflect.InvocationHandler;
@@ -159,29 +161,33 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (!hasAcceptHeader) {
             requestSpec = requestSpec.accept(MediaType.APPLICATION_JSON);
         }
+        WebClient.RequestBodySpec baseRequestSpec = requestSpec;
 
-        SerializedRequestBody serializedRequestBody = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader);
-        if (serializedRequestBody.originalBody() != null) {
-            requestSpec = requestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, serializedRequestBody.originalBody());
-        }
-        if (serializedRequestBody.rawBody() != null) {
-            requestSpec = requestSpec.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, serializedRequestBody.rawBody());
-        }
-
-        resolved.headers().forEach(requestSpec::header);
-
-        WebClient.RequestHeadersSpec<?> requestHeadersSpec;
-        if (serializedRequestBody.originalBody() != null) {
-            WebClient.RequestBodySpec requestWithBodySpec = requestSpec;
-            if (!hasContentTypeHeader) {
-                requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_JSON);
-            }
-            requestHeadersSpec = requestWithBodySpec.bodyValue(serializedRequestBody.bodyToWrite());
-        } else {
-            requestHeadersSpec = requestSpec;
-        }
         long timeoutMs = resolveTimeoutMs(meta);
-        requestHeadersSpec = applyRequestLevelResponseTimeout(requestHeadersSpec, meta, timeoutMs);
+        Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader)
+                .map(serializedRequestBody -> {
+                    WebClient.RequestBodySpec preparedRequestSpec = baseRequestSpec;
+                    if (serializedRequestBody.originalBody() != null) {
+                        preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, serializedRequestBody.originalBody());
+                    }
+                    if (serializedRequestBody.rawBody() != null) {
+                        preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, serializedRequestBody.rawBody());
+                    }
+
+                    resolved.headers().forEach(preparedRequestSpec::header);
+
+                    WebClient.RequestHeadersSpec<?> requestHeadersSpec;
+                    if (serializedRequestBody.originalBody() != null) {
+                        WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
+                        if (!hasContentTypeHeader) {
+                            requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_JSON);
+                        }
+                        requestHeadersSpec = requestWithBodySpec.bodyValue(serializedRequestBody.bodyToWrite());
+                    } else {
+                        requestHeadersSpec = preparedRequestSpec;
+                    }
+                    return applyRequestLevelResponseTimeout(requestHeadersSpec, meta, timeoutMs);
+                });
 
         AtomicReference<HttpStatusCode> responseStatus = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> responseHeaders = new AtomicReference<>(Map.of());
@@ -192,7 +198,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         HttpClientObserver observer = getObserver();
 
         if (meta.isReturnsFlux()) {
-            Flux<?> flux = requestHeadersSpec.exchangeToFlux(clientResponse -> {
+            Flux<?> flux = requestHeadersSpecMono.flatMapMany(requestHeadersSpec -> requestHeadersSpec.exchangeToFlux(clientResponse -> {
                 responseStatus.set(clientResponse.statusCode());
                 responseHeaders.set(copyHeaders(clientResponse));
 
@@ -200,7 +206,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
                 }
                 return buildFlux(clientResponse, meta.getResponseType());
-            }).doOnSubscribe(subscription -> {
+            })).doOnSubscribe(subscription -> {
                 responseStatus.set(null);
                 responseHeaders.set(Map.of());
                 terminalError.set(null);
@@ -227,7 +233,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return flux;
         }
 
-        Mono<?> mono = requestHeadersSpec.exchangeToMono(clientResponse -> {
+        Mono<?> mono = requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.exchangeToMono(clientResponse -> {
             responseStatus.set(clientResponse.statusCode());
             responseHeaders.set(copyHeaders(clientResponse));
 
@@ -235,7 +241,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 return decodeErrorResponse(clientResponse).flatMap(Mono::error);
             }
             return buildMono(clientResponse, meta.getResponseType());
-        }).doOnSubscribe(subscription -> {
+        })).doOnSubscribe(subscription -> {
             responseStatus.set(null);
             responseHeaders.set(Map.of());
             terminalError.set(null);
@@ -461,25 +467,28 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return method != null && resilience.getRetryMethods().contains(method.toUpperCase(Locale.ROOT));
     }
 
-    private SerializedRequestBody serializeRequestBodyForAuth(Object body, String contentTypeHeader) {
+    private Mono<SerializedRequestBody> serializeRequestBodyForAuth(Object body, String contentTypeHeader) {
         if (body == null) {
-            return new SerializedRequestBody(null, null, null);
+            return Mono.just(new SerializedRequestBody(null, null, null));
+        }
+        if (!StringUtils.hasText(clientConfig.getAuthProvider())) {
+            return Mono.just(new SerializedRequestBody(body, body, null));
         }
         if (body instanceof byte[] bytes) {
-            return new SerializedRequestBody(body, bytes, bytes);
+            return Mono.just(new SerializedRequestBody(body, bytes, bytes));
         }
         if (body instanceof String text) {
-            return new SerializedRequestBody(body, text, text.getBytes(StandardCharsets.UTF_8));
+            return Mono.just(new SerializedRequestBody(body, text, text.getBytes(StandardCharsets.UTF_8)));
         }
         if (!shouldProvideJsonRawBody(contentTypeHeader) || objectMapper == null) {
-            return new SerializedRequestBody(body, body, null);
+            return Mono.just(new SerializedRequestBody(body, body, null));
         }
-        try {
-            byte[] json = objectMapper.writeValueAsBytes(body);
-            return new SerializedRequestBody(body, json, json);
-        } catch (JsonProcessingException e) {
-            throw new RequestSerializationException(clientName, e);
-        }
+        return Mono.fromCallable(() -> {
+                    byte[] json = objectMapper.writeValueAsBytes(body);
+                    return new SerializedRequestBody(body, json, json);
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorMap(JsonProcessingException.class, e -> new RequestSerializationException(clientName, e));
     }
 
     private boolean shouldProvideJsonRawBody(String contentTypeHeader) {

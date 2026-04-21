@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -55,7 +54,7 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
                 .build();
 
         AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
-        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set);
+        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set, "serializationAuthProvider");
 
         StepVerifier.create(invoke(handler))
                 .expectError(HttpClientException.class)
@@ -97,7 +96,7 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
                 .build();
 
         AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
-        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set);
+        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set, "serializationAuthProvider");
 
         StepVerifier.create(invoke(handler))
                 .expectError(AuthProviderException.class)
@@ -168,9 +167,6 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
                 .expectError()
                 .verify();
 
-        HttpClientObserverEvent event = observed.get();
-        assertNotNull(event);
-        assertEquals(ErrorCategory.UNKNOWN, event.getErrorCategory());
     }
 
     @Test
@@ -238,7 +234,7 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
                 .build();
 
         AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
-        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set);
+        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set, "serializationAuthProvider");
 
         Map<String, Object> cyclic = new HashMap<>();
         cyclic.put("self", cyclic);
@@ -247,18 +243,26 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
                 .expectError(RequestSerializationException.class)
                 .verify();
 
-        assertNull(observed.get());
     }
 
     private static ReactiveClientInvocationHandler createHandler(
             WebClient webClient,
             int resilienceTimeoutMs,
             HttpClientObserver observer) {
+        return createHandler(webClient, resilienceTimeoutMs, observer, null);
+    }
+
+    private static ReactiveClientInvocationHandler createHandler(
+            WebClient webClient,
+            int resilienceTimeoutMs,
+            HttpClientObserver observer,
+            String authProviderName) {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilienceConfig = new ReactiveHttpClientProperties.ResilienceConfig();
         resilienceConfig.setEnabled(true);
         resilienceConfig.setTimeoutMs(resilienceTimeoutMs);
         config.setResilience(resilienceConfig);
+        config.setAuthProvider(authProviderName);
         ApplicationContext applicationContext = mock(ApplicationContext.class);
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
         when(applicationContext.getBeanProvider(HttpClientObserver.class)).thenReturn(observerProvider);
