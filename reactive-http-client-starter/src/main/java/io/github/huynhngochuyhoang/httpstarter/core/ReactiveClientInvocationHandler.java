@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
+import io.github.huynhngochuyhoang.httpstarter.exception.RequestSerializationException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
@@ -477,7 +478,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             byte[] json = objectMapper.writeValueAsBytes(body);
             return new SerializedRequestBody(body, json, json);
         } catch (JsonProcessingException e) {
-            throw new AuthProviderException(clientName, e);
+            throw new RequestSerializationException(clientName, e);
         }
     }
 

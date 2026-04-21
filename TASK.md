@@ -122,7 +122,7 @@
   - **Issue:** MDC key `"correlationId"` rarely matches what tracing frameworks set (`traceId`, `X-Correlation-Id`).
   - **Fix:** Try multiple conventional keys in MDC, or document explicitly.
 
-- [ ] **M9. Use distinct exception for JSON serialization failures**
+- [x] **M9. Use distinct exception for JSON serialization failures**
   - **Where:** `ReactiveClientInvocationHandler.java:472-478`
   - **Issue:** Wrapping `JsonProcessingException` as `AuthProviderException` misclassifies developer errors as auth failures in `error.category`.
   - **Fix:** Throw `IllegalArgumentException` or a dedicated `RequestSerializationException`.
@@ -152,7 +152,7 @@
 ## Test Coverage Gaps
 
 - [x] **T1.** `@PATCH` verb (after H6)
-- [ ] **T2.** `@Body` with `byte[]`, `String`, and custom content types
+- [x] **T2.** `@Body` with `byte[]`, `String`, and custom content types
 - [x] **T3.** Default methods on `@ReactiveHttpClient` interfaces (H4)
 - [x] **T4.** Non-Mono/Flux return types must throw at parse time (H2)
 - [x] **T5.** Concurrent `RefreshingBearerAuthProvider.invalidate()` vs in-flight refresh (H7)

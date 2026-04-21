@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -124,6 +125,74 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     }
 
     @Test
+    void shouldProvideRawBodyForStringBody() {
+        AtomicReference<byte[]> capturedRawBody = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    capturedRawBody.set((byte[]) request.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE).orElse(null));
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build());
+                })
+                .build();
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+        StepVerifier.create(invokePost(handler, "text/plain", "payload"))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertArrayEquals("payload".getBytes(StandardCharsets.UTF_8), capturedRawBody.get());
+    }
+
+    @Test
+    void shouldProvideRawBodyForByteArrayBody() {
+        AtomicReference<byte[]> capturedRawBody = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    capturedRawBody.set((byte[]) request.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE).orElse(null));
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build());
+                })
+                .build();
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+        byte[] payload = "binary-data".getBytes(StandardCharsets.UTF_8);
+        StepVerifier.create(invokePostBytes(handler, "application/octet-stream", payload))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertArrayEquals(payload, capturedRawBody.get());
+    }
+
+    @Test
+    void shouldProvideRawBodyForCustomJsonContentType() {
+        AtomicReference<byte[]> capturedRawBody = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    capturedRawBody.set((byte[]) request.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE).orElse(null));
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build());
+                })
+                .build();
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+        StepVerifier.create(invokePostJson(handler, "application/problem+json", Map.of("type", "validation-error")))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertNotNull(capturedRawBody.get());
+        assertTrue(new String(capturedRawBody.get(), StandardCharsets.UTF_8).contains("\"type\":\"validation-error\""));
+    }
+
+    @Test
     void shouldSupportDefaultMethodsOnReactiveClientInterfaces() {
         ReactiveClientInvocationHandler handler = createHandler(WebClient.builder().baseUrl("http://test.local").build());
         ClientWithDefaultMethod proxy = (ClientWithDefaultMethod) Proxy.newProxyInstance(
@@ -166,6 +235,16 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     }
 
     @SuppressWarnings("unchecked")
+    private static Mono<String> invokePostBytes(ReactiveClientInvocationHandler handler, String contentType, byte[] body) {
+        try {
+            var method = ClientWithByteArrayBodyHeaders.class.getMethod("post", String.class, byte[].class);
+            return (Mono<String>) handler.invoke(null, method, new Object[]{contentType, body});
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     private static ReactiveClientInvocationHandler createHandler(WebClient webClient) {
         ApplicationContext appCtx = mock(ApplicationContext.class);
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
@@ -199,6 +278,11 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     interface ClientWithJsonBodyHeaders {
         @POST("/body")
         Mono<String> post(@HeaderParam("Content-Type") String contentType, @Body Map<String, Object> body);
+    }
+
+    interface ClientWithByteArrayBodyHeaders {
+        @POST("/body")
+        Mono<String> post(@HeaderParam("Content-Type") String contentType, @Body byte[] body);
     }
 
     interface ClientWithDefaultMethod {

@@ -1,15 +1,19 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
+import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
+import io.github.huynhngochuyhoang.httpstarter.annotation.Body;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
+import io.github.huynhngochuyhoang.httpstarter.exception.RequestSerializationException;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
@@ -24,6 +28,8 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
 import java.net.ConnectException;
 import java.net.UnknownHostException;
 import java.time.Duration;
@@ -32,6 +38,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -223,6 +230,26 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         assertEquals(ErrorCategory.TIMEOUT, event.getErrorCategory());
     }
 
+    @Test
+    void shouldThrowDistinctExceptionForRequestSerializationErrorBeforeDispatch() {
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK).build()))
+                .build();
+
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set);
+
+        Map<String, Object> cyclic = new HashMap<>();
+        cyclic.put("self", cyclic);
+
+        StepVerifier.create(invokeMonoWithArg(handler, SerializationClient.class, "create", cyclic))
+                .expectError(RequestSerializationException.class)
+                .verify();
+
+        assertNull(observed.get());
+    }
+
     private static ReactiveClientInvocationHandler createHandler(
             WebClient webClient,
             int resilienceTimeoutMs,
@@ -246,7 +273,7 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
                 "test-client",
                 applicationContext,
                 new NoopResilienceOperatorApplier(),
-                null,
+                new ObjectMapper(),
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );
     }
@@ -276,6 +303,20 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private static <T> Mono<T> invokeMonoWithArg(
+            ReactiveClientInvocationHandler handler,
+            Class<?> clientType,
+            String methodName,
+            Object arg) {
+        try {
+            Method method = clientType.getMethod(methodName, Map.class);
+            return (Mono<T>) handler.invoke(null, method, new Object[]{arg});
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
     interface TestClient {
         @GET("/users")
         Mono<String> call();
@@ -289,5 +330,10 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
     interface FluxIntegerClient {
         @GET("/users")
         Flux<Integer> callIntFlux();
+    }
+
+    interface SerializationClient {
+        @POST("/users")
+        Mono<String> create(@Body Map<String, Object> body);
     }
 }
