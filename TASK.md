@@ -102,12 +102,12 @@
   - **Issue:** `resolveTimeoutMs` and `shouldOverrideRequestLevelResponseTimeout` duplicate the same check. Two timeout layers also surface different exception types (see H3).
   - **Fix:** Merge helpers; pick one timeout mechanism as source of truth.
 
-- [ ] **M5. Fix `loggingFilter` javadoc / config-name mismatch**
+- [x] **M5. Fix `loggingFilter` javadoc / config-name mismatch**
   - **Where:** `ReactiveHttpClientFactoryBean.java:211-216`
   - **Issue:** Doc says "Logs method, URL, status and latency" but only logs status. `ClientConfig.logBody` triggers it though no body is logged.
   - **Fix:** Implement the documented contract or correct the doc and rename the flag.
 
-- [ ] **M6. Remove or clearly scope `UriTemplateExpander`**
+- [x] **M6. Remove or clearly scope `UriTemplateExpander`**
   - **Where:** `UriTemplateExpander.java`
   - **Issue:** Not used in the main invocation path; likely dead code or a utility.
   - **Fix:** Delete if dead, or document as public API and add load-bearing tests.
@@ -127,7 +127,7 @@
   - **Issue:** Wrapping `JsonProcessingException` as `AuthProviderException` misclassifies developer errors as auth failures in `error.category`.
   - **Fix:** Throw `IllegalArgumentException` or a dedicated `RequestSerializationException`.
 
-- [ ] **M10. Bound `loggerCache` growth**
+- [x] **M10. Bound `loggerCache` growth**
   - **Where:** `ReactiveClientInvocationHandler.java:73`
   - **Issue:** Unbounded `ConcurrentHashMap` keyed by logger Class; dynamic/generated classes could leak.
   - **Fix:** Add a size bound/eviction, or document intended lifecycle.
@@ -142,10 +142,10 @@
 - [x] **L4.** `Class.forName` uses default classloader; prefer `ClassUtils.resolveClassName(name, null)` for container safety. *(`ReactiveHttpClientsRegistrar.java:59`)*
 - [x] **L5.** Document on `HttpClientObserverEvent.getResponseBody()` that Flux responses always pass `null`.
 - [x] **L6.** Deprecate the older `HttpClientObserverEvent` constructor that leaves `errorCategory` null.
-- [ ] **L7.** `@ReactiveHttpClient` meta-annotated with `@Component` but registered via registrar ? verify skip-if-present guard handles both orderings.
+- [x] **L7.** `@ReactiveHttpClient` meta-annotated with `@Component` but registered via registrar ? verify skip-if-present guard handles both orderings.
 - [x] **L8.** `MicrometerHttpClientObserver.buildTags`: default `clientName` to `"UNKNOWN"` on null, matching `apiName`/`httpMethod`.
 - [x] **L9.** `AuthProviderException`: add a message-overload constructor for richer diagnostics.
-- [ ] **L10.** Enrich `DefaultErrorDecoder` exceptions with request URL/method for debugging.
+- [x] **L10.** Enrich `DefaultErrorDecoder` exceptions with request URL/method for debugging.
 
 ---
 
