@@ -3,6 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.config;
 import io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
+import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -47,6 +48,13 @@ public class ReactiveHttpClientAutoConfiguration {
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
     public CorrelationIdWebFilter correlationIdWebFilter() {
         return new CorrelationIdWebFilter();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(InboundHeadersWebFilter.class)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
+    public InboundHeadersWebFilter inboundHeadersWebFilter() {
+        return new InboundHeadersWebFilter();
     }
 
     @Bean
