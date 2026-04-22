@@ -95,9 +95,24 @@ public class RemoteServiceException extends RuntimeException {
     }
 
     private static String buildMessage(int statusCode, String requestMethod, String requestUrl) {
-        if ((requestMethod == null || requestMethod.isBlank()) && (requestUrl == null || requestUrl.isBlank())) {
+        String normalizedMethod = normalize(requestMethod);
+        String normalizedUrl = normalize(requestUrl);
+        if (normalizedMethod == null && normalizedUrl == null) {
             return "Remote service error " + statusCode;
         }
-        return "Remote service error " + statusCode + " (" + requestMethod + " " + requestUrl + ")";
+        if (normalizedMethod == null) {
+            return "Remote service error " + statusCode + " (" + normalizedUrl + ")";
+        }
+        if (normalizedUrl == null) {
+            return "Remote service error " + statusCode + " (" + normalizedMethod + ")";
+        }
+        return "Remote service error " + statusCode + " (" + normalizedMethod + " " + normalizedUrl + ")";
+    }
+
+    private static String normalize(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return "UNKNOWN".equalsIgnoreCase(value) ? null : value;
     }
 }
