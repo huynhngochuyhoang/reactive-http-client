@@ -19,8 +19,22 @@ class ReactiveHttpClientPropertiesTest {
         assertTrue(config.getResilience().getRetryMethods().contains("HEAD"));
         assertEquals(2, config.getCodecMaxInMemorySizeMb());
         assertFalse(config.isCompressionEnabled());
+        assertFalse(config.isLogExchange());
+        assertFalse(config.isExchangeLoggingEnabled());
         assertFalse(config.isLogBody());
         assertNull(config.getAuthProvider());
+    }
+
+    @Test
+    void shouldTreatLegacyLogBodyAsAliasForExchangeLogging() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+
+        config.setLogBody(true);
+        assertTrue(config.isExchangeLoggingEnabled());
+
+        config.setLogBody(false);
+        config.setLogExchange(true);
+        assertTrue(config.isExchangeLoggingEnabled());
     }
 
     @Test

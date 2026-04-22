@@ -6,12 +6,21 @@ import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpRequest;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.ClientResponse;
+import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
+import java.net.URI;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Verifies that {@link DefaultErrorDecoder} maps HTTP error responses
@@ -135,6 +144,28 @@ class DefaultErrorDecoderTest {
                     HttpClientException hce = (HttpClientException) ex;
                     assertEquals(4096, hce.getResponseBody().length());
                     assertEquals("HTTP client error 400", hce.getMessage());
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void shouldIncludeRequestMethodAndUrlInExceptionMessageWhenAvailable() {
+        ClientResponse response = mock(ClientResponse.class);
+        HttpRequest request = mock(HttpRequest.class);
+
+        when(response.statusCode()).thenReturn(HttpStatus.BAD_REQUEST);
+        when(response.bodyToFlux(org.springframework.core.io.buffer.DataBuffer.class))
+                .thenReturn(Flux.just(new DefaultDataBufferFactory().wrap("Bad request".getBytes())));
+        when(response.request()).thenReturn(request);
+        when(request.getMethod()).thenReturn(HttpMethod.POST);
+        when(request.getURI()).thenReturn(URI.create("https://api.example.com/orders"));
+
+        StepVerifier.create(decoder.decode(response))
+                .assertNext(ex -> {
+                    HttpClientException hce = (HttpClientException) ex;
+                    assertEquals("POST", hce.getRequestMethod());
+                    assertEquals("https://api.example.com/orders", hce.getRequestUrl());
+                    assertTrue(hce.getMessage().contains("POST https://api.example.com/orders"));
                 })
                 .verifyComplete();
     }

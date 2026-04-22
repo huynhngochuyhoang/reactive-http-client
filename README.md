@@ -110,7 +110,7 @@ reactive:
         auth-provider: userServiceAuthProvider
         codec-max-in-memory-size-mb: 2
         compression-enabled: false
-        log-body: false
+        log-exchange: false
         resilience:
           enabled: true
           circuit-breaker: user-service

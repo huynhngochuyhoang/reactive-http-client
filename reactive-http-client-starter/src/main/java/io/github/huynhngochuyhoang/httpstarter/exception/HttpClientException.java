@@ -16,6 +16,8 @@ public class HttpClientException extends RuntimeException {
     private final int statusCode;
     private final String responseBody;
     private final ErrorCategory errorCategory;
+    private final String requestMethod;
+    private final String requestUrl;
 
     /**
      * Creates a new {@code HttpClientException}.
@@ -26,10 +28,24 @@ public class HttpClientException extends RuntimeException {
      * @param responseBody the raw response body (may be empty)
      */
     public HttpClientException(int statusCode, String responseBody) {
-        super("HTTP client error " + statusCode);
+        this(statusCode, responseBody, null, null);
+    }
+
+    /**
+     * Creates a new {@code HttpClientException} enriched with request context.
+     *
+     * @param statusCode    the HTTP status code (4xx)
+     * @param responseBody  the raw response body (may be empty)
+     * @param requestMethod request method (optional)
+     * @param requestUrl    request URL (optional)
+     */
+    public HttpClientException(int statusCode, String responseBody, String requestMethod, String requestUrl) {
+        super(buildMessage(statusCode, requestMethod, requestUrl));
         this.statusCode = statusCode;
         this.responseBody = truncate(responseBody);
         this.errorCategory = statusCode == 429 ? ErrorCategory.RATE_LIMITED : ErrorCategory.CLIENT_ERROR;
+        this.requestMethod = requestMethod;
+        this.requestUrl = requestUrl;
     }
 
     /**
@@ -44,6 +60,8 @@ public class HttpClientException extends RuntimeException {
         this.statusCode = statusCode;
         this.responseBody = truncate(responseBody);
         this.errorCategory = errorCategory;
+        this.requestMethod = null;
+        this.requestUrl = null;
     }
 
     /**
@@ -58,6 +76,8 @@ public class HttpClientException extends RuntimeException {
         this.statusCode = statusCode;
         this.responseBody = truncate(responseBody);
         this.errorCategory = statusCode == 429 ? ErrorCategory.RATE_LIMITED : ErrorCategory.CLIENT_ERROR;
+        this.requestMethod = null;
+        this.requestUrl = null;
     }
 
     public int getStatusCode() {
@@ -79,6 +99,14 @@ public class HttpClientException extends RuntimeException {
         return errorCategory;
     }
 
+    public String getRequestMethod() {
+        return requestMethod;
+    }
+
+    public String getRequestUrl() {
+        return requestUrl;
+    }
+
     private static String truncate(String body) {
         if (body == null) {
             return null;
@@ -87,5 +115,27 @@ public class HttpClientException extends RuntimeException {
             return body;
         }
         return body.substring(0, MAX_RESPONSE_BODY_LENGTH);
+    }
+
+    private static String buildMessage(int statusCode, String requestMethod, String requestUrl) {
+        String normalizedMethod = normalize(requestMethod);
+        String normalizedUrl = normalize(requestUrl);
+        if (normalizedMethod == null && normalizedUrl == null) {
+            return "HTTP client error " + statusCode;
+        }
+        if (normalizedMethod == null) {
+            return "HTTP client error " + statusCode + " (" + normalizedUrl + ")";
+        }
+        if (normalizedUrl == null) {
+            return "HTTP client error " + statusCode + " (" + normalizedMethod + ")";
+        }
+        return "HTTP client error " + statusCode + " (" + normalizedMethod + " " + normalizedUrl + ")";
+    }
+
+    private static String normalize(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return "UNKNOWN".equalsIgnoreCase(value) ? null : value;
     }
 }

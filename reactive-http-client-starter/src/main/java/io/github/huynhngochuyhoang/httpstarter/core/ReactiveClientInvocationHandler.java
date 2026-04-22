@@ -48,6 +48,7 @@ import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -67,6 +68,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ReactiveClientInvocationHandler.class);
+    private static final int MAX_LOGGER_CACHE_SIZE = 256;
 
     private final WebClient webClient;
     private final MethodMetadataCache metadataCache;
@@ -76,6 +78,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final String clientName;
     private final ApplicationContext applicationContext;
     private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> loggerCache = new ConcurrentHashMap<>();
+    private final AtomicBoolean loggerCacheLimitWarningLogged = new AtomicBoolean(false);
     private final Set<String> resilienceWarningKeys = ConcurrentHashMap.newKeySet();
 
     private final ResilienceOperatorApplier resilienceOperatorApplier;
@@ -504,18 +507,35 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return null;
         }
 
-        return loggerCache.computeIfAbsent(meta.getHttpExchangeLoggerClass(), clazz -> {
-            HttpExchangeLogger bean = applicationContext.getBeanProvider(clazz).getIfAvailable();
-            if (bean != null) {
-                return bean;
+        Class<? extends HttpExchangeLogger> loggerClass = meta.getHttpExchangeLoggerClass();
+        HttpExchangeLogger cached = loggerCache.get(loggerClass);
+        if (cached != null) {
+            return cached;
+        }
+
+        HttpExchangeLogger created = instantiateExchangeLogger(loggerClass);
+        if (loggerCache.size() >= MAX_LOGGER_CACHE_SIZE) {
+            if (loggerCacheLimitWarningLogged.compareAndSet(false, true)) {
+                log.warn("HttpExchangeLogger cache reached configured limit ({}). New logger classes will not be cached.",
+                        MAX_LOGGER_CACHE_SIZE);
             }
-            try {
-                return clazz.getDeclaredConstructor().newInstance();
-            } catch (Exception e) {
-                throw new IllegalStateException(
-                        "Cannot instantiate HttpExchangeLogger: " + clazz.getName(), e);
-            }
-        });
+            return created;
+        }
+        HttpExchangeLogger existing = loggerCache.putIfAbsent(loggerClass, created);
+        return existing != null ? existing : created;
+    }
+
+    private HttpExchangeLogger instantiateExchangeLogger(Class<? extends HttpExchangeLogger> loggerClass) {
+        HttpExchangeLogger bean = applicationContext.getBeanProvider(loggerClass).getIfAvailable();
+        if (bean != null) {
+            return bean;
+        }
+        try {
+            return loggerClass.getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Cannot instantiate HttpExchangeLogger: " + loggerClass.getName(), e);
+        }
     }
 
     private void logExchange(
