@@ -8,6 +8,12 @@ import java.util.Map;
  *
  * <p>For {@code Flux<T>} responses, {@code responseBody} is {@code null} because
  * the stream may contain multiple elements; use status/headers/duration instead.
+ *
+ * <p>{@code inboundHeaders} contains the inbound request headers received from the
+ * upstream caller (e.g. an internal service that triggered this outbound call). These
+ * are populated automatically when
+ * {@link io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter} is
+ * registered and the call originates within a WebFlux request context.
  */
 public record HttpExchangeLogContext(
         String clientName,
@@ -15,6 +21,7 @@ public record HttpExchangeLogContext(
         String pathTemplate,
         Map<String, Object> pathVariables,
         Map<String, List<Object>> queryParameters,
+        Map<String, List<String>> inboundHeaders,
         Map<String, String> requestHeaders,
         Object requestBody,
         Integer responseStatus,

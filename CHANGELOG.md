@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.0] – 2026-04-22
+
+### Added
+
+- `InboundHeadersWebFilter` — a new `WebFilter` that captures a snapshot of all inbound request headers from the upstream caller and stores them in the Reactor `Context` under `InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY`. Auto-registered by `ReactiveHttpClientAutoConfiguration` when Spring WebFlux is present (`@ConditionalOnWebApplication(REACTIVE)`).
+- `HttpExchangeLogContext#inboundHeaders()` — new field on the log-context record carrying the inbound headers map. Populated automatically when `InboundHeadersWebFilter` is active and the outbound call originates within a WebFlux request chain; defaults to an empty map otherwise.
+
+### Changed
+
+- `DefaultHttpExchangeLogger` now includes `inboundHeaders=` in both success (`INFO`) and error (`WARN`) log lines, making it easy to correlate outbound calls with the triggering inbound request.
+- `ReactiveClientInvocationHandler` uses `Mono.deferContextual` / `Flux.deferContextual` to read inbound headers from the Reactor `Context` and passes them into the log context.
+
+### Removed
+
+- `UpstreamHeadersWebFilter` — replaced by the more general `InboundHeadersWebFilter`.
+
+---
+
 ## [1.7.0] – 2026-04-22
 
 ### Added
@@ -223,7 +241,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.  
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.5.0...v1.5.1

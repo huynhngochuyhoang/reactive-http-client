@@ -36,10 +36,11 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
         Object responseBody = shouldLogBodies() ? context.responseBody() : OMITTED;
 
         if (context.error() == null) {
-            log.info("[{}] {} {} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms",
+            log.info("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms",
                     context.clientName(),
                     context.httpMethod(),
                     context.pathTemplate(),
+                    context.inboundHeaders(),
                     requestHeaders,
                     requestBody,
                     context.responseStatus(),
@@ -49,10 +50,11 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
             return;
         }
 
-        log.warn("[{}] {} {} reqHeaders={} reqBody={} respStatus={} respHeaders={} duration={}ms error={}",
+        log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} duration={}ms error={}",
                 context.clientName(),
                 context.httpMethod(),
                 context.pathTemplate(),
+                context.inboundHeaders(),
                 requestHeaders,
                 requestBody,
                 context.responseStatus(),

@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
@@ -229,18 +230,25 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             });
             flux = applyResilienceFlux(flux, meta);
             if (exchangeLogger != null || observer != null) {
-                flux = flux
-                        .doOnError(terminalError::set)
-                        .doFinally(signalType -> {
-                            Throwable error = terminalErrorForSignal(signalType, terminalError.get());
-                            if (exchangeLogger != null) {
-                                logExchange(exchangeLogger, meta, resolved, start.get(),
-                                        responseStatus.get(), responseHeaders.get(), null, error);
-                            }
-                            if (observer != null) {
-                                notifyObserver(observer, meta, resolved, start.get(), responseStatus.get(), error, null, attemptCount.get());
-                            }
-                        });
+                AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(Map.of());
+                Flux<?> capturedFlux = flux;
+                flux = Flux.deferContextual(ctx -> {
+                    inboundHeadersRef.set(ctx.hasKey(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                            ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                            : Map.of());
+                    return capturedFlux;
+                })
+                .doOnError(terminalError::set)
+                .doFinally(signalType -> {
+                    Throwable error = terminalErrorForSignal(signalType, terminalError.get());
+                    if (exchangeLogger != null) {
+                        logExchange(exchangeLogger, meta, resolved, start.get(),
+                                responseStatus.get(), responseHeaders.get(), null, error, inboundHeadersRef.get());
+                    }
+                    if (observer != null) {
+                        notifyObserver(observer, meta, resolved, start.get(), responseStatus.get(), error, null, attemptCount.get());
+                    }
+                });
             }
             return flux;
         }
@@ -267,20 +275,27 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         });
         mono = applyResilienceMono(mono, meta);
         if (exchangeLogger != null || observer != null) {
-            mono = mono
-                    .doOnSuccess(terminalBody::set)
-                    .doOnError(terminalError::set)
-                    .doFinally(signalType -> {
-                        Throwable error = terminalErrorForSignal(signalType, terminalError.get());
-                        Object body = terminalBody.get();
-                        if (exchangeLogger != null) {
-                            logExchange(exchangeLogger, meta, resolved, start.get(),
-                                    responseStatus.get(), responseHeaders.get(), body, error);
-                        }
-                        if (observer != null) {
-                            notifyObserver(observer, meta, resolved, start.get(), responseStatus.get(), error, body, attemptCount.get());
-                        }
-                    });
+            AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(Map.of());
+            Mono<?> capturedMono = mono;
+            mono = Mono.deferContextual(ctx -> {
+                inboundHeadersRef.set(ctx.hasKey(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                        ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                        : Map.of());
+                return capturedMono;
+            })
+            .doOnSuccess(terminalBody::set)
+            .doOnError(terminalError::set)
+            .doFinally(signalType -> {
+                Throwable error = terminalErrorForSignal(signalType, terminalError.get());
+                Object body = terminalBody.get();
+                if (exchangeLogger != null) {
+                    logExchange(exchangeLogger, meta, resolved, start.get(),
+                            responseStatus.get(), responseHeaders.get(), body, error, inboundHeadersRef.get());
+                }
+                if (observer != null) {
+                    notifyObserver(observer, meta, resolved, start.get(), responseStatus.get(), error, body, attemptCount.get());
+                }
+            });
         }
         return mono;
     }
@@ -556,13 +571,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             HttpStatusCode statusCode,
             Map<String, List<String>> responseHeaders,
             Object responseBody,
-            Throwable error) {
+            Throwable error,
+            Map<String, List<String>> inboundHeaders) {
         exchangeLogger.log(new HttpExchangeLogContext(
                 clientName,
                 meta.getHttpMethod(),
                 meta.getPathTemplate(),
                 Map.copyOf(resolved.pathVars()),
                 copyQueryParams(resolved.queryParams()),
+                inboundHeaders,
                 Map.copyOf(resolved.headers()),
                 resolved.body(),
                 statusCode != null ? statusCode.value() : null,
