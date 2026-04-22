@@ -19,7 +19,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 import reactor.netty.resources.ConnectionProvider;
 import reactor.netty.http.client.HttpClient;
 
@@ -184,7 +183,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             configured = configured.filter(new OutboundAuthFilter(clientName, authProvider));
         }
 
-        if (config.isLogBody()) {
+        if (config.isExchangeLoggingEnabled()) {
             configured = configured.filter(loggingFilter());
         }
 
@@ -208,12 +207,24 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         return CorrelationIdWebFilter.exchangeFilter();
     }
 
-    /** Logs method, URL, status and latency. */
+    /** Logs method, URL, status and latency when exchange logging is enabled for the client. */
     private ExchangeFilterFunction loggingFilter() {
-        return ExchangeFilterFunction.ofResponseProcessor(response -> {
-            log.debug("Response status: {}", response.statusCode());
-            return Mono.just(response);
-        });
+        return (request, next) -> {
+            long startMs = System.currentTimeMillis();
+            return next.exchange(request)
+                    .doOnNext(response -> log.debug("[{}] {} {} -> {} ({}ms)",
+                            type != null ? type.getSimpleName() : "ReactiveHttpClient",
+                            request.method(),
+                            request.url(),
+                            response.statusCode(),
+                            System.currentTimeMillis() - startMs))
+                    .doOnError(error -> log.debug("[{}] {} {} -> ERROR {} ({}ms)",
+                            type != null ? type.getSimpleName() : "ReactiveHttpClient",
+                            request.method(),
+                            request.url(),
+                            error.getClass().getSimpleName(),
+                            System.currentTimeMillis() - startMs));
+        };
     }
 
     private Object resolveSafely(String className) {

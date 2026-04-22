@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import reactor.core.publisher.Mono;
 
 import java.io.ByteArrayOutputStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -27,13 +28,22 @@ public class DefaultErrorDecoder {
      */
     public Mono<? extends Throwable> decode(ClientResponse response) {
         int code = response.statusCode().value();
+        RequestContext requestContext = resolveRequestContext(response);
         return readBodyWithCap(response, MAX_ERROR_BODY_BYTES)
                 .defaultIfEmpty("")
                 .map(body -> {
                     if (code >= 400 && code < 500) {
-                        return (Throwable) new HttpClientException(code, body);
+                        return (Throwable) new HttpClientException(
+                                code,
+                                body,
+                                requestContext.method(),
+                                requestContext.url());
                     }
-                    return new RemoteServiceException(code, body);
+                    return new RemoteServiceException(
+                            code,
+                            body,
+                            requestContext.method(),
+                            requestContext.url());
                 });
     }
 
@@ -57,5 +67,24 @@ public class DefaultErrorDecoder {
                 })
                 .map(output -> output.toString(StandardCharsets.UTF_8))
                 .defaultIfEmpty("");
+    }
+
+    private RequestContext resolveRequestContext(ClientResponse response) {
+        try {
+            var request = response.request();
+            if (request == null) {
+                return RequestContext.EMPTY;
+            }
+            String method = request.getMethod() != null ? request.getMethod().name() : null;
+            URI uri = request.getURI();
+            String url = uri != null ? uri.toString() : null;
+            return new RequestContext(method, url);
+        } catch (UnsupportedOperationException ignored) {
+            return RequestContext.EMPTY;
+        }
+    }
+
+    private record RequestContext(String method, String url) {
+        private static final RequestContext EMPTY = new RequestContext(null, null);
     }
 }

@@ -4,6 +4,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
+import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
@@ -81,13 +82,37 @@ public class ReactiveHttpClientsRegistrar implements ImportBeanDefinitionRegistr
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void registerFactoryBean(Class<?> interfaceClass, BeanDefinitionRegistry registry) {
+        if (hasExistingBeanRegistration(interfaceClass, registry)) {
+            return;
+        }
+
         BeanDefinitionBuilder builder = BeanDefinitionBuilder
                 .genericBeanDefinition(ReactiveHttpClientFactoryBean.class);
         builder.addPropertyValue("type", interfaceClass);
 
-        String beanName = interfaceClass.getName();
-        if (!registry.containsBeanDefinition(beanName)) {
-            registry.registerBeanDefinition(beanName, builder.getBeanDefinition());
+        registry.registerBeanDefinition(interfaceClass.getName(), builder.getBeanDefinition());
+    }
+
+    private boolean hasExistingBeanRegistration(Class<?> interfaceClass, BeanDefinitionRegistry registry) {
+        String interfaceClassName = interfaceClass.getName();
+        if (registry.containsBeanDefinition(interfaceClassName)) {
+            return true;
         }
+
+        for (String beanName : registry.getBeanDefinitionNames()) {
+            BeanDefinition definition = registry.getBeanDefinition(beanName);
+            if (interfaceClassName.equals(definition.getBeanClassName())) {
+                return true;
+            }
+
+            Object factoryObjectType = definition.getAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
+            if (factoryObjectType instanceof Class<?> clazz && interfaceClass.equals(clazz)) {
+                return true;
+            }
+            if (factoryObjectType instanceof String className && interfaceClassName.equals(className)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

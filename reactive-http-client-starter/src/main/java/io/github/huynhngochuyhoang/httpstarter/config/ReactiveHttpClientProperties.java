@@ -28,7 +28,7 @@ import java.util.Set;
  *         base-url: https://api.example.com
  *         codec-max-in-memory-size-mb: 2
  *         compression-enabled: false
- *         log-body: false
+ *         log-exchange: false
  *         auth-provider: userServiceAuthProvider
  *         resilience:
  *           enabled: false
@@ -97,7 +97,9 @@ public class ReactiveHttpClientProperties {
         private String baseUrl;
         private int codecMaxInMemorySizeMb = 2;
         private boolean compressionEnabled = false;
-        private boolean logBody = false;
+        private boolean logExchange = false;
+        @Deprecated
+        private Boolean logBody;
         /**
          * Bean name of {@code AuthProvider} to use for this client.
          * Empty means no automatic auth injection.
@@ -114,8 +116,24 @@ public class ReactiveHttpClientProperties {
         public boolean isCompressionEnabled() { return compressionEnabled; }
         public void setCompressionEnabled(boolean compressionEnabled) { this.compressionEnabled = compressionEnabled; }
 
-        public boolean isLogBody() { return logBody; }
+        public boolean isLogExchange() { return logExchange; }
+        public void setLogExchange(boolean logExchange) { this.logExchange = logExchange; }
+
+        /**
+         * @deprecated use {@code log-exchange} / {@link #isLogExchange()} instead.
+         */
+        @Deprecated
+        public boolean isLogBody() { return Boolean.TRUE.equals(logBody); }
+
+        /**
+         * @deprecated use {@code log-exchange} / {@link #setLogExchange(boolean)} instead.
+         */
+        @Deprecated
         public void setLogBody(boolean logBody) { this.logBody = logBody; }
+
+        public boolean isExchangeLoggingEnabled() {
+            return logExchange || Boolean.TRUE.equals(logBody);
+        }
 
         public String getAuthProvider() { return authProvider; }
         public void setAuthProvider(String authProvider) { this.authProvider = authProvider; }
