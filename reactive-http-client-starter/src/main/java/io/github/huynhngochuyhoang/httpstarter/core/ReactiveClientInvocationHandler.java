@@ -187,7 +187,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     } else {
                         requestHeadersSpec = preparedRequestSpec;
                     }
-                    return applyRequestLevelResponseTimeout(requestHeadersSpec, meta, timeoutMs);
+                    return applyRequestLevelResponseTimeout(requestHeadersSpec);
                 });
 
         AtomicReference<HttpStatusCode> responseStatus = new AtomicReference<>();
@@ -361,25 +361,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private WebClient.RequestHeadersSpec<?> applyRequestLevelResponseTimeout(
-            WebClient.RequestHeadersSpec<?> requestHeadersSpec,
-            MethodMetadata meta,
-            long timeoutMs) {
-        if (!shouldOverrideRequestLevelResponseTimeout(meta, timeoutMs)) {
-            return requestHeadersSpec;
-        }
+            WebClient.RequestHeadersSpec<?> requestHeadersSpec) {
         return requestHeadersSpec.httpRequest(httpRequest -> {
             Object nativeRequest = httpRequest.getNativeRequest();
             if (nativeRequest instanceof HttpClientRequest reactorRequest) {
-                reactorRequest.responseTimeout(timeoutMs > 0 ? Duration.ofMillis(timeoutMs) : null);
+                // Use Reactor timeout() as the single timeout mechanism and clear any connector-level Netty timeout.
+                reactorRequest.responseTimeout(null);
             }
         });
-    }
-
-    private boolean shouldOverrideRequestLevelResponseTimeout(MethodMetadata meta, long timeoutMs) {
-        if (meta.getTimeoutMs() != MethodMetadata.TIMEOUT_NOT_SET) {
-            return true;
-        }
-        return timeoutMs > 0;
     }
 
     private Mono<? extends Throwable> decodeErrorResponse(ClientResponse response) {

@@ -97,7 +97,7 @@
   - **Issue:** `System.currentTimeMillis()` captured at invoke-time; deferred subscription inflates observed duration.
   - **Fix:** Wrap pipeline in `Mono.defer(() -> { long start = ...; ... })`.
 
-- [ ] **M4. Consolidate duplicated timeout resolution logic**
+- [x] **M4. Consolidate duplicated timeout resolution logic**
   - **Where:** `ReactiveClientInvocationHandler.java:336-370`
   - **Issue:** `resolveTimeoutMs` and `shouldOverrideRequestLevelResponseTimeout` duplicate the same check. Two timeout layers also surface different exception types (see H3).
   - **Fix:** Merge helpers; pick one timeout mechanism as source of truth.

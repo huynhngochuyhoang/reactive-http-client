@@ -15,6 +15,8 @@ import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.server.HttpServer;
 import reactor.test.StepVerifier;
 
+import java.util.concurrent.TimeoutException;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -73,6 +75,38 @@ class ApiLevelTimeoutReadTimeoutPrecedenceTest {
             StepVerifier.create(invokeResilienceTimeoutApi(handler))
                     .expectNext("ok")
                     .verifyComplete();
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    @Test
+    void shouldUseReactiveTimeoutExceptionWhenGlobalNettyReadTimeoutIsConfigured() {
+        DisposableServer server = HttpServer.create()
+                .port(0)
+                .route(routes -> routes.get("/slow", (request, response) ->
+                        Mono.delay(java.time.Duration.ofMillis(250))
+                                .then(response.sendString(Mono.just("ok")).then())))
+                .bindNow();
+
+        try {
+            WebClient webClient = WebClient.builder()
+                    .baseUrl("http://127.0.0.1:" + server.port())
+                    .clientConnector(new ReactorClientHttpConnector(
+                            HttpClient.create().responseTimeout(java.time.Duration.ofMillis(100))))
+                    .build();
+
+            ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
+            ReactiveHttpClientProperties.ResilienceConfig resilienceConfig = new ReactiveHttpClientProperties.ResilienceConfig();
+            resilienceConfig.setEnabled(true);
+            resilienceConfig.setTimeoutMs(150);
+            clientConfig.setResilience(resilienceConfig);
+
+            ReactiveClientInvocationHandler handler = createHandler(webClient, clientConfig);
+
+            StepVerifier.create(invokeResilienceTimeoutApi(handler))
+                    .expectError(TimeoutException.class)
+                    .verify();
         } finally {
             server.disposeNow();
         }
