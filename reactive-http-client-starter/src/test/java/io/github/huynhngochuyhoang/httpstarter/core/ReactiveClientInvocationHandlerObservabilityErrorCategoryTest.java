@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -168,6 +169,9 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
                 .expectError()
                 .verify();
 
+        HttpClientObserverEvent event = observed.get();
+        assertNotNull(event);
+        assertEquals(ErrorCategory.UNKNOWN, event.getErrorCategory());
     }
 
     @Test
@@ -244,6 +248,7 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
                 .expectError(RequestSerializationException.class)
                 .verify();
 
+        assertNull(observed.get());
     }
 
     @Test
