@@ -11,6 +11,8 @@ package io.github.huynhngochuyhoang.httpstarter.exception;
  */
 public class HttpClientException extends RuntimeException {
 
+    private static final int MAX_RESPONSE_BODY_LENGTH = 4096;
+
     private final int statusCode;
     private final String responseBody;
     private final ErrorCategory errorCategory;
@@ -24,9 +26,9 @@ public class HttpClientException extends RuntimeException {
      * @param responseBody the raw response body (may be empty)
      */
     public HttpClientException(int statusCode, String responseBody) {
-        super("HTTP client error " + statusCode + ": " + responseBody);
+        super("HTTP client error " + statusCode);
         this.statusCode = statusCode;
-        this.responseBody = responseBody;
+        this.responseBody = truncate(responseBody);
         this.errorCategory = statusCode == 429 ? ErrorCategory.RATE_LIMITED : ErrorCategory.CLIENT_ERROR;
     }
 
@@ -38,9 +40,9 @@ public class HttpClientException extends RuntimeException {
      * @param errorCategory the error category
      */
     public HttpClientException(int statusCode, String responseBody, ErrorCategory errorCategory) {
-        super("HTTP client error " + statusCode + ": " + responseBody);
+        super("HTTP client error " + statusCode);
         this.statusCode = statusCode;
-        this.responseBody = responseBody;
+        this.responseBody = truncate(responseBody);
         this.errorCategory = errorCategory;
     }
 
@@ -52,9 +54,9 @@ public class HttpClientException extends RuntimeException {
      * @param cause        the underlying cause
      */
     public HttpClientException(int statusCode, String responseBody, Throwable cause) {
-        super("HTTP client error " + statusCode + ": " + responseBody, cause);
+        super("HTTP client error " + statusCode, cause);
         this.statusCode = statusCode;
-        this.responseBody = responseBody;
+        this.responseBody = truncate(responseBody);
         this.errorCategory = statusCode == 429 ? ErrorCategory.RATE_LIMITED : ErrorCategory.CLIENT_ERROR;
     }
 
@@ -75,5 +77,15 @@ public class HttpClientException extends RuntimeException {
      */
     public ErrorCategory getErrorCategory() {
         return errorCategory;
+    }
+
+    private static String truncate(String body) {
+        if (body == null) {
+            return null;
+        }
+        if (body.length() <= MAX_RESPONSE_BODY_LENGTH) {
+            return body;
+        }
+        return body.substring(0, MAX_RESPONSE_BODY_LENGTH);
     }
 }

@@ -67,7 +67,10 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
     private ClientRequest applyAuth(ClientRequest original, AuthContext authContext) {
         ClientRequest.Builder builder = ClientRequest.from(original);
 
-        authContext.getHeaders().forEach((name, value) -> builder.headers(headers -> headers.set(name, value)));
+        authContext.getHeaders().forEach((name, value) -> {
+            validateHeaderValue(name, value);
+            builder.headers(headers -> headers.set(name, value));
+        });
 
         if (!authContext.getQueryParams().isEmpty()) {
             URI updatedUri = applyQueryParams(original.url(), authContext.getQueryParams());
@@ -84,6 +87,19 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
                 uriBuilder.queryParam(name, value);
             }
         });
-        return uriBuilder.build(true).toUri();
+        return uriBuilder.encode().build().toUri();
+    }
+
+    private void validateHeaderValue(String headerName, String value) {
+        if (value == null) {
+            return;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (ch == '\r' || ch == '\n' || Character.isISOControl(ch)) {
+                throw new IllegalArgumentException("Invalid auth header value for '" + headerName
+                        + "': CRLF and control characters are not allowed");
+            }
+        }
     }
 }

@@ -41,7 +41,10 @@ public class RequestArgumentResolver {
         for (Map.Entry<Integer, String> entry : meta.getHeaderParams().entrySet()) {
             int idx = entry.getKey();
             if (args != null && idx < args.length && args[idx] != null) {
-                headers.put(entry.getValue(), String.valueOf(args[idx]));
+                String headerName = entry.getValue();
+                String headerValue = String.valueOf(args[idx]);
+                validateHeaderValue(headerName, headerValue);
+                headers.put(headerName, headerValue);
             }
         }
         for (Integer idx : meta.getHeaderMapParams()) {
@@ -50,7 +53,9 @@ public class RequestArgumentResolver {
                     if (headerEntry.getKey() != null && headerEntry.getValue() != null) {
                         String key = String.valueOf(headerEntry.getKey());
                         if (!key.isBlank()) {
-                            headers.put(key, String.valueOf(headerEntry.getValue()));
+                            String value = String.valueOf(headerEntry.getValue());
+                            validateHeaderValue(key, value);
+                            headers.put(key, value);
                         }
                     }
                 }
@@ -85,6 +90,19 @@ public class RequestArgumentResolver {
             return list;
         }
         return List.of(value);
+    }
+
+    private void validateHeaderValue(String headerName, String value) {
+        if (value == null) {
+            return;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (ch == '\r' || ch == '\n' || Character.isISOControl(ch)) {
+                throw new IllegalArgumentException("Invalid header value for '" + headerName
+                        + "': CRLF and control characters are not allowed");
+            }
+        }
     }
 
     /**

@@ -30,6 +30,7 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
     private volatile Mono<CachedAccessToken> inFlightRefresh;
     private volatile Instant lastRefreshFailureAt;
     private volatile Throwable lastRefreshFailure;
+    private volatile long invalidationEpoch;
 
     public RefreshingBearerAuthProvider(AccessTokenProvider accessTokenProvider) {
         this(accessTokenProvider, DEFAULT_REFRESH_SKEW, DEFAULT_FAILURE_COOLDOWN, Clock.systemUTC());
@@ -78,6 +79,7 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
     @Override
     public Mono<Void> invalidate() {
         synchronized (this) {
+            invalidationEpoch++;
             cachedToken = null;
             inFlightRefresh = null;
             lastRefreshFailureAt = null;
@@ -117,6 +119,7 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
             }
 
             AtomicReference<Mono<CachedAccessToken>> refreshRef = new AtomicReference<>();
+            long refreshEpoch = invalidationEpoch;
             Mono<CachedAccessToken> refreshMono = Mono.defer(accessTokenProvider::fetchToken)
                     .switchIfEmpty(Mono.error(new AuthProviderException(
                             clientName,
@@ -126,13 +129,21 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
                             ? error
                             : new AuthProviderException(clientName, error))
                     .doOnNext(token -> {
-                        cachedToken = token;
-                        lastRefreshFailureAt = null;
-                        lastRefreshFailure = null;
+                        synchronized (this) {
+                            if (refreshEpoch == invalidationEpoch) {
+                                cachedToken = token;
+                                lastRefreshFailureAt = null;
+                                lastRefreshFailure = null;
+                            }
+                        }
                     })
                     .doOnError(error -> {
-                        lastRefreshFailureAt = clock.instant();
-                        lastRefreshFailure = error;
+                        synchronized (this) {
+                            if (refreshEpoch == invalidationEpoch) {
+                                lastRefreshFailureAt = clock.instant();
+                                lastRefreshFailure = error;
+                            }
+                        }
                     })
                     .doFinally(signalType -> clearInFlight(refreshRef.get()))
                     .cache();

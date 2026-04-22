@@ -7,6 +7,8 @@ package io.github.huynhngochuyhoang.httpstarter.exception;
  */
 public class RemoteServiceException extends RuntimeException {
 
+    private static final int MAX_RESPONSE_BODY_LENGTH = 4096;
+
     private final int statusCode;
     private final String responseBody;
     private final ErrorCategory errorCategory;
@@ -19,9 +21,9 @@ public class RemoteServiceException extends RuntimeException {
      * @param responseBody the raw response body (may be empty)
      */
     public RemoteServiceException(int statusCode, String responseBody) {
-        super("Remote service error " + statusCode + ": " + responseBody);
+        super("Remote service error " + statusCode);
         this.statusCode = statusCode;
-        this.responseBody = responseBody;
+        this.responseBody = truncate(responseBody);
         this.errorCategory = ErrorCategory.SERVER_ERROR;
     }
 
@@ -33,9 +35,9 @@ public class RemoteServiceException extends RuntimeException {
      * @param cause        the underlying cause
      */
     public RemoteServiceException(int statusCode, String responseBody, Throwable cause) {
-        super("Remote service error " + statusCode + ": " + responseBody, cause);
+        super("Remote service error " + statusCode, cause);
         this.statusCode = statusCode;
-        this.responseBody = responseBody;
+        this.responseBody = truncate(responseBody);
         this.errorCategory = ErrorCategory.SERVER_ERROR;
     }
 
@@ -54,5 +56,15 @@ public class RemoteServiceException extends RuntimeException {
      */
     public ErrorCategory getErrorCategory() {
         return errorCategory;
+    }
+
+    private static String truncate(String body) {
+        if (body == null) {
+            return null;
+        }
+        if (body.length() <= MAX_RESPONSE_BODY_LENGTH) {
+            return body;
+        }
+        return body.substring(0, MAX_RESPONSE_BODY_LENGTH);
     }
 }

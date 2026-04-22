@@ -8,13 +8,18 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
+import reactor.netty.DisposableServer;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.http.server.HttpServer;
 import reactor.test.StepVerifier;
 
 import java.time.Duration;
-import java.util.concurrent.TimeoutException;
+import io.netty.handler.timeout.ReadTimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.Mockito.mock;
@@ -36,29 +41,39 @@ class HttpEdgeCasesTest {
     // -------------------------------------------------------------------------
 
     /**
-     * When the upstream never responds and the resilience timeout is configured,
-     * the Mono must terminate with a {@link TimeoutException}.
+     * When the upstream response is slower than request-level timeout,
+     * the Mono must terminate with a {@link ReadTimeoutException}.
      */
     @Test
-    void shouldTimeoutWhenUpstreamNeverResponds() {
-        // WebClient backed by an exchange function that returns Mono.never() – simulates
-        // an upstream that accepts the connection but sends no response.
-        WebClient webClient = WebClient.builder()
-                .baseUrl("http://test.local")
-                .exchangeFunction(request -> Mono.never())
-                .build();
+    void shouldTimeoutWhenUpstreamIsTooSlow() {
+        DisposableServer server = HttpServer.create()
+                .port(0)
+                .route(routes -> routes.get("/users", (request, response) ->
+                        Mono.delay(Duration.ofMillis(250))
+                                .then(response.sendString(Mono.just("pong")).then())))
+                .bindNow();
 
-        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
-        config.setResilience(resilienceConfig(true, 500)); // 500 ms – will be advanced virtually
+        try {
+            WebClient webClient = WebClient.builder()
+                    .baseUrl("http://127.0.0.1:" + server.port())
+                    .clientConnector(new ReactorClientHttpConnector(
+                            HttpClient.create().responseTimeout(Duration.ofSeconds(5))))
+                    .build();
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, config);
+            ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+            config.setResilience(resilienceConfig(true, 100));
 
-        // Use virtualTime so the test doesn't actually wait 500 ms.
-        StepVerifier.withVirtualTime(() -> invokeGetUsers(handler))
-                .expectSubscription()
-                .thenAwait(Duration.ofMillis(501))
-                .expectErrorSatisfies(ex -> assertInstanceOf(TimeoutException.class, ex))
-                .verify(Duration.ofSeconds(5));
+            ReactiveClientInvocationHandler handler = createHandler(webClient, config);
+
+            StepVerifier.create(invokeGetUsers(handler))
+                    .expectErrorSatisfies(ex -> {
+                        WebClientRequestException requestException = assertInstanceOf(WebClientRequestException.class, ex);
+                        assertInstanceOf(ReadTimeoutException.class, requestException.getCause());
+                    })
+                    .verify(Duration.ofSeconds(5));
+        } finally {
+            server.disposeNow();
+        }
     }
 
     /**
@@ -66,22 +81,35 @@ class HttpEdgeCasesTest {
      */
     @Test
     void shouldRespectMethodLevelTimeoutOverride() {
-        WebClient webClient = WebClient.builder()
-                .baseUrl("http://test.local")
-                .exchangeFunction(request -> Mono.never())
-                .build();
+        DisposableServer server = HttpServer.create()
+                .port(0)
+                .route(routes -> routes.get("/users", (request, response) ->
+                        Mono.delay(Duration.ofMillis(250))
+                                .then(response.sendString(Mono.just("pong")).then())))
+                .bindNow();
 
-        // Resilience timeout 5000 ms, but method overrides to 200 ms.
-        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
-        config.setResilience(resilienceConfig(true, 5000));
+        try {
+            WebClient webClient = WebClient.builder()
+                    .baseUrl("http://127.0.0.1:" + server.port())
+                    .clientConnector(new ReactorClientHttpConnector(
+                            HttpClient.create().responseTimeout(Duration.ofSeconds(5))))
+                    .build();
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, config);
+            // Resilience timeout 5000 ms, but method overrides to 200 ms.
+            ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+            config.setResilience(resilienceConfig(true, 5000));
 
-        StepVerifier.withVirtualTime(() -> invokeGetUsersWithShortTimeout(handler))
-                .expectSubscription()
-                .thenAwait(Duration.ofMillis(201))
-                .expectErrorSatisfies(ex -> assertInstanceOf(TimeoutException.class, ex))
-                .verify(Duration.ofSeconds(5));
+            ReactiveClientInvocationHandler handler = createHandler(webClient, config);
+
+            StepVerifier.create(invokeGetUsersWithShortTimeout(handler))
+                    .expectErrorSatisfies(ex -> {
+                        WebClientRequestException requestException = assertInstanceOf(WebClientRequestException.class, ex);
+                        assertInstanceOf(ReadTimeoutException.class, requestException.getCause());
+                    })
+                    .verify(Duration.ofSeconds(5));
+        } finally {
+            server.disposeNow();
+        }
     }
 
     // -------------------------------------------------------------------------

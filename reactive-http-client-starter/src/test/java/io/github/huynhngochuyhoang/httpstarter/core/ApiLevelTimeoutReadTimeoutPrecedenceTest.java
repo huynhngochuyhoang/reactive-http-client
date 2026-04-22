@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
@@ -15,8 +16,11 @@ import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.server.HttpServer;
 import reactor.test.StepVerifier;
 
+import io.netty.handler.timeout.ReadTimeoutException;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 class ApiLevelTimeoutReadTimeoutPrecedenceTest {
 
@@ -73,6 +77,41 @@ class ApiLevelTimeoutReadTimeoutPrecedenceTest {
             StepVerifier.create(invokeResilienceTimeoutApi(handler))
                     .expectNext("ok")
                     .verifyComplete();
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    @Test
+    void shouldUseNettyReadTimeoutExceptionWhenRequestLevelTimeoutIsConfigured() {
+        DisposableServer server = HttpServer.create()
+                .port(0)
+                .route(routes -> routes.get("/slow", (request, response) ->
+                        Mono.delay(java.time.Duration.ofMillis(250))
+                                .then(response.sendString(Mono.just("ok")).then())))
+                .bindNow();
+
+        try {
+            WebClient webClient = WebClient.builder()
+                    .baseUrl("http://127.0.0.1:" + server.port())
+                    .clientConnector(new ReactorClientHttpConnector(
+                            HttpClient.create().responseTimeout(java.time.Duration.ofMillis(100))))
+                    .build();
+
+            ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
+            ReactiveHttpClientProperties.ResilienceConfig resilienceConfig = new ReactiveHttpClientProperties.ResilienceConfig();
+            resilienceConfig.setEnabled(true);
+            resilienceConfig.setTimeoutMs(150);
+            clientConfig.setResilience(resilienceConfig);
+
+            ReactiveClientInvocationHandler handler = createHandler(webClient, clientConfig);
+
+            StepVerifier.create(invokeResilienceTimeoutApi(handler))
+                    .expectErrorSatisfies(ex -> {
+                        WebClientRequestException requestException = assertInstanceOf(WebClientRequestException.class, ex);
+                        assertInstanceOf(ReadTimeoutException.class, requestException.getCause());
+                    })
+                    .verify();
         } finally {
             server.disposeNow();
         }

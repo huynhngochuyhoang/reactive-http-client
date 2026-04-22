@@ -56,6 +56,24 @@ class HeaderParamMapSupportTest {
         assertTrue(ex.getMessage().contains("must not be blank"));
     }
 
+    @Test
+    void shouldRejectNamedHeaderParamForMapParameter() throws Exception {
+        Method method = InvalidMapClient.class.getMethod("get", Map.class);
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new MethodMetadataCache().get(method));
+        assertTrue(ex.getMessage().contains("must be blank for Map parameter"));
+    }
+
+    @Test
+    void shouldRejectHeaderValuesContainingControlCharacters() {
+        MethodMetadata meta = new MethodMetadata();
+        meta.getHeaderParams().put(0, "Authorization");
+
+        RequestArgumentResolver resolver = new RequestArgumentResolver();
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> resolver.resolve(meta, new Object[]{"Bearer abc\r\nX-Evil: 1"}));
+        assertTrue(ex.getMessage().contains("Invalid header value"));
+    }
+
     interface ValidClient {
         @GET("/users")
         Mono<String> get(@HeaderParam Map<String, String> headers, @HeaderParam("X-Tenant") String tenant);
@@ -64,5 +82,10 @@ class HeaderParamMapSupportTest {
     interface InvalidClient {
         @GET("/users")
         Mono<String> get(@HeaderParam String tenant);
+    }
+
+    interface InvalidMapClient {
+        @GET("/users")
+        Mono<String> get(@HeaderParam("X-Tenant") Map<String, String> headers);
     }
 }

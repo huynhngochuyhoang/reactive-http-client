@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
+import io.github.huynhngochuyhoang.httpstarter.exception.RequestSerializationException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
@@ -19,11 +20,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
+import io.netty.handler.timeout.ReadTimeoutException;
+import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClientRequest;
 
 import java.lang.reflect.InvocationHandler;
@@ -44,6 +48,7 @@ import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -71,7 +76,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final String clientName;
     private final ApplicationContext applicationContext;
     private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> loggerCache = new ConcurrentHashMap<>();
-    private final java.util.Set<String> resilienceWarningKeys = ConcurrentHashMap.newKeySet();
+    private final Set<String> resilienceWarningKeys = ConcurrentHashMap.newKeySet();
 
     private final ResilienceOperatorApplier resilienceOperatorApplier;
     private final ObjectMapper objectMapper;
@@ -113,8 +118,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
      * are still visible after this handler has been constructed.
      */
     private HttpClientObserver getObserver() {
-        HttpClientObserver observer = observerProvider.getIfAvailable();
-        return observer != null ? observer : null;
+        return observerProvider.getIfAvailable();
     }
 
     @Override
@@ -127,17 +131,20 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 default -> method.invoke(this, args);
             };
         }
+        if (method.isDefault()) {
+            return InvocationHandler.invokeDefault(proxy, method, args != null ? args : new Object[0]);
+        }
 
         MethodMetadata meta = metadataCache.get(method);
 
         if (meta.getHttpMethod() == null) {
             throw new UnsupportedOperationException(
-                    "Method " + method.getName() + " has no HTTP verb annotation (@GET, @POST, @PUT, @DELETE)");
+                    "Method " + method.getName() + " has no HTTP verb annotation (@GET, @POST, @PUT, @DELETE, @PATCH)");
         }
 
         RequestArgumentResolver.ResolvedArgs resolved = argumentResolver.resolve(meta, args);
 
-        long start = System.currentTimeMillis();
+        AtomicLong start = new AtomicLong();
         HttpExchangeLogger exchangeLogger = resolveExchangeLogger(meta);
 
         WebClient.RequestBodySpec requestSpec = webClient
@@ -155,29 +162,33 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (!hasAcceptHeader) {
             requestSpec = requestSpec.accept(MediaType.APPLICATION_JSON);
         }
+        WebClient.RequestBodySpec baseRequestSpec = requestSpec;
 
-        SerializedRequestBody serializedRequestBody = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader);
-        if (serializedRequestBody.originalBody() != null) {
-            requestSpec = requestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, serializedRequestBody.originalBody());
-        }
-        if (serializedRequestBody.rawBody() != null) {
-            requestSpec = requestSpec.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, serializedRequestBody.rawBody());
-        }
-
-        resolved.headers().forEach(requestSpec::header);
-
-        WebClient.RequestHeadersSpec<?> requestHeadersSpec;
-        if (serializedRequestBody.originalBody() != null) {
-            WebClient.RequestBodySpec requestWithBodySpec = requestSpec;
-            if (!hasContentTypeHeader) {
-                requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_JSON);
-            }
-            requestHeadersSpec = requestWithBodySpec.bodyValue(serializedRequestBody.bodyToWrite());
-        } else {
-            requestHeadersSpec = requestSpec;
-        }
         long timeoutMs = resolveTimeoutMs(meta);
-        requestHeadersSpec = applyRequestLevelResponseTimeout(requestHeadersSpec, meta, timeoutMs);
+        Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader)
+                .map(serializedRequestBody -> {
+                    WebClient.RequestBodySpec preparedRequestSpec = baseRequestSpec;
+                    if (serializedRequestBody.originalBody() != null) {
+                        preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, serializedRequestBody.originalBody());
+                    }
+                    if (serializedRequestBody.rawBody() != null) {
+                        preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, serializedRequestBody.rawBody());
+                    }
+
+                    resolved.headers().forEach(preparedRequestSpec::header);
+
+                    WebClient.RequestHeadersSpec<?> requestHeadersSpec;
+                    if (serializedRequestBody.originalBody() != null) {
+                        WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
+                        if (!hasContentTypeHeader) {
+                            requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_JSON);
+                        }
+                        requestHeadersSpec = requestWithBodySpec.bodyValue(serializedRequestBody.bodyToWrite());
+                    } else {
+                        requestHeadersSpec = preparedRequestSpec;
+                    }
+                    return applyRequestLevelResponseTimeout(requestHeadersSpec, timeoutMs);
+                });
 
         AtomicReference<HttpStatusCode> responseStatus = new AtomicReference<>();
         AtomicReference<Map<String, List<String>>> responseHeaders = new AtomicReference<>(Map.of());
@@ -188,7 +199,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         HttpClientObserver observer = getObserver();
 
         if (meta.isReturnsFlux()) {
-            Flux<?> flux = requestHeadersSpec.exchangeToFlux(clientResponse -> {
+            Flux<?> flux = requestHeadersSpecMono.flatMapMany(requestHeadersSpec -> requestHeadersSpec.exchangeToFlux(clientResponse -> {
                 responseStatus.set(clientResponse.statusCode());
                 responseHeaders.set(copyHeaders(clientResponse));
 
@@ -196,34 +207,34 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
                 }
                 return buildFlux(clientResponse, meta.getResponseType());
-            }).doOnSubscribe(subscription -> {
+            })).doOnSubscribe(subscription -> {
+                start.set(System.currentTimeMillis());
                 responseStatus.set(null);
                 responseHeaders.set(Map.of());
                 terminalError.set(null);
+                if (exchangeLogger == null) {
+                    logRequest(meta, start.get());
+                }
             });
-            flux = applyTimeoutFlux(flux, timeoutMs);
             flux = applyResilienceFlux(flux, meta);
-            if (exchangeLogger == null) {
-                logRequest(meta, start);
-            }
             if (exchangeLogger != null || observer != null) {
                 flux = flux
                         .doOnError(terminalError::set)
                         .doFinally(signalType -> {
                             Throwable error = terminalErrorForSignal(signalType, terminalError.get());
                             if (exchangeLogger != null) {
-                                logExchange(exchangeLogger, meta, resolved, start,
+                                logExchange(exchangeLogger, meta, resolved, start.get(),
                                         responseStatus.get(), responseHeaders.get(), null, error);
                             }
                             if (observer != null) {
-                                notifyObserver(observer, meta, resolved, start, responseStatus.get(), error, null);
+                                notifyObserver(observer, meta, resolved, start.get(), responseStatus.get(), error, null);
                             }
                         });
             }
             return flux;
         }
 
-        Mono<?> mono = requestHeadersSpec.exchangeToMono(clientResponse -> {
+        Mono<?> mono = requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.exchangeToMono(clientResponse -> {
             responseStatus.set(clientResponse.statusCode());
             responseHeaders.set(copyHeaders(clientResponse));
 
@@ -231,17 +242,17 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 return decodeErrorResponse(clientResponse).flatMap(Mono::error);
             }
             return buildMono(clientResponse, meta.getResponseType());
-        }).doOnSubscribe(subscription -> {
+        })).doOnSubscribe(subscription -> {
+            start.set(System.currentTimeMillis());
             responseStatus.set(null);
             responseHeaders.set(Map.of());
             terminalError.set(null);
             terminalBody.set(null);
+            if (exchangeLogger == null) {
+                logRequest(meta, start.get());
+            }
         });
-        mono = applyTimeoutMono(mono, timeoutMs);
         mono = applyResilienceMono(mono, meta);
-        if (exchangeLogger == null) {
-            logRequest(meta, start);
-        }
         if (exchangeLogger != null || observer != null) {
             mono = mono
                     .doOnSuccess(terminalBody::set)
@@ -250,11 +261,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         Throwable error = terminalErrorForSignal(signalType, terminalError.get());
                         Object body = terminalBody.get();
                         if (exchangeLogger != null) {
-                            logExchange(exchangeLogger, meta, resolved, start,
+                            logExchange(exchangeLogger, meta, resolved, start.get(),
                                     responseStatus.get(), responseHeaders.get(), body, error);
                         }
                         if (observer != null) {
-                            notifyObserver(observer, meta, resolved, start, responseStatus.get(), error, body);
+                            notifyObserver(observer, meta, resolved, start.get(), responseStatus.get(), error, body);
                         }
                     });
         }
@@ -309,30 +320,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return flux;
     }
 
-    /**
-     * Applies timeout when resolved timeout is {@code > 0}.
-     * A resolved value of {@code 0} disables timeout (from method override or config).
-     * This operator is placed before retry so the timeout is enforced per attempt.
-     */
-    private Mono<?> applyTimeoutMono(Mono<?> mono, long timeoutMs) {
-        if (timeoutMs <= 0) {
-            return mono;
-        }
-        return mono.timeout(Duration.ofMillis(timeoutMs));
-    }
-
-    /**
-     * Applies timeout when resolved timeout is {@code > 0}.
-     * A resolved value of {@code 0} disables timeout (from method override or config).
-     * This operator is placed before retry so the timeout is enforced per attempt.
-     */
-    private Flux<?> applyTimeoutFlux(Flux<?> flux, long timeoutMs) {
-        if (timeoutMs <= 0) {
-            return flux;
-        }
-        return flux.timeout(Duration.ofMillis(timeoutMs));
-    }
-
     private long resolveTimeoutMs(MethodMetadata meta) {
         // Method-level override has highest priority.
         // A method annotation value of 0 explicitly disables timeout for that API method.
@@ -349,24 +336,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     private WebClient.RequestHeadersSpec<?> applyRequestLevelResponseTimeout(
             WebClient.RequestHeadersSpec<?> requestHeadersSpec,
-            MethodMetadata meta,
             long timeoutMs) {
-        if (!shouldOverrideRequestLevelResponseTimeout(meta, timeoutMs)) {
-            return requestHeadersSpec;
-        }
         return requestHeadersSpec.httpRequest(httpRequest -> {
             Object nativeRequest = httpRequest.getNativeRequest();
             if (nativeRequest instanceof HttpClientRequest reactorRequest) {
                 reactorRequest.responseTimeout(timeoutMs > 0 ? Duration.ofMillis(timeoutMs) : null);
             }
         });
-    }
-
-    private boolean shouldOverrideRequestLevelResponseTimeout(MethodMetadata meta, long timeoutMs) {
-        if (meta.getTimeoutMs() != MethodMetadata.TIMEOUT_NOT_SET) {
-            return true;
-        }
-        return timeoutMs > 0;
     }
 
     private Mono<? extends Throwable> decodeErrorResponse(ClientResponse response) {
@@ -441,11 +417,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private String getHeaderIgnoreCase(Map<String, String> headers, String headerName) {
-        return headers.entrySet().stream()
-                .filter(entry -> headerName.equalsIgnoreCase(entry.getKey()))
-                .map(Map.Entry::getValue)
-                .findFirst()
-                .orElse(null);
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            if (headerName.equalsIgnoreCase(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     private boolean isRetryableMethod(String method) {
@@ -456,25 +433,28 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return method != null && resilience.getRetryMethods().contains(method.toUpperCase(Locale.ROOT));
     }
 
-    private SerializedRequestBody serializeRequestBodyForAuth(Object body, String contentTypeHeader) {
+    private Mono<SerializedRequestBody> serializeRequestBodyForAuth(Object body, String contentTypeHeader) {
         if (body == null) {
-            return new SerializedRequestBody(null, null, null);
+            return Mono.just(new SerializedRequestBody(null, null, null));
+        }
+        if (!StringUtils.hasText(clientConfig.getAuthProvider())) {
+            return Mono.just(new SerializedRequestBody(body, body, null));
         }
         if (body instanceof byte[] bytes) {
-            return new SerializedRequestBody(body, bytes, bytes);
+            return Mono.just(new SerializedRequestBody(body, bytes, bytes));
         }
         if (body instanceof String text) {
-            return new SerializedRequestBody(body, text, text.getBytes(StandardCharsets.UTF_8));
+            return Mono.just(new SerializedRequestBody(body, text, text.getBytes(StandardCharsets.UTF_8)));
         }
         if (!shouldProvideJsonRawBody(contentTypeHeader) || objectMapper == null) {
-            return new SerializedRequestBody(body, body, null);
+            return Mono.just(new SerializedRequestBody(body, body, null));
         }
-        try {
-            byte[] json = objectMapper.writeValueAsBytes(body);
-            return new SerializedRequestBody(body, json, json);
-        } catch (JsonProcessingException e) {
-            throw new AuthProviderException(clientName, e);
-        }
+        return Mono.fromCallable(() -> {
+                    byte[] json = objectMapper.writeValueAsBytes(body);
+                    return new SerializedRequestBody(body, json, json);
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorMap(JsonProcessingException.class, e -> new RequestSerializationException(clientName, e));
     }
 
     private boolean shouldProvideJsonRawBody(String contentTypeHeader) {
@@ -615,7 +595,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (error instanceof RemoteServiceException remoteServiceException) {
             return remoteServiceException.getErrorCategory();
         }
-        if (error instanceof TimeoutException) {
+        if (error instanceof TimeoutException || error instanceof ReadTimeoutException) {
             return ErrorCategory.TIMEOUT;
         }
         if (error instanceof CancellationException) {

@@ -18,15 +18,15 @@ public class MethodMetadata {
     private String pathTemplate;
 
     /** index → path variable name */
-    private final Map<Integer, String> pathVars = new HashMap<>();
+    private Map<Integer, String> pathVars = new HashMap<>();
 
     /** index → query parameter name */
-    private final Map<Integer, String> queryParams = new HashMap<>();
+    private Map<Integer, String> queryParams = new HashMap<>();
 
     /** index → header name */
-    private final Map<Integer, String> headerParams = new HashMap<>();
+    private Map<Integer, String> headerParams = new HashMap<>();
     /** parameter indexes of map-based headers */
-    private final Set<Integer> headerMapParams = new HashSet<>();
+    private Set<Integer> headerMapParams = new HashSet<>();
 
     /** parameter index of the @Body argument, or -1 if absent */
     private int bodyIndex = -1;
@@ -85,5 +85,12 @@ public class MethodMetadata {
     public Class<? extends HttpExchangeLogger> getHttpExchangeLoggerClass() { return httpExchangeLoggerClass; }
     public void setHttpExchangeLoggerClass(Class<? extends HttpExchangeLogger> httpExchangeLoggerClass) {
         this.httpExchangeLoggerClass = httpExchangeLoggerClass;
+    }
+
+    void freezeCollections() {
+        pathVars = Map.copyOf(pathVars);
+        queryParams = Map.copyOf(queryParams);
+        headerParams = Map.copyOf(headerParams);
+        headerMapParams = Set.copyOf(headerMapParams);
     }
 }

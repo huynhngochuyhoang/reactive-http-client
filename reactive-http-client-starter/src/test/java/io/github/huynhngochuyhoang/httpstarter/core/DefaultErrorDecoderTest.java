@@ -39,6 +39,7 @@ class DefaultErrorDecoderTest {
                     assertEquals(429, hce.getStatusCode());
                     assertEquals("Rate limit exceeded", hce.getResponseBody());
                     assertEquals(ErrorCategory.RATE_LIMITED, hce.getErrorCategory());
+                    assertEquals("HTTP client error 429", hce.getMessage());
                 })
                 .verifyComplete();
     }
@@ -116,6 +117,24 @@ class DefaultErrorDecoderTest {
                     assertEquals(500, rse.getStatusCode());
                     assertEquals("{\"error\":\"Something went wrong\"}", rse.getResponseBody());
                     assertEquals(ErrorCategory.SERVER_ERROR, rse.getErrorCategory());
+                    assertEquals("Remote service error 500", rse.getMessage());
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void shouldTruncateLargeErrorResponseBodyToConfiguredCap() {
+        String largeBody = "x".repeat(5000);
+        ClientResponse response = ClientResponse.create(HttpStatus.BAD_REQUEST)
+                .header("Content-Type", MediaType.TEXT_PLAIN_VALUE)
+                .body(largeBody)
+                .build();
+
+        StepVerifier.create(decoder.decode(response))
+                .assertNext(ex -> {
+                    HttpClientException hce = (HttpClientException) ex;
+                    assertEquals(4096, hce.getResponseBody().length());
+                    assertEquals("HTTP client error 400", hce.getMessage());
                 })
                 .verifyComplete();
     }
