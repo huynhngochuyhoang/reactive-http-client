@@ -230,6 +230,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             flux = applyResilienceFlux(flux, meta);
             if (exchangeLogger != null || observer != null) {
                 AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(Map.of());
+                AtomicBoolean reported = new AtomicBoolean(false);
                 Flux<?> capturedFlux = flux;
                 flux = Flux.deferContextual(ctx -> {
                     inboundHeadersRef.set(ctx.hasKey(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
@@ -239,24 +240,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 })
                 .doOnError(terminalError::set)
                 .doOnTerminate(() -> {
-                    Throwable error = terminalError.get();
-                    if (exchangeLogger != null) {
-                        logExchange(exchangeLogger, meta, resolved, start.get(),
-                                responseStatus.get(), responseHeaders.get(), null, error, inboundHeadersRef.get());
-                    }
-                    if (observer != null) {
-                        notifyObserver(observer, meta, resolved, start.get(), responseStatus.get(), error, null, attemptCount.get());
-                    }
+                    if (reported.compareAndSet(false, true))
+                        reportExchange(exchangeLogger, observer, meta, resolved, start.get(),
+                                responseStatus.get(), responseHeaders.get(), null, terminalError.get(), inboundHeadersRef.get(), attemptCount.get());
                 })
                 .doOnCancel(() -> {
-                    CancellationException cancel = new CancellationException("Request was cancelled");
-                    if (exchangeLogger != null) {
-                        logExchange(exchangeLogger, meta, resolved, start.get(),
-                                responseStatus.get(), responseHeaders.get(), null, cancel, inboundHeadersRef.get());
-                    }
-                    if (observer != null) {
-                        notifyObserver(observer, meta, resolved, start.get(), responseStatus.get(), cancel, null, attemptCount.get());
-                    }
+                    if (reported.compareAndSet(false, true))
+                        reportExchange(exchangeLogger, observer, meta, resolved, start.get(),
+                                responseStatus.get(), responseHeaders.get(), null, new CancellationException("Request was cancelled"), inboundHeadersRef.get(), attemptCount.get());
                 });
             }
             return flux;
@@ -285,6 +276,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         mono = applyResilienceMono(mono, meta);
         if (exchangeLogger != null || observer != null) {
             AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(Map.of());
+            AtomicBoolean reported = new AtomicBoolean(false);
             Mono<?> capturedMono = mono;
             mono = Mono.deferContextual(ctx -> {
                 inboundHeadersRef.set(ctx.hasKey(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
@@ -295,25 +287,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             .doOnSuccess(terminalBody::set)
             .doOnError(terminalError::set)
             .doOnTerminate(() -> {
-                Throwable error = terminalError.get();
-                Object body = terminalBody.get();
-                if (exchangeLogger != null) {
-                    logExchange(exchangeLogger, meta, resolved, start.get(),
-                            responseStatus.get(), responseHeaders.get(), body, error, inboundHeadersRef.get());
-                }
-                if (observer != null) {
-                    notifyObserver(observer, meta, resolved, start.get(), responseStatus.get(), error, body, attemptCount.get());
-                }
+                if (reported.compareAndSet(false, true))
+                    reportExchange(exchangeLogger, observer, meta, resolved, start.get(),
+                            responseStatus.get(), responseHeaders.get(), terminalBody.get(), terminalError.get(), inboundHeadersRef.get(), attemptCount.get());
             })
             .doOnCancel(() -> {
-                CancellationException cancel = new CancellationException("Request was cancelled");
-                if (exchangeLogger != null) {
-                    logExchange(exchangeLogger, meta, resolved, start.get(),
-                            responseStatus.get(), responseHeaders.get(), null, cancel, inboundHeadersRef.get());
-                }
-                if (observer != null) {
-                    notifyObserver(observer, meta, resolved, start.get(), responseStatus.get(), cancel, null, attemptCount.get());
-                }
+                if (reported.compareAndSet(false, true))
+                    reportExchange(exchangeLogger, observer, meta, resolved, start.get(),
+                            responseStatus.get(), responseHeaders.get(), null, new CancellationException("Request was cancelled"), inboundHeadersRef.get(), attemptCount.get());
             });
         }
         return mono;
@@ -569,6 +550,26 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         } catch (Exception e) {
             throw new IllegalStateException(
                     "Cannot instantiate HttpExchangeLogger: " + loggerClass.getName(), e);
+        }
+    }
+
+    private void reportExchange(
+            HttpExchangeLogger exchangeLogger,
+            HttpClientObserver observer,
+            MethodMetadata meta,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            long startMs,
+            HttpStatusCode statusCode,
+            Map<String, List<String>> responseHeaders,
+            Object responseBody,
+            Throwable error,
+            Map<String, List<String>> inboundHeaders,
+            int attemptCount) {
+        if (exchangeLogger != null) {
+            logExchange(exchangeLogger, meta, resolved, startMs, statusCode, responseHeaders, responseBody, error, inboundHeaders);
+        }
+        if (observer != null) {
+            notifyObserver(observer, meta, resolved, startMs, statusCode, error, responseBody, attemptCount);
         }
     }
 

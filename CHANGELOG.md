@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.1] – 2026-04-23
+
+### Fixed
+
+- **Auth header leakage between clients** — `starterWebClientBuilder()` in `ReactiveHttpClientAutoConfiguration` was registered as a singleton. Because `WebClient.Builder` is mutable, each client's factory bean called `.filter()` on the *same* shared instance, accumulating filters across clients. A client with no `AuthProvider` configured would therefore inherit the `OutboundAuthFilter` of whichever client was initialised first, causing that client's auth headers to appear on all its outbound requests. Fixed by adding `@Scope("prototype")` to `starterWebClientBuilder()`, mirroring Spring Boot's own `WebClientAutoConfiguration`.
+- **Double metrics/log recording on null-body responses** — when an external API returned a null or empty body, Reactor fired `doOnTerminate` for the `onComplete` signal and then `doOnCancel` as Netty released the connection, causing both hooks to execute. An `AtomicBoolean` guard now ensures only the first signal (termination for a completed request, cancellation for a true cancel) triggers logging and observer notification.
+
+### Changed
+
+- Extracted `reportExchange(...)` private helper in `ReactiveClientInvocationHandler` to consolidate the duplicated logger/observer dispatch logic shared by `doOnTerminate` and `doOnCancel` in both the Mono and Flux paths.
+
+---
+
 ## [1.8.0] – 2026-04-22
 
 ### Added
@@ -241,7 +254,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.  
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.8.1...HEAD
+[1.8.1]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v1.5.1...v1.6.0
