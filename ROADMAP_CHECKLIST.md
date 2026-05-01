@@ -455,11 +455,11 @@
 - [ ] Replace `IdentityHashMap` guard with a bounded loop (max depth 16).
 - [ ] Confirm no regression against existing cause-chain tests.
 
-### [ ] 2.10 Unify Mono / Flux invocation pipelines
-- [ ] Extract the shared request-construction + error-decoding portion into a private
+### [x] 2.10 Unify Mono / Flux invocation pipelines
+- [x] Extract the shared request-construction + error-decoding portion into a private
   helper parameterised by a `Function<ClientResponse, Publisher<?>>`.
-- [ ] Existing 1.8.1 `reportExchange(...)` already covers the terminal callback.
-- [ ] Regression tests must cover both paths after the refactor.
+- [x] Existing 1.8.1 `reportExchange(...)` already covers the terminal callback.
+- [x] Regression tests cover both paths after the refactor.
 
 ---
 

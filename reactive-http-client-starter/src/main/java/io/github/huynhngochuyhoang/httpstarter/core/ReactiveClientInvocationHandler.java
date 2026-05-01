@@ -34,6 +34,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import io.netty.handler.timeout.ReadTimeoutException;
@@ -62,6 +63,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /**
  * JDK dynamic-proxy {@link InvocationHandler} that translates annotated interface
@@ -173,8 +175,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return ub.build(resolved.pathVars());
                 });
 
-        boolean hasAcceptHeader = hasHeaderIgnoreCase(resolved.headers(), HttpHeaders.ACCEPT);
-        String contentTypeHeader = getHeaderIgnoreCase(resolved.headers(), HttpHeaders.CONTENT_TYPE);
+        boolean hasAcceptHeader = resolved.headers().keySet().stream()
+                .anyMatch(HttpHeaders.ACCEPT::equalsIgnoreCase);
+        String contentTypeHeader = getContentTypeHeaderIgnoreCase(resolved.headers());
         boolean hasContentTypeHeader = contentTypeHeader != null;
         if (!hasAcceptHeader) {
             requestSpec = requestSpec.accept(MediaType.APPLICATION_JSON);
@@ -227,15 +230,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         HttpClientObserver observer = getObserver();
 
         if (meta.isReturnsFlux()) {
-            Flux<?> flux = requestHeadersSpecMono.flatMapMany(requestHeadersSpec -> requestHeadersSpec.exchangeToFlux(clientResponse -> {
-                responseStatus.set(clientResponse.statusCode());
-                responseHeaders.set(copyHeaders(clientResponse));
-
-                if (clientResponse.statusCode().isError()) {
-                    return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
-                }
-                return buildFlux(clientResponse, meta.getResponseType());
-            })).doOnSubscribe(subscription -> {
+            Flux<?> flux = exchange(requestHeadersSpecMono, responseStatus, responseHeaders,
+                    response -> buildFlux(response, meta.getResponseType()))
+                    .doOnSubscribe(subscription -> {
                 attemptCount.incrementAndGet();
                 start.compareAndSet(0L, System.currentTimeMillis());
                 responseStatus.set(null);
@@ -244,7 +241,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 if (exchangeLogger == null && firstAttempt.compareAndSet(true, false)) {
                     logRequest(meta, start.get());
                 }
-            });
+                    });
             flux = applyResilienceFlux(flux, meta);
             if (exchangeLogger != null || observer != null) {
                 AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(Map.of());
@@ -272,15 +269,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
 
         AtomicReference<Object> terminalBody = new AtomicReference<>();
-        Mono<?> mono = requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.exchangeToMono(clientResponse -> {
-            responseStatus.set(clientResponse.statusCode());
-            responseHeaders.set(copyHeaders(clientResponse));
-
-            if (clientResponse.statusCode().isError()) {
-                return decodeErrorResponse(clientResponse).flatMap(Mono::error);
-            }
-            return buildMono(clientResponse, meta.getResponseType());
-        })).doOnSubscribe(subscription -> {
+        Mono<?> mono = exchange(requestHeadersSpecMono, responseStatus, responseHeaders,
+                response -> buildMono(response, meta.getResponseType()))
+                .next()
+                .doOnSubscribe(subscription -> {
             attemptCount.incrementAndGet();
             start.compareAndSet(0L, System.currentTimeMillis());
             responseStatus.set(null);
@@ -290,7 +282,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             if (exchangeLogger == null && firstAttempt.compareAndSet(true, false)) {
                 logRequest(meta, start.get());
             }
-        });
+                });
         mono = applyResilienceMono(mono, meta);
         if (exchangeLogger != null || observer != null) {
             AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(Map.of());
@@ -321,6 +313,22 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    private <T> Flux<T> exchange(
+            Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono,
+            AtomicReference<HttpStatusCode> responseStatus,
+            AtomicReference<Map<String, List<String>>> responseHeaders,
+            Function<ClientResponse, Publisher<T>> successResponseHandler) {
+        return requestHeadersSpecMono.flatMapMany(requestHeadersSpec -> requestHeadersSpec.exchangeToFlux(clientResponse -> {
+            responseStatus.set(clientResponse.statusCode());
+            responseHeaders.set(copyHeaders(clientResponse));
+
+            if (clientResponse.statusCode().isError()) {
+                return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
+            }
+            return Flux.from(successResponseHandler.apply(clientResponse));
+        }));
+    }
 
     private Mono<?> buildMono(ClientResponse response, Type responseType) {
         if (responseType == null || Void.class.equals(responseType)) {
@@ -494,13 +502,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
     }
 
-    private boolean hasHeaderIgnoreCase(Map<String, String> headers, String headerName) {
-        return getHeaderIgnoreCase(headers, headerName) != null;
-    }
 
-    private String getHeaderIgnoreCase(Map<String, String> headers, String headerName) {
+    private static String getContentTypeHeaderIgnoreCase(Map<String, String> headers) {
         for (Map.Entry<String, String> entry : headers.entrySet()) {
-            if (headerName.equalsIgnoreCase(entry.getKey())) {
+            if (HttpHeaders.CONTENT_TYPE.equalsIgnoreCase(entry.getKey())) {
                 return entry.getValue();
             }
         }
