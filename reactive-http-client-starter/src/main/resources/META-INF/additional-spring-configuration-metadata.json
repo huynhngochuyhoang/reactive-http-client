@@ -277,7 +277,7 @@
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
       "deprecation": {
         "replacement": "reactive.http.clients.[name].log-exchange",
-        "reason": "Renamed to log-exchange for clarity.",
+        "reason": "Replaced by log-exchange for clarity.",
         "level": "warning"
       }
     },

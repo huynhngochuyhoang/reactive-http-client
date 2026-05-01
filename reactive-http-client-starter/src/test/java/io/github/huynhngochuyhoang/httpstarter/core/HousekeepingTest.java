@@ -192,12 +192,17 @@ class HousekeepingTest {
                 .verify();
 
         // With a 16-depth cap the ConnectException at depth 20 is NOT reachable.
-        // The traversal stops at depth 16 (still inside RuntimeException wrappers).
-        // The category falls through to UNKNOWN (the topLevel exception itself is not classified).
+        // The traversal stops at RuntimeException layer 15 (0-indexed), which is
+        // classified as UNKNOWN because the handler only checks HttpClientException,
+        // RemoteServiceException, TimeoutException, CancellationException,
+        // AuthProviderException, UnknownHostException, and ConnectException directly
+        // on the top-level error or via getRootCause – and here getRootCause returns
+        // the RuntimeException at depth 16, not the ConnectException at depth 20.
+        // The critical property under test is *termination* (no StackOverflowError,
+        // no infinite loop) even with a chain longer than the bound.
         assertNotNull(observed.get());
-        // Just assert we don't hang and get a result (could be UNKNOWN or CONNECT_ERROR
-        // depending on which layer the traversal stops at – either is acceptable).
-        // The important property is termination without StackOverflowError / infinite loop.
+        assertEquals(ErrorCategory.UNKNOWN, observed.get().getErrorCategory(),
+                "deeply nested cause beyond depth 16 must not be classified as CONNECT_ERROR");
     }
 
     @Test
