@@ -44,6 +44,8 @@ jobs:
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
+      - name: Debug GPG
+        run: gpg --list-secret-keys --keyid-format=long
       - name: Assert non-SNAPSHOT version
         run: |
           VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
