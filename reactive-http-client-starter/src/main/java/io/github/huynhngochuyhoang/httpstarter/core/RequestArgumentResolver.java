@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Resolves method invocation arguments into structured maps according to the annotations
@@ -110,11 +111,37 @@ public class RequestArgumentResolver {
      *
      * <p>{@code queryParams} maps each parameter name to a list of values to support
      * multi-value query parameters (e.g. {@code ?roles=admin&roles=user}).
+     *
+     * <p>{@code headersIgnoreCase} is a pre-built case-insensitive view of
+     * {@code headers}, built once per invocation so header name lookups
+     * (e.g. for {@code Content-Type} or {@code Accept}) don't require iterating
+     * the full header map on every check.
      */
     public record ResolvedArgs(
             Map<String, Object> pathVars,
             Map<String, List<Object>> queryParams,
             Map<String, String> headers,
-            Object body
-    ) {}
+            Object body,
+            Map<String, String> headersIgnoreCase
+    ) {
+        /**
+         * Convenience factory — builds the case-insensitive view from {@code headers}.
+         */
+        public ResolvedArgs(
+                Map<String, Object> pathVars,
+                Map<String, List<Object>> queryParams,
+                Map<String, String> headers,
+                Object body) {
+            this(pathVars, queryParams, headers, body, buildIgnoreCaseView(headers));
+        }
+
+        private static Map<String, String> buildIgnoreCaseView(Map<String, String> headers) {
+            if (headers == null || headers.isEmpty()) {
+                return java.util.Collections.emptyMap();
+            }
+            TreeMap<String, String> map = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+            map.putAll(headers);
+            return map;
+        }
+    }
 }

@@ -57,6 +57,16 @@ public class MethodMetadata {
     private String circuitBreakerInstanceName;
     private String bulkheadInstanceName;
 
+    /**
+     * Resolved {@link HttpExchangeLogger} instance cached after first resolution.
+     * Stored as a {@code volatile} field so that the write on first invocation is
+     * visible to all subsequent invocations without a lock.  The {@code null} sentinel
+     * means "not yet resolved"; the {@link #NOOP_EXCHANGE_LOGGER} sentinel means
+     * "resolved to no logger" (i.e. logging is disabled for this method).
+     */
+    private static final HttpExchangeLogger NOOP_EXCHANGE_LOGGER = ctx -> {};
+    private volatile HttpExchangeLogger resolvedExchangeLogger;
+
     // ---- getters / setters ----
 
     public String getHttpMethod() { return httpMethod; }
@@ -119,6 +129,24 @@ public class MethodMetadata {
     public void setBulkheadInstanceName(String bulkheadInstanceName) {
         this.bulkheadInstanceName = bulkheadInstanceName;
     }
+
+    /**
+     * Returns the cached exchange-logger for this method, or {@code null} if it has
+     * not been resolved yet.  The sentinel value {@link #NOOP_EXCHANGE_LOGGER} indicates
+     * that resolution has already happened and produced no logger (logging disabled).
+     */
+    public HttpExchangeLogger getResolvedExchangeLogger() { return resolvedExchangeLogger; }
+
+    /**
+     * Stores the resolved exchange-logger.  Pass {@link #NOOP_EXCHANGE_LOGGER} to record
+     * that resolution has happened but produced no logger (so the null-check fast-path
+     * above can be used even for methods where logging is disabled).
+     */
+    public void setResolvedExchangeLogger(HttpExchangeLogger resolvedExchangeLogger) {
+        this.resolvedExchangeLogger = resolvedExchangeLogger;
+    }
+
+    public static HttpExchangeLogger noopExchangeLogger() { return NOOP_EXCHANGE_LOGGER; }
 
     void freezeCollections() {
         pathVars = Map.copyOf(pathVars);

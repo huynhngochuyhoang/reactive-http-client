@@ -48,8 +48,6 @@ import java.net.ConnectException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -175,9 +173,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return ub.build(resolved.pathVars());
                 });
 
-        boolean hasAcceptHeader = resolved.headers().keySet().stream()
-                .anyMatch(HttpHeaders.ACCEPT::equalsIgnoreCase);
-        String contentTypeHeader = getContentTypeHeaderIgnoreCase(resolved.headers());
+        boolean hasAcceptHeader = resolved.headersIgnoreCase().containsKey(HttpHeaders.ACCEPT);
+        String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         boolean hasContentTypeHeader = contentTypeHeader != null;
         if (!hasAcceptHeader) {
             requestSpec = requestSpec.accept(MediaType.APPLICATION_JSON);
@@ -503,15 +500,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
 
-    private static String getContentTypeHeaderIgnoreCase(Map<String, String> headers) {
-        for (Map.Entry<String, String> entry : headers.entrySet()) {
-            if (HttpHeaders.CONTENT_TYPE.equalsIgnoreCase(entry.getKey())) {
-                return entry.getValue();
-            }
-        }
-        return null;
-    }
-
     private boolean isRetryableMethod(String method) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null || resilience.getRetryMethods() == null || resilience.getRetryMethods().isEmpty()) {
@@ -577,26 +565,39 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private HttpExchangeLogger resolveExchangeLogger(MethodMetadata meta) {
+        // Fast path: already resolved for this method on a previous invocation.
+        HttpExchangeLogger perMethodCached = meta.getResolvedExchangeLogger();
+        if (perMethodCached != null) {
+            return perMethodCached != MethodMetadata.noopExchangeLogger() ? perMethodCached : null;
+        }
+
+        // Slow path: first resolution for this method.
+        HttpExchangeLogger resolved;
         if (!meta.isHttpExchangeLoggingEnabled() || meta.getHttpExchangeLoggerClass() == null) {
-            return null;
-        }
-
-        Class<? extends HttpExchangeLogger> loggerClass = meta.getHttpExchangeLoggerClass();
-        HttpExchangeLogger cached = loggerCache.get(loggerClass);
-        if (cached != null) {
-            return cached;
-        }
-
-        HttpExchangeLogger created = instantiateExchangeLogger(loggerClass);
-        if (loggerCache.size() >= MAX_LOGGER_CACHE_SIZE) {
-            if (loggerCacheLimitWarningLogged.compareAndSet(false, true)) {
-                log.warn("HttpExchangeLogger cache reached configured limit ({}). New logger classes will not be cached.",
-                        MAX_LOGGER_CACHE_SIZE);
+            resolved = null;
+        } else {
+            Class<? extends HttpExchangeLogger> loggerClass = meta.getHttpExchangeLoggerClass();
+            HttpExchangeLogger cached = loggerCache.get(loggerClass);
+            if (cached != null) {
+                resolved = cached;
+            } else {
+                HttpExchangeLogger created = instantiateExchangeLogger(loggerClass);
+                if (loggerCache.size() >= MAX_LOGGER_CACHE_SIZE) {
+                    if (loggerCacheLimitWarningLogged.compareAndSet(false, true)) {
+                        log.warn("HttpExchangeLogger cache reached configured limit ({}). New logger classes will not be cached.",
+                                MAX_LOGGER_CACHE_SIZE);
+                    }
+                    resolved = created;
+                } else {
+                    HttpExchangeLogger existing = loggerCache.putIfAbsent(loggerClass, created);
+                    resolved = existing != null ? existing : created;
+                }
             }
-            return created;
         }
-        HttpExchangeLogger existing = loggerCache.putIfAbsent(loggerClass, created);
-        return existing != null ? existing : created;
+
+        // Store on the method metadata so subsequent invocations skip the slow path.
+        meta.setResolvedExchangeLogger(resolved != null ? resolved : MethodMetadata.noopExchangeLogger());
+        return resolved;
     }
 
     private HttpExchangeLogger instantiateExchangeLogger(Class<? extends HttpExchangeLogger> loggerClass) {
@@ -909,9 +910,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     private Throwable getRootCause(Throwable error) {
         Throwable current = error;
-        Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
-        while (current != null && current.getCause() != null && visited.add(current)) {
+        int depth = 0;
+        while (current != null && current.getCause() != null && current.getCause() != current && depth < 16) {
             current = current.getCause();
+            depth++;
         }
         return current;
     }

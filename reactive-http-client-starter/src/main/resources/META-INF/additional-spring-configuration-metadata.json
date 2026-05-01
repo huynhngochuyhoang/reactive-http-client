@@ -1,0 +1,563 @@
+{
+  "groups": [
+    {
+      "name": "reactive.http",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties"
+    },
+    {
+      "name": "reactive.http.network",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$NetworkConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties",
+      "sourceMethod": "getNetwork()"
+    },
+    {
+      "name": "reactive.http.network.connection-pool",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$NetworkConfig",
+      "sourceMethod": "getConnectionPool()"
+    },
+    {
+      "name": "reactive.http.network.proxy",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$NetworkConfig",
+      "sourceMethod": "getProxy()"
+    },
+    {
+      "name": "reactive.http.network.tls",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$NetworkConfig",
+      "sourceMethod": "getTls()"
+    },
+    {
+      "name": "reactive.http.clients",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties"
+    },
+    {
+      "name": "reactive.http.observability",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties",
+      "sourceMethod": "getObservability()"
+    },
+    {
+      "name": "reactive.http.observability.health",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$HealthConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
+      "sourceMethod": "getHealth()"
+    },
+    {
+      "name": "reactive.http.correlation-id",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CorrelationIdConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties",
+      "sourceMethod": "getCorrelationId()"
+    },
+    {
+      "name": "reactive.http.inbound-headers",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$InboundHeadersConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties",
+      "sourceMethod": "getInboundHeaders()"
+    }
+  ],
+  "properties": [
+    {
+      "name": "reactive.http.network.connect-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "TCP connect timeout in milliseconds. Default: 2000.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$NetworkConfig",
+      "defaultValue": 2000
+    },
+    {
+      "name": "reactive.http.network.network-read-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Netty ReadTimeoutHandler safety-net: fires when no inbound bytes arrive for this duration. Sized well above any per-request timeout. Default: 60000.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$NetworkConfig",
+      "defaultValue": 60000
+    },
+    {
+      "name": "reactive.http.network.network-write-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Netty WriteTimeoutHandler safety-net: fires when no outbound bytes are accepted for this duration. Sized well above any per-request timeout. Default: 60000.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$NetworkConfig",
+      "defaultValue": 60000
+    },
+    {
+      "name": "reactive.http.network.read-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Deprecated alias for network-read-timeout-ms. Use network-read-timeout-ms instead.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$NetworkConfig",
+      "deprecation": {
+        "replacement": "reactive.http.network.network-read-timeout-ms",
+        "level": "warning"
+      }
+    },
+    {
+      "name": "reactive.http.network.write-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Deprecated alias for network-write-timeout-ms. Use network-write-timeout-ms instead.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$NetworkConfig",
+      "deprecation": {
+        "replacement": "reactive.http.network.network-write-timeout-ms",
+        "level": "warning"
+      }
+    },
+    {
+      "name": "reactive.http.network.connection-pool.max-connections",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of connections in the pool. Default: 200.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig",
+      "defaultValue": 200
+    },
+    {
+      "name": "reactive.http.network.connection-pool.pending-acquire-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "Maximum time in milliseconds to wait for a connection from the pool before failing. Default: 5000.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig",
+      "defaultValue": 5000
+    },
+    {
+      "name": "reactive.http.network.connection-pool.max-idle-time-ms",
+      "type": "java.lang.Long",
+      "description": "Idle duration in milliseconds after which a pooled connection is evicted. 0 means no idle eviction (Reactor Netty default). Default: 0.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig",
+      "defaultValue": 0
+    },
+    {
+      "name": "reactive.http.network.connection-pool.max-life-time-ms",
+      "type": "java.lang.Long",
+      "description": "Maximum lifetime in milliseconds of a pooled connection. 0 means unlimited (Reactor Netty default). Default: 0.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig",
+      "defaultValue": 0
+    },
+    {
+      "name": "reactive.http.network.connection-pool.evict-in-background-ms",
+      "type": "java.lang.Long",
+      "description": "Interval in milliseconds at which the pool sweeps for evictable connections. 0 disables background eviction. Default: 0.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig",
+      "defaultValue": 0
+    },
+    {
+      "name": "reactive.http.network.connection-pool.metrics-enabled",
+      "type": "java.lang.Boolean",
+      "description": "When true, publishes Reactor Netty pool gauges (reactor.netty.connection.provider.*) to the MeterRegistry. Requires micrometer-core. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig",
+      "defaultValue": false
+    },
+    {
+      "name": "reactive.http.network.proxy.type",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type",
+      "description": "Proxy protocol type. Set to NONE to explicitly bypass a global proxy for one client. Default: HTTP.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig",
+      "defaultValue": "HTTP"
+    },
+    {
+      "name": "reactive.http.network.proxy.host",
+      "type": "java.lang.String",
+      "description": "Proxy host name or IP address.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.network.proxy.port",
+      "type": "java.lang.Integer",
+      "description": "Proxy port number.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.network.proxy.username",
+      "type": "java.lang.String",
+      "description": "Optional proxy authentication username.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.network.proxy.password",
+      "type": "java.lang.String",
+      "description": "Optional proxy authentication password.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.network.proxy.non-proxy-hosts",
+      "type": "java.lang.String",
+      "description": "Java regex pattern for hosts that bypass the proxy (pipe-separated alternatives). Example: localhost|.*\\.internal.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.network.tls.trust-store",
+      "type": "java.lang.String",
+      "description": "Path to the truststore (classpath:, file:, or absolute). Resolved via Spring's DefaultResourceLoader.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.network.tls.trust-store-password",
+      "type": "java.lang.String",
+      "description": "Password for the truststore.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.network.tls.trust-store-type",
+      "type": "java.lang.String",
+      "description": "Truststore format. Default: PKCS12.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig",
+      "defaultValue": "PKCS12"
+    },
+    {
+      "name": "reactive.http.network.tls.key-store",
+      "type": "java.lang.String",
+      "description": "Path to the keystore for mTLS client certificate (classpath:, file:, or absolute).",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.network.tls.key-store-password",
+      "type": "java.lang.String",
+      "description": "Password for the keystore.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.network.tls.key-store-type",
+      "type": "java.lang.String",
+      "description": "Keystore format. Default: PKCS12.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig",
+      "defaultValue": "PKCS12"
+    },
+    {
+      "name": "reactive.http.network.tls.protocols",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Allowed TLS protocol versions (e.g. TLSv1.3, TLSv1.2). Empty list means JDK defaults.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.network.tls.ciphers",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Allowed TLS cipher suites. Empty list means JDK defaults.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.network.tls.insecure-trust-all",
+      "type": "java.lang.Boolean",
+      "description": "Disables certificate verification — NEVER use in production. Logs a WARN when enabled. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig",
+      "defaultValue": false
+    },
+    {
+      "name": "reactive.http.clients",
+      "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig>",
+      "description": "Per-client configuration map. Keys are the logical client names used in @ReactiveHttpClient(name=...).",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties"
+    },
+    {
+      "name": "reactive.http.clients.[name].base-url",
+      "type": "java.lang.String",
+      "description": "Base URL for this client (e.g. https://api.example.com).",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].codec-max-in-memory-size-mb",
+      "type": "java.lang.Integer",
+      "description": "Maximum in-memory codec buffer size in MiB for response decoding. Default: 2.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "defaultValue": 2
+    },
+    {
+      "name": "reactive.http.clients.[name].compression-enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable HTTP response compression (Accept-Encoding: gzip). Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "defaultValue": false
+    },
+    {
+      "name": "reactive.http.clients.[name].log-exchange",
+      "type": "java.lang.Boolean",
+      "description": "Enable structured HTTP exchange logging (request + response) for all methods on this client. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "defaultValue": false
+    },
+    {
+      "name": "reactive.http.clients.[name].log-body",
+      "type": "java.lang.Boolean",
+      "description": "Deprecated. Use log-exchange instead.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "deprecation": {
+        "replacement": "reactive.http.clients.[name].log-exchange",
+        "reason": "Renamed to log-exchange for clarity.",
+        "level": "warning"
+      }
+    },
+    {
+      "name": "reactive.http.clients.[name].auth-provider",
+      "type": "java.lang.String",
+      "description": "Bean name of the AuthProvider to inject for this client. Leave empty to disable automatic auth. Default: empty.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].resilience.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Master switch for Resilience4j operators (retry, circuit-breaker, bulkhead, timeout) on this client. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
+      "defaultValue": false
+    },
+    {
+      "name": "reactive.http.clients.[name].resilience.circuit-breaker",
+      "type": "java.lang.String",
+      "description": "Name of the Resilience4j CircuitBreaker instance from application config. Default: default.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
+      "defaultValue": "default"
+    },
+    {
+      "name": "reactive.http.clients.[name].resilience.retry",
+      "type": "java.lang.String",
+      "description": "Name of the Resilience4j Retry instance from application config. Default: default.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
+      "defaultValue": "default"
+    },
+    {
+      "name": "reactive.http.clients.[name].resilience.retry-methods",
+      "type": "java.util.Set<java.lang.String>",
+      "description": "HTTP methods eligible for retry. Values are upper-cased. Default: [GET, HEAD].",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
+      "defaultValue": ["GET", "HEAD"]
+    },
+    {
+      "name": "reactive.http.clients.[name].resilience.bulkhead",
+      "type": "java.lang.String",
+      "description": "Name of the Resilience4j Bulkhead instance from application config. Default: default.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
+      "defaultValue": "default"
+    },
+    {
+      "name": "reactive.http.clients.[name].resilience.timeout-ms",
+      "type": "java.lang.Long",
+      "description": "Per-request response timeout in milliseconds applied via HttpClientRequest.responseTimeout(). 0 disables the timeout. Default: 0.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
+      "defaultValue": 0
+    },
+    {
+      "name": "reactive.http.clients.[name].pool.max-connections",
+      "type": "java.lang.Integer",
+      "description": "Per-client connection pool max connections override. Overrides the global pool when set.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].pool.pending-acquire-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "Per-client pending acquire timeout override in milliseconds.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].pool.max-idle-time-ms",
+      "type": "java.lang.Long",
+      "description": "Per-client idle eviction timeout override in milliseconds. 0 means no idle eviction.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].pool.max-life-time-ms",
+      "type": "java.lang.Long",
+      "description": "Per-client connection max lifetime override in milliseconds. 0 means unlimited.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].pool.evict-in-background-ms",
+      "type": "java.lang.Long",
+      "description": "Per-client background eviction interval override in milliseconds. 0 disables background eviction.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].pool.metrics-enabled",
+      "type": "java.lang.Boolean",
+      "description": "Per-client pool metrics override. When true, publishes Reactor Netty pool gauges to the MeterRegistry.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].proxy.type",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type",
+      "description": "Per-client proxy type override. Set to NONE to bypass a global proxy for this client.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].proxy.host",
+      "type": "java.lang.String",
+      "description": "Per-client proxy host override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].proxy.port",
+      "type": "java.lang.Integer",
+      "description": "Per-client proxy port override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].proxy.username",
+      "type": "java.lang.String",
+      "description": "Per-client proxy authentication username override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].proxy.password",
+      "type": "java.lang.String",
+      "description": "Per-client proxy authentication password override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].proxy.non-proxy-hosts",
+      "type": "java.lang.String",
+      "description": "Per-client non-proxy hosts regex override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].tls.trust-store",
+      "type": "java.lang.String",
+      "description": "Per-client truststore path override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].tls.trust-store-password",
+      "type": "java.lang.String",
+      "description": "Per-client truststore password override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].tls.trust-store-type",
+      "type": "java.lang.String",
+      "description": "Per-client truststore format override. Default: PKCS12.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].tls.key-store",
+      "type": "java.lang.String",
+      "description": "Per-client keystore path override for mTLS client certificate.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].tls.key-store-password",
+      "type": "java.lang.String",
+      "description": "Per-client keystore password override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].tls.key-store-type",
+      "type": "java.lang.String",
+      "description": "Per-client keystore format override. Default: PKCS12.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].tls.protocols",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Per-client allowed TLS protocol versions override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].tls.ciphers",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Per-client allowed TLS cipher suites override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].tls.insecure-trust-all",
+      "type": "java.lang.Boolean",
+      "description": "Per-client certificate verification disable override — NEVER use in production.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.observability.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Master switch for all metrics and tracing. Default: true.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
+      "defaultValue": true
+    },
+    {
+      "name": "reactive.http.observability.metric-name",
+      "type": "java.lang.String",
+      "description": "Micrometer timer/counter name for outbound HTTP client requests. Default: http.client.requests.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
+      "defaultValue": "http.client.requests"
+    },
+    {
+      "name": "reactive.http.observability.include-url-path",
+      "type": "java.lang.Boolean",
+      "description": "Include the URL path template as a metric tag. Disable for high-cardinality paths. Default: true.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
+      "defaultValue": true
+    },
+    {
+      "name": "reactive.http.observability.log-request-body",
+      "type": "java.lang.Boolean",
+      "description": "Include the request body in span events. Caution: may expose PII or large payloads. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
+      "defaultValue": false
+    },
+    {
+      "name": "reactive.http.observability.log-response-body",
+      "type": "java.lang.Boolean",
+      "description": "Include the response body in span events. Caution: may expose PII or large payloads. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
+      "defaultValue": false
+    },
+    {
+      "name": "reactive.http.observability.health.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable the Actuator health indicator for reactive HTTP clients. Default: true.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$HealthConfig",
+      "defaultValue": true
+    },
+    {
+      "name": "reactive.http.observability.health.error-rate-threshold",
+      "type": "java.lang.Double",
+      "description": "Error ratio threshold [0, 1] above which a client is reported DOWN. Default: 0.5.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$HealthConfig",
+      "defaultValue": 0.5
+    },
+    {
+      "name": "reactive.http.observability.health.min-samples",
+      "type": "java.lang.Long",
+      "description": "Minimum probe-interval sample count required before evaluating a client's health. Avoids noisy DOWN status from isolated errors. Default: 10.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$HealthConfig",
+      "defaultValue": 10
+    },
+    {
+      "name": "reactive.http.correlation-id.max-length",
+      "type": "java.lang.Integer",
+      "description": "Maximum accepted length of a correlation-ID value. Values longer than this are dropped. Default: 128.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CorrelationIdConfig",
+      "defaultValue": 128
+    },
+    {
+      "name": "reactive.http.correlation-id.mdc-keys",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Ordered list of MDC keys consulted by the outbound filter when no correlation-ID is in the Reactor context. First non-blank value wins. Default: [correlationId, X-Correlation-Id, traceId].",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CorrelationIdConfig",
+      "defaultValue": ["correlationId", "X-Correlation-Id", "traceId"]
+    },
+    {
+      "name": "reactive.http.inbound-headers.allow-list",
+      "type": "java.util.Set<java.lang.String>",
+      "description": "When non-empty, only headers whose names match an entry are captured in the inbound snapshot. Empty means capture everything. Default: [] (capture all).",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$InboundHeadersConfig"
+    },
+    {
+      "name": "reactive.http.inbound-headers.deny-list",
+      "type": "java.util.Set<java.lang.String>",
+      "description": "Header names whose values are replaced with [REDACTED] in the inbound snapshot before logging. Default: SensitiveHeaders.DEFAULTS (Authorization, Cookie, Set-Cookie, Proxy-Authorization, X-Api-Key, X-Auth-Token, X-Csrf-Token).",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$InboundHeadersConfig"
+    }
+  ],
+  "hints": [
+    {
+      "name": "reactive.http.network.proxy.type",
+      "values": [
+        { "value": "HTTP",   "description": "Plain HTTP CONNECT proxy." },
+        { "value": "HTTPS",  "description": "HTTPS CONNECT proxy." },
+        { "value": "SOCKS4", "description": "SOCKS4 proxy." },
+        { "value": "SOCKS5", "description": "SOCKS5 proxy." },
+        { "value": "NONE",   "description": "Disable proxy for this client (overrides a global proxy)." }
+      ]
+    },
+    {
+      "name": "reactive.http.clients.[name].proxy.type",
+      "values": [
+        { "value": "HTTP",   "description": "Plain HTTP CONNECT proxy." },
+        { "value": "HTTPS",  "description": "HTTPS CONNECT proxy." },
+        { "value": "SOCKS4", "description": "SOCKS4 proxy." },
+        { "value": "SOCKS5", "description": "SOCKS5 proxy." },
+        { "value": "NONE",   "description": "Disable proxy for this client (overrides a global proxy)." }
+      ]
+    }
+  ]
+}

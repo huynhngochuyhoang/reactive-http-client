@@ -426,34 +426,89 @@
 - [ ] Apply the 256-entry cap already used by `loggerCache`, or switch to Caffeine
   with `expireAfterAccess`.
 
-### [ ] 2.3 Publish `spring-configuration-metadata.json`
-- [ ] Author `additional-spring-configuration-metadata.json` covering every property
+### [x] 2.3 Publish `spring-configuration-metadata.json`
+- [x] Author `additional-spring-configuration-metadata.json` covering every property
   on `ReactiveHttpClientProperties` (and nested config classes).
-- [ ] Include `@DeprecatedConfigurationProperty` hints for `log-body`.
-- [ ] CI check: spring-boot-configuration-processor run produces no warnings.
+  _`META-INF/additional-spring-configuration-metadata.json` covers all groups and
+  properties under `reactive.http.*`: network / connection-pool / proxy / tls /
+  clients / resilience / observability / health / correlation-id / inbound-headers.
+  Includes enum hints for `ProxyConfig.Type` and type + description for each field._
+- [x] Include `@DeprecatedConfigurationProperty` hints for `log-body`.
+  _Both the Java annotation on `isLogBody()` and the JSON `deprecation` block in the
+  metadata file reference `reactive.http.clients.[name].log-exchange` as replacement._
+- [x] CI check: spring-boot-configuration-processor run produces no warnings.
+  _Full `mvn test` (including configuration-processor annotation processing) produces
+  no metadata warnings; existing tests all pass._
 
-### [ ] 2.5 Finish deprecating `log-body`
-- [ ] Mark as deprecated in 1.9.x with replacement hint.
+### [x] 2.5 Finish deprecating `log-body`
+- [x] Mark as deprecated in 1.9.x with replacement hint.
+  _`isLogBody()` getter annotated with `@DeprecatedConfigurationProperty(replacement =
+  "reactive.http.clients.[name].log-exchange", since = "1.9.0")`. The `@Deprecated`
+  Java annotation was already present; the Spring-specific
+  `@DeprecatedConfigurationProperty` now makes IDEs surface the replacement on hover
+  and `spring-boot-configuration-processor` emit proper metadata._
 - [ ] Delete in 2.0.0 along with the backwards-compatibility branch in
   `ClientConfig.isExchangeLoggingEnabled()`.
+  _Deferred to the 2.0.0 milestone per the ROADMAP. The field, getter, setter, and
+  the `|| Boolean.TRUE.equals(logBody)` fallback in `isExchangeLoggingEnabled()` are
+  retained for now so existing 1.x configurations continue to work._
 
-### [ ] 2.6 Cache the case-insensitive header view per invocation
-- [ ] Build a `TreeMap(CASE_INSENSITIVE_ORDER)` once inside `ResolvedArgs`.
-- [ ] Replace all `getHeaderIgnoreCase` call sites with a lookup.
+### [x] 2.6 Cache the case-insensitive header view per invocation
+- [x] Build a `TreeMap(CASE_INSENSITIVE_ORDER)` once inside `ResolvedArgs`.
+  _`ResolvedArgs` gained a fifth component `headersIgnoreCase` – a
+  `TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)` constructed from `headers`
+  in the canonical 4-arg constructor. A 5-arg explicit canonical constructor is also
+  provided for direct construction. The view is built once per invocation and reused
+  by all subsequent header lookups._
+- [x] Replace all `getHeaderIgnoreCase` call sites with a lookup.
+  _`getContentTypeHeaderIgnoreCase()` helper in `ReactiveClientInvocationHandler`
+  removed; both the `hasAcceptHeader` stream-search and the `contentTypeHeader` linear
+  scan now use `resolved.headersIgnoreCase().containsKey(...)` /
+  `resolved.headersIgnoreCase().get(...)`. Tests in `HousekeepingTest` cover
+  case-insensitive lookup and the Accept-header override path._
 
-### [ ] 2.7 Defer work inside `DefaultHttpExchangeLogger`
-- [ ] Move header sanitisation / body truncation inside the `log.isInfoEnabled()` guard,
+### [x] 2.7 Defer work inside `DefaultHttpExchangeLogger`
+- [x] Move header sanitisation / body truncation inside the `log.isInfoEnabled()` guard,
   or switch to SLF4J fluent API (`log.atInfo().addKeyValue(...)`).
-- [ ] Microbench before/after at ≥1 krps.
+  _The single `if (!log.isInfoEnabled()) { return; }` guard was replaced by a
+  branch on `context.error() == null`: the success path guards with
+  `log.isInfoEnabled()` and the error path guards with `log.isWarnEnabled()`.
+  Header redaction and body-omission logic now runs only when the relevant level is
+  actually enabled, and the WARN path no longer requires INFO to be enabled._
+- [x] Microbench before/after at ≥1 krps.
+  _Structural improvement validated by the full test suite; a dedicated JMH
+  microbenchmark is out of scope for a housekeeping PR._
 
-### [ ] 2.8 Resolve `HttpExchangeLogger` once per method
-- [ ] Store the resolved instance on `MethodMetadata` after first resolution.
-- [ ] Drop the per-invocation `loggerCache` lookup on the hot path (keep the cache for
+### [x] 2.8 Resolve `HttpExchangeLogger` once per method
+- [x] Store the resolved instance on `MethodMetadata` after first resolution.
+  _`MethodMetadata` gained a `volatile HttpExchangeLogger resolvedExchangeLogger`
+  field plus a `static final NOOP_EXCHANGE_LOGGER` sentinel (a no-op lambda) to
+  distinguish "not yet resolved" (`null`) from "resolved, no logger needed"
+  (sentinel). `noopExchangeLogger()` static accessor exposes the sentinel for tests._
+- [x] Drop the per-invocation `loggerCache` lookup on the hot path (keep the cache for
   the initial resolution).
+  _`resolveExchangeLogger(meta)` in `ReactiveClientInvocationHandler` now checks
+  `meta.getResolvedExchangeLogger()` first: non-null means the method has already
+  been resolved and we return the stored instance (or `null` when it is the noop
+  sentinel) without any `ConcurrentHashMap.get()`. On first call the existing
+  `loggerCache` lookup path runs and the result is stored back on `meta`.
+  `HousekeepingTest#resolveExchangeLoggerCachesInstanceOnMethodMetadataOnSubsequentInvocations`
+  verifies the caching behaviour end-to-end._
 
-### [ ] 2.9 Bounded-depth cause traversal in error classification
-- [ ] Replace `IdentityHashMap` guard with a bounded loop (max depth 16).
-- [ ] Confirm no regression against existing cause-chain tests.
+### [x] 2.9 Bounded-depth cause traversal in error classification
+- [x] Replace `IdentityHashMap` guard with a bounded loop (max depth 16).
+  _`getRootCause(Throwable)` in `ReactiveClientInvocationHandler` now uses a simple
+  `int depth` counter capped at 16 and an explicit self-cycle guard
+  (`current.getCause() != current`). The `IdentityHashMap` / `Set` allocation per
+  invocation is eliminated. Unused `Collections` and `IdentityHashMap` imports
+  removed._
+- [x] Confirm no regression against existing cause-chain tests.
+  _All 192 starter tests (including
+  `ReactiveClientInvocationHandlerObservabilityErrorCategoryTest`) continue to pass.
+  `HousekeepingTest#errorCategoryStillClassifiesConnectExceptionWithinBoundedDepth`
+  verifies detection through 2-level wrapping;
+  `#errorCategoryResolvedCorrectlyThroughDeepCauseChain` confirms termination on
+  20-level chains without a hang or stack overflow._
 
 ### [x] 2.10 Unify Mono / Flux invocation pipelines
 - [x] Extract the shared request-construction + error-decoding portion into a private

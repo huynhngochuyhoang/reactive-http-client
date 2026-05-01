@@ -18,15 +18,14 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
 
     @Override
     public void log(HttpExchangeLogContext context) {
-        if (!log.isInfoEnabled()) {
-            return;
-        }
-        Map<String, String> requestHeaders = redactRequestHeaders(context.requestHeaders());
-        Map<String, List<String>> responseHeaders = redactResponseHeaders(context.responseHeaders());
-        Object requestBody = shouldLogBodies() ? context.requestBody() : OMITTED;
-        Object responseBody = shouldLogBodies() ? context.responseBody() : OMITTED;
-
         if (context.error() == null) {
+            if (!log.isInfoEnabled()) {
+                return;
+            }
+            Map<String, String> requestHeaders = redactRequestHeaders(context.requestHeaders());
+            Map<String, List<String>> responseHeaders = redactResponseHeaders(context.responseHeaders());
+            Object requestBody = shouldLogBodies() ? context.requestBody() : OMITTED;
+            Object responseBody = shouldLogBodies() ? context.responseBody() : OMITTED;
             log.info("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms",
                     context.clientName(),
                     context.httpMethod(),
@@ -38,20 +37,25 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
                     responseHeaders,
                     responseBody,
                     context.durationMs());
-            return;
+        } else {
+            if (!log.isWarnEnabled()) {
+                return;
+            }
+            Map<String, String> requestHeaders = redactRequestHeaders(context.requestHeaders());
+            Map<String, List<String>> responseHeaders = redactResponseHeaders(context.responseHeaders());
+            Object requestBody = shouldLogBodies() ? context.requestBody() : OMITTED;
+            log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} duration={}ms error={}",
+                    context.clientName(),
+                    context.httpMethod(),
+                    context.pathTemplate(),
+                    context.inboundHeaders(),
+                    requestHeaders,
+                    requestBody,
+                    context.responseStatus(),
+                    responseHeaders,
+                    context.durationMs(),
+                    context.error().toString());
         }
-
-        log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} duration={}ms error={}",
-                context.clientName(),
-                context.httpMethod(),
-                context.pathTemplate(),
-                context.inboundHeaders(),
-                requestHeaders,
-                requestBody,
-                context.responseStatus(),
-                responseHeaders,
-                context.durationMs(),
-                context.error().toString());
     }
 
     private boolean shouldLogBodies() {

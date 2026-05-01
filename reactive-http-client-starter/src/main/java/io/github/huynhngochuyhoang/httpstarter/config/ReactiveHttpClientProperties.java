@@ -374,6 +374,9 @@ public class ReactiveHttpClientProperties {
          * @deprecated use {@code log-exchange} / {@link #isLogExchange()} instead.
          */
         @Deprecated
+        @DeprecatedConfigurationProperty(
+                replacement = "reactive.http.clients.[name].log-exchange",
+                since = "1.9.0")
         public boolean isLogBody() { return Boolean.TRUE.equals(logBody); }
 
         /**
