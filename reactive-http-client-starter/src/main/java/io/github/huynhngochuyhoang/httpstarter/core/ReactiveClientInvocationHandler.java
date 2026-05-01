@@ -429,9 +429,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return requestHeadersSpec.httpRequest(httpRequest -> {
             Object nativeRequest = httpRequest.getNativeRequest();
             if (nativeRequest instanceof HttpClientRequest reactorRequest) {
-                if (timeoutMs > 0) {
-                    reactorRequest.responseTimeout(Duration.ofMillis(timeoutMs));
-                }
+                reactorRequest.responseTimeout(timeoutMs > 0 ? Duration.ofMillis(timeoutMs) : null);
             }
         });
     }
