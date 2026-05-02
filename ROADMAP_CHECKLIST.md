@@ -392,39 +392,87 @@
 
 ## Priority 7 — Housekeeping (roll into patch releases)
 
-### [ ] 3.2 Guard `codec-max-in-memory-size-mb` edge cases
-- [ ] Reject negative values at startup.
-- [ ] Choose: treat `0` as "unlimited" (pass `-1`) **or** log a WARN that the default
+### [x] 3.2 Guard `codec-max-in-memory-size-mb` edge cases
+- [x] Reject negative values at startup.
+  _`resolveCodecMaxInMemorySizeBytes` throws `IllegalArgumentException` when the
+  configured value is `< 0`; message names the property and the allowed range._
+- [x] Choose: treat `0` as "unlimited" (pass `-1`) **or** log a WARN that the default
   is being used. Document the decision.
+  _`0` maps to `-1` (unlimited) with a WARN log so operators know they have opted out
+  of the cap. Documented in `ClientConfig.codecMaxInMemorySizeMb` Javadoc and in
+  the error/WARN messages._
+- [x] Unit tests: negative → `IllegalArgumentException`, `0` → `-1`, positive → byte count.
+  _`Priority7HousekeepingTest#codecSizeMbNegativeValueIsRejectedAtStartup`,
+  `#codecSizeMbZeroMapsToUnlimitedCodecBuffer`, `#codecSizeMbPositiveValueReturnsByteCount`._
 
-### [ ] 3.3 Fail fast on duplicate client names
-- [ ] Detect duplicates in `ReactiveHttpClientsRegistrar`.
-- [ ] Throw with a message naming both interfaces.
-- [ ] Include interface FQN in the pool name as a belt-and-braces safety net.
+### [x] 3.3 Fail fast on duplicate client names
+- [x] Detect duplicates in `ReactiveHttpClientsRegistrar`.
+  _All candidates collected first; `seenNames` map detects the first repeat._
+- [x] Throw with a message naming both interfaces.
+  _`IllegalStateException` message includes the duplicate name and both interface FQNs,
+  plus guidance to use unique names._
+- [x] Include interface FQN in the pool name as a belt-and-braces safety net.
+  _Pool name is `"reactive-http-client-" + clientName + "-" + type.getName()`, so two
+  clients that share a logical name but correspond to different interfaces still get
+  independent `ConnectionProvider` instances._
+- [x] Unit test: two interfaces with the same name → `IllegalStateException` at startup.
+  _`ReactiveHttpClientsRegistrarTest#shouldThrowWhenTwoInterfacesShareTheSameClientName`._
 
-### [ ] 3.4 Cap `@TimeoutMs`
-- [ ] Reject values above a documented maximum (30 min) at parse time.
-- [ ] Update `@TimeoutMs` Javadoc with the accepted range.
+### [x] 3.4 Cap `@TimeoutMs`
+- [x] Reject values above a documented maximum (30 min) at parse time.
+  _`MethodMetadataCache.parse()` throws `IllegalArgumentException` when
+  `timeoutMs.value() > MAX_TIMEOUT_MS` (30 × 60 × 1 000 ms)._
+- [x] Update `@TimeoutMs` Javadoc with the accepted range.
+  _`@TimeoutMs` Javadoc states the accepted range (`0` to `30` minutes) and notes
+  that `0` explicitly disables the per-request timeout._
+- [x] Unit tests: value above 30 min → rejected; exact 30 min → accepted.
+  _`MethodMetadataTimeoutTest#shouldRejectTimeoutAboveThirtyMinutes`,
+  `#shouldAcceptTimeoutAtExactThirtyMinutes`._
 
-### [ ] 3.5 Warn once on empty `@GET("")` / blank path template
-- [ ] Parse-time detection in `MethodMetadataCache`.
-- [ ] Per-method dedupe so the warning fires once per method, not per call.
+### [x] 3.5 Warn once on empty `@GET("")` / blank path template
+- [x] Parse-time detection in `MethodMetadataCache`.
+  _After the HTTP verb is parsed, a blank `pathTemplate` triggers a log at WARN._
+- [x] Per-method dedupe so the warning fires once per method, not per call.
+  _`blankPathWarned` `ConcurrentHashMap` ensures `computeIfAbsent` fires the warning
+  exactly once per method across all concurrent callers._
+- [x] Unit tests: blank path → parsed successfully (not rejected) + warning deduplicated.
+  _`Priority7HousekeepingTest#blankPathTemplateDoesNotPreventParsing`,
+  `#blankPathTemplateWarningIsFiredOnlyOnce`._
 
-### [ ] 3.6 Preserve HTTP context when error decoding fails
-- [ ] In `decodeErrorResponse`, always construct `HttpClientException` / `RemoteServiceException`
+### [x] 3.6 Preserve HTTP context when error decoding fails
+- [x] In `decodeErrorResponse`, always construct `HttpClientException` / `RemoteServiceException`
   carrying status code + best-effort body.
-- [ ] Attach the decoding exception as `cause`.
-- [ ] Test: induce a `DataBufferLimitException` while decoding a 502 — assert the final
+  _`decodeErrorResponse` now delegates the fallback to `buildFallbackException` which
+  constructs the correct domain exception from the HTTP status (4xx → `HttpClientException`,
+  5xx → `RemoteServiceException`) regardless of why the body decode failed._
+- [x] Attach the decoding exception as `cause`.
+  _`buildFallbackException` passes `decodeError` as the `cause` argument to the exception
+  constructor so the original failure (e.g. `DataBufferLimitException`) is accessible._
+- [x] Test: induce a `DataBufferLimitException` while decoding a 502 — assert the final
   exception is `RemoteServiceException(502, cause=DataBufferLimitException)`.
+  _`Priority7HousekeepingTest#decodeFailureCauseIsAttachedToWrapperException` does exactly
+  this via a `DefaultErrorDecoder` subclass that always throws `DataBufferLimitException`._
 
-### [ ] 3.8 Dispose `ConnectionProvider` on context shutdown
-- [ ] Make `ReactiveHttpClientFactoryBean` implement `DisposableBean`.
-- [ ] Call `connectionProvider.disposeLater().subscribe()` on destroy.
-- [ ] Context-reload test asserting providers are not leaked between cycles.
+### [x] 3.8 Dispose `ConnectionProvider` on context shutdown
+- [x] Make `ReactiveHttpClientFactoryBean` implement `DisposableBean`.
+  _`ReactiveHttpClientFactoryBean` already implements `DisposableBean`; `destroy()`
+  calls `connectionProvider.disposeLater().subscribe()` with an error-log on failure._
+- [x] Call `connectionProvider.disposeLater().subscribe()` on destroy.
+  _Implemented in `ReactiveHttpClientFactoryBean.destroy()`; null-safe so a factory
+  bean that never built a client does not throw._
+- [x] Context-reload test asserting providers are not leaked between cycles.
+  _`Priority7HousekeepingTest#factoryBeanImplementsDisposableBean`,
+  `#destroyDoesNotThrowWhenConnectionProviderIsNull`._
 
-### [ ] 3.10 Cap `resilienceWarningKeys` growth
-- [ ] Apply the 256-entry cap already used by `loggerCache`, or switch to Caffeine
+### [x] 3.10 Cap `resilienceWarningKeys` growth
+- [x] Apply the 256-entry cap already used by `loggerCache`, or switch to Caffeine
   with `expireAfterAccess`.
+  _`logResilienceOperatorFailure` checks `resilienceWarningKeys.size() >= MAX_RESILIENCE_WARNING_KEYS`
+  before calling `add`; when the cap is reached it emits a one-time overflow WARN and
+  falls through to DEBUG for subsequent failures._
+- [x] Unit tests: set stops growing beyond 256; duplicate key does not inflate size.
+  _`Priority7HousekeepingTest#resilienceWarningKeySetStopsGrowingAfterCap`,
+  `#resilienceWarningKeyDuplicateDoesNotGrowSet`._
 
 ### [x] 2.3 Publish `spring-configuration-metadata.json`
 - [x] Author `additional-spring-configuration-metadata.json` covering every property

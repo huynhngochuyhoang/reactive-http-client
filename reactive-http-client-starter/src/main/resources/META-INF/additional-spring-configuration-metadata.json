@@ -239,7 +239,7 @@
     },
     {
       "name": "reactive.http.clients",
-      "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig>",
+      "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties.ClientConfig>",
       "description": "Per-client configuration map. Keys are the logical client names used in @ReactiveHttpClient(name=...).",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties"
     },

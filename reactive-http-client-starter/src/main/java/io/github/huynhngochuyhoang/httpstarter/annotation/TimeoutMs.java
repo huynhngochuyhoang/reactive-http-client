@@ -17,9 +17,11 @@ import java.lang.annotation.Target;
  *
  * <p>Value rules:
  * <ul>
- *   <li>{@code > 0}: apply this timeout for this method</li>
+ *   <li>{@code > 0}: apply this timeout for this method; accepted range is 1 to 1 800 000 ms
+ *       (30 minutes). Values above the cap are rejected at parse time with
+ *       {@link IllegalArgumentException}.</li>
  *   <li>{@code = 0}: disable the per-request timeout for this method (safety nets still apply)</li>
- *   <li>{@code < 0}: rejected at parse time</li>
+ *   <li>{@code < 0}: rejected at parse time with {@link IllegalArgumentException}</li>
  * </ul>
  */
 @Target(ElementType.METHOD)

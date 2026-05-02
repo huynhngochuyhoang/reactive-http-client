@@ -9,6 +9,7 @@ import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MethodMetadataTimeoutTest {
 
@@ -37,6 +38,25 @@ class MethodMetadataTimeoutTest {
         assertThrows(IllegalArgumentException.class, () -> new MethodMetadataCache().get(method));
     }
 
+    @Test
+    void shouldRejectTimeoutAboveThirtyMinutes() throws Exception {
+        Method method = ExcessiveTimeoutClient.class.getMethod("getUser");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> new MethodMetadataCache().get(method));
+        assertTrue(ex.getMessage().contains("30 minutes"),
+                "Error message should mention the 30-minute maximum");
+    }
+
+    @Test
+    void shouldAcceptTimeoutAtExactThirtyMinutes() throws Exception {
+        Method method = MaxTimeoutClient.class.getMethod("getUser");
+
+        MethodMetadata metadata = new MethodMetadataCache().get(method);
+
+        assertEquals(30L * 60 * 1000, metadata.getTimeoutMs());
+    }
+
     interface TimeoutClient {
         @GET("/users/1")
         @TimeoutMs(1500)
@@ -51,6 +71,18 @@ class MethodMetadataTimeoutTest {
     interface InvalidClient {
         @GET("/users/1")
         @TimeoutMs(-1)
+        Mono<String> getUser();
+    }
+
+    interface ExcessiveTimeoutClient {
+        @GET("/users/1")
+        @TimeoutMs(Long.MAX_VALUE)
+        Mono<String> getUser();
+    }
+
+    interface MaxTimeoutClient {
+        @GET("/users/1")
+        @TimeoutMs(30L * 60 * 1000)
         Mono<String> getUser();
     }
 }

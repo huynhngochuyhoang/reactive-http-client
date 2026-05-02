@@ -17,7 +17,10 @@ import org.springframework.util.ClassUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Scans the configured base packages for interfaces annotated with
@@ -53,17 +56,48 @@ public class ReactiveHttpClientsRegistrar implements ImportBeanDefinitionRegistr
 
         ClassPathScanningCandidateComponentProvider scanner = buildScanner();
 
+        // Collect all candidates first so we can detect duplicate client names before
+        // registering any bean definitions.
+        // Use a LinkedHashMap keyed by class name to de-duplicate candidates that may appear
+        // more than once when base packages overlap (e.g. both "com.example" and
+        // "com.example.sub" are configured and contain the same interface).
+        LinkedHashMap<String, Class<?>> candidateByClassName = new LinkedHashMap<>();
         for (String basePackage : basePackages) {
             for (BeanDefinition candidate : scanner.findCandidateComponents(basePackage)) {
                 String interfaceClassName = candidate.getBeanClassName();
+                if (candidateByClassName.containsKey(interfaceClassName)) {
+                    continue; // already seen from an overlapping package scan
+                }
                 try {
                     Class<?> interfaceClass = ClassUtils.resolveClassName(interfaceClassName, null);
-                    registerFactoryBean(interfaceClass, registry);
+                    candidateByClassName.put(interfaceClassName, interfaceClass);
                 } catch (IllegalArgumentException e) {
                     throw new IllegalStateException(
                             "Could not load @ReactiveHttpClient interface: " + interfaceClassName, e);
                 }
             }
+        }
+        List<Class<?>> candidates = new ArrayList<>(candidateByClassName.values());
+
+        // Detect duplicate client names: two interfaces with the same @ReactiveHttpClient(name)
+        // would silently share a connection pool — fail fast with a descriptive message.
+        Map<String, String> seenNames = new HashMap<>();
+        for (Class<?> interfaceClass : candidates) {
+            ReactiveHttpClient annotation = interfaceClass.getAnnotation(ReactiveHttpClient.class);
+            if (annotation == null) continue;
+            String clientName = annotation.name();
+            String previous = seenNames.put(clientName, interfaceClass.getName());
+            if (previous != null) {
+                throw new IllegalStateException(
+                        "Duplicate @ReactiveHttpClient name \"" + clientName + "\" detected. "
+                                + "Both " + previous + " and " + interfaceClass.getName()
+                                + " declare the same client name. "
+                                + "Each @ReactiveHttpClient interface must have a unique name.");
+            }
+        }
+
+        for (Class<?> interfaceClass : candidates) {
+            registerFactoryBean(interfaceClass, registry);
         }
     }
 
