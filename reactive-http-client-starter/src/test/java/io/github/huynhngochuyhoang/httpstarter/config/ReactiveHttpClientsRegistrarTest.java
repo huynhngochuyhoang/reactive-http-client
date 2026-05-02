@@ -1,6 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
-import io.github.huynhngochuyhoang.httpstarter.config.fixtures.DuplicateNameClient;
+import io.github.huynhngochuyhoang.httpstarter.config.duplicates.DuplicateNameClientA;
 import io.github.huynhngochuyhoang.httpstarter.config.fixtures.RegistrarScannedClient;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
@@ -71,13 +71,13 @@ class ReactiveHttpClientsRegistrarTest {
     void shouldThrowWhenTwoInterfacesShareTheSameClientName() {
         BeanDefinitionRegistry registry = new DefaultListableBeanFactory();
 
-        // DuplicateConfiguration scans a package that contains both RegistrarScannedClient
-        // and DuplicateNameClient — both carry name = "registrar-fixture".
+        // DuplicateConfiguration scans the duplicates package which contains DuplicateNameClientA
+        // and DuplicateNameClientB — both carry name = "duplicate-fixture".
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> registrar.registerBeanDefinitions(
                         AnnotationMetadata.introspect(DuplicateConfiguration.class), registry));
 
-        assertTrue(ex.getMessage().contains("registrar-fixture"),
+        assertTrue(ex.getMessage().contains("duplicate-fixture"),
                 "Error message must include the duplicate client name");
         assertTrue(ex.getMessage().contains("unique name"),
                 "Error message must guide the user to use a unique name");
@@ -87,7 +87,7 @@ class ReactiveHttpClientsRegistrarTest {
     private static class TestRegistrarConfiguration {
     }
 
-    @EnableReactiveHttpClients(basePackageClasses = {RegistrarScannedClient.class, DuplicateNameClient.class})
+    @EnableReactiveHttpClients(basePackageClasses = DuplicateNameClientA.class)
     private static class DuplicateConfiguration {
     }
 }
