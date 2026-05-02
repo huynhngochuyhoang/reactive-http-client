@@ -11,6 +11,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.10.1] – 2026-05-02
+
+### Changed
+
+- **Unified Mono / Flux invocation pipeline.** Refactored `ReactiveClientInvocationHandler`
+  to share a single `exchange(...)` method for both `Mono` and `Flux` return types,
+  eliminating duplicated pipeline assembly and reducing the risk of divergence between
+  the two paths. (#35)
+
+### Added
+
+- **Spring Boot configuration metadata.** Added
+  `META-INF/additional-spring-configuration-metadata.json` covering all
+  `ReactiveHttpClientProperties` fields so IDEs provide auto-completion and
+  documentation for every `reactive.http.*` property. (#36)
+- **Method-scoped logger caching.** `MethodMetadata` now resolves and caches the
+  per-method `HttpExchangeLogger` on first use via a `volatile` field with a
+  `NOOP_EXCHANGE_LOGGER` sentinel, avoiding repeated registry lookups on the hot
+  path. (#36)
+- **`MethodMetadataCache.testOnlyBlankPathWarnedCount()`.** Test-only helper that
+  exposes how many times the blank-path-template warning has been emitted, allowing
+  the `blankPathTemplateWarningIsFiredOnlyOnce` test to assert the exact count rather
+  than relying on log output. (#37)
+
+### Changed
+
+- **`@DeprecatedConfigurationProperty` on `log-body`.** The `logBody` getter in
+  `ClientConfig` is now annotated with `@DeprecatedConfigurationProperty` (with a
+  `replacement` and `since` value) so Spring Boot's configuration processor surfaces
+  the deprecation in IDE hints. (#36)
+- **Header lookup optimisation.** `ResolvedArgs` now builds a case-insensitive
+  `TreeMap` view of its headers once on construction; all downstream header lookups
+  use this cached view instead of iterating the raw map. (#36)
+- **Logger guard helpers.** `DefaultHttpExchangeLogger` extracts `logSuccess()` and
+  `logError()` private methods with per-level `isEnabled` guards to avoid unnecessary
+  string formatting on the hot path; `responseBody` is now included in the WARN log
+  path. (#36)
+- **Bounded root-cause traversal.** `getRootCause` replaces the previous
+  `IdentityHashMap`-based cycle detection with a simple bounded loop (max depth 16),
+  removing the allocation overhead on every exception-handling call. (#36)
+- **`buildFallbackException` reactive safety.** `releaseBody()` is now composed
+  inside the reactive chain via `.thenReturn()` instead of a `subscribe()` side
+  effect, ensuring the release is always sequenced and never silently dropped. (#37)
+- **`ReactiveHttpClientFactoryBean` destroy logging.** `destroy()` now passes the
+  full exception object to `log.warn(...)` so the stack trace is visible to operators
+  when connection-provider shutdown fails. (#37)
+- **Explicit `this.connectionProvider` reference** in `ReactiveHttpClientFactoryBean`
+  to make the intent clear and avoid potential confusion with a local variable of the
+  same name. (#37)
+
+### Fixed
+
+- **`ReactiveHttpClientsRegistrar` false-positive duplicate-name error.** Candidates
+  are now de-duplicated by interface class name before the duplicate-name check,
+  preventing spurious `IllegalStateException` when base-package lists overlap and the
+  same interface is scanned more than once. (#37)
+
+---
+
 ## [1.10.0] – 2026-05-01
 
 ### Added
