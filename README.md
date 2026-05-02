@@ -42,7 +42,7 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 ## 2) Quick Start
 
 ### 2.1 Requirements
-- Java 17+
+- Java 21+
 - Spring Boot 3.x
 - Maven 3.8+
 
@@ -52,7 +52,7 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-starter</artifactId>
-  <version>1.10.0</version>
+  <version>1.10.1</version>
 </dependency>
 ```
 

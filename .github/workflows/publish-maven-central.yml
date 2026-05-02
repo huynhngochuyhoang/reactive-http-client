@@ -15,11 +15,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
           cache: maven
 
       - name: Verify
@@ -35,11 +35,11 @@ jobs:
       - name: Clean GPG
         run: rm -rf ~/.gnupg
       
-      - name: Set up JDK 17, Maven Central credentials and GPG
+      - name: Set up JDK 21, Maven Central credentials and GPG
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
           cache: maven
           server-id: central
           server-username: MAVEN_CENTRAL_USERNAME
