@@ -13,13 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.10.1] – 2026-05-02
 
-### Changed
-
-- **Unified Mono / Flux invocation pipeline.** Refactored `ReactiveClientInvocationHandler`
-  to share a single `exchange(...)` method for both `Mono` and `Flux` return types,
-  eliminating duplicated pipeline assembly and reducing the risk of divergence between
-  the two paths. (#35)
-
 ### Added
 
 - **Spring Boot configuration metadata.** Added
@@ -37,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Unified Mono / Flux invocation pipeline.** Refactored `ReactiveClientInvocationHandler`
+  to share a single `exchange(...)` method for both `Mono` and `Flux` return types,
+  eliminating duplicated pipeline assembly and reducing the risk of divergence between
+  the two paths. (#35)
 - **`@DeprecatedConfigurationProperty` on `log-body`.** The `logBody` getter in
   `ClientConfig` is now annotated with `@DeprecatedConfigurationProperty` (with a
   `replacement` and `since` value) so Spring Boot's configuration processor surfaces
