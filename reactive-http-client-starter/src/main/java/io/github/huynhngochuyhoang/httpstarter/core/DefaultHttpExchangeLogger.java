@@ -51,7 +51,8 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
         Map<String, String> requestHeaders = redactRequestHeaders(context.requestHeaders());
         Map<String, List<String>> responseHeaders = redactResponseHeaders(context.responseHeaders());
         Object requestBody = shouldLogBodies() ? context.requestBody() : OMITTED;
-        log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} duration={}ms error={}",
+        Object responseBody = shouldLogBodies() ? context.responseBody() : OMITTED;
+        log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms error={}",
                 context.clientName(),
                 context.httpMethod(),
                 context.pathTemplate(),
@@ -60,6 +61,7 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
                 requestBody,
                 context.responseStatus(),
                 responseHeaders,
+                responseBody,
                 context.durationMs(),
                 context.error().toString());
     }

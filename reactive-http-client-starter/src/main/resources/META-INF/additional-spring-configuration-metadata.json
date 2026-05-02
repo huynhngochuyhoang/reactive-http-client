@@ -534,7 +534,7 @@
     {
       "name": "reactive.http.inbound-headers.deny-list",
       "type": "java.util.Set<java.lang.String>",
-      "description": "Header names whose values are replaced with [REDACTED] in the inbound snapshot before logging. Default: SensitiveHeaders.DEFAULTS (Authorization, Cookie, Set-Cookie, Proxy-Authorization, X-Api-Key, X-Auth-Token, X-Csrf-Token).",
+      "description": "Header names whose values are replaced with [REDACTED] in the inbound snapshot before logging. Default: SensitiveHeaders.DEFAULTS (authorization, cookie, set-cookie, proxy-authorization, x-api-key).",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$InboundHeadersConfig"
     }
   ],

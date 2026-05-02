@@ -66,8 +66,8 @@ class HousekeepingTest {
     }
 
     @Test
-    void resolvedArgsIgnoreCaseViewIsEmptyForNullHeaders() {
-        // Null body and empty headers
+    void resolvedArgsIgnoreCaseViewIsEmptyForEmptyHeaders() {
+        // Empty headers map → view must also be empty
         RequestArgumentResolver.ResolvedArgs args =
                 new RequestArgumentResolver.ResolvedArgs(Map.of(), Map.of(), Map.of(), null);
 
@@ -95,7 +95,7 @@ class HousekeepingTest {
         ReactiveClientInvocationHandler handler = buildHandler(webClient);
 
         // Method supplies "ACCEPT" (upper-case) as a header parameter
-        StepVerifier.create(invokeWithHeader(handler, "ACCEPT", "text/html"))
+        StepVerifier.create(invokeWithHeader(handler, "text/html"))
                 .expectNext("ok")
                 .verifyComplete();
 
@@ -259,7 +259,7 @@ class HousekeepingTest {
         ObjectProvider<HttpClientObserver> provider = mock(ObjectProvider.class);
         when(ctx.getBeanProvider(HttpClientObserver.class)).thenReturn(provider);
         when(provider.getIfAvailable()).thenReturn(null);
-        // Return the noop logger sentinel when asked for DefaultHttpExchangeLogger
+        // Provide a real DefaultHttpExchangeLogger bean so the logger is resolved via the ApplicationContext
         ObjectProvider<DefaultHttpExchangeLogger> loggerProvider = mock(ObjectProvider.class);
         when(loggerProvider.getIfAvailable()).thenReturn(new DefaultHttpExchangeLogger());
         when(ctx.getBeanProvider(DefaultHttpExchangeLogger.class)).thenReturn(loggerProvider);
@@ -272,8 +272,7 @@ class HousekeepingTest {
     }
 
     @SuppressWarnings("unchecked")
-    private Mono<String> invokeWithHeader(ReactiveClientInvocationHandler handler,
-                                          String headerName, String headerValue) {
+    private Mono<String> invokeWithHeader(ReactiveClientInvocationHandler handler, String headerValue) {
         try {
             Method method = ClientWithOneHeader.class.getMethod("call", String.class);
             return (Mono<String>) handler.invoke(null, method, new Object[]{headerValue});
