@@ -253,6 +253,14 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             configured = configured.filter(loggingFilter());
         }
 
+        // Apply per-client customizations registered as Spring beans.
+        // Customizers are applied in @Order / Ordered sequence after all built-in filters.
+        final WebClient.Builder finalConfigured = configured;
+        applicationContext.getBeanProvider(ReactiveHttpClientCustomizer.class)
+                .orderedStream()
+                .filter(customizer -> customizer.supports(clientName))
+                .forEach(customizer -> customizer.customize(finalConfigured));
+
         return configured.build();
     }
 
