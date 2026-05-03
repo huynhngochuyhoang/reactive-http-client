@@ -18,7 +18,19 @@ public interface UserApiClient {
 }
 ```
 
-The starter resolves the `HttpExchangeLogger` bean (or the built-in default if none is registered) and calls `log(HttpExchangeLogContext)` after each exchange.
+The `@LogHttpExchange` annotation has an optional `logger` attribute that names the `HttpExchangeLogger` class to use. The runtime resolves this logger by looking up a Spring bean of that class, or—if no bean is found—instantiating the class directly via its no-arg constructor. The default is `DefaultHttpExchangeLogger`.
+
+```java
+// Use the default logger
+@GET("/users/{id}")
+@LogHttpExchange
+Mono<User> getUser(@PathVar("id") String id);
+
+// Use a custom logger class
+@POST("/orders")
+@LogHttpExchange(logger = MyOrderLogger.class)
+Mono<Order> placeOrder(@Body NewOrder body);
+```
 
 ### Enabling logging for an entire client
 
@@ -78,12 +90,15 @@ Sensitive headers (`Authorization`, `Cookie`, `Set-Cookie`, `Proxy-Authorization
 
 ## Custom logger
 
-Implement `HttpExchangeLogger` and register it as a Spring bean:
+You can supply a custom `HttpExchangeLogger` class (or bean) per method via the `logger` attribute on `@LogHttpExchange`. The runtime first checks the Spring `ApplicationContext` for a bean of the named class; if none is found it instantiates the class directly using its no-arg constructor.
 
 ```java
-@Bean
-HttpExchangeLogger myExchangeLogger() {
-    return context -> {
+public class AuditExchangeLogger implements HttpExchangeLogger {
+
+    private static final Logger log = LoggerFactory.getLogger(AuditExchangeLogger.class);
+
+    @Override
+    public void log(HttpExchangeLogContext context) {
         if (context.error() != null) {
             log.error("[{}] {} {} -> {} ({}ms) ERROR: {}",
                     context.clientName(),
@@ -100,11 +115,30 @@ HttpExchangeLogger myExchangeLogger() {
                     context.responseStatus(),
                     context.durationMs());
         }
-    };
+    }
 }
 ```
 
-Only one `HttpExchangeLogger` bean may be registered. When absent, the starter falls back to `DefaultHttpExchangeLogger`.
+Annotate individual methods to select the logger class to use:
+
+```java
+@POST("/orders")
+@LogHttpExchange(logger = AuditExchangeLogger.class)
+Mono<Order> placeOrder(@Body NewOrder body);
+```
+
+To share a single configured instance (e.g. one that needs constructor injection), register it as a Spring bean:
+
+```java
+@Bean
+AuditExchangeLogger auditExchangeLogger(AuditService auditService) {
+    return new AuditExchangeLogger(auditService);
+}
+```
+
+The runtime will resolve the bean by class and reuse it across all methods that reference `AuditExchangeLogger.class`. Different methods can reference different logger classes — there is no global limit of one logger bean.
+
+When `@LogHttpExchange` is used without a `logger` attribute (i.e. `logger = DefaultHttpExchangeLogger.class`), the runtime resolves `DefaultHttpExchangeLogger` through the same look-up/instantiation path.
 
 ---
 

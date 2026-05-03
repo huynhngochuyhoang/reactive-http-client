@@ -59,13 +59,17 @@ Every call through the mock proxy is recorded. `RecordedExchange` exposes:
 | `method()` | `HttpMethod` | HTTP verb of the outbound request |
 | `uri()` | `URI` | Full request URI including path and query |
 | `headers()` | `HttpHeaders` | Request headers |
-| `body()` | `byte[]` | Serialized request body bytes |
+| `contentType()` | `MediaType` | `Content-Type` header of the request |
+| `header(String)` | `String` | First value of a named header, or `null` |
+| `bodyAsString()` | `String` | UTF-8 decoded request body; empty string if no body was written |
+| `materialized()` | `MockClientHttpRequest` | Raw materialised request for low-level inspection |
 
 ```java
 RecordedExchange exchange = mock.lastExchange();
 assertThat(exchange.method()).isEqualTo(HttpMethod.POST);
 assertThat(exchange.uri().getPath()).isEqualTo("/users");
 assertThat(exchange.headers().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
+assertThat(exchange.bodyAsString()).contains("\"name\":\"alice\"");
 ```
 
 ---
@@ -113,32 +117,31 @@ ErrorCategoryAssertions.assertThatFails(mock.proxy().getUser(1))
 
 ---
 
-## Using with Spring Boot test slices
+## Using `MockReactiveHttpClient` in a service unit test
+
+The simplest approach is to build the mock, extract the proxy, and pass it directly to the service under test — no Spring context required:
 
 ```java
-@SpringBootTest
 class UserServiceTest {
 
-    MockReactiveHttpClient<UserApiClient> mockClient = MockReactiveHttpClient
-            .forClient(UserApiClient.class)
-            .baseUrl("http://mock.local")
-            .respondTo(HttpMethod.GET, "/users/42",
-                    ex -> MockReactiveHttpClient.json(200, "{\"id\":42,\"name\":\"alice\"}"))
-            .build();
-
-    @MockBean
-    UserApiClient userApiClient;
-
-    @BeforeEach
-    void setUp() {
-        // inject the mock proxy
-        ReflectionTestUtils.setField(userApiClient, "delegate", mockClient.proxy());
-    }
-
     @Test
-    void getsUser() {
-        User user = mockClient.proxy().getUser(42).block();
+    void delegatesToUserApiClient() {
+        MockReactiveHttpClient<UserApiClient> mock = MockReactiveHttpClient
+                .forClient(UserApiClient.class)
+                .baseUrl("http://mock.local")
+                .respondTo(HttpMethod.GET, "/users/42",
+                        ex -> MockReactiveHttpClient.json(200, "{\"id\":42,\"name\":\"alice\"}"))
+                .build();
+
+        // Inject the mock proxy directly into the service under test
+        UserService service = new UserService(mock.proxy());
+
+        User user = service.getUser("42").block();
         assertThat(user.getId()).isEqualTo(42);
+
+        assertThat(mock.lastExchange().method()).isEqualTo(HttpMethod.GET);
+        assertThat(mock.lastExchange().uri().getPath()).isEqualTo("/users/42");
     }
 }
 ```
+
