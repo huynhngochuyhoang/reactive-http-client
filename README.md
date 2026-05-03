@@ -35,12 +35,11 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 
 ---
 
-## 1) Support level vs Spring `@HttpExchange` (current starter)
+## 1) Why reactive-http-client beats Spring `@HttpExchange`
 
-### Overall assessment
+### Overview
 
-**Support level:** the starter is a **higher-level opinionated layer** on top of WebFlux, while Spring `@HttpExchange` is a **lower-level declarative HTTP interface**.  
-**Current fit:** if you only need declarative HTTP mapping, `@HttpExchange` is enough; if you need built-in cross-cutting concerns (resilience, auth strategy, observability, network policy), this starter provides broader support out of the box.
+Spring's `@HttpExchange` gives you declarative HTTP mapping and nothing more. **reactive-http-client** starts where `@HttpExchange` stops: it adds a production-ready platform of cross-cutting concerns — resilience, auth strategy, structured observability, network policy, and test helpers — wired and opinionated from day one, so you write business logic instead of boilerplate infrastructure.
 
 | Capability | This starter | Spring `@HttpExchange` |
 |---|---|---|
@@ -55,8 +54,8 @@ A Spring Boot starter for building **declarative reactive HTTP clients** (annota
 
 ### Practical conclusion
 
-- Choose **Spring `@HttpExchange`** when you want minimal abstraction and full manual control.
-- Choose this **starter** when you want a ready-to-use platform for outbound HTTP governance with consistent policies across clients.
+- Choose this **starter** when you want a ready-to-use platform for outbound HTTP governance with consistent policies, resilience, auth, and observability across every client — with zero boilerplate infrastructure.
+- Choose **Spring `@HttpExchange`** when you prefer minimal abstraction and full manual control over cross-cutting concerns.
 
 ---
 
