@@ -6,7 +6,7 @@
 
     <groupId>io.github.huynhngochuyhoang</groupId>
     <artifactId>reactive-http-client</artifactId>
-    <version>1.10.1</version>
+    <version>1.11.0</version>
     <packaging>pom</packaging>
 
     <name>reactive-http-client</name>

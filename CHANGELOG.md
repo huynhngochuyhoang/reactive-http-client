@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.11.0] – 2026-05-03
+
+### Added
+
+- **`ReactiveHttpClientCustomizer` SPI.** New `@FunctionalInterface` in the `core`
+  package that lets applications attach custom `ExchangeFilterFunction`s (or any
+  other `WebClient.Builder` customization) to one or more reactive HTTP clients
+  without recreating a raw `WebClient` and losing starter-managed filters.
+  `ReactiveHttpClientFactoryBean` discovers all `ReactiveHttpClientCustomizer` beans
+  via `ObjectProvider.orderedStream()` (honoring `@Order` / `Ordered`), filters them
+  by `supports(clientName)`, and applies matching ones after built-in filters
+  (correlation-ID, auth, exchange logging) and before `WebClient.build()`.
+  The default `supports()` implementation returns `true`, so a customizer declared
+  without overriding the method applies to every client. See
+  [docs/15-customizer.md](docs/15-customizer.md) for the full reference.
+
+---
+
 ## [1.10.1] – 2026-05-02
 
 ### Added

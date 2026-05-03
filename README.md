@@ -73,7 +73,7 @@ Spring's `@HttpExchange` gives you declarative HTTP mapping and nothing more. **
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-starter</artifactId>
-  <version>1.10.1</version>
+  <version>1.11.0</version>
 </dependency>
 ```
 
