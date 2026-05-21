@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **HTTP contract ergonomics.** Added non-streaming `Mono<ResponseEntity<T>>`
   and `Mono<ResponseEntity<Void>>` response envelope support, plus an opt-in
   `ProblemDetailErrorResponseMapper` for `application/problem+json` errors.
+- **AOT and release compatibility.** Added runtime hints for starter
+  annotations, configuration properties, and scanned client interface proxies,
+  plus AOT and release-smoke coverage for a minimal metrics-enabled client.
 
 ### Changed
 
@@ -36,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Documented the raw-value URI encoding contract for `@PathVar`,
   `@QueryParam`, literal path query strings, and `@ApiRef` paths.
+- Documented native-image support boundaries and the release smoke matrix.
 
 ---
 
