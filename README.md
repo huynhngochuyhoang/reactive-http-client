@@ -218,6 +218,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Migration from WebClient](docs/17-migration-from-webclient.md) | Migration examples |
 | [Conflict and Cardinality Guardrails](docs/18-conflict-cardinality-guardrails.md) | Precedence and safe observability defaults |
 | [Lifecycle Hooks](docs/19-lifecycle-hooks.md) | Ordered invocation callbacks |
+| [Native Image and Release Compatibility](docs/20-native-release-compatibility.md) | AOT support and smoke matrix |
 | [Configuration Properties](docs/configuration-properties.md) | Generated property reference |
 | [Examples](docs/examples/README.md) | Copy-paste snippets |
 

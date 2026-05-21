@@ -24,6 +24,7 @@ import io.micrometer.core.instrument.binder.MeterBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -32,6 +33,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.context.annotation.Scope;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -52,9 +54,15 @@ import org.springframework.web.reactive.function.client.WebClient;
         "org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration"
 })
 @EnableConfigurationProperties(ReactiveHttpClientProperties.class)
+@ImportRuntimeHints(ReactiveHttpClientRuntimeHints.class)
 public class ReactiveHttpClientAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(ReactiveHttpClientAutoConfiguration.class);
+
+    @Bean
+    public static BeanFactoryInitializationAotProcessor reactiveHttpClientBeanFactoryInitializationAotProcessor() {
+        return new ReactiveHttpClientBeanFactoryInitializationAotProcessor();
+    }
 
     @Bean
     @Scope("prototype")

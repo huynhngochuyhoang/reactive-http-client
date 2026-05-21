@@ -126,8 +126,10 @@ public class ReactiveHttpClientsRegistrar implements ImportBeanDefinitionRegistr
         BeanDefinitionBuilder builder = BeanDefinitionBuilder
                 .genericBeanDefinition(ReactiveHttpClientFactoryBean.class);
         builder.addPropertyValue("type", interfaceClass);
+        BeanDefinition beanDefinition = builder.getBeanDefinition();
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, interfaceClass);
 
-        registry.registerBeanDefinition(interfaceClass.getName(), builder.getBeanDefinition());
+        registry.registerBeanDefinition(interfaceClass.getName(), beanDefinition);
     }
 
     private boolean hasExistingBeanRegistration(Class<?> interfaceClass, BeanDefinitionRegistry registry) {

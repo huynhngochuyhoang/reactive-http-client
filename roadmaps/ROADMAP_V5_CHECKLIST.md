@@ -67,24 +67,24 @@
 
 ## Priority 5 — Release compatibility
 
-### [ ] 1.1 Spring AOT and native-image readiness
-- [ ] Add runtime hints for client proxies, annotations, and configuration
+### [x] 1.1 Spring AOT and native-image readiness
+- [x] Add runtime hints for client proxies, annotations, and configuration
   properties.
-- [ ] Add an AOT smoke test application.
-- [ ] Document supported native-image paths and limits.
+- [x] Add an AOT smoke test application.
+- [x] Document supported native-image paths and limits.
 
-### [ ] 2.3 Compatibility smoke matrix
-- [ ] Add a release smoke job or profile.
-- [ ] Exercise a minimal declarative client with metrics enabled.
-- [ ] Capture tested Java and framework versions in release docs.
+### [x] 2.3 Compatibility smoke matrix
+- [x] Add a release smoke job or profile.
+- [x] Exercise a minimal declarative client with metrics enabled.
+- [x] Capture tested Java and framework versions in release docs.
 
 ---
 
 ## Release Readiness
 
-- [ ] `CHANGELOG.md` has V5 entries grouped under Added/Changed/Fixed/Docs.
-- [ ] README stays short and links to detailed docs.
-- [ ] New properties have configuration metadata and metadata tests.
-- [ ] New public APIs have focused tests and concise docs.
-- [ ] `mvn test` passes.
-- [ ] Breaking behavior, if any, is explicitly called out before release.
+- [x] `CHANGELOG.md` has V5 entries grouped under Added/Changed/Fixed/Docs.
+- [x] README stays short and links to detailed docs.
+- [x] New properties have configuration metadata and metadata tests.
+- [x] New public APIs have focused tests and concise docs.
+- [x] `mvn test` passes.
+- [x] Breaking behavior, if any, is explicitly called out before release.
