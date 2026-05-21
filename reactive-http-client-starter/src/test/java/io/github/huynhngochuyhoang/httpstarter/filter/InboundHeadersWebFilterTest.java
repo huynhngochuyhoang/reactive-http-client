@@ -2,24 +2,24 @@ package io.github.huynhngochuyhoang.httpstarter.filter;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for {@link InboundHeadersWebFilter}, focused on the redaction / allow-list
- * behaviour introduced for roadmap item 3.7.
+ * Unit tests for {@link InboundHeadersWebFilter}, focused on snapshot capture,
+ * allow-list matching, and redaction behavior.
  */
 class InboundHeadersWebFilterTest {
 
@@ -57,6 +57,51 @@ class InboundHeadersWebFilterTest {
 
         assertEquals(List.of("[REDACTED]"), captured.get("AUTHORIZATION"));
         assertEquals(List.of("[REDACTED]"), captured.get("proxy-authorization"));
+    }
+
+    @Test
+    void preservesOriginalHeaderCasingWhileMatchingCaseInsensitively() {
+        ReactiveHttpClientProperties.InboundHeadersConfig config =
+                new ReactiveHttpClientProperties.InboundHeadersConfig();
+        config.setAllowList(Set.of("x-request-id", "authorization"));
+        config.setDenyList(Set.of("authorization"));
+
+        InboundHeadersWebFilter filter = new InboundHeadersWebFilter(config);
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/test")
+                .header("X-ReQuEsT-Id", "req-7")
+                .header("AUTHORIZATION", "Bearer x")
+                .header("X-Trace-Id", "trace-1")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        Map<String, List<String>> captured = runFilter(filter, exchange);
+
+        assertEquals(List.of("req-7"), captured.get("X-ReQuEsT-Id"));
+        assertEquals(List.of("[REDACTED]"), captured.get("AUTHORIZATION"));
+        assertFalse(captured.containsKey("x-request-id"));
+        assertFalse(captured.containsKey("authorization"));
+        assertFalse(captured.containsKey("X-Trace-Id"));
+    }
+
+    @Test
+    void snapshotIsDefensiveAndImmutable() {
+        InboundHeadersWebFilter filter = new InboundHeadersWebFilter();
+        HttpHeaders headers = new HttpHeaders();
+        List<String> originalValues = new ArrayList<>(List.of("one", "two"));
+        headers.put("X-Multi", originalValues);
+
+        Map<String, List<String>> captured = filter.filterHeaders(headers);
+
+        originalValues.add("three");
+        headers.add("X-After", "after");
+
+        assertEquals(List.of("one", "two"), captured.get("X-Multi"));
+        assertFalse(captured.containsKey("X-After"));
+        assertThrows(UnsupportedOperationException.class,
+                () -> captured.put("X-New", List.of("new")));
+        assertThrows(UnsupportedOperationException.class,
+                () -> captured.get("X-Multi").add("three"));
     }
 
     @Test

@@ -7,19 +7,19 @@
 
 ## Priority 1 — Snapshot correctness foundation
 
-### [ ] 3.1 Inbound header snapshot immutability
-- [ ] Audit `InboundHeadersWebFilter` snapshot construction.
-- [ ] Store defensive, immutable map and list copies.
-- [ ] Preserve header order and multi-value behavior.
-- [ ] Add tests proving original request/header-list mutation cannot affect the
+### [x] 3.1 Inbound header snapshot immutability
+- [x] Audit `InboundHeadersWebFilter` snapshot construction.
+- [x] Store defensive, immutable map and list copies.
+- [x] Preserve header order and multi-value behavior.
+- [x] Add tests proving original request/header-list mutation cannot affect the
   stored snapshot.
-- [ ] Add tests proving returned snapshots cannot be mutated.
+- [x] Add tests proving returned snapshots cannot be mutated.
 
-### [ ] 3.3 Header casing, redaction, and deny-list consistency
-- [ ] Audit mixed-case allow-list and deny-list matching.
-- [ ] Verify denied headers are redacted before snapshot capture.
-- [ ] Verify snapshot restore cannot reintroduce raw denied header values.
-- [ ] Document captured inbound header casing behavior.
+### [x] 3.3 Header casing, redaction, and deny-list consistency
+- [x] Audit mixed-case allow-list and deny-list matching.
+- [x] Verify denied headers are redacted before snapshot capture.
+- [x] Verify snapshot restore cannot reintroduce raw denied header values.
+- [x] Document captured inbound header casing behavior.
 
 ---
 

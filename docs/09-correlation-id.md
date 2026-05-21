@@ -94,4 +94,4 @@ reactive:
 | Default allow-list | Empty — capture all headers |
 | Default deny-list | `authorization`, `cookie`, `set-cookie`, `proxy-authorization`, `x-api-key` |
 
-Matching is case-insensitive. Sensitive headers are never stored or logged by default.
+Matching is case-insensitive. Captured snapshots preserve the original inbound header casing, while denied values are replaced with `[REDACTED]` before the snapshot is stored. The stored snapshot is an immutable defensive copy, so later request-header mutation cannot change what loggers or async handoff code observe. Sensitive headers are never stored or logged by default.

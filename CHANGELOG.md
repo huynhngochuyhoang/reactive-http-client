@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Inbound header snapshots.** Stored inbound header snapshots are now
+  immutable defensive copies, preserving original header casing while keeping
+  allow-list and deny-list matching case-insensitive.
+
+### Docs
+
+- Documented inbound header snapshot immutability, casing, and redaction
+  behavior for logs and future async context handoff.
+
 ---
 
 ## [2.4.0] - 2026-05-21
