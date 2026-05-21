@@ -196,6 +196,7 @@ reactive:
           locale: [en-US]
         log-exchange: false
         log-preset: metadata-only
+        request-timeout-ms: 0
         resilience:
           enabled: true
           circuit-breaker: user-service
@@ -203,7 +204,6 @@ reactive:
           retry-methods: [GET, HEAD]
           rate-limiter: user-service
           bulkhead: user-service
-          timeout-ms: 0
     observability:
       enabled: true
       metric-name: reactive.http.client.requests

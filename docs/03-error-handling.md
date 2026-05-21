@@ -158,6 +158,36 @@ decoder. The fallback preserves the original HTTP status, raw response body, and
 `ErrorResponseContext.defaultException()` is available when a mapper wants to
 inspect or wrap the default `HttpClientException` / `RemoteServiceException`.
 
+### Problem Detail responses
+
+The starter includes an opt-in mapper for RFC 9457 `application/problem+json`
+responses. Register it as an `ErrorResponseMapper` bean when a downstream uses
+Problem Detail consistently:
+
+```java
+@Bean
+ErrorResponseMapper problemDetailErrorResponseMapper(ObjectMapper objectMapper) {
+    return new ProblemDetailErrorResponseMapper(objectMapper);
+}
+```
+
+When the response has `Content-Type: application/problem+json`, 4xx responses map
+to `ProblemDetailHttpClientException` and 5xx responses map to
+`ProblemDetailRemoteServiceException`. Both exceptions expose the parsed
+`ProblemDetail` and keep the original status, raw response body, request context,
+and `ErrorCategory` from the default exception model.
+
+```java
+orderClient.createOrder(request)
+    .onErrorResume(ProblemDetailHttpClientException.class, ex -> {
+        ProblemDetail problem = ex.getProblemDetail();
+        return Mono.error(new OrderRejectedException(problem.getTitle(), ex));
+    });
+```
+
+Missing content type, non-problem content type, or invalid problem JSON falls back
+to the default decoder.
+
 ---
 
 ## Observability and error categories

@@ -251,6 +251,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     // Apply when: (a) caller set an explicit @TimeoutMs (including 0 to disable), or (b) a resilience timeout resolved to > 0.
                     boolean shouldApplyResponseTimeout = plan.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET
                             || effectiveApi.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET
+                            || isClientLevelRequestTimeoutConfigured()
                             || timeoutMs > 0;
                     return configureNativeRequest(requestHeadersSpec, timeoutMs, shouldApplyResponseTimeout, requestUrl);
                 });
@@ -413,6 +414,34 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private Mono<?> buildMono(ClientResponse response, Type responseType) {
+        // Streaming passthrough for Mono<ResponseEntity<Flux<DataBuffer>>>: skip the
+        // in-memory codec entirely so large payloads aren't bound by codec-max-in-memory-size.
+        if (isResponseEntityOfFluxDataBuffer(responseType)) {
+            Flux<DataBuffer> streaming = response.bodyToFlux(DataBuffer.class);
+            return Mono.just(ResponseEntity.status(response.statusCode())
+                    .headers(response.headers().asHttpHeaders())
+                    .body(streaming));
+        }
+
+        Type responseEntityBodyType = responseEntityBodyType(responseType);
+        if (responseEntityBodyType != null) {
+            return buildResponseEntityMono(response, responseEntityBodyType);
+        }
+        return bodyToMono(response, responseType);
+    }
+
+    private Mono<?> buildResponseEntityMono(ClientResponse response, Type bodyType) {
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(response.statusCode())
+                .headers(response.headers().asHttpHeaders());
+        if (Void.class.equals(bodyType) || void.class.equals(bodyType)) {
+            return response.releaseBody().thenReturn(builder.build());
+        }
+        return bodyToMono(response, bodyType)
+                .map(body -> builder.body(body))
+                .switchIfEmpty(Mono.fromSupplier(builder::build));
+    }
+
+    private Mono<?> bodyToMono(ClientResponse response, Type responseType) {
         if (responseType == null || Void.class.equals(responseType)) {
             return response.bodyToMono(Void.class);
         }
@@ -424,14 +453,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
         if (responseType == DataBuffer.class) {
             return response.bodyToMono(DataBuffer.class);
-        }
-        // Streaming passthrough for Mono<ResponseEntity<Flux<DataBuffer>>>: skip the
-        // in-memory codec entirely so large payloads aren't bound by codec-max-in-memory-size.
-        if (isResponseEntityOfFluxDataBuffer(responseType)) {
-            Flux<DataBuffer> streaming = response.bodyToFlux(DataBuffer.class);
-            return Mono.just(ResponseEntity.status(response.statusCode())
-                    .headers(response.headers().asHttpHeaders())
-                    .body(streaming));
         }
         return response.bodyToMono(ParameterizedTypeReference.forType(responseType));
     }
@@ -449,14 +470,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return response.bodyToFlux(ParameterizedTypeReference.forType(responseType));
     }
 
+    /** Returns the body type when {@code responseType} is {@code ResponseEntity<T>}. */
+    private static Type responseEntityBodyType(Type responseType) {
+        if (!(responseType instanceof java.lang.reflect.ParameterizedType outer)) return null;
+        if (!(outer.getRawType() instanceof Class<?> outerRaw)) return null;
+        if (!ResponseEntity.class.equals(outerRaw)) return null;
+        Type[] outerArgs = outer.getActualTypeArguments();
+        return outerArgs.length == 1 ? outerArgs[0] : null;
+    }
+
     /** {@code true} when {@code responseType} is exactly {@code ResponseEntity<Flux<DataBuffer>>}. */
     private static boolean isResponseEntityOfFluxDataBuffer(Type responseType) {
-        if (!(responseType instanceof java.lang.reflect.ParameterizedType outer)) return false;
-        if (!(outer.getRawType() instanceof Class<?> outerRaw)) return false;
-        if (!ResponseEntity.class.equals(outerRaw)) return false;
-        Type[] outerArgs = outer.getActualTypeArguments();
-        if (outerArgs.length != 1) return false;
-        if (!(outerArgs[0] instanceof java.lang.reflect.ParameterizedType inner)) return false;
+        Type bodyType = responseEntityBodyType(responseType);
+        if (!(bodyType instanceof java.lang.reflect.ParameterizedType inner)) return false;
         if (!(inner.getRawType() instanceof Class<?> innerRaw)) return false;
         if (!Flux.class.equals(innerRaw)) return false;
         Type[] innerArgs = inner.getActualTypeArguments();
@@ -512,12 +538,23 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (configuredApiTimeoutMs != MethodMetadata.TIMEOUT_NOT_SET) {
             return configuredApiTimeoutMs;
         }
-        // Fall back to resilience timeout when method timeout is not configured.
+        // Canonical client-level timeout wins over the deprecated resilience alias.
+        if (clientConfig.isRequestTimeoutMsConfigured()) {
+            return clientConfig.getRequestTimeoutMs();
+        }
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
-        if (resilience != null && resilience.isEnabled() && resilience.getTimeoutMs() > 0) {
+        if (resilience != null && resilience.isTimeoutMsConfigured()) {
             return resilience.getTimeoutMs();
         }
         return 0;
+    }
+
+    private boolean isClientLevelRequestTimeoutConfigured() {
+        if (clientConfig.isRequestTimeoutMsConfigured()) {
+            return true;
+        }
+        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
+        return resilience != null && resilience.isTimeoutMsConfigured();
     }
 
     private EffectiveApi resolveEffectiveApi(Method method, MethodMetadata meta) {

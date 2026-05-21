@@ -32,6 +32,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "reactive.http.clients.[name].http2-enabled",
                 "reactive.http.clients.[name].log-exchange",
                 "reactive.http.clients.[name].log-preset",
+                "reactive.http.clients.[name].request-timeout-ms",
                 "reactive.http.clients.[name].default-headers",
                 "reactive.http.clients.[name].default-query-params",
                 "reactive.http.clients.[name].auth-provider",
@@ -66,6 +67,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.clients.[name].http2-enabled", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].log-exchange", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].log-preset", "metadata-only");
+        assertDefaultValue(metadata, "reactive.http.clients.[name].request-timeout-ms", 0);
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.enabled", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.retry", "default");
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.circuit-breaker", "default");

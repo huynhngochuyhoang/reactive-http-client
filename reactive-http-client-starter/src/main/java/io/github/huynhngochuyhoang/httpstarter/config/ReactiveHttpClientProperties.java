@@ -26,6 +26,7 @@ import java.util.*;
  *         codec-max-in-memory-size-mb: 2
  *         compression-enabled: false
  *         log-exchange: false
+ *         request-timeout-ms: 5000
  *         auth-provider: userServiceAuthProvider
  *         resilience:
  *           enabled: false
@@ -33,7 +34,6 @@ import java.util.*;
  *           retry: default
  *           retry-methods: [GET, HEAD]
  *           bulkhead: default
- *           timeout-ms: 0
  * }</pre>
  */
 @ConfigurationProperties(prefix = "reactive.http")
@@ -99,7 +99,7 @@ public class ReactiveHttpClientProperties {
      *       connections, not ordinary slow responses.</li>
      *   <li><b>Per-request response timeouts</b>
      *       (method-level {@link io.github.huynhngochuyhoang.httpstarter.annotation.TimeoutMs @TimeoutMs}
-     *       or client-level {@code resilience.timeout-ms}) — applied via
+     *       or client-level {@code request-timeout-ms}) — applied via
      *       {@code HttpClientRequest.responseTimeout()} on each attempt. This is
      *       the timeout most callers want to tune.</li>
      * </ul>
@@ -362,6 +362,7 @@ public class ReactiveHttpClientProperties {
     public static class ClientConfig {
 
         private static final int MAX_CODEC_MAX_IN_MEMORY_SIZE_MB = Integer.MAX_VALUE / (1024 * 1024);
+        private static final long MAX_REQUEST_TIMEOUT_MS = 30L * 60 * 1000;
 
         private String baseUrl;
         private int codecMaxInMemorySizeMb = 2;
@@ -369,6 +370,8 @@ public class ReactiveHttpClientProperties {
         private boolean http2Enabled = false;
         private boolean logExchange = false;
         private LogPreset logPreset = LogPreset.METADATA_ONLY;
+        /** Per-request response timeout in milliseconds. {@code null} means not configured; {@code 0} disables it. */
+        private Long requestTimeoutMs;
         /**
          * Bean name of {@code AuthProvider} to use for this client.
          * Empty means no automatic auth injection.
@@ -437,6 +440,19 @@ public class ReactiveHttpClientProperties {
         public void setLogPreset(LogPreset logPreset) {
             this.logPreset = logPreset != null ? logPreset : LogPreset.METADATA_ONLY;
         }
+
+        public long getRequestTimeoutMs() { return requestTimeoutMs != null ? requestTimeoutMs : 0; }
+        public void setRequestTimeoutMs(long requestTimeoutMs) { setRequestTimeoutMs(Long.valueOf(requestTimeoutMs)); }
+        public void setRequestTimeoutMs(Long requestTimeoutMs) {
+            if (requestTimeoutMs == null) {
+                this.requestTimeoutMs = null;
+                return;
+            }
+            requireAtLeast("reactive.http.clients.*.request-timeout-ms", requestTimeoutMs, 0);
+            requireAtMost("reactive.http.clients.*.request-timeout-ms", requestTimeoutMs, MAX_REQUEST_TIMEOUT_MS);
+            this.requestTimeoutMs = requestTimeoutMs;
+        }
+        public boolean isRequestTimeoutMsConfigured() { return requestTimeoutMs != null; }
 
         public boolean isExchangeLoggingEnabled() {
             return logExchange;
@@ -614,8 +630,9 @@ public class ReactiveHttpClientProperties {
         private String bulkhead = "default";
         /** Name of the Resilience4j RateLimiter instance. */
         private String rateLimiter = "default";
-        /** Request timeout in milliseconds (0 = disabled). */
-        private long timeoutMs = 0;
+        /** @deprecated use client-level request-timeout-ms. */
+        @Deprecated
+        private Long timeoutMs;
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -648,12 +665,27 @@ public class ReactiveHttpClientProperties {
         public String getRateLimiter() { return rateLimiter; }
         public void setRateLimiter(String rateLimiter) { this.rateLimiter = rateLimiter; }
 
-        public long getTimeoutMs() { return timeoutMs; }
-        public void setTimeoutMs(long timeoutMs) {
+        /**
+         * @deprecated use {@code reactive.http.clients.<name>.request-timeout-ms}.
+         */
+        @Deprecated
+        @DeprecatedConfigurationProperty(replacement = "reactive.http.clients.[name].request-timeout-ms")
+        public long getTimeoutMs() { return timeoutMs != null ? timeoutMs : 0; }
+        /** @deprecated setter retained so {@code resilience.timeout-ms} continues to bind for one compatibility cycle. */
+        @Deprecated
+        public void setTimeoutMs(long timeoutMs) { setTimeoutMs(Long.valueOf(timeoutMs)); }
+        /** @deprecated setter retained so {@code resilience.timeout-ms} continues to bind for one compatibility cycle. */
+        @Deprecated
+        public void setTimeoutMs(Long timeoutMs) {
+            if (timeoutMs == null) {
+                this.timeoutMs = null;
+                return;
+            }
             requireAtLeast("reactive.http.clients.*.resilience.timeout-ms", timeoutMs, 0);
             requireAtMost("reactive.http.clients.*.resilience.timeout-ms", timeoutMs, MAX_TIMEOUT_MS);
             this.timeoutMs = timeoutMs;
         }
+        public boolean isTimeoutMsConfigured() { return timeoutMs != null; }
     }
 
     // ---- observability / metrics sub-config ----

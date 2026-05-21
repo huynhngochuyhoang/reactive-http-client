@@ -4,23 +4,22 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.TimeoutMs;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
+import io.netty.handler.timeout.ReadTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.server.HttpServer;
 import reactor.test.StepVerifier;
 
-import io.netty.handler.timeout.ReadTimeoutException;
-
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 class ApiLevelTimeoutReadTimeoutPrecedenceTest {
 
@@ -51,7 +50,7 @@ class ApiLevelTimeoutReadTimeoutPrecedenceTest {
     }
 
     @Test
-    void shouldApplyResilienceTimeoutAsRequestLevelOverrideWhenMethodTimeoutIsNotConfigured() {
+    void shouldApplyClientRequestTimeoutAsRequestLevelOverrideWhenMethodTimeoutIsNotConfigured() {
         DisposableServer server = HttpServer.create()
                 .port(0)
                 .route(routes -> routes.get("/slow", (request, response) ->
@@ -67,14 +66,11 @@ class ApiLevelTimeoutReadTimeoutPrecedenceTest {
                     .build();
 
             ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
-            ReactiveHttpClientProperties.ResilienceConfig resilienceConfig = new ReactiveHttpClientProperties.ResilienceConfig();
-            resilienceConfig.setEnabled(true);
-            resilienceConfig.setTimeoutMs(1000);
-            clientConfig.setResilience(resilienceConfig);
+            clientConfig.setRequestTimeoutMs(1000);
 
             ReactiveClientInvocationHandler handler = createHandler(webClient, clientConfig);
 
-            StepVerifier.create(invokeResilienceTimeoutApi(handler))
+            StepVerifier.create(invokeClientRequestTimeoutApi(handler))
                     .expectNext("ok")
                     .verifyComplete();
         } finally {
@@ -99,14 +95,11 @@ class ApiLevelTimeoutReadTimeoutPrecedenceTest {
                     .build();
 
             ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
-            ReactiveHttpClientProperties.ResilienceConfig resilienceConfig = new ReactiveHttpClientProperties.ResilienceConfig();
-            resilienceConfig.setEnabled(true);
-            resilienceConfig.setTimeoutMs(150);
-            clientConfig.setResilience(resilienceConfig);
+            clientConfig.setRequestTimeoutMs(150);
 
             ReactiveClientInvocationHandler handler = createHandler(webClient, clientConfig);
 
-            StepVerifier.create(invokeResilienceTimeoutApi(handler))
+            StepVerifier.create(invokeClientRequestTimeoutApi(handler))
                     .expectErrorSatisfies(ex -> {
                         WebClientRequestException requestException = assertInstanceOf(WebClientRequestException.class, ex);
                         assertInstanceOf(ReadTimeoutException.class, requestException.getCause());
@@ -150,9 +143,9 @@ class ApiLevelTimeoutReadTimeoutPrecedenceTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static Mono<String> invokeResilienceTimeoutApi(ReactiveClientInvocationHandler handler) {
+    private static Mono<String> invokeClientRequestTimeoutApi(ReactiveClientInvocationHandler handler) {
         try {
-            java.lang.reflect.Method method = ResilienceTimeoutApiClient.class.getMethod("slow");
+            java.lang.reflect.Method method = ClientRequestTimeoutApiClient.class.getMethod("slow");
             return (Mono<String>) handler.invoke(null, method, new Object[0]);
         } catch (Throwable t) {
             return Mono.error(t);
@@ -165,7 +158,7 @@ class ApiLevelTimeoutReadTimeoutPrecedenceTest {
         Mono<String> slow();
     }
 
-    interface ResilienceTimeoutApiClient {
+    interface ClientRequestTimeoutApiClient {
         @GET("/slow")
         Mono<String> slow();
     }

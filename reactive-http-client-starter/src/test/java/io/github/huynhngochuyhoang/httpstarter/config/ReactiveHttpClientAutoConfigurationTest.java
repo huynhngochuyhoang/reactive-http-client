@@ -2,6 +2,9 @@ package io.github.huynhngochuyhoang.httpstarter.config;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
+import io.github.huynhngochuyhoang.httpstarter.auth.OAuth2ClientCredentialsAuthProviderFactory;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientHealthIndicator;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -94,6 +98,20 @@ class ReactiveHttpClientAutoConfigurationTest {
     }
 
     @Test
+    void userSuppliedWebClientBuilderOverridesStarterPrototypeBuilder() {
+        runner.withUserConfiguration(UserWebClientBuilderConfig.class, CountingCustomizerConfig.class)
+                .run(context -> {
+                    CountingCustomizer customizer = context.getBean(CountingCustomizer.class);
+
+                    assertThat(context).hasSingleBean(WebClient.Builder.class);
+                    assertThat(context).hasBean("userWebClientBuilder");
+                    assertThat(customizer.invocationCount())
+                            .as("starter customizer application only happens on the starter-managed prototype builder")
+                            .isZero();
+                });
+    }
+
+    @Test
     void customizersAppliedInOrder() {
         runner.withUserConfiguration(OrderedCustomizersConfig.class)
                 .run(context -> {
@@ -152,6 +170,14 @@ class ReactiveHttpClientAutoConfigurationTest {
 
         synchronized List<WebClient.Builder> customizedBuilders() {
             return List.copyOf(seen);
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class UserWebClientBuilderConfig {
+        @Bean
+        WebClient.Builder userWebClientBuilder() {
+            return WebClient.builder();
         }
     }
 
@@ -236,6 +262,13 @@ class ReactiveHttpClientAutoConfigurationTest {
     }
 
     @Test
+    void resilience4jBindersSkippedWhenTaggedMetricsClassMissing() {
+        runner.withClassLoader(new FilteredClassLoader(TaggedCircuitBreakerMetrics.class))
+                .withUserConfiguration(Resilience4jRegistriesConfig.class, SimpleMeterRegistryConfig.class)
+                .run(context -> assertThat(context.getBeansOfType(MeterBinder.class)).isEmpty());
+    }
+
+    @Test
     void userObserverDoesNotSuppressNamedMicrometerObserver() {
         runner.withUserConfiguration(SimpleMeterRegistryConfig.class, CustomObserverConfig.class)
                 .run(context -> {
@@ -244,6 +277,42 @@ class ReactiveHttpClientAutoConfigurationTest {
                             .isInstanceOf(MicrometerHttpClientObserver.class);
                     assertThat(context.getBeansOfType(HttpClientObserver.class))
                             .containsKeys("customHttpClientObserver", "micrometerHttpClientObserver");
+                });
+    }
+
+    @Test
+    void namedUserObserverOverridesBuiltInMicrometerObserver() {
+        runner.withUserConfiguration(SimpleMeterRegistryConfig.class, NamedMicrometerObserverConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(HttpClientObserver.class);
+                    assertThat(context.getBean("micrometerHttpClientObserver"))
+                            .isNotInstanceOf(MicrometerHttpClientObserver.class);
+                });
+    }
+
+    @Test
+    void micrometerObserverSkippedWhenObservabilityDisabled() {
+        runner.withUserConfiguration(SimpleMeterRegistryConfig.class)
+                .withPropertyValues("reactive.http.observability.enabled=false")
+                .run(context -> assertThat(context).doesNotHaveBean("micrometerHttpClientObserver"));
+    }
+
+    @Test
+    void healthIndicatorSkippedWhenHealthDisabled() {
+        runner.withUserConfiguration(SimpleMeterRegistryConfig.class)
+                .withPropertyValues("reactive.http.observability.health.enabled=false")
+                .run(context -> assertThat(context).doesNotHaveBean(HttpClientHealthIndicator.class));
+    }
+
+    @Test
+    void userSuppliedOauth2AuthProviderFactoryOverridesBuiltInFactory() {
+        runner.withUserConfiguration(UserOauthFactoryConfig.class)
+                .run(context -> {
+                    assertThat(context).hasBean("oauth2ClientCredentialsAuthProviderFactory");
+                    assertThat(context.getBeansOfType(OAuth2ClientCredentialsAuthProviderFactory.class))
+                            .containsOnlyKeys("oauth2ClientCredentialsAuthProviderFactory");
+                    assertThat(context.getBeansOfType(AuthProviderFactory.class))
+                            .containsKeys("oauth2ClientCredentialsAuthProviderFactory", "awsSigV4AuthProviderFactory");
                 });
     }
 
@@ -283,6 +352,22 @@ class ReactiveHttpClientAutoConfigurationTest {
         @Bean
         HttpClientObserver customHttpClientObserver() {
             return event -> { };
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class NamedMicrometerObserverConfig {
+        @Bean(name = "micrometerHttpClientObserver")
+        HttpClientObserver micrometerHttpClientObserver() {
+            return event -> { };
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class UserOauthFactoryConfig {
+        @Bean
+        OAuth2ClientCredentialsAuthProviderFactory oauth2ClientCredentialsAuthProviderFactory() {
+            return new OAuth2ClientCredentialsAuthProviderFactory();
         }
     }
 }

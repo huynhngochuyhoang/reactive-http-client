@@ -13,7 +13,7 @@ Use this checklist before putting a `@ReactiveHttpClient` client on a production
 
 - Set `reactive.http.network.connect-timeout-ms`.
 - Keep `network-read-timeout-ms` and `network-write-timeout-ms` above normal request timeouts.
-- Use `@TimeoutMs` or `reactive.http.clients.<name>.resilience.timeout-ms` for per-request response limits.
+- Use `@TimeoutMs` or `reactive.http.clients.<name>.request-timeout-ms` for per-request response limits.
 - Tune `connection-pool.max-connections` and `pending-acquire-timeout-ms` for expected concurrency.
 - Use per-client `pool` blocks only when one client needs different limits.
 

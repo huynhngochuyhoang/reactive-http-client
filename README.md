@@ -124,11 +124,11 @@ reactive:
         http2-enabled: false
         log-exchange: false
         log-preset: metadata-only
+        request-timeout-ms: 0
         resilience:
           enabled: true
           retry: user-service
           circuit-breaker: user-service
-          timeout-ms: 0
 ```
 
 `log-exchange` is the 2.0+ property for client-wide exchange logging. The old `log-body` compatibility property was removed in `2.0.0`.

@@ -239,7 +239,7 @@
     {
       "name": "reactive.http.network.tls.insecure-trust-all",
       "type": "java.lang.Boolean",
-      "description": "Disables certificate verification — NEVER use in production. Logs a WARN when enabled. Default: false.",
+      "description": "Disables certificate verification \u2014 NEVER use in production. Logs a WARN when enabled. Default: false.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig",
       "defaultValue": false
     },
@@ -289,6 +289,13 @@
       "description": "Controls how much data the default exchange logger writes when log-exchange is enabled or @LogHttpExchange uses DefaultHttpExchangeLogger. Values: metadata-only, headers, bodies. Default: metadata-only.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
       "defaultValue": "metadata-only"
+    },
+    {
+      "name": "reactive.http.clients.[name].request-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "Canonical per-request response timeout in milliseconds applied via HttpClientRequest.responseTimeout(). 0 disables the timeout. Wins over deprecated resilience.timeout-ms. Default: 0.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "defaultValue": 0
     },
     {
       "name": "reactive.http.clients.[name].default-headers",
@@ -416,7 +423,7 @@
     {
       "name": "reactive.http.clients.[name].resilience.enabled",
       "type": "java.lang.Boolean",
-      "description": "Master switch for Resilience4j operators (retry, circuit-breaker, bulkhead, timeout) on this client. Default: false.",
+      "description": "Master switch for Resilience4j operators (retry, circuit-breaker, bulkhead, rate-limiter) on this client. Default: false.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
       "defaultValue": false
     },
@@ -439,7 +446,10 @@
       "type": "java.util.Set<java.lang.String>",
       "description": "HTTP methods eligible for retry. Values are upper-cased. Default: [GET, HEAD].",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
-      "defaultValue": ["GET", "HEAD"]
+      "defaultValue": [
+        "GET",
+        "HEAD"
+      ]
     },
     {
       "name": "reactive.http.clients.[name].resilience.bulkhead",
@@ -458,9 +468,13 @@
     {
       "name": "reactive.http.clients.[name].resilience.timeout-ms",
       "type": "java.lang.Long",
-      "description": "Per-request response timeout in milliseconds applied via HttpClientRequest.responseTimeout(). 0 disables the timeout. Default: 0.",
+      "description": "Deprecated alias for request-timeout-ms. 0 disables the per-request timeout. request-timeout-ms wins when both are configured.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
-      "defaultValue": 0
+      "defaultValue": 0,
+      "deprecation": {
+        "level": "warning",
+        "replacement": "reactive.http.clients.[name].request-timeout-ms"
+      }
     },
     {
       "name": "reactive.http.clients.[name].pool.max-connections",
@@ -585,7 +599,7 @@
     {
       "name": "reactive.http.clients.[name].tls.insecure-trust-all",
       "type": "java.lang.Boolean",
-      "description": "Per-client certificate verification disable override — NEVER use in production.",
+      "description": "Per-client certificate verification disable override \u2014 NEVER use in production.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
     },
     {
@@ -663,7 +677,15 @@
       "type": "java.util.List<java.lang.Long>",
       "description": "SLO bucket boundaries in milliseconds for the latency histogram. Default: [50, 100, 200, 500, 1000, 2000, 5000].",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$HistogramConfig",
-      "defaultValue": [50, 100, 200, 500, 1000, 2000, 5000]
+      "defaultValue": [
+        50,
+        100,
+        200,
+        500,
+        1000,
+        2000,
+        5000
+      ]
     },
     {
       "name": "reactive.http.correlation-id.max-length",
@@ -677,7 +699,11 @@
       "type": "java.util.List<java.lang.String>",
       "description": "Ordered list of MDC keys consulted by the outbound filter when no correlation-ID is in the Reactor context. First non-blank value wins. Default: [correlationId, X-Correlation-Id, traceId].",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CorrelationIdConfig",
-      "defaultValue": ["correlationId", "X-Correlation-Id", "traceId"]
+      "defaultValue": [
+        "correlationId",
+        "X-Correlation-Id",
+        "traceId"
+      ]
     },
     {
       "name": "reactive.http.inbound-headers.allow-list",
@@ -696,39 +722,88 @@
     {
       "name": "reactive.http.network.proxy.type",
       "values": [
-        { "value": "HTTP",   "description": "Plain HTTP CONNECT proxy." },
-        { "value": "HTTPS",  "description": "HTTPS CONNECT proxy." },
-        { "value": "SOCKS4", "description": "SOCKS4 proxy." },
-        { "value": "SOCKS5", "description": "SOCKS5 proxy." },
-        { "value": "NONE",   "description": "Disable proxy for this client (overrides a global proxy)." }
+        {
+          "value": "HTTP",
+          "description": "Plain HTTP CONNECT proxy."
+        },
+        {
+          "value": "HTTPS",
+          "description": "HTTPS CONNECT proxy."
+        },
+        {
+          "value": "SOCKS4",
+          "description": "SOCKS4 proxy."
+        },
+        {
+          "value": "SOCKS5",
+          "description": "SOCKS5 proxy."
+        },
+        {
+          "value": "NONE",
+          "description": "Disable proxy for this client (overrides a global proxy)."
+        }
       ]
     },
     {
       "name": "reactive.http.clients.[name].proxy.type",
       "values": [
-        { "value": "HTTP",   "description": "Plain HTTP CONNECT proxy." },
-        { "value": "HTTPS",  "description": "HTTPS CONNECT proxy." },
-        { "value": "SOCKS4", "description": "SOCKS4 proxy." },
-        { "value": "SOCKS5", "description": "SOCKS5 proxy." },
-        { "value": "NONE",   "description": "Disable proxy for this client (overrides a global proxy)." }
+        {
+          "value": "HTTP",
+          "description": "Plain HTTP CONNECT proxy."
+        },
+        {
+          "value": "HTTPS",
+          "description": "HTTPS CONNECT proxy."
+        },
+        {
+          "value": "SOCKS4",
+          "description": "SOCKS4 proxy."
+        },
+        {
+          "value": "SOCKS5",
+          "description": "SOCKS5 proxy."
+        },
+        {
+          "value": "NONE",
+          "description": "Disable proxy for this client (overrides a global proxy)."
+        }
       ]
     },
     {
       "name": "reactive.http.clients.[name].apis.[api-name].method",
       "values": [
-        { "value": "GET" },
-        { "value": "POST" },
-        { "value": "PUT" },
-        { "value": "DELETE" },
-        { "value": "PATCH" }
+        {
+          "value": "GET"
+        },
+        {
+          "value": "POST"
+        },
+        {
+          "value": "PUT"
+        },
+        {
+          "value": "DELETE"
+        },
+        {
+          "value": "PATCH"
+        }
       ]
     },
     {
       "name": "reactive.http.clients.[name].log-preset",
       "values": [
-        { "value": "metadata-only", "description": "Log method, path, status, and duration with headers and bodies omitted." },
-        { "value": "headers", "description": "Log metadata plus redacted request, response, and inbound headers." },
-        { "value": "bodies", "description": "Log metadata, redacted headers, and request/response bodies." }
+        {
+          "value": "metadata-only",
+          "description": "Log method, path, status, and duration with headers and bodies omitted."
+        },
+        {
+          "value": "headers",
+          "description": "Log metadata plus redacted request, response, and inbound headers."
+        },
+        {
+          "value": "bodies",
+          "description": "Log metadata, redacted headers, and request/response bodies."
+        }
       ]
     }
   ]

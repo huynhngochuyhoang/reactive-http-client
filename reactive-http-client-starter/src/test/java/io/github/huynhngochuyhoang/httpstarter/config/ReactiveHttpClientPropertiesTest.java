@@ -19,7 +19,10 @@ class ReactiveHttpClientPropertiesTest {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
 
         assertFalse(config.getResilience().isEnabled());
+        assertEquals(0, config.getRequestTimeoutMs());
+        assertFalse(config.isRequestTimeoutMsConfigured());
         assertEquals(0, config.getResilience().getTimeoutMs());
+        assertFalse(config.getResilience().isTimeoutMsConfigured());
         assertTrue(config.getResilience().getRetryMethods().contains("GET"));
         assertTrue(config.getResilience().getRetryMethods().contains("HEAD"));
         assertEquals(2, config.getCodecMaxInMemorySizeMb());
@@ -187,6 +190,32 @@ class ReactiveHttpClientPropertiesTest {
     }
 
     @Test
+    void clientRequestTimeoutBindsAsCanonicalPerRequestTimeout() {
+        Map<String, Object> yaml = new LinkedHashMap<>();
+        yaml.put("reactive.http.clients.users.request-timeout-ms", 5_000);
+
+        ReactiveHttpClientProperties bound = bind(yaml);
+        ReactiveHttpClientProperties.ClientConfig config = bound.getClients().get("users");
+
+        assertEquals(5_000, config.getRequestTimeoutMs());
+        assertTrue(config.isRequestTimeoutMsConfigured());
+        assertFalse(config.getResilience().isTimeoutMsConfigured());
+    }
+
+    @Test
+    void deprecatedResilienceTimeoutStillBindsAsAlias() {
+        Map<String, Object> yaml = new LinkedHashMap<>();
+        yaml.put("reactive.http.clients.users.resilience.timeout-ms", 4_000);
+
+        ReactiveHttpClientProperties bound = bind(yaml);
+        ReactiveHttpClientProperties.ClientConfig config = bound.getClients().get("users");
+
+        assertFalse(config.isRequestTimeoutMsConfigured());
+        assertEquals(4_000, config.getResilience().getTimeoutMs());
+        assertTrue(config.getResilience().isTimeoutMsConfigured());
+    }
+
+    @Test
     void poolMetricsFlagDefaultsOffAndBindsFromYaml() {
         ReactiveHttpClientProperties.ConnectionPoolConfig defaults =
                 new ReactiveHttpClientProperties.ConnectionPoolConfig();
@@ -324,7 +353,17 @@ class ReactiveHttpClientPropertiesTest {
     }
 
     @Test
-    void invalidResilienceTimeoutIncludesPropertyNameAndAcceptedRange() {
+    void invalidClientRequestTimeoutIncludesPropertyNameAndAcceptedRange() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+
+        assertInvalidConfig(() -> config.setRequestTimeoutMs(-1),
+                "reactive.http.clients.*.request-timeout-ms", ">= 0");
+        assertInvalidConfig(() -> config.setRequestTimeoutMs(30L * 60 * 1000 + 1),
+                "reactive.http.clients.*.request-timeout-ms", "<= 1800000");
+    }
+
+    @Test
+    void invalidResilienceTimeoutAliasIncludesPropertyNameAndAcceptedRange() {
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
 
         assertInvalidConfig(() -> resilience.setTimeoutMs(-1),

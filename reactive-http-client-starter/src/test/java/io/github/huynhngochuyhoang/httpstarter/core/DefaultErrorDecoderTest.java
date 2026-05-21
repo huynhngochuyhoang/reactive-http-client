@@ -94,6 +94,23 @@ class DefaultErrorDecoderTest {
                 .verifyComplete();
     }
 
+    @Test
+    void shouldPreserveErrorBodyWhenContentTypeIsMalformed() {
+        ClientResponse response = ClientResponse.create(HttpStatus.BAD_REQUEST)
+                .header("Content-Type", "not a media type")
+                .body("malformed content type body")
+                .build();
+
+        StepVerifier.create(decoder.decode(response))
+                .assertNext(ex -> {
+                    HttpClientException hce = (HttpClientException) ex;
+                    assertEquals(400, hce.getStatusCode());
+                    assertEquals("malformed content type body", hce.getResponseBody());
+                    assertEquals(ErrorCategory.CLIENT_ERROR, hce.getErrorCategory());
+                })
+                .verifyComplete();
+    }
+
     // -------------------------------------------------------------------------
     // 5xx – Server Errors
     // -------------------------------------------------------------------------

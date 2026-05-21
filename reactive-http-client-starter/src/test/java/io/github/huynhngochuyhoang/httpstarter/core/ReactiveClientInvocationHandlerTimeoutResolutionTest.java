@@ -13,8 +13,8 @@ import static org.mockito.Mockito.mock;
 class ReactiveClientInvocationHandlerTimeoutResolutionTest {
 
     @Test
-    void shouldPreferMethodTimeoutOverResilienceTimeout() throws Exception {
-        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(true, 3000);
+    void shouldPreferMethodTimeoutOverClientRequestTimeout() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(3000);
         ReactiveClientInvocationHandler handler = createHandler(clientConfig);
         MethodMetadata meta = new MethodMetadata();
         meta.setTimeoutMs(1200);
@@ -23,8 +23,8 @@ class ReactiveClientInvocationHandlerTimeoutResolutionTest {
     }
 
     @Test
-    void shouldUseResilienceTimeoutWhenMethodTimeoutNotConfigured() throws Exception {
-        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(true, 3000);
+    void shouldUseClientRequestTimeoutWhenMethodAndApiTimeoutNotConfigured() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(3000);
         ReactiveClientInvocationHandler handler = createHandler(clientConfig);
         MethodMetadata meta = new MethodMetadata();
 
@@ -33,7 +33,7 @@ class ReactiveClientInvocationHandlerTimeoutResolutionTest {
 
     @Test
     void shouldUseApiMapTimeoutWhenMethodTimeoutNotConfigured() throws Exception {
-        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(true, 3000);
+        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(3000);
         ReactiveClientInvocationHandler handler = createHandler(clientConfig);
         MethodMetadata meta = new MethodMetadata();
 
@@ -41,20 +41,43 @@ class ReactiveClientInvocationHandlerTimeoutResolutionTest {
     }
 
     @Test
-    void shouldReturnZeroWhenNoMethodAndResilienceTimeoutNotConfigured() throws Exception {
-        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(false, 3000);
+    void shouldUseDeprecatedResilienceTimeoutAliasWhenCanonicalTimeoutNotConfigured() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig clientConfig = deprecatedAliasConfig(3000);
+        ReactiveClientInvocationHandler handler = createHandler(clientConfig);
+        MethodMetadata meta = new MethodMetadata();
+
+        assertEquals(3000, resolveTimeoutMs(handler, meta));
+    }
+
+    @Test
+    void shouldPreferClientRequestTimeoutOverDeprecatedResilienceTimeoutAlias() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig clientConfig = clientConfig(2000);
+        clientConfig.getResilience().setTimeoutMs(3000);
+        ReactiveClientInvocationHandler handler = createHandler(clientConfig);
+        MethodMetadata meta = new MethodMetadata();
+
+        assertEquals(2000, resolveTimeoutMs(handler, meta));
+    }
+
+    @Test
+    void shouldReturnZeroWhenNoClientTimeoutConfigured() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
         ReactiveClientInvocationHandler handler = createHandler(clientConfig);
         MethodMetadata meta = new MethodMetadata();
 
         assertEquals(0, resolveTimeoutMs(handler, meta));
     }
 
-    private static ReactiveHttpClientProperties.ClientConfig clientConfig(boolean resilienceEnabled, long resilienceTimeoutMs) {
+    private static ReactiveHttpClientProperties.ClientConfig clientConfig(long requestTimeoutMs) {
         ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
+        clientConfig.setRequestTimeoutMs(requestTimeoutMs);
+        return clientConfig;
+    }
 
+    private static ReactiveHttpClientProperties.ClientConfig deprecatedAliasConfig(long timeoutMs) {
+        ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilienceConfig = new ReactiveHttpClientProperties.ResilienceConfig();
-        resilienceConfig.setEnabled(resilienceEnabled);
-        resilienceConfig.setTimeoutMs(resilienceTimeoutMs);
+        resilienceConfig.setTimeoutMs(timeoutMs);
         clientConfig.setResilience(resilienceConfig);
         return clientConfig;
     }

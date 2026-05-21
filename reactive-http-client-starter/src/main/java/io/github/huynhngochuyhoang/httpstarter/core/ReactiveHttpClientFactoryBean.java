@@ -335,6 +335,15 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             }
         }
 
+        ReactiveHttpClientProperties.ResilienceConfig resilience = config.getResilience();
+        if (config.isRequestTimeoutMsConfigured()
+                && resilience != null
+                && resilience.isTimeoutMsConfigured()) {
+            log.warn("Reactive HTTP client [{}] has both request-timeout-ms and deprecated resilience.timeout-ms configured. "
+                    + "Using request-timeout-ms [{}] and ignoring resilience.timeout-ms [{}].",
+                    clientName, config.getRequestTimeoutMs(), resilience.getTimeoutMs());
+        }
+
         if (StringUtils.hasText(config.getAuthProvider())
                 && config.getAuth() != null
                 && StringUtils.hasText(config.getAuth().getType())) {
@@ -442,7 +451,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         boolean observabilityEnabled = observabilityConfig == null || observabilityConfig.isEnabled();
 
         log.debug("Reactive HTTP client [{}] startup configuration: baseUrl={} (source={}), protocol={}, poolSource={}, "
-                        + "pool=maxConnections:{}, pendingAcquireTimeoutMs:{}, proxy={}, tls={}, auth={}, resilience={}, "
+                        + "pool=maxConnections:{}, pendingAcquireTimeoutMs:{}, proxy={}, tls={}, auth={}, requestTimeout={}, resilience={}, "
                         + "observability={}, exchangeLogging={}, logPreset={}",
                 clientName,
                 baseUrl,
@@ -454,6 +463,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 proxySummary(proxy),
                 tlsSummary(tls),
                 authSummary(config),
+                requestTimeoutSummary(config),
                 resilienceSummary(resilience),
                 observabilityEnabled ? "enabled" : "disabled",
                 config.isExchangeLoggingEnabled() ? "enabled" : "disabled",
@@ -507,6 +517,21 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         return "none";
     }
 
+    private static String requestTimeoutSummary(ReactiveHttpClientProperties.ClientConfig config) {
+        if (config.isRequestTimeoutMsConfigured()) {
+            return config.getRequestTimeoutMs() > 0
+                    ? "configured(" + config.getRequestTimeoutMs() + "ms)"
+                    : "disabled(configured)";
+        }
+        ReactiveHttpClientProperties.ResilienceConfig resilience = config.getResilience();
+        if (resilience != null && resilience.isTimeoutMsConfigured()) {
+            return resilience.getTimeoutMs() > 0
+                    ? "deprecated-alias(" + resilience.getTimeoutMs() + "ms)"
+                    : "disabled(deprecated-alias)";
+        }
+        return "disabled";
+    }
+
     private static String resilienceSummary(ReactiveHttpClientProperties.ResilienceConfig resilience) {
         if (resilience == null || !resilience.isEnabled()) {
             return "disabled";
@@ -515,7 +540,6 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 + ", circuitBreaker=" + resilience.getCircuitBreaker()
                 + ", bulkhead=" + resilience.getBulkhead()
                 + ", rateLimiter=" + resilience.getRateLimiter()
-                + ", timeoutMs=" + resilience.getTimeoutMs()
                 + ")";
     }
 

@@ -35,10 +35,10 @@ reactive:
           rate-limiter: user-service
           bulkhead: user-service
           retry-methods: [GET, HEAD]      # only these verbs are retried
-          timeout-ms: 5000                # per-request timeout (0 = disabled)
+        request-timeout-ms: 5000          # per-request timeout (0 = disabled)
 ```
 
-When `enabled: false` (the default), no Resilience4j operators are applied regardless of other settings.
+When `enabled: false` (the default), no Resilience4j operators are applied regardless of other settings. `request-timeout-ms` is independent of this switch and still applies when configured.
 
 ---
 
@@ -191,3 +191,9 @@ When both `micrometer-core` and `resilience4j-micrometer` are on the classpath, 
 | `resilience4j.ratelimiter.*` | Available permissions, waiting threads |
 
 To disable the binding for a specific registry, declare your own `MeterBinder` bean named `reactiveHttpCircuitBreakerMeterBinder` (or the retry / bulkhead / rate-limiter equivalent).
+
+---
+
+## Deprecated timeout alias
+
+`reactive.http.clients.<name>.resilience.timeout-ms` is retained as a deprecated alias for `request-timeout-ms` for one compatibility cycle. Prefer the client-level property in new config. If both are present, `request-timeout-ms` wins.

@@ -44,13 +44,14 @@
 | `reactive.http.clients.[name].proxy.port` | `java.lang.Integer` |  | Per-client proxy port override. |  |
 | `reactive.http.clients.[name].proxy.type` | `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type` |  | Per-client proxy type override. Set to NONE to bypass a global proxy for this client. |  |
 | `reactive.http.clients.[name].proxy.username` | `java.lang.String` |  | Per-client proxy authentication username override. |  |
+| `reactive.http.clients.[name].request-timeout-ms` | `java.lang.Long` | `0` | Canonical per-request response timeout in milliseconds applied via HttpClientRequest.responseTimeout(). 0 disables the timeout. Wins over deprecated resilience.timeout-ms. Default: 0. |  |
 | `reactive.http.clients.[name].resilience.bulkhead` | `java.lang.String` | `"default"` | Name of the Resilience4j Bulkhead instance from application config. Default: default. |  |
 | `reactive.http.clients.[name].resilience.circuit-breaker` | `java.lang.String` | `"default"` | Name of the Resilience4j CircuitBreaker instance from application config. Default: default. |  |
-| `reactive.http.clients.[name].resilience.enabled` | `java.lang.Boolean` | `false` | Master switch for Resilience4j operators (retry, circuit-breaker, bulkhead, timeout) on this client. Default: false. |  |
+| `reactive.http.clients.[name].resilience.enabled` | `java.lang.Boolean` | `false` | Master switch for Resilience4j operators (retry, circuit-breaker, bulkhead, rate-limiter) on this client. Default: false. |  |
 | `reactive.http.clients.[name].resilience.rate-limiter` | `java.lang.String` | `"default"` | Name of the Resilience4j RateLimiter instance from application config. Default: default. |  |
 | `reactive.http.clients.[name].resilience.retry` | `java.lang.String` | `"default"` | Name of the Resilience4j Retry instance from application config. Default: default. |  |
 | `reactive.http.clients.[name].resilience.retry-methods` | `java.util.Set<java.lang.String>` | `["GET","HEAD"]` | HTTP methods eligible for retry. Values are upper-cased. Default: [GET, HEAD]. |  |
-| `reactive.http.clients.[name].resilience.timeout-ms` | `java.lang.Long` | `0` | Per-request response timeout in milliseconds applied via HttpClientRequest.responseTimeout(). 0 disables the timeout. Default: 0. |  |
+| `reactive.http.clients.[name].resilience.timeout-ms` | `java.lang.Long` | `0` | Deprecated alias for request-timeout-ms. 0 disables the per-request timeout. request-timeout-ms wins when both are configured. | warning; replacement: `reactive.http.clients.[name].request-timeout-ms` |
 | `reactive.http.clients.[name].tls.ciphers` | `java.util.List<java.lang.String>` |  | Per-client allowed TLS cipher suites override. |  |
 | `reactive.http.clients.[name].tls.insecure-trust-all` | `java.lang.Boolean` |  | Per-client certificate verification disable override — NEVER use in production. |  |
 | `reactive.http.clients.[name].tls.key-store` | `java.lang.String` |  | Per-client keystore path override for mTLS client certificate. |  |

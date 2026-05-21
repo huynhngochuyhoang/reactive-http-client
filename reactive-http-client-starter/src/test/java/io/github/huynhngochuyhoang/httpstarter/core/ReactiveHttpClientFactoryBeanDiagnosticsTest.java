@@ -56,6 +56,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties.TlsConfig tls = new ReactiveHttpClientProperties.TlsConfig();
         tls.setInsecureTrustAll(true);
         config.setTls(tls);
+        config.setRequestTimeoutMs(2500);
         config.getResilience().setEnabled(true);
         config.getResilience().setRetry("diagnostic-retry");
         properties.getClients().put("diagnostic-client", config);
@@ -276,6 +277,27 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .contains("has both auth-provider and auth.type configured")
                     .contains("Using auth-provider bean [namedAuthProvider]")
                     .contains("ignoring object-style auth [oauth2-client-credentials]");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void requestTimeoutTakesPrecedenceOverDeprecatedResilienceTimeoutAlias(CapturedOutput output) throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.setRequestTimeoutMs(1500);
+        config.getResilience().setTimeoutMs(3000);
+        properties.getClients().put("diagnostic-client", config);
+
+        ReactiveHttpClientFactoryBean<DiagnosticClient> factoryBean = buildFactoryBean(properties);
+        try {
+            factoryBean.getObject();
+
+            assertThat(output.getOut())
+                    .contains("has both request-timeout-ms and deprecated resilience.timeout-ms configured")
+                    .contains("Using request-timeout-ms [1500]")
+                    .contains("ignoring resilience.timeout-ms [3000]");
         } finally {
             factoryBean.destroy();
         }
