@@ -8,6 +8,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import reactor.core.publisher.Mono;
@@ -108,7 +109,12 @@ public class DefaultErrorDecoder {
     }
 
     private int maxErrorBodyBytes(HttpHeaders responseHeaders) {
-        MediaType contentType = responseHeaders.getContentType();
+        MediaType contentType;
+        try {
+            contentType = responseHeaders.getContentType();
+        } catch (InvalidMediaTypeException ex) {
+            return MAX_ERROR_BODY_BYTES;
+        }
         if (contentType != null && MediaType.APPLICATION_PROBLEM_JSON.isCompatibleWith(contentType)) {
             return MAX_PROBLEM_DETAIL_BODY_BYTES;
         }
