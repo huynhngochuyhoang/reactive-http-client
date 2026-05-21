@@ -27,7 +27,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         return (generationContext, beanFactoryInitializationCode) -> clientInterfaces.forEach(clientInterface -> {
             generationContext.getRuntimeHints().proxies().registerJdkProxy(clientInterface);
             generationContext.getRuntimeHints().reflection().registerType(clientInterface,
-                    MemberCategory.INTROSPECT_DECLARED_METHODS);
+                    MemberCategory.INTROSPECT_PUBLIC_METHODS);
         });
     }
 
@@ -46,7 +46,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
 
     private Class<?> resolveClientInterface(BeanDefinition definition, ClassLoader classLoader) {
         Object objectType = definition.getAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
-        Class<?> objectTypeClass = resolveClass(objectType, classLoader);
+        Class<?> objectTypeClass = resolveClass(objectType, classLoader, true);
         if (objectTypeClass != null) {
             return objectTypeClass;
         }
@@ -55,15 +55,22 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             return null;
         }
         PropertyValue typeProperty = definition.getPropertyValues().getPropertyValue("type");
-        return typeProperty != null ? resolveClass(typeProperty.getValue(), classLoader) : null;
+        return typeProperty != null ? resolveClass(typeProperty.getValue(), classLoader, false) : null;
     }
 
-    private Class<?> resolveClass(Object value, ClassLoader classLoader) {
+    private Class<?> resolveClass(Object value, ClassLoader classLoader, boolean ignoreResolutionFailures) {
         if (value instanceof Class<?> clazz) {
             return clazz;
         }
         if (value instanceof String className) {
-            return ClassUtils.resolveClassName(className, classLoader);
+            try {
+                return ClassUtils.resolveClassName(className, classLoader);
+            } catch (IllegalArgumentException ex) {
+                if (ignoreResolutionFailures) {
+                    return null;
+                }
+                throw ex;
+            }
         }
         return null;
     }

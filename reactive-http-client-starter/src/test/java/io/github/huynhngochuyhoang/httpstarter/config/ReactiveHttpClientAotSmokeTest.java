@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.aot.ApplicationContextAotGenerator;
 import org.springframework.javapoet.ClassName;
+import reactor.core.publisher.Mono;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,7 +59,43 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.proxies().forInterfaces(AotSmokeClient.class))
                 .accepts(generationContext.getRuntimeHints());
         assertThat(generationContext.getRuntimeHints().reflection().getTypeHint(AotSmokeClient.class).getMemberCategories())
-                .contains(MemberCategory.INTROSPECT_DECLARED_METHODS);
+                .contains(MemberCategory.INTROSPECT_PUBLIC_METHODS);
+        context.close();
+    }
+
+    @Test
+    void beanFactoryAotProcessorRegistersPublicMethodHintForInheritedClientMethods() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", ChildSmokeClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ChildSmokeClient.class);
+        context.registerBeanDefinition(ChildSmokeClient.class.getName(), beanDefinition);
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+        DefaultGenerationContext generationContext = newGenerationContext();
+
+        contribution.applyTo(generationContext, null);
+
+        assertThat(RuntimeHintsPredicates.proxies().forInterfaces(ChildSmokeClient.class))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(generationContext.getRuntimeHints().reflection().getTypeHint(ChildSmokeClient.class).getMemberCategories())
+                .contains(MemberCategory.INTROSPECT_PUBLIC_METHODS);
+        context.close();
+    }
+
+    @Test
+    void beanFactoryAotProcessorIgnoresUnresolvableForeignFactoryBeanObjectType() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(Object.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, "com.example.DoesNotExist");
+        context.registerBeanDefinition("foreignFactoryBean", beanDefinition);
+
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+
+        assertThat(contribution).isNull();
         context.close();
     }
 
@@ -81,6 +118,15 @@ class ReactiveHttpClientAotSmokeTest {
         return new DefaultGenerationContext(
                 new ClassNameGenerator(ClassName.get("com.example", "ReactiveHttpClientAotSmoke")),
                 new InMemoryGeneratedFiles());
+    }
+
+    interface ParentSmokeOperations {
+        @GET("/parent")
+        Mono<String> parentPing();
+    }
+
+    @ReactiveHttpClient(name = "child-smoke", baseUrl = "http://child-smoke.test")
+    interface ChildSmokeClient extends ParentSmokeOperations {
     }
 
     @Configuration(proxyBeanMethods = false)
