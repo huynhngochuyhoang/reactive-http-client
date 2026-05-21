@@ -8,6 +8,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import reactor.core.publisher.Mono;
 
@@ -28,6 +29,7 @@ public class DefaultErrorDecoder {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultErrorDecoder.class);
     private static final int MAX_ERROR_BODY_BYTES = 4096;
+    private static final int MAX_PROBLEM_DETAIL_BODY_BYTES = 64 * 1024;
 
     private final String clientName;
     private final List<ErrorResponseMapper> errorResponseMappers;
@@ -63,17 +65,18 @@ public class DefaultErrorDecoder {
     public Mono<? extends Throwable> decode(ClientResponse response) {
         int code = response.statusCode().value();
         RequestContext requestContext = resolveRequestContext(response);
-        return readBodyWithCap(response, MAX_ERROR_BODY_BYTES)
+        HttpHeaders responseHeaders = resolveResponseHeaders(response);
+        return readBodyWithCap(response, maxErrorBodyBytes(responseHeaders))
                 .defaultIfEmpty("")
-                .map(body -> mapOrDefault(response, code, body, requestContext));
+                .map(body -> mapOrDefault(code, body, responseHeaders, requestContext));
     }
 
-    private Throwable mapOrDefault(ClientResponse response, int code, String body, RequestContext requestContext) {
+    private Throwable mapOrDefault(int code, String body, HttpHeaders responseHeaders, RequestContext requestContext) {
         ErrorResponseContext context = new ErrorResponseContext(
                 clientName,
                 code,
                 body,
-                resolveResponseHeaders(response),
+                responseHeaders,
                 requestContext.method(),
                 requestContext.url(),
                 null);
@@ -102,6 +105,14 @@ public class DefaultErrorDecoder {
                     mapper.getClass().getName(), clientName, ex.getMessage());
             return false;
         }
+    }
+
+    private int maxErrorBodyBytes(HttpHeaders responseHeaders) {
+        MediaType contentType = responseHeaders.getContentType();
+        if (contentType != null && MediaType.APPLICATION_PROBLEM_JSON.isCompatibleWith(contentType)) {
+            return MAX_PROBLEM_DETAIL_BODY_BYTES;
+        }
+        return MAX_ERROR_BODY_BYTES;
     }
 
     private Mono<String> readBodyWithCap(ClientResponse response, int maxBytes) {

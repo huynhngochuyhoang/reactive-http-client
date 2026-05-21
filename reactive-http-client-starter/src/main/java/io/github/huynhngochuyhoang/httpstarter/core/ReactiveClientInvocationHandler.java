@@ -434,7 +434,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(response.statusCode())
                 .headers(response.headers().asHttpHeaders());
         if (Void.class.equals(bodyType) || void.class.equals(bodyType)) {
-            return response.bodyToMono(Void.class).thenReturn(builder.build());
+            return response.releaseBody().thenReturn(builder.build());
         }
         return bodyToMono(response, bodyType)
                 .map(body -> builder.body(body))

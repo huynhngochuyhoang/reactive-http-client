@@ -22,8 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class ResponseEntitySupportTest {
 
@@ -63,6 +62,29 @@ class ResponseEntitySupportTest {
                     assertThat(entity.getBody()).isNull();
                 })
                 .verifyComplete();
+    }
+
+    @Test
+    void monoResponseEntityVoidReleasesUnexpectedResponseBody() {
+        ClientResponse response = mock(ClientResponse.class);
+        ClientResponse.Headers headers = mock(ClientResponse.Headers.class);
+        when(response.statusCode()).thenReturn(HttpStatus.OK);
+        when(response.headers()).thenReturn(headers);
+        when(headers.asHttpHeaders()).thenReturn(HttpHeaders.EMPTY);
+        when(response.releaseBody()).thenReturn(Mono.empty());
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://entity.test")
+                .exchangeFunction(req -> Mono.just(response))
+                .build();
+
+        StepVerifier.create(invokeVoidEntity(createHandler(webClient, new DefaultErrorDecoder())))
+                .assertNext(entity -> {
+                    assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
+                    assertThat(entity.getBody()).isNull();
+                })
+                .verifyComplete();
+
+        verify(response).releaseBody();
     }
 
     @Test

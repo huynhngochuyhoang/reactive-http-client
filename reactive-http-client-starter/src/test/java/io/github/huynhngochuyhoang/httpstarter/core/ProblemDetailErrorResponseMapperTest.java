@@ -44,6 +44,28 @@ class ProblemDetailErrorResponseMapperTest {
     }
 
     @Test
+    void mapsProblemJsonBodyLargerThanDefaultErrorBodyCap() {
+        String detail = "x".repeat(5000);
+        String body = "{\"type\":\"about:blank\",\"title\":\"Large problem\",\"status\":422,\"detail\":\""
+                + detail + "\"}";
+        ClientResponse response = ClientResponse.create(HttpStatus.UNPROCESSABLE_ENTITY)
+                .header("Content-Type", MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+                .body(body)
+                .build();
+
+        StepVerifier.create(decoder.decode(response))
+                .assertNext(error -> {
+                    assertThat(error).isInstanceOf(ProblemDetailHttpClientException.class);
+                    ProblemDetailHttpClientException ex = (ProblemDetailHttpClientException) error;
+                    assertThat(ex.getStatusCode()).isEqualTo(422);
+                    assertThat(ex.getErrorCategory()).isEqualTo(ErrorCategory.CLIENT_ERROR);
+                    assertThat(ex.getProblemDetail().getTitle()).isEqualTo("Large problem");
+                    assertThat(ex.getProblemDetail().getDetail()).isEqualTo(detail);
+                })
+                .verifyComplete();
+    }
+
+    @Test
     void mapsProblemJson5xxToProblemDetailRemoteServiceException() {
         String body = """
                 {"type":"about:blank","title":"Unavailable","status":503,"detail":"Try later"}
