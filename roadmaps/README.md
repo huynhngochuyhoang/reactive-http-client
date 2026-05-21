@@ -11,3 +11,5 @@ Planning documents for the project:
 - [ROADMAP_V4_CHECKLIST.md](ROADMAP_V4_CHECKLIST.md) — V4 execution checklist
 - [ROADMAP_V5.md](ROADMAP_V5.md) — V5 roadmap
 - [ROADMAP_V5_CHECKLIST.md](ROADMAP_V5_CHECKLIST.md) — V5 execution checklist
+- [ROADMAP_V6.md](ROADMAP_V6.md) — V6 roadmap
+- [ROADMAP_V6_CHECKLIST.md](ROADMAP_V6_CHECKLIST.md) — V6 execution checklist

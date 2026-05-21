@@ -1,10 +1,10 @@
 # Reactive HTTP Client — Roadmap V5
 
-> **Status:** draft after the V4 maturity work. V4 completed the starter's
+> **Status:** completed for `2.4.0` on 2026-05-21. V4 completed the starter's
 > extension points, release-doc checks, conflict audit, and observability
-> guardrails. V5 should be a hardening roadmap for the starter itself: native
-> readiness, clearer HTTP response contracts, compatibility confidence, and
-> correctness around URI/body edge cases.
+> guardrails. V5 hardened the starter itself: native readiness, clearer HTTP
+> response contracts, compatibility confidence, and correctness around
+> URI/body edge cases.
 
 V5 keeps the same three-bucket shape:
 
@@ -40,11 +40,11 @@ declared intentionally instead of relying on runtime classpath behavior.
 
 **Acceptance:**
 
-- [ ] Runtime hints cover proxy creation for scanned `@ReactiveHttpClient`
+- [x] Runtime hints cover proxy creation for scanned `@ReactiveHttpClient`
       interfaces.
-- [ ] AOT test proves the starter context can be processed without missing
+- [x] AOT test proves the starter context can be processed without missing
       reflection/proxy hints.
-- [ ] Docs include a native-image section with supported and unsupported paths.
+- [x] Docs include a native-image section with supported and unsupported paths.
 
 ---
 
@@ -66,12 +66,12 @@ Today the starter exposes ordinary decoded bodies and a streaming
 
 **Acceptance:**
 
-- [ ] `Mono<ResponseEntity<T>>` returns decoded body, status, and headers for
+- [x] `Mono<ResponseEntity<T>>` returns decoded body, status, and headers for
       successful responses.
-- [ ] `Mono<ResponseEntity<Void>>` handles `204` and empty `200` responses.
-- [ ] Non-2xx responses still use the existing error category and mapper
+- [x] `Mono<ResponseEntity<Void>>` handles `204` and empty `200` responses.
+- [x] Non-2xx responses still use the existing error category and mapper
       fallback model.
-- [ ] Docs explain when to use `ResponseEntity<T>` vs normal body returns vs
+- [x] Docs explain when to use `ResponseEntity<T>` vs normal body returns vs
       streaming response entities.
 
 ---
@@ -91,11 +91,11 @@ to write the same mapper to preserve problem fields.
 
 **Acceptance:**
 
-- [ ] Mapper recognizes compatible problem-detail responses when enabled.
-- [ ] Invalid or partial problem payloads fall back to default decoding.
-- [ ] Tests cover `4xx`, `5xx`, missing content type, invalid JSON, and mapper
+- [x] Mapper recognizes compatible problem-detail responses when enabled.
+- [x] Invalid or partial problem payloads fall back to default decoding.
+- [x] Tests cover `4xx`, `5xx`, missing content type, invalid JSON, and mapper
       ordering relative to user-provided mappers.
-- [ ] Docs include a small example for application error handling.
+- [x] Docs include a small example for application error handling.
 
 ---
 
@@ -118,11 +118,11 @@ per-request response timeout, not a Resilience4j operator. Keeping it under
 
 **Acceptance:**
 
-- [ ] New property binds and is documented with metadata.
-- [ ] Existing `resilience.timeout-ms` continues to work and emits migration
+- [x] New property binds and is documented with metadata.
+- [x] Existing `resilience.timeout-ms` continues to work and emits migration
       guidance.
-- [ ] Conflict behavior is explicit if both properties are configured.
-- [ ] Timeout docs and guardrail docs use the new canonical property.
+- [x] Conflict behavior is explicit if both properties are configured.
+- [x] Timeout docs and guardrail docs use the new canonical property.
 
 ---
 
@@ -142,10 +142,10 @@ applications get.
 
 **Acceptance:**
 
-- [ ] Tests cover no optional dependencies, Micrometer only, Resilience4j only,
+- [x] Tests cover no optional dependencies, Micrometer only, Resilience4j only,
       actuator only, and user-supplied observer/auth/customizer beans.
-- [ ] Built-in bean names and override semantics are documented.
-- [ ] No existing public override path is broken.
+- [x] Built-in bean names and override semantics are documented.
+- [x] No existing public override path is broken.
 
 ---
 
@@ -164,10 +164,10 @@ not enough signal before release.
 
 **Acceptance:**
 
-- [ ] CI includes a smoke job or profile that can be run before release.
-- [ ] The smoke app exercises one declarative client, auth disabled, metrics
+- [x] CI includes a smoke job or profile that can be run before release.
+- [x] The smoke app exercises one declarative client, auth disabled, metrics
       enabled, and a mocked exchange.
-- [ ] Release docs name the tested Java, Spring Boot, Reactor Netty,
+- [x] Release docs name the tested Java, Spring Boot, Reactor Netty,
       Resilience4j, Micrometer, and OpenTelemetry versions.
 
 ---
@@ -191,11 +191,11 @@ are easy to regress.
 
 **Acceptance:**
 
-- [ ] Tests cover reserved characters in `@PathVar` and `@QueryParam`.
-- [ ] Tests cover default query values combined with method values and existing
+- [x] Tests cover reserved characters in `@PathVar` and `@QueryParam`.
+- [x] Tests cover default query values combined with method values and existing
       query strings.
-- [ ] Tests cover `@ApiRef` paths with templates and query strings.
-- [ ] Docs state whether callers pass raw or pre-encoded values.
+- [x] Tests cover `@ApiRef` paths with templates and query strings.
+- [x] Docs state whether callers pass raw or pre-encoded values.
 
 ---
 
@@ -214,11 +214,11 @@ double consumption, hanging cancellation paths, and leaked buffers.
 
 **Acceptance:**
 
-- [ ] Cancellation tests prove lifecycle hooks and observers receive the
+- [x] Cancellation tests prove lifecycle hooks and observers receive the
       expected terminal signal once.
-- [ ] Error mapper fallback does not consume the response body twice.
-- [ ] Streaming response paths do not buffer accidentally.
-- [ ] No new unbounded body buffering is introduced.
+- [x] Error mapper fallback does not consume the response body twice.
+- [x] Streaming response paths do not buffer accidentally.
+- [x] No new unbounded body buffering is introduced.
 
 ---
 
@@ -237,10 +237,10 @@ Netty, Resilience4j, or metrics behavior.
 
 **Acceptance:**
 
-- [ ] Validation tests cover invalid timeout, pool, codec, histogram, and health
+- [x] Validation tests cover invalid timeout, pool, codec, histogram, and health
       values.
-- [ ] Error messages include the property name and accepted range.
-- [ ] Docs preserve every documented `0 = disabled/default` rule.
+- [x] Error messages include the property name and accepted range.
+- [x] Docs preserve every documented `0 = disabled/default` rule.
 
 ---
 
