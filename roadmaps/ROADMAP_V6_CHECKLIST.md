@@ -25,20 +25,20 @@
 
 ## Priority 2 — Async context handoff
 
-### [ ] 1.1 Request context snapshot for async handoff
-- [ ] Add immutable request context snapshot type for starter-owned values.
-- [ ] Capture correlation ID from Reactor context.
-- [ ] Capture filtered inbound headers from Reactor context.
-- [ ] Add helper to restore snapshot values into Reactor context.
-- [ ] Ensure empty context produces an empty snapshot.
-- [ ] Document that sinks do not automatically carry Reactor context.
+### [x] 1.1 Request context snapshot for async handoff
+- [x] Add immutable request context snapshot type for starter-owned values.
+- [x] Capture correlation ID from Reactor context.
+- [x] Capture filtered inbound headers from Reactor context.
+- [x] Add helper to restore snapshot values into Reactor context.
+- [x] Ensure empty context produces an empty snapshot.
+- [x] Document that sinks do not automatically carry Reactor context.
 
-### [ ] 3.2 Sink and scheduler boundary correctness
-- [ ] Add tests showing sink subscribers do not see emitter context by default.
-- [ ] Add tests showing explicit snapshot handoff across `Sinks.Many`.
-- [ ] Add tests showing restored snapshot values survive `publishOn`.
-- [ ] Add tests showing restored snapshot values survive `subscribeOn`.
-- [ ] Verify no global Reactor hook is required.
+### [x] 3.2 Sink and scheduler boundary correctness
+- [x] Add tests showing sink subscribers do not see emitter context by default.
+- [x] Add tests showing explicit snapshot handoff across `Sinks.Many`.
+- [x] Add tests showing restored snapshot values survive `publishOn`.
+- [x] Add tests showing restored snapshot values survive `subscribeOn`.
+- [x] Verify no global Reactor hook is required.
 
 ---
 

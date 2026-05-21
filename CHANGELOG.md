@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Async request context handoff.** Added `RequestContextSnapshot` to capture
+  and restore starter-owned Reactor context values across explicit async
+  boundaries such as `Sinks.Many` event envelopes.
+
 ### Fixed
 
 - **Inbound header snapshots.** Stored inbound header snapshots are now
@@ -19,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Documented inbound header snapshot immutability, casing, and redaction
   behavior for logs and future async context handoff.
+- Documented that Reactor context is not automatically carried through sinks,
+  queues, or callbacks, and showed explicit snapshot capture/restore.
 
 ---
 

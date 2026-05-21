@@ -95,3 +95,38 @@ reactive:
 | Default deny-list | `authorization`, `cookie`, `set-cookie`, `proxy-authorization`, `x-api-key` |
 
 Matching is case-insensitive. Captured snapshots preserve the original inbound header casing, while denied values are replaced with `[REDACTED]` before the snapshot is stored. The stored snapshot is an immutable defensive copy, so later request-header mutation cannot change what loggers or async handoff code observe. Sensitive headers are never stored or logged by default.
+
+---
+
+## Async boundaries and sinks
+
+Reactor `Context` is scoped to a subscription chain. Values captured by
+`CorrelationIdWebFilter` and `InboundHeadersWebFilter` are visible to outbound
+client calls made in the same chain, but they are not automatically carried when
+application code emits an event into `Sinks.Many`, a queue, or another callback.
+A sink subscriber sees its own subscriber context, not the emitter context.
+
+Use `RequestContextSnapshot` when an application needs to carry starter-owned
+request context through an explicit event envelope:
+
+```java
+record EventEnvelope<T>(T payload, RequestContextSnapshot context) {}
+
+Mono<Void> publish(OrderCreated event) {
+    return Mono.deferContextual(ctx -> {
+        sink.tryEmitNext(new EventEnvelope<>(event, RequestContextSnapshot.capture(ctx)));
+        return Mono.empty();
+    });
+}
+
+Flux<Void> consume() {
+    return sink.asFlux()
+            .flatMap(envelope -> downstreamClient.send(envelope.payload())
+                    .contextWrite(envelope.context()::writeTo));
+}
+```
+
+`RequestContextSnapshot` currently carries the starter-owned correlation ID and
+filtered inbound header snapshot. Empty contexts produce an empty snapshot, and
+restoring an empty snapshot is a no-op. The snapshot remains independent of any
+specific sink, queue, or broker library.
