@@ -84,6 +84,8 @@ The starter owns these Reactor context keys and keeps the existing string keys s
 
 Prefer the `RequestContext` helpers or `RequestContextSnapshot` for new code. Existing integrations that write `CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY` or `InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY` continue to work because those constants keep the same string values.
 
+`RequestContext.defaultContributors()` exposes the built-in correlation ID and inbound header contributors for custom integration code that needs ordered capture/restore without referencing raw context keys. Optional integrations can pass an empty contributor list without changing behavior. Contributors restore in ascending `order()`, then by `key()`.
+
 Correlation ID precedence is:
 
 1. Caller-supplied outbound `X-Correlation-Id` request header.
@@ -152,3 +154,51 @@ Flux<Void> consume() {
 filtered inbound header snapshot. Empty contexts produce an empty snapshot, and
 restoring an empty snapshot is a no-op. The snapshot remains independent of any
 specific sink, queue, or broker library.
+
+### Event envelope guidance
+
+For durable queues or long-lived broker messages, prefer explicit low-cardinality fields over a full inbound header snapshot:
+
+```java
+record OrderEventEnvelope<T>(
+        T payload,
+        String correlationId,
+        String requestId,
+        String tenantId,
+        Map<String, String> traceContext) {}
+```
+
+Good envelope fields are correlation ID, request ID, tenant-like routing keys, and trace context required by the receiving side. Avoid copying large, user-controlled, or sensitive header snapshots into long-lived queues; they increase memory use, metric cardinality, and data-retention exposure.
+
+Use the full `RequestContextSnapshot` for short-lived in-process boundaries such as `Sinks.Many`, executor callbacks, or local handoff queues where the event remains inside the process and keeps the same retention expectations as the request.
+
+A queue handoff can capture explicit fields before enqueue and restore only the values needed before the outbound call:
+
+```java
+record QueueEnvelope<T>(T payload, String correlationId, String requestId) {}
+
+Mono<Void> enqueue(OrderCreated event) {
+    return Mono.deferContextual(ctx -> {
+        Map<String, List<String>> headers = RequestContext.inboundHeaders(ctx);
+        queue.offer(new QueueEnvelope<>(
+                event,
+                RequestContext.correlationId(ctx).orElse(null),
+                first(headers, "X-Request-Id")));
+        return Mono.empty();
+    });
+}
+
+Mono<Void> handle(QueueEnvelope<OrderCreated> envelope) {
+    return downstreamClient.send(envelope.payload())
+            .contextWrite(ctx -> RequestContext.withCorrelationId(ctx, envelope.correlationId()));
+}
+```
+
+For custom in-process integrations that cannot use a shared envelope, use the contributor SPI directly:
+
+```java
+Map<String, Object> snapshot = RequestContext.capture(ctx, RequestContext.defaultContributors());
+Context restored = RequestContext.restore(Context.empty(), snapshot, RequestContext.defaultContributors());
+```
+
+Applications should still prefer explicit event fields for brokered or persisted messages. The SPI is intended for framework adapters and short-lived custom integrations where the starter-owned values are restored immediately before subscribing to downstream work.

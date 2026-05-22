@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [2.5.0] - 2026-05-22
+
 ### Added
 
 - **Async request context handoff.** Added `RequestContextSnapshot` to capture
@@ -21,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   starter request-context snapshot visible to the mock exchange function, and
   `RecordedExchangeAssertions` can assert captured correlation IDs and inbound
   headers.
+- **Request context contributor SPI.** Added ordered `RequestContextContributor`
+  hooks plus built-in correlation ID and inbound header contributors for custom
+  in-process integrations.
 
 ### Fixed
 
@@ -38,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Reactor context or restored snapshots, and MDC fallback.
 - Documented test-helper assertions for captured async request context with a
   `Sinks.Many` snapshot handoff example.
+- Added async observability guidance for event envelopes, queue handoff, and
+  production use of request-context snapshots.
 
 ---
 
@@ -933,7 +942,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.  
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.1.0...v2.2.0

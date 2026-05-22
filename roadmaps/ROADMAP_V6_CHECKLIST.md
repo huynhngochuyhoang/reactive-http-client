@@ -74,33 +74,33 @@
 
 ## Priority 5 — Documentation and extension hooks
 
-### [ ] 2.3 Async observability guidance
-- [ ] Add async-context guidance to docs.
-- [ ] Document recommended event-envelope fields.
-- [ ] Warn against large or sensitive header snapshots in long-lived queues.
-- [ ] Add sink and queue examples.
-- [ ] Update the production checklist with async-context handoff guidance.
+### [x] 2.3 Async observability guidance
+- [x] Add async-context guidance to docs.
+- [x] Document recommended event-envelope fields.
+- [x] Warn against large or sensitive header snapshots in long-lived queues.
+- [x] Add sink and queue examples.
+- [x] Update the production checklist with async-context handoff guidance.
 
-### [ ] 1.3 Explicit context propagation hooks for custom integrations
-- [ ] Publish minimal SPI for starter-owned context contributors/readers.
-- [ ] Include built-in correlation ID and inbound header contributors.
-- [ ] Allow optional contributors to be absent without changing starter
+### [x] 1.3 Explicit context propagation hooks for custom integrations
+- [x] Publish minimal SPI for starter-owned context contributors/readers.
+- [x] Include built-in correlation ID and inbound header contributors.
+- [x] Allow optional contributors to be absent without changing starter
   behavior.
-- [ ] Test deterministic restore order.
-- [ ] Ensure SPI exposes immutable snapshots only.
-- [ ] Document when explicit event fields are preferred over custom hooks.
+- [x] Test deterministic restore order.
+- [x] Ensure SPI exposes immutable snapshots only.
+- [x] Document when explicit event fields are preferred over custom hooks.
 
 ---
 
 ## Release Readiness
 
-- [ ] `CHANGELOG.md` has V6 entries grouped under Added/Changed/Fixed/Docs.
-- [ ] README stays short and links to detailed docs.
-- [ ] New public APIs have focused tests and concise docs.
-- [ ] New test-helper APIs are covered by examples.
-- [ ] Configuration metadata is updated if new properties are added.
-- [ ] Async context behavior is documented without implying automatic sink
+- [x] `CHANGELOG.md` has V6 entries grouped under Added/Changed/Fixed/Docs.
+- [x] README stays short and links to detailed docs.
+- [x] New public APIs have focused tests and concise docs.
+- [x] New test-helper APIs are covered by examples.
+- [x] Configuration metadata is updated if new properties are added.
+- [x] Async context behavior is documented without implying automatic sink
   propagation.
-- [ ] `mvn test` passes.
-- [ ] `mvn -Prelease-smoke test` passes before release.
-- [ ] Breaking behavior, if any, is explicitly called out before release.
+- [x] `mvn test` passes.
+- [x] `mvn -Prelease-smoke test` passes before release.
+- [x] Breaking behavior, if any, is explicitly called out before release.
