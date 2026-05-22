@@ -44,30 +44,30 @@
 
 ## Priority 3 — Precedence and public contract
 
-### [ ] 2.2 Context precedence and fallback audit
-- [ ] Document precedence for Reactor context, restored snapshot values, MDC
+### [x] 2.2 Context precedence and fallback audit
+- [x] Document precedence for Reactor context, restored snapshot values, MDC
   fallback, and caller-supplied outbound headers.
-- [ ] Test snapshot restore over empty subscriber context.
-- [ ] Test snapshot restore when subscriber context already has correlation ID
+- [x] Test snapshot restore over empty subscriber context.
+- [x] Test snapshot restore when subscriber context already has correlation ID
   and inbound headers.
-- [ ] Verify caller-supplied outbound headers still win where documented.
+- [x] Verify caller-supplied outbound headers still win where documented.
 
-### [ ] 2.1 Typed context-key and snapshot contract audit
-- [ ] List public Reactor context keys in docs.
-- [ ] Add typed accessors/helpers so new APIs do not require raw string keys.
-- [ ] Preserve existing string-key compatibility.
-- [ ] Add tests that old correlation ID and inbound header keys still work.
+### [x] 2.1 Typed context-key and snapshot contract audit
+- [x] List public Reactor context keys in docs.
+- [x] Add typed accessors/helpers so new APIs do not require raw string keys.
+- [x] Preserve existing string-key compatibility.
+- [x] Add tests that old correlation ID and inbound header keys still work.
 
 ---
 
 ## Priority 4 — Test helper support
 
-### [ ] 1.2 Context-aware test helpers
-- [ ] Add assertions for captured correlation ID.
-- [ ] Add assertions for allowed inbound headers.
-- [ ] Add assertions for denied or absent inbound headers.
-- [ ] Add assertions for redacted inbound header values.
-- [ ] Add a documented `Sinks.Many` example proving capture on emit and restore
+### [x] 1.2 Context-aware test helpers
+- [x] Add assertions for captured correlation ID.
+- [x] Add assertions for allowed inbound headers.
+- [x] Add assertions for denied or absent inbound headers.
+- [x] Add assertions for redacted inbound header values.
+- [x] Add a documented `Sinks.Many` example proving capture on emit and restore
   on subscribe before an outbound mock client call.
 
 ---

@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Async request context handoff.** Added `RequestContextSnapshot` to capture
   and restore starter-owned Reactor context values across explicit async
   boundaries such as `Sinks.Many` event envelopes.
+- **Typed request context helpers.** Added `RequestContext` accessors for
+  starter-owned Reactor context values so new integrations do not need raw
+  string keys.
+- **Context-aware test helpers.** `MockReactiveHttpClient` now records the
+  starter request-context snapshot visible to the mock exchange function, and
+  `RecordedExchangeAssertions` can assert captured correlation IDs and inbound
+  headers.
 
 ### Fixed
 
@@ -27,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   behavior for logs and future async context handoff.
 - Documented that Reactor context is not automatically carried through sinks,
   queues, or callbacks, and showed explicit snapshot capture/restore.
+- Documented public context keys and precedence for caller-supplied headers,
+  Reactor context or restored snapshots, and MDC fallback.
+- Documented test-helper assertions for captured async request context with a
+  `Sinks.Many` snapshot handoff example.
 
 ---
 

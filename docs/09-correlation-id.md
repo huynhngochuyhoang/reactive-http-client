@@ -73,6 +73,28 @@ If the outbound request already carries an `X-Correlation-Id` header (set explic
 
 ---
 
+## Public context contract
+
+The starter owns these Reactor context keys and keeps the existing string keys stable for compatibility:
+
+| Value | String key | Typed helper |
+|---|---|---|
+| Correlation ID | `correlationId` | `RequestContext.correlationId(ctx)` / `RequestContext.withCorrelationId(ctx, value)` |
+| Filtered inbound headers | `inboundHeaders` | `RequestContext.inboundHeaders(ctx)` / `RequestContext.withInboundHeaders(ctx, headers)` |
+
+Prefer the `RequestContext` helpers or `RequestContextSnapshot` for new code. Existing integrations that write `CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY` or `InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY` continue to work because those constants keep the same string values.
+
+Correlation ID precedence is:
+
+1. Caller-supplied outbound `X-Correlation-Id` request header.
+2. Reactor context value, including a restored `RequestContextSnapshot`.
+3. Configured MDC fallback keys, in order.
+4. No outbound correlation header.
+
+Restoring a `RequestContextSnapshot` writes the values present in the snapshot into the subscriber context. If that subscriber context already contains values for the same starter-owned keys, the restored snapshot values replace them; missing snapshot values do not clear existing context values.
+
+---
+
 ## Inbound headers snapshot
 
 `InboundHeadersWebFilter` stores a filtered snapshot of all inbound request headers in the Reactor context under the key `"inboundHeaders"`. This snapshot is used by `DefaultHttpExchangeLogger` to include inbound context in log output.

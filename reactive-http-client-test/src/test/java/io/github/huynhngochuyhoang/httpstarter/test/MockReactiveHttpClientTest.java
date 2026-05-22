@@ -1,13 +1,17 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.core.RequestContext;
+import io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.test.StepVerifier;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,6 +34,9 @@ class MockReactiveHttpClientTest {
         Mono<String> search(@QueryParam("tag") List<String> tags,
                             @QueryParam("page") int page,
                             @HeaderParam("Authorization") String authorization);
+
+        @POST("/events")
+        Mono<String> sendEvent(@Body String body);
     }
 
     @Test
@@ -104,6 +111,53 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void recordsRestoredRequestContextAcrossSinkHandoff() {
+        Sinks.Many<EventEnvelope> sink = Sinks.many().unicast().onBackpressureBuffer();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .respondTo(HttpMethod.POST, "/events",
+                        ex -> MockReactiveHttpClient.json(202, "\"accepted\""))
+                .build();
+
+        StepVerifier.create(sink.asFlux()
+                        .take(1)
+                        .flatMap(envelope -> mock.proxy().sendEvent("created")
+                                .contextWrite(envelope.context()::writeTo)))
+                .then(() -> Mono.deferContextual(ctx -> {
+                            sink.tryEmitNext(new EventEnvelope(RequestContextSnapshot.capture(ctx))).orThrow();
+                            return Mono.empty();
+                        })
+                        .contextWrite(ctx -> RequestContext.withInboundHeaders(
+                                RequestContext.withCorrelationId(ctx, "cid-7"),
+                                Map.of(
+                                        "X-Request-Id", List.of("req-7"),
+                                        "Authorization", List.of("[REDACTED]"))))
+                        .block())
+                .expectNext("\"accepted\"")
+                .verifyComplete();
+
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasCapturedCorrelationId("cid-7")
+                .hasInboundHeader("X-Request-Id", "req-7")
+                .hasRedactedInboundHeader("Authorization")
+                .doesNotHaveInboundHeader("X-Missing")
+                .hasStatusCode(202);
+    }
+
+    @Test
+    void recordsEmptyContextWhenNoStarterContextIsPresent() {
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .respondTo(HttpMethod.GET, "/users/42",
+                        ex -> MockReactiveHttpClient.json(200, "alice"))
+                .build();
+
+        mock.proxy().getUser(42).block();
+
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .doesNotHaveCapturedCorrelationId()
+                .doesNotHaveInboundHeader("X-Request-Id");
+    }
+
+    @Test
     void unmatchedRequestFallsThroughToFallbackResponse() {
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class).build();
 
@@ -136,5 +190,8 @@ class MockReactiveHttpClientTest {
         ErrorCategoryAssertions.assertThatFails(mock.proxy().getUser(8))
                 .hasStatusCode(503)
                 .hasErrorCategory(ErrorCategory.SERVER_ERROR);
+    }
+
+    private record EventEnvelope(RequestContextSnapshot context) {
     }
 }

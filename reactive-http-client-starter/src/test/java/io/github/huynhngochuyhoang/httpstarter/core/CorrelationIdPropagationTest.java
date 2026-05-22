@@ -61,6 +61,39 @@ class CorrelationIdPropagationTest {
     }
 
     @Test
+    void reactorContextWinsOverMdcFallback() {
+        AtomicReference<String> capturedHeader = new AtomicReference<>();
+
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(CorrelationIdWebFilter.exchangeFilter())
+                .exchangeFunction(request -> {
+                    capturedHeader.set(request.headers().getFirst(CorrelationIdWebFilter.CORRELATION_ID_HEADER));
+                    ClientResponse ok = ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build();
+                    return Mono.just(ok);
+                })
+                .build();
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        org.slf4j.MDC.put(CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY, "mdc-value");
+        try {
+            StepVerifier.create(invokeGetUsers(handler)
+                            .contextWrite(ctx -> RequestContext.withCorrelationId(ctx, "context-value")))
+                    .expectNextMatches(body -> "ok".equals(body))
+                    .verifyComplete();
+
+            assertEquals("context-value", capturedHeader.get(),
+                    "Reactor context must win over MDC fallback");
+        } finally {
+            org.slf4j.MDC.remove(CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY);
+        }
+    }
+
+    @Test
     void shouldNotForwardCorrelationIdWhenContextIsEmpty() {
         AtomicReference<String> capturedHeader = new AtomicReference<>();
 
@@ -253,8 +286,9 @@ class CorrelationIdPropagationTest {
 
         ReactiveClientInvocationHandler handler = createHandler(webClient);
 
+        RequestContextSnapshot snapshot = new RequestContextSnapshot("ctx-id", java.util.Map.of());
         Mono<String> result = invokeGetUsersWithHeader(handler, "preset-id")
-                .contextWrite(Context.of(CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY, "ctx-id"));
+                .contextWrite(snapshot::writeTo);
 
         StepVerifier.create(result)
                 .expectNextMatches(body -> "ok".equals(body))

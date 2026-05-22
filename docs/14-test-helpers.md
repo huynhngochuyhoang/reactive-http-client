@@ -92,6 +92,9 @@ Every call through the mock proxy is recorded. `RecordedExchange` exposes:
 | `statusCode()` | `HttpStatusCode` | HTTP status selected by the mock response handler |
 | `statusCodeValue()` | `int` | Numeric HTTP status selected by the mock response handler |
 | `bodyAsString()` | `String` | UTF-8 decoded request body; empty string if no body was written |
+| `requestContextSnapshot()` | `RequestContextSnapshot` | Starter-owned Reactor context captured by the mock exchange function |
+| `correlationId()` | `String` | Captured correlation ID, or `null` if absent |
+| `inboundHeaders()` | `Map<String, List<String>>` | Captured filtered inbound headers |
 | `materialized()` | `MockClientHttpRequest` | Raw materialised request for low-level inspection |
 
 ```java
@@ -146,9 +149,57 @@ Available assertion methods:
 | `hasHeaderValues(String, String...)` | Asserts repeated request header values in order |
 | `hasRedactedHeader(String)` | Asserts the header value is `[REDACTED]` |
 | `doesNotHaveHeader(String)` | Asserts a request header is absent |
+| `hasCapturedCorrelationId(String)` | Asserts the captured starter correlation ID |
+| `doesNotHaveCapturedCorrelationId()` | Asserts no starter correlation ID was captured |
+| `hasInboundHeader(String, String)` | Asserts one captured inbound header value |
+| `hasInboundHeaderValues(String, String...)` | Asserts captured inbound header values in order |
+| `hasRedactedInboundHeader(String)` | Asserts the captured inbound header value is `[REDACTED]` |
+| `doesNotHaveInboundHeader(String)` | Asserts a captured inbound header is absent |
 | `hasBody(String)` | Asserts the full UTF-8 request body |
 | `bodyContains(String)` | Asserts a substring of the UTF-8 request body |
 | `hasStatusCode(int)` | Asserts the served HTTP status |
+
+---
+
+## Async context assertions
+
+`MockReactiveHttpClient` captures the starter-owned Reactor context visible to its exchange function. This lets tests prove explicit async handoff before an outbound mock client call:
+
+```java
+record EventEnvelope<T>(T payload, RequestContextSnapshot context) {}
+
+Sinks.Many<EventEnvelope<OrderCreated>> sink = Sinks.many().unicast().onBackpressureBuffer();
+MockReactiveHttpClient<OrderEventsClient> mock = MockReactiveHttpClient
+        .forClient(OrderEventsClient.class)
+        .respondTo(HttpMethod.POST, "/events",
+                ex -> MockReactiveHttpClient.json(202, "\"accepted\""))
+        .build();
+
+StepVerifier.create(sink.asFlux()
+                .take(1)
+                .flatMap(envelope -> mock.proxy().send(envelope.payload())
+                        .contextWrite(envelope.context()::writeTo)))
+        .then(() -> Mono.deferContextual(ctx -> {
+                    sink.tryEmitNext(new EventEnvelope<>(event, RequestContextSnapshot.capture(ctx))).orThrow();
+                    return Mono.empty();
+                })
+                .contextWrite(ctx -> RequestContext.withInboundHeaders(
+                        RequestContext.withCorrelationId(ctx, "cid-7"),
+                        Map.of(
+                                "X-Request-Id", List.of("req-7"),
+                                "Authorization", List.of("[REDACTED]"))))
+                .block())
+        .expectNext("\"accepted\"")
+        .verifyComplete();
+
+RecordedExchangeAssertions.assertThat(mock.lastExchange())
+        .hasCapturedCorrelationId("cid-7")
+        .hasInboundHeader("X-Request-Id", "req-7")
+        .hasRedactedInboundHeader("Authorization")
+        .doesNotHaveInboundHeader("X-Missing");
+```
+
+The assertions read the filtered snapshot captured from Reactor context. They do not inspect raw inbound HTTP requests, so denied headers should be asserted as absent or redacted according to the configured snapshot behavior.
 
 ---
 

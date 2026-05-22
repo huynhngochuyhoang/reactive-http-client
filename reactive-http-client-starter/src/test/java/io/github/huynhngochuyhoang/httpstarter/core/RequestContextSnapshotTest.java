@@ -10,6 +10,7 @@ import reactor.test.StepVerifier;
 import reactor.util.context.Context;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,7 +34,7 @@ class RequestContextSnapshotTest {
 
     @Test
     void capturesAndRestoresCorrelationIdAndInboundHeaders() {
-        Map<String, List<String>> inboundHeaders = new java.util.LinkedHashMap<>();
+        Map<String, List<String>> inboundHeaders = new LinkedHashMap<>();
         inboundHeaders.put("X-Request-Id", new ArrayList<>(List.of("req-7")));
         inboundHeaders.put("Authorization", new ArrayList<>(List.of("[REDACTED]")));
 
@@ -55,6 +56,51 @@ class RequestContextSnapshotTest {
         StepVerifier.create(restoredContextValues().contextWrite(snapshot::writeTo))
                 .expectNext("cid-1|req-7|[REDACTED]")
                 .verifyComplete();
+    }
+
+    @Test
+    void restoresSnapshotOverEmptySubscriberContext() {
+        RequestContextSnapshot snapshot = new RequestContextSnapshot("snapshot-cid",
+                Map.of("X-Request-Id", List.of("snapshot-req")));
+
+        StepVerifier.create(restoredContextValues().contextWrite(snapshot::writeTo))
+                .expectNext("snapshot-cid|snapshot-req|null")
+                .verifyComplete();
+    }
+
+    @Test
+    void snapshotRestoreOverridesExistingSubscriberContextValues() {
+        RequestContextSnapshot snapshot = new RequestContextSnapshot("snapshot-cid",
+                Map.of("X-Request-Id", List.of("snapshot-req")));
+
+        StepVerifier.create(restoredContextValues()
+                        .contextWrite(ctx -> snapshot.writeTo(RequestContext.withInboundHeaders(
+                                RequestContext.withCorrelationId(ctx, "subscriber-cid"),
+                                Map.of("X-Request-Id", List.of("subscriber-req"))))))
+                .expectNext("snapshot-cid|snapshot-req|null")
+                .verifyComplete();
+    }
+
+    @Test
+    void typedHelpersPreserveExistingStringKeyCompatibility() {
+        Context helperContext = RequestContext.withInboundHeaders(
+                RequestContext.withCorrelationId(Context.empty(), "helper-cid"),
+                Map.of("X-Request-Id", List.of("helper-req")));
+
+        assertThat(helperContext.<String>get(CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY))
+                .isEqualTo("helper-cid");
+        assertThat(helperContext.<Map<String, List<String>>>get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY))
+                .containsEntry("X-Request-Id", List.of("helper-req"));
+        assertThat(RequestContext.correlationId(helperContext)).contains("helper-cid");
+        assertThat(RequestContext.inboundHeaders(helperContext))
+                .containsEntry("X-Request-Id", List.of("helper-req"));
+
+        RequestContextSnapshot legacySnapshot = RequestContextSnapshot.capture(Context.of(
+                CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY, "legacy-cid",
+                InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY, Map.of("X-Legacy", List.of("legacy-value"))));
+
+        assertThat(legacySnapshot.correlationId()).isEqualTo("legacy-cid");
+        assertThat(legacySnapshot.inboundHeaders()).containsEntry("X-Legacy", List.of("legacy-value"));
     }
 
     @Test
