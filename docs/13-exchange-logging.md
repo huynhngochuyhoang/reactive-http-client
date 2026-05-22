@@ -222,7 +222,7 @@ Custom loggers receive raw values from `HttpExchangeLogContext`. Use `SensitiveH
 
 ## Inbound headers in log context
 
-`HttpExchangeLogContext.inboundHeaders()` contains a filtered snapshot of the inbound request headers from the calling WebFlux request (populated by `InboundHeadersWebFilter`). This is useful for correlating outbound calls with their originating request context.
+`HttpExchangeLogContext.inboundHeaders()` contains a filtered immutable snapshot of the inbound request headers from the calling WebFlux request (populated by `InboundHeadersWebFilter`). This is useful for correlating outbound calls with their originating request context. The snapshot preserves original header casing, applies allow-list / deny-list matching case-insensitively, and stores redacted values before loggers see them.
 
 Configure which headers are captured and which are redacted in:
 

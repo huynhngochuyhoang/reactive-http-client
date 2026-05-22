@@ -7,11 +7,7 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * {@link WebFilter} that captures a filtered snapshot of inbound request headers
@@ -56,7 +52,7 @@ public class InboundHeadersWebFilter implements WebFilter {
                 .contextWrite(ctx -> ctx.put(INBOUND_HEADERS_CONTEXT_KEY, snapshot));
     }
 
-    private Map<String, List<String>> filterHeaders(HttpHeaders headers) {
+    Map<String, List<String>> filterHeaders(HttpHeaders headers) {
         Map<String, List<String>> out = new LinkedHashMap<>();
         headers.forEach((name, values) -> {
             String lower = name.toLowerCase(Locale.ROOT);
@@ -66,9 +62,9 @@ public class InboundHeadersWebFilter implements WebFilter {
             if (denyList.contains(lower)) {
                 out.put(name, REDACTED_VALUE);
             } else {
-                out.put(name, values);
+                out.put(name, List.copyOf(values));
             }
         });
-        return out;
+        return Collections.unmodifiableMap(out);
     }
 }
