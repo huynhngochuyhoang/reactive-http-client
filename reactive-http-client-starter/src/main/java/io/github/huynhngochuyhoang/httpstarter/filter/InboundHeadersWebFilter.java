@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.filter;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.core.RequestContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
@@ -26,7 +27,7 @@ import java.util.*;
 public class InboundHeadersWebFilter implements WebFilter {
 
     /** Reactor context key under which the filtered inbound headers map is stored. */
-    public static final String INBOUND_HEADERS_CONTEXT_KEY = "inboundHeaders";
+    public static final String INBOUND_HEADERS_CONTEXT_KEY = RequestContext.INBOUND_HEADERS_CONTEXT_KEY;
 
     private static final List<String> REDACTED_VALUE = List.of("[REDACTED]");
 

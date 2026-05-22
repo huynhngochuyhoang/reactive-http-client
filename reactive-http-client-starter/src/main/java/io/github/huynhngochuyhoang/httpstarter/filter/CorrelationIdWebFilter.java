@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.filter;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.core.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -37,7 +38,7 @@ public class CorrelationIdWebFilter implements WebFilter {
     private static final Logger log = LoggerFactory.getLogger(CorrelationIdWebFilter.class);
 
     /** Reactor context key used to carry the correlation ID across reactive operator boundaries. */
-    public static final String CORRELATION_ID_CONTEXT_KEY = "correlationId";
+    public static final String CORRELATION_ID_CONTEXT_KEY = RequestContext.CORRELATION_ID_CONTEXT_KEY;
 
     /** HTTP header name for the correlation ID. */
     public static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
@@ -90,7 +91,7 @@ public class CorrelationIdWebFilter implements WebFilter {
         int maxLen = resolved.getMaxLength();
         List<String> mdcKeys = List.copyOf(resolved.getMdcKeys());
         return (request, next) -> Mono.deferContextual(ctx -> {
-            String correlationId = ctx.getOrDefault(CORRELATION_ID_CONTEXT_KEY, null);
+            String correlationId = RequestContext.correlationId(ctx).orElse(null);
             if (correlationId == null) {
                 correlationId = resolveFromMdc(mdcKeys);
             }

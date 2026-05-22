@@ -1,12 +1,12 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
-import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
 import org.springframework.util.CollectionUtils;
 import reactor.util.context.Context;
 import reactor.util.context.ContextView;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Immutable snapshot of starter-owned request context values that can be carried
@@ -17,7 +17,7 @@ public record RequestContextSnapshot(String correlationId, Map<String, List<Stri
     private static final RequestContextSnapshot EMPTY = new RequestContextSnapshot(null, Map.of());
 
     public RequestContextSnapshot {
-        inboundHeaders = immutableHeaders(inboundHeaders);
+        inboundHeaders = RequestContext.immutableHeaders(inboundHeaders);
     }
 
     /**
@@ -32,9 +32,8 @@ public record RequestContextSnapshot(String correlationId, Map<String, List<Stri
      */
     public static RequestContextSnapshot capture(ContextView context) {
         Objects.requireNonNull(context, "context must not be null");
-        String correlationId = context.getOrDefault(CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY, null);
-        Map<String, List<String>> inboundHeaders = context.getOrDefault(
-                InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY, Map.of());
+        String correlationId = RequestContext.correlationId(context).orElse(null);
+        Map<String, List<String>> inboundHeaders = RequestContext.inboundHeaders(context);
         if (correlationId == null && CollectionUtils.isEmpty(inboundHeaders)) {
             return EMPTY;
         }
@@ -50,10 +49,10 @@ public record RequestContextSnapshot(String correlationId, Map<String, List<Stri
         Objects.requireNonNull(context, "context must not be null");
         Context updated = context;
         if (correlationId != null) {
-            updated = updated.put(CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY, correlationId);
+            updated = RequestContext.withCorrelationId(updated, correlationId);
         }
         if (!inboundHeaders.isEmpty()) {
-            updated = updated.put(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY, inboundHeaders);
+            updated = RequestContext.withInboundHeaders(updated, inboundHeaders);
         }
         return updated;
     }
@@ -65,12 +64,4 @@ public record RequestContextSnapshot(String correlationId, Map<String, List<Stri
         return correlationId == null && inboundHeaders.isEmpty();
     }
 
-    private static Map<String, List<String>> immutableHeaders(Map<String, List<String>> headers) {
-        if (headers == null || headers.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, List<String>> copy = new LinkedHashMap<>();
-        headers.forEach((name, values) -> copy.put(name, List.copyOf(values != null ? values : List.of())));
-        return Collections.unmodifiableMap(copy);
-    }
 }

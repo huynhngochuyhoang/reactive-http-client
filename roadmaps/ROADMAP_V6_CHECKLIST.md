@@ -44,19 +44,19 @@
 
 ## Priority 3 — Precedence and public contract
 
-### [ ] 2.2 Context precedence and fallback audit
-- [ ] Document precedence for Reactor context, restored snapshot values, MDC
+### [x] 2.2 Context precedence and fallback audit
+- [x] Document precedence for Reactor context, restored snapshot values, MDC
   fallback, and caller-supplied outbound headers.
-- [ ] Test snapshot restore over empty subscriber context.
-- [ ] Test snapshot restore when subscriber context already has correlation ID
+- [x] Test snapshot restore over empty subscriber context.
+- [x] Test snapshot restore when subscriber context already has correlation ID
   and inbound headers.
-- [ ] Verify caller-supplied outbound headers still win where documented.
+- [x] Verify caller-supplied outbound headers still win where documented.
 
-### [ ] 2.1 Typed context-key and snapshot contract audit
-- [ ] List public Reactor context keys in docs.
-- [ ] Add typed accessors/helpers so new APIs do not require raw string keys.
-- [ ] Preserve existing string-key compatibility.
-- [ ] Add tests that old correlation ID and inbound header keys still work.
+### [x] 2.1 Typed context-key and snapshot contract audit
+- [x] List public Reactor context keys in docs.
+- [x] Add typed accessors/helpers so new APIs do not require raw string keys.
+- [x] Preserve existing string-key compatibility.
+- [x] Add tests that old correlation ID and inbound header keys still work.
 
 ---
 
