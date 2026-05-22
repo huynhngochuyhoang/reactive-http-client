@@ -96,6 +96,52 @@ public final class RecordedExchangeAssertions {
             return hasHeaderValues(name, REDACTED);
         }
 
+        public RecordedExchangeAssert hasCapturedCorrelationId(String expected) {
+            isNotNull();
+            if (!expected.equals(actual.correlationId())) {
+                failWithMessage("expected captured correlation ID <%s> but was <%s>",
+                        expected, actual.correlationId());
+            }
+            return myself;
+        }
+
+        public RecordedExchangeAssert doesNotHaveCapturedCorrelationId() {
+            isNotNull();
+            if (actual.correlationId() != null) {
+                failWithMessage("expected captured correlation ID to be absent but was <%s>",
+                        actual.correlationId());
+            }
+            return myself;
+        }
+
+        public RecordedExchangeAssert hasInboundHeader(String name, String value) {
+            return hasInboundHeaderValues(name, value);
+        }
+
+        public RecordedExchangeAssert hasInboundHeaderValues(String name, String... values) {
+            isNotNull();
+            List<String> actualValues = actual.inboundHeaders().get(name);
+            List<String> expected = Arrays.asList(values);
+            if (!expected.equals(actualValues)) {
+                failWithMessage("expected captured inbound header <%s> to have values <%s> but was <%s>",
+                        name, expected, actualValues);
+            }
+            return myself;
+        }
+
+        public RecordedExchangeAssert hasRedactedInboundHeader(String name) {
+            return hasInboundHeaderValues(name, REDACTED);
+        }
+
+        public RecordedExchangeAssert doesNotHaveInboundHeader(String name) {
+            isNotNull();
+            if (actual.inboundHeaders().containsKey(name)) {
+                failWithMessage("expected captured inbound header <%s> to be absent but was <%s>",
+                        name, actual.inboundHeaders().get(name));
+            }
+            return myself;
+        }
+
         public RecordedExchangeAssert doesNotHaveHeader(String name) {
             isNotNull();
             if (actual.headers().containsKey(name)) {

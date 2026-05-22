@@ -62,12 +62,12 @@
 
 ## Priority 4 — Test helper support
 
-### [ ] 1.2 Context-aware test helpers
-- [ ] Add assertions for captured correlation ID.
-- [ ] Add assertions for allowed inbound headers.
-- [ ] Add assertions for denied or absent inbound headers.
-- [ ] Add assertions for redacted inbound header values.
-- [ ] Add a documented `Sinks.Many` example proving capture on emit and restore
+### [x] 1.2 Context-aware test helpers
+- [x] Add assertions for captured correlation ID.
+- [x] Add assertions for allowed inbound headers.
+- [x] Add assertions for denied or absent inbound headers.
+- [x] Add assertions for redacted inbound header values.
+- [x] Add a documented `Sinks.Many` example proving capture on emit and restore
   on subscribe before an outbound mock client call.
 
 ---

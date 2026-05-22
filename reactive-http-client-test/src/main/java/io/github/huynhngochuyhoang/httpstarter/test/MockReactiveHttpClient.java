@@ -178,7 +178,8 @@ public final class MockReactiveHttpClient<T> {
             List<Matcher> liveMatchers = new CopyOnWriteArrayList<>(matchers);
             AtomicReference<ClientResponse> fallbackRef = new AtomicReference<>(fallback);
 
-            ExchangeFunction exchangeFunction = request -> {
+            ExchangeFunction exchangeFunction = request -> Mono.deferContextual(contextView -> {
+                RequestContextSnapshot contextSnapshot = RequestContextSnapshot.capture(contextView);
                 MockClientHttpRequest materialized = new MockClientHttpRequest(
                         request.method(), URI.create(request.url().toString()));
                 return request.writeTo(materialized, ExchangeStrategies.withDefaults())
@@ -186,7 +187,9 @@ public final class MockReactiveHttpClient<T> {
                             RecordedExchange requestExchange = new RecordedExchange(
                                     request.method(),
                                     URI.create(request.url().toString()),
-                                    materialized);
+                                    materialized,
+                                    contextSnapshot,
+                                    null);
                             exchanges.add(requestExchange);
                             ClientResponse response = fallbackRef.get();
                             for (Matcher matcher : liveMatchers) {
@@ -199,10 +202,11 @@ public final class MockReactiveHttpClient<T> {
                                     request.method(),
                                     URI.create(request.url().toString()),
                                     materialized,
+                                    contextSnapshot,
                                     response.statusCode()));
                             return response;
                         }));
-            };
+            });
 
             WebClient webClient = WebClient.builder()
                     .baseUrl(baseUrl)
