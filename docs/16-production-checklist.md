@@ -70,6 +70,9 @@ reactive:
 - Review metric tags before enabling high-cardinality fields such as resolved server address.
 - Use the published error categories from [Error Handling](03-error-handling.md) in alerts and dashboards.
 - Enable OpenTelemetry with the `reactive-http-client-otel` module when traces are required.
+- For async handoff through sinks, queues, or callbacks, restore request context explicitly before outbound calls.
+- Prefer explicit envelope fields for durable events: correlation ID, request ID, tenant-like low-cardinality keys, and trace context.
+- Do not place large or sensitive inbound header snapshots in long-lived queues. Use full `RequestContextSnapshot` only for short-lived in-process handoff.
 
 ## Logging and testing
 

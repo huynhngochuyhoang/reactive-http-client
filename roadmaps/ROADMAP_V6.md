@@ -1,9 +1,7 @@
 # Reactive HTTP Client — Roadmap V6
 
-> **Status:** draft after the V5 hardening release. V5 completed native/AOT
-> readiness, response envelope support, Problem Detail mapping, request-timeout
-> clarity, URI/body correctness, and release smoke coverage. V6 should focus on
-> context propagation across asynchronous boundaries, without turning the starter
+> **Status:** completed for `2.5.0` on 2026-05-22. V6 focused on explicit
+> context propagation across asynchronous boundaries without turning the starter
 > into an eventing framework.
 
 V6 keeps the same three-bucket shape:
@@ -55,12 +53,12 @@ their own event envelope.
 
 **Acceptance:**
 
-- [ ] A handler can capture the current request context and include it in an
+- [x] A handler can capture the current request context and include it in an
       application event envelope.
-- [ ] A sink subscriber can restore that snapshot before calling a
+- [x] A sink subscriber can restore that snapshot before calling a
       `@ReactiveHttpClient`.
-- [ ] Empty context produces an empty snapshot without errors.
-- [ ] Docs clearly state that sinks do not automatically carry Reactor context.
+- [x] Empty context produces an empty snapshot without errors.
+- [x] Docs clearly state that sinks do not automatically carry Reactor context.
 
 ---
 
@@ -82,9 +80,9 @@ test helper module focuses on HTTP exchanges, not request-context envelopes.
 
 **Acceptance:**
 
-- [ ] Tests can assert a captured correlation ID.
-- [ ] Tests can assert allowed, denied, and redacted inbound headers.
-- [ ] A documented sink example verifies context restoration before an outbound
+- [x] Tests can assert a captured correlation ID.
+- [x] Tests can assert allowed, denied, and redacted inbound headers.
+- [x] A documented sink example verifies context restoration before an outbound
       mock client call.
 
 ---
@@ -107,10 +105,10 @@ eventing library.
 
 **Acceptance:**
 
-- [ ] Built-in correlation ID and inbound headers are available through the SPI.
-- [ ] Optional contributors can be absent without changing starter behavior.
-- [ ] Restore order is tested and documented.
-- [ ] The SPI does not expose mutable internal maps or lists.
+- [x] Built-in correlation ID and inbound headers are available through the SPI.
+- [x] Optional contributors can be absent without changing starter behavior.
+- [x] Restore order is tested and documented.
+- [x] The SPI does not expose mutable internal maps or lists.
 
 ---
 
@@ -132,9 +130,9 @@ are also easy to collide with application code and hard to evolve.
 
 **Acceptance:**
 
-- [ ] Public context keys are listed in docs.
-- [ ] New snapshot APIs do not require users to reference raw string keys.
-- [ ] Existing correlation ID and inbound header context behavior remains
+- [x] Public context keys are listed in docs.
+- [x] New snapshot APIs do not require users to reference raw string keys.
+- [x] Existing correlation ID and inbound header context behavior remains
       backward compatible.
 
 ---
@@ -157,10 +155,10 @@ to debug.
 
 **Acceptance:**
 
-- [ ] Docs state precedence for correlation ID and inbound headers.
-- [ ] Tests cover snapshot restore over empty context.
-- [ ] Tests cover snapshot restore when subscriber context already has values.
-- [ ] Caller-supplied outbound headers still win where currently documented.
+- [x] Docs state precedence for correlation ID and inbound headers.
+- [x] Tests cover snapshot restore over empty context.
+- [x] Tests cover snapshot restore when subscriber context already has values.
+- [x] Caller-supplied outbound headers still win where currently documented.
 
 ---
 
@@ -180,9 +178,9 @@ observability defaults; V6 should extend that guidance to async handoff.
 
 **Acceptance:**
 
-- [ ] Docs include an async-context section with sink and queue examples.
-- [ ] Docs call out memory and cardinality risks.
-- [ ] The production checklist includes async-context handoff guidance.
+- [x] Docs include an async-context section with sink and queue examples.
+- [x] Docs call out memory and cardinality risks.
+- [x] The production checklist includes async-context handoff guidance.
 
 ---
 
@@ -202,10 +200,10 @@ more important because events may be consumed after the request has completed.
 
 **Acceptance:**
 
-- [ ] Tests prove mutating the original request headers does not mutate the
+- [x] Tests prove mutating the original request headers does not mutate the
       stored snapshot.
-- [ ] Tests prove mutating a returned snapshot is not possible.
-- [ ] Header order and multi-value values remain stable.
+- [x] Tests prove mutating a returned snapshot is not possible.
+- [x] Header order and multi-value values remain stable.
 
 ---
 
@@ -225,11 +223,11 @@ callbacks. The starter should document and test the boundaries it supports.
 
 **Acceptance:**
 
-- [ ] Tests show sink subscribers do not see emitter context unless a snapshot
+- [x] Tests show sink subscribers do not see emitter context unless a snapshot
       is carried explicitly.
-- [ ] Tests show restored snapshot values survive scheduler hops inside the
+- [x] Tests show restored snapshot values survive scheduler hops inside the
       subscriber chain.
-- [ ] No global Reactor hook is required for starter behavior.
+- [x] No global Reactor hook is required for starter behavior.
 
 ---
 
@@ -248,9 +246,9 @@ redaction must remain consistent across those consumers.
 
 **Acceptance:**
 
-- [ ] Mixed-case sensitive headers are denied/redacted consistently.
-- [ ] Snapshot restore cannot reintroduce raw denied header values.
-- [ ] Docs state casing behavior for captured inbound headers.
+- [x] Mixed-case sensitive headers are denied/redacted consistently.
+- [x] Snapshot restore cannot reintroduce raw denied header values.
+- [x] Docs state casing behavior for captured inbound headers.
 
 ---
 
