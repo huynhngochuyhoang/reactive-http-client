@@ -58,7 +58,8 @@ import java.util.function.Function;
  *   <li>Resolve arguments via {@link RequestArgumentResolver}</li>
  *   <li>Build and execute a WebClient request</li>
  *   <li>Decode errors with {@link DefaultErrorDecoder}</li>
- *   <li>Optionally apply timeout + Resilience4j operators (retry, circuit-breaker, bulkhead)</li>
+ *   <li>Optionally apply native request timeout, then Resilience4j operators
+ *       (retry -> rate-limiter -> circuit-breaker -> bulkhead)</li>
  * </ol>
  */
 public class ReactiveClientInvocationHandler implements InvocationHandler {
@@ -66,6 +67,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private static final Logger log = LoggerFactory.getLogger(ReactiveClientInvocationHandler.class);
     static final String OBSERVED_REQUEST_URL_ATTRIBUTE =
             ReactiveClientInvocationHandler.class.getName() + ".observedRequestUrl";
+    static final String RESILIENCE_OPERATOR_ORDER = "retry -> rate-limiter -> circuit-breaker -> bulkhead";
+    private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     private static final int MAX_LOGGER_CACHE_SIZE = 256;
     private static final int MAX_RESILIENCE_WARNING_KEYS = 256;
 
@@ -79,6 +82,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> loggerCache = new ConcurrentHashMap<>();
     private final AtomicBoolean loggerCacheLimitWarningLogged = new AtomicBoolean(false);
     private final Set<String> resilienceWarningKeys = ConcurrentHashMap.newKeySet();
+    private final Set<String> unsafeRetryWarningKeys = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean resilienceWarningKeysLimitWarningLogged = new AtomicBoolean(false);
 
     private final ResilienceOperatorApplier resilienceOperatorApplier;
@@ -279,7 +283,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), start.get());
                 }
                     });
-            flux = applyResilienceFlux(flux, plan, effectiveApi.httpMethod());
+            flux = applyResilienceFlux(flux, plan, effectiveApi.httpMethod(), resolved);
             if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
                 AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(Map.of());
                 AtomicBoolean reported = new AtomicBoolean(false);
@@ -329,7 +333,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), start.get());
             }
                 });
-        mono = applyResilienceMono(mono, plan, effectiveApi.httpMethod());
+        mono = applyResilienceMono(mono, plan, effectiveApi.httpMethod(), resolved);
         if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
             AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(Map.of());
             AtomicBoolean reported = new AtomicBoolean(false);
@@ -489,12 +493,17 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return innerArgs.length == 1 && DataBuffer.class.equals(innerArgs[0]);
     }
 
-    private Mono<?> applyResilienceMono(Mono<?> mono, RequestPlan plan, String httpMethod) {
+    private Mono<?> applyResilienceMono(Mono<?> mono,
+                                         RequestPlan plan,
+                                         String httpMethod,
+                                         RequestArgumentResolver.ResolvedArgs resolved) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null || !resilience.isEnabled()) return mono;
 
         if (isRetryableMethod(httpMethod)) {
-            mono = applyRetryMono(mono, resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry()));
+            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
+            logUnsafeRetryIfNeeded(plan, resilience, httpMethod, resolved, retryInstance);
+            mono = applyRetryMono(mono, retryInstance);
         }
         mono = applyRateLimiterMono(mono, resolveResilienceInstanceName(plan.rateLimiterInstanceName(), resilience.getRateLimiter()));
         mono = applyCircuitBreakerMono(mono, resolveResilienceInstanceName(plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker()));
@@ -502,12 +511,17 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return mono;
     }
 
-    private Flux<?> applyResilienceFlux(Flux<?> flux, RequestPlan plan, String httpMethod) {
+    private Flux<?> applyResilienceFlux(Flux<?> flux,
+                                        RequestPlan plan,
+                                        String httpMethod,
+                                        RequestArgumentResolver.ResolvedArgs resolved) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null || !resilience.isEnabled()) return flux;
 
         if (isRetryableMethod(httpMethod)) {
-            flux = applyRetryFlux(flux, resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry()));
+            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
+            logUnsafeRetryIfNeeded(plan, resilience, httpMethod, resolved, retryInstance);
+            flux = applyRetryFlux(flux, retryInstance);
         }
         flux = applyRateLimiterFlux(flux, resolveResilienceInstanceName(plan.rateLimiterInstanceName(), resilience.getRateLimiter()));
         flux = applyCircuitBreakerFlux(flux, resolveResilienceInstanceName(plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker()));
@@ -518,6 +532,49 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     /** Per-method override wins; otherwise the client-level config applies. */
     private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {
         return (methodLevel != null && !methodLevel.isBlank()) ? methodLevel : clientLevel;
+    }
+
+    private void logUnsafeRetryIfNeeded(RequestPlan plan,
+                                        ReactiveHttpClientProperties.ResilienceConfig resilience,
+                                        String httpMethod,
+                                        RequestArgumentResolver.ResolvedArgs resolved,
+                                        String retryInstance) {
+        if (effectiveRetrySafety(plan, httpMethod, resolved) != RetrySafetyClassification.UNSAFE_RETRY) {
+            return;
+        }
+        String methodName = plan.method() != null
+                ? plan.method().getDeclaringClass().getSimpleName() + "#" + plan.method().getName()
+                : plan.apiName();
+        String warningKey = clientName + ":" + methodName + ":" + httpMethod + ":" + retryInstance;
+        if (unsafeRetryWarningKeys.add(warningKey)) {
+            log.warn("Unsafe retry configured for reactive HTTP client [{}] method [{}] HTTP [{}]: "
+                            + "retry instance [{}] from [{}] is enabled for retry-methods {} without an explicit {} header. "
+                            + "Existing behavior is preserved; add an idempotency key or remove this method from retry-methods to avoid duplicate side effects.",
+                    clientName,
+                    methodName,
+                    httpMethod,
+                    retryInstance,
+                    plan.retryInstanceName() != null ? "method-level @Retry" : "client resilience.retry",
+                    resilience.getRetryMethods(),
+                    IDEMPOTENCY_KEY_HEADER);
+        }
+    }
+
+    private RetrySafetyClassification effectiveRetrySafety(RequestPlan plan,
+                                                            String httpMethod,
+                                                            RequestArgumentResolver.ResolvedArgs resolved) {
+        if (isSafeRetryMethod(httpMethod) || plan.retrySafety() == RetrySafetyClassification.SAFE_METHOD) {
+            return RetrySafetyClassification.SAFE_METHOD;
+        }
+        if (plan.retrySafety() == RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY
+                || resolved.headersIgnoreCase().containsKey(IDEMPOTENCY_KEY_HEADER)) {
+            return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
+        }
+        return RetrySafetyClassification.UNSAFE_RETRY;
+    }
+
+    static boolean isSafeRetryMethod(String httpMethod) {
+        return httpMethod != null && Set.of("GET", "HEAD").contains(httpMethod.toUpperCase(Locale.ROOT));
     }
 
     private long resolveTimeoutMs(MethodMetadata meta) {

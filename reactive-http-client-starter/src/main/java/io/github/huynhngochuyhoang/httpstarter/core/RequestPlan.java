@@ -35,7 +35,8 @@ record RequestPlan(
         String retryInstanceName,
         String circuitBreakerInstanceName,
         String bulkheadInstanceName,
-        String rateLimiterInstanceName
+        String rateLimiterInstanceName,
+        RetrySafetyClassification retrySafety
 ) {
 
     static RequestPlan from(MethodMetadata meta) {
@@ -60,7 +61,8 @@ record RequestPlan(
                 meta.getRetryInstanceName(),
                 meta.getCircuitBreakerInstanceName(),
                 meta.getBulkheadInstanceName(),
-                meta.getRateLimiterInstanceName());
+                meta.getRateLimiterInstanceName(),
+                retrySafety(meta.getHttpMethod(), meta.getHeaderParams()));
     }
 
     private static List<NamedArgumentBinding> namedBindings(Map<Integer, String> source) {
@@ -79,6 +81,17 @@ record RequestPlan(
         return source.entrySet().stream()
                 .map(entry -> new FormFileBinding(entry.getKey(), entry.getValue()))
                 .toList();
+    }
+
+    private static RetrySafetyClassification retrySafety(String httpMethod, Map<Integer, String> headerParams) {
+        if (httpMethod != null && Set.of("GET", "HEAD").contains(httpMethod.toUpperCase(java.util.Locale.ROOT))) {
+            return RetrySafetyClassification.SAFE_METHOD;
+        }
+        boolean hasIdempotencyKeyHeader = headerParams.values().stream()
+                .anyMatch(name -> "Idempotency-Key".equalsIgnoreCase(name));
+        return hasIdempotencyKeyHeader
+                ? RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY
+                : RetrySafetyClassification.UNSAFE_RETRY;
     }
 
     record NamedArgumentBinding(int argumentIndex, String name) {}

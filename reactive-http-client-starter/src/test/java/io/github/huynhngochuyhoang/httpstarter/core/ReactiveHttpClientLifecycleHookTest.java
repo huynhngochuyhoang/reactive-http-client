@@ -5,9 +5,14 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
 import io.github.huynhngochuyhoang.httpstarter.annotation.QueryParam;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
+import io.github.resilience4j.bulkhead.Bulkhead;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.ratelimiter.RateLimiter;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
@@ -120,6 +125,80 @@ class ReactiveHttpClientLifecycleHookTest {
                 "hook:start:1:get",
                 "hook:retry:2:get",
                 "hook:success:2:200"), events);
+    }
+
+    @Test
+    void shouldNotifyRetryExhaustionOnce() throws Throwable {
+        List<String> events = new ArrayList<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> Mono.error(new IllegalStateException("downstream failed")))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, List.of(new RecordingHook("hook", events)),
+                retryOnceApplier(), retryConfig());
+
+        StepVerifier.create(invokeGet(handler, "42"))
+                .expectError(IllegalStateException.class)
+                .verify();
+
+        assertEquals(List.of(
+                "hook:start:1:get",
+                "hook:retry:2:get",
+                "hook:error:2:null:IllegalStateException"), events);
+    }
+
+    @Test
+    void shouldNotifyLifecycleAndObserverOnceWhenBulkheadRejects() throws Throwable {
+        List<String> events = new ArrayList<>();
+        List<HttpClientObserverEvent> observed = new ArrayList<>();
+        Throwable rejection = BulkheadFullException.createBulkheadFullException(Bulkhead.ofDefaults("orders"));
+        ReactiveClientInvocationHandler handler = createHandler(okWebClient(), List.of(new RecordingHook("hook", events)),
+                bulkheadRejectingApplier(rejection), retryConfig(), observed::add);
+
+        StepVerifier.create(invokeGet(handler, "42"))
+                .expectError(BulkheadFullException.class)
+                .verify();
+
+        assertEquals(List.of("hook:error:0:null:BulkheadFullException"), events);
+        assertEquals(1, observed.size());
+        assertEquals(ErrorCategory.RESILIENCE_ERROR, observed.get(0).getErrorCategory());
+    }
+
+    @Test
+    void shouldNotifyLifecycleAndObserverOnceWhenRateLimiterRejects() throws Throwable {
+        List<String> events = new ArrayList<>();
+        List<HttpClientObserverEvent> observed = new ArrayList<>();
+        Throwable rejection = RequestNotPermitted.createRequestNotPermitted(RateLimiter.ofDefaults("orders"));
+        ReactiveClientInvocationHandler handler = createHandler(okWebClient(), List.of(new RecordingHook("hook", events)),
+                rateLimiterRejectingApplier(rejection), retryConfig(), observed::add);
+
+        StepVerifier.create(invokeGet(handler, "42"))
+                .expectError(RequestNotPermitted.class)
+                .verify();
+
+        assertEquals(List.of("hook:error:0:null:RequestNotPermitted"), events);
+        assertEquals(1, observed.size());
+        assertEquals(ErrorCategory.RESILIENCE_ERROR, observed.get(0).getErrorCategory());
+    }
+
+    @Test
+    void shouldNotifyLifecycleAndObserverOnceWhenTimeoutOccurs() throws Throwable {
+        List<String> events = new ArrayList<>();
+        List<HttpClientObserverEvent> observed = new ArrayList<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> Mono.error(io.netty.handler.timeout.ReadTimeoutException.INSTANCE))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, List.of(new RecordingHook("hook", events)),
+                new NoopResilienceOperatorApplier(), defaultConfig(), observed::add);
+
+        StepVerifier.create(invokeGet(handler, "42"))
+                .expectError(io.netty.handler.timeout.ReadTimeoutException.class)
+                .verify();
+
+        assertEquals(List.of("hook:start:1:get", "hook:error:1:null:ReadTimeoutException"), events);
+        assertEquals(1, observed.size());
+        assertEquals(ErrorCategory.TIMEOUT, observed.get(0).getErrorCategory());
     }
 
     @Test
@@ -319,6 +398,24 @@ class ReactiveHttpClientLifecycleHookTest {
         };
     }
 
+    private static ResilienceOperatorApplier bulkheadRejectingApplier(Throwable rejection) {
+        return new NoopResilienceOperatorApplier() {
+            @Override
+            public <T> Mono<T> applyBulkhead(Mono<T> mono, String instanceName) {
+                return Mono.error(rejection);
+            }
+        };
+    }
+
+    private static ResilienceOperatorApplier rateLimiterRejectingApplier(Throwable rejection) {
+        return new NoopResilienceOperatorApplier() {
+            @Override
+            public <T> Mono<T> applyRateLimiter(Mono<T> mono, String instanceName) {
+                return Mono.error(rejection);
+            }
+        };
+    }
+
     interface LifecycleClient {
         @GET("/items/{id}")
         Mono<String> get(@PathVar("id") String id);
@@ -366,6 +463,12 @@ class ReactiveHttpClientLifecycleHookTest {
         @Override
         public void onCancel(ReactiveHttpClientLifecycleContext context) {
             events.add(name + ":cancel:" + context.attemptNumber());
+        }
+
+        @Override
+        public void onError(ReactiveHttpClientLifecycleContext context) {
+            events.add(name + ":error:" + context.attemptNumber() + ":"
+                    + context.statusCode() + ":" + context.error().getClass().getSimpleName());
         }
     }
 

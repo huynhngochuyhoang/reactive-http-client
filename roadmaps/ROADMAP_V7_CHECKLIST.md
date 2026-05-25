@@ -7,29 +7,29 @@
 
 ## Priority 1 — Retry Safety and Operator Diagnostics
 
-### [ ] 1.2 Retry safety policy for unsafe methods
-- [ ] Add retry-safety classification to method metadata plans.
-- [ ] Classify safe HTTP methods separately from unsafe methods.
-- [ ] Detect explicit idempotency signals for unsafe methods.
-- [ ] Add diagnostics for unsafe retry with client name, method, HTTP method,
+### [x] 1.2 Retry safety policy for unsafe methods
+- [x] Add retry-safety classification to method metadata plans.
+- [x] Classify safe HTTP methods separately from unsafe methods.
+- [x] Detect explicit idempotency signals for unsafe methods.
+- [x] Add diagnostics for unsafe retry with client name, method, HTTP method,
   and retry source.
-- [ ] Preserve compatibility unless a stricter policy is explicitly enabled.
-- [ ] Ensure retry-safety logic is inactive when retry support is absent.
-- [ ] Document retry-safety behavior for annotations, `@ApiRef`, and per-client
+- [x] Preserve compatibility unless a stricter policy is explicitly enabled.
+- [x] Ensure retry-safety logic is inactive when retry support is absent.
+- [x] Document retry-safety behavior for annotations, `@ApiRef`, and per-client
   resilience settings.
 
-### [ ] 2.1 Resilience operator order and diagnostics audit
-- [ ] Re-audit the actual retry, circuit-breaker, bulkhead, rate-limiter,
+### [x] 2.1 Resilience operator order and diagnostics audit
+- [x] Re-audit the actual retry, circuit-breaker, bulkhead, rate-limiter,
   timeout, observer, hook, and decoder order.
-- [ ] Document the final operator order in one canonical place.
-- [ ] Add tests for retry success terminal signals.
-- [ ] Add tests for retry exhaustion terminal signals.
-- [ ] Add tests for bulkhead rejection and rate-limit rejection terminal
+- [x] Document the final operator order in one canonical place.
+- [x] Add tests for retry success terminal signals.
+- [x] Add tests for retry exhaustion terminal signals.
+- [x] Add tests for bulkhead rejection and rate-limit rejection terminal
   signals.
-- [ ] Add tests for timeout and cancellation terminal signals.
-- [ ] Include active resilience operators in startup diagnostics per client and
+- [x] Add tests for timeout and cancellation terminal signals.
+- [x] Include active resilience operators in startup diagnostics per client and
   per method where applicable.
-- [ ] Verify published resilience error categories remain stable.
+- [x] Verify published resilience error categories remain stable.
 
 ---
 
