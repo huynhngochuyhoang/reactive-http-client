@@ -194,6 +194,37 @@ policy explicit for larger payloads, malformed media types, and mapper fallback.
 
 ---
 
+### 2.4 Final outbound request diagnostics
+
+**Why:** `DefaultHttpExchangeLogger` currently logs headers from the declarative
+method argument resolution step. Headers added later by `WebClient` filters,
+including `ReactiveHttpClientCustomizer`, auth, tracing, or correlation filters,
+may be sent downstream but not appear in the logged `requestHeaders`. That makes
+production debugging confusing when users need to verify final outbound headers.
+
+**What:**
+
+- Capture final outbound request method, URL, and headers after the `WebClient`
+  filter chain has applied request mutations.
+- Feed final request headers into exchange logging and observer diagnostics when
+  available.
+- Preserve existing sensitive-header redaction rules.
+- Do not buffer or duplicate request bodies to improve logging.
+- Document the difference between declarative headers and final outbound
+  headers.
+
+**Acceptance:**
+
+- [ ] Headers added by a `ReactiveHttpClientCustomizer` filter appear in default
+      exchange logs when header logging is enabled.
+- [ ] Built-in auth, correlation, and tracing headers are visible or redacted
+      according to existing sensitive-header policy.
+- [ ] Final request diagnostics do not change the actual outbound request.
+- [ ] Streaming or non-repeatable bodies are not buffered for diagnostics.
+- [ ] Docs explain where to look when debugging customizer-added headers.
+
+---
+
 ## 3. Bugs / correctness to fix
 
 ### 3.1 Duplicate lifecycle and observer signals under retry
@@ -273,5 +304,6 @@ state or shared builders.
 2. Non-repeatable body detection and retry behavior.
 3. Idempotency key support and header precedence.
 4. Test-helper retry/idempotency assertions.
-5. Error body capture and timeout layering audits.
-6. Documentation and release readiness.
+5. Final outbound request diagnostics.
+6. Error body capture and timeout layering audits.
+7. Documentation and release readiness.

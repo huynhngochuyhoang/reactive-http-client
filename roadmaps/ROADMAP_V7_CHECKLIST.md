@@ -88,7 +88,25 @@
 
 ---
 
-## Priority 5 — Error Body and Timeout Correctness
+## Priority 5 — Final Outbound Request Diagnostics
+
+### [ ] 2.4 Final outbound request diagnostics
+- [ ] Capture final outbound request method, URL, and headers after `WebClient`
+  filters mutate the request.
+- [ ] Feed final request headers into default exchange logging when available.
+- [ ] Feed final request metadata into observer diagnostics when available.
+- [ ] Verify headers added by `ReactiveHttpClientCustomizer` filters appear in
+  exchange logs when header logging is enabled.
+- [ ] Verify built-in auth, correlation, and tracing headers use existing
+  sensitive-header redaction rules.
+- [ ] Verify final request diagnostics do not change the outbound request.
+- [ ] Verify streaming or non-repeatable bodies are not buffered for diagnostics.
+- [ ] Document declarative headers versus final outbound headers in customizer
+  and exchange-logging docs.
+
+---
+
+## Priority 6 — Error Body and Timeout Correctness
 
 ### [ ] 2.3 Error body capture policy audit
 - [ ] Document default retained error body size for exceptions.
@@ -111,7 +129,7 @@
 
 ---
 
-## Priority 6 — Retry Signal Semantics and Release Readiness
+## Priority 7 — Retry Signal Semantics and Release Readiness
 
 ### [ ] 3.1 Duplicate lifecycle and observer signals under retry
 - [ ] Audit lifecycle hook invocation points around retries.
@@ -132,6 +150,8 @@
 - [ ] Configuration metadata is updated if new properties are added.
 - [ ] Retry and idempotency behavior is documented without implying automatic
   business idempotency.
+- [ ] Final outbound request diagnostics are documented without implying body
+  buffering or unredacted sensitive-header logging.
 - [ ] Non-repeatable body behavior is documented without implying large-body
   buffering.
 - [ ] `mvn test` passes.
