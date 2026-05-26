@@ -566,15 +566,21 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (isSafeRetryMethod(httpMethod) || plan.retrySafety() == RetrySafetyClassification.SAFE_METHOD) {
             return RetrySafetyClassification.SAFE_METHOD;
         }
-        if (plan.retrySafety() == RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY
-                || resolved.headersIgnoreCase().containsKey(IDEMPOTENCY_KEY_HEADER)) {
+        if (hasIdempotencyKeyHeaderValue(resolved.headersIgnoreCase())) {
             return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
         }
         return RetrySafetyClassification.UNSAFE_RETRY;
     }
 
+    private static boolean hasIdempotencyKeyHeaderValue(Map<String, String> headersIgnoreCase) {
+        String value = headersIgnoreCase.get(IDEMPOTENCY_KEY_HEADER);
+        return StringUtils.hasText(value);
+    }
+
     static boolean isSafeRetryMethod(String httpMethod) {
-        return httpMethod != null && Set.of("GET", "HEAD").contains(httpMethod.toUpperCase(Locale.ROOT));
+        return httpMethod != null
+                && Set.of("GET", "HEAD", "PUT", "DELETE", "OPTIONS", "TRACE")
+                .contains(httpMethod.toUpperCase(Locale.ROOT));
     }
 
     private long resolveTimeoutMs(MethodMetadata meta) {

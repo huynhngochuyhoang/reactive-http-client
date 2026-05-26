@@ -84,7 +84,7 @@ record RequestPlan(
     }
 
     private static RetrySafetyClassification retrySafety(String httpMethod, Map<Integer, String> headerParams) {
-        if (httpMethod != null && Set.of("GET", "HEAD").contains(httpMethod.toUpperCase(java.util.Locale.ROOT))) {
+        if (ReactiveClientInvocationHandler.isSafeRetryMethod(httpMethod)) {
             return RetrySafetyClassification.SAFE_METHOD;
         }
         boolean hasIdempotencyKeyHeader = headerParams.values().stream()

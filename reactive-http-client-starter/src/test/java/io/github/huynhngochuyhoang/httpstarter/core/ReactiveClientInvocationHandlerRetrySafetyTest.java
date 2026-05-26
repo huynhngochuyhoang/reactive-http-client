@@ -1,8 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
-import io.github.huynhngochuyhoang.httpstarter.annotation.HeaderParam;
-import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
+import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
@@ -53,6 +51,44 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
                 .verifyComplete();
 
         assertThat(attempts).hasValue(2);
+        assertThat(output.getOut()).doesNotContain("Unsafe retry configured");
+    }
+
+    @Test
+    void retryEnabledPostWithNullIdempotencyKeyWarnsButKeepsCompatibility(CapturedOutput output) {
+        AtomicInteger attempts = new AtomicInteger();
+        ReactiveClientInvocationHandler handler = createHandler(flakyThenOk(attempts), true, Set.of("POST"));
+
+        StepVerifier.create(invoke(handler, "createWithIdempotencyKey", (Object) null))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(attempts).hasValue(2);
+        assertThat(output.getOut())
+                .contains("Unsafe retry configured for reactive HTTP client [test-client]")
+                .contains("RetrySafetyClient#createWithIdempotencyKey")
+                .contains("HTTP [POST]")
+                .contains("Idempotency-Key");
+    }
+
+    @Test
+    void retryEnabledIdempotentWriteMethodsDoNotWarn(CapturedOutput output) {
+        AtomicInteger putAttempts = new AtomicInteger();
+        ReactiveClientInvocationHandler putHandler = createHandler(flakyThenOk(putAttempts), true, Set.of("PUT", "DELETE"));
+
+        StepVerifier.create(invoke(putHandler, "replaceIdempotently"))
+                .expectNext("ok")
+                .verifyComplete();
+
+        AtomicInteger deleteAttempts = new AtomicInteger();
+        ReactiveClientInvocationHandler deleteHandler = createHandler(flakyThenOk(deleteAttempts), true, Set.of("PUT", "DELETE"));
+
+        StepVerifier.create(invoke(deleteHandler, "deleteIdempotently"))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(putAttempts).hasValue(2);
+        assertThat(deleteAttempts).hasValue(2);
         assertThat(output.getOut()).doesNotContain("Unsafe retry configured");
     }
 
@@ -168,5 +204,11 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
 
         @POST("/safe-write")
         Mono<String> createWithIdempotencyKey(@HeaderParam("Idempotency-Key") String idempotencyKey);
+
+        @PUT("/replace")
+        Mono<String> replaceIdempotently();
+
+        @DELETE("/delete")
+        Mono<String> deleteIdempotently();
     }
 }

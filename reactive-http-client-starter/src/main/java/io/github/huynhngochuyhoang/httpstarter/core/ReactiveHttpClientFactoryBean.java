@@ -702,7 +702,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     resolveResilienceInstanceName(plan.rateLimiterInstanceName(), resilience.getRateLimiter()),
                     resolveResilienceInstanceName(plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker()),
                     resolveResilienceInstanceName(plan.bulkheadInstanceName(), resilience.getBulkhead()),
-                    diagnosticRetrySafety(plan, httpMethod),
+                    diagnosticRetrySafety(plan, httpMethod, clientConfig),
                     ReactiveClientInvocationHandler.RESILIENCE_OPERATOR_ORDER);
         }
     }
@@ -726,12 +726,26 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 && resilience.getRetryMethods().contains(httpMethod.toUpperCase(Locale.ROOT));
     }
 
-    private static RetrySafetyClassification diagnosticRetrySafety(RequestPlan plan, String httpMethod) {
+    private static RetrySafetyClassification diagnosticRetrySafety(RequestPlan plan,
+                                                                    String httpMethod,
+                                                                    ReactiveHttpClientProperties.ClientConfig clientConfig) {
         if (ReactiveClientInvocationHandler.isSafeRetryMethod(httpMethod)
                 || plan.retrySafety() == RetrySafetyClassification.SAFE_METHOD) {
             return RetrySafetyClassification.SAFE_METHOD;
         }
+        if (hasDefaultIdempotencyKeyHeaderValue(clientConfig)) {
+            return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
+        }
         return plan.retrySafety();
+    }
+
+    private static boolean hasDefaultIdempotencyKeyHeaderValue(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (clientConfig.getDefaultHeaders() == null) {
+            return false;
+        }
+        return clientConfig.getDefaultHeaders().entrySet().stream()
+                .anyMatch(entry -> "Idempotency-Key".equalsIgnoreCase(entry.getKey())
+                        && StringUtils.hasText(entry.getValue()));
     }
 
     private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {

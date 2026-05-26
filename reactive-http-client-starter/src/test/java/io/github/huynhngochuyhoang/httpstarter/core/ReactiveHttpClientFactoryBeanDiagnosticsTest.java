@@ -3,10 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
-import io.github.huynhngochuyhoang.httpstarter.annotation.HeaderParam;
-import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
-import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
@@ -119,7 +116,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.getResilience().setEnabled(true);
-        config.getResilience().setRetryMethods(java.util.Set.of("GET", "POST"));
+        config.getResilience().setRetryMethods(java.util.Set.of("GET", "POST", "PUT"));
         properties.getClients().put("diagnostic-client", config);
 
         ReactiveHttpClientFactoryBean<ResilienceDiagnosticClient> factoryBean =
@@ -130,9 +127,38 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
             assertThat(output.getOut())
                     .contains("method [ResilienceDiagnosticClient#read] resilience")
                     .contains("retrySafety=SAFE_METHOD")
+                    .contains("method [ResilienceDiagnosticClient#replace] resilience")
+                    .contains("retrySafety=SAFE_METHOD")
                     .contains("method [ResilienceDiagnosticClient#write] resilience")
                     .contains("retrySafety=EXPLICIT_IDEMPOTENCY_KEY")
                     .contains("operatorOrder=retry -> rate-limiter -> circuit-breaker -> bulkhead");
+        } finally {
+            logger.setLevel(previousLevel);
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void debugStartupDiagnosticsReflectDefaultIdempotencyKey(CapturedOutput output) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.setDefaultHeaders(Map.of("Idempotency-Key", "configured-key"));
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        properties.getClients().put("diagnostic-client", config);
+
+        ReactiveHttpClientFactoryBean<DefaultIdempotencyKeyDiagnosticClient> factoryBean =
+                buildFactoryBean(properties, DefaultIdempotencyKeyDiagnosticClient.class);
+        try {
+            factoryBean.getObject();
+
+            assertThat(output.getOut())
+                    .contains("method [DefaultIdempotencyKeyDiagnosticClient#create] resilience")
+                    .contains("retrySafety=EXPLICIT_IDEMPOTENCY_KEY");
         } finally {
             logger.setLevel(previousLevel);
             factoryBean.destroy();
@@ -406,6 +432,15 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
         @POST("/write")
         Mono<String> write(@HeaderParam("Idempotency-Key") String idempotencyKey);
+
+        @PUT("/replace")
+        Mono<String> replace();
+    }
+
+    @ReactiveHttpClient(name = "diagnostic-client")
+    interface DefaultIdempotencyKeyDiagnosticClient {
+        @POST("/create")
+        Mono<String> create();
     }
 
     @ReactiveHttpClient(name = "annotation-url-client", baseUrl = "http://annotation.example")
