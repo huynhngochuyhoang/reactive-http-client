@@ -119,7 +119,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
 
         if (config.getResilience() != null && config.getResilience().isEnabled()) {
             validatePerMethodResilienceInstances(type, metadataCache, resilienceOperatorApplier, clientName);
-            logMethodResilienceDiagnostics(type, metadataCache, config, clientName);
+            logMethodResilienceDiagnostics(type, metadataCache, config, resilienceOperatorApplier, clientName);
         }
 
         ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
@@ -670,6 +670,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     private void logMethodResilienceDiagnostics(Class<?> clientInterface,
                                                 MethodMetadataCache metadataCache,
                                                 ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                ResilienceOperatorApplier resilienceOperatorApplier,
                                                 String clientName) {
         if (!log.isDebugEnabled()) {
             return;
@@ -688,7 +689,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             }
             RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
             String httpMethod = diagnosticHttpMethod(meta, clientConfig);
-            boolean retryEnabled = isRetryMethodEnabled(resilience, httpMethod);
+            boolean retryEnabled = isRetryMethodEnabled(resilience, httpMethod)
+                    && resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY);
             String retryInstance = retryEnabled
                     ? resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry())
                     : "disabled";

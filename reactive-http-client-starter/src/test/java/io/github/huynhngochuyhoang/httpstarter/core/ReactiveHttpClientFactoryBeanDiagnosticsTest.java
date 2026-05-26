@@ -165,6 +165,32 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         }
     }
 
+
+    @Test
+    void debugStartupDiagnosticsDisableRetryWhenRetryOperatorIsUnavailable(CapturedOutput output) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        properties.getClients().put("diagnostic-client", config);
+
+        ReactiveHttpClientFactoryBean<DefaultIdempotencyKeyDiagnosticClient> factoryBean =
+                buildFactoryBean(properties, DefaultIdempotencyKeyDiagnosticClient.class);
+        try {
+            factoryBean.getObject();
+
+            assertThat(output.getOut())
+                    .contains("method [DefaultIdempotencyKeyDiagnosticClient#create] resilience: httpMethod=POST, retry=disabled");
+        } finally {
+            logger.setLevel(previousLevel);
+            factoryBean.destroy();
+        }
+    }
+
     @Test
     void failsFastWhenProxyPortIsSetWithoutHost() {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
