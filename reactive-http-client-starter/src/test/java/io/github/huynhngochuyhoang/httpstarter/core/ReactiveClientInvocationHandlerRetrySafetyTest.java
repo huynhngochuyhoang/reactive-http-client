@@ -111,6 +111,37 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
                 .contains("Idempotency-Key");
     }
 
+
+    @Test
+    void unsafeRetryWarningDoesNotLogWhenRetryOperatorIsNoop(CapturedOutput output) {
+        AtomicInteger attempts = new AtomicInteger();
+        ReactiveClientInvocationHandler handler = createHandler(
+                flakyThenOk(attempts), true, Set.of("POST"), new NoopResilienceOperatorApplier());
+
+        StepVerifier.create(invoke(handler, "createWithoutIdempotencyKey"))
+                .expectError()
+                .verify();
+
+        assertThat(attempts).hasValue(1);
+        assertThat(output.getOut()).doesNotContain("Unsafe retry configured");
+    }
+
+    @Test
+    void unsafeRetryWarningDedupKeyIncludesOverloadedMethodSignature(CapturedOutput output) {
+        ReactiveClientInvocationHandler handler = createHandler(ok(new AtomicInteger()), true, Set.of("POST"));
+
+        StepVerifier.create(invokeOverloadedCreate(handler, String.class, "one"))
+                .expectNext("ok")
+                .verifyComplete();
+        StepVerifier.create(invokeOverloadedCreate(handler, Integer.class, 1))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(output.getOut())
+                .contains("RetrySafetyClient#create(String)")
+                .contains("RetrySafetyClient#create(Integer)");
+    }
+
     @Test
     void retrySafetyLogicDoesNotRunWhenResilienceIsDisabled(CapturedOutput output) {
         AtomicInteger attempts = new AtomicInteger();
@@ -168,6 +199,31 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
                 .waitDuration(Duration.ZERO)
                 .build();
 
+        return createHandler(
+                webClient,
+                resilienceEnabled,
+                retryMethods,
+                new Resilience4jOperatorApplier(null, RetryRegistry.of(retryConfig), null, null));
+    }
+
+    private static ReactiveClientInvocationHandler createHandler(WebClient webClient,
+                                                                 boolean resilienceEnabled,
+                                                                 Set<String> retryMethods,
+                                                                 ResilienceOperatorApplier resilienceOperatorApplier) {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(resilienceEnabled);
+        resilience.setRetry("default");
+        resilience.setRetryMethods(retryMethods);
+        config.setResilience(resilience);
+
+        ApplicationContext appCtx = mock(ApplicationContext.class);
+        ObjectProvider<io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver> observerProvider =
+                mock(ObjectProvider.class);
+        when(appCtx.getBeanProvider(io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver.class))
+                .thenReturn(observerProvider);
+        when(observerProvider.getIfAvailable()).thenReturn(null);
+
         return new ReactiveClientInvocationHandler(
                 webClient,
                 new MethodMetadataCache(),
@@ -176,10 +232,20 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
                 config,
                 "test-client",
                 appCtx,
-                new Resilience4jOperatorApplier(null, RetryRegistry.of(retryConfig), null, null),
+                resilienceOperatorApplier,
                 null,
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Mono<String> invokeOverloadedCreate(ReactiveClientInvocationHandler handler, Class<?> parameterType, Object arg) {
+        try {
+            Method method = RetrySafetyClient.class.getMethod("create", parameterType);
+            return (Mono<String>) handler.invoke(null, method, new Object[]{arg});
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -210,5 +276,11 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
 
         @DELETE("/delete")
         Mono<String> deleteIdempotently();
+
+        @POST("/create-string")
+        Mono<String> create(String name);
+
+        @POST("/create-integer")
+        Mono<String> create(Integer id);
     }
 }

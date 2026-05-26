@@ -502,7 +502,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         if (isRetryableMethod(httpMethod)) {
             String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
-            logUnsafeRetryIfNeeded(plan, resilience, httpMethod, resolved, retryInstance);
+            if (isRetryOperatorAvailable()) {
+                logUnsafeRetryIfNeeded(plan, resilience, httpMethod, resolved, retryInstance);
+            }
             mono = applyRetryMono(mono, retryInstance);
         }
         mono = applyRateLimiterMono(mono, resolveResilienceInstanceName(plan.rateLimiterInstanceName(), resilience.getRateLimiter()));
@@ -520,7 +522,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         if (isRetryableMethod(httpMethod)) {
             String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
-            logUnsafeRetryIfNeeded(plan, resilience, httpMethod, resolved, retryInstance);
+            if (isRetryOperatorAvailable()) {
+                logUnsafeRetryIfNeeded(plan, resilience, httpMethod, resolved, retryInstance);
+            }
             flux = applyRetryFlux(flux, retryInstance);
         }
         flux = applyRateLimiterFlux(flux, resolveResilienceInstanceName(plan.rateLimiterInstanceName(), resilience.getRateLimiter()));
@@ -542,9 +546,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (effectiveRetrySafety(plan, httpMethod, resolved) != RetrySafetyClassification.UNSAFE_RETRY) {
             return;
         }
-        String methodName = plan.method() != null
-                ? plan.method().getDeclaringClass().getSimpleName() + "#" + plan.method().getName()
-                : plan.apiName();
+        String methodName = methodSignature(plan);
         String warningKey = clientName + ":" + methodName + ":" + httpMethod + ":" + retryInstance;
         if (unsafeRetryWarningKeys.add(warningKey)) {
             log.warn("Unsafe retry configured for reactive HTTP client [{}] method [{}] HTTP [{}]: "
@@ -558,6 +560,21 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     resilience.getRetryMethods(),
                     IDEMPOTENCY_KEY_HEADER);
         }
+    }
+
+    private boolean isRetryOperatorAvailable() {
+        return resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY);
+    }
+
+    private String methodSignature(RequestPlan plan) {
+        Method method = plan.method();
+        if (method == null) {
+            return plan.apiName();
+        }
+        String parameters = Arrays.stream(method.getParameterTypes())
+                .map(Class::getSimpleName)
+                .collect(java.util.stream.Collectors.joining(","));
+        return method.getDeclaringClass().getSimpleName() + "#" + method.getName() + "(" + parameters + ")";
     }
 
     private RetrySafetyClassification effectiveRetrySafety(RequestPlan plan,

@@ -47,4 +47,9 @@ public class NoopResilienceOperatorApplier implements ResilienceOperatorApplier 
     public <T> Flux<T> applyRateLimiter(Flux<T> flux, String instanceName) {
         return flux;
     }
+    @Override
+    public boolean isOperatorAvailable(InstanceType type) {
+        return false;
+    }
+
 }
