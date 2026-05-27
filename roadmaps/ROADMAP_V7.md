@@ -160,12 +160,12 @@ empty body. Users need the starter to avoid hiding this class of production bug.
 
 **Acceptance:**
 
-- [ ] Tests cover retry with JSON body, form body, multipart body, and raw
+- [x] Tests cover retry with JSON body, form body, multipart body, and raw
       publisher body.
-- [ ] Non-repeatable body paths do not retry silently when retry-safety policy
+- [x] Non-repeatable body paths do not retry silently when retry-safety policy
       is enabled.
-- [ ] Docs explain which body types are repeatable, risky, or application-owned.
-- [ ] No new behavior buffers large request bodies just to make retry possible.
+- [x] Docs explain which body types are repeatable, risky, or application-owned.
+- [x] No new behavior buffers large request bodies just to make retry possible.
 
 ---
 

@@ -10,14 +10,20 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -109,6 +115,75 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
                 .contains("retry instance [default]")
                 .contains("retry-methods [POST]")
                 .contains("Idempotency-Key");
+    }
+
+    @Test
+    void retryEnabledRepeatableJsonBodyDoesNotWarnAboutBodyRepeatability(CapturedOutput output) {
+        AtomicInteger attempts = new AtomicInteger();
+        ReactiveClientInvocationHandler handler = createHandler(flakyThenOk(attempts), true, Set.of("POST"));
+
+        StepVerifier.create(invoke(handler, "createJson", Map.of("name", "alice")))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(attempts).hasValue(2);
+        assertThat(output.getOut())
+                .doesNotContain("with non-repeatable request body")
+                .doesNotContain("with application-owned request body");
+    }
+
+    @Test
+    void retryEnabledMultipartFormBodyDoesNotWarnAboutBodyRepeatability(CapturedOutput output) {
+        AtomicInteger attempts = new AtomicInteger();
+        ReactiveClientInvocationHandler handler = createHandler(flakyThenOk(attempts), true, Set.of("POST"));
+
+        StepVerifier.create(invoke(handler, "submitForm", "alice"))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(attempts).hasValue(2);
+        assertThat(output.getOut()).doesNotContain("request body [default]");
+    }
+
+    @Test
+    void retryEnabledMultipartResourceBodyWarnsAboutApplicationOwnedBody(CapturedOutput output) {
+        AtomicInteger attempts = new AtomicInteger();
+        ReactiveClientInvocationHandler handler = createHandler(flakyThenOk(attempts), true, Set.of("POST"));
+        Resource resource = new ByteArrayResource("content".getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() {
+                return "upload.txt";
+            }
+        };
+
+        StepVerifier.create(invoke(handler, "uploadResource", resource))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(attempts).hasValue(2);
+        assertThat(output.getOut())
+                .contains("Retry configured for reactive HTTP client [test-client]")
+                .contains("RetrySafetyClient#uploadResource")
+                .contains("with application-owned request body [default]");
+    }
+
+    @Test
+    void retryEnabledRawPublisherBodyWarnsAboutNonRepeatableBody(CapturedOutput output) {
+        AtomicInteger attempts = new AtomicInteger();
+        ReactiveClientInvocationHandler handler = createHandler(flakyThenOk(attempts), true, Set.of("POST"));
+        DefaultDataBufferFactory bufferFactory = new DefaultDataBufferFactory();
+        Flux<org.springframework.core.io.buffer.DataBuffer> body = Flux.defer(() ->
+                Flux.just(bufferFactory.wrap("payload".getBytes(StandardCharsets.UTF_8))));
+
+        StepVerifier.create(invoke(handler, "uploadPublisher", body))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(attempts).hasValue(2);
+        assertThat(output.getOut())
+                .contains("Retry configured for reactive HTTP client [test-client]")
+                .contains("RetrySafetyClient#uploadPublisher")
+                .contains("with non-repeatable request body [default]");
     }
 
 
@@ -273,7 +348,10 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
     private static Mono<String> invoke(ReactiveClientInvocationHandler handler, String methodName, Object... args) {
         try {
             Method method = switch (methodName) {
-                case "createWithIdempotencyKey" -> RetrySafetyClient.class.getMethod(methodName, String.class);
+                case "createWithIdempotencyKey", "submitForm" -> RetrySafetyClient.class.getMethod(methodName, String.class);
+                case "createJson" -> RetrySafetyClient.class.getMethod(methodName, Map.class);
+                case "uploadPublisher" -> RetrySafetyClient.class.getMethod(methodName, Flux.class);
+                case "uploadResource" -> RetrySafetyClient.class.getMethod(methodName, Resource.class);
                 default -> RetrySafetyClient.class.getMethod(methodName);
             };
             return (Mono<String>) handler.invoke(null, method, args);
@@ -291,6 +369,20 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
 
         @POST("/safe-write")
         Mono<String> createWithIdempotencyKey(@HeaderParam("Idempotency-Key") String idempotencyKey);
+
+        @POST("/json")
+        Mono<String> createJson(@Body Map<String, Object> body);
+
+        @POST("/form")
+        @MultipartBody
+        Mono<String> submitForm(@FormField("name") String name);
+
+        @POST("/resource")
+        @MultipartBody
+        Mono<String> uploadResource(@FormFile("file") Resource resource);
+
+        @POST("/publisher")
+        Mono<String> uploadPublisher(@Body Flux<org.springframework.core.io.buffer.DataBuffer> body);
 
         @PUT("/replace")
         Mono<String> replaceIdempotently();

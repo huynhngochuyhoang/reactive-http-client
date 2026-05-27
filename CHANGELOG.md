@@ -14,11 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Retry-safety diagnostics.** Added warning-only diagnostics for retry-enabled
   unsafe HTTP methods without an explicit `Idempotency-Key`, plus DEBUG startup
   diagnostics for per-method resilience operator decisions.
+- **Request body repeatability diagnostics.** Added retry diagnostics for
+  non-repeatable and application-owned request bodies without buffering large or
+  streaming uploads.
 
 ### Docs
 
 - Documented retry-safety classifications, unsafe retry warnings, and the
   canonical Resilience4j operator order.
+- Documented repeatable, non-repeatable, and application-owned request body
+  shapes for retry-enabled clients.
 
 ---
 

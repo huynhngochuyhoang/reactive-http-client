@@ -35,19 +35,19 @@
 
 ## Priority 2 — Non-Repeatable Body Handling
 
-### [ ] 2.2 Non-repeatable body detection and guidance
-- [ ] Audit request body paths for JSON objects.
-- [ ] Audit form body paths.
-- [ ] Audit multipart body paths.
-- [ ] Audit raw publisher, streaming body, and `DataBuffer` paths.
-- [ ] Mark obviously repeatable bodies as retry-compatible where metadata is
+### [x] 2.2 Non-repeatable body detection and guidance
+- [x] Audit request body paths for JSON objects.
+- [x] Audit form body paths.
+- [x] Audit multipart body paths.
+- [x] Audit raw publisher, streaming body, and `DataBuffer` paths.
+- [x] Mark obviously repeatable bodies as retry-compatible where metadata is
   available.
-- [ ] Mark obviously non-repeatable bodies as retry-risky where metadata is
+- [x] Mark obviously non-repeatable bodies as retry-risky where metadata is
   available.
-- [ ] Ensure non-repeatable body paths do not retry silently when retry-safety
+- [x] Ensure non-repeatable body paths do not retry silently when retry-safety
   policy is enabled.
-- [ ] Document repeatable, risky, and application-owned body types.
-- [ ] Verify no large request bodies are buffered to make retry possible.
+- [x] Document repeatable, risky, and application-owned body types.
+- [x] Verify no large request bodies are buffered to make retry possible.
 
 ---
 
