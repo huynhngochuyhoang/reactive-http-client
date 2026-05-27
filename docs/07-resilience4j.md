@@ -53,17 +53,32 @@ resilience:
   retry-methods: [GET, HEAD, PUT]   # PUT added for idempotent writes
 ```
 
-Values are normalized (trimmed and uppercased). If you add methods such as `POST`, `PUT`, `PATCH`, or `DELETE`, the starter preserves compatibility and still applies retry, but it logs a warning when a retry-enabled unsafe method has no explicit `Idempotency-Key` header. The warning includes the client name, Java method, HTTP method, retry instance, and configured `retry-methods` so the risky call is easy to find.
+Values are normalized (trimmed and uppercased). If you add methods such as `POST` or `PATCH`, the starter preserves compatibility and still applies retry, but it logs a warning when a retry-enabled unsafe method has no explicit `Idempotency-Key` header. The warning includes the client name, Java method, HTTP method, retry instance, and configured `retry-methods` so the risky call is easy to find.
 
 A retry-enabled method is classified as:
 
 | Classification | Meaning | Diagnostic behavior |
 |---|---|---|
-| `SAFE_METHOD` | `GET` or `HEAD` | No unsafe retry warning |
+| `SAFE_METHOD` | `GET`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`, or `TRACE` | No unsafe retry warning |
 | `EXPLICIT_IDEMPOTENCY_KEY` | The method invocation has an `Idempotency-Key` header from `@HeaderParam`, a header map, or client default headers | No unsafe retry warning |
 | `UNSAFE_RETRY` | Retry is enabled for another HTTP method without an idempotency key | Warn once per client method and keep existing retry behavior |
 
 The starter does not provide downstream idempotency storage. The header is only a signal that your downstream service can use to make duplicate attempts safe.
+
+### Request body repeatability
+
+Retries re-subscribe to the outbound request. The starter does not buffer large
+or streaming request bodies to make a retry possible.
+
+| Body shape | Retry guidance |
+|---|---|
+| JSON objects, `String`, `byte[]`, form fields, multipart `byte[]`, and `FileAttachment` parts | Treated as repeatable by the starter |
+| `Publisher` bodies and `DataBuffer` bodies | Treated as non-repeatable and logged as retry-risky |
+| `Resource` bodies and multipart `Resource` parts | Application-owned; make sure the resource can be read again before enabling retry |
+
+When retry is enabled for a method with a non-repeatable or application-owned
+body, the starter logs a warning once per client method. Existing retry behavior
+is preserved for compatibility.
 
 ### Resilience4j instance configuration
 
@@ -134,7 +149,7 @@ retry -> rate-limiter -> circuit-breaker -> bulkhead
 
 The same order appears in DEBUG startup diagnostics as `operatorOrder=retry -> rate-limiter -> circuit-breaker -> bulkhead`. With this ordering, the rate limiter wraps the retried operation at the starter layer instead of being treated as another timeout or bulkhead setting.
 
-When DEBUG logging is enabled for `ReactiveHttpClientFactoryBean`, startup diagnostics also list per-method resilience decisions: resolved HTTP method, retry instance or disabled retry, rate limiter, circuit breaker, bulkhead, retry-safety classification, and operator order.
+When DEBUG logging is enabled for `ReactiveHttpClientFactoryBean`, startup diagnostics also list per-method resilience decisions: resolved HTTP method, retry instance or disabled retry, rate limiter, circuit breaker, bulkhead, retry-safety classification, body-repeatability classification, and operator order.
 
 ---
 

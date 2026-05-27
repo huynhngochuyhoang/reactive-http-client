@@ -83,6 +83,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final AtomicBoolean loggerCacheLimitWarningLogged = new AtomicBoolean(false);
     private final Set<String> resilienceWarningKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> unsafeRetryWarningKeys = ConcurrentHashMap.newKeySet();
+    private final Set<String> retryBodyWarningKeys = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean resilienceWarningKeysLimitWarningLogged = new AtomicBoolean(false);
 
     private final ResilienceOperatorApplier resilienceOperatorApplier;
@@ -242,6 +243,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     WebClient.RequestHeadersSpec<?> requestHeadersSpec;
                     if (multipartBody != null) {
                         requestHeadersSpec = preparedRequestSpec.body(BodyInserters.fromMultipartData(multipartBody));
+                    } else if (serializedRequestBody.bodyToWrite() instanceof Publisher<?> publisher) {
+                        requestHeadersSpec = requestFromPublisher(preparedRequestSpec, publisher, plan.bodyType(), hasContentTypeHeader);
                     } else if (serializedRequestBody.originalBody() != null) {
                         WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
                         if (!hasContentTypeHeader) {
@@ -504,6 +507,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
             if (isRetryOperatorAvailable()) {
                 logUnsafeRetryIfNeeded(plan, resilience, httpMethod, resolved, retryInstance);
+                logRetryBodyRiskIfNeeded(plan, httpMethod, retryInstance, resolved.body());
             }
             mono = applyRetryMono(mono, retryInstance);
         }
@@ -524,6 +528,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
             if (isRetryOperatorAvailable()) {
                 logUnsafeRetryIfNeeded(plan, resilience, httpMethod, resolved, retryInstance);
+                logRetryBodyRiskIfNeeded(plan, httpMethod, retryInstance, resolved.body());
             }
             flux = applyRetryFlux(flux, retryInstance);
         }
@@ -566,6 +571,35 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY);
     }
 
+    private void logRetryBodyRiskIfNeeded(RequestPlan plan, String httpMethod, String retryInstance, Object body) {
+        RequestBodyRepeatability repeatability = effectiveBodyRepeatability(plan, body);
+        if (repeatability != RequestBodyRepeatability.NON_REPEATABLE
+                && repeatability != RequestBodyRepeatability.APPLICATION_OWNED) {
+            return;
+        }
+        String methodName = methodSignature(plan);
+        String warningKey = clientName + ":body:" + methodName + ":" + httpMethod + ":" + retryInstance;
+        if (retryBodyWarningKeys.add(warningKey)) {
+            log.warn("Retry configured for reactive HTTP client [{}] method [{}] HTTP [{}] with {} request body [{}]. "
+                            + "The starter does not buffer large or streaming bodies to make retry possible; ensure the body can be subscribed/read again or disable retry for this method.",
+                    clientName,
+                    methodName,
+                    httpMethod,
+                    repeatability == RequestBodyRepeatability.NON_REPEATABLE ? "non-repeatable" : "application-owned",
+                    retryInstance);
+        }
+    }
+
+    private RequestBodyRepeatability effectiveBodyRepeatability(RequestPlan plan, Object body) {
+        if (body instanceof Publisher<?> || body instanceof DataBuffer) {
+            return RequestBodyRepeatability.NON_REPEATABLE;
+        }
+        if (body instanceof Resource) {
+            return RequestBodyRepeatability.APPLICATION_OWNED;
+        }
+        return plan.bodyRepeatability();
+    }
+
     private String methodSignature(RequestPlan plan) {
         Method method = plan.method();
         if (method == null) {
@@ -598,6 +632,36 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return httpMethod != null
                 && Set.of("GET", "HEAD", "PUT", "DELETE", "OPTIONS", "TRACE")
                 .contains(httpMethod.toUpperCase(Locale.ROOT));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private WebClient.RequestHeadersSpec<?> requestFromPublisher(WebClient.RequestBodySpec requestSpec,
+                                                                 Publisher<?> publisher,
+                                                                 Type bodyType,
+                                                                 boolean hasContentTypeHeader) {
+        WebClient.RequestBodySpec requestWithBodySpec = requestSpec;
+        Class<?> elementClass = publisherElementClass(bodyType);
+        if (!hasContentTypeHeader) {
+            requestWithBodySpec = requestWithBodySpec.contentType(defaultPublisherContentType(elementClass));
+        }
+        return requestWithBodySpec.body(BodyInserters.fromPublisher((Publisher) publisher, (Class) elementClass));
+    }
+
+    private Class<?> publisherElementClass(Type bodyType) {
+        if (bodyType instanceof java.lang.reflect.ParameterizedType parameterizedType) {
+            Type[] args = parameterizedType.getActualTypeArguments();
+            if (args.length == 1 && args[0] instanceof Class<?> clazz) {
+                return clazz;
+            }
+        }
+        return Object.class;
+    }
+
+    private MediaType defaultPublisherContentType(Class<?> elementClass) {
+        if (DataBuffer.class.isAssignableFrom(elementClass) || byte[].class.equals(elementClass)) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+        return MediaType.APPLICATION_JSON;
     }
 
     private long resolveTimeoutMs(MethodMetadata meta) {
@@ -798,6 +862,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return Mono.just(new SerializedRequestBody(null, null, null));
         }
         if (!clientConfig.hasAuthConfigured()) {
+            return Mono.just(new SerializedRequestBody(body, body, null));
+        }
+        if (body instanceof Publisher<?>) {
             return Mono.just(new SerializedRequestBody(body, body, null));
         }
         if (body instanceof byte[] bytes) {

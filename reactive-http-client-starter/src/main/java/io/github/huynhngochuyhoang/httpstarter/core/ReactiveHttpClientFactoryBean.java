@@ -707,7 +707,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     ResilienceOperatorApplier.InstanceType.BULKHEAD,
                     plan.bulkheadInstanceName(), resilience.getBulkhead());
             log.debug("Reactive HTTP client [{}] method [{}#{}] resilience: httpMethod={}, retry={}, "
-                            + "rateLimiter={}, circuitBreaker={}, bulkhead={}, retrySafety={}, operatorOrder={}",
+                            + "rateLimiter={}, circuitBreaker={}, bulkhead={}, retrySafety={}, bodyRepeatability={}, operatorOrder={}",
                     clientName,
                     method.getDeclaringClass().getSimpleName(),
                     method.getName(),
@@ -717,6 +717,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     circuitBreakerInstance,
                     bulkheadInstance,
                     diagnosticRetrySafety(plan, httpMethod, clientConfig),
+                    plan.bodyRepeatability(),
                     ReactiveClientInvocationHandler.RESILIENCE_OPERATOR_ORDER);
         }
     }
