@@ -138,8 +138,29 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
                 .verifyComplete();
 
         assertThat(output.getOut())
-                .contains("RetrySafetyClient#create(String)")
-                .contains("RetrySafetyClient#create(Integer)");
+                .contains("RetrySafetyClient#create(java.lang.String)")
+                .contains("RetrySafetyClient#create(java.lang.Integer)");
+    }
+
+
+    @Test
+    void unsafeRetryWarningDedupKeyUsesQualifiedParameterTypeNames(CapturedOutput output) {
+        ReactiveClientInvocationHandler handler = createHandler(ok(new AtomicInteger()), true, Set.of("POST"));
+
+        StepVerifier.create(invokeOverloadedCreate(handler,
+                        io.github.huynhngochuyhoang.httpstarter.core.fixture.alpha.Id.class,
+                        new io.github.huynhngochuyhoang.httpstarter.core.fixture.alpha.Id("one")))
+                .expectNext("ok")
+                .verifyComplete();
+        StepVerifier.create(invokeOverloadedCreate(handler,
+                        io.github.huynhngochuyhoang.httpstarter.core.fixture.beta.Id.class,
+                        new io.github.huynhngochuyhoang.httpstarter.core.fixture.beta.Id("two")))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(output.getOut())
+                .contains("RetrySafetyClient#create(io.github.huynhngochuyhoang.httpstarter.core.fixture.alpha.Id)")
+                .contains("RetrySafetyClient#create(io.github.huynhngochuyhoang.httpstarter.core.fixture.beta.Id)");
     }
 
     @Test
@@ -282,5 +303,11 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
 
         @POST("/create-integer")
         Mono<String> create(Integer id);
+
+        @POST("/create-alpha-id")
+        Mono<String> create(io.github.huynhngochuyhoang.httpstarter.core.fixture.alpha.Id id);
+
+        @POST("/create-beta-id")
+        Mono<String> create(io.github.huynhngochuyhoang.httpstarter.core.fixture.beta.Id id);
     }
 }

@@ -572,7 +572,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return plan.apiName();
         }
         String parameters = Arrays.stream(method.getParameterTypes())
-                .map(Class::getSimpleName)
+                .map(type -> type.getCanonicalName() != null ? type.getCanonicalName() : type.getName())
                 .collect(java.util.stream.Collectors.joining(","));
         return method.getDeclaringClass().getSimpleName() + "#" + method.getName() + "(" + parameters + ")";
     }
