@@ -640,10 +640,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                                                  Type bodyType,
                                                                  boolean hasContentTypeHeader) {
         WebClient.RequestBodySpec requestWithBodySpec = requestSpec;
-        if (!hasContentTypeHeader) {
-            requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_OCTET_STREAM);
-        }
         Class<?> elementClass = publisherElementClass(bodyType);
+        if (!hasContentTypeHeader) {
+            requestWithBodySpec = requestWithBodySpec.contentType(defaultPublisherContentType(elementClass));
+        }
         return requestWithBodySpec.body(BodyInserters.fromPublisher((Publisher) publisher, (Class) elementClass));
     }
 
@@ -655,6 +655,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             }
         }
         return Object.class;
+    }
+
+    private MediaType defaultPublisherContentType(Class<?> elementClass) {
+        if (DataBuffer.class.isAssignableFrom(elementClass) || byte[].class.equals(elementClass)) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+        return MediaType.APPLICATION_JSON;
     }
 
     private long resolveTimeoutMs(MethodMetadata meta) {
@@ -855,6 +862,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return Mono.just(new SerializedRequestBody(null, null, null));
         }
         if (!clientConfig.hasAuthConfigured()) {
+            return Mono.just(new SerializedRequestBody(body, body, null));
+        }
+        if (body instanceof Publisher<?>) {
             return Mono.just(new SerializedRequestBody(body, body, null));
         }
         if (body instanceof byte[] bytes) {
