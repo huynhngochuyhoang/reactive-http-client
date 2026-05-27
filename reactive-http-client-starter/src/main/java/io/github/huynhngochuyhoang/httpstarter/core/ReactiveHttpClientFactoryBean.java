@@ -119,6 +119,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
 
         if (config.getResilience() != null && config.getResilience().isEnabled()) {
             validatePerMethodResilienceInstances(type, metadataCache, resilienceOperatorApplier, clientName);
+            logMethodResilienceDiagnostics(type, metadataCache, config, resilienceOperatorApplier, clientName);
         }
 
         ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
@@ -537,9 +538,11 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             return "disabled";
         }
         return "enabled(retry=" + resilience.getRetry()
+                + ", retryMethods=" + resilience.getRetryMethods()
+                + ", rateLimiter=" + resilience.getRateLimiter()
                 + ", circuitBreaker=" + resilience.getCircuitBreaker()
                 + ", bulkhead=" + resilience.getBulkhead()
-                + ", rateLimiter=" + resilience.getRateLimiter()
+                + ", operatorOrder=" + ReactiveClientInvocationHandler.RESILIENCE_OPERATOR_ORDER
                 + ")";
     }
 
@@ -662,6 +665,115 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                             + String.join("\n  - ", missing)
                             + "\nDefine them under resilience4j.<retry|circuitbreaker|bulkhead|ratelimiter>.instances.* in application config.");
         }
+    }
+
+    private void logMethodResilienceDiagnostics(Class<?> clientInterface,
+                                                MethodMetadataCache metadataCache,
+                                                ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                ResilienceOperatorApplier resilienceOperatorApplier,
+                                                String clientName) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
+        if (resilience == null || !resilience.isEnabled()) {
+            return;
+        }
+        for (Method method : clientInterface.getMethods()) {
+            if (method.isSynthetic() || method.isDefault() || method.isBridge()) continue;
+            MethodMetadata meta;
+            try {
+                meta = metadataCache.get(method);
+            } catch (RuntimeException e) {
+                continue;
+            }
+            RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
+            String httpMethod = diagnosticHttpMethod(meta, clientConfig);
+            boolean retryEnabled = isRetryMethodEnabled(resilience, httpMethod)
+                    && resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY);
+            String retryInstance = retryEnabled
+                    ? operatorDiagnostic(resilienceOperatorApplier,
+                    ResilienceOperatorApplier.InstanceType.RETRY,
+                    plan.retryInstanceName(),
+                    resilience.getRetry())
+                    : "disabled";
+            String rateLimiterInstance = operatorDiagnostic(resilienceOperatorApplier,
+                    ResilienceOperatorApplier.InstanceType.RATE_LIMITER,
+                    plan.rateLimiterInstanceName(), resilience.getRateLimiter());
+            String circuitBreakerInstance = operatorDiagnostic(resilienceOperatorApplier,
+                    ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER,
+                    plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker());
+            String bulkheadInstance = operatorDiagnostic(resilienceOperatorApplier,
+                    ResilienceOperatorApplier.InstanceType.BULKHEAD,
+                    plan.bulkheadInstanceName(), resilience.getBulkhead());
+            log.debug("Reactive HTTP client [{}] method [{}#{}] resilience: httpMethod={}, retry={}, "
+                            + "rateLimiter={}, circuitBreaker={}, bulkhead={}, retrySafety={}, operatorOrder={}",
+                    clientName,
+                    method.getDeclaringClass().getSimpleName(),
+                    method.getName(),
+                    httpMethod != null ? httpMethod : "unresolved",
+                    retryInstance,
+                    rateLimiterInstance,
+                    circuitBreakerInstance,
+                    bulkheadInstance,
+                    diagnosticRetrySafety(plan, httpMethod, clientConfig),
+                    ReactiveClientInvocationHandler.RESILIENCE_OPERATOR_ORDER);
+        }
+    }
+
+    private static String diagnosticHttpMethod(MethodMetadata meta, ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (StringUtils.hasText(meta.getHttpMethod())) {
+            return meta.getHttpMethod();
+        }
+        if (StringUtils.hasText(meta.getApiRefName()) && clientConfig.getApis() != null) {
+            ReactiveHttpClientProperties.ApiConfig apiConfig = clientConfig.getApis().get(meta.getApiRefName());
+            if (apiConfig != null && StringUtils.hasText(apiConfig.getMethod())) {
+                return apiConfig.getMethod().trim().toUpperCase(Locale.ROOT);
+            }
+        }
+        return null;
+    }
+
+    private static boolean isRetryMethodEnabled(ReactiveHttpClientProperties.ResilienceConfig resilience, String httpMethod) {
+        return httpMethod != null
+                && resilience.getRetryMethods() != null
+                && resilience.getRetryMethods().contains(httpMethod.toUpperCase(Locale.ROOT));
+    }
+
+    private static RetrySafetyClassification diagnosticRetrySafety(RequestPlan plan,
+                                                                    String httpMethod,
+                                                                    ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (ReactiveClientInvocationHandler.isSafeRetryMethod(httpMethod)
+                || plan.retrySafety() == RetrySafetyClassification.SAFE_METHOD) {
+            return RetrySafetyClassification.SAFE_METHOD;
+        }
+        if (hasDefaultIdempotencyKeyHeaderValue(clientConfig)) {
+            return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
+        }
+        return plan.retrySafety();
+    }
+
+    private static boolean hasDefaultIdempotencyKeyHeaderValue(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (clientConfig.getDefaultHeaders() == null) {
+            return false;
+        }
+        return clientConfig.getDefaultHeaders().entrySet().stream()
+                .anyMatch(entry -> "Idempotency-Key".equalsIgnoreCase(entry.getKey())
+                        && StringUtils.hasText(entry.getValue()));
+    }
+
+    private static String operatorDiagnostic(ResilienceOperatorApplier resilienceOperatorApplier,
+                                             ResilienceOperatorApplier.InstanceType type,
+                                             String methodLevel,
+                                             String clientLevel) {
+        if (!resilienceOperatorApplier.isOperatorAvailable(type)) {
+            return "disabled";
+        }
+        return resolveResilienceInstanceName(methodLevel, clientLevel);
+    }
+
+    private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {
+        return StringUtils.hasText(methodLevel) ? methodLevel : clientLevel;
     }
 
     /**

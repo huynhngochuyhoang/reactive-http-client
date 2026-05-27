@@ -30,6 +30,13 @@ public interface ResilienceOperatorApplier {
     <T> Flux<T> applyRateLimiter(Flux<T> flux, String instanceName);
 
     /**
+     * {@code true} if this applier can actually attach the given operator type.
+     */
+    default boolean isOperatorAvailable(InstanceType type) {
+        return true;
+    }
+
+    /**
      * {@code true} if the named instance is registered in the corresponding
      * Resilience4j registry. Used by the starter at proxy-construction time to
      * fail fast on a typo in a per-method {@code @Retry} / {@code @CircuitBreaker}

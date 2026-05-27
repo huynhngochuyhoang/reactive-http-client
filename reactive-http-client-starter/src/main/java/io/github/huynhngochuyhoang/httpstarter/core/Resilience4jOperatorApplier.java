@@ -95,6 +95,16 @@ public class Resilience4jOperatorApplier implements ResilienceOperatorApplier {
     }
 
     @Override
+    public boolean isOperatorAvailable(InstanceType type) {
+        return switch (type) {
+            case RETRY -> retryRegistry != null;
+            case CIRCUIT_BREAKER -> circuitBreakerRegistry != null;
+            case BULKHEAD -> bulkheadRegistry != null;
+            case RATE_LIMITER -> rateLimiterOperatorAdapter != null;
+        };
+    }
+
+    @Override
     public boolean isInstanceConfigured(InstanceType type, String instanceName) {
         if (instanceName == null || instanceName.isBlank()) return true;
         return switch (type) {

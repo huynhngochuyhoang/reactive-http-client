@@ -81,13 +81,13 @@ method.
 
 **Acceptance:**
 
-- [ ] Tests cover retry-enabled `GET`, `POST` with idempotency key, and `POST`
+- [x] Tests cover retry-enabled `GET`, `POST` with idempotency key, and `POST`
       without idempotency key.
-- [ ] Unsafe retry diagnostics include client name, method, HTTP method, and
+- [x] Unsafe retry diagnostics include client name, method, HTTP method, and
       resolved retry source.
-- [ ] Compatibility behavior is documented if existing unsafe retries remain
+- [x] Compatibility behavior is documented if existing unsafe retries remain
       allowed by default.
-- [ ] No retry-safety logic runs when retry support is absent.
+- [x] No retry-safety logic runs when retry support is absent.
 
 ---
 
@@ -133,13 +133,13 @@ timed out, retried, or transformed the failure.
 
 **Acceptance:**
 
-- [ ] Docs state the final operator order in one canonical place.
-- [ ] Tests prove observer/lifecycle terminal signals for retry success,
+- [x] Docs state the final operator order in one canonical place.
+- [x] Tests prove observer/lifecycle terminal signals for retry success,
       retry exhaustion, bulkhead rejection, rate-limit rejection, timeout, and
       cancellation.
-- [ ] Startup diagnostics identify which resilience operators are active per
+- [x] Startup diagnostics identify which resilience operators are active per
       client and per method where applicable.
-- [ ] Error categories remain stable for resilience failures.
+- [x] Error categories remain stable for resilience failures.
 
 ---
 
