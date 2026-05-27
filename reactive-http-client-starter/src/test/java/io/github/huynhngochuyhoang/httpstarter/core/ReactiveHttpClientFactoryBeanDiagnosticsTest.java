@@ -167,7 +167,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
 
     @Test
-    void debugStartupDiagnosticsDisableRetryWhenRetryOperatorIsUnavailable(CapturedOutput output) throws Exception {
+    void debugStartupDiagnosticsDisableUnavailableOperators(CapturedOutput output) throws Exception {
         Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
         Level previousLevel = logger.getLevel();
         logger.setLevel(Level.DEBUG);
@@ -184,7 +184,8 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
             factoryBean.getObject();
 
             assertThat(output.getOut())
-                    .contains("method [DefaultIdempotencyKeyDiagnosticClient#create] resilience: httpMethod=POST, retry=disabled");
+                    .contains("method [DefaultIdempotencyKeyDiagnosticClient#create] resilience: httpMethod=POST, "
+                            + "retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled");
         } finally {
             logger.setLevel(previousLevel);
             factoryBean.destroy();

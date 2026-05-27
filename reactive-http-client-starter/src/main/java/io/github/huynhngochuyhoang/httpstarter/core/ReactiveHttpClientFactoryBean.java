@@ -692,8 +692,20 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             boolean retryEnabled = isRetryMethodEnabled(resilience, httpMethod)
                     && resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY);
             String retryInstance = retryEnabled
-                    ? resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry())
+                    ? operatorDiagnostic(resilienceOperatorApplier,
+                    ResilienceOperatorApplier.InstanceType.RETRY,
+                    plan.retryInstanceName(),
+                    resilience.getRetry())
                     : "disabled";
+            String rateLimiterInstance = operatorDiagnostic(resilienceOperatorApplier,
+                    ResilienceOperatorApplier.InstanceType.RATE_LIMITER,
+                    plan.rateLimiterInstanceName(), resilience.getRateLimiter());
+            String circuitBreakerInstance = operatorDiagnostic(resilienceOperatorApplier,
+                    ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER,
+                    plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker());
+            String bulkheadInstance = operatorDiagnostic(resilienceOperatorApplier,
+                    ResilienceOperatorApplier.InstanceType.BULKHEAD,
+                    plan.bulkheadInstanceName(), resilience.getBulkhead());
             log.debug("Reactive HTTP client [{}] method [{}#{}] resilience: httpMethod={}, retry={}, "
                             + "rateLimiter={}, circuitBreaker={}, bulkhead={}, retrySafety={}, operatorOrder={}",
                     clientName,
@@ -701,9 +713,9 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     method.getName(),
                     httpMethod != null ? httpMethod : "unresolved",
                     retryInstance,
-                    resolveResilienceInstanceName(plan.rateLimiterInstanceName(), resilience.getRateLimiter()),
-                    resolveResilienceInstanceName(plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker()),
-                    resolveResilienceInstanceName(plan.bulkheadInstanceName(), resilience.getBulkhead()),
+                    rateLimiterInstance,
+                    circuitBreakerInstance,
+                    bulkheadInstance,
                     diagnosticRetrySafety(plan, httpMethod, clientConfig),
                     ReactiveClientInvocationHandler.RESILIENCE_OPERATOR_ORDER);
         }
@@ -748,6 +760,16 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         return clientConfig.getDefaultHeaders().entrySet().stream()
                 .anyMatch(entry -> "Idempotency-Key".equalsIgnoreCase(entry.getKey())
                         && StringUtils.hasText(entry.getValue()));
+    }
+
+    private static String operatorDiagnostic(ResilienceOperatorApplier resilienceOperatorApplier,
+                                             ResilienceOperatorApplier.InstanceType type,
+                                             String methodLevel,
+                                             String clientLevel) {
+        if (!resilienceOperatorApplier.isOperatorAvailable(type)) {
+            return "disabled";
+        }
+        return resolveResilienceInstanceName(methodLevel, clientLevel);
     }
 
     private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {
