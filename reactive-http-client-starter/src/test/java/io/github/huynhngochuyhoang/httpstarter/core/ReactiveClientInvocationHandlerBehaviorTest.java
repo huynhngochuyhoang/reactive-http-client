@@ -10,10 +10,14 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -382,6 +386,86 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         verify(objectMapper, never()).writeValueAsBytes(any());
     }
 
+    @Test
+    void shouldBypassJsonAuthSerializationForPublisherBodyWithoutContentType() throws Exception {
+        AtomicReference<Object> capturedBody = new AtomicReference<>();
+        AtomicReference<Object> capturedRawBody = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    capturedBody.set(request.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE).orElse(null));
+                    capturedRawBody.set(request.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE).orElse(null));
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build());
+                })
+                .build();
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
+        when(objectMapper.writeValueAsBytes(any())).thenThrow(new IllegalStateException("must not serialize publisher"));
+        Flux<String> body = Flux.just("one", "two");
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", objectMapper);
+
+        StepVerifier.create(invokePublisherBody(handler, body))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertSame(body, capturedBody.get());
+        assertNull(capturedRawBody.get());
+        verify(objectMapper, never()).writeValueAsBytes(any());
+    }
+
+    @Test
+    void shouldDefaultPublisherDtoBodyToJsonWhenContentTypeIsMissing() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    captured.set(request);
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build());
+                })
+                .build();
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        StepVerifier.create(invokeDtoPublisherBody(handler, Flux.just(new PublisherDto("one"))))
+                .expectNext("ok")
+                .verifyComplete();
+
+        MockClientHttpRequest request = materialize(captured.get());
+        assertEquals(MediaType.APPLICATION_JSON, request.getHeaders().getContentType());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Mono<String> invokePublisherBody(ReactiveClientInvocationHandler handler, Flux<String> body) {
+        try {
+            var method = ClientWithPublisherBody.class.getMethod("post", Flux.class);
+            return (Mono<String>) handler.invoke(null, method, new Object[]{body});
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Mono<String> invokeDtoPublisherBody(ReactiveClientInvocationHandler handler, Flux<PublisherDto> body) {
+        try {
+            var method = ClientWithDtoPublisherBody.class.getMethod("post", Flux.class);
+            return (Mono<String>) handler.invoke(null, method, new Object[]{body});
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
+    private static MockClientHttpRequest materialize(ClientRequest request) {
+        MockClientHttpRequest mock = new MockClientHttpRequest(request.method(), URI.create(request.url().toString()));
+        request.writeTo(mock, ExchangeStrategies.withDefaults()).block();
+        return mock;
+    }
+
     @SuppressWarnings("unchecked")
     private static Mono<String> invokeGet(ReactiveClientInvocationHandler handler, String accept) {
         try {
@@ -551,6 +635,18 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         @POST("/body")
         Mono<String> post(@HeaderParam("Content-Type") String contentType, @Body byte[] body);
     }
+
+    interface ClientWithPublisherBody {
+        @POST("/body")
+        Mono<String> post(@Body Flux<String> body);
+    }
+
+    interface ClientWithDtoPublisherBody {
+        @POST("/body")
+        Mono<String> post(@Body Flux<PublisherDto> body);
+    }
+
+    record PublisherDto(String name) {}
 
     interface ClientWithQueryParams {
         @GET("/search")

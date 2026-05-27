@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-repeatable and application-owned request bodies without buffering large or
   streaming uploads.
 
+### Fixed
+
+- Fixed publisher request bodies so auth raw-body serialization does not convert
+  `Publisher` bodies to JSON bytes, and publisher DTO bodies keep the default
+  JSON content type when no explicit `Content-Type` is set.
+- Fixed AWS SigV4 signing for unsupported publisher request bodies by failing
+  before sending a request instead of signing an empty payload that does not
+  match the streamed body bytes.
+
 ### Docs
 
 - Documented retry-safety classifications, unsafe retry warnings, and the

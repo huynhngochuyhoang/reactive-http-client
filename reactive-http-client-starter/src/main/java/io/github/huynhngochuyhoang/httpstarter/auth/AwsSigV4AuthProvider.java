@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import javax.crypto.Mac;
@@ -10,14 +11,7 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.TreeMap;
+import java.util.*;
 
 import static java.time.ZoneOffset.UTC;
 
@@ -183,7 +177,12 @@ public final class AwsSigV4AuthProvider implements AuthProvider {
         if (requestBody instanceof String text) {
             return text.getBytes(StandardCharsets.UTF_8);
         }
-        return new byte[0];
+        if (requestBody instanceof Publisher<?>) {
+            throw new IllegalArgumentException("AWS SigV4 auth cannot sign Publisher request bodies because raw bytes are not materialized. "
+                    + "Use a repeatable byte[], String, or JSON object body, or provide a custom AuthProvider that supports AWS streaming signatures.");
+        }
+        throw new IllegalArgumentException("AWS SigV4 auth cannot sign request body type "
+                + requestBody.getClass().getName() + " because raw bytes are not materialized.");
     }
 
     private static String uriEncode(String value, boolean preserveSlash) {

@@ -3,6 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.auth;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.reactive.function.client.ClientRequest;
+import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
 import java.net.URI;
@@ -70,6 +71,29 @@ class AwsSigV4AuthProviderTest {
                 .assertNext(auth -> assertThat(auth.getHeaders().get("x-amz-content-sha256"))
                         .isEqualTo("1cbbc951d99ac7588df0547a8abdc67f4c28a63a8d94c6a5edd5c6843f4e4c6e"))
                 .verifyComplete();
+    }
+
+    @Test
+    void rejectsPublisherBodiesInsteadOfSigningEmptyPayload() {
+        AwsSigV4AuthProvider provider = AwsSigV4AuthProvider.builder()
+                .accessKeyId("AKIAIOSFODNN7EXAMPLE")
+                .secretAccessKey("wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY")
+                .region("us-east-1")
+                .service("s3")
+                .clock(AWS_EXAMPLE_CLOCK)
+                .build();
+
+        ClientRequest request = ClientRequest.create(
+                        HttpMethod.PUT,
+                        URI.create("https://examplebucket.s3.amazonaws.com/upload.txt"))
+                .build();
+
+        StepVerifier.create(provider.getAuth(new AuthRequest("s3-client", request, Flux.just("payload"))))
+                .expectErrorSatisfies(error -> assertThat(error)
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("cannot sign Publisher request bodies")
+                        .hasMessageContaining("raw bytes are not materialized"))
+                .verify();
     }
 
     @Test
