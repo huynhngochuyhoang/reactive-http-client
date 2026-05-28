@@ -52,11 +52,11 @@ owned and must be repeated manually through headers or customizers.
 
 **Acceptance:**
 
-- [ ] A caller can provide an idempotency key without raw header plumbing.
-- [ ] Caller-supplied idempotency headers keep documented precedence.
-- [ ] Per-client configuration can rename or disable the managed header if that
-      is added.
-- [ ] Docs explain that the starter does not provide downstream idempotency
+- [x] A caller can provide an idempotency key without raw header plumbing.
+- [x] Caller-supplied idempotency headers keep documented precedence.
+- [x] Per-client rename/disable configuration was not added; the managed
+      header remains explicit through `@IdempotencyKey` or ordinary headers.
+- [x] Docs explain that the starter does not provide downstream idempotency
       storage.
 
 ---
@@ -290,10 +290,10 @@ state or shared builders.
 
 **Acceptance:**
 
-- [ ] Method/header-parameter idempotency values win over generated values.
-- [ ] Generated keys do not bleed across concurrent requests.
-- [ ] Customizers keep their existing documented precedence.
-- [ ] Logging and test helpers expose or redact idempotency keys consistently
+- [x] Method/header-parameter idempotency values win over generated values.
+- [x] Generated keys do not bleed across concurrent requests.
+- [x] Customizers keep their existing documented precedence.
+- [x] Logging and test helpers expose or redact idempotency keys consistently
       with existing header policy.
 
 ---

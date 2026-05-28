@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Request body repeatability diagnostics.** Added retry diagnostics for
   non-repeatable and application-owned request bodies without buffering large or
   streaming uploads.
+- **Idempotency key support.** Added `@IdempotencyKey` and
+  `RequestContext.withIdempotencyKey(...)` for opt-in outbound idempotency keys
+  with caller/default/context/generated precedence.
 
 ### Fixed
 
@@ -33,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   canonical Resilience4j operator order.
 - Documented repeatable, non-repeatable, and application-owned request body
   shapes for retry-enabled clients.
+- Documented idempotency key precedence and clarified that the starter does not
+  provide downstream idempotency storage.
 
 ---
 

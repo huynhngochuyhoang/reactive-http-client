@@ -29,6 +29,10 @@ public class MethodMetadata {
     private Map<Integer, String> headerParams = new HashMap<>();
     /** parameter indexes of map-based headers */
     private Set<Integer> headerMapParams = new HashSet<>();
+    /** index -> idempotency header name */
+    private Map<Integer, String> idempotencyKeyParams = new HashMap<>();
+    /** Method-level idempotency header name; non-null means generate when absent. */
+    private String generatedIdempotencyKeyHeader;
 
     /** parameter index of the @Body argument, or -1 if absent */
     private int bodyIndex = -1;
@@ -83,6 +87,11 @@ public class MethodMetadata {
     public Map<Integer, String> getQueryParams() { return queryParams; }
     public Map<Integer, String> getHeaderParams() { return headerParams; }
     public Set<Integer> getHeaderMapParams() { return headerMapParams; }
+    public Map<Integer, String> getIdempotencyKeyParams() { return idempotencyKeyParams; }
+    public String getGeneratedIdempotencyKeyHeader() { return generatedIdempotencyKeyHeader; }
+    public void setGeneratedIdempotencyKeyHeader(String generatedIdempotencyKeyHeader) {
+        this.generatedIdempotencyKeyHeader = generatedIdempotencyKeyHeader;
+    }
 
     public int getBodyIndex() { return bodyIndex; }
     public void setBodyIndex(int bodyIndex) { this.bodyIndex = bodyIndex; }
@@ -171,6 +180,7 @@ public class MethodMetadata {
         queryParams = Map.copyOf(queryParams);
         headerParams = Map.copyOf(headerParams);
         headerMapParams = Set.copyOf(headerMapParams);
+        idempotencyKeyParams = Map.copyOf(idempotencyKeyParams);
         formFieldParams = Map.copyOf(formFieldParams);
         formFileParams = Map.copyOf(formFileParams);
     }

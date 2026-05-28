@@ -48,6 +48,16 @@ public class RequestArgumentResolver {
                 headers.put(headerName, headerValue);
             }
         }
+        for (RequestPlan.NamedArgumentBinding binding : plan.idempotencyKeyParams()) {
+            int idx = binding.argumentIndex();
+            if (args != null && idx < args.length && args[idx] != null) {
+                String headerName = binding.name();
+                String headerValue = String.valueOf(args[idx]);
+                validateHeaderName(headerName);
+                validateHeaderValue(headerName, headerValue);
+                headers.put(headerName, headerValue);
+            }
+        }
         for (Integer idx : plan.headerMapParams()) {
             if (args != null && idx < args.length && args[idx] instanceof Map<?, ?> headerMap) {
                 for (Map.Entry<?, ?> headerEntry : headerMap.entrySet()) {

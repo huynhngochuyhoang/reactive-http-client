@@ -16,6 +16,7 @@ or trace cardinality.
 | Path variables | `@PathVar` arguments | none | Path variables are resolved per invocation. Missing placeholders fail when the URI is built. |
 | Query parameters | `@QueryParam` arguments | `default-query-params` | Same-name method query parameters replace configured defaults. Multi-value parameters are sent as repeated query parameters. |
 | Headers | `@HeaderParam` arguments | `default-headers` | Same-name headers override configured defaults case-insensitively. |
+| Idempotency key | Caller-supplied headers or `@IdempotencyKey` parameter | `default-headers`, then `RequestContext.withIdempotencyKey`, then method-level `@IdempotencyKey` generation | Generated keys are opt-in and scoped to one invocation. Later `WebClient` filters can still mutate the final request. |
 | Request body | `@Body` or `@MultipartBody` parts | none | `@Body` and `@MultipartBody` are mutually exclusive and fail fast when combined. |
 | Auth | `auth-provider` bean name | object-style `auth.type` | If both are configured, the named bean wins and the object-style block is ignored with a startup warning. |
 | Customizers | `ReactiveHttpClientCustomizer` | Spring `WebClientCustomizer` | Spring `WebClientCustomizer` runs when the prototype builder is created. Starter built-ins are then added. Per-client `ReactiveHttpClientCustomizer` runs after built-ins. |

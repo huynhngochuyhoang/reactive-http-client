@@ -87,6 +87,11 @@ public class MethodMetadataCache {
         }
 
         // ---- Parameters ----
+        IdempotencyKey methodIdempotencyKey = method.getAnnotation(IdempotencyKey.class);
+        if (methodIdempotencyKey != null) {
+            requireNonBlankAnnotationValue(methodIdempotencyKey.value(), "@IdempotencyKey", method);
+            meta.setGeneratedIdempotencyKeyHeader(methodIdempotencyKey.value());
+        }
         Annotation[][] paramAnnotations = method.getParameterAnnotations();
         Class<?>[] parameterTypes = method.getParameterTypes();
         for (int i = 0; i < paramAnnotations.length; i++) {
@@ -111,6 +116,9 @@ public class MethodMetadataCache {
                     }
                 } else if (ann instanceof Body) {
                     meta.setBodyIndex(i);
+                } else if (ann instanceof IdempotencyKey idempotencyKey) {
+                    requireNonBlankAnnotationValue(idempotencyKey.value(), "@IdempotencyKey", method);
+                    meta.getIdempotencyKeyParams().put(i, idempotencyKey.value());
                 } else if (ann instanceof FormField ff) {
                     if (ff.value() == null || ff.value().isBlank()) {
                         throw new IllegalArgumentException(

@@ -81,6 +81,7 @@ The starter owns these Reactor context keys and keeps the existing string keys s
 |---|---|---|
 | Correlation ID | `correlationId` | `RequestContext.correlationId(ctx)` / `RequestContext.withCorrelationId(ctx, value)` |
 | Filtered inbound headers | `inboundHeaders` | `RequestContext.inboundHeaders(ctx)` / `RequestContext.withInboundHeaders(ctx, headers)` |
+| Outbound idempotency key | `idempotencyKey` | `RequestContext.idempotencyKey(ctx)` / `RequestContext.withIdempotencyKey(ctx, value)` |
 
 Prefer the `RequestContext` helpers or `RequestContextSnapshot` for new code. Existing integrations that write `CorrelationIdWebFilter.CORRELATION_ID_CONTEXT_KEY` or `InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY` continue to work because those constants keep the same string values.
 
@@ -92,6 +93,16 @@ Correlation ID precedence is:
 2. Reactor context value, including a restored `RequestContextSnapshot`.
 3. Configured MDC fallback keys, in order.
 4. No outbound correlation header.
+
+Idempotency key precedence is:
+
+1. Caller-supplied outbound idempotency header from `@HeaderParam`, header map, or `@IdempotencyKey` parameter.
+2. Client `default-headers`.
+3. `RequestContext.withIdempotencyKey(ctx, value)`.
+4. Method-level `@IdempotencyKey` generated value.
+5. Later `WebClient` filters, including `ReactiveHttpClientCustomizer`, can still mutate the final request.
+
+Method-level generation is opt-in and creates one key per invocation. The starter does not generate idempotency keys for every request and does not provide downstream idempotency storage. `RequestContextSnapshot` carries correlation ID and inbound headers; if you need an idempotency key after an async handoff, write it explicitly with `RequestContext.withIdempotencyKey(...)` when subscribing the outbound call.
 
 Restoring a `RequestContextSnapshot` writes the values present in the snapshot into the subscriber context. If that subscriber context already contains values for the same starter-owned keys, the restored snapshot values replace them; missing snapshot values do not clear existing context values.
 

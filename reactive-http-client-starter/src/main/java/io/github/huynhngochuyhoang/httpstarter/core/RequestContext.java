@@ -20,6 +20,11 @@ public final class RequestContext {
      */
     public static final String INBOUND_HEADERS_CONTEXT_KEY = "inboundHeaders";
 
+    /**
+     * Reactor context key used to carry an outbound idempotency key.
+     */
+    public static final String IDEMPOTENCY_KEY_CONTEXT_KEY = "idempotencyKey";
+
     private static final RequestContextContributor<String> CORRELATION_ID_CONTRIBUTOR =
             new RequestContextContributor<>() {
                 @Override
@@ -141,6 +146,14 @@ public final class RequestContext {
     }
 
     /**
+     * Reads the outbound idempotency key from the Reactor context.
+     */
+    public static Optional<String> idempotencyKey(ContextView context) {
+        Objects.requireNonNull(context, "context must not be null");
+        return Optional.ofNullable(context.getOrDefault(IDEMPOTENCY_KEY_CONTEXT_KEY, null));
+    }
+
+    /**
      * Writes the correlation ID to the Reactor context.
      */
     public static Context withCorrelationId(Context context, String correlationId) {
@@ -155,6 +168,14 @@ public final class RequestContext {
         Objects.requireNonNull(context, "context must not be null");
         Map<String, List<String>> snapshot = immutableHeaders(inboundHeaders);
         return !snapshot.isEmpty() ? context.put(INBOUND_HEADERS_CONTEXT_KEY, snapshot) : context;
+    }
+
+    /**
+     * Writes an outbound idempotency key to the Reactor context.
+     */
+    public static Context withIdempotencyKey(Context context, String idempotencyKey) {
+        Objects.requireNonNull(context, "context must not be null");
+        return idempotencyKey != null ? context.put(IDEMPOTENCY_KEY_CONTEXT_KEY, idempotencyKey) : context;
     }
 
     private static List<RequestContextContributor<?>> ordered(
