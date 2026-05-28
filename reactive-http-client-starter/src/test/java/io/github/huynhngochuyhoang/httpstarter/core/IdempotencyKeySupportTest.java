@@ -109,6 +109,29 @@ class IdempotencyKeySupportTest {
     }
 
     @Test
+    void generatedIdempotencyKeysAreScopedToEachSubscription() {
+        List<String> keys = new CopyOnWriteArrayList<>();
+        AtomicInteger requests = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    requests.incrementAndGet();
+                    keys.add(request.headers().getFirst("Idempotency-Key"));
+                    return okResponse();
+                })
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        Mono<String> request = invoke(handler, "createWithGeneratedKey");
+        StepVerifier.create(Mono.when(request, request))
+                .verifyComplete();
+
+        assertEquals(2, requests.get());
+        assertTrue(keys.stream().allMatch(key -> key != null && !key.isBlank()));
+        assertEquals(2, Set.copyOf(keys).size());
+    }
+
+    @Test
     void generatedIdempotencyKeyIsStableAcrossRetryAttempts() {
         AtomicInteger attempts = new AtomicInteger();
         List<String> keys = new CopyOnWriteArrayList<>();
@@ -158,6 +181,31 @@ class IdempotencyKeySupportTest {
                 .verifyComplete();
 
         assertEquals("customizer-key", captured.get().headers().getFirst("Idempotency-Key"));
+    }
+
+    @Test
+    void lifecycleSuccessSeesGeneratedIdempotencyKeyHeader() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        List<ReactiveHttpClientLifecycleContext> successes = new CopyOnWriteArrayList<>();
+        ReactiveHttpClientLifecycleHook hook = new ReactiveHttpClientLifecycleHook() {
+            @Override
+            public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+                successes.add(context);
+            }
+        };
+        ReactiveClientInvocationHandler handler = createHandler(
+                captureRequestWebClient(captured),
+                new ReactiveHttpClientProperties.ClientConfig(),
+                new NoopResilienceOperatorApplier(),
+                List.of(hook));
+
+        StepVerifier.create(invoke(handler, "createWithGeneratedKey"))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertEquals(1, successes.size());
+        assertEquals(captured.get().headers().getFirst("Idempotency-Key"),
+                successes.get(0).headers().get("Idempotency-Key"));
     }
 
     @Test
@@ -214,14 +262,25 @@ class IdempotencyKeySupportTest {
         return createHandler(webClient, config, new NoopResilienceOperatorApplier());
     }
 
-    @SuppressWarnings("unchecked")
     private static ReactiveClientInvocationHandler createHandler(WebClient webClient,
                                                                  ReactiveHttpClientProperties.ClientConfig config,
                                                                  ResilienceOperatorApplier resilienceOperatorApplier) {
+        return createHandler(webClient, config, resilienceOperatorApplier, List.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ReactiveClientInvocationHandler createHandler(WebClient webClient,
+                                                                 ReactiveHttpClientProperties.ClientConfig config,
+                                                                 ResilienceOperatorApplier resilienceOperatorApplier,
+                                                                 List<ReactiveHttpClientLifecycleHook> hooks) {
         ApplicationContext appCtx = mock(ApplicationContext.class);
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
         when(appCtx.getBeanProvider(HttpClientObserver.class)).thenReturn(observerProvider);
         when(observerProvider.getIfAvailable()).thenReturn(null);
+
+        ObjectProvider<ReactiveHttpClientLifecycleHook> hookProvider = mock(ObjectProvider.class);
+        when(appCtx.getBeanProvider(ReactiveHttpClientLifecycleHook.class)).thenReturn(hookProvider);
+        when(hookProvider.orderedStream()).thenAnswer(invocation -> hooks.stream());
 
         return new ReactiveClientInvocationHandler(
                 webClient,
