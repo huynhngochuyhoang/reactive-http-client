@@ -29,8 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed AWS SigV4 signing for unsupported publisher request bodies by failing
   before sending a request instead of signing an empty payload that does not
   match the streamed body bytes.
-- Fixed generated `` headers so each cold publisher subscription
-  gets a fresh key, retries keep the same key, and lifecycle success/error/cancel
+- Fixed generated `@IdempotencyKey` headers so each cold publisher subscription
+  gets a fresh key, retries keep the same key, and lifecycle attempt and terminal
   callbacks see the prepared outbound headers.
 
 ### Docs

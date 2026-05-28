@@ -162,6 +162,53 @@ class IdempotencyKeySupportTest {
     }
 
     @Test
+    void lifecycleAttemptHooksSeeGeneratedIdempotencyKeyHeader() {
+        AtomicInteger attempts = new AtomicInteger();
+        List<String> keys = new CopyOnWriteArrayList<>();
+        List<ReactiveHttpClientLifecycleContext> starts = new CopyOnWriteArrayList<>();
+        List<ReactiveHttpClientLifecycleContext> retries = new CopyOnWriteArrayList<>();
+        ReactiveHttpClientLifecycleHook hook = new ReactiveHttpClientLifecycleHook() {
+            @Override
+            public void onStart(ReactiveHttpClientLifecycleContext context) {
+                starts.add(context);
+            }
+
+            @Override
+            public void onRetryAttempt(ReactiveHttpClientLifecycleContext context) {
+                retries.add(context);
+            }
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    keys.add(request.headers().getFirst("Idempotency-Key"));
+                    if (attempts.incrementAndGet() == 1) {
+                        return Mono.just(ClientResponse.create(HttpStatus.INTERNAL_SERVER_ERROR).body("boom").build());
+                    }
+                    return okResponse();
+                })
+                .build();
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setRetry("default");
+        resilience.setRetryMethods(Set.of("POST"));
+        config.setResilience(resilience);
+        ReactiveClientInvocationHandler handler = createHandler(webClient, config, retryApplier(), List.of(hook));
+
+        StepVerifier.create(invoke(handler, "createWithGeneratedKey"))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertEquals(2, keys.size());
+        assertEquals(1, starts.size());
+        assertEquals(1, retries.size());
+        assertEquals(keys.get(0), starts.get(0).headers().get("Idempotency-Key"));
+        assertEquals(keys.get(1), retries.get(0).headers().get("Idempotency-Key"));
+        assertEquals(keys.get(0), keys.get(1));
+    }
+
+    @Test
     void customizerFilterCanOverrideGeneratedIdempotencyKey() {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
         WebClient webClient = WebClient.builder()
