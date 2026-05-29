@@ -10,6 +10,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Proxy;
@@ -131,6 +132,8 @@ public final class MockReactiveHttpClient<T> {
         private ClientResponse fallback = ClientResponse.create(HttpStatus.NOT_FOUND)
                 .body("mock: no matcher for this request")
                 .build();
+        private ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
+        private ResilienceOperatorApplier resilienceOperatorApplier = new NoopResilienceOperatorApplier();
 
         private Builder(Class<T> clientInterface) {
             this.clientInterface = clientInterface;
@@ -170,6 +173,39 @@ public final class MockReactiveHttpClient<T> {
         /** Response served when no matcher applies. Defaults to HTTP 404. */
         public Builder<T> fallback(ClientResponse fallback) {
             this.fallback = fallback;
+            return this;
+        }
+
+        /** Uses the supplied client configuration when constructing the mock proxy. */
+        public Builder<T> clientConfig(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+            this.clientConfig = clientConfig != null ? clientConfig : new ReactiveHttpClientProperties.ClientConfig();
+            return this;
+        }
+
+        /** Uses the supplied resilience operator applier when constructing the mock proxy. */
+        public Builder<T> resilienceOperatorApplier(ResilienceOperatorApplier resilienceOperatorApplier) {
+            this.resilienceOperatorApplier = resilienceOperatorApplier != null
+                    ? resilienceOperatorApplier
+                    : new NoopResilienceOperatorApplier();
+            return this;
+        }
+
+        /**
+         * Enables a lightweight retry operator for mock-client tests.
+         * {@code maxAttempts} includes the initial request.
+         */
+        public Builder<T> retry(int maxAttempts, String... retryMethods) {
+            if (maxAttempts < 1) {
+                throw new IllegalArgumentException("maxAttempts must be at least 1");
+            }
+            ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+            resilience.setEnabled(true);
+            resilience.setRetry("mock");
+            resilience.setRetryMethods(retryMethods == null
+                    ? java.util.Set.of()
+                    : new java.util.LinkedHashSet<>(java.util.Arrays.asList(retryMethods)));
+            clientConfig.setResilience(resilience);
+            resilienceOperatorApplier = new MockRetryResilienceOperatorApplier(maxAttempts);
             return this;
         }
 
@@ -226,10 +262,10 @@ public final class MockReactiveHttpClient<T> {
                     new MethodMetadataCache(),
                     new RequestArgumentResolver(),
                     new DefaultErrorDecoder(),
-                    new ReactiveHttpClientProperties.ClientConfig(),
+                    clientConfig,
                     "mock-client",
                     appCtx,
-                    new NoopResilienceOperatorApplier(),
+                    resilienceOperatorApplier,
                     null,
                     new ReactiveHttpClientProperties.ObservabilityConfig()
             );
@@ -241,6 +277,28 @@ public final class MockReactiveHttpClient<T> {
                     handler);
 
             return new MockReactiveHttpClient<>(proxy, exchanges, liveMatchers, fallbackRef);
+        }
+    }
+
+    private static final class MockRetryResilienceOperatorApplier extends NoopResilienceOperatorApplier {
+        private final long retryCount;
+
+        private MockRetryResilienceOperatorApplier(int maxAttempts) {
+            this.retryCount = maxAttempts - 1L;
+        }
+
+        @Override
+        public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
+            return mono.retry(retryCount);
+        }
+
+        @Override
+        public <T> Flux<T> applyRetry(Flux<T> flux, String instanceName) {
+            return flux.retry(retryCount);
+        }
+
+        public boolean isOperatorAvailable(ResilienceOperatorApplier.InstanceType type) {
+            return type == ResilienceOperatorApplier.InstanceType.RETRY;
         }
     }
 

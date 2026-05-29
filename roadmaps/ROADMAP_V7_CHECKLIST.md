@@ -77,14 +77,14 @@
 
 ## Priority 4 — Retry and Idempotency Test Helpers
 
-### [ ] 1.3 Retry and idempotency test-helper assertions
-- [ ] Add fluent assertions for idempotency header presence.
-- [ ] Add fluent assertions for idempotency header absence.
-- [ ] Add fluent assertions for idempotency header value.
-- [ ] Add helper support to assert exchange attempt counts.
-- [ ] Add an example with transient downstream failure followed by successful
+### [x] 1.3 Retry and idempotency test-helper assertions
+- [x] Add fluent assertions for idempotency header presence.
+- [x] Add fluent assertions for idempotency header absence.
+- [x] Add fluent assertions for idempotency header value.
+- [x] Add helper support to assert exchange attempt counts.
+- [x] Add an example with transient downstream failure followed by successful
   retry.
-- [ ] Document compact retry/idempotency helper usage.
+- [x] Document compact retry/idempotency helper usage.
 
 ---
 

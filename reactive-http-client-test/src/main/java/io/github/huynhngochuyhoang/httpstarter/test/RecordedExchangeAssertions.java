@@ -27,6 +27,10 @@ public final class RecordedExchangeAssertions {
         return new RecordedExchangeAssert(actual);
     }
 
+    public static MockReactiveHttpClientAssert assertThat(MockReactiveHttpClient<?> actual) {
+        return new MockReactiveHttpClientAssert(actual);
+    }
+
     public static final class RecordedExchangeAssert
             extends AbstractAssert<RecordedExchangeAssert, RecordedExchange> {
 
@@ -94,6 +98,23 @@ public final class RecordedExchangeAssertions {
 
         public RecordedExchangeAssert hasRedactedHeader(String name) {
             return hasHeaderValues(name, REDACTED);
+        }
+
+        public RecordedExchangeAssert hasIdempotencyKey() {
+            isNotNull();
+            if (actual.idempotencyKey() == null || actual.idempotencyKey().isBlank()) {
+                failWithMessage("expected Idempotency-Key header to be present but was <%s>",
+                        actual.headers().get("Idempotency-Key"));
+            }
+            return myself;
+        }
+
+        public RecordedExchangeAssert hasIdempotencyKey(String expected) {
+            return hasHeader("Idempotency-Key", expected);
+        }
+
+        public RecordedExchangeAssert doesNotHaveIdempotencyKey() {
+            return doesNotHaveHeader("Idempotency-Key");
         }
 
         public RecordedExchangeAssert hasCapturedCorrelationId(String expected) {
@@ -178,4 +199,34 @@ public final class RecordedExchangeAssertions {
             return UriComponentsBuilder.fromUri(actual.uri()).build().getQueryParams().get(name);
         }
     }
+
+    public static final class MockReactiveHttpClientAssert
+            extends AbstractAssert<MockReactiveHttpClientAssert, MockReactiveHttpClient<?>> {
+
+        MockReactiveHttpClientAssert(MockReactiveHttpClient<?> actual) {
+            super(actual, MockReactiveHttpClientAssert.class);
+        }
+
+        public MockReactiveHttpClientAssert hasAttemptCount(int expected) {
+            isNotNull();
+            int actualCount = actual.exchanges().size();
+            if (actualCount != expected) {
+                failWithMessage("expected attempt count <%s> but was <%s>", expected, actualCount);
+            }
+            return myself;
+        }
+
+        public MockReactiveHttpClientAssert hasAttemptCount(HttpMethod method, String path, int expected) {
+            isNotNull();
+            long actualCount = actual.exchanges().stream()
+                    .filter(exchange -> method.equals(exchange.method()) && path.equals(exchange.uri().getPath()))
+                    .count();
+            if (actualCount != expected) {
+                failWithMessage("expected attempt count for <%s %s> to be <%s> but was <%s>",
+                        method, path, expected, actualCount);
+            }
+            return myself;
+        }
+    }
+
 }

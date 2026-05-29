@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Idempotency key support.** Added `@IdempotencyKey` and
   `RequestContext.withIdempotencyKey(...)` for opt-in outbound idempotency keys
   with caller/default/context/generated precedence.
+- **Retry and idempotency test helpers.** Added `MockReactiveHttpClient`
+  retry simulation plus fluent idempotency-key and attempt-count assertions.
 
 ### Fixed
 
@@ -46,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shapes for retry-enabled clients.
 - Documented idempotency key precedence and clarified that the starter does not
   provide downstream idempotency storage.
+- Documented compact retry/idempotency test-helper usage for transient
+  downstream failures.
 
 ---
 

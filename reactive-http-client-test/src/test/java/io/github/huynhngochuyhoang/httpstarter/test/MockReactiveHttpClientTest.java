@@ -12,6 +12,7 @@ import reactor.test.StepVerifier;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,6 +38,13 @@ class MockReactiveHttpClientTest {
 
         @POST("/events")
         Mono<String> sendEvent(@Body String body);
+
+        @POST("/payments")
+        @IdempotencyKey
+        Mono<String> createPayment(@Body String json);
+
+        @POST("/payments/manual")
+        Mono<String> createPaymentWithKey(@Body String json, @IdempotencyKey String idempotencyKey);
     }
 
     @Test
@@ -141,6 +149,56 @@ class MockReactiveHttpClientTest {
                 .hasRedactedInboundHeader("Authorization")
                 .doesNotHaveInboundHeader("X-Missing")
                 .hasStatusCode(202);
+    }
+
+    @Test
+    void recordedExchangeAssertionsCoverIdempotencyHeaders() {
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .respondTo(HttpMethod.POST, "/payments",
+                        ex -> MockReactiveHttpClient.json(201, "\"created\""))
+                .respondTo(HttpMethod.POST, "/payments/manual",
+                        ex -> MockReactiveHttpClient.json(201, "\"created\""))
+                .respondTo(HttpMethod.POST, "/users",
+                        ex -> MockReactiveHttpClient.json(201, "\"ok\""))
+                .build();
+
+        mock.proxy().createPayment("{\"amount\":10}").block();
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasIdempotencyKey();
+
+        mock.proxy().createPaymentWithKey("{\"amount\":20}", "idem-20").block();
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasIdempotencyKey("idem-20");
+
+        mock.proxy().createUser("{\"name\":\"alice\"}").block();
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .doesNotHaveIdempotencyKey();
+    }
+
+    @Test
+    void retryHelperRecordsAttemptsAndKeepsGeneratedIdempotencyKeyStable() {
+        AtomicInteger served = new AtomicInteger();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .retry(2, "POST")
+                .respondTo(HttpMethod.POST, "/payments", ex -> {
+                    if (served.incrementAndGet() == 1) {
+                        return MockReactiveHttpClient.json(503, "{\"error\":\"temporary\"}");
+                    }
+                    return MockReactiveHttpClient.json(201, "\"created\"");
+                })
+                .build();
+
+        StepVerifier.create(mock.proxy().createPayment("{\"amount\":10}"))
+                .expectNext("\"created\"")
+                .verifyComplete();
+
+        RecordedExchangeAssertions.assertThat(mock)
+                .hasAttemptCount(2)
+                .hasAttemptCount(HttpMethod.POST, "/payments", 2);
+        RecordedExchangeAssertions.assertThat(mock.exchanges().get(0))
+                .hasIdempotencyKey();
+        RecordedExchangeAssertions.assertThat(mock.exchanges().get(1))
+                .hasIdempotencyKey(mock.exchanges().get(0).idempotencyKey());
     }
 
     @Test

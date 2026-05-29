@@ -107,10 +107,10 @@ helper records exchanges, but V7 should make retry-safety assertions direct.
 
 **Acceptance:**
 
-- [ ] Tests can assert the idempotency key sent to downstream.
-- [ ] Tests can assert idempotency key absence for non-idempotent calls.
-- [ ] Tests can assert the number of attempts for a mocked exchange.
-- [ ] Docs include a compact retry/idempotency helper example.
+- [x] Tests can assert the idempotency key sent to downstream.
+- [x] Tests can assert idempotency key absence for non-idempotent calls.
+- [x] Tests can assert the number of attempts for a mocked exchange.
+- [x] Docs include a compact retry/idempotency helper example.
 
 ---
 

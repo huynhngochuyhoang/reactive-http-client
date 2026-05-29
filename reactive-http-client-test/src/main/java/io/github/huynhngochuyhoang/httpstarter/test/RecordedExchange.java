@@ -75,6 +75,9 @@ public final class RecordedExchange {
     /** Returns the first value of {@code headerName}, or {@code null} if absent. */
     public String header(String headerName) { return materialized.getHeaders().getFirst(headerName); }
 
+    /** Returns the first {@code Idempotency-Key} value, or {@code null} if absent. */
+    public String idempotencyKey() { return header("Idempotency-Key"); }
+
     /** HTTP status selected by the mock response handler. */
     public HttpStatusCode statusCode() {
         if (statusCode == null) {
