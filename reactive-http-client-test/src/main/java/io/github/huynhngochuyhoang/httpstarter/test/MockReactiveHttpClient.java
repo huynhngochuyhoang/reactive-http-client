@@ -198,12 +198,17 @@ public final class MockReactiveHttpClient<T> {
             if (maxAttempts < 1) {
                 throw new IllegalArgumentException("maxAttempts must be at least 1");
             }
+            if (retryMethods == null || retryMethods.length == 0) {
+                throw new IllegalArgumentException("retryMethods must contain at least one HTTP method");
+            }
+            java.util.LinkedHashSet<String> retryMethodSet = new java.util.LinkedHashSet<>(java.util.Arrays.asList(retryMethods));
+            if (retryMethodSet.stream().anyMatch(method -> method == null || method.isBlank())) {
+                throw new IllegalArgumentException("retryMethods must not contain null or blank HTTP methods");
+            }
             ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
             resilience.setEnabled(true);
             resilience.setRetry("mock");
-            resilience.setRetryMethods(retryMethods == null
-                    ? java.util.Set.of()
-                    : new java.util.LinkedHashSet<>(java.util.Arrays.asList(retryMethods)));
+            resilience.setRetryMethods(retryMethodSet);
             clientConfig.setResilience(resilience);
             resilienceOperatorApplier = new MockRetryResilienceOperatorApplier(maxAttempts);
             return this;

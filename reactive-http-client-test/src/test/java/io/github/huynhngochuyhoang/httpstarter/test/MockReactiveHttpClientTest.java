@@ -202,6 +202,14 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void retryHelperRejectsEmptyRetryMethods() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        MockReactiveHttpClient.forClient(SampleClient.class).retry(2))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("retryMethods");
+    }
+
+    @Test
     void recordsEmptyContextWhenNoStarterContextIsPresent() {
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
                 .respondTo(HttpMethod.GET, "/users/42",
