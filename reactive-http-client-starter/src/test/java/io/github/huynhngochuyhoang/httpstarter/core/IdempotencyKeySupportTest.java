@@ -18,6 +18,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.test.StepVerifier;
 
 import java.lang.reflect.Method;
@@ -253,6 +254,46 @@ class IdempotencyKeySupportTest {
         assertEquals(1, successes.size());
         assertEquals(captured.get().headers().getFirst("Idempotency-Key"),
                 successes.get(0).headers().get("Idempotency-Key"));
+    }
+
+    @Test
+    void concurrentSubscriptionsReportTheirOwnGeneratedIdempotencyKeyHeader() {
+        AtomicInteger requests = new AtomicInteger();
+        List<String> sentKeys = new CopyOnWriteArrayList<>();
+        List<String> successKeys = new CopyOnWriteArrayList<>();
+        Sinks.Empty<Void> secondRequestPrepared = Sinks.empty();
+        ReactiveHttpClientLifecycleHook hook = new ReactiveHttpClientLifecycleHook() {
+            @Override
+            public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+                successKeys.add(context.headers().get("Idempotency-Key"));
+            }
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    int requestNumber = requests.incrementAndGet();
+                    sentKeys.add(request.headers().getFirst("Idempotency-Key"));
+                    if (requestNumber == 1) {
+                        return secondRequestPrepared.asMono().then(okResponse());
+                    }
+                    secondRequestPrepared.tryEmitEmpty();
+                    return okResponse();
+                })
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(
+                webClient,
+                new ReactiveHttpClientProperties.ClientConfig(),
+                new NoopResilienceOperatorApplier(),
+                List.of(hook));
+
+        Mono<String> request = invoke(handler, "createWithGeneratedKey");
+        StepVerifier.create(Mono.when(request, request))
+                .verifyComplete();
+
+        assertEquals(2, sentKeys.size());
+        assertEquals(2, successKeys.size());
+        assertEquals(2, Set.copyOf(sentKeys).size());
+        assertEquals(Set.copyOf(sentKeys), Set.copyOf(successKeys));
     }
 
     @Test

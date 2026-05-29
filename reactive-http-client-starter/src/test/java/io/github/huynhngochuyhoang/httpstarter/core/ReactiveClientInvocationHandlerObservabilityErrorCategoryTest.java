@@ -266,8 +266,11 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
                 .expectError(RequestSerializationException.class)
                 .verify();
 
-        assertNotNull(observed.get());
-        assertEquals(ErrorCategory.UNKNOWN, observed.get().getErrorCategory());
+        HttpClientObserverEvent event = observed.get();
+        assertNotNull(event);
+        assertEquals(ErrorCategory.UNKNOWN, event.getErrorCategory());
+        assertEquals(1, event.getAttemptCount());
+        assertTrue(event.getDurationMs() < 5000);
     }
 
     @Test

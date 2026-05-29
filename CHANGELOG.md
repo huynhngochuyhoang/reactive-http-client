@@ -30,8 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before sending a request instead of signing an empty payload that does not
   match the streamed body bytes.
 - Fixed generated `@IdempotencyKey` headers so each cold publisher subscription
-  gets a fresh key, retries keep the same key, and lifecycle attempt and terminal
-  callbacks see the prepared outbound headers.
+  gets a fresh key, retries keep the same key, and lifecycle/logging callbacks
+  read subscription-local prepared outbound headers.
+- Fixed request serialization failures so lifecycle/observer attempt state starts
+  before auth body serialization can fail.
 
 ### Docs
 
