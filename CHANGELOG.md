@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read subscription-local prepared outbound headers.
 - Fixed request serialization failures so lifecycle/observer attempt state starts
   before auth body serialization can fail.
+- Fixed generated `@IdempotencyKey` concurrent subscriptions so lifecycle hooks
+  and observer events report subscription-local attempt counts instead of
+  invocation-shared counts.
 
 ### Docs
 

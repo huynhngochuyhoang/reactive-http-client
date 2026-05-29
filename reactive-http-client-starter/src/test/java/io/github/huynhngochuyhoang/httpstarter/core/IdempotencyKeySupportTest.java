@@ -261,11 +261,15 @@ class IdempotencyKeySupportTest {
         AtomicInteger requests = new AtomicInteger();
         List<String> sentKeys = new CopyOnWriteArrayList<>();
         List<String> successKeys = new CopyOnWriteArrayList<>();
+        List<Integer> successAttempts = new CopyOnWriteArrayList<>();
+        List<Integer> observerAttempts = new CopyOnWriteArrayList<>();
+        HttpClientObserver observer = event -> observerAttempts.add(event.getAttemptCount());
         Sinks.Empty<Void> secondRequestPrepared = Sinks.empty();
         ReactiveHttpClientLifecycleHook hook = new ReactiveHttpClientLifecycleHook() {
             @Override
             public void onSuccess(ReactiveHttpClientLifecycleContext context) {
                 successKeys.add(context.headers().get("Idempotency-Key"));
+                successAttempts.add(context.attemptNumber());
             }
         };
         WebClient webClient = WebClient.builder()
@@ -284,7 +288,8 @@ class IdempotencyKeySupportTest {
                 webClient,
                 new ReactiveHttpClientProperties.ClientConfig(),
                 new NoopResilienceOperatorApplier(),
-                List.of(hook));
+                List.of(hook),
+                observer);
 
         Mono<String> request = invoke(handler, "createWithGeneratedKey");
         StepVerifier.create(Mono.when(request, request))
@@ -294,6 +299,8 @@ class IdempotencyKeySupportTest {
         assertEquals(2, successKeys.size());
         assertEquals(2, Set.copyOf(sentKeys).size());
         assertEquals(Set.copyOf(sentKeys), Set.copyOf(successKeys));
+        assertEquals(List.of(1, 1), successAttempts);
+        assertEquals(List.of(1, 1), observerAttempts);
     }
 
     @Test
@@ -361,10 +368,19 @@ class IdempotencyKeySupportTest {
                                                                  ReactiveHttpClientProperties.ClientConfig config,
                                                                  ResilienceOperatorApplier resilienceOperatorApplier,
                                                                  List<ReactiveHttpClientLifecycleHook> hooks) {
+        return createHandler(webClient, config, resilienceOperatorApplier, hooks, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ReactiveClientInvocationHandler createHandler(WebClient webClient,
+                                                                 ReactiveHttpClientProperties.ClientConfig config,
+                                                                 ResilienceOperatorApplier resilienceOperatorApplier,
+                                                                 List<ReactiveHttpClientLifecycleHook> hooks,
+                                                                 HttpClientObserver observer) {
         ApplicationContext appCtx = mock(ApplicationContext.class);
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
         when(appCtx.getBeanProvider(HttpClientObserver.class)).thenReturn(observerProvider);
-        when(observerProvider.getIfAvailable()).thenReturn(null);
+        when(observerProvider.getIfAvailable()).thenReturn(observer);
 
         ObjectProvider<ReactiveHttpClientLifecycleHook> hookProvider = mock(ObjectProvider.class);
         when(appCtx.getBeanProvider(ReactiveHttpClientLifecycleHook.class)).thenReturn(hookProvider);

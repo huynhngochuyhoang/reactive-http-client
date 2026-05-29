@@ -71,6 +71,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     private static final Object GENERATED_IDEMPOTENCY_KEY_CONTEXT_KEY = new Object();
     private static final Object PREPARED_RESOLVED_CONTEXT_KEY = new Object();
+    private static final Object ATTEMPT_COUNT_CONTEXT_KEY = new Object();
     private static final int MAX_LOGGER_CACHE_SIZE = 256;
     private static final int MAX_RESILIENCE_WARNING_KEYS = 256;
 
@@ -206,7 +207,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         AtomicLong start = new AtomicLong();
         AtomicBoolean firstAttempt = new AtomicBoolean(true);
-        AtomicInteger attemptCount = new AtomicInteger(0);
         AtomicReference<URI> requestUrl = new AtomicReference<>();
         HttpExchangeLogger exchangeLogger = resolveExchangeLogger(proxy, method, meta);
 
@@ -233,6 +233,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = Mono.deferContextual(context -> {
             AtomicReference<String> generatedIdempotencyKey = generatedIdempotencyKeyState(context);
             AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolvedRef = preparedResolvedState(context, resolved);
+            AtomicInteger attemptCount = attemptCountState(context);
             RequestArgumentResolver.ResolvedArgs preparedResolved = applyIdempotencyKey(plan, resolved, context, generatedIdempotencyKey);
             preparedResolvedRef.set(preparedResolved);
             int attempt = attemptCount.incrementAndGet();
@@ -297,6 +298,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                     ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
                                     : Map.of());
                     AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolvedRef = preparedResolvedState(ctx, resolved);
+                    AtomicInteger attemptCount = attemptCountState(ctx);
                     AtomicBoolean reported = new AtomicBoolean(false);
                     return capturedFlux
                             .doOnComplete(() -> notifyLifecycleSuccess(lifecycleHooks, plan, effectiveApi, preparedResolvedRef.get(), requestUrl.get(),
@@ -336,6 +338,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                 ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
                                 : Map.of());
                 AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolvedRef = preparedResolvedState(ctx, resolved);
+                    AtomicInteger attemptCount = attemptCountState(ctx);
                 AtomicReference<Object> terminalBody = new AtomicReference<>();
                 AtomicBoolean reported = new AtomicBoolean(false);
                 return capturedMono
@@ -1453,12 +1456,17 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return context.getOrDefault(PREPARED_RESOLVED_CONTEXT_KEY, new AtomicReference<>(fallback));
     }
 
+    private static AtomicInteger attemptCountState(reactor.util.context.ContextView context) {
+        return context.getOrDefault(ATTEMPT_COUNT_CONTEXT_KEY, new AtomicInteger(0));
+    }
+
     private static reactor.util.context.Context withSubscriptionState(
             reactor.util.context.Context context,
             RequestArgumentResolver.ResolvedArgs resolved) {
         return context
                 .put(GENERATED_IDEMPOTENCY_KEY_CONTEXT_KEY, new AtomicReference<String>())
-                .put(PREPARED_RESOLVED_CONTEXT_KEY, new AtomicReference<>(resolved));
+                .put(PREPARED_RESOLVED_CONTEXT_KEY, new AtomicReference<>(resolved))
+                .put(ATTEMPT_COUNT_CONTEXT_KEY, new AtomicInteger(0));
     }
 
     private static String generatedIdempotencyKey(AtomicReference<String> generatedIdempotencyKey) {
