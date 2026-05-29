@@ -264,7 +264,6 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 .baseUrl(baseUrl)
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(resolveCodecMaxInMemorySizeBytes(config)))
-                .filter(ReactiveClientInvocationHandler.requestUrlObservationFilter())
                 .filter(correlationIdFilter(correlationIdConfig));
 
         if (authProvider != null) {
@@ -285,6 +284,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     customizer.customize(finalConfigured);
                 });
 
+        finalConfigured.filter(ReactiveClientInvocationHandler.finalRequestObservationFilter());
         return configured.build();
     }
 

@@ -24,6 +24,7 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -67,11 +68,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private static final Logger log = LoggerFactory.getLogger(ReactiveClientInvocationHandler.class);
     static final String OBSERVED_REQUEST_URL_ATTRIBUTE =
             ReactiveClientInvocationHandler.class.getName() + ".observedRequestUrl";
+    static final String FINAL_REQUEST_OBSERVATION_ATTRIBUTE =
+            ReactiveClientInvocationHandler.class.getName() + ".finalRequestObservation";
     static final String RESILIENCE_OPERATOR_ORDER = "retry -> rate-limiter -> circuit-breaker -> bulkhead";
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     private static final Object GENERATED_IDEMPOTENCY_KEY_CONTEXT_KEY = new Object();
     private static final Object PREPARED_RESOLVED_CONTEXT_KEY = new Object();
     private static final Object ATTEMPT_COUNT_CONTEXT_KEY = new Object();
+    private static final Object FINAL_REQUEST_OBSERVATION_CONTEXT_KEY = new Object();
     private static final int MAX_LOGGER_CACHE_SIZE = 256;
     private static final int MAX_RESILIENCE_WARNING_KEYS = 256;
 
@@ -169,11 +173,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     public static ExchangeFilterFunction requestUrlObservationFilter() {
+        return finalRequestObservationFilter();
+    }
+
+    public static ExchangeFilterFunction finalRequestObservationFilter() {
         return (request, next) -> {
             request.attribute(OBSERVED_REQUEST_URL_ATTRIBUTE)
                     .filter(AtomicReference.class::isInstance)
                     .map(AtomicReference.class::cast)
                     .ifPresent(reference -> reference.set(request.url()));
+            request.attribute(FINAL_REQUEST_OBSERVATION_ATTRIBUTE)
+                    .filter(AtomicReference.class::isInstance)
+                    .map(AtomicReference.class::cast)
+                    .ifPresent(reference -> reference.set(FinalRequestObservation.from(request)));
             return next.exchange(request);
         };
     }
@@ -234,6 +246,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             AtomicReference<String> generatedIdempotencyKey = generatedIdempotencyKeyState(context);
             AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolvedRef = preparedResolvedState(context, resolved);
             AtomicInteger attemptCount = attemptCountState(context);
+            AtomicReference<FinalRequestObservation> finalRequestObservationRef = finalRequestObservationState(context);
             RequestArgumentResolver.ResolvedArgs preparedResolved = applyIdempotencyKey(plan, resolved, context, generatedIdempotencyKey);
             preparedResolvedRef.set(preparedResolved);
             int attempt = attemptCount.incrementAndGet();
@@ -276,7 +289,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     } else {
                         requestHeadersSpec = preparedRequestSpec;
                     }
-                    requestHeadersSpec = requestHeadersSpec.attribute(OBSERVED_REQUEST_URL_ATTRIBUTE, requestUrl);
+                    requestHeadersSpec = requestHeadersSpec
+                            .attribute(OBSERVED_REQUEST_URL_ATTRIBUTE, requestUrl)
+                            .attribute(FINAL_REQUEST_OBSERVATION_ATTRIBUTE, finalRequestObservationRef);
                     // Apply when: (a) caller set an explicit @TimeoutMs (including 0 to disable), or (b) a resilience timeout resolved to > 0.
                     boolean shouldApplyResponseTimeout = plan.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET
                             || effectiveApi.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET
@@ -299,6 +314,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                     : Map.of());
                     AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolvedRef = preparedResolvedState(ctx, resolved);
                     AtomicInteger attemptCount = attemptCountState(ctx);
+                    AtomicReference<FinalRequestObservation> finalRequestObservationRef = finalRequestObservationState(ctx);
                     AtomicBoolean reported = new AtomicBoolean(false);
                     return capturedFlux
                             .doOnComplete(() -> notifyLifecycleSuccess(lifecycleHooks, plan, effectiveApi, preparedResolvedRef.get(), requestUrl.get(),
@@ -308,7 +324,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                     responseStatus.get(), error, attemptCount.get()))
                             .doOnTerminate(() -> {
                                 if (reported.compareAndSet(false, true))
-                                    reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), start.get(),
+                                    reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), finalRequestObservationRef.get(), start.get(),
                                             responseStatus.get(), responseHeaders.get(), null, terminalError.get(), inboundHeadersRef.get(), attemptCount.get(), requestBytes);
                             })
                             .doOnCancel(() -> {
@@ -318,7 +334,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                 notifyLifecycleCancel(lifecycleHooks, plan, effectiveApi, preparedResolvedRef.get(), requestUrl.get(),
                                         responseStatus.get(), cancellation, attemptCount.get());
                                 if (reported.compareAndSet(false, true))
-                                    reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), start.get(),
+                                    reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), finalRequestObservationRef.get(), start.get(),
                                             responseStatus.get(), responseHeaders.get(), null, cancellation, inboundHeadersRef.get(), attemptCount.get(), requestBytes);
                             });
                 });
@@ -338,7 +354,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                 ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
                                 : Map.of());
                 AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolvedRef = preparedResolvedState(ctx, resolved);
-                    AtomicInteger attemptCount = attemptCountState(ctx);
+                AtomicInteger attemptCount = attemptCountState(ctx);
+                AtomicReference<FinalRequestObservation> finalRequestObservationRef = finalRequestObservationState(ctx);
                 AtomicReference<Object> terminalBody = new AtomicReference<>();
                 AtomicBoolean reported = new AtomicBoolean(false);
                 return capturedMono
@@ -352,7 +369,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                 responseStatus.get(), error, attemptCount.get()))
                         .doOnTerminate(() -> {
                             if (reported.compareAndSet(false, true))
-                                reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), start.get(),
+                                reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), finalRequestObservationRef.get(), start.get(),
                                         responseStatus.get(), responseHeaders.get(), terminalBody.get(), terminalError.get(), inboundHeadersRef.get(), attemptCount.get(), requestBytes);
                         })
                         .doOnCancel(() -> {
@@ -362,7 +379,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                             notifyLifecycleCancel(lifecycleHooks, plan, effectiveApi, preparedResolvedRef.get(), requestUrl.get(),
                                     responseStatus.get(), cancellation, attemptCount.get());
                             if (reported.compareAndSet(false, true))
-                                reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), start.get(),
+                                reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), finalRequestObservationRef.get(), start.get(),
                                         responseStatus.get(), responseHeaders.get(), null, cancellation, inboundHeadersRef.get(), attemptCount.get(), requestBytes);
                         });
             });
@@ -1145,6 +1162,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String pathTemplate,
             RequestArgumentResolver.ResolvedArgs resolved,
             URI requestUrl,
+            FinalRequestObservation finalRequestObservation,
             long startMs,
             HttpStatusCode statusCode,
             Map<String, List<String>> responseHeaders,
@@ -1154,11 +1172,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             int attemptCount,
             long requestBytes) {
         if (exchangeLogger != null) {
-            logExchange(exchangeLogger, httpMethod, pathTemplate, resolved, startMs, statusCode, responseHeaders, responseBody, error, inboundHeaders);
+            logExchange(exchangeLogger, httpMethod, pathTemplate, resolved, finalRequestObservation, startMs, statusCode, responseHeaders, responseBody, error, inboundHeaders);
         }
         if (observer != null) {
             long responseBytes = extractContentLengthBytes(responseHeaders);
-            notifyObserver(observer, plan, httpMethod, pathTemplate, resolved, requestUrl, startMs, statusCode, error, responseBody, attemptCount, requestBytes, responseBytes);
+            URI observedRequestUrl = finalRequestObservation != null ? finalRequestObservation.url() : requestUrl;
+            notifyObserver(observer, plan, httpMethod, pathTemplate, resolved, observedRequestUrl, finalRequestObservation, startMs, statusCode, error, responseBody, attemptCount, requestBytes, responseBytes);
         }
     }
 
@@ -1167,6 +1186,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String httpMethod,
             String pathTemplate,
             RequestArgumentResolver.ResolvedArgs resolved,
+            FinalRequestObservation finalRequestObservation,
             long startMs,
             HttpStatusCode statusCode,
             Map<String, List<String>> responseHeaders,
@@ -1177,10 +1197,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 clientName,
                 httpMethod,
                 pathTemplate,
+                finalRequestObservation != null ? finalRequestObservation.url() : null,
                 Map.copyOf(resolved.pathVars()),
                 copyQueryParams(resolved.queryParams()),
                 inboundHeaders,
-                Map.copyOf(resolved.headers()),
+                finalRequestObservation != null ? finalRequestObservation.headers() : Map.copyOf(resolved.headers()),
                 resolved.body(),
                 statusCode != null ? statusCode.value() : null,
                 responseHeaders == null ? Map.of() : responseHeaders,
@@ -1215,6 +1236,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String pathTemplate,
             RequestArgumentResolver.ResolvedArgs resolved,
             URI requestUrl,
+            FinalRequestObservation finalRequestObservation,
             long startMs,
             HttpStatusCode statusCode,
             Throwable error,
@@ -1240,7 +1262,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     requestBytes,
                     responseBytes,
                     requestUrl != null ? requestUrl.getHost() : null,
-                    resolveServerPort(requestUrl)
+                    resolveServerPort(requestUrl),
+                    requestUrl != null ? requestUrl.toString() : null,
+                    finalRequestObservation != null ? finalRequestObservation.headers() : Map.of()
             ));
         } catch (Exception e) {
             log.warn("HttpClientObserver threw an exception – ignoring: {}", e.getMessage());
@@ -1460,13 +1484,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return context.getOrDefault(ATTEMPT_COUNT_CONTEXT_KEY, new AtomicInteger(0));
     }
 
+    @SuppressWarnings("unchecked")
+    private static AtomicReference<FinalRequestObservation> finalRequestObservationState(reactor.util.context.ContextView context) {
+        return context.getOrDefault(FINAL_REQUEST_OBSERVATION_CONTEXT_KEY, new AtomicReference<FinalRequestObservation>());
+    }
+
     private static reactor.util.context.Context withSubscriptionState(
             reactor.util.context.Context context,
             RequestArgumentResolver.ResolvedArgs resolved) {
         return context
                 .put(GENERATED_IDEMPOTENCY_KEY_CONTEXT_KEY, new AtomicReference<String>())
                 .put(PREPARED_RESOLVED_CONTEXT_KEY, new AtomicReference<>(resolved))
-                .put(ATTEMPT_COUNT_CONTEXT_KEY, new AtomicInteger(0));
+                .put(ATTEMPT_COUNT_CONTEXT_KEY, new AtomicInteger(0))
+                .put(FINAL_REQUEST_OBSERVATION_CONTEXT_KEY, new AtomicReference<FinalRequestObservation>());
     }
 
     private static String generatedIdempotencyKey(AtomicReference<String> generatedIdempotencyKey) {
@@ -1567,6 +1597,18 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     private record SerializedRequestBody(Object originalBody, Object bodyToWrite, byte[] rawBody) {}
     private record RequestUriTemplate(String path, String query) {}
+
+    private record FinalRequestObservation(String httpMethod, URI url, Map<String, String> headers) {
+        private static FinalRequestObservation from(ClientRequest request) {
+            return new FinalRequestObservation(request.method().name(), request.url(), copyRequestHeaders(request.headers()));
+        }
+    }
+
+    private static Map<String, String> copyRequestHeaders(HttpHeaders headers) {
+        Map<String, String> copied = new LinkedHashMap<>();
+        headers.forEach((name, values) -> copied.put(name, String.join(",", values)));
+        return Map.copyOf(copied);
+    }
 
     // -------------------------------------------------------------------------
     // Package-private accessors for unit tests

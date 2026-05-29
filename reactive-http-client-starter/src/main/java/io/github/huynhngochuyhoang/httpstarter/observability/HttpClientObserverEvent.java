@@ -2,6 +2,9 @@ package io.github.huynhngochuyhoang.httpstarter.observability;
 
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * Immutable data class carrying all observable data for a single HTTP exchange.
  *
@@ -28,6 +31,8 @@ public final class HttpClientObserverEvent {
     private final long responseBytes;
     private final String serverAddress;
     private final Integer serverPort;
+    private final String requestUrl;
+    private final Map<String, String> requestHeaders;
 
     /**
      * @deprecated Use {@link #HttpClientObserverEvent(String, String, String, String, Integer, long, Throwable, ErrorCategory, Object, Object)}
@@ -124,6 +129,28 @@ public final class HttpClientObserverEvent {
             long responseBytes,
             String serverAddress,
             Integer serverPort) {
+        this(clientName, apiName, httpMethod, uriPath, statusCode, durationMs, error, errorCategory,
+                requestBody, responseBody, attemptCount, requestBytes, responseBytes, serverAddress, serverPort, null, Map.of());
+    }
+
+    public HttpClientObserverEvent(
+            String clientName,
+            String apiName,
+            String httpMethod,
+            String uriPath,
+            Integer statusCode,
+            long durationMs,
+            Throwable error,
+            ErrorCategory errorCategory,
+            Object requestBody,
+            Object responseBody,
+            int attemptCount,
+            long requestBytes,
+            long responseBytes,
+            String serverAddress,
+            Integer serverPort,
+            String requestUrl,
+            Map<String, String> requestHeaders) {
         this.clientName = clientName;
         this.apiName = apiName;
         this.httpMethod = httpMethod;
@@ -139,6 +166,10 @@ public final class HttpClientObserverEvent {
         this.responseBytes = responseBytes;
         this.serverAddress = serverAddress;
         this.serverPort = serverPort;
+        this.requestUrl = requestUrl;
+        this.requestHeaders = requestHeaders == null || requestHeaders.isEmpty()
+                ? Map.of()
+                : Map.copyOf(new LinkedHashMap<>(requestHeaders));
     }
 
     /** The logical name of the client (value of {@code @ReactiveHttpClient(name = ...)}). */
@@ -204,6 +235,12 @@ public final class HttpClientObserverEvent {
 
     /** Resolved outbound server port, or {@code null} when unavailable. */
     public Integer getServerPort() { return serverPort; }
+
+    /** Final outbound request URL after WebClient filters have run, or {@code null} when unavailable. */
+    public String getRequestUrl() { return requestUrl; }
+
+    /** Final outbound request headers after WebClient filters have run. */
+    public Map<String, String> getRequestHeaders() { return requestHeaders; }
 
     /** {@code true} when {@link #getError()} is non-null. */
     public boolean isError() { return error != null; }

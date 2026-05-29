@@ -31,8 +31,9 @@ prototype `WebClient.Builder`. Optional companion modules, including
 outbound propagation.
 
 Per-client `ReactiveHttpClientCustomizer` beans run **after** starter per-client
-filters (correlation-ID propagation, outbound auth, exchange logging) are wired,
-so custom filters added here sit at the outermost position in the filter chain.
+filters such as correlation-ID propagation and outbound auth are registered. After
+customizers have been applied, the starter appends a final diagnostics filter that
+captures the outbound method, URL, and headers for exchange logging and observers.
 
 At DEBUG level, the starter logs the applied `WebClientCustomizer` classes and the
 per-client `ReactiveHttpClientCustomizer` classes in execution order.
@@ -87,7 +88,7 @@ public class RequestSigningCustomizer implements ReactiveHttpClientCustomizer {
 }
 ```
 
-No extra configuration is required — registering the bean is sufficient.
+No extra configuration is required — registering the bean is sufficient. When exchange logging uses the `headers` or `bodies` preset, the default logger reports this final outbound header after redaction rules are applied.
 
 ---
 

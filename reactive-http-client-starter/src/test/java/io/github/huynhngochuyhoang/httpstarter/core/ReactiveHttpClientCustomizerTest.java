@@ -1,36 +1,37 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.reactive.function.client.ClientRequest;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * Tests for {@link ReactiveHttpClientCustomizer} — both the interface contract
@@ -231,6 +232,38 @@ class ReactiveHttpClientCustomizerTest {
         }
     }
 
+
+    @Test
+    void factoryClientExchangeLoggingSeesHeadersAddedByCustomizerFilter() throws Exception {
+        AtomicReference<HttpExchangeLogContext> logged = new AtomicReference<>();
+        ReactiveHttpClientCustomizer customizer = builder -> builder.filter((request, next) -> next.exchange(
+                ClientRequest.from(request)
+                        .header("X-Request-ID", "req-factory")
+                        .build()));
+        ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
+        clientConfig.setBaseUrl("http://localhost:8080");
+        clientConfig.setExchangeLoggingEnabled(true);
+        clientConfig.setLogPreset(ReactiveHttpClientProperties.LogPreset.HEADERS);
+        WebClient.Builder builder = WebClient.builder()
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body("pong")
+                        .build()));
+
+        ReactiveHttpClientFactoryBean<PingClient> factoryBean = buildFactoryBean(
+                List.of(customizer), builder, clientConfig, new RecordingDefaultHttpExchangeLogger(logged));
+        try {
+            PingClient client = factoryBean.getObject();
+            StepVerifier.create(client.ping())
+                    .expectNext("pong")
+                    .verifyComplete();
+
+            assertEquals("req-factory", logged.get().requestHeaders().get("X-Request-ID"));
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
     @Test
     void factoryBean_buildsSuccessfully_whenNoCustomizersRegistered() throws Exception {
         ReactiveHttpClientFactoryBean<PingClient> factoryBean = buildFactoryBean(List.of());
@@ -252,6 +285,17 @@ class ReactiveHttpClientCustomizerTest {
     @SuppressWarnings("unchecked")
     private ReactiveHttpClientFactoryBean<PingClient> buildFactoryBean(
             List<ReactiveHttpClientCustomizer> customizers) {
+        ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
+        clientConfig.setBaseUrl("http://localhost:8080");
+        return buildFactoryBean(customizers, WebClient.builder(), clientConfig, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ReactiveHttpClientFactoryBean<PingClient> buildFactoryBean(
+            List<ReactiveHttpClientCustomizer> customizers,
+            WebClient.Builder builder,
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            DefaultHttpExchangeLogger defaultLogger) {
 
         ApplicationContext ctx = mock(ApplicationContext.class);
 
@@ -261,15 +305,12 @@ class ReactiveHttpClientCustomizerTest {
         when(defaultProvider.getIfAvailable()).thenReturn(null);
         lenient().when(defaultProvider.getIfAvailable(any(Supplier.class)))
                 .thenAnswer(inv -> inv.getArgument(0, Supplier.class).get());
-        lenient().when(defaultProvider.orderedStream()).thenReturn(Stream.empty());
+        lenient().when(defaultProvider.orderedStream()).thenAnswer(inv -> Stream.empty());
         when(ctx.getBeanProvider(any(Class.class))).thenReturn((ObjectProvider) defaultProvider);
 
         // Properties (with a base-url so the factory bean doesn't throw)
         ObjectProvider<ReactiveHttpClientProperties> propsProvider = mock(ObjectProvider.class);
         ReactiveHttpClientProperties props = new ReactiveHttpClientProperties();
-        ReactiveHttpClientProperties.ClientConfig clientConfig =
-                new ReactiveHttpClientProperties.ClientConfig();
-        clientConfig.setBaseUrl("http://localhost:8080");
         props.getClients().put("test-client", clientConfig);
         when(propsProvider.getIfAvailable(any(Supplier.class))).thenReturn(props);
         when(ctx.getBeanProvider(ReactiveHttpClientProperties.class)).thenReturn(propsProvider);
@@ -286,8 +327,14 @@ class ReactiveHttpClientCustomizerTest {
 
         // WebClient.Builder
         ObjectProvider<WebClient.Builder> builderProvider = mock(ObjectProvider.class);
-        when(builderProvider.getIfAvailable(any(Supplier.class))).thenReturn(WebClient.builder());
+        when(builderProvider.getIfAvailable(any(Supplier.class))).thenReturn(builder);
         when(ctx.getBeanProvider(WebClient.Builder.class)).thenReturn(builderProvider);
+
+        if (defaultLogger != null) {
+            ObjectProvider<DefaultHttpExchangeLogger> loggerProvider = mock(ObjectProvider.class);
+            when(loggerProvider.getIfAvailable()).thenReturn(defaultLogger);
+            when(ctx.getBeanProvider(DefaultHttpExchangeLogger.class)).thenReturn(loggerProvider);
+        }
 
         // ReactiveHttpClientCustomizer
         ObjectProvider<ReactiveHttpClientCustomizer> customizerProvider = mock(ObjectProvider.class);
@@ -307,6 +354,19 @@ class ReactiveHttpClientCustomizerTest {
     }
 
     // ---- Static inner classes for @Order test ----------------------------
+
+    private static class RecordingDefaultHttpExchangeLogger extends DefaultHttpExchangeLogger {
+        private final AtomicReference<HttpExchangeLogContext> logged;
+
+        private RecordingDefaultHttpExchangeLogger(AtomicReference<HttpExchangeLogContext> logged) {
+            this.logged = logged;
+        }
+
+        @Override
+        public void log(HttpExchangeLogContext context) {
+            logged.set(context);
+        }
+    }
 
     @Order(1)
     private static class Order1Customizer implements ReactiveHttpClientCustomizer {
