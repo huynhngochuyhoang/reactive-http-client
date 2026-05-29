@@ -89,6 +89,7 @@ Every call through the mock proxy is recorded. `RecordedExchange` exposes:
 | `headers()` | `HttpHeaders` | Request headers |
 | `contentType()` | `MediaType` | `Content-Type` header of the request |
 | `header(String)` | `String` | First value of a named header, or `null` |
+| `idempotencyKey()` | `String` | First `Idempotency-Key` value, or `null` |
 | `statusCode()` | `HttpStatusCode` | HTTP status selected by the mock response handler |
 | `statusCodeValue()` | `int` | Numeric HTTP status selected by the mock response handler |
 | `bodyAsString()` | `String` | UTF-8 decoded request body; empty string if no body was written |
@@ -148,6 +149,9 @@ Available assertion methods:
 | `hasHeader(String, String)` | Asserts one request header value |
 | `hasHeaderValues(String, String...)` | Asserts repeated request header values in order |
 | `hasRedactedHeader(String)` | Asserts the header value is `[REDACTED]` |
+| `hasIdempotencyKey()` | Asserts `Idempotency-Key` is present and non-blank |
+| `hasIdempotencyKey(String)` | Asserts the `Idempotency-Key` value |
+| `doesNotHaveIdempotencyKey()` | Asserts `Idempotency-Key` is absent |
 | `doesNotHaveHeader(String)` | Asserts a request header is absent |
 | `hasCapturedCorrelationId(String)` | Asserts the captured starter correlation ID |
 | `doesNotHaveCapturedCorrelationId()` | Asserts no starter correlation ID was captured |
@@ -158,6 +162,50 @@ Available assertion methods:
 | `hasBody(String)` | Asserts the full UTF-8 request body |
 | `bodyContains(String)` | Asserts a substring of the UTF-8 request body |
 | `hasStatusCode(int)` | Asserts the served HTTP status |
+| `RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(int)` | Asserts total recorded attempts |
+| `RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(HttpMethod, String, int)` | Asserts attempts for one method/path |
+
+---
+
+
+## Retry and idempotency assertions
+
+Use `@IdempotencyKey` plus the mock retry helper when a test needs to prove a transient downstream failure is retried with the same key:
+
+```java
+interface PaymentClient {
+    @POST("/payments")
+    @IdempotencyKey
+    Mono<String> create(@Body String body);
+}
+
+AtomicInteger served = new AtomicInteger();
+MockReactiveHttpClient<PaymentClient> mock = MockReactiveHttpClient
+        .forClient(PaymentClient.class)
+        .retry(2, "POST")
+        .respondTo(HttpMethod.POST, "/payments", exchange -> {
+            if (served.incrementAndGet() == 1) {
+                return MockReactiveHttpClient.json(503, "{\"error\":\"temporary\"}");
+            }
+            return MockReactiveHttpClient.json(201, "\"created\"");
+        })
+        .build();
+
+StepVerifier.create(mock.proxy().create("{\"amount\":10}"))
+        .expectNext("\"created\"")
+        .verifyComplete();
+
+RecordedExchangeAssertions.assertThat(mock)
+        .hasAttemptCount(2)
+        .hasAttemptCount(HttpMethod.POST, "/payments", 2);
+
+RecordedExchangeAssertions.assertThat(mock.exchanges().get(0))
+        .hasIdempotencyKey();
+RecordedExchangeAssertions.assertThat(mock.exchanges().get(1))
+        .hasIdempotencyKey(mock.exchanges().get(0).idempotencyKey());
+```
+
+The mock retry helper is intentionally small: it retries matching methods inside tests and records each outbound attempt. Production retry semantics still come from your application Resilience4j configuration.
 
 ---
 
