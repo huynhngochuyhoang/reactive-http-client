@@ -29,6 +29,8 @@ record RequestPlan(
         List<NamedArgumentBinding> queryParams,
         List<NamedArgumentBinding> headerParams,
         Set<Integer> headerMapParams,
+        List<NamedArgumentBinding> idempotencyKeyParams,
+        String generatedIdempotencyKeyHeader,
         int bodyIndex,
         boolean multipart,
         List<FormFieldBinding> formFields,
@@ -57,6 +59,8 @@ record RequestPlan(
                 namedBindings(meta.getQueryParams()),
                 namedBindings(meta.getHeaderParams()),
                 Set.copyOf(meta.getHeaderMapParams()),
+                namedBindings(meta.getIdempotencyKeyParams()),
+                meta.getGeneratedIdempotencyKeyHeader(),
                 meta.getBodyIndex(),
                 meta.isMultipart(),
                 formFieldBindings(meta.getFormFieldParams()),
@@ -68,7 +72,8 @@ record RequestPlan(
                 meta.getCircuitBreakerInstanceName(),
                 meta.getBulkheadInstanceName(),
                 meta.getRateLimiterInstanceName(),
-                retrySafety(meta.getHttpMethod(), meta.getHeaderParams()),
+                retrySafety(meta.getHttpMethod(), meta.getHeaderParams(),
+                        meta.getIdempotencyKeyParams(), meta.getGeneratedIdempotencyKeyHeader()),
                 bodyRepeatability(meta),
                 bodyType(meta));
     }
@@ -91,12 +96,17 @@ record RequestPlan(
                 .toList();
     }
 
-    private static RetrySafetyClassification retrySafety(String httpMethod, Map<Integer, String> headerParams) {
+    private static RetrySafetyClassification retrySafety(String httpMethod,
+                                                        Map<Integer, String> headerParams,
+                                                        Map<Integer, String> idempotencyKeyParams,
+                                                        String generatedIdempotencyKeyHeader) {
         if (ReactiveClientInvocationHandler.isSafeRetryMethod(httpMethod)) {
             return RetrySafetyClassification.SAFE_METHOD;
         }
         boolean hasIdempotencyKeyHeader = headerParams.values().stream()
-                .anyMatch(name -> "Idempotency-Key".equalsIgnoreCase(name));
+                .anyMatch(name -> "Idempotency-Key".equalsIgnoreCase(name))
+                || !idempotencyKeyParams.isEmpty()
+                || generatedIdempotencyKeyHeader != null;
         return hasIdempotencyKeyHeader
                 ? RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY
                 : RetrySafetyClassification.UNSAFE_RETRY;

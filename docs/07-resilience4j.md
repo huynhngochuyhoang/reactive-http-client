@@ -60,10 +60,10 @@ A retry-enabled method is classified as:
 | Classification | Meaning | Diagnostic behavior |
 |---|---|---|
 | `SAFE_METHOD` | `GET`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`, or `TRACE` | No unsafe retry warning |
-| `EXPLICIT_IDEMPOTENCY_KEY` | The method invocation has an `Idempotency-Key` header from `@HeaderParam`, a header map, or client default headers | No unsafe retry warning |
+| `EXPLICIT_IDEMPOTENCY_KEY` | The method invocation has an idempotency key from `@IdempotencyKey`, `@HeaderParam`, a header map, request context, or client default headers | No unsafe retry warning |
 | `UNSAFE_RETRY` | Retry is enabled for another HTTP method without an idempotency key | Warn once per client method and keep existing retry behavior |
 
-The starter does not provide downstream idempotency storage. The header is only a signal that your downstream service can use to make duplicate attempts safe.
+`@IdempotencyKey` can be used on a parameter to pass the key explicitly, or on a method to generate one key per invocation. `RequestContext.withIdempotencyKey(ctx, value)` can supply the key through Reactor context for one subscribed call. The starter does not provide downstream idempotency storage. The header is only a signal that your downstream service can use to make duplicate attempts safe.
 
 ### Request body repeatability
 

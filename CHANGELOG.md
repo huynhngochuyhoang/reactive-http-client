@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Request body repeatability diagnostics.** Added retry diagnostics for
   non-repeatable and application-owned request bodies without buffering large or
   streaming uploads.
+- **Idempotency key support.** Added `@IdempotencyKey` and
+  `RequestContext.withIdempotencyKey(...)` for opt-in outbound idempotency keys
+  with caller/default/context/generated precedence.
 
 ### Fixed
 
@@ -26,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed AWS SigV4 signing for unsupported publisher request bodies by failing
   before sending a request instead of signing an empty payload that does not
   match the streamed body bytes.
+- Fixed generated `@IdempotencyKey` headers so each cold publisher subscription
+  gets a fresh key, retries keep the same key, and lifecycle/logging callbacks
+  read subscription-local prepared outbound headers.
+- Fixed request serialization failures so lifecycle/observer attempt state starts
+  before auth body serialization can fail.
+- Fixed generated `@IdempotencyKey` concurrent subscriptions so lifecycle hooks
+  and observer events report subscription-local attempt counts instead of
+  invocation-shared counts.
 
 ### Docs
 
@@ -33,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   canonical Resilience4j operator order.
 - Documented repeatable, non-repeatable, and application-owned request body
   shapes for retry-enabled clients.
+- Documented idempotency key precedence and clarified that the starter does not
+  provide downstream idempotency storage.
 
 ---
 

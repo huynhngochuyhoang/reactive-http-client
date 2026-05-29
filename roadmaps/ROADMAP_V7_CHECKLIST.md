@@ -53,24 +53,24 @@
 
 ## Priority 3 — Idempotency Key Support and Header Precedence
 
-### [ ] 1.1 Idempotency key support for outbound requests
-- [ ] Add an explicit idempotency-key model for outbound calls.
-- [ ] Support the default `Idempotency-Key` header.
-- [ ] Allow per-client header override only if it fits existing configuration
-  patterns cleanly.
-- [ ] Keep caller-supplied idempotency headers authoritative.
-- [ ] Avoid implicit key generation for every request.
-- [ ] Document that the starter does not provide downstream idempotency storage.
+### [x] 1.1 Idempotency key support for outbound requests
+- [x] Add an explicit idempotency-key model for outbound calls.
+- [x] Support the default `Idempotency-Key` header.
+- [x] Leave per-client header override out because it does not fit existing
+  configuration patterns cleanly yet.
+- [x] Keep caller-supplied idempotency headers authoritative.
+- [x] Avoid implicit key generation for every request.
+- [x] Document that the starter does not provide downstream idempotency storage.
 
-### [ ] 3.3 Header precedence with generated idempotency keys
-- [ ] Test precedence against annotation headers.
-- [ ] Test precedence against method header parameters.
-- [ ] Test precedence against configured default headers.
-- [ ] Test precedence against request context or generated keys.
-- [ ] Test precedence against customizers.
-- [ ] Verify generated or contextual keys are scoped to one invocation.
-- [ ] Verify generated keys do not bleed across concurrent requests.
-- [ ] Keep logging and test-helper behavior aligned with existing header
+### [x] 3.3 Header precedence with generated idempotency keys
+- [x] Test precedence against annotation headers.
+- [x] Test precedence against method header parameters.
+- [x] Test precedence against configured default headers.
+- [x] Test precedence against request context or generated keys.
+- [x] Test precedence against customizers.
+- [x] Verify generated or contextual keys are scoped to one invocation.
+- [x] Verify generated keys do not bleed across concurrent requests.
+- [x] Keep logging and test-helper behavior aligned with existing header
   redaction policy.
 
 ---

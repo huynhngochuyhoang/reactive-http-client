@@ -139,6 +139,21 @@ Mono<Void> publish(
         @HeaderParam Map<String, String> extraHeaders);
 ```
 
+### `@IdempotencyKey`
+
+Adds an outbound idempotency key without spelling the raw header name at every call site. On a parameter, the non-null argument value is sent as `Idempotency-Key`. On a method, the starter generates one key per invocation, but only for that annotated method.
+
+```java
+@POST("/payments")
+Mono<Payment> createPayment(@Body CreatePayment request, @IdempotencyKey String key);
+
+@POST("/payments")
+@IdempotencyKey
+Mono<Payment> createPayment(@Body CreatePayment request);
+```
+
+The starter only sends the key. It does not provide downstream idempotency storage or duplicate-response replay.
+
 ### `@Body`
 
 Marks the parameter that provides the request body. Only one `@Body` parameter is allowed per method; combining `@Body` with `@MultipartBody` on the same method is rejected at startup.

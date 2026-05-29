@@ -69,6 +69,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             ReactiveClientInvocationHandler.class.getName() + ".observedRequestUrl";
     static final String RESILIENCE_OPERATOR_ORDER = "retry -> rate-limiter -> circuit-breaker -> bulkhead";
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+    private static final Object GENERATED_IDEMPOTENCY_KEY_CONTEXT_KEY = new Object();
+    private static final Object PREPARED_RESOLVED_CONTEXT_KEY = new Object();
+    private static final Object ATTEMPT_COUNT_CONTEXT_KEY = new Object();
     private static final int MAX_LOGGER_CACHE_SIZE = 256;
     private static final int MAX_RESILIENCE_WARNING_KEYS = 256;
 
@@ -204,21 +207,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         AtomicLong start = new AtomicLong();
         AtomicBoolean firstAttempt = new AtomicBoolean(true);
-        AtomicInteger attemptCount = new AtomicInteger(0);
         AtomicReference<URI> requestUrl = new AtomicReference<>();
         HttpExchangeLogger exchangeLogger = resolveExchangeLogger(proxy, method, meta);
-
-        WebClient.RequestBodySpec requestSpec = webClient
-                .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
-                .uri(uriBuilder -> buildRequestUri(uriBuilder, effectiveApi.pathTemplate(), resolved));
 
         boolean hasAcceptHeader = resolved.headersIgnoreCase().containsKey(HttpHeaders.ACCEPT);
         String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         boolean hasContentTypeHeader = contentTypeHeader != null;
-        if (!hasAcceptHeader) {
-            requestSpec = requestSpec.accept(MediaType.APPLICATION_JSON);
-        }
-        WebClient.RequestBodySpec baseRequestSpec = requestSpec;
 
         long timeoutMs = resolveTimeoutMs(plan, effectiveApi.timeoutMs());
 
@@ -226,11 +220,39 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 ? buildMultipartBody(plan, args)
                 : null;
 
+        AtomicReference<HttpStatusCode> responseStatus = new AtomicReference<>();
+        AtomicReference<Map<String, List<String>>> responseHeaders = new AtomicReference<>(Map.of());
+        AtomicReference<Throwable> terminalError = new AtomicReference<>();
+
+        // Resolve observer once per invocation to avoid repeated volatile reads
+        HttpClientObserver observer = getObserver();
+        List<ReactiveHttpClientLifecycleHook> lifecycleHooks = getLifecycleHooks();
+
         // Cache the serialized body so retries reuse the bytes without re-serializing.
         Mono<SerializedRequestBody> serializedBodyMono = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader).cache();
-        Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = serializedBodyMono
-                .map(serializedRequestBody -> {
-                    WebClient.RequestBodySpec preparedRequestSpec = baseRequestSpec;
+        Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = Mono.deferContextual(context -> {
+            AtomicReference<String> generatedIdempotencyKey = generatedIdempotencyKeyState(context);
+            AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolvedRef = preparedResolvedState(context, resolved);
+            AtomicInteger attemptCount = attemptCountState(context);
+            RequestArgumentResolver.ResolvedArgs preparedResolved = applyIdempotencyKey(plan, resolved, context, generatedIdempotencyKey);
+            preparedResolvedRef.set(preparedResolved);
+            int attempt = attemptCount.incrementAndGet();
+            start.compareAndSet(0L, System.currentTimeMillis());
+            responseStatus.set(null);
+            responseHeaders.set(Map.of());
+            terminalError.set(null);
+            notifyLifecycleAttempt(lifecycleHooks, plan, effectiveApi, preparedResolved, requestUrl.get(), null, null, attempt);
+            if (exchangeLogger == null && firstAttempt.compareAndSet(true, false)) {
+                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), start.get());
+            }
+
+            return serializedBodyMono.map(serializedRequestBody -> {
+                    WebClient.RequestBodySpec preparedRequestSpec = webClient
+                            .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
+                            .uri(uriBuilder -> buildRequestUri(uriBuilder, effectiveApi.pathTemplate(), resolved));
+                    if (!hasAcceptHeader) {
+                        preparedRequestSpec = preparedRequestSpec.accept(MediaType.APPLICATION_JSON);
+                    }
                     if (serializedRequestBody.originalBody() != null) {
                         preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, serializedRequestBody.originalBody());
                     }
@@ -238,7 +260,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, serializedRequestBody.rawBody());
                     }
 
-                    resolved.headers().forEach(preparedRequestSpec::header);
+                    preparedResolved.headers().forEach(preparedRequestSpec::header);
 
                     WebClient.RequestHeadersSpec<?> requestHeadersSpec;
                     if (multipartBody != null) {
@@ -262,114 +284,90 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                             || timeoutMs > 0;
                     return configureNativeRequest(requestHeadersSpec, timeoutMs, shouldApplyResponseTimeout, requestUrl);
                 });
-
-        AtomicReference<HttpStatusCode> responseStatus = new AtomicReference<>();
-        AtomicReference<Map<String, List<String>>> responseHeaders = new AtomicReference<>(Map.of());
-        AtomicReference<Throwable> terminalError = new AtomicReference<>();
-
-        // Resolve observer once per invocation to avoid repeated volatile reads
-        HttpClientObserver observer = getObserver();
-        List<ReactiveHttpClientLifecycleHook> lifecycleHooks = getLifecycleHooks();
+        });
 
         if (plan.returnsFlux()) {
             Flux<?> flux = exchange(requestHeadersSpecMono, responseStatus, responseHeaders,
-                    response -> buildFlux(response, plan.responseType()))
-                    .doOnSubscribe(subscription -> {
-                int attempt = attemptCount.incrementAndGet();
-                start.compareAndSet(0L, System.currentTimeMillis());
-                responseStatus.set(null);
-                responseHeaders.set(Map.of());
-                terminalError.set(null);
-                notifyLifecycleAttempt(lifecycleHooks, plan, effectiveApi, resolved, requestUrl.get(),
-                        responseStatus.get(), terminalError.get(), attempt);
-                if (exchangeLogger == null && firstAttempt.compareAndSet(true, false)) {
-                    logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), start.get());
-                }
-                    });
+                    response -> buildFlux(response, plan.responseType()));
             flux = applyResilienceFlux(flux, plan, effectiveApi.httpMethod(), resolved);
             if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
-                AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(Map.of());
-                AtomicBoolean reported = new AtomicBoolean(false);
                 Flux<?> capturedFlux = flux;
                 flux = Flux.deferContextual(ctx -> {
-                    inboundHeadersRef.set(ctx.hasKey(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
-                            ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
-                            : Map.of());
-                    return capturedFlux;
-                })
-                .doOnComplete(() -> notifyLifecycleSuccess(lifecycleHooks, plan, effectiveApi, resolved, requestUrl.get(),
-                        responseStatus.get(), attemptCount.get()))
-                .doOnError(terminalError::set)
-                .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, resolved, requestUrl.get(),
-                        responseStatus.get(), error, attemptCount.get()))
-                .doOnTerminate(() -> {
-                    if (reported.compareAndSet(false, true))
-                        reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), resolved, requestUrl.get(), start.get(),
-                                responseStatus.get(), responseHeaders.get(), null, terminalError.get(), inboundHeadersRef.get(), attemptCount.get(), requestBytes);
-                })
-                .doOnCancel(() -> {
-                    CancellationException cancellation = new CancellationException("Request was cancelled");
-                    notifyLifecycleCancel(lifecycleHooks, plan, effectiveApi, resolved, requestUrl.get(),
-                            responseStatus.get(), cancellation, attemptCount.get());
-                    if (reported.compareAndSet(false, true))
-                        reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), resolved, requestUrl.get(), start.get(),
-                                responseStatus.get(), responseHeaders.get(), null, cancellation, inboundHeadersRef.get(), attemptCount.get(), requestBytes);
+                    AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(
+                            ctx.hasKey(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                                    ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                                    : Map.of());
+                    AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolvedRef = preparedResolvedState(ctx, resolved);
+                    AtomicInteger attemptCount = attemptCountState(ctx);
+                    AtomicBoolean reported = new AtomicBoolean(false);
+                    return capturedFlux
+                            .doOnComplete(() -> notifyLifecycleSuccess(lifecycleHooks, plan, effectiveApi, preparedResolvedRef.get(), requestUrl.get(),
+                                    responseStatus.get(), attemptCount.get()))
+                            .doOnError(terminalError::set)
+                            .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, preparedResolvedRef.get(), requestUrl.get(),
+                                    responseStatus.get(), error, attemptCount.get()))
+                            .doOnTerminate(() -> {
+                                if (reported.compareAndSet(false, true))
+                                    reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), start.get(),
+                                            responseStatus.get(), responseHeaders.get(), null, terminalError.get(), inboundHeadersRef.get(), attemptCount.get(), requestBytes);
+                            })
+                            .doOnCancel(() -> {
+                                CancellationException cancellation = new CancellationException("Request was cancelled");
+                                notifyLifecycleAttemptFallbackIfNeeded(lifecycleHooks, plan, effectiveApi, resolved, requestUrl,
+                                        responseStatus, responseHeaders, terminalError, attemptCount, start, firstAttempt, exchangeLogger);
+                                notifyLifecycleCancel(lifecycleHooks, plan, effectiveApi, preparedResolvedRef.get(), requestUrl.get(),
+                                        responseStatus.get(), cancellation, attemptCount.get());
+                                if (reported.compareAndSet(false, true))
+                                    reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), start.get(),
+                                            responseStatus.get(), responseHeaders.get(), null, cancellation, inboundHeadersRef.get(), attemptCount.get(), requestBytes);
+                            });
                 });
             }
-            return flux;
+            return flux.contextWrite(context -> withSubscriptionState(context, resolved));
         }
 
-        AtomicReference<Object> terminalBody = new AtomicReference<>();
         Mono<?> mono = exchange(requestHeadersSpecMono, responseStatus, responseHeaders,
                 response -> buildMono(response, plan.responseType()))
-                .next()
-                .doOnSubscribe(subscription -> {
-            int attempt = attemptCount.incrementAndGet();
-            start.compareAndSet(0L, System.currentTimeMillis());
-            responseStatus.set(null);
-            responseHeaders.set(Map.of());
-            terminalError.set(null);
-            terminalBody.set(null);
-            notifyLifecycleAttempt(lifecycleHooks, plan, effectiveApi, resolved, requestUrl.get(),
-                    responseStatus.get(), terminalError.get(), attempt);
-            if (exchangeLogger == null && firstAttempt.compareAndSet(true, false)) {
-                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), start.get());
-            }
-                });
+                .next();
         mono = applyResilienceMono(mono, plan, effectiveApi.httpMethod(), resolved);
         if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
-            AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(Map.of());
-            AtomicBoolean reported = new AtomicBoolean(false);
             Mono<?> capturedMono = mono;
             mono = Mono.deferContextual(ctx -> {
-                inboundHeadersRef.set(ctx.hasKey(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
-                        ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
-                        : Map.of());
-                return capturedMono;
-            })
-            .doOnSuccess(body -> {
-                terminalBody.set(body);
-                notifyLifecycleSuccess(lifecycleHooks, plan, effectiveApi, resolved, requestUrl.get(),
-                        responseStatus.get(), attemptCount.get());
-            })
-            .doOnError(terminalError::set)
-            .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, resolved, requestUrl.get(),
-                    responseStatus.get(), error, attemptCount.get()))
-            .doOnTerminate(() -> {
-                if (reported.compareAndSet(false, true))
-                    reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), resolved, requestUrl.get(), start.get(),
-                            responseStatus.get(), responseHeaders.get(), terminalBody.get(), terminalError.get(), inboundHeadersRef.get(), attemptCount.get(), requestBytes);
-            })
-            .doOnCancel(() -> {
-                CancellationException cancellation = new CancellationException("Request was cancelled");
-                notifyLifecycleCancel(lifecycleHooks, plan, effectiveApi, resolved, requestUrl.get(),
-                        responseStatus.get(), cancellation, attemptCount.get());
-                if (reported.compareAndSet(false, true))
-                    reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), resolved, requestUrl.get(), start.get(),
-                            responseStatus.get(), responseHeaders.get(), null, cancellation, inboundHeadersRef.get(), attemptCount.get(), requestBytes);
+                AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(
+                        ctx.hasKey(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                                ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                                : Map.of());
+                AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolvedRef = preparedResolvedState(ctx, resolved);
+                    AtomicInteger attemptCount = attemptCountState(ctx);
+                AtomicReference<Object> terminalBody = new AtomicReference<>();
+                AtomicBoolean reported = new AtomicBoolean(false);
+                return capturedMono
+                        .doOnSuccess(body -> {
+                            terminalBody.set(body);
+                            notifyLifecycleSuccess(lifecycleHooks, plan, effectiveApi, preparedResolvedRef.get(), requestUrl.get(),
+                                    responseStatus.get(), attemptCount.get());
+                        })
+                        .doOnError(terminalError::set)
+                        .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, preparedResolvedRef.get(), requestUrl.get(),
+                                responseStatus.get(), error, attemptCount.get()))
+                        .doOnTerminate(() -> {
+                            if (reported.compareAndSet(false, true))
+                                reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), start.get(),
+                                        responseStatus.get(), responseHeaders.get(), terminalBody.get(), terminalError.get(), inboundHeadersRef.get(), attemptCount.get(), requestBytes);
+                        })
+                        .doOnCancel(() -> {
+                            CancellationException cancellation = new CancellationException("Request was cancelled");
+                            notifyLifecycleAttemptFallbackIfNeeded(lifecycleHooks, plan, effectiveApi, resolved, requestUrl,
+                                    responseStatus, responseHeaders, terminalError, attemptCount, start, firstAttempt, exchangeLogger);
+                            notifyLifecycleCancel(lifecycleHooks, plan, effectiveApi, preparedResolvedRef.get(), requestUrl.get(),
+                                    responseStatus.get(), cancellation, attemptCount.get());
+                            if (reported.compareAndSet(false, true))
+                                reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), preparedResolvedRef.get(), requestUrl.get(), start.get(),
+                                        responseStatus.get(), responseHeaders.get(), null, cancellation, inboundHeadersRef.get(), attemptCount.get(), requestBytes);
+                        });
             });
         }
-        return mono;
+        return mono.contextWrite(context -> withSubscriptionState(context, resolved));
     }
 
     // -------------------------------------------------------------------------
@@ -506,8 +504,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (isRetryableMethod(httpMethod)) {
             String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
             if (isRetryOperatorAvailable()) {
-                logUnsafeRetryIfNeeded(plan, resilience, httpMethod, resolved, retryInstance);
-                logRetryBodyRiskIfNeeded(plan, httpMethod, retryInstance, resolved.body());
+                Mono<?> retryCandidate = mono;
+                mono = Mono.deferContextual(context -> {
+                    RequestArgumentResolver.ResolvedArgs safetyResolved = applyContextIdempotencyKey(plan, resolved, context);
+                    logUnsafeRetryIfNeeded(plan, resilience, httpMethod, safetyResolved, retryInstance);
+                    logRetryBodyRiskIfNeeded(plan, httpMethod, retryInstance, resolved.body());
+                    return retryCandidate;
+                });
             }
             mono = applyRetryMono(mono, retryInstance);
         }
@@ -527,8 +530,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (isRetryableMethod(httpMethod)) {
             String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
             if (isRetryOperatorAvailable()) {
-                logUnsafeRetryIfNeeded(plan, resilience, httpMethod, resolved, retryInstance);
-                logRetryBodyRiskIfNeeded(plan, httpMethod, retryInstance, resolved.body());
+                Flux<?> retryCandidate = flux;
+                flux = Flux.deferContextual(context -> {
+                    RequestArgumentResolver.ResolvedArgs safetyResolved = applyContextIdempotencyKey(plan, resolved, context);
+                    logUnsafeRetryIfNeeded(plan, resilience, httpMethod, safetyResolved, retryInstance);
+                    logRetryBodyRiskIfNeeded(plan, httpMethod, retryInstance, resolved.body());
+                    return retryCandidate;
+                });
             }
             flux = applyRetryFlux(flux, retryInstance);
         }
@@ -617,16 +625,16 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (isSafeRetryMethod(httpMethod) || plan.retrySafety() == RetrySafetyClassification.SAFE_METHOD) {
             return RetrySafetyClassification.SAFE_METHOD;
         }
-        if (hasIdempotencyKeyHeaderValue(resolved.headersIgnoreCase())) {
+        if (plan.retrySafety() == RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY
+                && StringUtils.hasText(plan.generatedIdempotencyKeyHeader())) {
+            return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
+        }
+        if (hasIdempotencyKeyHeaderValue(plan, resolved.headersIgnoreCase())) {
             return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
         }
         return RetrySafetyClassification.UNSAFE_RETRY;
     }
 
-    private static boolean hasIdempotencyKeyHeaderValue(Map<String, String> headersIgnoreCase) {
-        String value = headersIgnoreCase.get(IDEMPOTENCY_KEY_HEADER);
-        return StringUtils.hasText(value);
-    }
 
     static boolean isSafeRetryMethod(String httpMethod) {
         return httpMethod != null
@@ -918,6 +926,32 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
         log.debug("Resilience4j {} operator not applied (instance='{}'): {}",
                 operatorType, instanceName, error.getMessage());
+    }
+
+    private void notifyLifecycleAttemptFallbackIfNeeded(
+            List<ReactiveHttpClientLifecycleHook> hooks,
+            RequestPlan plan,
+            EffectiveApi effectiveApi,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            AtomicReference<URI> requestUrl,
+            AtomicReference<HttpStatusCode> responseStatus,
+            AtomicReference<Map<String, List<String>>> responseHeaders,
+            AtomicReference<Throwable> terminalError,
+            AtomicInteger attemptCount,
+            AtomicLong start,
+            AtomicBoolean firstAttempt,
+            HttpExchangeLogger exchangeLogger) {
+        if (!attemptCount.compareAndSet(0, 1)) {
+            return;
+        }
+        start.compareAndSet(0L, System.currentTimeMillis());
+        responseStatus.set(null);
+        responseHeaders.set(Map.of());
+        terminalError.set(null);
+        notifyLifecycleAttempt(hooks, plan, effectiveApi, resolved, requestUrl.get(), null, null, 1);
+        if (exchangeLogger == null && firstAttempt.compareAndSet(true, false)) {
+            logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), start.get());
+        }
     }
 
     private void notifyLifecycleAttempt(
@@ -1389,6 +1423,114 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             }
             merged.put(name, value);
         });
+        return new RequestArgumentResolver.ResolvedArgs(
+                resolved.pathVars(),
+                resolved.queryParams(),
+                merged,
+                resolved.body());
+    }
+
+    private RequestArgumentResolver.ResolvedArgs applyIdempotencyKey(RequestPlan plan,
+                                                                     RequestArgumentResolver.ResolvedArgs resolved,
+                                                                     reactor.util.context.ContextView context,
+                                                                     AtomicReference<String> generatedIdempotencyKey) {
+        RequestArgumentResolver.ResolvedArgs contextResolved = applyContextIdempotencyKey(plan, resolved, context);
+        if (contextResolved != resolved || hasIdempotencyKeyHeaderValue(plan, contextResolved.headersIgnoreCase())) {
+            return contextResolved;
+        }
+        if (StringUtils.hasText(plan.generatedIdempotencyKeyHeader())) {
+            return withHeader(resolved, plan.generatedIdempotencyKeyHeader(), generatedIdempotencyKey(generatedIdempotencyKey));
+        }
+        return resolved;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static AtomicReference<String> generatedIdempotencyKeyState(reactor.util.context.ContextView context) {
+        return context.getOrDefault(GENERATED_IDEMPOTENCY_KEY_CONTEXT_KEY, new AtomicReference<String>());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolvedState(
+            reactor.util.context.ContextView context,
+            RequestArgumentResolver.ResolvedArgs fallback) {
+        return context.getOrDefault(PREPARED_RESOLVED_CONTEXT_KEY, new AtomicReference<>(fallback));
+    }
+
+    private static AtomicInteger attemptCountState(reactor.util.context.ContextView context) {
+        return context.getOrDefault(ATTEMPT_COUNT_CONTEXT_KEY, new AtomicInteger(0));
+    }
+
+    private static reactor.util.context.Context withSubscriptionState(
+            reactor.util.context.Context context,
+            RequestArgumentResolver.ResolvedArgs resolved) {
+        return context
+                .put(GENERATED_IDEMPOTENCY_KEY_CONTEXT_KEY, new AtomicReference<String>())
+                .put(PREPARED_RESOLVED_CONTEXT_KEY, new AtomicReference<>(resolved))
+                .put(ATTEMPT_COUNT_CONTEXT_KEY, new AtomicInteger(0));
+    }
+
+    private static String generatedIdempotencyKey(AtomicReference<String> generatedIdempotencyKey) {
+        String existing = generatedIdempotencyKey.get();
+        if (existing != null) {
+            return existing;
+        }
+        String candidate = UUID.randomUUID().toString();
+        return generatedIdempotencyKey.compareAndSet(null, candidate) ? candidate : generatedIdempotencyKey.get();
+    }
+
+    private RequestArgumentResolver.ResolvedArgs applyContextIdempotencyKey(RequestPlan plan,
+                                                                            RequestArgumentResolver.ResolvedArgs resolved,
+                                                                            reactor.util.context.ContextView context) {
+        if (hasIdempotencyKeyHeaderValue(plan, resolved.headersIgnoreCase())) {
+            return resolved;
+        }
+        String contextKey = RequestContext.idempotencyKey(context).orElse(null);
+        if (StringUtils.hasText(contextKey)) {
+            return withHeader(resolved, idempotencyHeaderName(plan), contextKey);
+        }
+        return resolved;
+    }
+
+    private static boolean hasIdempotencyKeyHeaderValue(RequestPlan plan, Map<String, String> headersIgnoreCase) {
+        if (hasHeaderValue(headersIgnoreCase, IDEMPOTENCY_KEY_HEADER)) {
+            return true;
+        }
+        if (StringUtils.hasText(plan.generatedIdempotencyKeyHeader())
+                && hasHeaderValue(headersIgnoreCase, plan.generatedIdempotencyKeyHeader())) {
+            return true;
+        }
+        return plan.idempotencyKeyParams().stream()
+                .map(RequestPlan.NamedArgumentBinding::name)
+                .anyMatch(headerName -> hasHeaderValue(headersIgnoreCase, headerName));
+    }
+
+    private static boolean hasHeaderValue(Map<String, String> headersIgnoreCase, String headerName) {
+        String value = headersIgnoreCase.get(headerName);
+        return StringUtils.hasText(value);
+    }
+
+    private static String idempotencyHeaderName(RequestPlan plan) {
+        if (StringUtils.hasText(plan.generatedIdempotencyKeyHeader())) {
+            return plan.generatedIdempotencyKeyHeader();
+        }
+        return plan.idempotencyKeyParams().stream()
+                .map(RequestPlan.NamedArgumentBinding::name)
+                .filter(StringUtils::hasText)
+                .findFirst()
+                .orElse(IDEMPOTENCY_KEY_HEADER);
+    }
+
+    private RequestArgumentResolver.ResolvedArgs withHeader(RequestArgumentResolver.ResolvedArgs resolved,
+                                                            String headerName,
+                                                            String headerValue) {
+        RequestArgumentResolver.validateHeaderName(headerName);
+        RequestArgumentResolver.validateHeaderValue(headerName, headerValue);
+        Map<String, String> merged = new LinkedHashMap<>(resolved.headers());
+        String existingName = findHeaderNameIgnoreCase(merged, headerName);
+        if (existingName != null) {
+            merged.remove(existingName);
+        }
+        merged.put(headerName, headerValue);
         return new RequestArgumentResolver.ResolvedArgs(
                 resolved.pathVars(),
                 resolved.queryParams(),
