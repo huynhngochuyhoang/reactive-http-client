@@ -27,10 +27,12 @@ The starter has **two independent timeout layers** that act on every outbound ca
 
 Timeouts before response headers usually have no HTTP status metadata. Timeouts
 after headers, including failures while decoding a `Mono<T>` body or consuming a
-streaming `Flux<T>` body, preserve the observed status and response headers in
-lifecycle hooks, exchange logs, and observer events. Streaming responses are not
-buffered to enforce or report timeout state; already emitted items stay visible
-to the subscriber before the timeout error is propagated.
+streaming `Flux<T>` body, preserve the observed status in lifecycle hooks,
+exchange logs, and observer events. Response headers are retained for exchange
+logging, but lifecycle hooks and observer events do not expose response-header
+maps. Streaming responses are not buffered to enforce or report timeout state;
+already emitted items stay visible to the subscriber before the timeout error is
+propagated.
 
 ---
 

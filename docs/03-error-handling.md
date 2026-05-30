@@ -23,19 +23,21 @@ Both types expose:
 ## Error body retention policy
 
 `DefaultErrorDecoder` keeps a bounded copy of the error response body before it
-creates `HttpClientException`, `RemoteServiceException`, or an
-`ErrorResponseMapper` context:
+creates an exception or invokes an `ErrorResponseMapper`:
 
 | Response body kind | Retained cap | Applies to |
 |---|---:|---|
 | Default error bodies | 4 KiB | Generic exceptions and custom mappers |
-| `application/problem+json` bodies | 64 KiB | Problem Detail and other structured mappers |
+| `application/problem+json` bodies | 64 KiB | Mapper input for Problem Detail and other structured mappers |
 
+`HttpClientException`, `RemoteServiceException`, and the Problem Detail exception
+subclasses still expose at most 4 KiB from `getResponseBody()`. The larger
+Problem Detail cap is for mapper parsing reliability, so a structured mapper can
+read richer `application/problem+json` payloads before constructing its exception.
 Malformed `Content-Type` headers fall back to the default 4 KiB cap instead of
-aborting decoding, so the original payload is still available up to that limit.
-Bodies larger than the selected cap are truncated in exception and mapper
-contexts. Exchange logging still follows `log-preset`: metadata-only and headers
-presets omit bodies; only the `bodies` preset logs request/response payloads.
+aborting decoding. Exchange logging still follows `log-preset`: metadata-only
+and headers presets omit bodies; only the `bodies` preset logs request/response
+payloads.
 
 ---
 
