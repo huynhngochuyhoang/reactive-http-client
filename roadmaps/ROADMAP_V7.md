@@ -215,13 +215,13 @@ production debugging confusing when users need to verify final outbound headers.
 
 **Acceptance:**
 
-- [ ] Headers added by a `ReactiveHttpClientCustomizer` filter appear in default
+- [x] Headers added by a `ReactiveHttpClientCustomizer` filter appear in default
       exchange logs when header logging is enabled.
-- [ ] Built-in auth, correlation, and tracing headers are visible or redacted
+- [x] Built-in auth, correlation, and tracing headers are visible or redacted
       according to existing sensitive-header policy.
-- [ ] Final request diagnostics do not change the actual outbound request.
-- [ ] Streaming or non-repeatable bodies are not buffered for diagnostics.
-- [ ] Docs explain where to look when debugging customizer-added headers.
+- [x] Final request diagnostics do not change the actual outbound request.
+- [x] Streaming or non-repeatable bodies are not buffered for diagnostics.
+- [x] Docs explain where to look when debugging customizer-added headers.
 
 ---
 

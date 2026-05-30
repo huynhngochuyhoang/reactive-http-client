@@ -79,6 +79,7 @@ class DefaultHttpExchangeLoggerTest {
                 null);
 
         assertThat(context.logPreset()).isEqualTo(ReactiveHttpClientProperties.LogPreset.METADATA_ONLY);
+        assertThat(context.requestUrl()).isNull();
     }
 
     private static HttpExchangeLogContext context(ReactiveHttpClientProperties.LogPreset preset) {

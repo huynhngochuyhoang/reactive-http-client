@@ -90,18 +90,18 @@
 
 ## Priority 5 — Final Outbound Request Diagnostics
 
-### [ ] 2.4 Final outbound request diagnostics
-- [ ] Capture final outbound request method, URL, and headers after `WebClient`
+### [x] 2.4 Final outbound request diagnostics
+- [x] Capture final outbound request method, URL, and headers after `WebClient`
   filters mutate the request.
-- [ ] Feed final request headers into default exchange logging when available.
-- [ ] Feed final request metadata into observer diagnostics when available.
-- [ ] Verify headers added by `ReactiveHttpClientCustomizer` filters appear in
+- [x] Feed final request headers into default exchange logging when available.
+- [x] Feed final request metadata into observer diagnostics when available.
+- [x] Verify headers added by `ReactiveHttpClientCustomizer` filters appear in
   exchange logs when header logging is enabled.
-- [ ] Verify built-in auth, correlation, and tracing headers use existing
+- [x] Verify built-in auth, correlation, and tracing headers use existing
   sensitive-header redaction rules.
-- [ ] Verify final request diagnostics do not change the outbound request.
-- [ ] Verify streaming or non-repeatable bodies are not buffered for diagnostics.
-- [ ] Document declarative headers versus final outbound headers in customizer
+- [x] Verify final request diagnostics do not change the outbound request.
+- [x] Verify streaming or non-repeatable bodies are not buffered for diagnostics.
+- [x] Document declarative headers versus final outbound headers in customizer
   and exchange-logging docs.
 
 ---

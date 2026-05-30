@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with caller/default/context/generated precedence.
 - **Retry and idempotency test helpers.** Added `MockReactiveHttpClient`
   retry simulation plus fluent idempotency-key and attempt-count assertions.
+- **Final outbound request diagnostics.** Added final request URL/header snapshots
+  for exchange logging and observer events after `WebClient` filters mutate the
+  outbound request.
 
 ### Fixed
 
@@ -50,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   provide downstream idempotency storage.
 - Documented compact retry/idempotency test-helper usage for transient
   downstream failures.
+- Documented declarative versus final outbound headers for exchange logging and
+  customizer debugging.
 
 ---
 

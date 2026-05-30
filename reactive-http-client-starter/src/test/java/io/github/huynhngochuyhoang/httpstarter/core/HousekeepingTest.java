@@ -1,11 +1,12 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.LogHttpExchange;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
@@ -24,10 +25,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -231,6 +229,67 @@ class HousekeepingTest {
         assertNotNull(logged.get(), "client-wide log-exchange should route through DefaultHttpExchangeLogger");
         assertEquals(ReactiveHttpClientProperties.LogPreset.HEADERS, logged.get().logPreset());
         assertEquals(List.of("text/plain"), logged.get().responseHeaders().get(HttpHeaders.CONTENT_TYPE));
+    }
+
+
+    @Test
+    void exchangeLoggingUsesFinalRequestHeadersAddedByWebClientFilters() throws Throwable {
+        AtomicReference<HttpExchangeLogContext> logged = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter((request, next) -> next.exchange(
+                        org.springframework.web.reactive.function.client.ClientRequest.from(request)
+                                .header("X-Request-ID", "req-123")
+                                .header(HttpHeaders.AUTHORIZATION, "secret-token")
+                                .build()))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(req -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body("ok")
+                        .build()))
+                .build();
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setExchangeLoggingEnabled(true);
+        config.setLogPreset(ReactiveHttpClientProperties.LogPreset.HEADERS);
+
+        ReactiveClientInvocationHandler handler = buildHandlerWithCache(
+                webClient, new MethodMetadataCache(), config, new RecordingDefaultHttpExchangeLogger(logged));
+
+        StepVerifier.create(invokeViaSimpleClient(handler))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertNotNull(logged.get());
+        assertEquals("req-123", logged.get().requestHeaders().get("X-Request-ID"));
+        assertEquals("secret-token", logged.get().requestHeaders().get(HttpHeaders.AUTHORIZATION));
+        assertEquals("http://test.local/items", logged.get().requestUrl().toString());
+    }
+
+    @Test
+    void observerReceivesFinalRequestMetadataAddedByWebClientFilters() {
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter((request, next) -> next.exchange(
+                        org.springframework.web.reactive.function.client.ClientRequest.from(request)
+                                .header("X-Request-ID", "req-456")
+                                .build()))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(req -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body("ok")
+                        .build()))
+                .build();
+
+        ReactiveClientInvocationHandler handler = buildHandlerWithObserver(webClient, observed::set);
+
+        StepVerifier.create(invokeViaSimpleClient(handler))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertNotNull(observed.get());
+        assertEquals("http://test.local/items", observed.get().getRequestUrl());
+        assertEquals("req-456", observed.get().getRequestHeaders().get("X-Request-ID"));
     }
 
     @Test

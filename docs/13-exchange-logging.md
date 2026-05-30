@@ -88,10 +88,11 @@ The context record carries all exchange fields available to the logger:
 | `clientName` | `String` | Logical client name |
 | `httpMethod` | `String` | HTTP verb |
 | `pathTemplate` | `String` | Path template, e.g. `/users/{id}` |
+| `requestUrl` | `URI` | Final outbound request URL after `WebClient` filters have run, when available |
 | `pathVariables` | `Map<String, Object>` | Resolved path variable values |
 | `queryParameters` | `Map<String, List<Object>>` | Query parameters |
 | `inboundHeaders` | `Map<String, List<String>>` | Filtered snapshot of inbound request headers (populated by `InboundHeadersWebFilter`) |
-| `requestHeaders` | `Map<String, String>` | Outgoing request headers |
+| `requestHeaders` | `Map<String, String>` | Final outbound request headers after `WebClient` filters have run, when available; otherwise declarative resolved headers |
 | `requestBody` | `Object` | Request body (may be `null`) |
 | `responseStatus` | `Integer` | HTTP response status code (`null` on network error) |
 | `responseHeaders` | `Map<String, List<String>>` | Response headers |
@@ -107,6 +108,8 @@ The context record carries all exchange fields available to the logger:
 The built-in logger logs at `INFO` on success and `WARN` on error. Request/response headers and bodies are controlled by `log-preset`; omitted values are written as `{}` or `[OMITTED]`.
 
 Sensitive headers (`Authorization`, `Cookie`, `Set-Cookie`, `Proxy-Authorization`, `X-Api-Key`) are automatically replaced with `[REDACTED]` in both request and response header maps.
+
+When the starter-managed `WebClient` is used, `requestHeaders` reflects the final outbound headers visible after built-in filters and per-client `ReactiveHttpClientCustomizer` filters. This lets header logging show customizer-added values such as `X-Request-ID` without buffering or inspecting the request body.
 
 ### Default log format (success)
 

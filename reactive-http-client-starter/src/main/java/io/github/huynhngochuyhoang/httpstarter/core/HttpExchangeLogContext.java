@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +22,7 @@ public record HttpExchangeLogContext(
         String clientName,
         String httpMethod,
         String pathTemplate,
+        URI requestUrl,
         Map<String, Object> pathVariables,
         Map<String, List<Object>> queryParameters,
         Map<String, List<String>> inboundHeaders,
@@ -46,11 +48,45 @@ public record HttpExchangeLogContext(
             Map<String, List<String>> responseHeaders,
             Object responseBody,
             long durationMs,
+            Throwable error,
+            ReactiveHttpClientProperties.LogPreset logPreset) {
+        this(
+                clientName,
+                httpMethod,
+                pathTemplate,
+                null,
+                pathVariables,
+                queryParameters,
+                inboundHeaders,
+                requestHeaders,
+                requestBody,
+                responseStatus,
+                responseHeaders,
+                responseBody,
+                durationMs,
+                error,
+                logPreset);
+    }
+
+    public HttpExchangeLogContext(
+            String clientName,
+            String httpMethod,
+            String pathTemplate,
+            Map<String, Object> pathVariables,
+            Map<String, List<Object>> queryParameters,
+            Map<String, List<String>> inboundHeaders,
+            Map<String, String> requestHeaders,
+            Object requestBody,
+            Integer responseStatus,
+            Map<String, List<String>> responseHeaders,
+            Object responseBody,
+            long durationMs,
             Throwable error) {
         this(
                 clientName,
                 httpMethod,
                 pathTemplate,
+                null,
                 pathVariables,
                 queryParameters,
                 inboundHeaders,
