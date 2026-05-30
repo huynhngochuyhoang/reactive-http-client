@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Final outbound request diagnostics.** Added final request URL/header snapshots
   for exchange logging and observer events after `WebClient` filters mutate the
   outbound request.
+- **Error body and timeout correctness coverage.** Added regression coverage for
+  retained error-body caps, malformed `Content-Type`, Problem Detail mapping,
+  timeout precedence, body-decode timeouts, and streaming timeout behavior.
 
 ### Fixed
 
@@ -55,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   downstream failures.
 - Documented declarative versus final outbound headers for exchange logging and
   customizer debugging.
+- Documented retained error body caps and timeout metadata behavior for header,
+  body decode, and streaming timeout paths.
 
 ---
 

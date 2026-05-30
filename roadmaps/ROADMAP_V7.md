@@ -185,12 +185,12 @@ policy explicit for larger payloads, malformed media types, and mapper fallback.
 
 **Acceptance:**
 
-- [ ] Docs state how much error body content is retained for exceptions and
+- [x] Docs state how much error body content is retained for exceptions and
       structured mappers.
-- [ ] Tests cover malformed content type without losing the response body.
-- [ ] Tests cover oversized Problem Detail payloads without generic fallback
+- [x] Tests cover malformed content type without losing the response body.
+- [x] Tests cover oversized Problem Detail payloads without generic fallback
       when the mapper has enough data.
-- [ ] Sensitive body logging remains controlled by existing presets.
+- [x] Sensitive body logging remains controlled by existing presets.
 
 ---
 
@@ -265,12 +265,12 @@ timeouts can produce confusing categories or leak in-flight body consumption.
 
 **Acceptance:**
 
-- [ ] Timeout precedence remains `@TimeoutMs` > `@ApiRef` > client request
+- [x] Timeout precedence remains `@TimeoutMs` > `@ApiRef` > client request
       timeout.
-- [ ] Header-timeout and body-timeout paths preserve status/body metadata when
+- [x] Header-timeout and body-timeout paths preserve status/body metadata when
       available.
-- [ ] Streaming timeout does not buffer the response body.
-- [ ] Timeout failures emit one terminal observer/lifecycle signal.
+- [x] Streaming timeout does not buffer the response body.
+- [x] Timeout failures emit one terminal observer/lifecycle signal.
 
 ---
 

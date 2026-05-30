@@ -20,6 +20,25 @@ Both types expose:
 | `getResponseBody()` | `String` | Raw response body (may be empty) |
 | `getErrorCategory()` | `ErrorCategory` | Coarse-grained failure category |
 
+## Error body retention policy
+
+`DefaultErrorDecoder` keeps a bounded copy of the error response body before it
+creates an exception or invokes an `ErrorResponseMapper`:
+
+| Response body kind | Retained cap | Applies to |
+|---|---:|---|
+| Default error bodies | 4 KiB | Generic exceptions and custom mappers |
+| `application/problem+json` bodies | 64 KiB | Mapper input for Problem Detail and other structured mappers |
+
+`HttpClientException`, `RemoteServiceException`, and the Problem Detail exception
+subclasses still expose at most 4 KiB from `getResponseBody()`. The larger
+Problem Detail cap is for mapper parsing reliability, so a structured mapper can
+read richer `application/problem+json` payloads before constructing its exception.
+Malformed `Content-Type` headers fall back to the default 4 KiB cap instead of
+aborting decoding. Exchange logging still follows `log-preset`: metadata-only
+and headers presets omit bodies; only the `bodies` preset logs request/response
+payloads.
+
 ---
 
 ## Error categories
@@ -186,7 +205,9 @@ orderClient.createOrder(request)
 ```
 
 Missing content type, non-problem content type, or invalid problem JSON falls back
-to the default decoder.
+to the default decoder. Problem Detail responses use the 64 KiB structured-body
+cap above so richer problem payloads can still be parsed without exposing
+unbounded response bodies.
 
 ---
 
