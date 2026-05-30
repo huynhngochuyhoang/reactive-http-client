@@ -20,6 +20,23 @@ Both types expose:
 | `getResponseBody()` | `String` | Raw response body (may be empty) |
 | `getErrorCategory()` | `ErrorCategory` | Coarse-grained failure category |
 
+## Error body retention policy
+
+`DefaultErrorDecoder` keeps a bounded copy of the error response body before it
+creates `HttpClientException`, `RemoteServiceException`, or an
+`ErrorResponseMapper` context:
+
+| Response body kind | Retained cap | Applies to |
+|---|---:|---|
+| Default error bodies | 4 KiB | Generic exceptions and custom mappers |
+| `application/problem+json` bodies | 64 KiB | Problem Detail and other structured mappers |
+
+Malformed `Content-Type` headers fall back to the default 4 KiB cap instead of
+aborting decoding, so the original payload is still available up to that limit.
+Bodies larger than the selected cap are truncated in exception and mapper
+contexts. Exchange logging still follows `log-preset`: metadata-only and headers
+presets omit bodies; only the `bodies` preset logs request/response payloads.
+
 ---
 
 ## Error categories
@@ -186,7 +203,9 @@ orderClient.createOrder(request)
 ```
 
 Missing content type, non-problem content type, or invalid problem JSON falls back
-to the default decoder.
+to the default decoder. Problem Detail responses use the 64 KiB structured-body
+cap above so richer problem payloads can still be parsed without exposing
+unbounded response bodies.
 
 ---
 

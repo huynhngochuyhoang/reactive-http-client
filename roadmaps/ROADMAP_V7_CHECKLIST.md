@@ -108,24 +108,24 @@
 
 ## Priority 6 — Error Body and Timeout Correctness
 
-### [ ] 2.3 Error body capture policy audit
-- [ ] Document default retained error body size for exceptions.
-- [ ] Document any larger cap used by structured mappers.
-- [ ] Test malformed `Content-Type` without losing the response body.
-- [ ] Test oversized Problem Detail payloads without generic fallback when the
+### [x] 2.3 Error body capture policy audit
+- [x] Document default retained error body size for exceptions.
+- [x] Document any larger cap used by structured mappers.
+- [x] Test malformed `Content-Type` without losing the response body.
+- [x] Test oversized Problem Detail payloads without generic fallback when the
   mapper has enough data.
-- [ ] Test non-JSON error bodies and mapper fallback.
-- [ ] Verify sensitive body logging remains controlled by existing presets.
+- [x] Test non-JSON error bodies and mapper fallback.
+- [x] Verify sensitive body logging remains controlled by existing presets.
 
-### [ ] 3.2 Timeout layering correctness
-- [ ] Re-test timeout precedence after the request-timeout migration.
-- [ ] Verify precedence remains `@TimeoutMs` > `@ApiRef` > client request
+### [x] 3.2 Timeout layering correctness
+- [x] Re-test timeout precedence after the request-timeout migration.
+- [x] Verify precedence remains `@TimeoutMs` > `@ApiRef` > client request
   timeout.
-- [ ] Add coverage for timeout during response headers.
-- [ ] Add coverage for timeout during body decode.
-- [ ] Add coverage for timeout during streaming response consumption.
-- [ ] Verify streaming timeout does not buffer the response body.
-- [ ] Verify timeout failures emit one terminal observer/lifecycle signal.
+- [x] Add coverage for timeout during response headers.
+- [x] Add coverage for timeout during body decode.
+- [x] Add coverage for timeout during streaming response consumption.
+- [x] Verify streaming timeout does not buffer the response body.
+- [x] Verify timeout failures emit one terminal observer/lifecycle signal.
 
 ---
 
