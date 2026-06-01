@@ -46,20 +46,20 @@
 
 ## Priority 3 — Observer and Lifecycle Test Helpers
 
-### [ ] 1.2 Observer and lifecycle support in test helpers
-- [ ] Add `MockReactiveHttpClient` builder support for a custom
+### [x] 1.2 Observer and lifecycle support in test helpers
+- [x] Add `MockReactiveHttpClient` builder support for a custom
   `HttpClientObserver`.
-- [ ] Add builder support for one or more `ReactiveHttpClientLifecycleHook`
+- [x] Add builder support for one or more `ReactiveHttpClientLifecycleHook`
   instances.
-- [ ] Register supplied hooks using starter ordering semantics.
-- [ ] Keep existing helper behavior unchanged when no observer or hook is
+- [x] Register supplied hooks using starter ordering semantics.
+- [x] Keep existing helper behavior unchanged when no observer or hook is
   supplied.
-- [ ] Keep the helper independent of Micrometer and OpenTelemetry by default.
-- [ ] Test one terminal observer event on retry success.
-- [ ] Test one terminal observer event on retry exhaustion.
-- [ ] Test lifecycle callback order for first subscription and retry
+- [x] Keep the helper independent of Micrometer and OpenTelemetry by default.
+- [x] Test one terminal observer event on retry success.
+- [x] Test one terminal observer event on retry exhaustion.
+- [x] Test lifecycle callback order for first subscription and retry
   subscriptions.
-- [ ] Document compact observer and lifecycle helper examples.
+- [x] Document compact observer and lifecycle helper examples.
 
 ---
 
