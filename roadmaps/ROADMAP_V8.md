@@ -253,14 +253,14 @@ subscriber report another subscriber's outcome.
 
 **Acceptance:**
 
-- [ ] Concurrent subscriptions can receive different statuses without
+- [x] Concurrent subscriptions can receive different statuses without
       cross-reporting response status or headers.
-- [ ] One cancelled subscriber does not overwrite another subscriber's terminal
+- [x] One cancelled subscriber does not overwrite another subscriber's terminal
       error or duration.
-- [ ] Final outbound URL and headers belong to the subscriber that emitted the
+- [x] Final outbound URL and headers belong to the subscriber that emitted the
       terminal observer/log record.
-- [ ] Retry attempts remain grouped inside their originating logical call.
-- [ ] Tests cover concurrent `Mono<T>` and streaming `Flux<T>` subscriptions.
+- [x] Retry attempts remain grouped inside their originating logical call.
+- [x] Tests cover concurrent `Mono<T>` and streaming `Flux<T>` subscriptions.
 
 ---
 

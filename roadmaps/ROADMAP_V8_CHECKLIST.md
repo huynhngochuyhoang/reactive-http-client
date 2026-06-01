@@ -7,20 +7,20 @@
 
 ## Priority 1 — Subscription-Local Terminal Reporting State
 
-### [ ] 3.1 Subscription-local terminal reporting state
-- [ ] Audit mutable invocation state in `ReactiveClientInvocationHandler`.
-- [ ] Move request start time into subscription-local state.
-- [ ] Move observed request URL into subscription-local state.
-- [ ] Move response status and response headers into subscription-local state.
-- [ ] Move terminal error into subscription-local state.
-- [ ] Keep generated idempotency keys, prepared headers, attempt count, and
+### [x] 3.1 Subscription-local terminal reporting state
+- [x] Audit mutable invocation state in `ReactiveClientInvocationHandler`.
+- [x] Move request start time into subscription-local state.
+- [x] Move observed request URL into subscription-local state.
+- [x] Move response status and response headers into subscription-local state.
+- [x] Move terminal error into subscription-local state.
+- [x] Keep generated idempotency keys, prepared headers, attempt count, and
   final request observation isolated per subscription.
-- [ ] Verify retry attempts remain grouped inside one logical call.
-- [ ] Test concurrent subscriptions with different `Mono<T>` statuses and
+- [x] Verify retry attempts remain grouped inside one logical call.
+- [x] Test concurrent subscriptions with different `Mono<T>` statuses and
   headers.
-- [ ] Test concurrent subscriptions with one cancellation and one completion.
-- [ ] Test concurrent streaming `Flux<T>` subscriptions.
-- [ ] Verify lifecycle hooks, observers, and exchange logs report the matching
+- [x] Test concurrent subscriptions with one cancellation and one completion.
+- [x] Test concurrent streaming `Flux<T>` subscriptions.
+- [x] Verify lifecycle hooks, observers, and exchange logs report the matching
   subscriber state.
 
 ---
