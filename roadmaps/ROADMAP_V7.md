@@ -1,9 +1,8 @@
 # Reactive HTTP Client — Roadmap V7
 
-> **Status:** draft after the V6 context propagation release. V6 completed
-> explicit request-context snapshots, context-aware test helpers, contributor
-> hooks, and async handoff documentation. V7 should focus on retry safety,
-> idempotency, and payload handling under production failure modes.
+> **Status:** completed for `2.6.0` on 2026-05-31. V7 focused on retry
+> safety, idempotency, payload handling, final outbound diagnostics, and
+> retry-signal release readiness under production failure modes.
 
 V7 keeps the same three-bucket shape:
 
@@ -242,10 +241,10 @@ metrics, logs, and custom hooks do not double-count unexpectedly.
 
 **Acceptance:**
 
-- [ ] Per-attempt and logical-call signals are documented.
-- [ ] Retry success emits the expected attempt count and final success once.
-- [ ] Retry exhaustion emits the expected attempt count and final error once.
-- [ ] Cancellation during retry does not emit both cancellation and error for
+- [x] Per-attempt and logical-call signals are documented.
+- [x] Retry success emits the expected attempt count and final success once.
+- [x] Retry exhaustion emits the expected attempt count and final error once.
+- [x] Cancellation during retry does not emit both cancellation and error for
       the same logical call.
 
 ---

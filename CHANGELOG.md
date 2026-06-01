@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [2.6.0] - 2026-05-31
+
 ### Added
 
 - **Retry-safety diagnostics.** Added warning-only diagnostics for retry-enabled
@@ -28,6 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Error body and timeout correctness coverage.** Added regression coverage for
   retained error-body caps, malformed `Content-Type`, Problem Detail mapping,
   timeout precedence, body-decode timeouts, and streaming timeout behavior.
+
+### Changed
+
+- **Retry signal contract.** Lifecycle hooks now have an explicit
+  per-subscription-attempt versus logical-call contract. Observer records remain
+  logical-call scoped with the final subscription-attempt count, while
+  exchange-log records remain logical-call scoped without that count. Existing
+  runtime behavior is preserved.
+- **Compatibility.** This release has no breaking behavior changes.
 
 ### Fixed
 
@@ -60,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   customizer debugging.
 - Documented retained error body caps and timeout metadata behavior for header,
   body decode, and streaming timeout paths.
+- Documented retry lifecycle per-attempt callbacks and logical-call terminal
+  observer, exchange-log, success, error, and cancellation semantics.
 
 ---
 
@@ -994,7 +1009,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.  
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.2.0...v2.3.0

@@ -7,6 +7,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.QueryParam;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
+import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.github.resilience4j.bulkhead.Bulkhead;
@@ -101,6 +102,7 @@ class ReactiveHttpClientLifecycleHookTest {
     @Test
     void shouldNotifyRetryAttemptBoundary() throws Throwable {
         List<String> events = new ArrayList<>();
+        List<HttpClientObserverEvent> observed = new ArrayList<>();
         AtomicInteger calls = new AtomicInteger();
         WebClient webClient = WebClient.builder()
                 .baseUrl("http://test.local")
@@ -115,7 +117,7 @@ class ReactiveHttpClientLifecycleHookTest {
                 })
                 .build();
         ReactiveClientInvocationHandler handler = createHandler(webClient, List.of(new RecordingHook("hook", events)),
-                retryOnceApplier(), retryConfig());
+                retryOnceApplier(), retryConfig(), observed::add);
 
         StepVerifier.create(invokeGet(handler, "42"))
                 .expectNext("ok")
@@ -125,17 +127,21 @@ class ReactiveHttpClientLifecycleHookTest {
                 "hook:start:1:get",
                 "hook:retry:2:get",
                 "hook:success:2:200"), events);
+        assertEquals(1, observed.size());
+        assertEquals(2, observed.get(0).getAttemptCount());
+        assertEquals(null, observed.get(0).getError());
     }
 
     @Test
     void shouldNotifyRetryExhaustionOnce() throws Throwable {
         List<String> events = new ArrayList<>();
+        List<HttpClientObserverEvent> observed = new ArrayList<>();
         WebClient webClient = WebClient.builder()
                 .baseUrl("http://test.local")
                 .exchangeFunction(request -> Mono.error(new IllegalStateException("downstream failed")))
                 .build();
         ReactiveClientInvocationHandler handler = createHandler(webClient, List.of(new RecordingHook("hook", events)),
-                retryOnceApplier(), retryConfig());
+                retryOnceApplier(), retryConfig(), observed::add);
 
         StepVerifier.create(invokeGet(handler, "42"))
                 .expectError(IllegalStateException.class)
@@ -145,6 +151,77 @@ class ReactiveHttpClientLifecycleHookTest {
                 "hook:start:1:get",
                 "hook:retry:2:get",
                 "hook:error:2:null:IllegalStateException"), events);
+        assertEquals(1, observed.size());
+        assertEquals(2, observed.get(0).getAttemptCount());
+        assertInstanceOf(IllegalStateException.class, observed.get(0).getError());
+    }
+
+    @Test
+    void shouldNotifyCancellationOnceWhenCancelledDuringRetryAttempt() throws Throwable {
+        List<String> events = new ArrayList<>();
+        List<HttpClientObserverEvent> observed = new ArrayList<>();
+        AtomicInteger calls = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> calls.incrementAndGet() == 1
+                        ? Mono.error(new IllegalStateException("first attempt failed"))
+                        : Mono.never())
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, List.of(new RecordingHook("hook", events)),
+                retryOnceApplier(), retryConfig(), observed::add);
+
+        StepVerifier.create(invokeGet(handler, "42"))
+                .expectSubscription()
+                .thenAwait(Duration.ofMillis(25))
+                .thenCancel()
+                .verify(Duration.ofSeconds(2));
+
+        assertEquals(2, calls.get());
+        assertEquals(List.of(
+                "hook:start:1:get",
+                "hook:retry:2:get",
+                "hook:cancel:2"), events);
+        assertEquals(1, observed.size());
+        assertEquals(2, observed.get(0).getAttemptCount());
+        assertInstanceOf(CancellationException.class, observed.get(0).getError());
+    }
+
+    @Test
+    void shouldNotifyMapperFallbackErrorOnceAfterRetry() throws Throwable {
+        List<String> events = new ArrayList<>();
+        List<HttpClientObserverEvent> observed = new ArrayList<>();
+        AtomicInteger calls = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    if (calls.incrementAndGet() == 1) {
+                        return Mono.error(new IllegalStateException("first attempt failed"));
+                    }
+                    return Mono.just(ClientResponse.create(HttpStatus.BAD_GATEWAY)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("not-json")
+                            .build());
+                })
+                .build();
+        DefaultErrorDecoder decoder = new DefaultErrorDecoder("test-client", List.of(context -> {
+            throw new IllegalArgumentException("invalid structured body");
+        }));
+        ReactiveClientInvocationHandler handler = createHandler(webClient, List.of(new RecordingHook("hook", events)),
+                retryOnceApplier(), retryConfig(), observed::add, decoder);
+
+        StepVerifier.create(invokeGet(handler, "42"))
+                .expectError(RemoteServiceException.class)
+                .verify();
+
+        assertEquals(2, calls.get());
+        assertEquals(List.of(
+                "hook:start:1:get",
+                "hook:retry:2:get",
+                "hook:error:2:502:RemoteServiceException"), events);
+        assertEquals(1, observed.size());
+        assertEquals(2, observed.get(0).getAttemptCount());
+        assertEquals(ErrorCategory.SERVER_ERROR, observed.get(0).getErrorCategory());
+        assertInstanceOf(RemoteServiceException.class, observed.get(0).getError());
     }
 
     @Test
@@ -349,6 +426,17 @@ class ReactiveHttpClientLifecycleHookTest {
             ResilienceOperatorApplier resilienceOperatorApplier,
             ReactiveHttpClientProperties.ClientConfig config,
             HttpClientObserver observer) {
+        return createHandler(webClient, hooks, resilienceOperatorApplier, config, observer, new DefaultErrorDecoder());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ReactiveClientInvocationHandler createHandler(
+            WebClient webClient,
+            List<ReactiveHttpClientLifecycleHook> hooks,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            ReactiveHttpClientProperties.ClientConfig config,
+            HttpClientObserver observer,
+            DefaultErrorDecoder errorDecoder) {
         ApplicationContext appCtx = mock(ApplicationContext.class);
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
         when(appCtx.getBeanProvider(HttpClientObserver.class)).thenReturn(observerProvider);
@@ -365,7 +453,7 @@ class ReactiveHttpClientLifecycleHookTest {
                 webClient,
                 new MethodMetadataCache(),
                 new RequestArgumentResolver(),
-                new DefaultErrorDecoder(),
+                errorDecoder,
                 config,
                 "test-client",
                 appCtx,

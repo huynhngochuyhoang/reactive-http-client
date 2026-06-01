@@ -131,29 +131,29 @@
 
 ## Priority 7 — Retry Signal Semantics and Release Readiness
 
-### [ ] 3.1 Duplicate lifecycle and observer signals under retry
-- [ ] Audit lifecycle hook invocation points around retries.
-- [ ] Audit observer invocation points around retries.
-- [ ] Define per-attempt versus logical-call signals.
-- [ ] Test retry success attempt count and final success once.
-- [ ] Test retry exhaustion attempt count and final error once.
-- [ ] Test cancellation during retry does not emit both cancellation and error
+### [x] 3.1 Duplicate lifecycle and observer signals under retry
+- [x] Audit lifecycle hook invocation points around retries.
+- [x] Audit observer invocation points around retries.
+- [x] Define per-attempt versus logical-call signals.
+- [x] Test retry success attempt count and final success once.
+- [x] Test retry exhaustion attempt count and final error once.
+- [x] Test cancellation during retry does not emit both cancellation and error
   for the same logical call.
-- [ ] Test mapper failure after retry.
-- [ ] Document per-attempt and logical-call signal semantics.
+- [x] Test mapper failure after retry.
+- [x] Document per-attempt and logical-call signal semantics.
 
-### [ ] Release Readiness
-- [ ] `CHANGELOG.md` has V7 entries grouped under Added/Changed/Fixed/Docs.
-- [ ] README stays short and links to detailed docs.
-- [ ] New public APIs have focused tests and concise docs.
-- [ ] New test-helper APIs are covered by examples.
-- [ ] Configuration metadata is updated if new properties are added.
-- [ ] Retry and idempotency behavior is documented without implying automatic
+### [x] Release Readiness
+- [x] `CHANGELOG.md` has V7 entries grouped under Added/Changed/Fixed/Docs.
+- [x] README stays short and links to detailed docs.
+- [x] New public APIs have focused tests and concise docs.
+- [x] New test-helper APIs are covered by examples.
+- [x] Configuration metadata is updated if new properties are added.
+- [x] Retry and idempotency behavior is documented without implying automatic
   business idempotency.
-- [ ] Final outbound request diagnostics are documented without implying body
+- [x] Final outbound request diagnostics are documented without implying body
   buffering or unredacted sensitive-header logging.
-- [ ] Non-repeatable body behavior is documented without implying large-body
+- [x] Non-repeatable body behavior is documented without implying large-body
   buffering.
-- [ ] `mvn test` passes.
-- [ ] `mvn -Prelease-smoke test` passes before release.
-- [ ] Breaking behavior, if any, is explicitly called out before release.
+- [x] `mvn test` passes.
+- [x] `mvn -Prelease-smoke test` passes before release.
+- [x] Breaking behavior, if any, is explicitly called out before release.
