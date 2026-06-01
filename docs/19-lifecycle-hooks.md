@@ -52,7 +52,8 @@ and `onError`.
 `HttpClientObserver` is also logical-call scoped. It records one terminal event
 after retries finish, with `HttpClientObserverEvent.getAttemptCount()` set to the
 total number of subscription attempts. Exchange logging follows the same
-logical-call boundary but does not include the attempt count.
+logical-call boundary and exposes the same meaning through
+`HttpExchangeLogContext.subscriptionAttemptCount()`.
 
 Hook failures are isolated. If a hook throws from `supports(...)` or a callback,
 the starter logs a warning and continues the client call and the remaining hooks.

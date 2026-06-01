@@ -37,27 +37,7 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
         Map<String, List<String>> responseHeaders = logHeaders ? redactResponseHeaders(context.responseHeaders()) : Map.of();
         Object requestBody = shouldLogBodies(context) ? context.requestBody() : OMITTED;
         Object responseBody = shouldLogBodies(context) ? context.responseBody() : OMITTED;
-        log.info("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms",
-                context.clientName(),
-                context.httpMethod(),
-                context.pathTemplate(),
-                inboundHeaders,
-                requestHeaders,
-                requestBody,
-                context.responseStatus(),
-                responseHeaders,
-                responseBody,
-                context.durationMs());
-    }
-
-    private void logError(HttpExchangeLogContext context) {
-        boolean logHeaders = shouldLogHeaders(context);
-        Map<String, List<String>> inboundHeaders = logHeaders ? context.inboundHeaders() : Map.of();
-        Map<String, String> requestHeaders = logHeaders ? redactRequestHeaders(context.requestHeaders()) : Map.of();
-        Map<String, List<String>> responseHeaders = logHeaders ? redactResponseHeaders(context.responseHeaders()) : Map.of();
-        Object requestBody = shouldLogBodies(context) ? context.requestBody() : OMITTED;
-        Object responseBody = shouldLogBodies(context) ? context.responseBody() : OMITTED;
-        log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms error={}",
+        log.info("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms subscriptionAttemptCount={}",
                 context.clientName(),
                 context.httpMethod(),
                 context.pathTemplate(),
@@ -68,6 +48,28 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
                 responseHeaders,
                 responseBody,
                 context.durationMs(),
+                context.subscriptionAttemptCount());
+    }
+
+    private void logError(HttpExchangeLogContext context) {
+        boolean logHeaders = shouldLogHeaders(context);
+        Map<String, List<String>> inboundHeaders = logHeaders ? context.inboundHeaders() : Map.of();
+        Map<String, String> requestHeaders = logHeaders ? redactRequestHeaders(context.requestHeaders()) : Map.of();
+        Map<String, List<String>> responseHeaders = logHeaders ? redactResponseHeaders(context.responseHeaders()) : Map.of();
+        Object requestBody = shouldLogBodies(context) ? context.requestBody() : OMITTED;
+        Object responseBody = shouldLogBodies(context) ? context.responseBody() : OMITTED;
+        log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms subscriptionAttemptCount={} error={}",
+                context.clientName(),
+                context.httpMethod(),
+                context.pathTemplate(),
+                inboundHeaders,
+                requestHeaders,
+                requestBody,
+                context.responseStatus(),
+                responseHeaders,
+                responseBody,
+                context.durationMs(),
+                context.subscriptionAttemptCount(),
                 context.error().toString());
     }
 

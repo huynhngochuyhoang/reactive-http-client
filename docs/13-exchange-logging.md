@@ -97,7 +97,8 @@ The context record carries all exchange fields available to the logger:
 | `responseStatus` | `Integer` | HTTP response status code (`null` on network error) |
 | `responseHeaders` | `Map<String, List<String>>` | Response headers |
 | `responseBody` | `Object` | Decoded response body (`null` for `Flux<T>` responses) |
-| `durationMs` | `long` | Exchange duration in milliseconds |
+| `durationMs` | `long` | Logical-call duration in milliseconds |
+| `subscriptionAttemptCount` | `int` | Number of subscription attempts inside this logical call; not a guaranteed count of HTTP requests sent |
 | `error` | `Throwable` | Thrown exception, or `null` on success |
 | `logPreset` | `LogPreset` | Configured preset for the default logger |
 
@@ -114,13 +115,13 @@ When the starter-managed `WebClient` is used, `requestHeaders` reflects the fina
 ### Default log format (success)
 
 ```
-[user-service] GET /users/{id} inboundHeaders={...} reqHeaders={...} reqBody=[OMITTED] respStatus=200 respHeaders={...} respBody=[OMITTED] duration=45ms
+[user-service] GET /users/{id} inboundHeaders={...} reqHeaders={...} reqBody=[OMITTED] respStatus=200 respHeaders={...} respBody=[OMITTED] duration=45ms subscriptionAttemptCount=1
 ```
 
 ### Default log format (error)
 
 ```
-[user-service] GET /users/{id} inboundHeaders={...} reqHeaders={...} reqBody=[OMITTED] respStatus=404 respHeaders={...} respBody=[OMITTED] duration=12ms error=HttpClientException: 404 Not Found
+[user-service] GET /users/{id} inboundHeaders={...} reqHeaders={...} reqBody=[OMITTED] respStatus=404 respHeaders={...} respBody=[OMITTED] duration=12ms subscriptionAttemptCount=1 error=HttpClientException: 404 Not Found
 ```
 
 ---
@@ -179,6 +180,10 @@ When `@LogHttpExchange` is used without a `logger` attribute (i.e. `logger = Def
 
 `log-preset` is applied by `DefaultHttpExchangeLogger`. Custom `HttpExchangeLogger` implementations receive the preset in `HttpExchangeLogContext` and may choose to honor or ignore it.
 
+`subscriptionAttemptCount` is logical-call metadata. It counts retry subscriptions,
+not guaranteed HTTP network sends. For example, request-body serialization can
+fail before dispatch after an attempt has started.
+
 ---
 
 ## Structured logging example
@@ -193,6 +198,7 @@ HttpExchangeLogger structuredExchangeLogger(ObjectMapper mapper) {
         fields.put("path", context.pathTemplate());
         fields.put("status", context.responseStatus());
         fields.put("durationMs", context.durationMs());
+        fields.put("subscriptionAttemptCount", context.subscriptionAttemptCount());
         if (context.error() != null) {
             fields.put("error", context.error().getMessage());
         }

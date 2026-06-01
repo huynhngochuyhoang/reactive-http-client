@@ -51,12 +51,12 @@ downstreams.
 
 **Acceptance:**
 
-- [ ] A first-try call reports subscription-attempt count `1`.
-- [ ] A retried call reports the final subscription-attempt count once in its
+- [x] A first-try call reports subscription-attempt count `1`.
+- [x] A retried call reports the final subscription-attempt count once in its
       terminal exchange-log context.
-- [ ] A pre-network serialization failure is not documented as an HTTP send.
-- [ ] Existing custom logger implementations continue to compile unchanged.
-- [ ] Exchange-logging docs show how a custom logger can record the count.
+- [x] A pre-network serialization failure is not documented as an HTTP send.
+- [x] Existing custom logger implementations continue to compile unchanged.
+- [x] Exchange-logging docs show how a custom logger can record the count.
 
 ---
 

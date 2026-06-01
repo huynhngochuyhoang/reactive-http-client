@@ -27,20 +27,20 @@
 
 ## Priority 2 — Exchange-Log Subscription-Attempt Count
 
-### [ ] 1.1 Exchange-log subscription-attempt count
-- [ ] Add a precisely named subscription-attempt count to
+### [x] 1.1 Exchange-log subscription-attempt count
+- [x] Add a precisely named subscription-attempt count to
   `HttpExchangeLogContext`.
-- [ ] Feed the final logical-call count into custom exchange loggers.
-- [ ] Include the count in `DefaultHttpExchangeLogger` output.
-- [ ] Preserve source compatibility for existing convenience constructors by
+- [x] Feed the final logical-call count into custom exchange loggers.
+- [x] Include the count in `DefaultHttpExchangeLogger` output.
+- [x] Preserve source compatibility for existing convenience constructors by
   defaulting the count to `1`.
-- [ ] Test a first-try call with count `1`.
-- [ ] Test a retried call with one terminal exchange-log record and the final
+- [x] Test a first-try call with count `1`.
+- [x] Test a retried call with one terminal exchange-log record and the final
   count.
-- [ ] Test pre-network serialization failure wording and behavior.
-- [ ] Document that the value counts subscriptions, not guaranteed network
+- [x] Test pre-network serialization failure wording and behavior.
+- [x] Document that the value counts subscriptions, not guaranteed network
   sends.
-- [ ] Add a custom logger example that records the count.
+- [x] Add a custom logger example that records the count.
 
 ---
 
