@@ -35,10 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Retry signal contract.** Lifecycle hooks now have an explicit per-attempt
-  versus logical-call contract, while observer and exchange-log records remain
-  logical-call scoped with the final attempt count. Existing runtime behavior is
-  preserved.
+- **Retry signal contract.** Lifecycle hooks now have an explicit
+  per-subscription-attempt versus logical-call contract. Observer records remain
+  logical-call scoped with the final subscription-attempt count, while
+  exchange-log records remain logical-call scoped without that count. Existing
+  runtime behavior is preserved.
 - **Compatibility.** This release has no breaking behavior changes.
 
 ### Fixed

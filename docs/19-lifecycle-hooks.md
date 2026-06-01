@@ -41,16 +41,18 @@ public class AuditLifecycleHook implements ReactiveHttpClientLifecycleHook {
 | `onError` | Final invocation fails |
 | `onCancel` | Subscriber cancels before completion |
 
-Retries create multiple HTTP attempts inside one logical client call. `onStart`
-and `onRetryAttempt` are per-attempt callbacks: `onStart` runs for attempt `1`,
-and `onRetryAttempt` runs once for each later attempt. `onSuccess`, `onError`,
-and `onCancel` are logical-call terminal callbacks and run at most once. A
-cancelled retried call emits `onCancel`, not both `onCancel` and `onError`.
+Retries create multiple subscription attempts inside one logical client call.
+`onStart` and `onRetryAttempt` are per-subscription-attempt callbacks: `onStart`
+runs for attempt `1`, and `onRetryAttempt` runs once for each later attempt.
+These callbacks do not prove that an HTTP request reached the network.
+`onSuccess`, `onError`, and `onCancel` are logical-call terminal callbacks and
+run at most once. A cancelled retried call emits `onCancel`, not both `onCancel`
+and `onError`.
 
 `HttpClientObserver` is also logical-call scoped. It records one terminal event
 after retries finish, with `HttpClientObserverEvent.getAttemptCount()` set to the
-total number of attempts. Exchange logging follows the same logical-call
-boundary.
+total number of subscription attempts. Exchange logging follows the same
+logical-call boundary but does not include the attempt count.
 
 Hook failures are isolated. If a hook throws from `supports(...)` or a callback,
 the starter logs a warning and continues the client call and the remaining hooks.

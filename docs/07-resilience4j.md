@@ -80,9 +80,11 @@ When retry is enabled for a method with a non-repeatable or application-owned
 body, the starter logs a warning once per client method. Existing retry behavior
 is preserved for compatibility.
 
-Retries create multiple HTTP attempts inside one logical client call. Lifecycle
-hooks expose attempt boundaries, while observers and exchange logging emit one
-terminal record with the final attempt count. See [Lifecycle Hooks](19-lifecycle-hooks.md).
+Retries create multiple subscription attempts inside one logical client call.
+Lifecycle hooks expose subscription-attempt boundaries. Observers emit one
+terminal record with the final subscription-attempt count, while exchange
+logging emits one terminal record without that count. See
+[Lifecycle Hooks](19-lifecycle-hooks.md).
 
 ### Resilience4j instance configuration
 
