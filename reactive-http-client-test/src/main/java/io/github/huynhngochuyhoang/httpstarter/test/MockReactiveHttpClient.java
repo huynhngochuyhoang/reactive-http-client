@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
+import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.*;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
@@ -268,6 +269,7 @@ public final class MockReactiveHttpClient<T> {
             WebClient webClient = WebClient.builder()
                     .baseUrl(baseUrl)
                     .exchangeFunction(exchangeFunction)
+                    .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
                     .build();
 
             StaticApplicationContext appCtx = new StaticApplicationContext();
@@ -279,13 +281,16 @@ public final class MockReactiveHttpClient<T> {
             }
             appCtx.refresh();
 
+            ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+            String clientName = annotation != null ? annotation.name() : "mock-client";
+
             ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                     webClient,
                     new MethodMetadataCache(),
                     new RequestArgumentResolver(),
                     new DefaultErrorDecoder(),
                     clientConfig,
-                    "mock-client",
+                    clientName,
                     appCtx,
                     resilienceOperatorApplier,
                     null,

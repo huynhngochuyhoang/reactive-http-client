@@ -239,8 +239,11 @@ MockReactiveHttpClient<PaymentClient> mock = MockReactiveHttpClient
 ```
 
 The observer receives one terminal event for the logical call, including the
-final subscription-attempt count. Lifecycle hooks receive `onStart` for attempt
-`1` and `onRetryAttempt` for later retry subscriptions. Repeated
+final subscription-attempt count and the final outbound URL and headers. The mock
+uses `@ReactiveHttpClient.name()` when the interface is annotated and falls back
+to `mock-client` for the helper's supported unannotated interfaces. Lifecycle
+hooks receive `onStart` for attempt `1` and `onRetryAttempt` for later retry
+subscriptions. Repeated
 `withLifecycleHook(...)` calls accumulate hooks; hooks implementing `Ordered` or
 annotated with `@Order` run with the same Spring ordering semantics as starter
 beans. The helper does not register Micrometer or OpenTelemetry observers unless

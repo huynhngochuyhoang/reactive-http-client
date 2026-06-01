@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.test.StepVerifier;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -50,6 +51,12 @@ class MockReactiveHttpClientTest {
 
         @POST("/payments/manual")
         Mono<String> createPaymentWithKey(@Body String json, @IdempotencyKey String idempotencyKey);
+    }
+
+    @ReactiveHttpClient(name = "named-client")
+    interface NamedClient {
+        @GET("/items/{id}")
+        Mono<String> getItem(@PathVar("id") long id, @HeaderParam("X-Trace") String trace);
     }
 
     @Test
@@ -220,8 +227,52 @@ class MockReactiveHttpClientTest {
                 .verifyComplete();
 
         assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getClientName()).isEqualTo("mock-client");
             assertThat(event.getStatusCode()).isEqualTo(200);
             assertThat(event.getAttemptCount()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void annotatedClientNameAndFinalRequestMetadataMatchProductionBehavior() {
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        List<String> supportedClientNames = new CopyOnWriteArrayList<>();
+        List<ReactiveHttpClientLifecycleContext> successes = new CopyOnWriteArrayList<>();
+        ReactiveHttpClientLifecycleHook hook = new ReactiveHttpClientLifecycleHook() {
+            @Override
+            public boolean supports(String clientName) {
+                supportedClientNames.add(clientName);
+                return "named-client".equals(clientName);
+            }
+
+            @Override
+            public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+                successes.add(context);
+            }
+        };
+        MockReactiveHttpClient<NamedClient> mock = MockReactiveHttpClient.forClient(NamedClient.class)
+                .baseUrl("http://named.mock.local:8081")
+                .withObserver(observed::add)
+                .withLifecycleHook(hook)
+                .respondTo(HttpMethod.GET, "/items/42",
+                        ex -> MockReactiveHttpClient.json(200, "item"))
+                .build();
+
+        StepVerifier.create(mock.proxy().getItem(42, "trace-42"))
+                .expectNext("item")
+                .verifyComplete();
+
+        assertThat(supportedClientNames).containsExactly("named-client");
+        assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getClientName()).isEqualTo("named-client");
+            assertThat(event.getRequestUrl()).isEqualTo("http://named.mock.local:8081/items/42");
+            assertThat(event.getServerAddress()).isEqualTo("named.mock.local");
+            assertThat(event.getServerPort()).isEqualTo(8081);
+            assertThat(event.getRequestHeaders()).containsEntry("X-Trace", "trace-42");
+        });
+        assertThat(successes).singleElement().satisfies(context -> {
+            assertThat(context.clientName()).isEqualTo("named-client");
+            assertThat(context.requestUrl()).isEqualTo(URI.create("http://named.mock.local:8081/items/42"));
         });
     }
 
