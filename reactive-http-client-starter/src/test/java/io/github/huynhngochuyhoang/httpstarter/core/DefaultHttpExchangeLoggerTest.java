@@ -25,6 +25,7 @@ class DefaultHttpExchangeLoggerTest {
         assertThat(output).contains("respHeaders={}");
         assertThat(output).contains("reqBody=[OMITTED]");
         assertThat(output).contains("respBody=[OMITTED]");
+        assertThat(output).contains("subscriptionAttemptCount=1");
         assertThat(output).doesNotContain("secret-token");
         assertThat(output).doesNotContain("Inbound=[inbound]");
         assertThat(output).doesNotContain("request-body");
@@ -80,6 +81,7 @@ class DefaultHttpExchangeLoggerTest {
 
         assertThat(context.logPreset()).isEqualTo(ReactiveHttpClientProperties.LogPreset.METADATA_ONLY);
         assertThat(context.requestUrl()).isNull();
+        assertThat(context.subscriptionAttemptCount()).isEqualTo(1);
     }
 
     private static HttpExchangeLogContext context(ReactiveHttpClientProperties.LogPreset preset) {

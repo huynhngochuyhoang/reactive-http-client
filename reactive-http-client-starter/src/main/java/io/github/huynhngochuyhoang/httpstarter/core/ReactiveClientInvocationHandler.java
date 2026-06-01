@@ -1150,7 +1150,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             int attemptCount,
             long requestBytes) {
         if (exchangeLogger != null) {
-            logExchange(exchangeLogger, httpMethod, pathTemplate, resolved, finalRequestObservation, startMs, statusCode, responseHeaders, responseBody, error, inboundHeaders);
+            logExchange(exchangeLogger, httpMethod, pathTemplate, resolved, finalRequestObservation, startMs, statusCode, responseHeaders, responseBody, error, inboundHeaders, attemptCount);
         }
         if (observer != null) {
             long responseBytes = extractContentLengthBytes(responseHeaders);
@@ -1170,7 +1170,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Map<String, List<String>> responseHeaders,
             Object responseBody,
             Throwable error,
-            Map<String, List<String>> inboundHeaders) {
+            Map<String, List<String>> inboundHeaders,
+            int subscriptionAttemptCount) {
         exchangeLogger.log(new HttpExchangeLogContext(
                 clientName,
                 httpMethod,
@@ -1185,6 +1186,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 responseHeaders == null ? Map.of() : responseHeaders,
                 responseBody,
                 System.currentTimeMillis() - startMs,
+                subscriptionAttemptCount,
                 error,
                 clientConfig.getLogPreset()
         ));

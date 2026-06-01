@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Exchange-log subscription-attempt count.** Added
+  `HttpExchangeLogContext#subscriptionAttemptCount()` and included it in default
+  exchange-log output. The value counts retry subscriptions inside one logical
+  call, not guaranteed HTTP network sends. Existing convenience constructors
+  default the value to `1`.
+
+### Docs
+
+- Documented subscription-attempt count semantics and a custom structured
+  exchange-logger example that records the count.
+
 ---
 
 ## [2.6.0] - 2026-05-31
