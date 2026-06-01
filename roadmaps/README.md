@@ -13,5 +13,7 @@ Planning documents for the project:
 - [ROADMAP_V5_CHECKLIST.md](ROADMAP_V5_CHECKLIST.md) — V5 execution checklist
 - [ROADMAP_V6.md](ROADMAP_V6.md) — V6 roadmap
 - [ROADMAP_V6_CHECKLIST.md](ROADMAP_V6_CHECKLIST.md) — V6 execution checklist
-- [ROADMAP_V7.md](ROADMAP_V7.md) — V7 roadmap, completed for `2.6.0`
+- [ROADMAP_V7.md](ROADMAP_V7.md) — V7 roadmap, released as `2.6.0`
 - [ROADMAP_V7_CHECKLIST.md](ROADMAP_V7_CHECKLIST.md) — V7 execution checklist
+- [ROADMAP_V8.md](ROADMAP_V8.md) — V8 roadmap, draft after `2.6.0`
+- [ROADMAP_V8_CHECKLIST.md](ROADMAP_V8_CHECKLIST.md) — V8 execution checklist

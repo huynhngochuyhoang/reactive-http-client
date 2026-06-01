@@ -1,8 +1,8 @@
 # Reactive HTTP Client — Roadmap V7
 
-> **Status:** completed for `2.6.0` on 2026-05-31. V7 focused on retry
-> safety, idempotency, payload handling, final outbound diagnostics, and
-> retry-signal release readiness under production failure modes.
+> **Status:** released as `2.6.0`. V7 focused on retry safety, idempotency,
+> payload handling, final outbound diagnostics, and retry-signal release
+> readiness under production failure modes.
 
 V7 keeps the same three-bucket shape:
 
