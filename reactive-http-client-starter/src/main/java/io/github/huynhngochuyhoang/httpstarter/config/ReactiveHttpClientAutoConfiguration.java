@@ -126,18 +126,23 @@ public class ReactiveHttpClientAutoConfiguration {
      *   <li>No bean named {@code micrometerHttpClientObserver} has been registered</li>
      * </ul>
      */
-    @Bean
+    @Configuration(proxyBeanMethods = false)
     @ConditionalOnClass(MeterRegistry.class)
     @ConditionalOnBean(MeterRegistry.class)
-    @ConditionalOnMissingBean(name = "micrometerHttpClientObserver")
-    @ConditionalOnProperty(
-            prefix = "reactive.http.observability",
-            name = "enabled",
-            havingValue = "true",
-            matchIfMissing = true)
-    public MicrometerHttpClientObserver micrometerHttpClientObserver(MeterRegistry meterRegistry,
-                                                                     ReactiveHttpClientProperties properties) {
-        return new MicrometerHttpClientObserver(meterRegistry, properties.getObservability());
+    static class MicrometerHttpClientObserverAutoConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean(name = "micrometerHttpClientObserver")
+        @ConditionalOnProperty(
+                prefix = "reactive.http.observability",
+                name = "enabled",
+                havingValue = "true",
+                matchIfMissing = true)
+        public MicrometerHttpClientObserver micrometerHttpClientObserver(
+                MeterRegistry meterRegistry,
+                ReactiveHttpClientProperties properties) {
+            return new MicrometerHttpClientObserver(meterRegistry, properties.getObservability());
+        }
     }
 
     /**

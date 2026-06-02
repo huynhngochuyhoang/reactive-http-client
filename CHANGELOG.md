@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-06-02
+
 ### Added
 
 - **Exchange-log subscription-attempt count.** Added
@@ -27,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `retainedResponseBodyBytes()` so structured mappers can distinguish complete
   bounded input from truncated input. The existing constructor remains available.
 
+### Changed
+
+- **Compatibility automation.** Added a japicmp release gate against published
+  `2.6.0` artifacts, a fixture check for additive versus breaking API changes,
+  and a manually triggered weekly minimal native-image smoke workflow.
+- **Compatibility.** This release has no intentional breaking behavior changes.
+
 ### Fixed
 
 - Fixed `MockReactiveHttpClient` observer and terminal lifecycle metadata by
@@ -42,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handling for cancellation paths.
 - Restricted `DefaultErrorDecoder` and registered `ErrorResponseMapper` invocation
   to actual 4xx/5xx statuses so visible redirects remain normal response values.
+- Fixed starter bootstrap when optional Micrometer dependencies are absent by
+  isolating the built-in observer behind a classpath-conditional configuration.
 
 ### Docs
 
@@ -54,6 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented a canonical diagnostic-context capability matrix and
   raw-versus-redacted header behavior for custom exchange loggers and observers.
 - Documented visible 3xx handling and transport-level redirect following.
+- Documented the Spring Boot `3.5.0` baseline, public API compatibility gate, and
+  core-versus-optional native-image support ownership.
 
 ---
 
@@ -1055,7 +1068,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.  
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.7.0...HEAD
+[2.7.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.3.0...v2.4.0

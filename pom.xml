@@ -6,7 +6,7 @@
 
     <groupId>io.github.huynhngochuyhoang</groupId>
     <artifactId>reactive-http-client</artifactId>
-    <version>2.6.0</version>
+    <version>2.7.0</version>
     <packaging>pom</packaging>
 
     <name>reactive-http-client</name>
@@ -32,6 +32,8 @@
         <maven-deploy-plugin.version>3.1.4</maven-deploy-plugin.version>
         <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
+        <japicmp-maven-plugin.version>0.26.0</japicmp-maven-plugin.version>
+        <api.compatibility.baseline.version>2.6.0</api.compatibility.baseline.version>
     </properties>
 
     <dependencyManagement>
@@ -167,6 +169,74 @@
                                 <reactive.http.release-smoke>true</reactive.http.release-smoke>
                             </systemPropertyVariables>
                         </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>api-compatibility</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.siom79.japicmp</groupId>
+                        <artifactId>japicmp-maven-plugin</artifactId>
+                        <version>${japicmp-maven-plugin.version}</version>
+                        <configuration>
+                            <oldVersion>
+                                <dependency>
+                                    <groupId>${project.groupId}</groupId>
+                                    <artifactId>${project.artifactId}</artifactId>
+                                    <version>${api.compatibility.baseline.version}</version>
+                                    <type>jar</type>
+                                </dependency>
+                            </oldVersion>
+                            <newVersion>
+                                <file>
+                                    <path>${project.build.directory}/${project.build.finalName}.jar</path>
+                                </file>
+                            </newVersion>
+                            <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
+                            <parameter>
+                                <accessModifier>public</accessModifier>
+                                <onlyModified>true</onlyModified>
+                                <ignoreMissingOptionalDependency>true</ignoreMissingOptionalDependency>
+                                <includes>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.annotation</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.auth</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.enable</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.exception</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.filter</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.observability</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties*</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.DefaultHttpExchangeLogger</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.ErrorResponseContext</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.ErrorResponseMapper</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.FileAttachment</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogContext</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogger</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.RequestContext</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.RequestContextContributor</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.test</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.otel</include>
+                                </includes>
+                            </parameter>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>compare-public-api</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>cmp</goal>
+                                </goals>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>

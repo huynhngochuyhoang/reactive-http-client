@@ -3,7 +3,7 @@
 ## Requirements
 
 - Java 21+
-- Spring Boot 3.x
+- Spring Boot 3.5.x
 - Maven 3.8+
 
 ## Add the dependency
@@ -12,7 +12,7 @@
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-starter</artifactId>
-  <version>2.6.0</version>
+  <version>2.7.0</version>
 </dependency>
 ```
 

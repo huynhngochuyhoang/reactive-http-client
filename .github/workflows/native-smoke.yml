@@ -1,0 +1,38 @@
+name: Native Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  native-smoke:
+    name: Minimal Starter Native Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM JDK 21
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: maven
+
+      - name: Install current starter artifacts
+        run: mvn -B -ntp -DskipTests install
+
+      - name: Resolve current project version
+        run: echo "PROJECT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)" >> "$GITHUB_ENV"
+
+      - name: Build minimal native image
+        run: mvn -B -ntp -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version="$PROJECT_VERSION" native:compile
+
+      - name: Run minimal native image
+        run: .github/native-smoke/target/reactive-http-client-native-smoke

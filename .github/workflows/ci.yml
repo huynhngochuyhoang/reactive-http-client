@@ -37,6 +37,35 @@ jobs:
           retention-days: 7
 
 
+  api-compatibility:
+    name: Public API Compatibility (baseline 2.6.0)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Compare published APIs to 2.6.0
+        run: mvn -B -ntp -Papi-compatibility -DskipTests verify
+
+      - name: Verify compatibility guard fixtures
+        run: bash scripts/verify-api-compatibility-fixtures.sh
+
+      - name: Upload API compatibility reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-compatibility-reports
+          path: "**/target/japicmp/*"
+          retention-days: 7
+
   release-smoke:
     name: Release Smoke (JDK ${{ matrix.java }}, Spring Boot ${{ matrix.spring-boot }})
     runs-on: ubuntu-latest

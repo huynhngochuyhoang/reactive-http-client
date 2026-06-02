@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V8
 
-> **Status:** draft after V7 was released as `2.6.0`. V8 should focus on
+> **Status:** released as `2.7.0`. V8 focused on
 > subscription-isolated reporting, diagnostic context parity, extension-point
 > testability, and stronger compatibility evidence.
 
@@ -196,10 +196,10 @@ compatible.
 
 **Acceptance:**
 
-- [ ] CI compares published API surfaces against the selected release baseline.
-- [ ] An accidental public constructor removal fails the compatibility check.
-- [ ] Additive public APIs pass without manual suppression.
-- [ ] Release docs explain how to review an intentional breaking change for a
+- [x] CI compares published API surfaces against the selected release baseline.
+- [x] An accidental public constructor removal fails the compatibility check.
+- [x] Additive public APIs pass without manual suppression.
+- [x] Release docs explain how to review an intentional breaking change for a
       future major version.
 
 ---
@@ -223,10 +223,10 @@ silently.
 
 **Acceptance:**
 
-- [ ] Normal CI still runs the fast Spring AOT smoke test.
-- [ ] A scheduled or explicitly triggered job builds one minimal native image.
-- [ ] Release-smoke CI covers each documented Spring Boot baseline.
-- [ ] Native-image docs clearly separate tested core support from optional
+- [x] Normal CI still runs the fast Spring AOT smoke test.
+- [x] A scheduled or explicitly triggered job builds one minimal native image.
+- [x] Release-smoke CI covers each documented Spring Boot baseline.
+- [x] Native-image docs clearly separate tested core support from optional
       integration ownership.
 
 ---

@@ -68,7 +68,7 @@ class UserService {
 Requirements:
 
 - Java 21+
-- Spring Boot 3.x
+- Spring Boot 3.5.x
 - Maven 3.8+
 
 Add the starter:
@@ -77,7 +77,7 @@ Add the starter:
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-starter</artifactId>
-  <version>2.6.0</version>
+  <version>2.7.0</version>
 </dependency>
 ```
 
@@ -143,7 +143,7 @@ reactive:
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-test</artifactId>
-  <version>2.6.0</version>
+  <version>2.7.0</version>
   <scope>test</scope>
 </dependency>
 ```
@@ -172,7 +172,7 @@ class UserApiClientTest {
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-otel</artifactId>
-  <version>2.6.0</version>
+  <version>2.7.0</version>
 </dependency>
 ```
 

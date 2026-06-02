@@ -80,4 +80,5 @@ reactive:
 - Keep `log-preset: metadata-only` by default; use `headers` or `bodies` only for targeted investigations.
 - Redact sensitive headers in inbound snapshots and exchange logs.
 - Cover client behavior with `reactive-http-client-test` mocks for status mapping, headers, query params, and auth.
-- Run `mvn test` before release.
+- Run `mvn test`, `mvn -Prelease-smoke test`, and
+  `mvn -Papi-compatibility -DskipTests verify` before release.
