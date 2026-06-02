@@ -16,11 +16,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exchange-log output. The value counts retry subscriptions inside one logical
   call, not guaranteed HTTP network sends. Existing convenience constructors
   default the value to `1`.
+- **Observer and lifecycle test helpers.** Added `MockReactiveHttpClient` builder
+  support for a custom `HttpClientObserver` and ordered
+  `ReactiveHttpClientLifecycleHook` instances.
+
+### Fixed
+
+- Fixed `MockReactiveHttpClient` observer and terminal lifecycle metadata by
+  installing the same final-request observation filter used by production
+  clients.
+- Fixed `MockReactiveHttpClient` hook, observer, and lifecycle client names by
+  using `@ReactiveHttpClient.name()` when present and retaining `mock-client` as
+  the unannotated-interface fallback.
+- Fixed `MockReactiveHttpClient` lifecycle-hook ordering so `@Order` annotations
+  are honored alongside `Ordered` implementations.
 
 ### Docs
 
 - Documented subscription-attempt count semantics and a custom structured
   exchange-logger example that records the count.
+- Documented compact `MockReactiveHttpClient` observer and lifecycle-hook usage
+  for retry subscription assertions.
 
 ---
 

@@ -1,8 +1,11 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
+import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.*;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import org.springframework.context.support.StaticApplicationContext;
+import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
@@ -17,6 +20,7 @@ import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -134,6 +138,8 @@ public final class MockReactiveHttpClient<T> {
                 .build();
         private ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
         private ResilienceOperatorApplier resilienceOperatorApplier = new NoopResilienceOperatorApplier();
+        private HttpClientObserver observer;
+        private final List<ReactiveHttpClientLifecycleHook> lifecycleHooks = new ArrayList<>();
 
         private Builder(Class<T> clientInterface) {
             this.clientInterface = clientInterface;
@@ -187,6 +193,18 @@ public final class MockReactiveHttpClient<T> {
             this.resilienceOperatorApplier = resilienceOperatorApplier != null
                     ? resilienceOperatorApplier
                     : new NoopResilienceOperatorApplier();
+            return this;
+        }
+
+        /** Registers a custom observer for logical-call terminal events. */
+        public Builder<T> withObserver(HttpClientObserver observer) {
+            this.observer = Objects.requireNonNull(observer, "observer");
+            return this;
+        }
+
+        /** Registers one lifecycle hook. Repeated calls accumulate hooks. */
+        public Builder<T> withLifecycleHook(ReactiveHttpClientLifecycleHook lifecycleHook) {
+            lifecycleHooks.add(Objects.requireNonNull(lifecycleHook, "lifecycleHook"));
             return this;
         }
 
@@ -252,15 +270,21 @@ public final class MockReactiveHttpClient<T> {
             WebClient webClient = WebClient.builder()
                     .baseUrl(baseUrl)
                     .exchangeFunction(exchangeFunction)
+                    .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
                     .build();
 
-            // Empty StaticApplicationContext — no HttpClientObserver registered, so
-            // observerProvider.getIfAvailable() returns null and the handler skips
-            // observer notifications. Sufficient for test scenarios that don't need
-            // metrics; users can override by calling withObserver(...) on a future
-            // builder method if needed.
             StaticApplicationContext appCtx = new StaticApplicationContext();
+            appCtx.getDefaultListableBeanFactory().setDependencyComparator(AnnotationAwareOrderComparator.INSTANCE);
+            if (observer != null) {
+                appCtx.getBeanFactory().registerSingleton("mockHttpClientObserver", observer);
+            }
+            for (int i = 0; i < lifecycleHooks.size(); i++) {
+                appCtx.getBeanFactory().registerSingleton("mockReactiveHttpClientLifecycleHook" + i, lifecycleHooks.get(i));
+            }
             appCtx.refresh();
+
+            ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+            String clientName = annotation != null ? annotation.name() : "mock-client";
 
             ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                     webClient,
@@ -268,7 +292,7 @@ public final class MockReactiveHttpClient<T> {
                     new RequestArgumentResolver(),
                     new DefaultErrorDecoder(),
                     clientConfig,
-                    "mock-client",
+                    clientName,
                     appCtx,
                     resilienceOperatorApplier,
                     null,

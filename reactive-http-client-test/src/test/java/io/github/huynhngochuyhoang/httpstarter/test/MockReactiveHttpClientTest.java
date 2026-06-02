@@ -1,17 +1,24 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook;
 import io.github.huynhngochuyhoang.httpstarter.core.RequestContext;
 import io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.test.StepVerifier;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,6 +52,12 @@ class MockReactiveHttpClientTest {
 
         @POST("/payments/manual")
         Mono<String> createPaymentWithKey(@Body String json, @IdempotencyKey String idempotencyKey);
+    }
+
+    @ReactiveHttpClient(name = "named-client")
+    interface NamedClient {
+        @GET("/items/{id}")
+        Mono<String> getItem(@PathVar("id") long id, @HeaderParam("X-Trace") String trace);
     }
 
     @Test
@@ -202,6 +215,143 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void observerReceivesOneTerminalEventForSuccessfulCall() {
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .withObserver(observed::add)
+                .respondTo(HttpMethod.GET, "/users/42",
+                        ex -> MockReactiveHttpClient.json(200, "alice"))
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectNext("alice")
+                .verifyComplete();
+
+        assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getClientName()).isEqualTo("mock-client");
+            assertThat(event.getStatusCode()).isEqualTo(200);
+            assertThat(event.getAttemptCount()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void annotatedClientNameAndFinalRequestMetadataMatchProductionBehavior() {
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        List<String> supportedClientNames = new CopyOnWriteArrayList<>();
+        List<ReactiveHttpClientLifecycleContext> successes = new CopyOnWriteArrayList<>();
+        ReactiveHttpClientLifecycleHook hook = new ReactiveHttpClientLifecycleHook() {
+            @Override
+            public boolean supports(String clientName) {
+                supportedClientNames.add(clientName);
+                return "named-client".equals(clientName);
+            }
+
+            @Override
+            public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+                successes.add(context);
+            }
+        };
+        MockReactiveHttpClient<NamedClient> mock = MockReactiveHttpClient.forClient(NamedClient.class)
+                .baseUrl("http://named.mock.local:8081")
+                .withObserver(observed::add)
+                .withLifecycleHook(hook)
+                .respondTo(HttpMethod.GET, "/items/42",
+                        ex -> MockReactiveHttpClient.json(200, "item"))
+                .build();
+
+        StepVerifier.create(mock.proxy().getItem(42, "trace-42"))
+                .expectNext("item")
+                .verifyComplete();
+
+        assertThat(supportedClientNames).containsExactly("named-client");
+        assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getClientName()).isEqualTo("named-client");
+            assertThat(event.getRequestUrl()).isEqualTo("http://named.mock.local:8081/items/42");
+            assertThat(event.getServerAddress()).isEqualTo("named.mock.local");
+            assertThat(event.getServerPort()).isEqualTo(8081);
+            assertThat(event.getRequestHeaders()).containsEntry("X-Trace", "trace-42");
+        });
+        assertThat(successes).singleElement().satisfies(context -> {
+            assertThat(context.clientName()).isEqualTo("named-client");
+            assertThat(context.requestUrl()).isEqualTo(URI.create("http://named.mock.local:8081/items/42"));
+        });
+    }
+
+    @Test
+    void retrySuccessNotifiesOneObserverEventAndOrderedLifecycleCallbacks() {
+        AtomicInteger served = new AtomicInteger();
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        List<String> lifecycleEvents = new CopyOnWriteArrayList<>();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .retry(2, "POST")
+                .withObserver(observed::add)
+                .withLifecycleHook(new OrderedRecordingHook("second", 20, lifecycleEvents))
+                .withLifecycleHook(new OrderedRecordingHook("first", 10, lifecycleEvents))
+                .respondTo(HttpMethod.POST, "/payments", ex -> {
+                    if (served.incrementAndGet() == 1) {
+                        return MockReactiveHttpClient.json(503, "{\"error\":\"temporary\"}");
+                    }
+                    return MockReactiveHttpClient.json(201, "\"created\"");
+                })
+                .build();
+
+        StepVerifier.create(mock.proxy().createPayment("{\"amount\":10}"))
+                .expectNext("\"created\"")
+                .verifyComplete();
+
+        assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getStatusCode()).isEqualTo(201);
+            assertThat(event.getAttemptCount()).isEqualTo(2);
+        });
+        assertThat(lifecycleEvents).containsExactly(
+                "first:start:1",
+                "second:start:1",
+                "first:retry:2",
+                "second:retry:2",
+                "first:success:2",
+                "second:success:2");
+    }
+
+    @Test
+    void annotationOrderedLifecycleHooksUseProductionOrdering() {
+        List<String> lifecycleEvents = new CopyOnWriteArrayList<>();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .withLifecycleHook(new SecondAnnotationOrderedHook(lifecycleEvents))
+                .withLifecycleHook(new FirstAnnotationOrderedHook(lifecycleEvents))
+                .respondTo(HttpMethod.GET, "/users/42",
+                        ex -> MockReactiveHttpClient.json(200, "alice"))
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectNext("alice")
+                .verifyComplete();
+
+        assertThat(lifecycleEvents).containsExactly("first:start", "second:start");
+    }
+
+    @Test
+    void retryExhaustionNotifiesOneTerminalObserverEvent() {
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .retry(2, "POST")
+                .withObserver(observed::add)
+                .respondTo(HttpMethod.POST, "/payments",
+                        ex -> MockReactiveHttpClient.json(503, "{\"error\":\"down\"}"))
+                .build();
+
+        ErrorCategoryAssertions.assertThatFails(mock.proxy().createPayment("{\"amount\":10}"))
+                .hasStatusCode(503)
+                .hasErrorCategory(ErrorCategory.SERVER_ERROR);
+
+        assertThat(mock.exchanges()).hasSize(2);
+        assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getStatusCode()).isEqualTo(503);
+            assertThat(event.getAttemptCount()).isEqualTo(2);
+            assertThat(event.getError()).isNotNull();
+        });
+    }
+
+    @Test
     void retryHelperRejectsEmptyRetryMethods() {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                         MockReactiveHttpClient.forClient(SampleClient.class).retry(2))
@@ -259,5 +409,65 @@ class MockReactiveHttpClientTest {
     }
 
     private record EventEnvelope(RequestContextSnapshot context) {
+    }
+
+    @Order(10)
+    private static final class FirstAnnotationOrderedHook implements ReactiveHttpClientLifecycleHook {
+        private final List<String> events;
+
+        private FirstAnnotationOrderedHook(List<String> events) {
+            this.events = events;
+        }
+
+        @Override
+        public void onStart(ReactiveHttpClientLifecycleContext context) {
+            events.add("first:start");
+        }
+    }
+
+    @Order(20)
+    private static final class SecondAnnotationOrderedHook implements ReactiveHttpClientLifecycleHook {
+        private final List<String> events;
+
+        private SecondAnnotationOrderedHook(List<String> events) {
+            this.events = events;
+        }
+
+        @Override
+        public void onStart(ReactiveHttpClientLifecycleContext context) {
+            events.add("second:start");
+        }
+    }
+
+    private static final class OrderedRecordingHook implements ReactiveHttpClientLifecycleHook, Ordered {
+        private final String name;
+        private final int order;
+        private final List<String> events;
+
+        private OrderedRecordingHook(String name, int order, List<String> events) {
+            this.name = name;
+            this.order = order;
+            this.events = events;
+        }
+
+        @Override
+        public int getOrder() {
+            return order;
+        }
+
+        @Override
+        public void onStart(ReactiveHttpClientLifecycleContext context) {
+            events.add(name + ":start:" + context.attemptNumber());
+        }
+
+        @Override
+        public void onRetryAttempt(ReactiveHttpClientLifecycleContext context) {
+            events.add(name + ":retry:" + context.attemptNumber());
+        }
+
+        @Override
+        public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+            events.add(name + ":success:" + context.attemptNumber());
+        }
     }
 }

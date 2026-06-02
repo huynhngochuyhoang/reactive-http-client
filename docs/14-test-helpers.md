@@ -207,6 +207,48 @@ RecordedExchangeAssertions.assertThat(mock.exchanges().get(1))
 
 The mock retry helper is intentionally small: it retries matching methods inside tests and records each outbound attempt. Production retry semantics still come from your application Resilience4j configuration.
 
+## Observer and lifecycle assertions
+
+Attach a custom observer and one or more lifecycle hooks when a test needs to
+assert logical-call telemetry or retry subscription boundaries:
+
+```java
+List<HttpClientObserverEvent> observed = new ArrayList<>();
+List<Integer> attempts = new ArrayList<>();
+
+ReactiveHttpClientLifecycleHook hook = new ReactiveHttpClientLifecycleHook() {
+    @Override
+    public void onStart(ReactiveHttpClientLifecycleContext context) {
+        attempts.add(context.attemptNumber());
+    }
+
+    @Override
+    public void onRetryAttempt(ReactiveHttpClientLifecycleContext context) {
+        attempts.add(context.attemptNumber());
+    }
+};
+
+MockReactiveHttpClient<PaymentClient> mock = MockReactiveHttpClient
+        .forClient(PaymentClient.class)
+        .retry(2, "POST")
+        .withObserver(observed::add)
+        .withLifecycleHook(hook)
+        .respondTo(HttpMethod.POST, "/payments",
+                ex -> MockReactiveHttpClient.json(201, "\"created\""))
+        .build();
+```
+
+The observer receives one terminal event for the logical call, including the
+final subscription-attempt count and the final outbound URL and headers. The mock
+uses `@ReactiveHttpClient.name()` when the interface is annotated and falls back
+to `mock-client` for the helper's supported unannotated interfaces. Lifecycle
+hooks receive `onStart` for attempt `1` and `onRetryAttempt` for later retry
+subscriptions. Repeated
+`withLifecycleHook(...)` calls accumulate hooks; hooks implementing `Ordered` or
+annotated with `@Order` run with the same Spring ordering semantics as starter
+beans. The helper does not register Micrometer or OpenTelemetry observers unless
+the test supplies one explicitly.
+
 ---
 
 ## Async context assertions

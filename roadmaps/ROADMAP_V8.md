@@ -80,11 +80,11 @@ retry callbacks need focused tests without constructing the handler manually.
 
 **Acceptance:**
 
-- [ ] Tests can attach one custom `HttpClientObserver` to a mock client.
-- [ ] Tests can attach ordered lifecycle hooks and assert callback order.
-- [ ] Retry success and exhaustion examples prove one logical-call observer
+- [x] Tests can attach one custom `HttpClientObserver` to a mock client.
+- [x] Tests can attach ordered lifecycle hooks and assert callback order.
+- [x] Retry success and exhaustion examples prove one logical-call observer
       event with the final subscription-attempt count.
-- [ ] Existing helper usage behaves exactly as before when no hook is supplied.
+- [x] Existing helper usage behaves exactly as before when no hook is supplied.
 
 ---
 
