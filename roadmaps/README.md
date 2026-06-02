@@ -17,3 +17,5 @@ Planning documents for the project:
 - [ROADMAP_V7_CHECKLIST.md](ROADMAP_V7_CHECKLIST.md) — V7 execution checklist
 - [ROADMAP_V8.md](ROADMAP_V8.md) — V8 roadmap, released as `2.7.0`
 - [ROADMAP_V8_CHECKLIST.md](ROADMAP_V8_CHECKLIST.md) — V8 execution checklist
+- [ROADMAP_V9.md](ROADMAP_V9.md) — V9 roadmap
+- [ROADMAP_V9_CHECKLIST.md](ROADMAP_V9_CHECKLIST.md) — V9 execution checklist
