@@ -35,9 +35,16 @@ subclasses still expose at most 4 KiB from `getResponseBody()`. The larger
 Problem Detail cap is for mapper parsing reliability, so a structured mapper can
 read richer `application/problem+json` payloads before constructing its exception.
 Malformed `Content-Type` headers fall back to the default 4 KiB cap instead of
-aborting decoding. Exchange logging still follows `log-preset`: metadata-only
-and headers presets omit bodies; only the `bodies` preset logs request/response
-payloads.
+aborting decoding. Mapper input is always bounded. Check
+`ErrorResponseContext.responseBodyTruncated()` before assuming structured input is
+complete; `retainedResponseBodyBytes()` reports the number of retained bytes.
+
+After reaching the cap, `DefaultErrorDecoder` continues draining the response and
+releases each consumed `DataBuffer` so the connection can be reused when the
+transport allows it. If the subscriber cancels before draining completes, capture
+stops and consumed buffers are still released, but connection reuse is not
+guaranteed. Exchange logging still follows `log-preset`: metadata-only and headers
+presets omit bodies; only the `bodies` preset logs request/response payloads.
 
 ---
 
@@ -158,6 +165,9 @@ public class PaymentErrorMapper implements ErrorResponseMapper {
 
     @Override
     public Optional<? extends Throwable> map(ErrorResponseContext context) throws Exception {
+        if (context.responseBodyTruncated()) {
+            return Optional.empty();
+        }
         PaymentError error = objectMapper.readValue(context.responseBody(), PaymentError.class);
         if (!"DECLINED".equals(error.code())) {
             return Optional.empty();
@@ -171,8 +181,8 @@ public class PaymentErrorMapper implements ErrorResponseMapper {
 
 Return `Optional.empty()` when a mapper does not apply. If a mapper throws while
 parsing an invalid body, the starter logs a warning and falls back to the default
-decoder. The fallback preserves the original HTTP status, raw response body, and
-`ErrorCategory`.
+decoder. The fallback preserves the original HTTP status, bounded retained response
+body, and `ErrorCategory`.
 
 `ErrorResponseContext.defaultException()` is available when a mapper wants to
 inspect or wrap the default `HttpClientException` / `RemoteServiceException`.
@@ -193,8 +203,8 @@ ErrorResponseMapper problemDetailErrorResponseMapper(ObjectMapper objectMapper) 
 When the response has `Content-Type: application/problem+json`, 4xx responses map
 to `ProblemDetailHttpClientException` and 5xx responses map to
 `ProblemDetailRemoteServiceException`. Both exceptions expose the parsed
-`ProblemDetail` and keep the original status, raw response body, request context,
-and `ErrorCategory` from the default exception model.
+`ProblemDetail` and keep the original status, bounded retained response body,
+request context, and `ErrorCategory` from the default exception model.
 
 ```java
 orderClient.createOrder(request)

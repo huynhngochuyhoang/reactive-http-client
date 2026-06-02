@@ -82,28 +82,28 @@
 
 ## Priority 5 — Error-Body Truncation Metadata and Drain Behavior
 
-### [ ] 1.3 Error-body truncation metadata for mappers
-- [ ] Expose whether mapper input was truncated.
-- [ ] Expose the retained body byte count.
-- [ ] Preserve source compatibility for existing `ErrorResponseContext`
+### [x] 1.3 Error-body truncation metadata for mappers
+- [x] Expose whether mapper input was truncated.
+- [x] Expose the retained body byte count.
+- [x] Preserve source compatibility for existing `ErrorResponseContext`
   callers.
-- [ ] Keep the default 4 KiB capture cap unchanged.
-- [ ] Keep the `application/problem+json` 64 KiB capture cap unchanged.
-- [ ] Test complete and truncated default mapper bodies.
-- [ ] Test complete and truncated Problem Detail mapper bodies.
-- [ ] Verify generic exceptions still expose at most their documented 4 KiB
+- [x] Keep the default 4 KiB capture cap unchanged.
+- [x] Keep the `application/problem+json` 64 KiB capture cap unchanged.
+- [x] Test complete and truncated default mapper bodies.
+- [x] Test complete and truncated Problem Detail mapper bodies.
+- [x] Verify generic exceptions still expose at most their documented 4 KiB
   body text.
-- [ ] Document that mapper input remains bounded and may be incomplete.
+- [x] Document that mapper input remains bounded and may be incomplete.
 
-### [ ] 3.3 Retained error-body drain and cancellation behavior
-- [ ] Audit `DataBuffer` release during bounded error-body capture.
-- [ ] Test oversized chunked error bodies.
-- [ ] Test mapper fallback after truncated input.
-- [ ] Test cancellation during error-body capture.
-- [ ] Verify every consumed `DataBuffer` is released on success, fallback, and
+### [x] 3.3 Retained error-body drain and cancellation behavior
+- [x] Audit `DataBuffer` release during bounded error-body capture.
+- [x] Test oversized chunked error bodies.
+- [x] Test mapper fallback after truncated input.
+- [x] Test cancellation during error-body capture.
+- [x] Verify every consumed `DataBuffer` is released on success, fallback, and
   cancellation paths.
-- [ ] Verify retained memory stays bounded.
-- [ ] Document draining behavior required for connection reuse.
+- [x] Verify retained memory stays bounded.
+- [x] Document draining behavior required for connection reuse.
 
 ---
 

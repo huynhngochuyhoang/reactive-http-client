@@ -6,8 +6,12 @@ import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
 import org.springframework.http.HttpHeaders;
 
+import java.nio.charset.StandardCharsets;
+
 /**
  * Immutable input passed to {@link ErrorResponseMapper} implementations.
+ * The response body is bounded; inspect {@link #responseBodyTruncated()} and
+ * {@link #retainedResponseBodyBytes()} before assuming structured input is complete.
  */
 public record ErrorResponseContext(
         String clientName,
@@ -16,8 +20,22 @@ public record ErrorResponseContext(
         HttpHeaders responseHeaders,
         String requestMethod,
         String requestUrl,
-        ErrorCategory errorCategory
+        ErrorCategory errorCategory,
+        boolean responseBodyTruncated,
+        int retainedResponseBodyBytes
 ) {
+
+    public ErrorResponseContext(
+            String clientName,
+            int statusCode,
+            String responseBody,
+            HttpHeaders responseHeaders,
+            String requestMethod,
+            String requestUrl,
+            ErrorCategory errorCategory) {
+        this(clientName, statusCode, responseBody, responseHeaders, requestMethod, requestUrl, errorCategory,
+                false, utf8Length(responseBody));
+    }
 
     public ErrorResponseContext {
         responseHeaders = responseHeaders != null
@@ -26,6 +44,13 @@ public record ErrorResponseContext(
         errorCategory = errorCategory != null
                 ? errorCategory
                 : ErrorCategories.fromStatusCode(statusCode);
+        if (retainedResponseBodyBytes < 0) {
+            throw new IllegalArgumentException("retainedResponseBodyBytes must be non-negative");
+        }
+    }
+
+    private static int utf8Length(String value) {
+        return value != null ? value.getBytes(StandardCharsets.UTF_8).length : 0;
     }
 
     /**

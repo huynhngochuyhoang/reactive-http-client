@@ -18,8 +18,10 @@ public interface ErrorResponseMapper {
     /**
      * Return {@link Optional#empty()} when this mapper does not apply.
      *
-     * <p>Throwing from this method is treated as a mapper miss; the default decoder
-     * remains the fallback so error handling never masks the upstream status/body.
+     * <p>The context body is bounded. Inspect its truncation metadata before assuming
+     * structured input is complete. Throwing from this method is treated as a mapper miss;
+     * the default decoder remains the fallback so error handling never masks the upstream
+     * status or retained body.
      */
     Optional<? extends Throwable> map(ErrorResponseContext context) throws Exception;
 }

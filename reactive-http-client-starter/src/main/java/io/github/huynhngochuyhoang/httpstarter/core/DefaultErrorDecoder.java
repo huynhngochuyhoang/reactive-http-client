@@ -68,19 +68,20 @@ public class DefaultErrorDecoder {
         RequestContext requestContext = resolveRequestContext(response);
         HttpHeaders responseHeaders = resolveResponseHeaders(response);
         return readBodyWithCap(response, maxErrorBodyBytes(responseHeaders))
-                .defaultIfEmpty("")
-                .map(body -> mapOrDefault(code, body, responseHeaders, requestContext));
+                .map(capture -> mapOrDefault(code, capture, responseHeaders, requestContext));
     }
 
-    private Throwable mapOrDefault(int code, String body, HttpHeaders responseHeaders, RequestContext requestContext) {
+    private Throwable mapOrDefault(int code, BodyCapture capture, HttpHeaders responseHeaders, RequestContext requestContext) {
         ErrorResponseContext context = new ErrorResponseContext(
                 clientName,
                 code,
-                body,
+                capture.body(),
                 responseHeaders,
                 requestContext.method(),
                 requestContext.url(),
-                null);
+                null,
+                capture.truncated(),
+                capture.retainedBytes());
         for (ErrorResponseMapper mapper : errorResponseMappers) {
             if (!supports(mapper, clientName)) {
                 continue;
@@ -121,26 +122,45 @@ public class DefaultErrorDecoder {
         return MAX_ERROR_BODY_BYTES;
     }
 
-    private Mono<String> readBodyWithCap(ClientResponse response, int maxBytes) {
+    private Mono<BodyCapture> readBodyWithCap(ClientResponse response, int maxBytes) {
         return response.bodyToFlux(DataBuffer.class)
-                .map(dataBuffer -> {
-                    try {
-                        byte[] chunk = new byte[dataBuffer.readableByteCount()];
-                        dataBuffer.read(chunk);
-                        return chunk;
-                    } finally {
-                        DataBufferUtils.release(dataBuffer);
-                    }
-                })
-                .reduce(new ByteArrayOutputStream(maxBytes), (output, chunk) -> {
-                    int remaining = maxBytes - output.size();
-                    if (remaining > 0) {
-                        output.write(chunk, 0, Math.min(remaining, chunk.length));
-                    }
-                    return output;
-                })
-                .map(output -> output.toString(StandardCharsets.UTF_8))
-                .defaultIfEmpty("");
+                .doOnDiscard(DataBuffer.class, DataBufferUtils::release)
+                .reduce(new BodyCaptureAccumulator(maxBytes), BodyCaptureAccumulator::append)
+                .map(BodyCaptureAccumulator::finish);
+    }
+
+    private static final class BodyCaptureAccumulator {
+        private final int maxBytes;
+        private final ByteArrayOutputStream output;
+        private boolean truncated;
+
+        private BodyCaptureAccumulator(int maxBytes) {
+            this.maxBytes = maxBytes;
+            this.output = new ByteArrayOutputStream(maxBytes);
+        }
+
+        private BodyCaptureAccumulator append(DataBuffer dataBuffer) {
+            try {
+                int readableBytes = dataBuffer.readableByteCount();
+                int retainedBytes = Math.min(maxBytes - output.size(), readableBytes);
+                if (retainedBytes > 0) {
+                    byte[] retained = new byte[retainedBytes];
+                    dataBuffer.read(retained);
+                    output.write(retained, 0, retainedBytes);
+                }
+                truncated |= readableBytes > retainedBytes;
+                return this;
+            } finally {
+                DataBufferUtils.release(dataBuffer);
+            }
+        }
+
+        private BodyCapture finish() {
+            return new BodyCapture(output.toString(StandardCharsets.UTF_8), truncated, output.size());
+        }
+    }
+
+    private record BodyCapture(String body, boolean truncated, int retainedBytes) {
     }
 
     private RequestContext resolveRequestContext(ClientResponse response) {
