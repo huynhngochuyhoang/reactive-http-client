@@ -1,6 +1,6 @@
 # Error Handling
 
-The starter maps every non-2xx response and network-level failure to a typed exception so callers can handle errors uniformly without inspecting raw `WebClientResponseException`.
+The starter maps 4xx and 5xx responses plus network-level failures to typed exceptions so callers can handle errors uniformly without inspecting raw `WebClientResponseException`.
 
 ---
 
@@ -19,6 +19,18 @@ Both types expose:
 | `getStatusCode()` | `int` | HTTP status code |
 | `getResponseBody()` | `String` | Raw response body (may be empty) |
 | `getErrorCategory()` | `ErrorCategory` | Coarse-grained failure category |
+
+## Redirect responses
+
+3xx responses are not errors and do not invoke `DefaultErrorDecoder` or registered
+`ErrorResponseMapper` beans. The starter-created Reactor Netty transport leaves
+automatic redirect following disabled, so a proxy method such as
+`Mono<ResponseEntity<T>>` can receive a visible 3xx response and inspect its
+`Location` header.
+
+If an application supplies a separately configured transport that follows
+redirects, the transport resolves the redirect before the proxy handles the
+response. The proxy then emits or decodes the final response status normally.
 
 ## Error body retention policy
 

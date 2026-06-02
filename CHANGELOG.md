@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed bounded error-body capture to retain only cap-sized data while draining
   oversized responses, releasing consumed buffers, and installing discard release
   handling for cancellation paths.
+- Restricted `DefaultErrorDecoder` and registered `ErrorResponseMapper` invocation
+  to actual 4xx/5xx statuses so visible redirects remain normal response values.
 
 ### Docs
 
@@ -51,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   connection reuse.
 - Documented a canonical diagnostic-context capability matrix and
   raw-versus-redacted header behavior for custom exchange loggers and observers.
+- Documented visible 3xx handling and transport-level redirect following.
 
 ---
 

@@ -73,6 +73,34 @@ class MicrometerHttpClientObserverTest {
         assertEquals(1, timer.count(), 0.0d);
     }
 
+    @Test
+    void shouldRecordRedirectionOutcomeForVisibleRedirect() {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(
+                meterRegistry,
+                new ReactiveHttpClientProperties.ObservabilityConfig()
+        );
+
+        observer.record(new HttpClientObserverEvent(
+                "user-service",
+                "user.get",
+                "GET",
+                "/users/{id}",
+                302,
+                8,
+                null,
+                null,
+                null,
+                null
+        ));
+
+        Timer timer = meterRegistry.find("reactive.http.client.requests")
+                .tag("outcome", "REDIRECTION")
+                .timer();
+        assertNotNull(timer);
+        assertEquals(1, timer.count(), 0.0d);
+    }
+
     @ParameterizedTest
     @EnumSource(ErrorCategory.class)
     void shouldUsePublishedErrorCategoryNamesAsMetricTagValues(ErrorCategory category) {

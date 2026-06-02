@@ -64,6 +64,9 @@ public class DefaultErrorDecoder {
      * given error response, or an empty Mono if the status code is not an error.
      */
     public Mono<? extends Throwable> decode(ClientResponse response) {
+        if (!response.statusCode().isError()) {
+            return Mono.empty();
+        }
         int code = response.statusCode().value();
         RequestContext requestContext = resolveRequestContext(response);
         HttpHeaders responseHeaders = resolveResponseHeaders(response);
