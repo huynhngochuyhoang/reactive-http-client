@@ -226,6 +226,8 @@ The default logger redacts the following headers automatically:
 | `X-Api-Key` | Request |
 
 Custom loggers receive raw values from `HttpExchangeLogContext`. Use `SensitiveHeaders.isSensitive(headerName)` to apply the same deny-list in your own implementation.
+See [Diagnostic Context Contracts](21-diagnostic-contexts.md) for the canonical
+extension-point capability matrix and raw-versus-redacted header behavior.
 
 ---
 

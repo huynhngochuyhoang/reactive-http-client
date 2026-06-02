@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for retry subscription assertions.
 - Documented bounded mapper input metadata and error-body draining behavior for
   connection reuse.
+- Documented a canonical diagnostic-context capability matrix and
+  raw-versus-redacted header behavior for custom exchange loggers and observers.
 
 ---
 

@@ -67,6 +67,8 @@ error when available, and attempt number.
 
 Context values are read-only snapshots. Use filters, auth providers, or a
 `ReactiveHttpClientCustomizer` when you need to mutate a request.
+See [Diagnostic Context Contracts](21-diagnostic-contexts.md) for the canonical
+capability matrix, including fields intentionally unavailable to hooks.
 
 ## Hooks vs Customizers vs Observers
 

@@ -38,6 +38,8 @@ Malformed `Content-Type` headers fall back to the default 4 KiB cap instead of
 aborting decoding. Mapper input is always bounded. Check
 `ErrorResponseContext.responseBodyTruncated()` before assuming structured input is
 complete; `retainedResponseBodyBytes()` reports the number of retained bytes.
+See [Diagnostic Context Contracts](21-diagnostic-contexts.md) for the fields
+available to error mappers and the other diagnostic extension points.
 
 After reaching the cap, `DefaultErrorDecoder` continues draining the response and
 releases each consumed `DataBuffer` so the connection can be reused when the
