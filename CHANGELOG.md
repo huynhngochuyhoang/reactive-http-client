@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`@ApiRef` observability-name fallback.** Methods now resolve logical API names
   with `@ApiName` value > `@ApiRef` value > Java method name precedence for
   observer events, metrics, traces, and lifecycle hooks.
+- **Error-body truncation metadata.** Added
+  `ErrorResponseContext#responseBodyTruncated()` and
+  `retainedResponseBodyBytes()` so structured mappers can distinguish complete
+  bounded input from truncated input. The existing constructor remains available.
 
 ### Fixed
 
@@ -33,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the unannotated-interface fallback.
 - Fixed `MockReactiveHttpClient` lifecycle-hook ordering so `@Order` annotations
   are honored alongside `Ordered` implementations.
+- Fixed bounded error-body capture to retain only cap-sized data while draining
+  oversized responses, releasing consumed buffers, and installing discard release
+  handling for cancellation paths.
 
 ### Docs
 
@@ -40,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exchange-logger example that records the count.
 - Documented compact `MockReactiveHttpClient` observer and lifecycle-hook usage
   for retry subscription assertions.
+- Documented bounded mapper input metadata and error-body draining behavior for
+  connection reuse.
 
 ---
 

@@ -106,11 +106,11 @@ structured document as malformed input and hide the real reason for fallback.
 
 **Acceptance:**
 
-- [ ] A mapper can distinguish a complete body from a truncated body.
-- [ ] Tests cover the default 4 KiB cap and the 64 KiB
+- [x] A mapper can distinguish a complete body from a truncated body.
+- [x] Tests cover the default 4 KiB cap and the 64 KiB
       `application/problem+json` cap.
-- [ ] Generic exceptions still expose at most their documented 4 KiB body text.
-- [ ] Existing mapper implementations remain source compatible.
+- [x] Generic exceptions still expose at most their documented 4 KiB body text.
+- [x] Existing mapper implementations remain source compatible.
 
 ---
 
@@ -310,11 +310,11 @@ expose leaks or surprising latency.
 
 **Acceptance:**
 
-- [ ] Oversized error streams retain only the configured cap.
-- [ ] Every consumed `DataBuffer` is released on success, fallback, and
+- [x] Oversized error streams retain only the configured cap.
+- [x] Every consumed `DataBuffer` is released on success, fallback, and
       cancellation paths.
-- [ ] Mapper fallback preserves status and bounded body metadata.
-- [ ] Error-body capture tests do not require unbounded buffering.
+- [x] Mapper fallback preserves status and bounded body metadata.
+- [x] Error-body capture tests do not require unbounded buffering.
 
 ---
 
