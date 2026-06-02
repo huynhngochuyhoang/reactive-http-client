@@ -269,6 +269,16 @@ class ReactiveHttpClientAutoConfigurationTest {
     }
 
     @Test
+    void starterContextLoadsWhenMicrometerMissing() {
+        runner.withClassLoader(new FilteredClassLoader("io.micrometer"))
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(WebClient.Builder.class);
+                    assertThat(context).doesNotHaveBean("micrometerHttpClientObserver");
+                });
+    }
+
+    @Test
     void userObserverDoesNotSuppressNamedMicrometerObserver() {
         runner.withUserConfiguration(SimpleMeterRegistryConfig.class, CustomObserverConfig.class)
                 .run(context -> {

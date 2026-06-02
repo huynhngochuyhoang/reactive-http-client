@@ -143,43 +143,43 @@
 
 ## Priority 8 — Compatibility Evidence and Release Readiness
 
-### [ ] 2.2 Public API compatibility automation
-- [ ] Select and document the released API compatibility baseline.
-- [ ] Add an API compatibility report for published artifacts.
-- [ ] Fail CI for unreviewed binary-incompatible public API changes.
-- [ ] Keep internal implementation classes and test fixtures out of the public
+### [x] 2.2 Public API compatibility automation
+- [x] Select and document the released API compatibility baseline.
+- [x] Add an API compatibility report for published artifacts.
+- [x] Fail CI for unreviewed binary-incompatible public API changes.
+- [x] Keep internal implementation classes and test fixtures out of the public
   API check.
-- [ ] Test that accidental public constructor removal fails the check.
-- [ ] Verify additive public APIs pass without manual suppression.
-- [ ] Document how to review an intentional breaking change for a future major
+- [x] Test that accidental public constructor removal fails the check.
+- [x] Verify additive public APIs pass without manual suppression.
+- [x] Document how to review an intentional breaking change for a future major
   release.
 
-### [ ] 2.3 Native-image and Spring Boot compatibility evidence
-- [ ] Keep the fast Spring AOT smoke test in normal CI.
-- [ ] Add an opt-in or scheduled minimal native-image build for the core starter
+### [x] 2.3 Native-image and Spring Boot compatibility evidence
+- [x] Keep the fast Spring AOT smoke test in normal CI.
+- [x] Add an opt-in or scheduled minimal native-image build for the core starter
   path.
-- [ ] Define the supported Spring Boot baseline policy.
-- [ ] Expand release-smoke CI to each documented Spring Boot baseline.
-- [ ] Verify inherited client methods remain covered by AOT reflection hints.
-- [ ] Verify optional integrations can be absent without breaking AOT
+- [x] Define the supported Spring Boot baseline policy.
+- [x] Expand release-smoke CI to each documented Spring Boot baseline.
+- [x] Verify inherited client methods remain covered by AOT reflection hints.
+- [x] Verify optional integrations can be absent without breaking AOT
   processing.
-- [ ] Document tested core support separately from optional integration
+- [x] Document tested core support separately from optional integration
   ownership.
 
-### [ ] Release Readiness
-- [ ] `CHANGELOG.md` has V8 entries grouped under Added/Changed/Fixed/Docs.
-- [ ] README stays short and links to detailed docs.
-- [ ] New public APIs have focused tests and concise docs.
-- [ ] New test-helper APIs are covered by examples.
-- [ ] Configuration metadata is updated if new properties are added.
-- [ ] Subscription-attempt wording does not imply guaranteed HTTP network
+### [x] Release Readiness
+- [x] `CHANGELOG.md` has V8 entries grouped under Added/Changed/Fixed/Docs.
+- [x] README stays short and links to detailed docs.
+- [x] New public APIs have focused tests and concise docs.
+- [x] New test-helper APIs are covered by examples.
+- [x] Configuration metadata is updated if new properties are added.
+- [x] Subscription-attempt wording does not imply guaranteed HTTP network
   sends.
-- [ ] Exchange-log, observer, lifecycle, and mapper docs match their actual
+- [x] Exchange-log, observer, lifecycle, and mapper docs match their actual
   runtime fields.
-- [ ] Error-body docs do not imply unbounded capture or complete truncated
+- [x] Error-body docs do not imply unbounded capture or complete truncated
   input.
-- [ ] Redirect docs describe visible and followed response behavior precisely.
-- [ ] API compatibility checks pass against the selected released baseline.
-- [ ] `mvn test` passes.
-- [ ] `mvn -Prelease-smoke test` passes before release.
-- [ ] Breaking behavior, if any, is explicitly called out before release.
+- [x] Redirect docs describe visible and followed response behavior precisely.
+- [x] API compatibility checks pass against the selected released baseline.
+- [x] `mvn test` passes.
+- [x] `mvn -Prelease-smoke test` passes before release.
+- [x] Breaking behavior, if any, is explicitly called out before release.
