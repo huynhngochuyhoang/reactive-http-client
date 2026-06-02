@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.core.*;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import org.springframework.context.support.StaticApplicationContext;
+import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
@@ -273,6 +274,7 @@ public final class MockReactiveHttpClient<T> {
                     .build();
 
             StaticApplicationContext appCtx = new StaticApplicationContext();
+            appCtx.getDefaultListableBeanFactory().setDependencyComparator(AnnotationAwareOrderComparator.INSTANCE);
             if (observer != null) {
                 appCtx.getBeanFactory().registerSingleton("mockHttpClientObserver", observer);
             }

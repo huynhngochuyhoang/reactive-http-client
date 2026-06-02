@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `MockReactiveHttpClient` hook, observer, and lifecycle client names by
   using `@ReactiveHttpClient.name()` when present and retaining `mock-client` as
   the unannotated-interface fallback.
+- Fixed `MockReactiveHttpClient` lifecycle-hook ordering so `@Order` annotations
+  are honored alongside `Ordered` implementations.
 
 ### Docs
 

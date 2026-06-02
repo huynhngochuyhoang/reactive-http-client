@@ -9,6 +9,7 @@ import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -312,6 +313,23 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void annotationOrderedLifecycleHooksUseProductionOrdering() {
+        List<String> lifecycleEvents = new CopyOnWriteArrayList<>();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .withLifecycleHook(new SecondAnnotationOrderedHook(lifecycleEvents))
+                .withLifecycleHook(new FirstAnnotationOrderedHook(lifecycleEvents))
+                .respondTo(HttpMethod.GET, "/users/42",
+                        ex -> MockReactiveHttpClient.json(200, "alice"))
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectNext("alice")
+                .verifyComplete();
+
+        assertThat(lifecycleEvents).containsExactly("first:start", "second:start");
+    }
+
+    @Test
     void retryExhaustionNotifiesOneTerminalObserverEvent() {
         List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
@@ -391,6 +409,34 @@ class MockReactiveHttpClientTest {
     }
 
     private record EventEnvelope(RequestContextSnapshot context) {
+    }
+
+    @Order(10)
+    private static final class FirstAnnotationOrderedHook implements ReactiveHttpClientLifecycleHook {
+        private final List<String> events;
+
+        private FirstAnnotationOrderedHook(List<String> events) {
+            this.events = events;
+        }
+
+        @Override
+        public void onStart(ReactiveHttpClientLifecycleContext context) {
+            events.add("first:start");
+        }
+    }
+
+    @Order(20)
+    private static final class SecondAnnotationOrderedHook implements ReactiveHttpClientLifecycleHook {
+        private final List<String> events;
+
+        private SecondAnnotationOrderedHook(List<String> events) {
+            this.events = events;
+        }
+
+        @Override
+        public void onStart(ReactiveHttpClientLifecycleContext context) {
+            events.add("second:start");
+        }
     }
 
     private static final class OrderedRecordingHook implements ReactiveHttpClientLifecycleHook, Ordered {
