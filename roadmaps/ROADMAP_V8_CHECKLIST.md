@@ -109,20 +109,20 @@
 
 ## Priority 6 — Diagnostic Context Contract Alignment
 
-### [ ] 2.1 Diagnostic context contract alignment
-- [ ] Audit fields exposed by `HttpExchangeLogContext`.
-- [ ] Audit fields exposed by `HttpClientObserverEvent`.
-- [ ] Audit fields exposed by `ReactiveHttpClientLifecycleContext`.
-- [ ] Audit fields exposed by `ErrorResponseContext`.
-- [ ] Add missing fields only where a concrete extension-point need exists.
-- [ ] Document one capability matrix covering final request URL, final request
+### [x] 2.1 Diagnostic context contract alignment
+- [x] Audit fields exposed by `HttpExchangeLogContext`.
+- [x] Audit fields exposed by `HttpClientObserverEvent`.
+- [x] Audit fields exposed by `ReactiveHttpClientLifecycleContext`.
+- [x] Audit fields exposed by `ErrorResponseContext`.
+- [x] Add missing fields only where a concrete extension-point need exists.
+- [x] Document one capability matrix covering final request URL, final request
   headers, response status, response headers, error body, duration, and
   subscription-attempt count.
-- [ ] Verify docs do not promise response headers in lifecycle hooks or
+- [x] Verify docs do not promise response headers in lifecycle hooks or
   observers when unavailable.
-- [ ] Document raw-versus-redacted header behavior for custom exchange loggers
+- [x] Document raw-versus-redacted header behavior for custom exchange loggers
   and custom observers.
-- [ ] Add focused contract tests for each documented context field.
+- [x] Add focused contract tests for each documented context field.
 
 ---
 

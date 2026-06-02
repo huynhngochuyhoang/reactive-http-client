@@ -246,6 +246,11 @@ wired.
 
 Custom `HttpClientObserver` beans now run alongside the built-ins. To replace a built-in, register a bean with the same name: `micrometerHttpClientObserver` or `openTelemetryHttpClientObserver`. To take complete control over delegation, expose your own observer and exclude or override the built-in bean names.
 
+Custom observers receive raw final outbound request headers when available, but
+do not receive response-header maps. See
+[Diagnostic Context Contracts](21-diagnostic-contexts.md) for the complete
+extension-point capability matrix and redaction responsibilities.
+
 For manual composition outside auto-configuration, use `CompositeHttpClientObserver`:
 
 ```java

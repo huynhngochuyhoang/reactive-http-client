@@ -169,11 +169,11 @@ subscription attempts; V8 should make the remaining differences explicit.
 
 **Acceptance:**
 
-- [ ] Docs contain one canonical diagnostic-context capability matrix.
-- [ ] Each documented field matches the runtime value and lifecycle stage.
-- [ ] Docs do not imply that lifecycle hooks expose response headers when they
+- [x] Docs contain one canonical diagnostic-context capability matrix.
+- [x] Each documented field matches the runtime value and lifecycle stage.
+- [x] Docs do not imply that lifecycle hooks expose response headers when they
       do not.
-- [ ] Docs state which extension points receive raw headers and which built-in
+- [x] Docs state which extension points receive raw headers and which built-in
       implementations redact them.
 
 ---
