@@ -128,16 +128,16 @@
 
 ## Priority 7 — Redirect Handling Contract
 
-### [ ] 3.2 Redirect handling contract
-- [ ] Audit visible 3xx handling through the real starter proxy path.
-- [ ] Audit followed redirects when the configured transport supports them.
-- [ ] Ensure 3xx responses are never mapped to `RemoteServiceException` solely
+### [x] 3.2 Redirect handling contract
+- [x] Audit visible 3xx handling through the real starter proxy path.
+- [x] Audit followed redirects when the configured transport supports them.
+- [x] Ensure 3xx responses are never mapped to `RemoteServiceException` solely
   because they are non-4xx.
-- [ ] Keep `ErrorResponseMapper` invocation restricted to actual error statuses.
-- [ ] Verify observer outcome is `REDIRECTION` when a 3xx response is visible.
-- [ ] Test one visible redirect response.
-- [ ] Test one followed redirect path if supported by transport configuration.
-- [ ] Update error-handling docs to describe 4xx/5xx decoding precisely.
+- [x] Keep `ErrorResponseMapper` invocation restricted to actual error statuses.
+- [x] Verify observer outcome is `REDIRECTION` when a 3xx response is visible.
+- [x] Test one visible redirect response.
+- [x] Test one followed redirect path if supported by transport configuration.
+- [x] Update error-handling docs to describe 4xx/5xx decoding precisely.
 
 ---
 

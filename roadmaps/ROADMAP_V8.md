@@ -282,12 +282,12 @@ need a tested contract so 3xx responses are not mislabeled as server errors.
 
 **Acceptance:**
 
-- [ ] 3xx responses are never mapped to `RemoteServiceException` solely because
+- [x] 3xx responses are never mapped to `RemoteServiceException` solely because
       they are non-4xx.
-- [ ] Tests cover at least one visible redirect response and one followed
+- [x] Tests cover at least one visible redirect response and one followed
       redirect path if transport configuration supports it.
-- [ ] Observer outcome remains `REDIRECTION` when a 3xx response is visible.
-- [ ] Error-handling docs describe 4xx/5xx decoding precisely.
+- [x] Observer outcome remains `REDIRECTION` when a 3xx response is visible.
+- [x] Error-handling docs describe 4xx/5xx decoding precisely.
 
 ---
 

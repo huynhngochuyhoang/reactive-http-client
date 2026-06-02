@@ -73,9 +73,10 @@ important but no body is expected:
 Mono<ResponseEntity<Void>> deleteOrder(@PathVar("id") long id);
 ```
 
-Non-2xx responses are still decoded through the configured `DefaultErrorDecoder`
-and any registered `ErrorResponseMapper` beans before a `ResponseEntity` is
-emitted. For large streaming bodies, use `Mono<ResponseEntity<Flux<DataBuffer>>>`
+4xx and 5xx responses are still decoded through the configured
+`DefaultErrorDecoder` and any registered `ErrorResponseMapper` beans before a
+`ResponseEntity` is emitted. Visible 3xx responses remain normal response values.
+For large streaming bodies, use `Mono<ResponseEntity<Flux<DataBuffer>>>`
 as documented in [11-streaming.md](11-streaming.md).
 
 ---

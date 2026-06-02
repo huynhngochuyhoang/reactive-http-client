@@ -46,7 +46,7 @@ Registering a bean with one of these names replaces that built-in while leaving 
 | `reactiveHttpClientHealthIndicator` | `HttpClientHealthIndicator` | Replaces the built-in Actuator health indicator. |
 | `oauth2ClientCredentialsAuthProviderFactory` | `AuthProviderFactory` | Replaces the built-in OAuth2 client-credentials auth factory. |
 | `awsSigV4AuthProviderFactory` | `AuthProviderFactory` | Replaces the built-in AWS SigV4 auth factory. |
-| `defaultErrorDecoder` | `DefaultErrorDecoder` | Replaces default non-2xx response decoding. |
+| `defaultErrorDecoder` | `DefaultErrorDecoder` | Replaces default 4xx/5xx response decoding. |
 | `methodMetadataCache` | `MethodMetadataCache` | Replaces method metadata caching/parsing. |
 
 ---

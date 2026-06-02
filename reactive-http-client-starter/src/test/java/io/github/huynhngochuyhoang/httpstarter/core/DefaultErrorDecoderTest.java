@@ -111,6 +111,23 @@ class DefaultErrorDecoderTest {
                 .verifyComplete();
     }
 
+    @Test
+    void shouldIgnoreRedirectWithoutInvokingMappers() {
+        AtomicInteger mapperInvocations = new AtomicInteger();
+        DefaultErrorDecoder mappedDecoder = new DefaultErrorDecoder("test-client", List.of(context -> {
+            mapperInvocations.incrementAndGet();
+            return Optional.empty();
+        }));
+        ClientResponse response = ClientResponse.create(HttpStatus.FOUND)
+                .header("Location", "/final")
+                .body("redirect")
+                .build();
+
+        StepVerifier.create(mappedDecoder.decode(response))
+                .verifyComplete();
+        assertEquals(0, mapperInvocations.get());
+    }
+
     // -------------------------------------------------------------------------
     // 5xx – Server Errors
     // -------------------------------------------------------------------------
