@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.huynhngochuyhoang.httpstarter.annotation.ApiRef;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
 import io.github.huynhngochuyhoang.httpstarter.annotation.QueryParam;
@@ -32,10 +33,7 @@ import reactor.test.StepVerifier;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -360,6 +358,35 @@ class ReactiveHttpClientLifecycleHookTest {
     }
 
     @Test
+    void shouldUseApiRefFallbackForLifecycleAndObserverApiName() throws Throwable {
+        List<ReactiveHttpClientLifecycleContext> starts = new ArrayList<>();
+        List<HttpClientObserverEvent> observed = new ArrayList<>();
+        ReactiveHttpClientLifecycleHook hook = new ReactiveHttpClientLifecycleHook() {
+            @Override
+            public void onStart(ReactiveHttpClientLifecycleContext context) {
+                starts.add(context);
+            }
+        };
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("GET");
+        api.setPath("/users/{id}");
+        ReactiveHttpClientProperties.ClientConfig config = defaultConfig();
+        config.setApis(Map.of("user.getById", api));
+        ReactiveClientInvocationHandler handler = createHandler(okWebClient(), List.of(hook),
+                new NoopResilienceOperatorApplier(), config, observed::add);
+        Method method = ApiRefLifecycleClient.class.getMethod("get", String.class);
+
+        @SuppressWarnings("unchecked")
+        Mono<String> mono = (Mono<String>) handler.invoke(null, method, new Object[]{"42"});
+        StepVerifier.create(mono)
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertEquals("user.getById", starts.get(0).apiName());
+        assertEquals("user.getById", observed.get(0).getApiName());
+    }
+
+    @Test
     void shouldPreserveNullQueryElementsWhenLifecycleHookIsRegistered() throws Throwable {
         AtomicReference<ClientRequest> capturedRequest = new AtomicReference<>();
         List<ReactiveHttpClientLifecycleContext> starts = new ArrayList<>();
@@ -506,6 +533,11 @@ class ReactiveHttpClientLifecycleHookTest {
 
     interface LifecycleClient {
         @GET("/items/{id}")
+        Mono<String> get(@PathVar("id") String id);
+    }
+
+    interface ApiRefLifecycleClient {
+        @ApiRef("user.getById")
         Mono<String> get(@PathVar("id") String id);
     }
 

@@ -84,7 +84,17 @@ class MethodMetadataValidationTest {
         MethodMetadata metadata = new MethodMetadataCache().get(method);
 
         assertEquals("user.getById", metadata.getApiRefName());
+        assertEquals("user.getById", metadata.getApiName());
         assertNull(metadata.getHttpMethod());
+    }
+
+    @Test
+    void shouldPreferApiNameOverApiRefForObservabilityName() throws Exception {
+        Method method = ApiNameAndRefClient.class.getMethod("call");
+        MethodMetadata metadata = new MethodMetadataCache().get(method);
+
+        assertEquals("user.getById", metadata.getApiRefName());
+        assertEquals("user.lookup", metadata.getApiName());
     }
 
     @Test
@@ -126,6 +136,12 @@ class MethodMetadataValidationTest {
     }
 
     interface ApiRefClient {
+        @ApiRef("user.getById")
+        Mono<String> call();
+    }
+
+    interface ApiNameAndRefClient {
+        @ApiName("user.lookup")
         @ApiRef("user.getById")
         Mono<String> call();
     }

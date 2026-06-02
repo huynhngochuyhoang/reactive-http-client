@@ -134,13 +134,13 @@ useful in metrics and traces than a generic Java method name such as `call`.
 
 **Acceptance:**
 
-- [ ] A method with only `@ApiRef("user.getById")` reports `user.getById` as its
+- [x] A method with only `@ApiRef("user.getById")` reports `user.getById` as its
       observer API name.
-- [ ] A method with both `@ApiName("user.lookup")` and
+- [x] A method with both `@ApiName("user.lookup")` and
       `@ApiRef("user.getById")` reports `user.lookup`.
-- [ ] A method without `@ApiName` or `@ApiRef` still reports its Java method
+- [x] A method without `@ApiName` or `@ApiRef` still reports its Java method
       name.
-- [ ] Micrometer tags, OpenTelemetry spans, lifecycle hooks, and docs use the
+- [x] Micrometer tags, OpenTelemetry spans, lifecycle hooks, and docs use the
       same precedence rule.
 
 ---

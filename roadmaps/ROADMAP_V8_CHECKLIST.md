@@ -65,18 +65,18 @@
 
 ## Priority 4 — `@ApiRef` Observability Name Fallback
 
-### [ ] 1.4 `@ApiRef` fallback for observability API names
-- [ ] Resolve observability API names with precedence:
+### [x] 1.4 `@ApiRef` fallback for observability API names
+- [x] Resolve observability API names with precedence:
   `@ApiName` value > `@ApiRef` value > Java method name.
-- [ ] Keep explicit `@ApiName` values authoritative for compatibility.
-- [ ] Feed the resolved name into `HttpClientObserverEvent`.
-- [ ] Verify Micrometer `api.name` uses the resolved name.
-- [ ] Verify OpenTelemetry `rhttp.api.name` and span names use the resolved name.
-- [ ] Keep lifecycle context API names aligned with observers.
-- [ ] Test a method with only `@ApiRef`.
-- [ ] Test a method with both `@ApiName` and `@ApiRef`.
-- [ ] Test a method with neither annotation.
-- [ ] Document the naming rule without implying a request-routing change.
+- [x] Keep explicit `@ApiName` values authoritative for compatibility.
+- [x] Feed the resolved name into `HttpClientObserverEvent`.
+- [x] Verify Micrometer `api.name` uses the resolved name.
+- [x] Verify OpenTelemetry `rhttp.api.name` and span names use the resolved name.
+- [x] Keep lifecycle context API names aligned with observers.
+- [x] Test a method with only `@ApiRef`.
+- [x] Test a method with both `@ApiName` and `@ApiRef`.
+- [x] Test a method with neither annotation.
+- [x] Document the naming rule without implying a request-routing change.
 
 ---
 

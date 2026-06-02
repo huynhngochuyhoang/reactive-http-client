@@ -64,6 +64,7 @@ public class MethodMetadataCache {
         if (apiRef != null) {
             requireNonBlankAnnotationValue(apiRef.value(), "@ApiRef", method);
             meta.setApiRefName(apiRef.value().trim());
+            meta.setApiName(meta.getApiRefName());
             if (meta.getHttpMethod() != null) {
                 throw new IllegalStateException(
                         "@ApiRef cannot be combined with @" + meta.getHttpMethod() + " on method: " + method);

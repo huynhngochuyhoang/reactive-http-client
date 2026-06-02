@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Observer and lifecycle test helpers.** Added `MockReactiveHttpClient` builder
   support for a custom `HttpClientObserver` and ordered
   `ReactiveHttpClientLifecycleHook` instances.
+- **`@ApiRef` observability-name fallback.** Methods now resolve logical API names
+  with `@ApiName` value > `@ApiRef` value > Java method name precedence for
+  observer events, metrics, traces, and lifecycle hooks.
 
 ### Fixed
 

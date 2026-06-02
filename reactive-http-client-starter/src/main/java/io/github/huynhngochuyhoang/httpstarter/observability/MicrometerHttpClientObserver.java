@@ -49,7 +49,7 @@ import java.util.concurrent.TimeUnit;
  * <h3>Tag semantics</h3>
  * <ul>
  *   <li><b>client.name</b> – logical name from {@code @ReactiveHttpClient(name = ...)}.</li>
- *   <li><b>api.name</b> – logical API name from {@code @ApiName} (or Java method name by default).</li>
+ *   <li><b>api.name</b> – logical API name from {@code @ApiName}, then {@code @ApiRef}, or Java method name by default.</li>
  *   <li><b>http.method</b> – uppercase HTTP verb (GET, POST, …).</li>
  *   <li><b>uri</b> – path template (e.g. {@code /users/{id}}) when
  *       {@code reactive.http.observability.include-url-path=true} (default); {@code NONE} otherwise.</li>
