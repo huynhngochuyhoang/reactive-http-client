@@ -203,7 +203,7 @@ Sets a human-readable logical name used as the `api.name` tag in metrics and as 
 Mono<User> getUser(@PathVar("id") long id);
 ```
 
-Defaults to the Java method name when omitted.
+When omitted, observability names fall back to the `@ApiRef` value when present, then to the Java method name.
 
 ### `@ApiRef`
 
@@ -239,7 +239,7 @@ apis:
     method: GET
 ```
 
-When `@ApiRef` is present, `method` and `path` are required in the map entry.
+When `@ApiRef` is present, `method` and `path` are required in the map entry. Its value is also the observability API-name fallback when `@ApiName` is omitted; this does not change request routing.
 `timeout-ms` is optional (`-1` means unset, `0` disables per-request timeout).
 
 ### `@TimeoutMs`

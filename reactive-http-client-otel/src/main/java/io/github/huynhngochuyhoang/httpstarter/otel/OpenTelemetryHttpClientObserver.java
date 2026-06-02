@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
  * <h3>Starter-specific attributes</h3>
  * <ul>
  *   <li>{@code rhttp.client.name} — logical name of the {@code @ReactiveHttpClient}</li>
- *   <li>{@code rhttp.api.name} — {@code @ApiName} value or method name</li>
+ *   <li>{@code rhttp.api.name} — {@code @ApiName} value, {@code @ApiRef} value, or method name</li>
  *   <li>{@code rhttp.attempt.count} — total subscription attempts (>1 = retried)</li>
  *   <li>{@code rhttp.request.bytes} / {@code rhttp.response.bytes} — when measurable</li>
  * </ul>

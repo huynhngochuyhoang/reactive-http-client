@@ -15,7 +15,7 @@ End-to-end duration from first attempt to final completion (after all retries).
 | Tag | Values |
 |---|---|
 | `client.name` | Logical client name from `@ReactiveHttpClient(name)` |
-| `api.name` | `@ApiName` value, or the Java method name |
+| `api.name` | `@ApiName` value, `@ApiRef` value, or the Java method name |
 | `http.method` | `GET`, `POST`, … |
 | `http.status_code` | Numeric HTTP status code, or `NONE` on network failure |
 | `outcome` | `SUCCESS`, `REDIRECTION`, `CLIENT_ERROR`, `SERVER_ERROR`, `UNKNOWN` |
@@ -50,7 +50,7 @@ A separate latency Timer configured with `serviceLevelObjectives(...)` buckets, 
 | Tag | Values |
 |---|---|
 | `client.name` | Logical client name from `@ReactiveHttpClient(name)` |
-| `api.name` | `@ApiName` value, or the Java method name |
+| `api.name` | `@ApiName` value, `@ApiRef` value, or the Java method name |
 | `http.method` | `GET`, `POST`, … |
 | `uri` | Path template (e.g. `/users/{id}`), or `NONE` |
 
@@ -209,7 +209,7 @@ reactive:
 | `url.template` | Path template, e.g. `/users/{id}`; opt in with `include-url-path: true` |
 | `error.type` | `ErrorCategory` name; falls back to the exception's simple class name |
 | `rhttp.client.name` | Logical client name |
-| `rhttp.api.name` | `@ApiName` value or method name |
+| `rhttp.api.name` | `@ApiName` value, `@ApiRef` value, or method name |
 | `rhttp.attempt.count` | Total attempts (>1 = retried) |
 | `rhttp.request.bytes` | Request body bytes (when measurable) |
 | `rhttp.response.bytes` | Response body bytes (from `Content-Length`) |

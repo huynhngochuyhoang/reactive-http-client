@@ -175,7 +175,7 @@ public final class HttpClientObserverEvent {
     /** The logical name of the client (value of {@code @ReactiveHttpClient(name = ...)}). */
     public String getClientName() { return clientName; }
 
-    /** Logical API name for the method ({@code @ApiName} or Java method name by default). */
+    /** Logical API name for the method ({@code @ApiName}, then {@code @ApiRef}, or Java method name by default). */
     public String getApiName() { return apiName; }
 
     /** HTTP verb: {@code GET}, {@code POST}, {@code PUT}, {@code DELETE}, etc. */
