@@ -75,6 +75,10 @@ important but no body is expected:
 Mono<ResponseEntity<Void>> deleteOrder(@PathVar("id") long id);
 ```
 
+For successful `Mono<Void>` and `Mono<ResponseEntity<Void>>` calls, any unexpected
+response content is drained or released before completion so pooled connections
+remain reusable.
+
 4xx and 5xx responses are still decoded through the configured
 `DefaultErrorDecoder` and any registered `ErrorResponseMapper` beans before a
 `ResponseEntity` is emitted. Visible 3xx responses remain normal response values.
