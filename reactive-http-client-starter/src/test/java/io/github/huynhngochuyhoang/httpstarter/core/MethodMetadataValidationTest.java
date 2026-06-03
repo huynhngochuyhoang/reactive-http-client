@@ -104,6 +104,56 @@ class MethodMetadataValidationTest {
         assertTrue(ex.getMessage().contains("@ApiRef cannot be combined"));
     }
 
+    @Test
+    void shouldRejectMultipleHttpVerbAnnotations() throws Exception {
+        Method method = AmbiguousVerbClient.class.getMethod("call");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> new MethodMetadataCache().get(method));
+
+        assertTrue(ex.getMessage().contains("Multiple HTTP verb annotations"));
+        assertTrue(ex.getMessage().contains("@GET"));
+        assertTrue(ex.getMessage().contains("@POST"));
+        assertTrue(ex.getMessage().contains(method.toString()));
+    }
+
+    @Test
+    void shouldRejectMultipleBodyParameters() throws Exception {
+        Method method = MultipleBodyClient.class.getMethod("create", String.class, String.class);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> new MethodMetadataCache().get(method));
+
+        assertTrue(ex.getMessage().contains("Multiple @Body parameters"));
+        assertTrue(ex.getMessage().contains(method.toString()));
+        assertTrue(ex.getMessage().contains("indexes 0 and 1"));
+    }
+
+    @Test
+    void shouldRejectInvalidMetadataDeterministicallyOnRepeatedParse() throws Exception {
+        Method method = MultipleBodyClient.class.getMethod("create", String.class, String.class);
+        MethodMetadataCache cache = new MethodMetadataCache();
+
+        IllegalStateException first = assertThrows(IllegalStateException.class, () -> cache.get(method));
+        IllegalStateException second = assertThrows(IllegalStateException.class, () -> cache.get(method));
+
+        assertEquals(first.getMessage(), second.getMessage());
+    }
+
+    @Test
+    void shouldCacheValidInheritedAndOverloadedMethodsIndependently() throws Exception {
+        Method inherited = ChildOverloadedClient.class.getMethod("get", String.class);
+        Method overloaded = ChildOverloadedClient.class.getMethod("get", Long.class);
+        MethodMetadataCache cache = new MethodMetadataCache();
+
+        MethodMetadata inheritedMetadata = cache.get(inherited);
+        MethodMetadata overloadedMetadata = cache.get(overloaded);
+
+        assertSame(inheritedMetadata, cache.get(inherited));
+        assertSame(overloadedMetadata, cache.get(overloaded));
+        assertNotSame(inheritedMetadata, overloadedMetadata);
+        assertEquals("/parent/{id}", inheritedMetadata.getPathTemplate());
+        assertEquals("/child/{id}", overloadedMetadata.getPathTemplate());
+    }
+
     interface InvalidReturnTypeClient {
         @GET("/items")
         String call();
@@ -150,6 +200,27 @@ class MethodMetadataValidationTest {
         @GET("/items")
         @ApiRef("user.getById")
         Mono<String> call();
+    }
+
+    interface AmbiguousVerbClient {
+        @GET("/items")
+        @POST("/items")
+        Mono<String> call();
+    }
+
+    interface MultipleBodyClient {
+        @POST("/items")
+        Mono<String> create(@Body String first, @Body String second);
+    }
+
+    interface ParentOverloadedClient {
+        @GET("/parent/{id}")
+        Mono<String> get(@PathVar("id") String id);
+    }
+
+    interface ChildOverloadedClient extends ParentOverloadedClient {
+        @GET("/child/{id}")
+        Mono<String> get(@PathVar("id") Long id);
     }
 
     static final class OverrideTestExchangeLogger implements HttpExchangeLogger {
