@@ -538,7 +538,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
-    void allowsLiteralQueryStringBracesInStaticPathTemplate() throws Exception {
+    void allowsLiteralQueryStringInStaticPathTemplate() throws Exception {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         properties.getClients().put("literal-query-client", clientConfig("http://localhost:8080"));
 
@@ -552,17 +552,51 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
-    void allowsLiteralQueryStringBracesInApiRefPathTemplate() throws Exception {
+    void allowsLiteralQueryStringInApiRefPathTemplate() throws Exception {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
         api.setMethod("GET");
-        api.setPath("/users/{id}?projection={literal}");
+        api.setPath("/users/{id}?projection=literal");
         config.setApis(Map.of("user.lookup", api));
         properties.getClients().put("api-contract-client", config);
 
         ReactiveHttpClientFactoryBean<ApiRefContractClient> factoryBean =
                 buildFactoryBean(properties, ApiRefContractClient.class);
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+
+    @Test
+    void allowsStaticQueryTemplateVariablesBoundByPathVar() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("query-pathvar-client", clientConfig("http://localhost:8080"));
+
+        ReactiveHttpClientFactoryBean<QueryPathVarClient> factoryBean =
+                buildFactoryBean(properties, QueryPathVarClient.class);
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void allowsApiRefQueryTemplateVariablesBoundByPathVar() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("GET");
+        api.setPath("/users/{id}?projection={projection}");
+        config.setApis(Map.of("user.queryLookup", api));
+        properties.getClients().put("api-query-pathvar-client", config);
+
+        ReactiveHttpClientFactoryBean<ApiRefQueryPathVarClient> factoryBean =
+                buildFactoryBean(properties, ApiRefQueryPathVarClient.class);
         try {
             assertThat(factoryBean.getObject()).isNotNull();
         } finally {
@@ -699,8 +733,21 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
     @ReactiveHttpClient(name = "literal-query-client")
     interface LiteralQueryClient {
-        @GET("/users?projection={literal}")
+        @GET("/users?projection=literal")
         Mono<String> lookup();
+    }
+
+
+    @ReactiveHttpClient(name = "query-pathvar-client")
+    interface QueryPathVarClient {
+        @GET("/users/{id}?projection={projection}")
+        Mono<String> lookup(@PathVar("id") String id, @PathVar("projection") String projection);
+    }
+
+    @ReactiveHttpClient(name = "api-query-pathvar-client")
+    interface ApiRefQueryPathVarClient {
+        @ApiRef("user.queryLookup")
+        Mono<String> lookup(@PathVar("id") String id, @PathVar("projection") String projection);
     }
 
     @ReactiveHttpClient(name = "blank-path-client")

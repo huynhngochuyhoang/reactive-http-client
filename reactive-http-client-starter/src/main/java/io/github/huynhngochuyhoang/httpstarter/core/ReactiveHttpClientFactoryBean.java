@@ -895,37 +895,32 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     }
 
     private static Set<String> extractPathTemplateVariables(String pathTemplate, String context) {
-        String pathOnly = pathTemplate;
-        int queryStart = pathOnly.indexOf('?');
-        if (queryStart >= 0) {
-            pathOnly = pathOnly.substring(0, queryStart);
-        }
         Set<String> variables = new LinkedHashSet<>();
         int index = 0;
-        while (index < pathOnly.length()) {
-            int open = pathOnly.indexOf('{', index);
+        while (index < pathTemplate.length()) {
+            int open = pathTemplate.indexOf('{', index);
             if (open < 0) {
                 break;
             }
-            int close = pathOnly.indexOf('}', open + 1);
+            int close = pathTemplate.indexOf('}', open + 1);
             if (close < 0) {
-                throw new IllegalStateException(context + " contains an unclosed URI template variable in path ["
+                throw new IllegalStateException(context + " contains an unclosed URI template variable in template ["
                         + pathTemplate + "].");
             }
-            String variable = pathOnly.substring(open + 1, close);
+            String variable = pathTemplate.substring(open + 1, close);
             int regexSeparator = variable.indexOf(':');
             if (regexSeparator >= 0) {
                 variable = variable.substring(0, regexSeparator);
             }
             if (!StringUtils.hasText(variable)) {
-                throw new IllegalStateException(context + " contains a blank URI template variable in path ["
+                throw new IllegalStateException(context + " contains a blank URI template variable in template ["
                         + pathTemplate + "].");
             }
             variables.add(variable.trim());
             index = close + 1;
         }
-        if (pathOnly.indexOf('}', index) >= 0) {
-            throw new IllegalStateException(context + " contains an unopened URI template variable in path ["
+        if (pathTemplate.indexOf('}', index) >= 0) {
+            throw new IllegalStateException(context + " contains an unopened URI template variable in template ["
                     + pathTemplate + "].");
         }
         return variables;
