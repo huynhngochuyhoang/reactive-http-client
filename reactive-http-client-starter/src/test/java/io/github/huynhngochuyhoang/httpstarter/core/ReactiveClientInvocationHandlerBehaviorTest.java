@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
@@ -157,6 +158,39 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 .verifyComplete();
 
         assertEquals("/files/reports%2F2026%20Q1%2Bdraft", captured.get().url().getRawPath());
+    }
+
+    @Test
+    void shouldSendHeadAndResolvePathVariables() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    captured.set(request);
+                    return Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build());
+                })
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        StepVerifier.create(invokeHead(handler, "object 42"))
+                .verifyComplete();
+
+        assertEquals(HttpMethod.HEAD, captured.get().method());
+        assertEquals("/objects/object%2042", captured.get().url().getRawPath());
+    }
+
+    @Test
+    void shouldSendOptions() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        WebClient webClient = captureRequestWebClient(captured);
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        StepVerifier.create(invokeOptions(handler))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertEquals(HttpMethod.OPTIONS, captured.get().method());
+        assertEquals("/objects", captured.get().url().getRawPath());
     }
 
     @Test
@@ -527,6 +561,26 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     }
 
     @SuppressWarnings("unchecked")
+    private static Mono<Void> invokeHead(ReactiveClientInvocationHandler handler, String id) {
+        try {
+            var method = ClientWithHead.class.getMethod("head", String.class);
+            return (Mono<Void>) handler.invoke(null, method, new Object[]{id});
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Mono<String> invokeOptions(ReactiveClientInvocationHandler handler) {
+        try {
+            var method = ClientWithOptions.class.getMethod("options");
+            return (Mono<String>) handler.invoke(null, method, null);
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     private static Mono<String> invokeComplexSearch(
             ReactiveClientInvocationHandler handler, String query, List<String> tags, String empty) {
         try {
@@ -656,6 +710,16 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     interface ClientWithPathVar {
         @GET("/files/{key}")
         Mono<String> file(@PathVar("key") String key);
+    }
+
+    interface ClientWithHead {
+        @HEAD("/objects/{id}")
+        Mono<Void> head(@PathVar("id") String id);
+    }
+
+    interface ClientWithOptions {
+        @OPTIONS("/objects")
+        Mono<String> options();
     }
 
     interface ClientWithComplexQueryParams {

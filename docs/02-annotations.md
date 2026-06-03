@@ -43,6 +43,8 @@ If you use `@ApiRef` on a method, do not add HTTP verb annotations to that metho
 | `@PUT(path)` | PUT |
 | `@DELETE(path)` | DELETE |
 | `@PATCH(path)` | PATCH |
+| `@HEAD(path)` | HEAD |
+| `@OPTIONS(path)` | OPTIONS |
 
 Path templates support `{variable}` placeholders resolved from `@PathVar` parameters.
 

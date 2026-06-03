@@ -61,19 +61,19 @@
 
 ## Priority 4 — Declarative `@HEAD` and `@OPTIONS`
 
-### [ ] 1.1 Declarative `@HEAD` and `@OPTIONS` support
-- [ ] Add `@HEAD` with the existing static path-template annotation shape.
-- [ ] Add `@OPTIONS` with the existing static path-template annotation shape.
-- [ ] Parse both annotations into immutable method metadata and request plans.
-- [ ] Keep `TRACE` out of the static annotation surface.
-- [ ] Verify `@HEAD("/objects/{id}")` sends `HEAD` and resolves path variables.
-- [ ] Verify `@OPTIONS("/objects")` sends `OPTIONS`.
-- [ ] Verify timeout, resilience, lifecycle, observer, and exchange-log paths
+### [x] 1.1 Declarative `@HEAD` and `@OPTIONS` support
+- [x] Add `@HEAD` with the existing static path-template annotation shape.
+- [x] Add `@OPTIONS` with the existing static path-template annotation shape.
+- [x] Parse both annotations into immutable method metadata and request plans.
+- [x] Keep `TRACE` out of the static annotation surface.
+- [x] Verify `@HEAD("/objects/{id}")` sends `HEAD` and resolves path variables.
+- [x] Verify `@OPTIONS("/objects")` sends `OPTIONS`.
+- [x] Verify timeout, resilience, lifecycle, observer, and exchange-log paths
   work for both methods.
-- [ ] Reject combining `@ApiRef` with `@HEAD` or `@OPTIONS`.
-- [ ] Update annotation-reference docs.
-- [ ] Update mock-client coverage.
-- [ ] Verify AOT and native-image reflection hints cover the new annotations.
+- [x] Reject combining `@ApiRef` with `@HEAD` or `@OPTIONS`.
+- [x] Update annotation-reference docs.
+- [x] Update mock-client coverage.
+- [x] Verify AOT and native-image reflection hints cover the new annotations.
 
 ---
 
