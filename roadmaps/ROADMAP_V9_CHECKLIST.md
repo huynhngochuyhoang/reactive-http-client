@@ -22,20 +22,20 @@
 
 ## Priority 2 — Eager Declarative Method Validation
 
-### [ ] 2.1 Eager declarative method-contract validation
-- [ ] Parse every abstract endpoint method during proxy construction.
-- [ ] Reject an abstract method with neither a static HTTP verb nor `@ApiRef`.
-- [ ] Keep Java default methods available as interface helpers without endpoint
+### [x] 2.1 Eager declarative method-contract validation
+- [x] Parse every abstract endpoint method during proxy construction.
+- [x] Reject an abstract method with neither a static HTTP verb nor `@ApiRef`.
+- [x] Keep Java default methods available as interface helpers without endpoint
   annotations.
-- [ ] Validate inherited abstract endpoint methods during proxy construction.
-- [ ] Validate non-blank `@PathVar` names.
-- [ ] Validate non-blank `@QueryParam` names.
-- [ ] Validate non-blank non-map `@HeaderParam` names.
-- [ ] Validate non-blank `@ApiName` values.
-- [ ] Keep idempotency-key annotation value validation consistent.
-- [ ] Test that invalid declarations fail at proxy construction rather than
+- [x] Validate inherited abstract endpoint methods during proxy construction.
+- [x] Validate non-blank `@PathVar` names.
+- [x] Validate non-blank `@QueryParam` names.
+- [x] Validate non-blank non-map `@HeaderParam` names.
+- [x] Validate non-blank `@ApiName` values.
+- [x] Keep idempotency-key annotation value validation consistent.
+- [x] Test that invalid declarations fail at proxy construction rather than
   first invocation.
-- [ ] Extend AOT smoke coverage for inherited endpoint validation.
+- [x] Extend AOT smoke coverage for inherited endpoint validation.
 
 ---
 

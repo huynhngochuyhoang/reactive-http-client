@@ -104,6 +104,47 @@ class MethodMetadataValidationTest {
         assertTrue(ex.getMessage().contains("@ApiRef cannot be combined"));
     }
 
+
+    @Test
+    void shouldRejectMissingEndpointAnnotation() throws Exception {
+        Method method = MissingEndpointClient.class.getMethod("call");
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> new MethodMetadataCache().get(method));
+
+        assertTrue(ex.getMessage().contains("must declare an HTTP verb annotation or @ApiRef"));
+        assertTrue(ex.getMessage().contains(method.toString()));
+    }
+
+    @Test
+    void shouldRejectBlankPathVarName() throws Exception {
+        Method method = BlankPathVarClient.class.getMethod("call", String.class);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new MethodMetadataCache().get(method));
+
+        assertTrue(ex.getMessage().contains("@PathVar value must not be blank"));
+        assertTrue(ex.getMessage().contains(method.toString()));
+    }
+
+    @Test
+    void shouldRejectBlankQueryParamName() throws Exception {
+        Method method = BlankQueryParamClient.class.getMethod("call", String.class);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new MethodMetadataCache().get(method));
+
+        assertTrue(ex.getMessage().contains("@QueryParam value must not be blank"));
+        assertTrue(ex.getMessage().contains(method.toString()));
+    }
+
+    @Test
+    void shouldRejectBlankApiName() throws Exception {
+        Method method = BlankApiNameClient.class.getMethod("call");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> new MethodMetadataCache().get(method));
+
+        assertTrue(ex.getMessage().contains("@ApiName value must not be blank"));
+        assertTrue(ex.getMessage().contains(method.toString()));
+    }
+
     @Test
     void shouldRejectMultipleHttpVerbAnnotations() throws Exception {
         Method method = AmbiguousVerbClient.class.getMethod("call");
@@ -199,6 +240,27 @@ class MethodMetadataValidationTest {
     interface InvalidApiRefClient {
         @GET("/items")
         @ApiRef("user.getById")
+        Mono<String> call();
+    }
+
+
+    interface MissingEndpointClient {
+        Mono<String> call();
+    }
+
+    interface BlankPathVarClient {
+        @GET("/items/{id}")
+        Mono<String> call(@PathVar(" ") String id);
+    }
+
+    interface BlankQueryParamClient {
+        @GET("/items")
+        Mono<String> call(@QueryParam("") String query);
+    }
+
+    interface BlankApiNameClient {
+        @GET("/items")
+        @ApiName(" ")
         Mono<String> call();
     }
 

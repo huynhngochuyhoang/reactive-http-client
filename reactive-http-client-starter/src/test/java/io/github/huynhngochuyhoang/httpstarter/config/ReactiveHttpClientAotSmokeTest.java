@@ -3,6 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.config;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.AotSmokeClient;
+import io.github.huynhngochuyhoang.httpstarter.config.smoke.InheritedAotSmokeClient;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
 import org.junit.jupiter.api.Test;
@@ -111,6 +112,11 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(generatedInitializer).isNotNull();
         assertThat(RuntimeHintsPredicates.proxies().forInterfaces(AotSmokeClient.class))
                 .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.proxies().forInterfaces(InheritedAotSmokeClient.class))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(generationContext.getRuntimeHints().reflection()
+                .getTypeHint(InheritedAotSmokeClient.class).getMemberCategories())
+                .contains(MemberCategory.INTROSPECT_PUBLIC_METHODS);
         context.close();
     }
 

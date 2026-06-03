@@ -389,6 +389,65 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         }
     }
 
+
+    @Test
+    void failsFastWhenAbstractMethodHasNoEndpointMetadata() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("invalid-contract-client", clientConfig("http://localhost:8080"));
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, MissingEndpointFactoryClient.class).getObject())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must declare an HTTP verb annotation or @ApiRef")
+                .hasMessageContaining("missing");
+    }
+
+    @Test
+    void allowsDefaultHelperMethodWithoutEndpointMetadata() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("helper-client", clientConfig("http://localhost:8080"));
+
+        ReactiveHttpClientFactoryBean<DefaultHelperClient> factoryBean =
+                buildFactoryBean(properties, DefaultHelperClient.class);
+        try {
+            assertThat(factoryBean.getObject().helper()).isEqualTo("ok");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void validatesInheritedAbstractMethodsDuringProxyConstruction() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("invalid-inherited-client", clientConfig("http://localhost:8080"));
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, InvalidInheritedClient.class).getObject())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("@PathVar value must not be blank")
+                .hasMessageContaining("get");
+    }
+
+    @Test
+    void failsFastWhenNonMapHeaderParamNameIsBlank() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("invalid-header-client", clientConfig("http://localhost:8080"));
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, BlankHeaderParamClient.class).getObject())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("@HeaderParam value must not be blank for non-Map parameter")
+                .hasMessageContaining("call");
+    }
+
+    @Test
+    void failsFastWhenGeneratedIdempotencyKeyHeaderNameIsBlank() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("invalid-idempotency-client", clientConfig("http://localhost:8080"));
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, BlankIdempotencyKeyClient.class).getObject())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("@IdempotencyKey value must not be blank")
+                .hasMessageContaining("call");
+    }
+
     @SuppressWarnings("unchecked")
     private ReactiveHttpClientFactoryBean<DiagnosticClient> buildFactoryBean(ReactiveHttpClientProperties properties) {
         return buildFactoryBean(properties, DiagnosticClient.class);
@@ -468,6 +527,44 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     interface DefaultIdempotencyKeyDiagnosticClient {
         @POST("/create")
         Mono<String> create();
+    }
+
+
+    @ReactiveHttpClient(name = "invalid-contract-client")
+    interface MissingEndpointFactoryClient {
+        Mono<String> missing();
+    }
+
+    @ReactiveHttpClient(name = "helper-client")
+    interface DefaultHelperClient {
+        @GET("/ping")
+        Mono<String> ping();
+
+        default String helper() {
+            return "ok";
+        }
+    }
+
+    interface InvalidInheritedParent {
+        @GET("/items/{id}")
+        Mono<String> get(@PathVar(" ") String id);
+    }
+
+    @ReactiveHttpClient(name = "invalid-inherited-client")
+    interface InvalidInheritedClient extends InvalidInheritedParent {
+    }
+
+    @ReactiveHttpClient(name = "invalid-header-client")
+    interface BlankHeaderParamClient {
+        @GET("/ping")
+        Mono<String> call(@HeaderParam("") String tenant);
+    }
+
+    @ReactiveHttpClient(name = "invalid-idempotency-client")
+    interface BlankIdempotencyKeyClient {
+        @POST("/create")
+        @IdempotencyKey(" ")
+        Mono<String> call();
     }
 
     @ReactiveHttpClient(name = "annotation-url-client", baseUrl = "http://annotation.example")

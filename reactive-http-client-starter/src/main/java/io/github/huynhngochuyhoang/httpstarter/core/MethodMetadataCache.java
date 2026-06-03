@@ -57,6 +57,10 @@ public class MethodMetadataCache {
                         "@ApiRef cannot be combined with @" + meta.getHttpMethod() + " on method: " + method);
             }
         }
+        if (meta.getHttpMethod() == null && meta.getApiRefName() == null) {
+            throw new IllegalStateException(
+                    "Method " + method + " must declare an HTTP verb annotation or @ApiRef");
+        }
 
         // Warn once per method when the path template is blank.
         // Blank paths are occasionally intentional (resolves to the base URL) but are far
@@ -85,8 +89,10 @@ public class MethodMetadataCache {
         for (int i = 0; i < paramAnnotations.length; i++) {
             for (Annotation ann : paramAnnotations[i]) {
                 if (ann instanceof PathVar pv) {
+                    requireNonBlankAnnotationValue(pv.value(), "@PathVar", method);
                     meta.getPathVars().put(i, pv.value());
                 } else if (ann instanceof QueryParam qp) {
+                    requireNonBlankAnnotationValue(qp.value(), "@QueryParam", method);
                     meta.getQueryParams().put(i, qp.value());
                 } else if (ann instanceof HeaderParam hp) {
                     if (Map.class.isAssignableFrom(parameterTypes[i])) {
@@ -170,7 +176,8 @@ public class MethodMetadataCache {
 
         ApiName apiName = method.getAnnotation(ApiName.class);
         if (apiName != null) {
-            meta.setApiName(apiName.value());
+            requireNonBlankAnnotationValue(apiName.value(), "@ApiName", method);
+            meta.setApiName(apiName.value().trim());
         }
 
         TimeoutMs timeoutMs = method.getAnnotation(TimeoutMs.class);
