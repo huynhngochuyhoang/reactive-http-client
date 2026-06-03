@@ -728,7 +728,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         long configuredTimeoutMs = apiConfig.getTimeoutMs();
 
         return new EffectiveApi(
-                apiConfig.getMethod().toUpperCase(Locale.ROOT),
+                apiConfig.getMethod().trim().toUpperCase(Locale.ROOT),
                 apiConfig.getPath(),
                 configuredTimeoutMs);
     }

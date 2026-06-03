@@ -41,21 +41,21 @@
 
 ## Priority 3 — URI Template and `@ApiRef` Startup Validation
 
-### [ ] 2.2 URI-template and `@ApiRef` startup validation parity
-- [ ] Validate the effective base URL before building the client.
-- [ ] Include the client name and annotation-or-property source in malformed
+### [x] 2.2 URI-template and `@ApiRef` startup validation parity
+- [x] Validate the effective base URL before building the client.
+- [x] Include the client name and annotation-or-property source in malformed
   base-URL failures.
-- [ ] Define the supported outbound HTTP-method set for configured APIs.
-- [ ] Reject unsupported or misspelled `@ApiRef.method` values during proxy
+- [x] Define the supported outbound HTTP-method set for configured APIs.
+- [x] Reject unsupported or misspelled `@ApiRef.method` values during proxy
   construction.
-- [ ] Apply the same path-template placeholder validation to static annotations
+- [x] Apply the same path-template placeholder validation to static annotations
   and configured `@ApiRef` paths.
-- [ ] Define and test the outcome for missing `@PathVar` bindings.
-- [ ] Define and test the outcome for duplicate `@PathVar` bindings.
-- [ ] Define and test the outcome for unused `@PathVar` declarations.
-- [ ] Preserve intentional empty paths and the existing warning behavior.
-- [ ] Preserve literal query strings in annotation and configured API paths.
-- [ ] Verify existing raw-value path and query encoding tests remain unchanged.
+- [x] Define and test the outcome for missing `@PathVar` bindings.
+- [x] Define and test the outcome for duplicate `@PathVar` bindings.
+- [x] Define and test the outcome for unused `@PathVar` declarations.
+- [x] Preserve intentional empty paths and the existing warning behavior.
+- [x] Preserve literal query strings in annotation and configured API paths.
+- [x] Verify existing raw-value path and query encoding tests remain unchanged.
 
 ---
 
