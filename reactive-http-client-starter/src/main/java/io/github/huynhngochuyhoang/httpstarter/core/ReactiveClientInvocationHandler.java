@@ -449,7 +449,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     private Mono<?> bodyToMono(ClientResponse response, Type responseType) {
         if (responseType == null || Void.class.equals(responseType)) {
-            return response.bodyToMono(Void.class);
+            return response.releaseBody();
         }
         if (responseType == String.class) {
             return response.bodyToMono(String.class);

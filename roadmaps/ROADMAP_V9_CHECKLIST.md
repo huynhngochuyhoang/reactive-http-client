@@ -79,17 +79,17 @@
 
 ## Priority 5 — Drain Bodiless Responses
 
-### [ ] 3.1 Drain unexpected bodies for all bodiless response shapes
-- [ ] Audit every successful bodiless response path.
-- [ ] Drain or release unexpected 2xx content for plain `Mono<Void>`.
-- [ ] Keep `Mono<ResponseEntity<Void>>` status and headers while draining
+### [x] 3.1 Drain unexpected bodies for all bodiless response shapes
+- [x] Audit every successful bodiless response path.
+- [x] Drain or release unexpected 2xx content for plain `Mono<Void>`.
+- [x] Keep `Mono<ResponseEntity<Void>>` status and headers while draining
   unexpected content.
-- [ ] Keep 4xx and 5xx responses routed through `DefaultErrorDecoder`.
-- [ ] Add real Reactor Netty pooled-client coverage for plain `Mono<Void>`.
-- [ ] Add real Reactor Netty pooled-client coverage for
+- [x] Keep 4xx and 5xx responses routed through `DefaultErrorDecoder`.
+- [x] Add real Reactor Netty pooled-client coverage for plain `Mono<Void>`.
+- [x] Add real Reactor Netty pooled-client coverage for
   `Mono<ResponseEntity<Void>>`.
-- [ ] Verify a pooled connection remains reusable after both response shapes.
-- [ ] Document the bodiless-response drain contract where response envelopes are
+- [x] Verify a pooled connection remains reusable after both response shapes.
+- [x] Document the bodiless-response drain contract where response envelopes are
   described.
 
 ---
