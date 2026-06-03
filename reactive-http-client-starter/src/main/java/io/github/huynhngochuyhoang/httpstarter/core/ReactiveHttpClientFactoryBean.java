@@ -29,11 +29,10 @@ import reactor.netty.resources.ConnectionProvider;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -46,6 +45,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
 
     private static final Logger log = LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
     private static final int MAX_CODEC_MAX_IN_MEMORY_SIZE_MB = Integer.MAX_VALUE / (1024 * 1024);
+    private static final Set<String> SUPPORTED_OUTBOUND_HTTP_METHODS = Set.of(
+            "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS");
 
     private Class<T> type;
     private ApplicationContext applicationContext;
@@ -83,6 +84,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                             + "or use @ReactiveHttpClient(name=\"" + clientName + "\", baseUrl=\"...\")");
         }
 
+        validateBaseUrl(clientName, baseUrl, annotationBaseUrl ? "annotation" : "property");
         validateClientConfiguration(clientName, config, properties.getNetwork());
         MethodMetadataCache metadataCache = applicationContext
                 .getBeanProvider(MethodMetadataCache.class)
@@ -300,6 +302,26 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 && baseUrl.regionMatches(true, 0, "http://", 0, "http://".length());
         HttpProtocol protocol = clearText ? HttpProtocol.H2C : HttpProtocol.H2;
         return httpClient.protocol(protocol);
+    }
+
+    private void validateBaseUrl(String clientName, String baseUrl, String source) {
+        URI uri;
+        try {
+            uri = new URI(baseUrl);
+        } catch (URISyntaxException ex) {
+            throw invalidBaseUrl(clientName, baseUrl, source, ex);
+        }
+        String scheme = uri.getScheme();
+        if (!("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
+                || !StringUtils.hasText(uri.getHost())) {
+            throw invalidBaseUrl(clientName, baseUrl, source, null);
+        }
+    }
+
+    private IllegalArgumentException invalidBaseUrl(String clientName, String baseUrl, String source, Throwable cause) {
+        String message = "Invalid baseUrl for reactive HTTP client [" + clientName + "] (source=" + source + "): "
+                + baseUrl + ". Expected an absolute http(s) URL with a host.";
+        return cause != null ? new IllegalArgumentException(message, cause) : new IllegalArgumentException(message);
     }
 
     private void validateClientConfiguration(String clientName,
@@ -775,7 +797,11 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                                                     MethodMetadataCache metadataCache) {
         for (Method method : clientInterface.getMethods()) {
             if (!isDeclarativeClientMethod(method)) continue;
-            metadataCache.get(method);
+            MethodMetadata meta = metadataCache.get(method);
+            if (meta.getApiRefName() == null) {
+                validatePathTemplate(meta.getPathTemplate(), pathVarNames(meta),
+                        "Method " + method + " path template");
+            }
         }
     }
 
@@ -800,6 +826,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             String configPrefix = ApiRefValidationSupport.configPrefix(clientName, apiRefName);
             String apiRefContext = ApiRefValidationSupport.apiRefContext(method, apiRefName);
             validateApiRef(apiConfig, configPrefix, apiRefContext);
+            validatePathTemplate(apiConfig.getPath(), pathVarNames(meta), apiRefContext + " path template");
         }
     }
 
@@ -822,9 +849,86 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         if (!StringUtils.hasText(apiConfig.getMethod())) {
             throw new IllegalStateException(apiRefContext + " but " + configPrefix + ".method is blank.");
         }
+        String method = apiConfig.getMethod().trim().toUpperCase(Locale.ROOT);
+        if (!SUPPORTED_OUTBOUND_HTTP_METHODS.contains(method)) {
+            throw new IllegalStateException(apiRefContext + " but " + configPrefix + ".method ["
+                    + apiConfig.getMethod() + "] is not supported. Supported methods: "
+                    + SUPPORTED_OUTBOUND_HTTP_METHODS);
+        }
         if (!StringUtils.hasText(apiConfig.getPath())) {
             throw new IllegalStateException(apiRefContext + " but " + configPrefix + ".path is blank.");
         }
+    }
+
+    private static Set<String> pathVarNames(MethodMetadata meta) {
+        return pathVarNames(meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta));
+    }
+
+    private static Set<String> pathVarNames(RequestPlan plan) {
+        Set<String> names = new LinkedHashSet<>();
+        for (RequestPlan.NamedArgumentBinding binding : plan.pathVars()) {
+            if (!names.add(binding.name())) {
+                throw new IllegalStateException("Method " + plan.method()
+                        + " declares duplicate @PathVar(\"" + binding.name() + "\") bindings.");
+            }
+        }
+        return names;
+    }
+
+    private static void validatePathTemplate(String pathTemplate, Set<String> declaredPathVars, String context) {
+        if (!StringUtils.hasText(pathTemplate)) {
+            return;
+        }
+        Set<String> placeholders = extractPathTemplateVariables(pathTemplate, context);
+        Set<String> missing = new LinkedHashSet<>(placeholders);
+        missing.removeAll(declaredPathVars);
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException(context + " has URI template variables " + missing
+                    + " without matching @PathVar parameters.");
+        }
+        Set<String> unused = new LinkedHashSet<>(declaredPathVars);
+        unused.removeAll(placeholders);
+        if (!unused.isEmpty()) {
+            throw new IllegalStateException(context + " declares @PathVar parameters " + unused
+                    + " that are not used by the path template.");
+        }
+    }
+
+    private static Set<String> extractPathTemplateVariables(String pathTemplate, String context) {
+        String pathOnly = pathTemplate;
+        int queryStart = pathOnly.indexOf('?');
+        if (queryStart >= 0) {
+            pathOnly = pathOnly.substring(0, queryStart);
+        }
+        Set<String> variables = new LinkedHashSet<>();
+        int index = 0;
+        while (index < pathOnly.length()) {
+            int open = pathOnly.indexOf('{', index);
+            if (open < 0) {
+                break;
+            }
+            int close = pathOnly.indexOf('}', open + 1);
+            if (close < 0) {
+                throw new IllegalStateException(context + " contains an unclosed URI template variable in path ["
+                        + pathTemplate + "].");
+            }
+            String variable = pathOnly.substring(open + 1, close);
+            int regexSeparator = variable.indexOf(':');
+            if (regexSeparator >= 0) {
+                variable = variable.substring(0, regexSeparator);
+            }
+            if (!StringUtils.hasText(variable)) {
+                throw new IllegalStateException(context + " contains a blank URI template variable in path ["
+                        + pathTemplate + "].");
+            }
+            variables.add(variable.trim());
+            index = close + 1;
+        }
+        if (pathOnly.indexOf('}', index) >= 0) {
+            throw new IllegalStateException(context + " contains an unopened URI template variable in path ["
+                    + pathTemplate + "].");
+        }
+        return variables;
     }
 
     private static void checkInstance(ResilienceOperatorApplier applier,

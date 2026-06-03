@@ -1,21 +1,19 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ApiRef;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 
 class ReactiveClientInvocationHandlerApiRefTest {
@@ -24,7 +22,7 @@ class ReactiveClientInvocationHandlerApiRefTest {
     void shouldResolveMethodAndPathFromApiMap() throws Exception {
         ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
         ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
-        api.setMethod("GET");
+        api.setMethod(" get ");
         api.setPath("/users/{id}");
         api.setTimeoutMs(1200);
         clientConfig.setApis(Map.of("user.getById", api));
