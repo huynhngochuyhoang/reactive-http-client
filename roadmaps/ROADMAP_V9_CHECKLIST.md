@@ -7,16 +7,16 @@
 
 ## Priority 1 — Reject Ambiguous Body and Verb Metadata
 
-### [ ] 3.2 Reject ambiguous body and verb metadata before caching
-- [ ] Count static HTTP verb annotations explicitly instead of relying on
+### [x] 3.2 Reject ambiguous body and verb metadata before caching
+- [x] Count static HTTP verb annotations explicitly instead of relying on
   ordered `else if` selection.
-- [ ] Reject a method with more than one static HTTP verb annotation.
-- [ ] Include the method and conflicting annotations in the failure message.
-- [ ] Detect a second `@Body` parameter before replacing the first body index.
-- [ ] Include the method in the multiple-body failure message.
-- [ ] Ensure invalid metadata never enters `MethodMetadataCache`.
-- [ ] Test repeated parse attempts for the same deterministic failure.
-- [ ] Verify valid inherited and overloaded methods still cache independently.
+- [x] Reject a method with more than one static HTTP verb annotation.
+- [x] Include the method and conflicting annotations in the failure message.
+- [x] Detect a second `@Body` parameter before replacing the first body index.
+- [x] Include the method in the multiple-body failure message.
+- [x] Ensure invalid metadata never enters `MethodMetadataCache`.
+- [x] Test repeated parse attempts for the same deterministic failure.
+- [x] Verify valid inherited and overloaded methods still cache independently.
 
 ---
 

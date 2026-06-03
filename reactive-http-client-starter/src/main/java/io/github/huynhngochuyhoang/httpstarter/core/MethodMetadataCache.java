@@ -8,6 +8,8 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -43,22 +45,7 @@ public class MethodMetadataCache {
         meta.setApiName(method.getName());
 
         // ---- HTTP verb ----
-        if (method.isAnnotationPresent(GET.class)) {
-            meta.setHttpMethod("GET");
-            meta.setPathTemplate(method.getAnnotation(GET.class).value());
-        } else if (method.isAnnotationPresent(POST.class)) {
-            meta.setHttpMethod("POST");
-            meta.setPathTemplate(method.getAnnotation(POST.class).value());
-        } else if (method.isAnnotationPresent(PUT.class)) {
-            meta.setHttpMethod("PUT");
-            meta.setPathTemplate(method.getAnnotation(PUT.class).value());
-        } else if (method.isAnnotationPresent(DELETE.class)) {
-            meta.setHttpMethod("DELETE");
-            meta.setPathTemplate(method.getAnnotation(DELETE.class).value());
-        } else if (method.isAnnotationPresent(PATCH.class)) {
-            meta.setHttpMethod("PATCH");
-            meta.setPathTemplate(method.getAnnotation(PATCH.class).value());
-        }
+        applyHttpVerb(method, meta);
 
         ApiRef apiRef = method.getAnnotation(ApiRef.class);
         if (apiRef != null) {
@@ -116,6 +103,11 @@ public class MethodMetadataCache {
                         meta.getHeaderParams().put(i, hp.value());
                     }
                 } else if (ann instanceof Body) {
+                    if (meta.getBodyIndex() >= 0) {
+                        throw new IllegalStateException(
+                                "Multiple @Body parameters on method: " + method
+                                        + " at indexes " + meta.getBodyIndex() + " and " + i);
+                    }
                     meta.setBodyIndex(i);
                 } else if (ann instanceof IdempotencyKey idempotencyKey) {
                     requireNonBlankAnnotationValue(idempotencyKey.value(), "@IdempotencyKey", method);
@@ -226,6 +218,53 @@ public class MethodMetadataCache {
         meta.freezeCollections();
         meta.setRequestPlan(RequestPlan.from(meta));
         return meta;
+    }
+
+    private static void applyHttpVerb(Method method, MethodMetadata meta) {
+        List<String> verbAnnotations = new ArrayList<>(5);
+        String httpMethod = null;
+        String pathTemplate = null;
+
+        GET get = method.getAnnotation(GET.class);
+        if (get != null) {
+            verbAnnotations.add("@GET");
+            httpMethod = "GET";
+            pathTemplate = get.value();
+        }
+        POST post = method.getAnnotation(POST.class);
+        if (post != null) {
+            verbAnnotations.add("@POST");
+            httpMethod = "POST";
+            pathTemplate = post.value();
+        }
+        PUT put = method.getAnnotation(PUT.class);
+        if (put != null) {
+            verbAnnotations.add("@PUT");
+            httpMethod = "PUT";
+            pathTemplate = put.value();
+        }
+        DELETE delete = method.getAnnotation(DELETE.class);
+        if (delete != null) {
+            verbAnnotations.add("@DELETE");
+            httpMethod = "DELETE";
+            pathTemplate = delete.value();
+        }
+        PATCH patch = method.getAnnotation(PATCH.class);
+        if (patch != null) {
+            verbAnnotations.add("@PATCH");
+            httpMethod = "PATCH";
+            pathTemplate = patch.value();
+        }
+
+        if (verbAnnotations.size() > 1) {
+            throw new IllegalStateException(
+                    "Multiple HTTP verb annotations " + String.join(", ", verbAnnotations)
+                            + " on method: " + method);
+        }
+        if (verbAnnotations.size() == 1) {
+            meta.setHttpMethod(httpMethod);
+            meta.setPathTemplate(pathTemplate);
+        }
     }
 
     private static void requireNonBlankAnnotationValue(String value, String annotationName, Method method) {
