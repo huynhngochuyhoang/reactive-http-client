@@ -27,6 +27,7 @@ import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -83,6 +84,12 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         }
 
         validateClientConfiguration(clientName, config, properties.getNetwork());
+        MethodMetadataCache metadataCache = applicationContext
+                .getBeanProvider(MethodMetadataCache.class)
+                .getIfAvailable(MethodMetadataCache::new);
+        validateDeclarativeMethodContracts(type, metadataCache);
+        validateApiRefMappings(type, metadataCache, config, clientName);
+
         AuthProvider authProvider = resolveAuthProvider(clientName, config);
         logStartupConfiguration(
                 clientName,
@@ -98,11 +105,6 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 properties.getCorrelationId(),
                 clientName,
                 authProvider);
-
-        MethodMetadataCache metadataCache = applicationContext
-                .getBeanProvider(MethodMetadataCache.class)
-                .getIfAvailable(MethodMetadataCache::new);
-        validateApiRefMappings(type, metadataCache, config, clientName);
 
         DefaultErrorDecoder errorDecoder = applicationContext
                 .getBeanProvider(DefaultErrorDecoder.class)
@@ -641,15 +643,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                                                       String clientName) {
         List<String> missing = new ArrayList<>();
         for (Method method : clientInterface.getMethods()) {
-            if (method.isSynthetic() || method.isDefault() || method.isBridge()) continue;
-            MethodMetadata meta;
-            try {
-                meta = metadataCache.get(method);
-            } catch (RuntimeException e) {
-                // Methods that fail to parse (e.g. helper methods without HTTP verb)
-                // are validated only when invoked; skip them here.
-                continue;
-            }
+            if (!isDeclarativeClientMethod(method)) continue;
+            MethodMetadata meta = metadataCache.get(method);
             checkInstance(applier, ResilienceOperatorApplier.InstanceType.RETRY,
                     meta.getRetryInstanceName(), method, "@Retry", missing);
             checkInstance(applier, ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER,
@@ -680,13 +675,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             return;
         }
         for (Method method : clientInterface.getMethods()) {
-            if (method.isSynthetic() || method.isDefault() || method.isBridge()) continue;
-            MethodMetadata meta;
-            try {
-                meta = metadataCache.get(method);
-            } catch (RuntimeException e) {
-                continue;
-            }
+            if (!isDeclarativeClientMethod(method)) continue;
+            MethodMetadata meta = metadataCache.get(method);
             RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
             String httpMethod = diagnosticHttpMethod(meta, clientConfig);
             boolean retryEnabled = isRetryMethodEnabled(resilience, httpMethod)
@@ -778,6 +768,18 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     }
 
     /**
+     * Eagerly parses every abstract client method so declarative contract errors fail
+     * at proxy construction instead of first invocation.
+     */
+    private void validateDeclarativeMethodContracts(Class<?> clientInterface,
+                                                    MethodMetadataCache metadataCache) {
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method)) continue;
+            metadataCache.get(method);
+        }
+    }
+
+    /**
      * Eagerly validates {@code @ApiRef} usage so typos in API-map keys fail fast
      * at startup instead of throwing only when the method is first invoked.
      */
@@ -786,17 +788,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                                         ReactiveHttpClientProperties.ClientConfig clientConfig,
                                         String clientName) {
         for (Method method : clientInterface.getMethods()) {
-            if (method.isSynthetic() || method.isDefault() || method.isBridge()) continue;
-            MethodMetadata meta;
-            try {
-                meta = metadataCache.get(method);
-            } catch (RuntimeException e) {
-                // Methods that fail to parse (e.g. helper methods without HTTP verb)
-                // are validated only when invoked; skip @ApiRef startup checks here.
-                log.debug("Skipping @ApiRef startup validation for {}.{} due to metadata parse failure.",
-                        method.getDeclaringClass().getSimpleName(), method.getName(), e);
-                continue;
-            }
+            if (!isDeclarativeClientMethod(method)) continue;
+            MethodMetadata meta = metadataCache.get(method);
             String apiRefName = meta.getApiRefName();
             if (!StringUtils.hasText(apiRefName)) {
                 continue;
@@ -808,6 +801,16 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             String apiRefContext = ApiRefValidationSupport.apiRefContext(method, apiRefName);
             validateApiRef(apiConfig, configPrefix, apiRefContext);
         }
+    }
+
+    private static boolean isDeclarativeClientMethod(Method method) {
+        int modifiers = method.getModifiers();
+        return method.getDeclaringClass() != Object.class
+                && Modifier.isAbstract(modifiers)
+                && !Modifier.isStatic(modifiers)
+                && !method.isSynthetic()
+                && !method.isDefault()
+                && !method.isBridge();
     }
 
     static void validateApiRef(ReactiveHttpClientProperties.ApiConfig apiConfig,
