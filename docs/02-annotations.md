@@ -46,7 +46,7 @@ If you use `@ApiRef` on a method, do not add HTTP verb annotations to that metho
 | `@HEAD(path)` | HEAD |
 | `@OPTIONS(path)` | OPTIONS |
 
-Path templates support `{variable}` placeholders resolved from `@PathVar` parameters. `TRACE` is intentionally available only through `@ApiRef` configuration, not as a static annotation.
+Path templates support `{variable}` placeholders resolved from `@PathVar` parameters.
 
 ```java
 @GET("/orders/{orderId}/items/{itemId}")
