@@ -228,7 +228,7 @@ public class MethodMetadataCache {
     }
 
     private static void applyHttpVerb(Method method, MethodMetadata meta) {
-        List<String> verbAnnotations = new ArrayList<>(5);
+        List<String> verbAnnotations = new ArrayList<>(7);
         String httpMethod = null;
         String pathTemplate = null;
 
@@ -261,6 +261,18 @@ public class MethodMetadataCache {
             verbAnnotations.add("@PATCH");
             httpMethod = "PATCH";
             pathTemplate = patch.value();
+        }
+        HEAD head = method.getAnnotation(HEAD.class);
+        if (head != null) {
+            verbAnnotations.add("@HEAD");
+            httpMethod = "HEAD";
+            pathTemplate = head.value();
+        }
+        OPTIONS options = method.getAnnotation(OPTIONS.class);
+        if (options != null) {
+            verbAnnotations.add("@OPTIONS");
+            httpMethod = "OPTIONS";
+            pathTemplate = options.value();
         }
 
         if (verbAnnotations.size() > 1) {

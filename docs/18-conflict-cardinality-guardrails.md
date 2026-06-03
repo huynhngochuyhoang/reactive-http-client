@@ -11,7 +11,7 @@ or trace cardinality.
 | Area | Highest precedence | Fallback | Behavior |
 |---|---|---|---|
 | Client base URL | `@ReactiveHttpClient(baseUrl = "...")` | `reactive.http.clients.<name>.base-url` | Annotation value wins. A missing effective base URL fails startup. |
-| HTTP method and path | HTTP verb annotation or `@ApiRef`, but not both | none | Combining `@ApiRef` with `@GET`, `@POST`, `@PUT`, `@DELETE`, or `@PATCH` fails metadata parsing. |
+| HTTP method and path | HTTP verb annotation or `@ApiRef`, but not both | none | Combining `@ApiRef` with `@GET`, `@POST`, `@PUT`, `@DELETE`, `@PATCH`, `@HEAD`, or `@OPTIONS` fails metadata parsing. |
 | `@ApiRef` map | `reactive.http.clients.<name>.apis.<api>.method/path/timeout-ms` | none | Missing API entries, blank method, or blank path fail at proxy construction. |
 | Path variables | `@PathVar` arguments | none | Path variables are resolved per invocation. Missing placeholders fail when the URI is built. |
 | Query parameters | `@QueryParam` arguments | `default-query-params` | Same-name method query parameters replace configured defaults. Multi-value parameters are sent as repeated query parameters. |

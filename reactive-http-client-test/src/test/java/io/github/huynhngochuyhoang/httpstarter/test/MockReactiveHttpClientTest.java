@@ -52,6 +52,12 @@ class MockReactiveHttpClientTest {
 
         @POST("/payments/manual")
         Mono<String> createPaymentWithKey(@Body String json, @IdempotencyKey String idempotencyKey);
+
+        @HEAD("/objects/{id}")
+        Mono<Void> headObject(@PathVar("id") String id);
+
+        @OPTIONS("/objects")
+        Mono<String> optionsObjects();
     }
 
     @ReactiveHttpClient(name = "named-client")
@@ -78,6 +84,47 @@ class MockReactiveHttpClientTest {
                 .hasMethod(HttpMethod.GET)
                 .hasPath("/users/42")
                 .hasStatusCode(200);
+    }
+
+    @Test
+    void recordsHeadAndOptionsAnnotations() {
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        List<ReactiveHttpClientLifecycleContext> successes = new CopyOnWriteArrayList<>();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .withObserver(observed::add)
+                .withLifecycleHook(new ReactiveHttpClientLifecycleHook() {
+                    @Override
+                    public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+                        successes.add(context);
+                    }
+                })
+                .respondTo(HttpMethod.HEAD, "/objects/abc",
+                        ex -> MockReactiveHttpClient.empty(204))
+                .respondTo(HttpMethod.OPTIONS, "/objects",
+                        ex -> MockReactiveHttpClient.json(200, "\"allowed\""))
+                .build();
+
+        StepVerifier.create(mock.proxy().headObject("abc"))
+                .verifyComplete();
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasMethod(HttpMethod.HEAD)
+                .hasPath("/objects/abc")
+                .hasStatusCode(204);
+
+        StepVerifier.create(mock.proxy().optionsObjects())
+                .expectNext("\"allowed\"")
+                .verifyComplete();
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasMethod(HttpMethod.OPTIONS)
+                .hasPath("/objects")
+                .hasStatusCode(200);
+
+        assertThat(observed)
+                .extracting(HttpClientObserverEvent::getHttpMethod)
+                .containsExactly("HEAD", "OPTIONS");
+        assertThat(successes)
+                .extracting(ReactiveHttpClientLifecycleContext::httpMethod)
+                .containsExactly("HEAD", "OPTIONS");
     }
 
     @Test

@@ -51,7 +51,7 @@ class UserService {
 
 | Area | Built in |
 |---|---|
-| Declarative clients | `@ReactiveHttpClient`, `@GET`, `@POST`, `@Body`, `@PathVar`, `@QueryParam`, headers |
+| Declarative clients | `@ReactiveHttpClient`, HTTP verb annotations, `@Body`, `@PathVar`, `@QueryParam`, headers |
 | Configuration | Per-client config under `reactive.http.clients.<name>` |
 | Timeouts | Connect timeout, network read/write safety nets, per-request `@TimeoutMs` |
 | Errors | Consistent exception model and error categories |

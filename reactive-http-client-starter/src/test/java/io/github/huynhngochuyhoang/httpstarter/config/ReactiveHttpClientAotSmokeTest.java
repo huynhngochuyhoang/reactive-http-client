@@ -1,6 +1,8 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
+import io.github.huynhngochuyhoang.httpstarter.annotation.HEAD;
+import io.github.huynhngochuyhoang.httpstarter.annotation.OPTIONS;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.AotSmokeClient;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.InheritedAotSmokeClient;
@@ -36,6 +38,10 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClient.class).getMemberCategories())
                 .contains(MemberCategory.INTROSPECT_DECLARED_METHODS);
         assertThat(hints.reflection().getTypeHint(GET.class).getMemberCategories())
+                .contains(MemberCategory.INTROSPECT_DECLARED_METHODS);
+        assertThat(hints.reflection().getTypeHint(HEAD.class).getMemberCategories())
+                .contains(MemberCategory.INTROSPECT_DECLARED_METHODS);
+        assertThat(hints.reflection().getTypeHint(OPTIONS.class).getMemberCategories())
                 .contains(MemberCategory.INTROSPECT_DECLARED_METHODS);
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.class).getMemberCategories())
                 .contains(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS, MemberCategory.INVOKE_PUBLIC_METHODS);

@@ -20,6 +20,8 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
             PUT.class,
             DELETE.class,
             PATCH.class,
+            HEAD.class,
+            OPTIONS.class,
             PathVar.class,
             QueryParam.class,
             HeaderParam.class,

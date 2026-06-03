@@ -27,6 +27,31 @@ class MethodMetadataValidationTest {
     }
 
     @Test
+    void shouldParseHeadAndOptionsAnnotations() throws Exception {
+        Method head = HeadOptionsClient.class.getMethod("head", String.class);
+        Method options = HeadOptionsClient.class.getMethod("options");
+
+        MethodMetadata headMetadata = new MethodMetadataCache().get(head);
+        MethodMetadata optionsMetadata = new MethodMetadataCache().get(options);
+
+        assertEquals("HEAD", headMetadata.getHttpMethod());
+        assertEquals("/objects/{id}", headMetadata.getPathTemplate());
+        assertEquals("HEAD", headMetadata.getRequestPlan().httpMethod());
+        assertEquals("id", headMetadata.getRequestPlan().pathVars().get(0).name());
+        assertEquals(250, headMetadata.getTimeoutMs());
+        assertEquals("head-retry", headMetadata.getRetryInstanceName());
+        assertTrue(headMetadata.isHttpExchangeLoggingEnabled());
+
+        assertEquals("OPTIONS", optionsMetadata.getHttpMethod());
+        assertEquals("/objects", optionsMetadata.getPathTemplate());
+        assertEquals("OPTIONS", optionsMetadata.getRequestPlan().httpMethod());
+        assertEquals(300, optionsMetadata.getTimeoutMs());
+        assertEquals("options-retry", optionsMetadata.getRetryInstanceName());
+        assertEquals("options-cb", optionsMetadata.getCircuitBreakerInstanceName());
+        assertTrue(optionsMetadata.isHttpExchangeLoggingEnabled());
+    }
+
+    @Test
     void shouldFreezeMetadataCollectionsAfterParsing() throws Exception {
         Method method = PatchClient.class.getMethod("patch");
         MethodMetadata metadata = new MethodMetadataCache().get(method);
@@ -102,6 +127,18 @@ class MethodMetadataValidationTest {
         Method method = InvalidApiRefClient.class.getMethod("call");
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> new MethodMetadataCache().get(method));
         assertTrue(ex.getMessage().contains("@ApiRef cannot be combined"));
+    }
+
+    @Test
+    void shouldRejectApiRefCombinedWithHeadOrOptions() throws Exception {
+        Method head = InvalidHeadApiRefClient.class.getMethod("call");
+        Method options = InvalidOptionsApiRefClient.class.getMethod("call");
+
+        IllegalStateException headEx = assertThrows(IllegalStateException.class, () -> new MethodMetadataCache().get(head));
+        IllegalStateException optionsEx = assertThrows(IllegalStateException.class, () -> new MethodMetadataCache().get(options));
+
+        assertTrue(headEx.getMessage().contains("@ApiRef cannot be combined with @HEAD"));
+        assertTrue(optionsEx.getMessage().contains("@ApiRef cannot be combined with @OPTIONS"));
     }
 
 
@@ -205,6 +242,21 @@ class MethodMetadataValidationTest {
         Mono<String> patch();
     }
 
+    interface HeadOptionsClient {
+        @HEAD("/objects/{id}")
+        @TimeoutMs(250)
+        @Retry("head-retry")
+        @LogHttpExchange(logger = OverrideTestExchangeLogger.class)
+        Mono<Void> head(@PathVar("id") String id);
+
+        @OPTIONS("/objects")
+        @TimeoutMs(300)
+        @Retry("options-retry")
+        @CircuitBreaker("options-cb")
+        @LogHttpExchange(logger = OverrideTestExchangeLogger.class)
+        Mono<String> options();
+    }
+
     interface RequestPlanClient {
         @POST("/items/{id}")
         Mono<String> create(
@@ -239,6 +291,18 @@ class MethodMetadataValidationTest {
 
     interface InvalidApiRefClient {
         @GET("/items")
+        @ApiRef("user.getById")
+        Mono<String> call();
+    }
+
+    interface InvalidHeadApiRefClient {
+        @HEAD("/items")
+        @ApiRef("user.getById")
+        Mono<String> call();
+    }
+
+    interface InvalidOptionsApiRefClient {
+        @OPTIONS("/items")
         @ApiRef("user.getById")
         Mono<String> call();
     }
