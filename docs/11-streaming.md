@@ -1,6 +1,6 @@
 # Streaming Responses
 
-Methods that declare `Flux<DataBuffer>` or `Mono<ResponseEntity<Flux<DataBuffer>>>` as their return type bypass the in-memory codec entirely. Payloads of any size are streamed without risk of a `DataBufferLimitException`, regardless of the `codec-max-in-memory-size-mb` setting.
+Methods that declare `Flux<DataBuffer>` or `Mono<ResponseEntity<Flux<DataBuffer>>>` as their return type bypass the in-memory codec entirely. Payloads of any size are streamed without risk of a `DataBufferLimitException`, regardless of the `codec-max-in-memory-size-mb` setting. Streaming bodies are pass-through; the starter does not aggregate or inspect them.
 
 ---
 
@@ -15,7 +15,7 @@ public interface ObjectStoreClient {
 }
 ```
 
-The caller receives `DataBuffer` chunks as Reactor Netty produces them. Buffers are released automatically as the consumer drives the `Flux`.
+The caller receives `DataBuffer` chunks as Reactor Netty produces them. Emitted buffers are owned by the downstream consumer. If your code reads or drops chunks manually, release them with `DataBufferUtils.release(buffer)` or hand the `Flux` to a WebFlux response writer that owns that release step. The starter releases buffers that Reactor discards before handoff, such as queued chunks discarded by cancellation.
 
 ---
 
@@ -43,15 +43,17 @@ Mono<ResponseEntity<Flux<DataBuffer>>> proxy(
 }
 ```
 
-The upstream status code and headers are forwarded to the caller without buffering the body.
+The upstream status code and headers are forwarded to the caller without buffering the body. The outer `Mono` completes when the response envelope is available; the inner `Flux<DataBuffer>` is not subscribed until the caller consumes it. If the caller never subscribes the inner body, no body chunks are read by the starter.
 
 ---
 
 ## Memory behaviour
 
-- Buffers are reference-counted by Reactor Netty and released as the consumer drains the `Flux`.
-- Memory usage stays bounded regardless of payload size — the limit is the number of in-flight chunks, not the total payload.
-- Standard observability (duration, response size from `Content-Length`) still applies to streaming responses.
+- Streaming responses are not buffered by the starter. Memory usage stays bounded by the number of in-flight chunks, not the total payload.
+- Emitted `DataBuffer` chunks are consumer-owned. Release them after manual reads, or pass them to a component that documents ownership transfer.
+- Buffers discarded before consumer handoff are released by the starter, including queued chunks discarded by cancellation.
+- For direct `Flux<DataBuffer>` methods, lifecycle hooks, observers, and exchange logs finish when the stream completes, errors, or is cancelled.
+- For `Mono<ResponseEntity<Flux<DataBuffer>>>`, lifecycle hooks, observers, and exchange logs finish when the response envelope is emitted. They do not prove that the inner body was subscribed, fully consumed, or released. Response-size diagnostics still use `Content-Length` when available.
 
 ---
 
@@ -73,4 +75,4 @@ Flux<DataBuffer> exportData(
 
 ## Error handling for streaming responses
 
-Errors from the upstream server (4xx / 5xx) are decoded and thrown before the `Flux<DataBuffer>` is emitted, following the same error-handling contract as non-streaming methods. See [03-error-handling.md](03-error-handling.md).
+Errors from the upstream server (4xx / 5xx) are decoded and thrown before the streaming body is emitted, following the same error-handling contract as non-streaming methods. Error bodies are bounded and released by `DefaultErrorDecoder`. See [03-error-handling.md](03-error-handling.md).

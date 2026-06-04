@@ -7,20 +7,25 @@ import io.netty.buffer.PooledByteBufAllocator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
-import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DefaultDataBufferFactory;
-import org.springframework.core.io.buffer.NettyDataBufferFactory;
+import org.springframework.core.io.buffer.*;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.netty.DisposableServer;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.http.server.HttpServer;
 import reactor.test.StepVerifier;
 
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -51,7 +56,7 @@ class StreamingResponseTest {
         ReactiveClientInvocationHandler handler = createHandler(webClient);
 
         Mono<Long> totalBytes = invokeStream(handler)
-                .map(DataBuffer::readableByteCount)
+                .map(StreamingResponseTest::readableBytesAndRelease)
                 .reduce(0L, (acc, sz) -> acc + sz);
 
         StepVerifier.create(totalBytes)
@@ -75,11 +80,48 @@ class StreamingResponseTest {
                     assertThat(entity.getStatusCode().value()).isEqualTo(200);
                     assertThat(entity.getHeaders().getFirst(HttpHeaders.CONTENT_TYPE)).isEqualTo("application/octet-stream");
                     return entity.getBody()
-                            .map(DataBuffer::readableByteCount)
+                            .map(StreamingResponseTest::readableBytesAndRelease)
                             .reduce(0L, (acc, sz) -> acc + sz);
                 }))
                 .expectNext((long) CHUNK_COUNT * CHUNK_SIZE)
                 .verifyComplete();
+    }
+
+    @Test
+    void monoResponseEntityFluxDataBufferKeepsRealBodyConsumableAfterOuterMonoCompletes() {
+        DisposableServer server = HttpServer.create()
+                .port(0)
+                .route(routes -> routes.get("/large-file", (request, response) -> response
+                        .status(HttpStatus.OK.value())
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                        .sendString(Flux.just("alpha", "beta"))
+                        .then()))
+                .bindNow();
+        try {
+            WebClient webClient = WebClient.builder()
+                    .baseUrl("http://127.0.0.1:" + server.port())
+                    .clientConnector(new ReactorClientHttpConnector(
+                            HttpClient.create().responseTimeout(Duration.ofSeconds(5))))
+                    .build();
+            ReactiveClientInvocationHandler handler = createHandler(webClient);
+            AtomicReference<ResponseEntity<Flux<DataBuffer>>> entityRef = new AtomicReference<>();
+
+            StepVerifier.create(invokeStreamEntity(handler).doOnNext(entityRef::set))
+                    .assertNext(entity -> {
+                        assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
+                        assertThat(entity.getBody()).isNotNull();
+                    })
+                    .verifyComplete();
+
+            StepVerifier.create(entityRef.get().getBody()
+                            .map(StreamingResponseTest::readStringAndRelease)
+                            .reduce("", String::concat))
+                    .expectNext("alphabeta")
+                    .expectComplete()
+                    .verify(Duration.ofSeconds(5));
+        } finally {
+            server.disposeNow();
+        }
     }
 
     @Test
@@ -109,16 +151,118 @@ class StreamingResponseTest {
                 .verifyComplete();
 
         assertThat(bodySubscriptions.get()).isZero();
-        StepVerifier.create(entityRef.get().getBody().map(DataBuffer::readableByteCount))
+        StepVerifier.create(entityRef.get().getBody().map(StreamingResponseTest::readableBytesAndRelease))
                 .expectNext(5)
                 .verifyComplete();
         assertThat(bodySubscriptions.get()).isEqualTo(1);
+    }
+
+    @Test
+    void fluxOfDataBufferLeavesEmittedBuffersForCallerToRelease() {
+        List<PooledDataBuffer> buffers = pooledBuffers("one", "two", "three");
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://stream.test")
+                .exchangeFunction(req -> Mono.just(streamingResponse(buffers)))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        StepVerifier.create(invokeStream(handler).map(StreamingResponseTest::readableBytesAndRelease))
+                .expectNext(3, 3, 5)
+                .verifyComplete();
+
+        assertReleased(buffers);
+    }
+
+    @Test
+    void fluxOfDataBufferReleasesDiscardedBuffersOnCancellation() {
+        List<PooledDataBuffer> buffers = pooledBuffers("one", "two", "three");
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://stream.test")
+                .exchangeFunction(req -> Mono.just(streamingResponse(buffers)))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        StepVerifier.create(invokeStream(handler).take(1).map(StreamingResponseTest::readableBytesAndRelease))
+                .expectNext(3)
+                .verifyComplete();
+
+        assertReleased(buffers);
+    }
+
+    @Test
+    void responseEntityFluxDataBufferLeavesEmittedBuffersForCallerToRelease() {
+        List<PooledDataBuffer> buffers = pooledBuffers("one", "two", "three");
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://stream.test")
+                .exchangeFunction(req -> Mono.just(streamingResponse(buffers)))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        StepVerifier.create(invokeStreamEntity(handler)
+                        .flatMapMany(entity -> entity.getBody().map(StreamingResponseTest::readableBytesAndRelease)))
+                .expectNext(3, 3, 5)
+                .verifyComplete();
+
+        assertReleased(buffers);
+    }
+
+    @Test
+    void responseEntityFluxDataBufferReleasesDiscardedBuffersWhenInnerStreamIsCancelled() {
+        List<PooledDataBuffer> buffers = pooledBuffers("one", "two", "three");
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://stream.test")
+                .exchangeFunction(req -> Mono.just(streamingResponse(buffers)))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        StepVerifier.create(invokeStreamEntity(handler)
+                        .flatMapMany(entity -> entity.getBody().take(1).map(StreamingResponseTest::readableBytesAndRelease)))
+                .expectNext(3)
+                .verifyComplete();
+
+        assertReleased(buffers);
     }
 
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private static ClientResponse streamingResponse(List<PooledDataBuffer> buffers) {
+        return ClientResponse.create(HttpStatus.OK)
+                .header(HttpHeaders.CONTENT_TYPE, "application/octet-stream")
+                .body(Flux.fromIterable(buffers).cast(DataBuffer.class))
+                .build();
+    }
+
+    private static List<PooledDataBuffer> pooledBuffers(String... values) {
+        NettyDataBufferFactory bufferFactory = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
+        return java.util.Arrays.stream(values)
+                .map(value -> (PooledDataBuffer) bufferFactory.wrap(value.getBytes(StandardCharsets.UTF_8)))
+                .toList();
+    }
+
+    private static String readStringAndRelease(DataBuffer buffer) {
+        try {
+            byte[] bytes = new byte[buffer.readableByteCount()];
+            buffer.read(bytes);
+            return new String(bytes, StandardCharsets.UTF_8);
+        } finally {
+            DataBufferUtils.release(buffer);
+        }
+    }
+
+    private static int readableBytesAndRelease(DataBuffer buffer) {
+        try {
+            return buffer.readableByteCount();
+        } finally {
+            DataBufferUtils.release(buffer);
+        }
+    }
+
+    private static void assertReleased(List<PooledDataBuffer> buffers) {
+        assertThat(buffers).allMatch(buffer -> !buffer.isAllocated());
+    }
 
     private static ClientResponse largeChunkedResponse() {
         NettyDataBufferFactory bufferFactory = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);

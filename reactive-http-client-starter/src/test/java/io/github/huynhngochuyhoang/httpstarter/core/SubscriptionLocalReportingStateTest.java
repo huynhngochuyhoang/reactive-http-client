@@ -9,9 +9,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -149,6 +151,49 @@ class SubscriptionLocalReportingStateTest {
         assertTerminalState(observed, logger.contexts, List.of(), 200, "second");
     }
 
+
+    @Test
+    void concurrentStreamingEnvelopeSubscriptionsReportTheirOwnTerminalState() throws Throwable {
+        Sinks.Empty<Void> releaseFirstBody = Sinks.empty();
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        RecordingLogger logger = new RecordingLogger();
+        RecordingHook hook = new RecordingHook();
+        HttpClientObserver observer = event -> {
+            observed.add(event);
+            if (Integer.valueOf(200).equals(event.getStatusCode())) {
+                releaseFirstBody.tryEmitEmpty();
+            }
+        };
+        WebClient webClient = reportingWebClient(request -> {
+            String subscriber = request.headers().getFirst("X-Subscriber");
+            if ("first".equals(subscriber)) {
+                return Mono.just(response(HttpStatus.PARTIAL_CONTENT, "first", Flux.concat(
+                        Mono.just(buffer("first-1")),
+                        releaseFirstBody.asMono().thenReturn(buffer("first-2")))));
+            }
+            return Mono.just(response(HttpStatus.OK, "second", Flux.just(buffer("second"))));
+        });
+        ReactiveClientInvocationHandler handler = createHandler(webClient, logger, observer, hook);
+
+        Mono<ResponseEntity<Flux<DataBuffer>>> request = invokeStreamEntity(handler);
+        Mono<List<String>> first = request
+                .contextWrite(context -> context.put("subscriber", "first"))
+                .flatMapMany(entity -> entity.getBody().map(SubscriptionLocalReportingStateTest::readAndRelease))
+                .collectList();
+        Mono<List<String>> second = request
+                .contextWrite(context -> context.put("subscriber", "second"))
+                .flatMapMany(entity -> entity.getBody().map(SubscriptionLocalReportingStateTest::readAndRelease))
+                .collectList();
+
+        StepVerifier.create(Mono.zip(first, second))
+                .expectNextMatches(tuple -> List.of("first-1", "first-2").equals(tuple.getT1())
+                        && List.of("second").equals(tuple.getT2()))
+                .verifyComplete();
+
+        assertTerminalState(observed, logger.contexts, hook.successes, 206, "first");
+        assertTerminalState(observed, logger.contexts, hook.successes, 200, "second");
+    }
+
     private static WebClient reportingWebClient(
             org.springframework.web.reactive.function.client.ExchangeFunction exchangeFunction) {
         return WebClient.builder()
@@ -225,6 +270,22 @@ class SubscriptionLocalReportingStateTest {
     }
 
     @SuppressWarnings("unchecked")
+    private static Mono<ResponseEntity<Flux<DataBuffer>>> invokeStreamEntity(ReactiveClientInvocationHandler handler) throws Throwable {
+        Method method = ReportingClient.class.getMethod("streamEntity");
+        return (Mono<ResponseEntity<Flux<DataBuffer>>>) handler.invoke(null, method, new Object[0]);
+    }
+
+    private static String readAndRelease(DataBuffer buffer) {
+        try {
+            byte[] bytes = new byte[buffer.readableByteCount()];
+            buffer.read(bytes);
+            return new String(bytes, StandardCharsets.UTF_8);
+        } finally {
+            DataBufferUtils.release(buffer);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     private static ReactiveClientInvocationHandler createHandler(
             WebClient webClient,
             RecordingLogger logger,
@@ -265,6 +326,9 @@ class SubscriptionLocalReportingStateTest {
 
         @GET("/items")
         Flux<String> flux();
+
+        @GET("/items")
+        Mono<ResponseEntity<Flux<DataBuffer>>> streamEntity();
     }
 
     static final class RecordingLogger extends DefaultHttpExchangeLogger {

@@ -21,6 +21,8 @@ Subscription-attempt values count reactive subscriptions, not guaranteed HTTP
 network sends. Request-body serialization can fail after an attempt starts but
 before dispatch.
 
+For `Mono<ResponseEntity<Flux<DataBuffer>>>`, terminal lifecycle, observer, and exchange-log records describe response-envelope completion. They do not indicate that the inner streamed body was subscribed or fully consumed. Direct `Flux<DataBuffer>` methods report terminal state when the stream itself completes, errors, or is cancelled.
+
 ## Header handling
 
 Custom `HttpExchangeLogger` implementations receive raw final outbound request
