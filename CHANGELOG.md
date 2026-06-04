@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-06-04
+
+### Added
+
+- **Declarative `@HEAD` and `@OPTIONS`.** Added static verb annotations with the same path-template, timeout, resilience, lifecycle, observer, exchange-log, AOT, and mock-client support as the existing HTTP verb annotations.
+- **Opt-in redirect following.** Added per-client `reactive.http.clients.<name>.follow-redirects`, defaulting to `false`, to let the starter-created Reactor Netty transport follow `301`, `302`, `303`, `307`, and `308` redirects when explicitly enabled.
+- **Multi-value outbound headers.** `@HeaderParam` now accepts collection and array values for named parameters and map entries, preserves caller order, validates every expanded value, and replaces same-name configured defaults case-insensitively.
+- **Header-aware mock responses.** Added `MockReactiveHttpClient` raw text/byte response helpers and custom repeated response-header helpers while keeping `json(...)` and `empty(...)` source compatible.
+
+### Changed
+
+- **Eager declarative validation.** Client proxy construction now validates every abstract endpoint method, including inherited endpoints, missing verb or `@ApiRef` metadata, conflicting verb annotations, duplicate body parameters, blank parameter annotation names, malformed base URLs, configured `@ApiRef` methods, and URI-template placeholder mismatches.
+- **Bodiless response draining.** Successful `Mono<Void>` and `Mono<ResponseEntity<Void>>` responses now drain unexpected response content before completing so pooled connections can remain reusable when the transport permits it.
+- **Streaming response ownership.** `Flux<DataBuffer>` and `Mono<ResponseEntity<Flux<DataBuffer>>>` contracts now explicitly separate starter-owned discard release from consumer-owned emitted buffers, and streaming envelope diagnostics complete when the response envelope is emitted.
+- **Compatibility.** Public API compatibility is checked against published `2.7.0` artifacts; no intentional breaking behavior changes are included in this release.
+
+### Fixed
+
+- Fixed URI-template validation so placeholders in literal query strings are included when matching declared `@PathVar` parameters.
+- Fixed the annotation reference by keeping unsupported `TRACE` out of the documented `@ApiRef` method set.
+- Fixed `Mono<ResponseEntity<Flux<DataBuffer>>>` handling with real `WebClient` so the inner streaming body remains consumable after the outer response envelope completes.
+- Fixed startup metadata parsing so invalid declarations fail deterministically before entering the method metadata cache.
+
+### Docs
+
+- Documented `@HEAD`, `@OPTIONS`, multi-value `@HeaderParam`, and `@ApiRef` validation contracts.
+- Documented visible-3xx default behavior, opt-in redirect forwarding, sensitive-header behavior on cross-authority redirects, loop handling, and request-body replay risks.
+- Documented bodiless-response draining, error-body retention boundaries, streaming buffer ownership, and response-envelope completion semantics.
+- Documented repeated-header assertions and raw mock response helpers for tests.
+
 ## [2.7.0] - 2026-06-02
 
 ### Added
@@ -1065,10 +1095,11 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 1. Update `<version>` in the root `pom.xml` (remove `-SNAPSHOT` suffix for releases).
 2. Update this file: move items from `[Unreleased]` to a new versioned section.
 3. Create and push a git tag: `git tag v<VERSION> && git push origin v<VERSION>`.
-4. Create a GitHub Release from that tag.  
+4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.7.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.4.0...v2.5.0

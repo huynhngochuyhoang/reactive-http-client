@@ -176,34 +176,34 @@
 
 ## Priority 9 — Compatibility Evidence and Release Readiness
 
-### [ ] Compatibility automation
-- [ ] Update the API compatibility baseline only when the prior release
+### [x] Compatibility automation
+- [x] Update the API compatibility baseline only when the prior release
   artifact is available.
-- [ ] Run the published-artifact API compatibility report.
-- [ ] Verify additive annotations, properties, and helper methods remain binary
+- [x] Run the published-artifact API compatibility report.
+- [x] Verify additive annotations, properties, and helper methods remain binary
   compatible.
-- [ ] Keep internal implementation classes and fixtures outside the public API
+- [x] Keep internal implementation classes and fixtures outside the public API
   check.
-- [ ] Verify AOT smoke coverage includes inherited endpoint validation.
-- [ ] Verify the scheduled/manual native-image smoke path covers the final
+- [x] Verify AOT smoke coverage includes inherited endpoint validation.
+- [x] Verify the scheduled/manual native-image smoke path covers the final
   starter artifact.
 
-### [ ] Release readiness
-- [ ] Add V9 entries to `CHANGELOG.md` under Added/Changed/Fixed/Docs.
-- [ ] Keep README concise and link detailed docs.
-- [ ] Update annotation-reference docs for `@HEAD` and `@OPTIONS`.
-- [ ] Update configuration metadata and generated property docs for
+### [x] Release readiness
+- [x] Add V9 entries to `CHANGELOG.md` under Added/Changed/Fixed/Docs.
+- [x] Keep README concise and link detailed docs.
+- [x] Update annotation-reference docs for `@HEAD` and `@OPTIONS`.
+- [x] Update configuration metadata and generated property docs for
   `follow-redirects`.
-- [ ] Update redirect docs for opt-in forwarding, sensitive-header behavior,
+- [x] Update redirect docs for opt-in forwarding, sensitive-header behavior,
   loop handling, and request-body replay risks.
-- [ ] Update streaming docs for buffer ownership and envelope completion.
-- [ ] Update test-helper docs for repeated headers and raw mock responses.
-- [ ] Verify body-drain docs do not promise connection reuse after
+- [x] Update streaming docs for buffer ownership and envelope completion.
+- [x] Update test-helper docs for repeated headers and raw mock responses.
+- [x] Verify body-drain docs do not promise connection reuse after
   cancellation.
-- [ ] Verify redirect docs preserve the V8 visible-3xx default contract.
-- [ ] Run `mvn test`.
-- [ ] Run `mvn -Prelease-smoke test`.
-- [ ] Run `mvn -Papi-compatibility -DskipTests verify`.
-- [ ] Run API compatibility fixtures.
-- [ ] Run `git diff --check`.
-- [ ] Call out any breaking behavior before release.
+- [x] Verify redirect docs preserve the V8 visible-3xx default contract.
+- [x] Run `mvn test`.
+- [x] Run `mvn -Prelease-smoke test`.
+- [x] Run `mvn -Papi-compatibility -DskipTests verify`.
+- [x] Run API compatibility fixtures.
+- [x] Run `git diff --check`.
+- [x] Call out any breaking behavior before release.
