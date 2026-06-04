@@ -188,9 +188,10 @@ public final class HttpClientObserverEvent {
     public Integer getStatusCode() { return statusCode; }
 
     /**
-     * Elapsed wall-clock time in milliseconds from the start of the request to response completion.
+     * Elapsed wall-clock time in milliseconds from the start of the request to terminal reporting.
      * For {@code Mono<T>} responses this is the time to receive the single value (or error).
-     * For {@code Flux<T>} (streaming) responses this is the time until all items have been emitted.
+     * For direct {@code Flux<T>} responses this is the time until the stream completes, errors, or is cancelled.
+     * For {@code Mono<ResponseEntity<Flux<DataBuffer>>>}, this is response-envelope timing, not full inner-body consumption timing.
      */
     public long getDurationMs() { return durationMs; }
 

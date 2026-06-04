@@ -121,28 +121,28 @@
 
 ## Priority 7 — Streaming Response Ownership
 
-### [ ] 2.3 Streaming response ownership contract
-- [ ] Audit direct `Flux<DataBuffer>` response handling.
-- [ ] Audit `Mono<ResponseEntity<Flux<DataBuffer>>>` response handling.
-- [ ] Document buffer ownership for pass-through, manual consumption, discard,
+### [x] 2.3 Streaming response ownership contract
+- [x] Audit direct `Flux<DataBuffer>` response handling.
+- [x] Audit `Mono<ResponseEntity<Flux<DataBuffer>>>` response handling.
+- [x] Document buffer ownership for pass-through, manual consumption, discard,
   and cancellation.
-- [ ] Distinguish outer response-envelope completion from inner streamed-body
+- [x] Distinguish outer response-envelope completion from inner streamed-body
   completion.
-- [ ] Define observer, lifecycle, and exchange-log timing for response-envelope
+- [x] Define observer, lifecycle, and exchange-log timing for response-envelope
   streaming.
-- [ ] Keep streaming bodies unbuffered.
-- [ ] Add leak-sensitive tests for full stream consumption.
-- [ ] Add leak-sensitive tests for stream cancellation.
-- [ ] Ensure pass-through examples do not imply automatic release after manual
+- [x] Keep streaming bodies unbuffered.
+- [x] Add leak-sensitive tests for full stream consumption.
+- [x] Add leak-sensitive tests for stream cancellation.
+- [x] Ensure pass-through examples do not imply automatic release after manual
   consumption.
 
-### [ ] 3.3 Streaming-envelope cancellation and terminal reporting correctness
-- [ ] Reproduce cancellation before inner-stream subscription.
-- [ ] Reproduce cancellation during inner-stream consumption.
-- [ ] Release discarded buffers where ownership remains with the starter.
-- [ ] Keep streaming terminal reporting subscription-local.
-- [ ] Test concurrent streaming-envelope subscriptions.
-- [ ] Ensure diagnostics describe envelope completion accurately without
+### [x] 3.3 Streaming-envelope cancellation and terminal reporting correctness
+- [x] Reproduce cancellation before inner-stream subscription.
+- [x] Reproduce cancellation during inner-stream consumption.
+- [x] Release discarded buffers where ownership remains with the starter.
+- [x] Keep streaming terminal reporting subscription-local.
+- [x] Test concurrent streaming-envelope subscriptions.
+- [x] Ensure diagnostics describe envelope completion accurately without
   claiming full streamed-body consumption.
 
 ---

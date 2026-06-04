@@ -19,6 +19,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.*;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.util.MultiValueMap;
@@ -423,7 +424,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         // Streaming passthrough for Mono<ResponseEntity<Flux<DataBuffer>>>: skip the
         // in-memory codec entirely so large payloads aren't bound by codec-max-in-memory-size.
         if (isResponseEntityOfFluxDataBuffer(responseType)) {
-            Flux<DataBuffer> streaming = response.bodyToFlux(DataBuffer.class);
+            Flux<DataBuffer> streaming = streamingDataBuffers(response);
             return Mono.just(ResponseEntity.status(response.statusCode())
                     .headers(response.headers().asHttpHeaders())
                     .body(streaming));
@@ -463,6 +464,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return response.bodyToMono(ParameterizedTypeReference.forType(responseType));
     }
 
+    private Flux<DataBuffer> streamingDataBuffers(ClientResponse response) {
+        return response.bodyToFlux(DataBuffer.class)
+                .doOnDiscard(DataBuffer.class, DataBufferUtils::release);
+    }
+
     private Flux<?> buildFlux(ClientResponse response, Type responseType) {
         if (responseType == null) {
             return response.bodyToFlux(Object.class);
@@ -471,7 +477,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             // Streaming passthrough: bodyToFlux(DataBuffer.class) wires the identity
             // DataBufferDecoder, so the codec-max-in-memory-size limit does not apply
             // — buffers are emitted as they arrive.
-            return response.bodyToFlux(DataBuffer.class);
+            return streamingDataBuffers(response);
         }
         return response.bodyToFlux(ParameterizedTypeReference.forType(responseType));
     }
