@@ -277,6 +277,13 @@
       "defaultValue": false
     },
     {
+      "name": "reactive.http.clients.[name].follow-redirects",
+      "type": "java.lang.Boolean",
+      "description": "Opt in to Reactor Netty automatic redirect following for HTTP 301, 302, 303, 307, and 308 responses on this client. Default: false, so 3xx responses remain visible to ResponseEntity callers.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "defaultValue": false
+    },
+    {
       "name": "reactive.http.clients.[name].log-exchange",
       "type": "java.lang.Boolean",
       "description": "Enable structured HTTP exchange logging (request + response) for all methods on this client. Default: false.",

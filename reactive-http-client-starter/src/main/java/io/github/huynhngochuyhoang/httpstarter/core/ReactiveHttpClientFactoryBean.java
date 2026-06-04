@@ -243,6 +243,9 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                             resolvedNetworkConfig.getNetworkWriteTimeoutMs(), TimeUnit.MILLISECONDS));
                 })
                 .compress(config.isCompressionEnabled());
+        if (config.isFollowRedirects()) {
+            httpClient = httpClient.followRedirect(true);
+        }
         httpClient = applyHttpProtocol(httpClient, config, baseUrl);
 
         ReactiveHttpClientProperties.ProxyConfig proxy = resolveProxy(config, resolvedNetworkConfig);
