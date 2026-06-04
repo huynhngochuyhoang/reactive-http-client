@@ -96,25 +96,25 @@
 
 ## Priority 6 — Opt-In Automatic Redirect Following
 
-### [ ] 1.4 Opt-in automatic redirect following
-- [ ] Add per-client `follow-redirects`, defaulting to `false`.
-- [ ] Update Spring configuration metadata and generated property docs.
-- [ ] Configure the starter-created Reactor Netty transport to follow redirects
+### [x] 1.4 Opt-in automatic redirect following
+- [x] Add per-client `follow-redirects`, defaulting to `false`.
+- [x] Update Spring configuration metadata and generated property docs.
+- [x] Configure the starter-created Reactor Netty transport to follow redirects
   only when the option is enabled.
-- [ ] Preserve visible 3xx pass-through when the option is disabled.
-- [ ] Test a visible `Mono<ResponseEntity<T>>` redirect with its `Location`
+- [x] Preserve visible 3xx pass-through when the option is disabled.
+- [x] Test a visible `Mono<ResponseEntity<T>>` redirect with its `Location`
   header when disabled.
-- [ ] Test a same-origin `GET` redirect exposing the final response when
+- [x] Test a same-origin `GET` redirect exposing the final response when
   enabled.
-- [ ] Test final 4xx and 5xx responses after redirects through
+- [x] Test final 4xx and 5xx responses after redirects through
   `DefaultErrorDecoder`.
-- [ ] Audit `301`, `302`, `303`, `307`, and `308` behavior with and without
+- [x] Audit `301`, `302`, `303`, `307`, and `308` behavior with and without
   request bodies.
-- [ ] Test cross-authority redirects without leaking sensitive headers.
-- [ ] Test a redirect loop or excessive redirect chain.
-- [ ] Document request-body replay risks, especially non-repeatable bodies with
+- [x] Test cross-authority redirects without leaking sensitive headers.
+- [x] Test a redirect loop or excessive redirect chain.
+- [x] Document request-body replay risks, especially non-repeatable bodies with
   `307` and `308`.
-- [ ] Document whether observer and exchange-log diagnostics expose initial,
+- [x] Document whether observer and exchange-log diagnostics expose initial,
   final, or both request URLs.
 
 ---

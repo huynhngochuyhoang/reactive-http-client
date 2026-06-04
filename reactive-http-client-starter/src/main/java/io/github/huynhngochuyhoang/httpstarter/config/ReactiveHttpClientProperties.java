@@ -368,6 +368,7 @@ public class ReactiveHttpClientProperties {
         private int codecMaxInMemorySizeMb = 2;
         private boolean compressionEnabled = false;
         private boolean http2Enabled = false;
+        private boolean followRedirects = false;
         private boolean logExchange = false;
         private LogPreset logPreset = LogPreset.METADATA_ONLY;
         /** Per-request response timeout in milliseconds. {@code null} means not configured; {@code 0} disables it. */
@@ -432,6 +433,9 @@ public class ReactiveHttpClientProperties {
 
         public boolean isHttp2Enabled() { return http2Enabled; }
         public void setHttp2Enabled(boolean http2Enabled) { this.http2Enabled = http2Enabled; }
+
+        public boolean isFollowRedirects() { return followRedirects; }
+        public void setFollowRedirects(boolean followRedirects) { this.followRedirects = followRedirects; }
 
         public boolean isLogExchange() { return logExchange; }
         public void setLogExchange(boolean logExchange) { this.logExchange = logExchange; }

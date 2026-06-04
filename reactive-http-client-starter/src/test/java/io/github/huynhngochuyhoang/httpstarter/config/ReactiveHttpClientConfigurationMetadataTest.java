@@ -30,6 +30,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "reactive.http.clients.[name].codec-max-in-memory-size-mb",
                 "reactive.http.clients.[name].compression-enabled",
                 "reactive.http.clients.[name].http2-enabled",
+                "reactive.http.clients.[name].follow-redirects",
                 "reactive.http.clients.[name].log-exchange",
                 "reactive.http.clients.[name].log-preset",
                 "reactive.http.clients.[name].request-timeout-ms",
@@ -65,6 +66,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.clients.[name].codec-max-in-memory-size-mb", 2);
         assertDefaultValue(metadata, "reactive.http.clients.[name].compression-enabled", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].http2-enabled", false);
+        assertDefaultValue(metadata, "reactive.http.clients.[name].follow-redirects", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].log-exchange", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].log-preset", "metadata-only");
         assertDefaultValue(metadata, "reactive.http.clients.[name].request-timeout-ms", 0);

@@ -24,13 +24,26 @@ Both types expose:
 
 3xx responses are not errors and do not invoke `DefaultErrorDecoder` or registered
 `ErrorResponseMapper` beans. The starter-created Reactor Netty transport leaves
-automatic redirect following disabled, so a proxy method such as
+automatic redirect following disabled by default, so a proxy method such as
 `Mono<ResponseEntity<T>>` can receive a visible 3xx response and inspect its
 `Location` header.
 
-If an application supplies a separately configured transport that follows
-redirects, the transport resolves the redirect before the proxy handles the
-response. The proxy then emits or decodes the final response status normally.
+Set `reactive.http.clients.<name>.follow-redirects=true` to opt in to Reactor
+Netty automatic redirect following for `301`, `302`, `303`, `307`, and `308`.
+When enabled, the transport resolves the redirect before the proxy handles the
+response. The proxy then emits or decodes the final response status normally, so
+a final `4xx` or `5xx` still goes through `DefaultErrorDecoder`.
+
+Redirect following is delegated to Reactor Netty. On cross-domain redirects,
+Reactor Netty removes sensitive redirect headers such as `Authorization`,
+`Cookie`, `Proxy-Authorization`, and `Expect` unless you provide a custom
+transport policy. Request bodies can be replayed by the transport for redirect
+requests; be careful with non-repeatable bodies. Reactor Netty preserves the
+method and body for `301`, `302`, `307`, and `308`; `303` switches to a
+bodiless `GET`. When the transport stops after an excessive redirect chain,
+the remaining 3xx response is surfaced to the proxy. Starter observer and
+exchange-log request
+URL fields describe the original declarative request, not every redirect hop.
 
 ## Error body retention policy
 
