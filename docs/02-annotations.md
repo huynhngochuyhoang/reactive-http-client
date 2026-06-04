@@ -29,6 +29,41 @@ public interface PaymentClient { ... }
 public interface LocalApiClient { ... }
 ```
 
+`@ReactiveHttpClient` interfaces may extend parent interfaces that declare
+endpoint methods. Put `@ReactiveHttpClient` on each concrete downstream client
+interface, not on the shared parent, so every child keeps its own client name,
+base URL, auth, timeout, resilience, and observability configuration.
+
+```java
+public interface UserReadOperations {
+
+    @GET("/users/{id}")
+    Mono<UserDto> getUser(@PathVar("id") String id);
+}
+
+@ReactiveHttpClient(name = "internal-user-service")
+public interface InternalUserClient extends UserReadOperations {
+}
+
+@ReactiveHttpClient(name = "partner-user-service")
+public interface PartnerUserClient extends UserReadOperations {
+}
+```
+
+```yaml
+reactive:
+  http:
+    clients:
+      internal-user-service:
+        base-url: https://internal-users.example.com
+      partner-user-service:
+        base-url: https://partner-users.example.com
+```
+
+The starter validates inherited abstract endpoint methods when the proxy is
+created. Java default methods can still be used as local helper methods without
+HTTP annotations.
+
 ---
 
 ## HTTP verb annotations

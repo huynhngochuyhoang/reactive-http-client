@@ -38,7 +38,7 @@ jobs:
 
 
   api-compatibility:
-    name: Public API Compatibility (baseline 2.6.0)
+    name: Public API Compatibility (baseline 2.7.0)
     runs-on: ubuntu-latest
 
     steps:
@@ -52,7 +52,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Compare published APIs to 2.6.0
+      - name: Compare published APIs to 2.7.0
         run: mvn -B -ntp -Papi-compatibility -DskipTests verify
 
       - name: Verify compatibility guard fixtures
