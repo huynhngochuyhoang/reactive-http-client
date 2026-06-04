@@ -132,19 +132,31 @@ appended after them.
 
 ### `@HeaderParam`
 
-Adds a static or dynamic request header. Accepts a plain value or a `Map<String, String>` for multiple headers at once.
+Adds static or dynamic request headers. `null` method arguments are omitted. A
+named header parameter accepts a scalar, collection, or array; collection and
+array values are sent as repeated header values in caller-provided order. `null`
+elements inside a collection or array are skipped. Every expanded value is
+validated against CRLF and control characters before the request is built.
 
 ```java
 // single header
 @GET("/reports")
 Mono<Report> getReport(@HeaderParam("X-Tenant") String tenant);
 
-// dynamic header map – each entry becomes its own request header
+// repeated header values
+@GET("/reports")
+Mono<Report> getReport(@HeaderParam("X-Tag") List<String> tags);
+
+// dynamic header map - each entry may be a scalar, collection, or array
 @POST("/events")
 Mono<Void> publish(
         @Body Event event,
-        @HeaderParam Map<String, String> extraHeaders);
+        @HeaderParam Map<String, Object> extraHeaders);
 ```
+
+Method `@HeaderParam` values override same-name client default headers
+case-insensitively. For example, a method argument named `X-Tenant` replaces a
+configured default named `x-tenant` rather than appending to it.
 
 ### `@IdempotencyKey`
 
@@ -234,7 +246,7 @@ reactive:
             timeout-ms: 3000
 ```
 
-Prefer `-` in API keys (for example `user-get-by-id`).  
+Prefer `-` in API keys (for example `user-get-by-id`).
 If an API key contains `.`, use bracket notation in `.properties` (for example
 `reactive.http.clients.user-service.apis[user.getById].method=GET`).
 

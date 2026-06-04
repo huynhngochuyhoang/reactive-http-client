@@ -108,6 +108,23 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         assertFalse(captured.get().headers().get(HttpHeaders.ACCEPT).contains("application/json"));
     }
 
+
+    @Test
+    void shouldLetMultiValueHeaderParamOverrideDefaultHeaderIgnoringCase() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        WebClient webClient = captureRequestWebClient(captured);
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setDefaultHeaders(Map.of("x-tag", "default"));
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient, config);
+        StepVerifier.create(invokeMultiHeader(handler, List.of("alpha", "beta")))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertEquals(List.of("alpha", "beta"), captured.get().headers().get("X-Tag"));
+        assertFalse(captured.get().headers().get("X-Tag").contains("default"));
+    }
+
     @Test
     void shouldApplyDefaultQueryParamsToRequestsWithoutMethodQuery() {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
@@ -510,6 +527,17 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         }
     }
 
+
+    @SuppressWarnings("unchecked")
+    private static Mono<String> invokeMultiHeader(ReactiveClientInvocationHandler handler, List<String> tags) {
+        try {
+            var method = ClientWithMultiHeaders.class.getMethod("get", List.class);
+            return (Mono<String>) handler.invoke(null, method, new Object[]{tags});
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static Mono<String> invokePost(ReactiveClientInvocationHandler handler, String contentType, String body) {
         try {
@@ -673,6 +701,12 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     interface ClientWithHeaders {
         @GET("/headers")
         Mono<String> get(@HeaderParam("Accept") String accept);
+    }
+
+
+    interface ClientWithMultiHeaders {
+        @GET("/headers")
+        Mono<String> get(@HeaderParam("X-Tag") List<String> tags);
     }
 
     interface ClientWithBodyHeaders {

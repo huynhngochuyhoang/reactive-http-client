@@ -167,6 +167,42 @@ Available assertion methods:
 
 ---
 
+### Response factories and repeated headers
+
+`json(status, body)` and `empty(status)` remain the shortest helpers for common
+responses. For raw payloads or response headers, use `text(...)`, `bytes(...)`,
+or `response(...)`:
+
+```java
+MockReactiveHttpClient<ReportClient> mock = MockReactiveHttpClient
+        .forClient(ReportClient.class)
+        .respondTo(HttpMethod.GET, "/reports", ex ->
+                MockReactiveHttpClient.text(200, "ok",
+                        Map.of("X-Trace", List.of("trace-1", "trace-2"))))
+        .build();
+```
+
+Repeated outbound request headers can be asserted in order:
+
+```java
+mock.proxy().getReports(List.of("finance", "q1")).block();
+
+RecordedExchangeAssertions.assertThat(mock.lastExchange())
+        .hasHeaderValues("X-Tag", "finance", "q1");
+```
+
+For bodiless endpoints that unexpectedly return content, serve a raw text body
+and assert the call still completes:
+
+```java
+mock.respondTo(HttpMethod.DELETE, "/sessions/s-1",
+        ex -> MockReactiveHttpClient.text(200, "unexpected-body"));
+
+StepVerifier.create(mock.proxy().closeSession("s-1"))
+        .verifyComplete();
+```
+
+---
 
 ## Retry and idempotency assertions
 

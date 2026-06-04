@@ -7,13 +7,11 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class HeaderParamMapSupportTest {
 
@@ -33,11 +31,45 @@ class HeaderParamMapSupportTest {
         RequestArgumentResolver.ResolvedArgs resolved = resolver.resolve(meta, new Object[]{dynamicHeaders, "tenant-a"});
 
         assertEquals(2, resolved.headers().size());
-        assertEquals("trace-123", resolved.headers().get("X-Trace-Id"));
-        assertEquals("tenant-a", resolved.headers().get("X-Tenant"));
+        assertEquals(List.of("trace-123"), resolved.headers().get("X-Trace-Id"));
+        assertEquals(List.of("tenant-a"), resolved.headers().get("X-Tenant"));
         assertFalse(resolved.headers().containsKey(""));
         assertFalse(resolved.headers().containsKey("X-Null"));
         assertTrue(resolved.headers().keySet().stream().noneMatch(Objects::isNull));
+    }
+
+    @Test
+    void shouldResolveMultiValueHeaderParamsAndMapEntriesInOrder() {
+        MethodMetadata meta = new MethodMetadata();
+        meta.getHeaderParams().put(0, "X-Tag");
+        meta.getHeaderParams().put(1, "X-Mode");
+        meta.getHeaderMapParams().add(2);
+
+        Map<String, Object> dynamicHeaders = new LinkedHashMap<>();
+        dynamicHeaders.put("X-Map", java.util.Arrays.asList("one", null, "two"));
+        dynamicHeaders.put("X-Array", new int[]{1, 2});
+        dynamicHeaders.put("X-Only-Nulls", java.util.Arrays.asList(null, null));
+
+        RequestArgumentResolver.ResolvedArgs resolved = new RequestArgumentResolver()
+                .resolve(meta, new Object[]{java.util.Arrays.asList("alpha", null, "beta"),
+                        new String[]{"fast", "safe"}, dynamicHeaders});
+
+        assertEquals(List.of("alpha", "beta"), resolved.headers().get("X-Tag"));
+        assertEquals(List.of("fast", "safe"), resolved.headers().get("X-Mode"));
+        assertEquals(List.of("one", "two"), resolved.headers().get("X-Map"));
+        assertEquals(List.of("1", "2"), resolved.headers().get("X-Array"));
+        assertFalse(resolved.headers().containsKey("X-Only-Nulls"));
+    }
+
+    @Test
+    void shouldRejectControlCharactersInExpandedHeaderValues() {
+        MethodMetadata meta = new MethodMetadata();
+        meta.getHeaderParams().put(0, "X-Tag");
+
+        RequestArgumentResolver resolver = new RequestArgumentResolver();
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> resolver.resolve(meta, new Object[]{List.of("safe", "bad\nvalue")}));
+        assertTrue(ex.getMessage().contains("Invalid header value"));
     }
 
     @Test

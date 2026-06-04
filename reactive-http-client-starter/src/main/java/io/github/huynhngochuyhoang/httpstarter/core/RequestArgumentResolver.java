@@ -21,7 +21,7 @@ public class RequestArgumentResolver {
     public ResolvedArgs resolve(RequestPlan plan, Object[] args) {
         Map<String, Object> pathVars = new LinkedHashMap<>();
         Map<String, List<Object>> queryParams = new LinkedHashMap<>();
-        Map<String, String> headers = new LinkedHashMap<>();
+        Map<String, List<String>> headers = new LinkedHashMap<>();
         Object body = null;
 
         for (RequestPlan.NamedArgumentBinding binding : plan.pathVars()) {
@@ -41,21 +41,13 @@ public class RequestArgumentResolver {
         for (RequestPlan.NamedArgumentBinding binding : plan.headerParams()) {
             int idx = binding.argumentIndex();
             if (args != null && idx < args.length && args[idx] != null) {
-                String headerName = binding.name();
-                String headerValue = String.valueOf(args[idx]);
-                validateHeaderName(headerName);
-                validateHeaderValue(headerName, headerValue);
-                headers.put(headerName, headerValue);
+                putHeaderValues(headers, binding.name(), args[idx]);
             }
         }
         for (RequestPlan.NamedArgumentBinding binding : plan.idempotencyKeyParams()) {
             int idx = binding.argumentIndex();
             if (args != null && idx < args.length && args[idx] != null) {
-                String headerName = binding.name();
-                String headerValue = String.valueOf(args[idx]);
-                validateHeaderName(headerName);
-                validateHeaderValue(headerName, headerValue);
-                headers.put(headerName, headerValue);
+                putHeaderValues(headers, binding.name(), args[idx]);
             }
         }
         for (Integer idx : plan.headerMapParams()) {
@@ -64,10 +56,7 @@ public class RequestArgumentResolver {
                     if (headerEntry.getKey() != null && headerEntry.getValue() != null) {
                         String key = String.valueOf(headerEntry.getKey());
                         if (!key.isBlank()) {
-                            String value = String.valueOf(headerEntry.getValue());
-                            validateHeaderName(key);
-                            validateHeaderValue(key, value);
-                            headers.put(key, value);
+                            putHeaderValues(headers, key, headerEntry.getValue());
                         }
                     }
                 }
@@ -84,9 +73,9 @@ public class RequestArgumentResolver {
     /**
      * Converts a query-parameter value into a list of individual elements.
      * <ul>
-     *   <li>{@link Collection} → each element becomes a separate value</li>
-     *   <li>array → each element becomes a separate value</li>
-     *   <li>scalar → wrapped in a single-element list</li>
+     *   <li>{@link Collection} -> each element becomes a separate value</li>
+     *   <li>array -> each element becomes a separate value</li>
+     *   <li>scalar -> wrapped in a single-element list</li>
      * </ul>
      */
     private List<Object> toValueList(Object value) {
@@ -102,6 +91,42 @@ public class RequestArgumentResolver {
             return list;
         }
         return List.of(value);
+    }
+
+    private void putHeaderValues(Map<String, List<String>> headers, String headerName, Object rawValue) {
+        validateHeaderName(headerName);
+        List<String> values = toHeaderValueList(headerName, rawValue);
+        if (!values.isEmpty()) {
+            headers.put(headerName, values);
+        }
+    }
+
+    private List<String> toHeaderValueList(String headerName, Object value) {
+        List<String> values = new ArrayList<>();
+        if (value instanceof Collection<?> collection) {
+            for (Object item : collection) {
+                addHeaderValue(values, headerName, item);
+            }
+            return values;
+        }
+        if (value != null && value.getClass().isArray()) {
+            int len = Array.getLength(value);
+            for (int i = 0; i < len; i++) {
+                addHeaderValue(values, headerName, Array.get(value, i));
+            }
+            return values;
+        }
+        addHeaderValue(values, headerName, value);
+        return values;
+    }
+
+    private void addHeaderValue(List<String> values, String headerName, Object value) {
+        if (value == null) {
+            return;
+        }
+        String headerValue = String.valueOf(value);
+        validateHeaderValue(headerName, headerValue);
+        values.add(headerValue);
     }
 
     static void validateHeaderName(String headerName) {
@@ -143,7 +168,7 @@ public class RequestArgumentResolver {
     public record ResolvedArgs(
             Map<String, Object> pathVars,
             Map<String, List<Object>> queryParams,
-            Map<String, String> headers,
+            Map<String, List<String>> headers,
             Object body,
             Map<String, String> headersIgnoreCase
     ) {
@@ -153,17 +178,49 @@ public class RequestArgumentResolver {
         public ResolvedArgs(
                 Map<String, Object> pathVars,
                 Map<String, List<Object>> queryParams,
-                Map<String, String> headers,
+                Map<String, List<String>> headers,
                 Object body) {
-            this(pathVars, queryParams, headers, body, buildIgnoreCaseView(headers));
+            this(pathVars, queryParams, copyHeaders(headers), body, buildIgnoreCaseView(headers));
         }
 
-        private static Map<String, String> buildIgnoreCaseView(Map<String, String> headers) {
+        Map<String, String> flattenedHeaders() {
+            if (headers == null || headers.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, String> flattened = new LinkedHashMap<>();
+            headers.forEach((name, values) -> flattened.put(name, String.join(",", values)));
+            return Map.copyOf(flattened);
+        }
+
+        boolean hasHeaderValueIgnoreCase(String headerName) {
+            if (headers == null || headers.isEmpty()) {
+                return false;
+            }
+            for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+                if (entry.getKey().equalsIgnoreCase(headerName)
+                        && entry.getValue().stream().anyMatch(value -> value != null && !value.isBlank())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static Map<String, List<String>> copyHeaders(Map<String, List<String>> headers) {
+            if (headers == null || headers.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, List<String>> copied = new LinkedHashMap<>();
+            headers.forEach((name, values) -> copied.put(name, values != null ? List.copyOf(values) : List.of()));
+            return Map.copyOf(copied);
+        }
+
+        private static Map<String, String> buildIgnoreCaseView(Map<String, List<String>> headers) {
             if (headers == null || headers.isEmpty()) {
                 return java.util.Collections.emptyMap();
             }
             TreeMap<String, String> map = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-            map.putAll(headers);
+            headers.forEach((name, values) -> map.put(name,
+                    values == null || values.isEmpty() ? null : values.get(0)));
             return map;
         }
     }

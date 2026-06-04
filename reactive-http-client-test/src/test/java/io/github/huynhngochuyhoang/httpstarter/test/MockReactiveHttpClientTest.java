@@ -11,11 +11,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.test.StepVerifier;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -58,6 +60,20 @@ class MockReactiveHttpClientTest {
 
         @OPTIONS("/objects")
         Mono<String> optionsObjects();
+
+        @GET("/headers")
+        Mono<String> repeatedHeaders(@HeaderParam("X-Tag") List<String> tags,
+                                     @HeaderParam("X-Mode") String[] modes,
+                                     @HeaderParam Map<String, Object> extraHeaders);
+
+        @DELETE("/sessions/{id}")
+        Mono<Void> closeSession(@PathVar("id") String id);
+
+        @GET("/headers/response")
+        Mono<ResponseEntity<String>> responseWithHeaders();
+
+        @GET("/bytes")
+        Mono<byte[]> bytes();
     }
 
     @ReactiveHttpClient(name = "named-client")
@@ -176,6 +192,68 @@ class MockReactiveHttpClientTest {
                 .hasRedactedHeader("Authorization")
                 .doesNotHaveHeader("X-Missing")
                 .hasStatusCode(202);
+    }
+
+    @Test
+    void repeatedOutboundHeadersAndCustomResponseHeadersAreEasyToAssert() {
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .respondTo(HttpMethod.GET, "/headers",
+                        ex -> MockReactiveHttpClient.text(200, "ok"))
+                .respondTo(HttpMethod.GET, "/headers/response",
+                        ex -> MockReactiveHttpClient.text(200, "accepted",
+                                Map.of("X-Trace", List.of("trace-1", "trace-2"))))
+                .build();
+
+        Map<String, Object> extraHeaders = new java.util.LinkedHashMap<>();
+        extraHeaders.put("X-Map", List.of("one", "two"));
+        extraHeaders.put("X-Array", new int[]{1, 2});
+
+        StepVerifier.create(mock.proxy().repeatedHeaders(
+                        List.of("alpha", "beta"), new String[]{"fast", "safe"}, extraHeaders))
+                .expectNext("ok")
+                .verifyComplete();
+
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasHeaderValues("X-Tag", "alpha", "beta")
+                .hasHeaderValues("X-Mode", "fast", "safe")
+                .hasHeaderValues("X-Map", "one", "two")
+                .hasHeaderValues("X-Array", "1", "2");
+
+        StepVerifier.create(mock.proxy().responseWithHeaders())
+                .assertNext(entity -> {
+                    assertThat(entity.getBody()).isEqualTo("accepted");
+                    assertThat(entity.getHeaders().get("X-Trace")).containsExactly("trace-1", "trace-2");
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void rawTextUnexpectedBodyCanBeServedToVoidEndpoint() {
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .respondTo(HttpMethod.DELETE, "/sessions/s-1",
+                        ex -> MockReactiveHttpClient.text(200, "unexpected-body"))
+                .build();
+
+        StepVerifier.create(mock.proxy().closeSession("s-1"))
+                .verifyComplete();
+
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasMethod(HttpMethod.DELETE)
+                .hasPath("/sessions/s-1")
+                .hasStatusCode(200);
+    }
+
+    @Test
+    void rawByteResponseHelperServesByteBodies() {
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .respondTo(HttpMethod.GET, "/bytes",
+                        ex -> MockReactiveHttpClient.bytes(200, "abc".getBytes(StandardCharsets.UTF_8),
+                                Map.of("X-Checksum", List.of("sha-abc"))))
+                .build();
+
+        StepVerifier.create(mock.proxy().bytes())
+                .assertNext(bytes -> assertThat(bytes).containsExactly("abc".getBytes(StandardCharsets.UTF_8)))
+                .verifyComplete();
     }
 
     @Test
