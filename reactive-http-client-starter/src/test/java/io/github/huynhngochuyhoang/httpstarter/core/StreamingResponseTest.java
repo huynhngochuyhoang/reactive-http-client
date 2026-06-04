@@ -10,15 +10,21 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.buffer.*;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.netty.DisposableServer;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.http.server.HttpServer;
 import reactor.test.StepVerifier;
 
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -79,6 +85,43 @@ class StreamingResponseTest {
                 }))
                 .expectNext((long) CHUNK_COUNT * CHUNK_SIZE)
                 .verifyComplete();
+    }
+
+    @Test
+    void monoResponseEntityFluxDataBufferKeepsRealBodyConsumableAfterOuterMonoCompletes() {
+        DisposableServer server = HttpServer.create()
+                .port(0)
+                .route(routes -> routes.get("/large-file", (request, response) -> response
+                        .status(HttpStatus.OK.value())
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                        .sendString(Flux.just("alpha", "beta"))
+                        .then()))
+                .bindNow();
+        try {
+            WebClient webClient = WebClient.builder()
+                    .baseUrl("http://127.0.0.1:" + server.port())
+                    .clientConnector(new ReactorClientHttpConnector(
+                            HttpClient.create().responseTimeout(Duration.ofSeconds(5))))
+                    .build();
+            ReactiveClientInvocationHandler handler = createHandler(webClient);
+            AtomicReference<ResponseEntity<Flux<DataBuffer>>> entityRef = new AtomicReference<>();
+
+            StepVerifier.create(invokeStreamEntity(handler).doOnNext(entityRef::set))
+                    .assertNext(entity -> {
+                        assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
+                        assertThat(entity.getBody()).isNotNull();
+                    })
+                    .verifyComplete();
+
+            StepVerifier.create(entityRef.get().getBody()
+                            .map(StreamingResponseTest::readStringAndRelease)
+                            .reduce("", String::concat))
+                    .expectNext("alphabeta")
+                    .expectComplete()
+                    .verify(Duration.ofSeconds(5));
+        } finally {
+            server.disposeNow();
+        }
     }
 
     @Test
@@ -197,6 +240,16 @@ class StreamingResponseTest {
         return java.util.Arrays.stream(values)
                 .map(value -> (PooledDataBuffer) bufferFactory.wrap(value.getBytes(StandardCharsets.UTF_8)))
                 .toList();
+    }
+
+    private static String readStringAndRelease(DataBuffer buffer) {
+        try {
+            byte[] bytes = new byte[buffer.readableByteCount()];
+            buffer.read(bytes);
+            return new String(bytes, StandardCharsets.UTF_8);
+        } finally {
+            DataBufferUtils.release(buffer);
+        }
     }
 
     private static int readableBytesAndRelease(DataBuffer buffer) {
