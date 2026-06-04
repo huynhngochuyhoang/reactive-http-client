@@ -6,6 +6,7 @@ import io.github.huynhngochuyhoang.httpstarter.core.*;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
@@ -116,9 +117,58 @@ public final class MockReactiveHttpClient<T> {
                 .build();
     }
 
+    /** Convenience factory producing a text/plain response. */
+    public static ClientResponse text(int status, String body) {
+        return text(status, body, java.util.Map.of());
+    }
+
+    /** Convenience factory producing a text/plain response with custom headers. */
+    public static ClientResponse text(int status, String body, java.util.Map<String, List<String>> headers) {
+        ClientResponse.Builder builder = responseBuilder(status, headers)
+                .header("Content-Type", MediaType.TEXT_PLAIN_VALUE);
+        return builder.body(body != null ? body : "").build();
+    }
+
+    /** Convenience factory producing an application/octet-stream response. */
+    public static ClientResponse bytes(int status, byte[] body) {
+        return bytes(status, body, java.util.Map.of());
+    }
+
+    /** Convenience factory producing an application/octet-stream response with custom headers. */
+    public static ClientResponse bytes(int status, byte[] body, java.util.Map<String, List<String>> headers) {
+        byte[] bytes = body != null ? body : new byte[0];
+        return responseBuilder(status, headers)
+                .header("Content-Type", MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                .body(Flux.just(new DefaultDataBufferFactory().wrap(bytes)))
+                .build();
+    }
+
+    /** Convenience factory producing a response with custom headers and a raw text body. */
+    public static ClientResponse response(int status, java.util.Map<String, List<String>> headers, String body) {
+        return responseBuilder(status, headers)
+                .body(body != null ? body : "")
+                .build();
+    }
+
+    /** Convenience factory producing a response with custom headers and a raw byte body. */
+    public static ClientResponse response(int status, java.util.Map<String, List<String>> headers, byte[] body) {
+        byte[] bytes = body != null ? body : new byte[0];
+        return responseBuilder(status, headers)
+                .body(Flux.just(new DefaultDataBufferFactory().wrap(bytes)))
+                .build();
+    }
+
     /** Convenience factory producing an empty response (used for Void-returning methods). */
     public static ClientResponse empty(int status) {
         return ClientResponse.create(HttpStatus.valueOf(status)).build();
+    }
+
+    private static ClientResponse.Builder responseBuilder(int status, java.util.Map<String, List<String>> headers) {
+        ClientResponse.Builder builder = ClientResponse.create(HttpStatus.valueOf(status));
+        if (headers != null) {
+            headers.forEach((name, values) -> builder.header(name, values.toArray(String[]::new)));
+        }
+        return builder;
     }
 
     public static <T> Builder<T> forClient(Class<T> clientInterface) {

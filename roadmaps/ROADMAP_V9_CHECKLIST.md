@@ -149,28 +149,28 @@
 
 ## Priority 8 — Multi-Value Headers and Test Helpers
 
-### [ ] 1.2 Multi-value outbound header parameters
-- [ ] Let named `@HeaderParam` arguments accept scalar values.
-- [ ] Let named `@HeaderParam` arguments accept collections.
-- [ ] Let named `@HeaderParam` arguments accept arrays.
-- [ ] Let map-based `@HeaderParam` entries accept scalar, collection, and array
+### [x] 1.2 Multi-value outbound header parameters
+- [x] Let named `@HeaderParam` arguments accept scalar values.
+- [x] Let named `@HeaderParam` arguments accept collections.
+- [x] Let named `@HeaderParam` arguments accept arrays.
+- [x] Let map-based `@HeaderParam` entries accept scalar, collection, and array
   values.
-- [ ] Preserve caller-provided header-value order.
-- [ ] Keep null method arguments omitted.
-- [ ] Define and test the null collection-element rule.
-- [ ] Validate every expanded value against the existing CRLF and
+- [x] Preserve caller-provided header-value order.
+- [x] Keep null method arguments omitted.
+- [x] Define and test the null collection-element rule.
+- [x] Validate every expanded value against the existing CRLF and
   control-character guard.
-- [ ] Keep scalar header behavior unchanged.
-- [ ] Replace same-name configured defaults case-insensitively.
-- [ ] Document multi-value header behavior and precedence.
+- [x] Keep scalar header behavior unchanged.
+- [x] Replace same-name configured defaults case-insensitively.
+- [x] Document multi-value header behavior and precedence.
 
-### [ ] 1.3 Header-aware test-helper assertions and response builders
-- [ ] Add minimal mock response helpers for custom headers.
-- [ ] Add minimal mock response helpers for raw text or byte bodies.
-- [ ] Keep existing `json(...)` and `empty(...)` helpers source compatible.
-- [ ] Avoid introducing a broad response-stubbing DSL.
-- [ ] Add a mock example for repeated outbound request headers.
-- [ ] Add a mock example for an unexpected body on a `Mono<Void>` endpoint.
+### [x] 1.3 Header-aware test-helper assertions and response builders
+- [x] Add minimal mock response helpers for custom headers.
+- [x] Add minimal mock response helpers for raw text or byte bodies.
+- [x] Keep existing `json(...)` and `empty(...)` helpers source compatible.
+- [x] Avoid introducing a broad response-stubbing DSL.
+- [x] Add a mock example for repeated outbound request headers.
+- [x] Add a mock example for an unexpected body on a `Mono<Void>` endpoint.
 
 ---
 

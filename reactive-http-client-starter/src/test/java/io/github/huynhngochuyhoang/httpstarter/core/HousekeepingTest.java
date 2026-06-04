@@ -46,10 +46,10 @@ class HousekeepingTest {
     @Test
     void resolvedArgsBuildsCaseInsensitiveHeaderView() {
         // Headers with mixed-case names
-        Map<String, String> headers = Map.of(
-                "Content-Type", "application/json",
-                "ACCEPT", "application/xml",
-                "x-custom-header", "value");
+        Map<String, List<String>> headers = Map.of(
+                "Content-Type", List.of("application/json"),
+                "ACCEPT", List.of("application/xml"),
+                "x-custom-header", List.of("value"));
 
         RequestArgumentResolver.ResolvedArgs args =
                 new RequestArgumentResolver.ResolvedArgs(Map.of(), Map.of(), headers, null);

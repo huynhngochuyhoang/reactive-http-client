@@ -263,7 +263,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, serializedRequestBody.rawBody());
                     }
 
-                    preparedResolved.headers().forEach(preparedRequestSpec::header);
+                    for (Map.Entry<String, List<String>> header : preparedResolved.headers().entrySet()) {
+                        preparedRequestSpec.header(header.getKey(), header.getValue().toArray(String[]::new));
+                    }
 
                     WebClient.RequestHeadersSpec<?> requestHeadersSpec;
                     if (multipartBody != null) {
@@ -661,7 +663,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 && StringUtils.hasText(plan.generatedIdempotencyKeyHeader())) {
             return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
         }
-        if (hasIdempotencyKeyHeaderValue(plan, resolved.headersIgnoreCase())) {
+        if (hasIdempotencyKeyHeaderValue(plan, resolved)) {
             return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
         }
         return RetrySafetyClassification.UNSAFE_RETRY;
@@ -1211,7 +1213,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 Map.copyOf(resolved.pathVars()),
                 copyQueryParams(resolved.queryParams()),
                 inboundHeaders,
-                finalRequestObservation != null ? finalRequestObservation.headers() : Map.copyOf(resolved.headers()),
+                finalRequestObservation != null ? finalRequestObservation.headers() : resolved.flattenedHeaders(),
                 resolved.body(),
                 statusCode != null ? statusCode.value() : null,
                 responseHeaders == null ? Map.of() : responseHeaders,
@@ -1450,13 +1452,18 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (clientConfig.getDefaultHeaders() == null || clientConfig.getDefaultHeaders().isEmpty()) {
             return resolved;
         }
-        Map<String, String> merged = new LinkedHashMap<>(clientConfig.getDefaultHeaders());
-        resolved.headers().forEach((name, value) -> {
+        Map<String, List<String>> merged = new LinkedHashMap<>();
+        clientConfig.getDefaultHeaders().forEach((name, value) -> {
+            if (value != null) {
+                merged.put(name, List.of(value));
+            }
+        });
+        resolved.headers().forEach((name, values) -> {
             String existingName = findHeaderNameIgnoreCase(merged, name);
             if (existingName != null) {
                 merged.remove(existingName);
             }
-            merged.put(name, value);
+            merged.put(name, values);
         });
         return new RequestArgumentResolver.ResolvedArgs(
                 resolved.pathVars(),
@@ -1470,7 +1477,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                                                      ContextView context,
                                                                      AtomicReference<String> generatedIdempotencyKey) {
         RequestArgumentResolver.ResolvedArgs contextResolved = applyContextIdempotencyKey(plan, resolved, context);
-        if (contextResolved != resolved || hasIdempotencyKeyHeaderValue(plan, contextResolved.headersIgnoreCase())) {
+        if (contextResolved != resolved || hasIdempotencyKeyHeaderValue(plan, contextResolved)) {
             return contextResolved;
         }
         if (StringUtils.hasText(plan.generatedIdempotencyKeyHeader())) {
@@ -1501,7 +1508,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private RequestArgumentResolver.ResolvedArgs applyContextIdempotencyKey(RequestPlan plan,
                                                                             RequestArgumentResolver.ResolvedArgs resolved,
                                                                             reactor.util.context.ContextView context) {
-        if (hasIdempotencyKeyHeaderValue(plan, resolved.headersIgnoreCase())) {
+        if (hasIdempotencyKeyHeaderValue(plan, resolved)) {
             return resolved;
         }
         String contextKey = RequestContext.idempotencyKey(context).orElse(null);
@@ -1511,22 +1518,17 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return resolved;
     }
 
-    private static boolean hasIdempotencyKeyHeaderValue(RequestPlan plan, Map<String, String> headersIgnoreCase) {
-        if (hasHeaderValue(headersIgnoreCase, IDEMPOTENCY_KEY_HEADER)) {
+    private static boolean hasIdempotencyKeyHeaderValue(RequestPlan plan, RequestArgumentResolver.ResolvedArgs resolved) {
+        if (resolved.hasHeaderValueIgnoreCase(IDEMPOTENCY_KEY_HEADER)) {
             return true;
         }
         if (StringUtils.hasText(plan.generatedIdempotencyKeyHeader())
-                && hasHeaderValue(headersIgnoreCase, plan.generatedIdempotencyKeyHeader())) {
+                && resolved.hasHeaderValueIgnoreCase(plan.generatedIdempotencyKeyHeader())) {
             return true;
         }
         return plan.idempotencyKeyParams().stream()
                 .map(RequestPlan.NamedArgumentBinding::name)
-                .anyMatch(headerName -> hasHeaderValue(headersIgnoreCase, headerName));
-    }
-
-    private static boolean hasHeaderValue(Map<String, String> headersIgnoreCase, String headerName) {
-        String value = headersIgnoreCase.get(headerName);
-        return StringUtils.hasText(value);
+                .anyMatch(resolved::hasHeaderValueIgnoreCase);
     }
 
     private static String idempotencyHeaderName(RequestPlan plan) {
@@ -1545,12 +1547,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                                             String headerValue) {
         RequestArgumentResolver.validateHeaderName(headerName);
         RequestArgumentResolver.validateHeaderValue(headerName, headerValue);
-        Map<String, String> merged = new LinkedHashMap<>(resolved.headers());
+        Map<String, List<String>> merged = new LinkedHashMap<>(resolved.headers());
         String existingName = findHeaderNameIgnoreCase(merged, headerName);
         if (existingName != null) {
             merged.remove(existingName);
         }
-        merged.put(headerName, headerValue);
+        merged.put(headerName, List.of(headerValue));
         return new RequestArgumentResolver.ResolvedArgs(
                 resolved.pathVars(),
                 resolved.queryParams(),
@@ -1576,7 +1578,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 resolved.body());
     }
 
-    private String findHeaderNameIgnoreCase(Map<String, String> headers, String headerName) {
+    private String findHeaderNameIgnoreCase(Map<String, ?> headers, String headerName) {
         for (String existingName : headers.keySet()) {
             if (existingName.equalsIgnoreCase(headerName)) {
                 return existingName;

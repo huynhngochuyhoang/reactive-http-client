@@ -44,7 +44,7 @@ public record ReactiveHttpClientLifecycleContext(
                 pathTemplate,
                 resolved.pathVars(),
                 resolved.queryParams(),
-                resolved.headers(),
+                resolved.flattenedHeaders(),
                 resolved.body(),
                 requestUrl,
                 statusCode,
