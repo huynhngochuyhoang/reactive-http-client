@@ -76,6 +76,15 @@ class MockReactiveHttpClientTest {
         Mono<byte[]> bytes();
     }
 
+    interface SharedCatalogOperations {
+        @GET("/catalog/{id}")
+        Mono<String> getCatalog(@PathVar("id") String id);
+    }
+
+    @ReactiveHttpClient(name = "inherited-named-client")
+    interface InheritedNamedClient extends SharedCatalogOperations {
+    }
+
     @ReactiveHttpClient(name = "named-client")
     interface NamedClient {
         @GET("/items/{id}")
@@ -399,6 +408,58 @@ class MockReactiveHttpClientTest {
         assertThat(successes).singleElement().satisfies(context -> {
             assertThat(context.clientName()).isEqualTo("named-client");
             assertThat(context.requestUrl()).isEqualTo(URI.create("http://named.mock.local:8081/items/42"));
+        });
+    }
+
+    @Test
+    void inheritedAnnotatedClientRecordsMetadataAndReportsConcreteClientName() {
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        List<String> supportedClientNames = new CopyOnWriteArrayList<>();
+        List<ReactiveHttpClientLifecycleContext> successes = new CopyOnWriteArrayList<>();
+        ReactiveHttpClientLifecycleHook hook = new ReactiveHttpClientLifecycleHook() {
+            @Override
+            public boolean supports(String clientName) {
+                supportedClientNames.add(clientName);
+                return "inherited-named-client".equals(clientName);
+            }
+
+            @Override
+            public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+                successes.add(context);
+            }
+        };
+
+        MockReactiveHttpClient<InheritedNamedClient> mock = MockReactiveHttpClient
+                .forClient(InheritedNamedClient.class)
+                .baseUrl("http://inherited.mock.local:8082")
+                .withObserver(observed::add)
+                .withLifecycleHook(hook)
+                .respondTo(HttpMethod.GET, "/catalog/42",
+                        ex -> MockReactiveHttpClient.text(200, "catalog"))
+                .build();
+
+        StepVerifier.create(mock.proxy().getCatalog("42"))
+                .expectNext("catalog")
+                .verifyComplete();
+
+        assertThat(supportedClientNames).containsExactly("inherited-named-client");
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasMethod(HttpMethod.GET)
+                .hasPath("/catalog/42")
+                .hasStatusCode(200);
+        assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getClientName()).isEqualTo("inherited-named-client");
+            assertThat(event.getHttpMethod()).isEqualTo("GET");
+            assertThat(event.getUriPath()).isEqualTo("/catalog/{id}");
+            assertThat(event.getRequestUrl()).isEqualTo("http://inherited.mock.local:8082/catalog/42");
+            assertThat(event.getServerAddress()).isEqualTo("inherited.mock.local");
+            assertThat(event.getServerPort()).isEqualTo(8082);
+        });
+        assertThat(successes).singleElement().satisfies(context -> {
+            assertThat(context.clientName()).isEqualTo("inherited-named-client");
+            assertThat(context.httpMethod()).isEqualTo("GET");
+            assertThat(context.pathTemplate()).isEqualTo("/catalog/{id}");
+            assertThat(context.requestUrl()).isEqualTo(URI.create("http://inherited.mock.local:8082/catalog/42"));
         });
     }
 
