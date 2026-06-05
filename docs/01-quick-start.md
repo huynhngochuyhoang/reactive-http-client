@@ -65,6 +65,45 @@ public interface UserApiClient {
 
 The `name` must match a key in `reactive.http.clients` so the starter knows which `base-url` to use.
 
+## Optional: reuse one endpoint contract for multiple clients
+
+If two downstreams expose the same endpoint shape, put the endpoint methods on a
+plain parent interface and put `@ReactiveHttpClient` on each concrete scanned
+client. Each child keeps its own `reactive.http.clients.<name>` configuration,
+including `request-timeout-ms`.
+
+```java
+public interface UserReadOperations {
+
+    @GET("/users/{id}")
+    Mono<UserDto> getUser(@PathVar("id") String id);
+}
+
+@ReactiveHttpClient(name = "internal-user-service")
+public interface InternalUserClient extends UserReadOperations {
+}
+
+@ReactiveHttpClient(name = "partner-user-service")
+public interface PartnerUserClient extends UserReadOperations {
+}
+```
+
+```yaml
+reactive:
+  http:
+    clients:
+      internal-user-service:
+        base-url: https://internal-users.example.com
+        request-timeout-ms: 2000
+      partner-user-service:
+        base-url: https://partner-users.example.com
+        request-timeout-ms: 8000
+```
+
+The starter validates inherited abstract endpoint methods when each child proxy
+is created. Java default methods can stay on the parent as local helpers; they
+do not need HTTP metadata.
+
 ## Optional: dynamic API map with `@ApiRef`
 
 If you want to keep request method/path/timeout in configuration instead of annotations, use `@ApiRef`:
