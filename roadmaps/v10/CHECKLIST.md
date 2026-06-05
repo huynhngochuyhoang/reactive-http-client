@@ -92,18 +92,18 @@
 
 ## Priority 6 — Inherited Endpoint Startup Validation Messages
 
-### [ ] 2.1 Inherited endpoint startup validation messages
-- [ ] Audit validation errors for inherited methods.
-- [ ] Include the parent method-declaring interface where inherited-method
+### [x] 2.1 Inherited endpoint startup validation messages
+- [x] Audit validation errors for inherited methods.
+- [x] Include the parent method-declaring interface where inherited-method
   validation fails.
-- [ ] Include the concrete child client name or type where proxy construction is
+- [x] Include the concrete child client name or type where proxy construction is
   the failing context.
-- [ ] Cover blank `@PathVar` failures on inherited methods.
-- [ ] Cover unused path-variable failures on inherited methods.
-- [ ] Cover missing path-variable failures on inherited methods.
-- [ ] Cover invalid `@ApiRef` metadata on inherited methods.
-- [ ] Preserve current exception types.
-- [ ] Keep directly declared method errors concise.
+- [x] Cover blank `@PathVar` failures on inherited methods.
+- [x] Cover unused path-variable failures on inherited methods.
+- [x] Cover missing path-variable failures on inherited methods.
+- [x] Cover invalid `@ApiRef` metadata on inherited methods.
+- [x] Preserve current exception types.
+- [x] Keep directly declared method errors concise.
 
 ---
 
