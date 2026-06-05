@@ -7,49 +7,49 @@
 
 ## Priority 1 — Documentation Link Hygiene
 
-### [ ] 3.3 Documentation link hygiene after roadmap restructuring
-- [ ] Scan `roadmaps/`, README, docs, and changelog for stale flat roadmap
+### [x] 3.3 Documentation link hygiene after roadmap restructuring
+- [x] Scan `roadmaps/`, README, docs, and changelog for stale flat roadmap
   links.
-- [ ] Keep every checklist linked to its sibling `ROADMAP.md`.
-- [ ] Keep cross-version references relative and explicit.
-- [ ] Verify `roadmaps/README.md` links to every roadmap subdirectory.
-- [ ] Verify no stale flat roadmap-file references remain.
-- [ ] Run `git diff --check`.
+- [x] Keep every checklist linked to its sibling `ROADMAP.md`.
+- [x] Keep cross-version references relative and explicit.
+- [x] Verify `roadmaps/README.md` links to every roadmap subdirectory.
+- [x] Verify no stale flat roadmap-file references remain.
+- [x] Run `git diff --check`.
 
 ---
 
 ## Priority 2 — Shared Contract Documentation and Examples
 
-### [ ] 1.1 Shared contract documentation and examples
-- [ ] Promote the inherited-endpoint pattern in quick-start docs.
-- [ ] Keep the inherited-endpoint pattern documented in the annotation
+### [x] 1.1 Shared contract documentation and examples
+- [x] Promote the inherited-endpoint pattern in quick-start docs.
+- [x] Keep the inherited-endpoint pattern documented in the annotation
   reference.
-- [ ] Show one parent operations interface and two concrete
+- [x] Show one parent operations interface and two concrete
   `@ReactiveHttpClient` children.
-- [ ] Add an example where each child uses a different
+- [x] Add an example where each child uses a different
   `reactive.http.clients.<name>.request-timeout-ms`.
-- [ ] Clarify that `@ReactiveHttpClient` belongs on each concrete scanned
+- [x] Clarify that `@ReactiveHttpClient` belongs on each concrete scanned
   client, not on the shared parent interface.
-- [ ] Clarify that Java default methods remain local helpers and do not need
+- [x] Clarify that Java default methods remain local helpers and do not need
   HTTP metadata.
-- [ ] Run inherited-method validation and AOT smoke tests.
+- [x] Run inherited-method validation and AOT smoke tests.
 
 ---
 
 ## Priority 3 — Effective Timeout Reporting for Inherited Endpoints
 
-### [ ] 3.1 Effective timeout reporting for inherited endpoints
-- [ ] Audit timeout diagnostics for inherited endpoint methods.
-- [ ] Audit lifecycle contexts for inherited endpoint methods.
-- [ ] Audit observer events for inherited endpoint methods.
-- [ ] Add focused tests proving two concrete clients inherit the same method
+### [x] 3.1 Effective timeout reporting for inherited endpoints
+- [x] Audit timeout diagnostics for inherited endpoint methods.
+- [x] Audit lifecycle contexts for inherited endpoint methods.
+- [x] Audit observer events for inherited endpoint methods.
+- [x] Add focused tests proving two concrete clients inherit the same method
   but use different client-level request timeouts.
-- [ ] Verify observer and lifecycle metadata report the concrete client name for
+- [x] Verify observer and lifecycle metadata report the concrete client name for
   both clients.
-- [ ] Keep timeout precedence unchanged:
+- [x] Keep timeout precedence unchanged:
   `@TimeoutMs` > `@ApiRef timeout-ms` > client `request-timeout-ms` >
   deprecated resilience timeout alias.
-- [ ] Ensure docs and diagnostics describe the timeout as concrete-client
+- [x] Ensure docs and diagnostics describe the timeout as concrete-client
   policy.
 
 ---

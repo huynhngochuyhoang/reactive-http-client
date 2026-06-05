@@ -23,6 +23,11 @@ The starter has **two independent timeout layers** that act on every outbound ca
 4. Deprecated `resilience.timeout-ms` is accepted as a compatibility alias only when `request-timeout-ms` is not configured.
 5. Safety-net timeouts (`network-read-timeout-ms` / `network-write-timeout-ms`) are independent of the per-request timeout and act as absolute upper bounds on socket inactivity.
 
+For inherited endpoint methods, the method metadata comes from the parent interface,
+but the client-level `request-timeout-ms` comes from the concrete
+`@ReactiveHttpClient` child being invoked. Two child clients can therefore share
+the same parent method and still use different client-level timeout policies.
+
 **Rule of thumb:** set the safety-net timeouts well above the largest `@TimeoutMs`, `@ApiRef timeout-ms`, or `request-timeout-ms` you use. This ensures the per-request timeout always fires first, so retries behave predictably. If the safety net fires instead, no retry is attempted — the socket is dropped.
 
 Timeouts before response headers usually have no HTTP status metadata. Timeouts

@@ -56,8 +56,10 @@ reactive:
     clients:
       internal-user-service:
         base-url: https://internal-users.example.com
+        request-timeout-ms: 2000
       partner-user-service:
         base-url: https://partner-users.example.com
+        request-timeout-ms: 8000
 ```
 
 The starter validates inherited abstract endpoint methods when the proxy is
