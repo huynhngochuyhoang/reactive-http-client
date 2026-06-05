@@ -56,18 +56,18 @@
 
 ## Priority 4 — Inherited `@ApiRef` Parity
 
-### [ ] 3.2 Inherited `@ApiRef` parity
-- [ ] Add tests for inherited `@ApiRef` methods with two concrete clients that
+### [x] 3.2 Inherited `@ApiRef` parity
+- [x] Add tests for inherited `@ApiRef` methods with two concrete clients that
   define the same API key differently.
-- [ ] Verify each concrete client resolves its own configured method, path, and
+- [x] Verify each concrete client resolves its own configured method, path, and
   timeout for the inherited `@ApiRef`.
-- [ ] Verify path-variable validation uses the concrete client's configured API
+- [x] Verify path-variable validation uses the concrete client's configured API
   map.
-- [ ] Verify missing API config fails for the concrete client that owns the bad
+- [x] Verify missing API config fails for the concrete client that owns the bad
   configuration.
-- [ ] Verify malformed API config fails for the concrete client that owns the
+- [x] Verify malformed API config fails for the concrete client that owns the
   bad configuration.
-- [ ] Verify observability API-name precedence remains
+- [x] Verify observability API-name precedence remains
   `@ApiName` > `@ApiRef` > method name.
 
 ---

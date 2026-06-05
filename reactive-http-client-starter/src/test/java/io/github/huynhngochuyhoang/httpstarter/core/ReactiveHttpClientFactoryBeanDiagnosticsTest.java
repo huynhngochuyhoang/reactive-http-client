@@ -165,7 +165,6 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         }
     }
 
-
     @Test
     void debugStartupDiagnosticsDisableUnavailableOperators(CapturedOutput output) throws Exception {
         Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
@@ -389,7 +388,6 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         }
     }
 
-
     @Test
     void failsFastWhenAbstractMethodHasNoEndpointMetadata() {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
@@ -447,7 +445,6 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                 .hasMessageContaining("@IdempotencyKey value must not be blank")
                 .hasMessageContaining("call");
     }
-
 
     @Test
     void failsFastWhenPropertyBaseUrlIsMalformed() {
@@ -570,7 +567,6 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         }
     }
 
-
     @Test
     void allowsStaticQueryTemplateVariablesBoundByPathVar() throws Exception {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
@@ -602,6 +598,84 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         } finally {
             factoryBean.destroy();
         }
+    }
+
+    @Test
+    void allowsInheritedApiRefMethodsToUseEachConcreteClientApiMap() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig internal = clientConfig("http://localhost:8080");
+        ReactiveHttpClientProperties.ApiConfig internalApi = new ReactiveHttpClientProperties.ApiConfig();
+        internalApi.setMethod("GET");
+        internalApi.setPath("/internal-users/{id}");
+        internalApi.setTimeoutMs(1000);
+        internal.setApis(Map.of("user.lookup", internalApi));
+        properties.getClients().put("internal-inherited-api-ref-client", internal);
+
+        ReactiveHttpClientProperties.ClientConfig partner = clientConfig("http://localhost:8081");
+        ReactiveHttpClientProperties.ApiConfig partnerApi = new ReactiveHttpClientProperties.ApiConfig();
+        partnerApi.setMethod("DELETE");
+        partnerApi.setPath("/partner-users/{id}");
+        partnerApi.setTimeoutMs(2000);
+        partner.setApis(Map.of("user.lookup", partnerApi));
+        properties.getClients().put("partner-inherited-api-ref-client", partner);
+
+        ReactiveHttpClientFactoryBean<InternalInheritedApiRefClient> internalFactory =
+                buildFactoryBean(properties, InternalInheritedApiRefClient.class);
+        ReactiveHttpClientFactoryBean<PartnerInheritedApiRefClient> partnerFactory =
+                buildFactoryBean(properties, PartnerInheritedApiRefClient.class);
+        try {
+            assertThat(internalFactory.getObject()).isNotNull();
+            assertThat(partnerFactory.getObject()).isNotNull();
+        } finally {
+            internalFactory.destroy();
+            partnerFactory.destroy();
+        }
+    }
+
+    @Test
+    void failsFastWhenInheritedApiRefMappingIsMissingForConcreteClient() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("missing-inherited-api-ref-client", clientConfig("http://localhost:8080"));
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, MissingInheritedApiRefClient.class).getObject())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("@ApiRef(\"user.lookup\")")
+                .hasMessageContaining("reactive.http.clients.missing-inherited-api-ref-client.apis[user.lookup]")
+                .hasMessageContaining("is not configured");
+    }
+
+    @Test
+    void failsFastWhenInheritedApiRefMethodIsUnsupportedForConcreteClient() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("FETCH");
+        api.setPath("/users/{id}");
+        config.setApis(Map.of("user.lookup", api));
+        properties.getClients().put("malformed-inherited-api-ref-client", config);
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, MalformedInheritedApiRefClient.class).getObject())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("@ApiRef(\"user.lookup\")")
+                .hasMessageContaining("reactive.http.clients.malformed-inherited-api-ref-client.apis[user.lookup].method")
+                .hasMessageContaining("method [FETCH] is not supported");
+    }
+
+    @Test
+    void validatesInheritedApiRefPathVariablesAgainstConcreteClientApiMap() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("GET");
+        api.setPath("/users/{userId}");
+        config.setApis(Map.of("user.lookup", api));
+        properties.getClients().put("pathvar-inherited-api-ref-client", config);
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, PathVarInheritedApiRefClient.class).getObject())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("@ApiRef(\"user.lookup\")")
+                .hasMessageContaining("URI template variables [userId]")
+                .hasMessageContaining("without matching @PathVar parameters");
     }
 
     @Test
@@ -700,7 +774,6 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
 
-
     @ReactiveHttpClient(name = "annotation-url-malformed-client", baseUrl = "http://bad host")
     interface MalformedAnnotationBaseUrlClient {
         @GET("/ping")
@@ -736,7 +809,6 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         @GET("/users?projection=literal")
         Mono<String> lookup();
     }
-
 
     @ReactiveHttpClient(name = "query-pathvar-client")
     interface QueryPathVarClient {
@@ -798,4 +870,30 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         @GET("/ping")
         Mono<String> ping();
     }
+
+    interface InheritedApiRefOperations {
+        @ApiRef("user.lookup")
+        Mono<String> lookup(@PathVar("id") String id);
+    }
+
+    @ReactiveHttpClient(name = "internal-inherited-api-ref-client")
+    interface InternalInheritedApiRefClient extends InheritedApiRefOperations {
+    }
+
+    @ReactiveHttpClient(name = "partner-inherited-api-ref-client")
+    interface PartnerInheritedApiRefClient extends InheritedApiRefOperations {
+    }
+
+    @ReactiveHttpClient(name = "missing-inherited-api-ref-client")
+    interface MissingInheritedApiRefClient extends InheritedApiRefOperations {
+    }
+
+    @ReactiveHttpClient(name = "malformed-inherited-api-ref-client")
+    interface MalformedInheritedApiRefClient extends InheritedApiRefOperations {
+    }
+
+    @ReactiveHttpClient(name = "pathvar-inherited-api-ref-client")
+    interface PathVarInheritedApiRefClient extends InheritedApiRefOperations {
+    }
+
 }
