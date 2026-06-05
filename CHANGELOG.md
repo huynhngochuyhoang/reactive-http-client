@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Inherited client policy diagnostics.** DEBUG startup diagnostics now report inherited endpoint policy per concrete client, including the parent declaring interface, concrete child client, base URL source, and effective request-timeout source.
+
+### Changed
+
+- **Inherited endpoint validation messages.** Startup validation failures for inherited endpoint methods now include both the parent declaring interface and the concrete `@ReactiveHttpClient` child context while preserving the existing exception categories.
+- **API compatibility baseline.** The public API compatibility gate now compares against the latest released `2.8.0` artifacts.
+
+### Docs
+
+- Documented shared parent endpoint contracts, per-child timeout behavior, inherited `@ApiRef` parity, mock-helper coverage for inherited clients, and multi-client configuration examples.
+- Updated roadmap links and native/release compatibility evidence after the roadmap directory cleanup.
+
 ## [2.8.0] - 2026-06-04
 
 ### Added

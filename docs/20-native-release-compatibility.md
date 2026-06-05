@@ -11,7 +11,7 @@ is documented as supported.
 ## Public API compatibility
 
 The `api-compatibility` profile compares the supported public surfaces of all
-three published jars against the latest released baseline, `2.7.0`:
+three published jars against the latest released baseline, `2.8.0`:
 
 ```bash
 mvn -Papi-compatibility -DskipTests verify

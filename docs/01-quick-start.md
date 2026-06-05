@@ -104,6 +104,43 @@ The starter validates inherited abstract endpoint methods when each child proxy
 is created. Java default methods can stay on the parent as local helpers; they
 do not need HTTP metadata.
 
+The same shared contract can still have very different concrete-client policy.
+These fields commonly vary per downstream: base URL, per-request timeout,
+static default headers, auth provider, Resilience4j instance names, and redirect
+following.
+
+```yaml
+reactive:
+  http:
+    clients:
+      internal-user-service:
+        base-url: https://internal-users.example.com
+        request-timeout-ms: 2000
+        default-headers:
+          X-Client: internal-users
+        auth-provider: internalUserAuthProvider
+        follow-redirects: false
+        resilience:
+          enabled: true
+          retry: internal-users
+          circuit-breaker: internal-users
+      partner-user-service:
+        base-url: https://partner-users.example.com
+        request-timeout-ms: 8000
+        default-headers:
+          X-Client: partner-users
+        auth-provider: partnerUserAuthProvider
+        follow-redirects: true
+        resilience:
+          enabled: true
+          retry: partner-users
+          circuit-breaker: partner-users
+```
+
+For the detailed rules behind those fields, see [Timeouts](04-timeouts.md),
+[Outbound auth](06-auth-providers.md), [Resilience4j](07-resilience4j.md),
+[Proxy & TLS/mTLS](12-proxy-tls.md), and [Redirect responses](03-error-handling.md#redirect-responses).
+
 ## Optional: dynamic API map with `@ApiRef`
 
 If you want to keep request method/path/timeout in configuration instead of annotations, use `@ApiRef`:
