@@ -89,7 +89,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         MethodMetadataCache metadataCache = applicationContext
                 .getBeanProvider(MethodMetadataCache.class)
                 .getIfAvailable(MethodMetadataCache::new);
-        validateDeclarativeMethodContracts(type, metadataCache);
+        validateDeclarativeMethodContracts(type, clientName, metadataCache);
         validateApiRefMappings(type, metadataCache, config, clientName);
 
         AuthProvider authProvider = resolveAuthProvider(clientName, config);
@@ -797,14 +797,17 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
      * at proxy construction instead of first invocation.
      */
     private void validateDeclarativeMethodContracts(Class<?> clientInterface,
+                                                    String clientName,
                                                     MethodMetadataCache metadataCache) {
         for (Method method : clientInterface.getMethods()) {
             if (!isDeclarativeClientMethod(method)) continue;
-            MethodMetadata meta = metadataCache.get(method);
-            if (meta.getApiRefName() == null) {
-                validatePathTemplate(meta.getPathTemplate(), pathVarNames(meta),
-                        "Method " + method + " path template");
-            }
+            validateMethodContract(clientInterface, clientName, method, () -> {
+                MethodMetadata meta = metadataCache.get(method);
+                if (meta.getApiRefName() == null) {
+                    validatePathTemplate(meta.getPathTemplate(), pathVarNames(meta),
+                            "Method " + method + " path template");
+                }
+            });
         }
     }
 
@@ -818,19 +821,55 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                                         String clientName) {
         for (Method method : clientInterface.getMethods()) {
             if (!isDeclarativeClientMethod(method)) continue;
-            MethodMetadata meta = metadataCache.get(method);
-            String apiRefName = meta.getApiRefName();
-            if (!StringUtils.hasText(apiRefName)) {
-                continue;
-            }
-            ReactiveHttpClientProperties.ApiConfig apiConfig = clientConfig.getApis() != null
-                    ? clientConfig.getApis().get(apiRefName)
-                    : null;
-            String configPrefix = ApiRefValidationSupport.configPrefix(clientName, apiRefName);
-            String apiRefContext = ApiRefValidationSupport.apiRefContext(method, apiRefName);
-            validateApiRef(apiConfig, configPrefix, apiRefContext);
-            validatePathTemplate(apiConfig.getPath(), pathVarNames(meta), apiRefContext + " path template");
+            validateMethodContract(clientInterface, clientName, method, () -> {
+                MethodMetadata meta = metadataCache.get(method);
+                String apiRefName = meta.getApiRefName();
+                if (!StringUtils.hasText(apiRefName)) {
+                    return;
+                }
+                ReactiveHttpClientProperties.ApiConfig apiConfig = clientConfig.getApis() != null
+                        ? clientConfig.getApis().get(apiRefName)
+                        : null;
+                String configPrefix = ApiRefValidationSupport.configPrefix(clientName, apiRefName);
+                String apiRefContext = ApiRefValidationSupport.apiRefContext(method, apiRefName);
+                validateApiRef(apiConfig, configPrefix, apiRefContext);
+                validatePathTemplate(apiConfig.getPath(), pathVarNames(meta), apiRefContext + " path template");
+            });
         }
+    }
+
+    private static void validateMethodContract(Class<?> clientInterface,
+                                               String clientName,
+                                               Method method,
+                                               Runnable validation) {
+        try {
+            validation.run();
+        } catch (IllegalArgumentException ex) {
+            throw inheritedMethodException(clientInterface, clientName, method, ex);
+        } catch (IllegalStateException ex) {
+            throw inheritedMethodException(clientInterface, clientName, method, ex);
+        }
+    }
+
+    private static RuntimeException inheritedMethodException(Class<?> clientInterface,
+                                                            String clientName,
+                                                            Method method,
+                                                            RuntimeException ex) {
+        if (method.getDeclaringClass() == clientInterface) {
+            return ex;
+        }
+        String message = "Inherited method " + method + " from "
+                + method.getDeclaringClass().getName()
+                + " on @ReactiveHttpClient(\"" + clientName + "\") "
+                + clientInterface.getName()
+                + ": " + ex.getMessage();
+        if (ex instanceof IllegalArgumentException) {
+            return new IllegalArgumentException(message, ex);
+        }
+        if (ex instanceof IllegalStateException) {
+            return new IllegalStateException(message, ex);
+        }
+        return ex;
     }
 
     private static boolean isDeclarativeClientMethod(Method method) {

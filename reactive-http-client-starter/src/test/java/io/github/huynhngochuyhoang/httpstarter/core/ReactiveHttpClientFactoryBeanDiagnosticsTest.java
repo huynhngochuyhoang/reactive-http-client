@@ -420,8 +420,42 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
         assertThatThrownBy(() -> buildFactoryBean(properties, InvalidInheritedClient.class).getObject())
                 .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Inherited method")
+                .hasMessageContaining("InvalidInheritedParent")
+                .hasMessageContaining("@ReactiveHttpClient(\"invalid-inherited-client\")")
+                .hasMessageContaining("InvalidInheritedClient")
                 .hasMessageContaining("@PathVar value must not be blank")
                 .hasMessageContaining("get");
+    }
+
+    @Test
+    void inheritedStaticPathTemplateReportsConcreteClientWhenPathVarIsMissing() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("missing-inherited-pathvar-client", clientConfig("http://localhost:8080"));
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, MissingInheritedPathVarClient.class).getObject())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Inherited method")
+                .hasMessageContaining("InheritedMissingPathVarParent")
+                .hasMessageContaining("@ReactiveHttpClient(\"missing-inherited-pathvar-client\")")
+                .hasMessageContaining("MissingInheritedPathVarClient")
+                .hasMessageContaining("URI template variables [id]")
+                .hasMessageContaining("without matching @PathVar parameters");
+    }
+
+    @Test
+    void inheritedStaticPathTemplateReportsConcreteClientWhenPathVarIsUnused() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("unused-inherited-pathvar-client", clientConfig("http://localhost:8080"));
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, UnusedInheritedPathVarClient.class).getObject())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Inherited method")
+                .hasMessageContaining("InheritedUnusedPathVarParent")
+                .hasMessageContaining("@ReactiveHttpClient(\"unused-inherited-pathvar-client\")")
+                .hasMessageContaining("UnusedInheritedPathVarClient")
+                .hasMessageContaining("@PathVar parameters [id]")
+                .hasMessageContaining("not used by the path template");
     }
 
     @Test
@@ -493,7 +527,8 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         assertThatThrownBy(() -> buildFactoryBean(properties, MissingPathVarClient.class).getObject())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("URI template variables [id]")
-                .hasMessageContaining("without matching @PathVar parameters");
+                .hasMessageContaining("without matching @PathVar parameters")
+                .satisfies(ex -> assertThat(ex.getMessage()).doesNotContain("Inherited method"));
     }
 
     @Test
@@ -639,6 +674,10 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
         assertThatThrownBy(() -> buildFactoryBean(properties, MissingInheritedApiRefClient.class).getObject())
                 .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Inherited method")
+                .hasMessageContaining("InheritedApiRefOperations")
+                .hasMessageContaining("@ReactiveHttpClient(\"missing-inherited-api-ref-client\")")
+                .hasMessageContaining("MissingInheritedApiRefClient")
                 .hasMessageContaining("@ApiRef(\"user.lookup\")")
                 .hasMessageContaining("reactive.http.clients.missing-inherited-api-ref-client.apis[user.lookup]")
                 .hasMessageContaining("is not configured");
@@ -656,6 +695,10 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
         assertThatThrownBy(() -> buildFactoryBean(properties, MalformedInheritedApiRefClient.class).getObject())
                 .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Inherited method")
+                .hasMessageContaining("InheritedApiRefOperations")
+                .hasMessageContaining("@ReactiveHttpClient(\"malformed-inherited-api-ref-client\")")
+                .hasMessageContaining("MalformedInheritedApiRefClient")
                 .hasMessageContaining("@ApiRef(\"user.lookup\")")
                 .hasMessageContaining("reactive.http.clients.malformed-inherited-api-ref-client.apis[user.lookup].method")
                 .hasMessageContaining("method [FETCH] is not supported");
@@ -673,6 +716,10 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
         assertThatThrownBy(() -> buildFactoryBean(properties, PathVarInheritedApiRefClient.class).getObject())
                 .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Inherited method")
+                .hasMessageContaining("InheritedApiRefOperations")
+                .hasMessageContaining("@ReactiveHttpClient(\"pathvar-inherited-api-ref-client\")")
+                .hasMessageContaining("PathVarInheritedApiRefClient")
                 .hasMessageContaining("@ApiRef(\"user.lookup\")")
                 .hasMessageContaining("URI template variables [userId]")
                 .hasMessageContaining("without matching @PathVar parameters");
@@ -850,6 +897,24 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
     @ReactiveHttpClient(name = "invalid-inherited-client")
     interface InvalidInheritedClient extends InvalidInheritedParent {
+    }
+
+    interface InheritedMissingPathVarParent {
+        @GET("/items/{id}")
+        Mono<String> get();
+    }
+
+    @ReactiveHttpClient(name = "missing-inherited-pathvar-client")
+    interface MissingInheritedPathVarClient extends InheritedMissingPathVarParent {
+    }
+
+    interface InheritedUnusedPathVarParent {
+        @GET("/items")
+        Mono<String> get(@PathVar("id") String id);
+    }
+
+    @ReactiveHttpClient(name = "unused-inherited-pathvar-client")
+    interface UnusedInheritedPathVarClient extends InheritedUnusedPathVarParent {
     }
 
     @ReactiveHttpClient(name = "invalid-header-client")
