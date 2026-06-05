@@ -74,18 +74,18 @@
 
 ## Priority 5 — Mock Helper Coverage for Inherited Clients
 
-### [ ] 1.3 Mock helper coverage for inherited clients
-- [ ] Add a mock-client test for a concrete client that inherits endpoint
+### [x] 1.3 Mock helper coverage for inherited clients
+- [x] Add a mock-client test for a concrete client that inherits endpoint
   methods from a parent interface.
-- [ ] Add a docs example for testing an inherited endpoint with
+- [x] Add a docs example for testing an inherited endpoint with
   `MockReactiveHttpClient`.
-- [ ] Verify a mock proxy can call an inherited endpoint method successfully.
-- [ ] Verify observer test hooks receive the concrete child client name.
-- [ ] Verify lifecycle test hooks receive the concrete child client name.
-- [ ] Verify recorded request metadata matches the inherited endpoint path and
+- [x] Verify a mock proxy can call an inherited endpoint method successfully.
+- [x] Verify observer test hooks receive the concrete child client name.
+- [x] Verify lifecycle test hooks receive the concrete child client name.
+- [x] Verify recorded request metadata matches the inherited endpoint path and
   method.
-- [ ] Keep unannotated-interface fallback behavior unchanged.
-- [ ] Verify existing mock helper behavior for directly declared methods is
+- [x] Keep unannotated-interface fallback behavior unchanged.
+- [x] Verify existing mock helper behavior for directly declared methods is
   unchanged.
 
 ---

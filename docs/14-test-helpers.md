@@ -46,6 +46,39 @@ RecordedExchangeAssertions.assertThat(recorded)
         .hasStatusCode(200);
 ```
 
+
+### Inherited endpoint contracts
+
+For shared contracts, build the mock for the concrete annotated child client, not
+the plain parent interface. The proxy can still call inherited endpoint methods,
+and observers/lifecycle hooks use the child client name.
+
+```java
+interface UserReadOperations {
+    @GET("/users/{id}")
+    Mono<UserDto> getUser(@PathVar("id") String id);
+}
+
+@ReactiveHttpClient(name = "partner-user-service")
+interface PartnerUserClient extends UserReadOperations {
+}
+
+MockReactiveHttpClient<PartnerUserClient> mock = MockReactiveHttpClient
+        .forClient(PartnerUserClient.class)
+        .respondTo(HttpMethod.GET, "/users/42",
+                ex -> MockReactiveHttpClient.json(200, "{\"id\":42}"))
+        .build();
+
+StepVerifier.create(mock.proxy().getUser("42"))
+        .expectNextMatches(user -> user.id() == 42)
+        .verifyComplete();
+
+RecordedExchangeAssertions.assertThat(mock.lastExchange())
+        .hasMethod(HttpMethod.GET)
+        .hasPath("/users/42")
+        .hasStatusCode(200);
+```
+
 ### Unmatched requests
 
 Requests that do not match any registered matcher fall through to a configurable fallback response (HTTP 404 by default), so tests fail loudly instead of hanging on a missing matcher.
