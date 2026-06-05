@@ -108,6 +108,146 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
+    void debugStartupDiagnosticsReportInheritedMethodPolicyPerConcreteClient(CapturedOutput output) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig internal = clientConfig("http://internal.example");
+        internal.setRequestTimeoutMs(1000);
+        properties.getClients().put("internal-policy-client", internal);
+        ReactiveHttpClientProperties.ClientConfig partner = clientConfig("http://partner.example");
+        partner.setRequestTimeoutMs(2000);
+        properties.getClients().put("partner-policy-client", partner);
+
+        ReactiveHttpClientFactoryBean<InternalPolicyClient> internalFactory =
+                buildFactoryBean(properties, InternalPolicyClient.class);
+        ReactiveHttpClientFactoryBean<PartnerPolicyClient> partnerFactory =
+                buildFactoryBean(properties, PartnerPolicyClient.class);
+        try {
+            internalFactory.getObject();
+            partnerFactory.getObject();
+
+            assertThat(output.getOut())
+                    .contains("Reactive HTTP client [internal-policy-client] inherited method policy")
+                    .contains("method=[InheritedPolicyOperations#getUser]")
+                    .contains("declaredBy=" + InheritedPolicyOperations.class.getName())
+                    .contains("concreteClient=" + InternalPolicyClient.class.getName())
+                    .contains("inherited=true")
+                    .contains("baseUrl=http://internal.example (source=property)")
+                    .contains("requestTimeout=client request-timeout-ms(1000ms)")
+                    .contains("Reactive HTTP client [partner-policy-client] inherited method policy")
+                    .contains("concreteClient=" + PartnerPolicyClient.class.getName())
+                    .contains("baseUrl=http://partner.example (source=property)")
+                    .contains("requestTimeout=client request-timeout-ms(2000ms)");
+        } finally {
+            logger.setLevel(previousLevel);
+            internalFactory.destroy();
+            partnerFactory.destroy();
+        }
+    }
+
+    @Test
+    void debugStartupDiagnosticsReportMethodTimeoutAsWinningSource(CapturedOutput output) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://method-timeout.property");
+        config.setRequestTimeoutMs(2500);
+        properties.getClients().put("method-timeout-policy-client", config);
+
+        ReactiveHttpClientFactoryBean<MethodTimeoutPolicyClient> factoryBean =
+                buildFactoryBean(properties, MethodTimeoutPolicyClient.class);
+        try {
+            factoryBean.getObject();
+
+            assertThat(output.getOut())
+                    .contains("Reactive HTTP client [method-timeout-policy-client] inherited method policy")
+                    .contains("baseUrl=http://method-timeout.annotation (source=annotation)")
+                    .contains("method=[MethodTimeoutPolicyOperations#getUser]")
+                    .contains("requestTimeout=method @TimeoutMs(350ms)")
+                    .doesNotContain("requestTimeout=client request-timeout-ms(2500ms)");
+        } finally {
+            logger.setLevel(previousLevel);
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void debugStartupDiagnosticsReportRemainingTimeoutSources(CapturedOutput output) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig apiRef = clientConfig("http://api-ref-policy.example");
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("GET");
+        api.setPath("/api-ref-users/{id}");
+        api.setTimeoutMs(1200);
+        apiRef.setApis(Map.of("user.lookup", api));
+        apiRef.setRequestTimeoutMs(2500);
+        properties.getClients().put("api-ref-policy-client", apiRef);
+
+        ReactiveHttpClientProperties.ClientConfig deprecatedAlias = clientConfig("http://deprecated-policy.example");
+        deprecatedAlias.getResilience().setTimeoutMs(1800);
+        properties.getClients().put("deprecated-timeout-policy-client", deprecatedAlias);
+        properties.getClients().put("disabled-timeout-policy-client", clientConfig("http://disabled-policy.example"));
+
+        ReactiveHttpClientFactoryBean<ApiRefPolicyClient> apiRefFactory =
+                buildFactoryBean(properties, ApiRefPolicyClient.class);
+        ReactiveHttpClientFactoryBean<DeprecatedTimeoutPolicyClient> deprecatedFactory =
+                buildFactoryBean(properties, DeprecatedTimeoutPolicyClient.class);
+        ReactiveHttpClientFactoryBean<DisabledTimeoutPolicyClient> disabledFactory =
+                buildFactoryBean(properties, DisabledTimeoutPolicyClient.class);
+        try {
+            apiRefFactory.getObject();
+            deprecatedFactory.getObject();
+            disabledFactory.getObject();
+
+            assertThat(output.getOut())
+                    .contains("Reactive HTTP client [api-ref-policy-client] inherited method policy")
+                    .contains("pathTemplate=/api-ref-users/{id}")
+                    .contains("requestTimeout=@ApiRef timeout-ms(1200ms)")
+                    .contains("Reactive HTTP client [deprecated-timeout-policy-client] inherited method policy")
+                    .contains("requestTimeout=deprecated resilience.timeout-ms(1800ms)")
+                    .contains("Reactive HTTP client [disabled-timeout-policy-client] inherited method policy")
+                    .contains("requestTimeout=disabled");
+        } finally {
+            logger.setLevel(previousLevel);
+            apiRefFactory.destroy();
+            deprecatedFactory.destroy();
+            disabledFactory.destroy();
+        }
+    }
+
+    @Test
+    void inheritedMethodPolicyDiagnosticsStayOutOfInfoLogs(CapturedOutput output) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.INFO);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://info-policy.example");
+        config.setRequestTimeoutMs(1000);
+        properties.getClients().put("internal-policy-client", config);
+
+        ReactiveHttpClientFactoryBean<InternalPolicyClient> factoryBean =
+                buildFactoryBean(properties, InternalPolicyClient.class);
+        try {
+            factoryBean.getObject();
+
+            assertThat(output.getOut()).doesNotContain("inherited method policy");
+        } finally {
+            logger.setLevel(previousLevel);
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
     void debugStartupSummaryIncludesPerMethodResilienceDiagnostics(CapturedOutput output) throws Exception {
         Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
         Level previousLevel = logger.getLevel();
@@ -915,6 +1055,41 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
     @ReactiveHttpClient(name = "unused-inherited-pathvar-client")
     interface UnusedInheritedPathVarClient extends InheritedUnusedPathVarParent {
+    }
+
+    interface InheritedPolicyOperations {
+        @GET("/users/{id}")
+        Mono<String> getUser(@PathVar("id") String id);
+    }
+
+    @ReactiveHttpClient(name = "internal-policy-client")
+    interface InternalPolicyClient extends InheritedPolicyOperations {
+    }
+
+    @ReactiveHttpClient(name = "partner-policy-client")
+    interface PartnerPolicyClient extends InheritedPolicyOperations {
+    }
+
+    interface MethodTimeoutPolicyOperations {
+        @TimeoutMs(350)
+        @GET("/users/{id}")
+        Mono<String> getUser(@PathVar("id") String id);
+    }
+
+    @ReactiveHttpClient(name = "method-timeout-policy-client", baseUrl = "http://method-timeout.annotation")
+    interface MethodTimeoutPolicyClient extends MethodTimeoutPolicyOperations {
+    }
+
+    @ReactiveHttpClient(name = "api-ref-policy-client")
+    interface ApiRefPolicyClient extends InheritedApiRefOperations {
+    }
+
+    @ReactiveHttpClient(name = "deprecated-timeout-policy-client")
+    interface DeprecatedTimeoutPolicyClient extends InheritedPolicyOperations {
+    }
+
+    @ReactiveHttpClient(name = "disabled-timeout-policy-client")
+    interface DisabledTimeoutPolicyClient extends InheritedPolicyOperations {
     }
 
     @ReactiveHttpClient(name = "invalid-header-client")

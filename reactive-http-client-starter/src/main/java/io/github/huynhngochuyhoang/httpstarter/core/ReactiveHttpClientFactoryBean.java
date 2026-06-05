@@ -100,6 +100,13 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 config,
                 properties.getNetwork(),
                 properties.getObservability());
+        logInheritedMethodPolicyDiagnostics(
+                type,
+                metadataCache,
+                config,
+                clientName,
+                baseUrl,
+                annotationBaseUrl ? "annotation" : "property");
         WebClient webClient = buildWebClient(
                 baseUrl,
                 config,
@@ -496,6 +503,78 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 observabilityEnabled ? "enabled" : "disabled",
                 config.isExchangeLoggingEnabled() ? "enabled" : "disabled",
                 config.getLogPreset().name().toLowerCase(Locale.ROOT).replace('_', '-'));
+    }
+
+    private void logInheritedMethodPolicyDiagnostics(Class<?> clientInterface,
+                                                     MethodMetadataCache metadataCache,
+                                                     ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                     String clientName,
+                                                     String baseUrl,
+                                                     String baseUrlSource) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method) || method.getDeclaringClass() == clientInterface) continue;
+            MethodMetadata meta = metadataCache.get(method);
+            RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
+            EffectiveApi effectiveApi = diagnosticEffectiveApi(plan, clientConfig);
+            log.debug("Reactive HTTP client [{}] inherited method policy: method=[{}#{}], declaredBy={}, "
+                            + "concreteClient={}, inherited=true, httpMethod={}, pathTemplate={}, baseUrl={} (source={}), "
+                            + "requestTimeout={}",
+                    clientName,
+                    method.getDeclaringClass().getSimpleName(),
+                    method.getName(),
+                    method.getDeclaringClass().getName(),
+                    clientInterface.getName(),
+                    effectiveApi.httpMethod(),
+                    effectiveApi.pathTemplate(),
+                    baseUrl,
+                    baseUrlSource,
+                    requestTimeoutSummary(plan, effectiveApi, clientConfig));
+        }
+    }
+
+    private static EffectiveApi diagnosticEffectiveApi(RequestPlan plan,
+                                                       ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (!StringUtils.hasText(plan.apiRefName())) {
+            return plan.staticEffectiveApi();
+        }
+        ReactiveHttpClientProperties.ApiConfig apiConfig = clientConfig.getApis() != null
+                ? clientConfig.getApis().get(plan.apiRefName())
+                : null;
+        if (apiConfig == null) {
+            return new EffectiveApi("unresolved", "unresolved", MethodMetadata.TIMEOUT_NOT_SET);
+        }
+        return new EffectiveApi(
+                StringUtils.hasText(apiConfig.getMethod())
+                        ? apiConfig.getMethod().trim().toUpperCase(Locale.ROOT)
+                        : "unresolved",
+                StringUtils.hasText(apiConfig.getPath()) ? apiConfig.getPath() : "unresolved",
+                apiConfig.getTimeoutMs());
+    }
+
+    private static String requestTimeoutSummary(RequestPlan plan,
+                                                EffectiveApi effectiveApi,
+                                                ReactiveHttpClientProperties.ClientConfig config) {
+        if (plan.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET) {
+            return timeoutSummary("method @TimeoutMs", plan.timeoutMs());
+        }
+        if (effectiveApi.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET) {
+            return timeoutSummary("@ApiRef timeout-ms", effectiveApi.timeoutMs());
+        }
+        if (config.isRequestTimeoutMsConfigured()) {
+            return timeoutSummary("client request-timeout-ms", config.getRequestTimeoutMs());
+        }
+        ReactiveHttpClientProperties.ResilienceConfig resilience = config.getResilience();
+        if (resilience != null && resilience.isTimeoutMsConfigured()) {
+            return timeoutSummary("deprecated resilience.timeout-ms", resilience.getTimeoutMs());
+        }
+        return "disabled";
+    }
+
+    private static String timeoutSummary(String source, long timeoutMs) {
+        return timeoutMs > 0 ? source + "(" + timeoutMs + "ms)" : "disabled(" + source + ")";
     }
 
     private static String proxySummary(ReactiveHttpClientProperties.ProxyConfig proxy) {

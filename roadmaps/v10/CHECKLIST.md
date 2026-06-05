@@ -109,21 +109,21 @@
 
 ## Priority 7 — Effective Client-Policy Diagnostics
 
-### [ ] 1.2 Effective client-policy diagnostics
-- [ ] Add DEBUG startup diagnostics for inherited endpoint methods.
-- [ ] Include the concrete client name in inherited endpoint diagnostics.
-- [ ] Include the parent method-declaring interface in inherited endpoint
+### [x] 1.2 Effective client-policy diagnostics
+- [x] Add DEBUG startup diagnostics for inherited endpoint methods.
+- [x] Include the concrete client name in inherited endpoint diagnostics.
+- [x] Include the parent method-declaring interface in inherited endpoint
   diagnostics.
-- [ ] Include effective request timeout source:
+- [x] Include effective request timeout source:
   method `@TimeoutMs`, `@ApiRef` timeout, client `request-timeout-ms`,
   deprecated alias, or disabled.
-- [ ] Include effective base URL source.
-- [ ] Mark whether the endpoint method came from a parent interface.
-- [ ] Verify two children inheriting the same method can report different
+- [x] Include effective base URL source.
+- [x] Mark whether the endpoint method came from a parent interface.
+- [x] Verify two children inheriting the same method can report different
   effective request timeouts.
-- [ ] Verify explicit `@TimeoutMs` still appears as the winning source when
+- [x] Verify explicit `@TimeoutMs` still appears as the winning source when
   present.
-- [ ] Keep valid-client diagnostics out of INFO/WARN logs.
+- [x] Keep valid-client diagnostics out of INFO/WARN logs.
 
 ---
 
