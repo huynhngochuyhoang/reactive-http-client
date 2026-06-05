@@ -1,14 +1,14 @@
 # Reactive HTTP Client — Roadmap V2
 
 > **Status:** baseline v1.14.0 (2026-05-12). The V1 roadmap
-> ([`ROADMAP.md`](ROADMAP.md) + [`ROADMAP_CHECKLIST.md`](ROADMAP_CHECKLIST.md)) is functionally complete: OpenTelemetry
+> ([`v1/ROADMAP.md`](../v1/ROADMAP.md) + [`v1/CHECKLIST.md`](../v1/CHECKLIST.md)) is functionally complete: OpenTelemetry
 > tracing and baggage propagation, multipart, test helpers, per-client pools,
 > HTTP proxy + TLS/mTLS, actuator health indicator + pool metrics, OAuth2
 > client-credentials, streaming passthrough, per-method resilience,
 > configurable correlation-ID, API-map routing via `@ApiRef`, plus every V1
 > optimisation and correctness fix shipped.
 
-This V2 roadmap follows the same three-bucket shape as [`ROADMAP.md`](ROADMAP.md):
+This V2 roadmap follows the same three-bucket shape as [`v1/ROADMAP.md`](../v1/ROADMAP.md):
 
 1. **Features to add** — net-new capabilities users currently have to build themselves.
 2. **Features to optimize** — existing code that works but can be made faster, clearer,

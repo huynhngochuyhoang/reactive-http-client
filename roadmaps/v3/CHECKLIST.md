@@ -1,6 +1,6 @@
 # Roadmap V3 Execution Checklist
 
-> Companion to [`ROADMAP_V3.md`](ROADMAP_V3.md). This file is the tracker; keep the rationale
+> Companion to [`ROADMAP.md`](ROADMAP.md). This file is the tracker; keep the rationale
 > and design discussion in the roadmap. Check items off as they ship.
 
 ---

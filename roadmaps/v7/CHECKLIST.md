@@ -1,6 +1,6 @@
 # Roadmap V7 Execution Checklist
 
-> Companion to [`ROADMAP_V7.md`](ROADMAP_V7.md). This file tracks execution;
+> Companion to [`ROADMAP.md`](ROADMAP.md). This file tracks execution;
 > keep rationale and design discussion in the roadmap.
 
 ---

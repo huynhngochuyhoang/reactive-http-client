@@ -2,20 +2,22 @@
 
 Planning documents for the project:
 
-- [ROADMAP.md](ROADMAP.md) — V1 roadmap
-- [ROADMAP_CHECKLIST.md](ROADMAP_CHECKLIST.md) — V1 execution checklist
-- [ROADMAP_V2.md](ROADMAP_V2.md) — V2 roadmap
-- [ROADMAP_V3.md](ROADMAP_V3.md) — V3 roadmap
-- [ROADMAP_V3_CHECKLIST.md](ROADMAP_V3_CHECKLIST.md) — V3 execution checklist
-- [ROADMAP_V4.md](ROADMAP_V4.md) — V4 roadmap
-- [ROADMAP_V4_CHECKLIST.md](ROADMAP_V4_CHECKLIST.md) — V4 execution checklist
-- [ROADMAP_V5.md](ROADMAP_V5.md) — V5 roadmap
-- [ROADMAP_V5_CHECKLIST.md](ROADMAP_V5_CHECKLIST.md) — V5 execution checklist
-- [ROADMAP_V6.md](ROADMAP_V6.md) — V6 roadmap
-- [ROADMAP_V6_CHECKLIST.md](ROADMAP_V6_CHECKLIST.md) — V6 execution checklist
-- [ROADMAP_V7.md](ROADMAP_V7.md) — V7 roadmap, released as `2.6.0`
-- [ROADMAP_V7_CHECKLIST.md](ROADMAP_V7_CHECKLIST.md) — V7 execution checklist
-- [ROADMAP_V8.md](ROADMAP_V8.md) — V8 roadmap, released as `2.7.0`
-- [ROADMAP_V8_CHECKLIST.md](ROADMAP_V8_CHECKLIST.md) — V8 execution checklist
-- [ROADMAP_V9.md](ROADMAP_V9.md) — V9 roadmap
-- [ROADMAP_V9_CHECKLIST.md](ROADMAP_V9_CHECKLIST.md) — V9 execution checklist
+- [v1/ROADMAP.md](v1/ROADMAP.md) — V1 roadmap
+- [v1/CHECKLIST.md](v1/CHECKLIST.md) — V1 execution checklist
+- [v2/ROADMAP.md](v2/ROADMAP.md) — V2 roadmap
+- [v3/ROADMAP.md](v3/ROADMAP.md) — V3 roadmap
+- [v3/CHECKLIST.md](v3/CHECKLIST.md) — V3 execution checklist
+- [v4/ROADMAP.md](v4/ROADMAP.md) — V4 roadmap
+- [v4/CHECKLIST.md](v4/CHECKLIST.md) — V4 execution checklist
+- [v5/ROADMAP.md](v5/ROADMAP.md) — V5 roadmap
+- [v5/CHECKLIST.md](v5/CHECKLIST.md) — V5 execution checklist
+- [v6/ROADMAP.md](v6/ROADMAP.md) — V6 roadmap
+- [v6/CHECKLIST.md](v6/CHECKLIST.md) — V6 execution checklist
+- [v7/ROADMAP.md](v7/ROADMAP.md) — V7 roadmap, released as `2.6.0`
+- [v7/CHECKLIST.md](v7/CHECKLIST.md) — V7 execution checklist
+- [v8/ROADMAP.md](v8/ROADMAP.md) — V8 roadmap, released as `2.7.0`
+- [v8/CHECKLIST.md](v8/CHECKLIST.md) — V8 execution checklist
+- [v9/ROADMAP.md](v9/ROADMAP.md) — V9 roadmap, released as `2.8.0`
+- [v9/CHECKLIST.md](v9/CHECKLIST.md) — V9 execution checklist
+- [v10/ROADMAP.md](v10/ROADMAP.md) — V10 draft roadmap
+- [v10/CHECKLIST.md](v10/CHECKLIST.md) — V10 execution checklist

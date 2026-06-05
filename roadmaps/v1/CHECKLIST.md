@@ -4,7 +4,7 @@
 > Check items off as they ship. Each top-level entry points back to the matching section in
 > [`ROADMAP.md`](ROADMAP.md) for full rationale — this file is the tracker, not the spec.
 >
-> **Items originally marked `Deferred` have been moved to [`ROADMAP_V2.md`](ROADMAP_V2.md)** — see
+> **Items originally marked `Deferred` have been moved to [`v2/ROADMAP.md`](../v2/ROADMAP.md)** — see
 > there for ongoing work. This file now tracks only V1 status; every remaining
 > entry below is either complete (`[x]`) or has its deferred sub-tasks migrated.
 
@@ -232,7 +232,7 @@
   `StaticApplicationContext` so the helper has no Mockito runtime
   dependency on the consumer side._
 - [→] JUnit 5 `@MockHttpServer` extension backed by a canned-response registry.
-  _Moved to [`ROADMAP_V2.md`](ROADMAP_V2.md) — **B1**. The matcher-driven builder API on
+  _Moved to [`v2/ROADMAP.md`](../v2/ROADMAP.md) — **B1**. The matcher-driven builder API on
   `MockReactiveHttpClient` already covers the same ergonomics inside a single
   `@Test`; the extension waits on real consumer feedback for multi-test
   patterns._
@@ -260,12 +260,12 @@
     inherited from the surrounding `RefreshingBearerAuthProvider` —
     already covered by its existing tests._
 - [→] `AwsSigV4AuthProvider` implementing `AuthProvider` directly.
-  _Moved to [`ROADMAP_V2.md`](ROADMAP_V2.md) — **A1**. SigV4 is ~300 LOC of cryptographic
+  _Moved to [`v2/ROADMAP.md`](../v2/ROADMAP.md) — **A1**. SigV4 is ~300 LOC of cryptographic
   code; the acceptance bar in V2 pins it to the official AWS SigV4
   test-suite vectors so production HMAC bugs (URL-encoded path segments,
   empty query strings, multi-line headers) are caught before release._
 - [→] Auto-configuration hooks so users can enable either via `application.yml`.
-  _Moved to [`ROADMAP_V2.md`](ROADMAP_V2.md) — **A2**. Best designed alongside SigV4 so the
+  _Moved to [`v2/ROADMAP.md`](../v2/ROADMAP.md) — **A2**. Best designed alongside SigV4 so the
   YAML shape covers both providers' parameter sets._
 
 ---

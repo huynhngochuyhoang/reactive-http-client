@@ -1,7 +1,7 @@
 # Reactive HTTP Client — Roadmap V9
 
-> **Status:** proposed after `2.7.0`. V9 focuses on declarative contract
-> completeness, startup validation, and resource-safe body handling.
+> **Status:** completed and released as `2.8.0`. V9 focused on declarative
+> contract completeness, startup validation, and resource-safe body handling.
 
 V9 keeps the same three-bucket shape:
 
