@@ -145,7 +145,7 @@
 ## Priority 9 — API Compatibility and Release Evidence Upkeep
 
 ### [x] 2.3 API compatibility and release evidence upkeep
-- [x] Keep API compatibility baseline pointed at the latest released artifact.
+- [x] Keep API compatibility baseline pointed at a published artifact that is not the current reactor version.
 - [x] Verify roadmap links after the directory cleanup.
 - [x] Keep native/release smoke docs aligned with the current project version.
 - [x] Add V10 changelog entries only when implementation begins.

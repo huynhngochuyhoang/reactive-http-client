@@ -11,7 +11,9 @@ is documented as supported.
 ## Public API compatibility
 
 The `api-compatibility` profile compares the supported public surfaces of all
-three published jars against the latest released baseline, `2.8.0`:
+three published jars against a published baseline that is intentionally different
+from the current reactor version. While the project version remains `2.8.0`,
+the baseline stays on `2.7.0`:
 
 ```bash
 mvn -Papi-compatibility -DskipTests verify
@@ -26,8 +28,9 @@ part of the filtered public API comparison.
 
 For an intentional breaking change, target a future major release. Review the
 japicmp report, document the migration in `CHANGELOG.md`, update
-`api.compatibility.baseline.version` after the major release is published, and
-keep CI failing until that review is complete.
+`api.compatibility.baseline.version` after the release-version bump is
+committed and the previous version is published, and keep CI failing until that
+review is complete.
 
 ## Spring AOT and native image
 

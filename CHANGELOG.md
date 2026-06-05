@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Inherited endpoint validation messages.** Startup validation failures for inherited endpoint methods now include both the parent declaring interface and the concrete `@ReactiveHttpClient` child context while preserving the existing exception categories.
-- **API compatibility baseline.** The public API compatibility gate now compares against the latest released `2.8.0` artifacts.
+- **API compatibility baseline.** Kept the public API compatibility baseline off the current reactor version so japicmp cannot self-compare against locally built `2.8.0` artifacts.
 
 ### Docs
 
