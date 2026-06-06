@@ -129,28 +129,28 @@
 
 ## Priority 8 — Configuration Examples for Multi-Client Reuse
 
-### [ ] 2.2 Configuration metadata examples for multi-client reuse
-- [ ] Add a concise multi-client YAML example to docs.
-- [ ] Show two clients sharing one Java interface contract with different base
+### [x] 2.2 Configuration metadata examples for multi-client reuse
+- [x] Add a concise multi-client YAML example to docs.
+- [x] Show two clients sharing one Java interface contract with different base
   URLs.
-- [ ] Show two clients sharing one Java interface contract with different
+- [x] Show two clients sharing one Java interface contract with different
   request timeouts.
-- [ ] Show which fields naturally vary per concrete client: base URL, timeout,
+- [x] Show which fields naturally vary per concrete client: base URL, timeout,
   default headers, auth provider, resilience instances, and redirect following.
-- [ ] Link to detailed timeout, auth, resilience, proxy/TLS, and redirect docs.
-- [ ] Keep README concise.
+- [x] Link to detailed timeout, auth, resilience, proxy/TLS, and redirect docs.
+- [x] Keep README concise.
 
 ---
 
 ## Priority 9 — API Compatibility and Release Evidence Upkeep
 
-### [ ] 2.3 API compatibility and release evidence upkeep
-- [ ] Keep API compatibility baseline pointed at the latest released artifact.
-- [ ] Verify roadmap links after the directory cleanup.
-- [ ] Keep native/release smoke docs aligned with the current project version.
-- [ ] Add V10 changelog entries only when implementation begins.
-- [ ] Run `mvn test`.
-- [ ] Run `mvn -Prelease-smoke test`.
-- [ ] Run `mvn -Papi-compatibility -DskipTests verify`.
-- [ ] Run API compatibility fixtures.
-- [ ] Run `git diff --check`.
+### [x] 2.3 API compatibility and release evidence upkeep
+- [x] Keep API compatibility baseline pointed at a published artifact that is not the current reactor version.
+- [x] Verify roadmap links after the directory cleanup.
+- [x] Keep native/release smoke docs aligned with the current project version.
+- [x] Add V10 changelog entries only when implementation begins.
+- [x] Run `mvn test`.
+- [x] Run `mvn -Prelease-smoke test`.
+- [x] Run `mvn -Papi-compatibility -DskipTests verify`.
+- [x] Run API compatibility fixtures.
+- [x] Run `git diff --check`.
