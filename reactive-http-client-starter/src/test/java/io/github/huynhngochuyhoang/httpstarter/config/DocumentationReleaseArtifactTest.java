@@ -12,9 +12,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -36,22 +34,28 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         List<String> brokenLinks = new ArrayList<>();
 
-        try (Stream<Path> files = Stream.concat(
-                Stream.of(root.resolve("README.md")),
-                Stream.concat(Files.walk(root.resolve("docs")), Files.walk(root.resolve("roadmaps"))))) {
-            for (Path markdown : files.filter(path -> path.toString().endsWith(".md")).toList()) {
+        try (Stream<Path> files = markdownFiles(root)) {
+            for (Path markdown : files.toList()) {
                 Matcher matcher = MARKDOWN_LINK.matcher(Files.readString(markdown));
                 while (matcher.find()) {
                     String target = matcher.group(1);
-                    if (isExternalOrAnchor(target)) {
+                    if (isExternal(target)) {
                         continue;
                     }
-                    String pathOnly = target.split("#", 2)[0];
-                    Path resolved = markdown.getParent()
-                            .resolve(URLDecoder.decode(pathOnly, StandardCharsets.UTF_8))
-                            .normalize();
+                    String[] parts = target.split("#", 2);
+                    String pathOnly = parts[0];
+                    String anchor = parts.length == 2 ? URLDecoder.decode(parts[1], StandardCharsets.UTF_8) : "";
+                    Path resolved = pathOnly.isBlank()
+                            ? markdown
+                            : markdown.getParent()
+                                    .resolve(URLDecoder.decode(pathOnly, StandardCharsets.UTF_8))
+                                    .normalize();
                     if (!Files.exists(resolved)) {
                         brokenLinks.add(root.relativize(markdown) + " -> " + target);
+                        continue;
+                    }
+                    if (!anchor.isBlank() && !markdownAnchors(resolved).contains(anchor)) {
+                        brokenLinks.add(root.relativize(markdown) + " -> " + target + " (missing anchor)");
                     }
                 }
             }
@@ -76,11 +80,60 @@ class DocumentationReleaseArtifactTest {
                 .isEqualTo(configurationReferenceMarkdown(metadata()));
     }
 
-    private static boolean isExternalOrAnchor(String target) {
+    private static Stream<Path> markdownFiles(Path root) throws IOException {
+        return Stream.of(
+                        Stream.of(root.resolve("README.md"), root.resolve("CHANGELOG.md")),
+                        Files.walk(root.resolve("docs")),
+                        Files.walk(root.resolve("roadmaps")))
+                .flatMap(stream -> stream)
+                .filter(path -> path.toString().endsWith(".md"));
+    }
+
+    private static Set<String> markdownAnchors(Path markdown) throws IOException {
+        Set<String> anchors = new HashSet<>();
+        Map<String, Integer> occurrences = new HashMap<>();
+        for (String line : Files.readAllLines(markdown)) {
+            if (!line.startsWith("#")) {
+                continue;
+            }
+            String heading = line.replaceFirst("^#{1,6}\\s+", "").replaceFirst("\\s+#*$", "");
+            if (heading.isBlank()) {
+                continue;
+            }
+            String anchor = markdownAnchor(heading);
+            int duplicate = occurrences.merge(anchor, 1, Integer::sum);
+            anchors.add(duplicate == 1 ? anchor : anchor + "-" + (duplicate - 1));
+        }
+        return anchors;
+    }
+
+    private static String markdownAnchor(String heading) {
+        String normalized = heading.toLowerCase(Locale.ROOT);
+        StringBuilder anchor = new StringBuilder();
+        boolean previousDash = false;
+        for (int i = 0; i < normalized.length(); i++) {
+            char current = normalized.charAt(i);
+            if (Character.isLetterOrDigit(current)) {
+                anchor.append(current);
+                previousDash = false;
+            }
+            else if (Character.isWhitespace(current) || current == '-') {
+                if (!previousDash && anchor.length() > 0) {
+                    anchor.append('-');
+                    previousDash = true;
+                }
+            }
+        }
+        while (anchor.length() > 0 && anchor.charAt(anchor.length() - 1) == '-') {
+            anchor.setLength(anchor.length() - 1);
+        }
+        return anchor.toString();
+    }
+
+    private static boolean isExternal(String target) {
         return target.startsWith("http://")
                 || target.startsWith("https://")
-                || target.startsWith("mailto:")
-                || target.startsWith("#");
+                || target.startsWith("mailto:");
     }
 
     private static void assertVersionSnippets(Path markdown, String projectVersion) throws IOException {

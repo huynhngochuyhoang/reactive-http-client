@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Configuration metadata drift checks.** Metadata tests now verify documented
+  `reactive.http.*` properties against generated metadata, require descriptions
+  and deprecation replacements, and cover OTel conditional properties.
+- **Generated documentation link validation.** Normal tests now validate local Markdown links across README, changelog, docs, and roadmaps, including common heading anchors and roadmap subdirectory links.
+- **API compatibility baseline guard.** The `api-compatibility` profile now
+  fails during `validate` when the configured baseline equals the current
+  reactor version, preventing japicmp self-comparisons against local builds.
 - **Inherited client policy diagnostics.** DEBUG startup diagnostics now report inherited endpoint policy per concrete client, including the parent declaring interface, concrete child client, base URL source, and effective request-timeout source.
 
 ### Changed

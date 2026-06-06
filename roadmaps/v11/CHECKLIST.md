@@ -7,51 +7,51 @@
 
 ## Priority 1 — API Compatibility Baseline Guard
 
-### [ ] 3.1 API compatibility baseline guard
-- [ ] Add an explicit guard for the `api-compatibility` profile when
+### [x] 3.1 API compatibility baseline guard
+- [x] Add an explicit guard for the `api-compatibility` profile when
   `api.compatibility.baseline.version` equals `project.version`.
-- [ ] Make the guard fail before the compatibility comparison can resolve a
+- [x] Make the guard fail before the compatibility comparison can resolve a
   current-reactor artifact as the old baseline.
-- [ ] Include a clear failure message that tells maintainers to choose the last
+- [x] Include a clear failure message that tells maintainers to choose the last
   published release as the baseline.
-- [ ] Document any release-maintainer override only if the implementation needs
+- [x] Document any release-maintainer override only if the implementation needs
   one.
-- [ ] Verify `mvn -Papi-compatibility -DskipTests verify` fails early when the
+- [x] Verify `mvn -Papi-compatibility -DskipTests verify` fails early when the
   baseline equals the current project version.
-- [ ] Verify normal compatibility checks still pass with the current published
+- [x] Verify normal compatibility checks still pass with the current published
   baseline.
 
 ---
 
 ## Priority 2 — Generated Documentation Link Validation
 
-### [ ] 3.2 Generated documentation link validation
-- [ ] Add a focused Markdown local-link validation test for README, docs,
+### [x] 3.2 Generated documentation link validation
+- [x] Add a focused Markdown local-link validation test for README, docs,
   changelog, and roadmaps.
-- [ ] Validate relative links from roadmap subdirectories, including sibling
+- [x] Validate relative links from roadmap subdirectories, including sibling
   links such as `ROADMAP.md` and `CHECKLIST.md`.
-- [ ] Validate common generated heading anchors.
-- [ ] Ignore external links for now unless an explicit networked link checker
+- [x] Validate common generated heading anchors.
+- [x] Ignore external links for now unless an explicit networked link checker
   is added later.
-- [ ] Verify broken local Markdown links fail a normal test.
-- [ ] Verify existing README, docs, changelog, and roadmap links pass.
+- [x] Verify broken local Markdown links fail a normal test.
+- [x] Verify existing README, docs, changelog, and roadmap links pass.
 
 ---
 
 ## Priority 3 — Configuration Metadata Drift for New Properties
 
-### [ ] 3.3 Configuration metadata drift for new properties
-- [ ] Audit `ReactiveHttpClientProperties` against generated configuration
+### [x] 3.3 Configuration metadata drift for new properties
+- [x] Audit `ReactiveHttpClientProperties` against generated configuration
   metadata.
-- [ ] Verify every documented `reactive.http.*` property exists in generated
+- [x] Verify every documented `reactive.http.*` property exists in generated
   metadata.
-- [ ] Verify metadata descriptions cover redirect following, timeout aliases,
+- [x] Verify metadata descriptions cover redirect following, timeout aliases,
   diagnostics, observability, proxy, TLS, default headers, and resilience
   fields.
-- [ ] Verify deprecated aliases include replacement metadata where available.
-- [ ] Verify documented defaults match metadata defaults for timeout, redirect,
+- [x] Verify deprecated aliases include replacement metadata where available.
+- [x] Verify documented defaults match metadata defaults for timeout, redirect,
   observability, proxy, TLS, and resilience fields.
-- [ ] Keep the check fast enough for normal `mvn test`.
+- [x] Keep the check fast enough for normal `mvn test`.
 
 ---
 
