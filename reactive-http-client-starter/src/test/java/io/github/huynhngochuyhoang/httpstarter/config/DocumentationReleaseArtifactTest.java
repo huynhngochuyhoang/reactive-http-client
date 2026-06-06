@@ -73,6 +73,25 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void apiCompatibilityBaselineGuardIsDynamicAndProfileScoped() throws IOException {
+        String pom = Files.readString(projectRoot().resolve("pom.xml"));
+        int profileStart = pom.indexOf("<id>api-compatibility</id>");
+        int profileEnd = pom.indexOf("</profile>", profileStart);
+
+        assertThat(pom)
+                .doesNotContain("api-compatibility-baseline-current-version-guard")
+                .doesNotContain("ERROR-api.compatibility.baseline.version")
+                .doesNotContain("<name>api.compatibility.baseline.version</name>");
+        assertThat(profileStart).as("api-compatibility profile").isNotNegative();
+        assertThat(profileEnd).as("api-compatibility profile end").isGreaterThan(profileStart);
+        assertThat(pom.substring(profileStart, profileEnd))
+                .contains("<id>reject-current-api-baseline</id>")
+                .contains("<inherited>false</inherited>")
+                .contains("<phase>validate</phase>")
+                .contains("<equals arg1=\"${api.compatibility.baseline.version}\" arg2=\"${project.version}\"/>");
+    }
+
+    @Test
     void generatedConfigurationReferenceMatchesMetadata() throws IOException {
         Path reference = projectRoot().resolve("docs/configuration-properties.md");
 
