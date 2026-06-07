@@ -436,3 +436,53 @@ class UserServiceTest {
     }
 }
 ```
+
+---
+
+## `ReactiveHttpClientContractSnapshot`
+
+`ReactiveHttpClientContractSnapshot` renders the effective declarative contract as a deterministic Markdown table. It is useful for approval-style tests around shared parent interfaces, per-client `@ApiRef` maps, timeout policy, redirect policy, and inherited endpoint metadata. It does not create a Spring context.
+
+```java
+@ReactiveHttpClient(name = "internal-users")
+interface InternalUsersClient extends SharedUserOperations {}
+
+@ReactiveHttpClient(name = "partner-users")
+interface PartnerUsersClient extends SharedUserOperations {}
+
+interface SharedUserOperations {
+    @ApiRef("users.get")
+    Mono<String> getUser(@PathVar("id") String id);
+}
+
+@Test
+void sharedContractSnapshot() {
+    ClientConfig internal = new ClientConfig();
+    internal.setBaseUrl("https://internal.example");
+    internal.setRequestTimeoutMs(1000);
+    internal.setApis(Map.of("users.get", api("GET", "/internal/users/{id}")));
+
+    ClientConfig partner = new ClientConfig();
+    partner.setBaseUrl("https://partner.example");
+    partner.setRequestTimeoutMs(2000);
+    partner.setApis(Map.of("users.get", api("GET", "/partner/users/{id}")));
+
+    String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+            .client(InternalUsersClient.class, internal)
+            .client(PartnerUsersClient.class, partner)
+            .filterMethod("getUser")
+            .render();
+
+    assertThat(snapshot).contains("| internal-users |");
+    assertThat(snapshot).contains("/partner/users/{id}");
+}
+
+private static ApiConfig api(String method, String path) {
+    ApiConfig api = new ApiConfig();
+    api.setMethod(method);
+    api.setPath(path);
+    return api;
+}
+```
+
+Rows are sorted by client name, declaring interface, and Java method signature. Use `filterClient("client-name")` and `filterMethod("methodName")` to keep snapshots focused. The output is sanitized: it includes contract metadata such as base URL, timeout source, resilience operator names, and body repeatability, but not auth secrets, default header values, proxy credentials, or request bodies.

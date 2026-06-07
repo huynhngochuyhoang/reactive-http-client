@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.springframework.util.StringUtils;
 
@@ -46,6 +47,7 @@ final class EffectiveHttpClientContractExporter {
         MethodMetadata meta = metadataCache.get(method);
         RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
         EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);
+        BaseUrl effectiveBaseUrl = effectiveBaseUrl(clientInterface, clientConfig);
         ReactiveHttpClientFactoryBean.validatePathTemplate(
                 effectiveApi.pathTemplate(),
                 ReactiveHttpClientFactoryBean.pathVarNames(plan),
@@ -58,12 +60,26 @@ final class EffectiveHttpClientContractExporter {
                 methodSignature(method),
                 effectiveApi.httpMethod(),
                 effectiveApi.pathTemplate(),
+                effectiveBaseUrl.value(),
+                effectiveBaseUrl.source(),
                 plan.apiName(),
                 plan.apiRefName(),
                 timeoutPolicy(plan, effectiveApi, clientConfig),
                 resiliencePolicy(plan, effectiveApi.httpMethod(), clientConfig, resilienceOperatorApplier),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 plan.bodyRepeatability());
+    }
+
+    private static BaseUrl effectiveBaseUrl(Class<?> clientInterface,
+                                            ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+        if (annotation != null && StringUtils.hasText(annotation.baseUrl())) {
+            return new BaseUrl(annotation.baseUrl(), "annotation");
+        }
+        if (clientConfig != null && StringUtils.hasText(clientConfig.getBaseUrl())) {
+            return new BaseUrl(clientConfig.getBaseUrl(), "property");
+        }
+        return new BaseUrl(null, "missing");
     }
 
     private static String pathTemplateContext(Method method, RequestPlan plan) {
@@ -167,6 +183,9 @@ final class EffectiveHttpClientContractExporter {
 
     private static String typeName(Type type) {
         return type.getTypeName();
+    }
+
+    private record BaseUrl(String value, String source) {
     }
 
     private static boolean isDeclarativeClientMethod(Method method) {
