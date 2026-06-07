@@ -35,7 +35,7 @@ final class EffectiveHttpClientContractExporter {
                                                         Method method) {
         MethodMetadata meta = metadataCache.get(method);
         RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
-        EffectiveApi effectiveApi = effectiveApi(plan, clientConfig);
+        EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);
         return new EffectiveHttpClientContract(
                 clientName,
                 clientInterface.getName(),
@@ -47,26 +47,26 @@ final class EffectiveHttpClientContractExporter {
                 plan.apiName(),
                 plan.apiRefName(),
                 timeoutPolicy(plan, effectiveApi, clientConfig),
-                resiliencePolicy(plan, clientConfig),
+                resiliencePolicy(plan, effectiveApi.httpMethod(), clientConfig),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 plan.bodyRepeatability());
     }
 
-    private static EffectiveApi effectiveApi(RequestPlan plan, ReactiveHttpClientProperties.ClientConfig clientConfig) {
+    private static EffectiveApi effectiveApi(RequestPlan plan,
+                                           String clientName,
+                                           ReactiveHttpClientProperties.ClientConfig clientConfig) {
         if (!StringUtils.hasText(plan.apiRefName())) {
             return plan.staticEffectiveApi();
         }
         ReactiveHttpClientProperties.ApiConfig apiConfig = clientConfig.getApis() != null
                 ? clientConfig.getApis().get(plan.apiRefName())
                 : null;
-        if (apiConfig == null) {
-            return new EffectiveApi("unresolved", "unresolved", MethodMetadata.TIMEOUT_NOT_SET);
-        }
+        String configPrefix = ApiRefValidationSupport.configPrefix(clientName, plan.apiRefName());
+        String apiRefContext = ApiRefValidationSupport.apiRefContext(plan.method(), plan.apiRefName());
+        ReactiveHttpClientFactoryBean.validateApiRef(apiConfig, configPrefix, apiRefContext);
         return new EffectiveApi(
-                StringUtils.hasText(apiConfig.getMethod())
-                        ? apiConfig.getMethod().trim().toUpperCase(Locale.ROOT)
-                        : "unresolved",
-                StringUtils.hasText(apiConfig.getPath()) ? apiConfig.getPath() : "unresolved",
+                apiConfig.getMethod().trim().toUpperCase(Locale.ROOT),
+                apiConfig.getPath(),
                 apiConfig.getTimeoutMs());
     }
 
@@ -88,22 +88,32 @@ final class EffectiveHttpClientContractExporter {
             return new EffectiveHttpClientContract.TimeoutPolicy(
                     "deprecated-resilience", resilience.getTimeoutMs());
         }
-        return new EffectiveHttpClientContract.TimeoutPolicy("disabled", MethodMetadata.TIMEOUT_NOT_SET);
+        return new EffectiveHttpClientContract.TimeoutPolicy("disabled", 0);
     }
 
     private static EffectiveHttpClientContract.ResiliencePolicy resiliencePolicy(
             RequestPlan plan,
+            String httpMethod,
             ReactiveHttpClientProperties.ClientConfig clientConfig) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null || !resilience.isEnabled()) {
             return new EffectiveHttpClientContract.ResiliencePolicy(
                     "disabled", "disabled", "disabled", "disabled");
         }
+        String retry = isRetryableMethod(httpMethod, resilience)
+                ? resolve(plan.retryInstanceName(), resilience.getRetry())
+                : "disabled";
         return new EffectiveHttpClientContract.ResiliencePolicy(
-                resolve(plan.retryInstanceName(), resilience.getRetry()),
+                retry,
                 resolve(plan.rateLimiterInstanceName(), resilience.getRateLimiter()),
                 resolve(plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker()),
                 resolve(plan.bulkheadInstanceName(), resilience.getBulkhead()));
+    }
+
+    private static boolean isRetryableMethod(String httpMethod, ReactiveHttpClientProperties.ResilienceConfig resilience) {
+        return httpMethod != null
+                && resilience.getRetryMethods() != null
+                && resilience.getRetryMethods().contains(httpMethod.toUpperCase(Locale.ROOT));
     }
 
     private static String resolve(String methodLevel, String clientLevel) {

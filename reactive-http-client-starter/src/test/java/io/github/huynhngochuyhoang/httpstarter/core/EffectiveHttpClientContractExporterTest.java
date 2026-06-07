@@ -7,8 +7,10 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EffectiveHttpClientContractExporterTest {
 
@@ -21,6 +23,7 @@ class EffectiveHttpClientContractExporterTest {
         ReactiveHttpClientProperties.ResilienceConfig resilience = config.getResilience();
         resilience.setEnabled(true);
         resilience.setRetry("client-retry");
+        resilience.setRetryMethods(Set.of("POST"));
         resilience.setRateLimiter("client-rate-limiter");
         resilience.setCircuitBreaker("client-circuit-breaker");
         resilience.setBulkhead("client-bulkhead");
@@ -77,6 +80,38 @@ class EffectiveHttpClientContractExporterTest {
     }
 
     @Test
+    void failsMissingApiRefInsteadOfExportingPlaceholder() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+
+        assertThatThrownBy(() -> EffectiveHttpClientContractExporter.export(
+                ApiRefClient.class, "diagnostic-client", config, metadataCache))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("reactive.http.clients.diagnostic-client.apis[item.update]")
+                .hasMessageContaining("is not configured");
+    }
+
+    @Test
+    void exportsDisabledTimeoutAsRuntimeValue() {
+        EffectiveHttpClientContract contract = onlyContract(NoTimeoutClient.class,
+                new ReactiveHttpClientProperties.ClientConfig());
+
+        assertThat(contract.timeout()).isEqualTo(new EffectiveHttpClientContract.TimeoutPolicy("disabled", 0));
+    }
+
+    @Test
+    void reportsRetryDisabledForNonRetryableMethods() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = config.getResilience();
+        resilience.setEnabled(true);
+        resilience.setRetry("client-retry");
+
+        EffectiveHttpClientContract contract = onlyContract(PostWithoutRetryMethodClient.class, config);
+
+        assertThat(contract.resilience().retry()).isEqualTo("disabled");
+        assertThat(contract.resilience().rateLimiter()).isEqualTo("default");
+    }
+
+    @Test
     void exportDoesNotIncludeConfiguredSecretValues() {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setDefaultHeaders(Map.of("Authorization", "Bearer secret-token", "X-Tenant", "tenant-a"));
@@ -127,6 +162,18 @@ class EffectiveHttpClientContractExporterTest {
     }
 
     interface ChildClient extends ParentClient {
+    }
+
+    interface NoTimeoutClient {
+
+        @GET("/health")
+        Mono<String> health();
+    }
+
+    interface PostWithoutRetryMethodClient {
+
+        @POST("/items")
+        Mono<String> create();
     }
 
     interface ApiRefClient {
