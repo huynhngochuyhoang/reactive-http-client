@@ -183,7 +183,6 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-antrun-plugin</artifactId>
                         <version>${maven-antrun-plugin.version}</version>
-                        <inherited>false</inherited>
                         <executions>
                             <execution>
                                 <id>reject-current-api-baseline</id>

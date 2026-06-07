@@ -86,7 +86,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(profileEnd).as("api-compatibility profile end").isGreaterThan(profileStart);
         assertThat(pom.substring(profileStart, profileEnd))
                 .contains("<id>reject-current-api-baseline</id>")
-                .contains("<inherited>false</inherited>")
+                .doesNotContain("<inherited>false</inherited>")
                 .contains("<phase>validate</phase>")
                 .contains("<equals arg1=\"${api.compatibility.baseline.version}\" arg2=\"${project.version}\"/>");
     }
