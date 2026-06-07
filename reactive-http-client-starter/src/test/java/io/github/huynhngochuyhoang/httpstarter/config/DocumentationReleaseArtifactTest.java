@@ -6,15 +6,12 @@ import org.junit.jupiter.api.Test;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -36,22 +33,28 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         List<String> brokenLinks = new ArrayList<>();
 
-        try (Stream<Path> files = Stream.concat(
-                Stream.of(root.resolve("README.md")),
-                Stream.concat(Files.walk(root.resolve("docs")), Files.walk(root.resolve("roadmaps"))))) {
-            for (Path markdown : files.filter(path -> path.toString().endsWith(".md")).toList()) {
+        try (Stream<Path> files = markdownFiles(root)) {
+            for (Path markdown : files.toList()) {
                 Matcher matcher = MARKDOWN_LINK.matcher(Files.readString(markdown));
                 while (matcher.find()) {
                     String target = matcher.group(1);
-                    if (isExternalOrAnchor(target)) {
+                    if (isExternal(target)) {
                         continue;
                     }
-                    String pathOnly = target.split("#", 2)[0];
-                    Path resolved = markdown.getParent()
-                            .resolve(URLDecoder.decode(pathOnly, StandardCharsets.UTF_8))
-                            .normalize();
+                    String[] parts = target.split("#", 2);
+                    String pathOnly = parts[0];
+                    String anchor = parts.length == 2 ? URLDecoder.decode(parts[1], StandardCharsets.UTF_8) : "";
+                    Path resolved = pathOnly.isBlank()
+                            ? markdown
+                            : markdown.getParent()
+                                    .resolve(URLDecoder.decode(pathOnly, StandardCharsets.UTF_8))
+                                    .normalize();
                     if (!Files.exists(resolved)) {
                         brokenLinks.add(root.relativize(markdown) + " -> " + target);
+                        continue;
+                    }
+                    if (!anchor.isBlank() && !markdownAnchors(resolved).contains(anchor)) {
+                        brokenLinks.add(root.relativize(markdown) + " -> " + target + " (missing anchor)");
                     }
                 }
             }
@@ -69,18 +72,86 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void apiCompatibilityBaselineGuardIsDynamicAndProfileScoped() throws IOException {
+        String pom = Files.readString(projectRoot().resolve("pom.xml"));
+        int profileStart = pom.indexOf("<id>api-compatibility</id>");
+        int profileEnd = pom.indexOf("</profile>", profileStart);
+
+        assertThat(pom)
+                .doesNotContain("api-compatibility-baseline-current-version-guard")
+                .doesNotContain("ERROR-api.compatibility.baseline.version")
+                .doesNotContain("<name>api.compatibility.baseline.version</name>");
+        assertThat(profileStart).as("api-compatibility profile").isNotNegative();
+        assertThat(profileEnd).as("api-compatibility profile end").isGreaterThan(profileStart);
+        assertThat(pom.substring(profileStart, profileEnd))
+                .contains("<id>reject-current-api-baseline</id>")
+                .doesNotContain("<inherited>false</inherited>")
+                .contains("<phase>validate</phase>")
+                .contains("<equals arg1=\"${api.compatibility.baseline.version}\" arg2=\"${project.version}\"/>");
+    }
+
+    @Test
     void generatedConfigurationReferenceMatchesMetadata() throws IOException {
         Path reference = projectRoot().resolve("docs/configuration-properties.md");
 
         assertThat(Files.readString(reference))
-                .isEqualTo(configurationReferenceMarkdown(metadata()));
+                .isEqualTo(configurationReferenceMarkdown(configurationMetadata(projectRoot())));
     }
 
-    private static boolean isExternalOrAnchor(String target) {
+    private static Stream<Path> markdownFiles(Path root) throws IOException {
+        return Stream.of(
+                        Stream.of(root.resolve("README.md"), root.resolve("CHANGELOG.md")),
+                        Files.walk(root.resolve("docs")),
+                        Files.walk(root.resolve("roadmaps")))
+                .flatMap(stream -> stream)
+                .filter(path -> path.toString().endsWith(".md"));
+    }
+
+    private static Set<String> markdownAnchors(Path markdown) throws IOException {
+        Set<String> anchors = new HashSet<>();
+        Map<String, Integer> occurrences = new HashMap<>();
+        for (String line : Files.readAllLines(markdown)) {
+            if (!line.startsWith("#")) {
+                continue;
+            }
+            String heading = line.replaceFirst("^#{1,6}\\s+", "").replaceFirst("\\s+#*$", "");
+            if (heading.isBlank()) {
+                continue;
+            }
+            String anchor = markdownAnchor(heading);
+            int duplicate = occurrences.merge(anchor, 1, Integer::sum);
+            anchors.add(duplicate == 1 ? anchor : anchor + "-" + (duplicate - 1));
+        }
+        return anchors;
+    }
+
+    private static String markdownAnchor(String heading) {
+        String normalized = heading.toLowerCase(Locale.ROOT);
+        StringBuilder anchor = new StringBuilder();
+        boolean previousDash = false;
+        for (int i = 0; i < normalized.length(); i++) {
+            char current = normalized.charAt(i);
+            if (Character.isLetterOrDigit(current)) {
+                anchor.append(current);
+                previousDash = false;
+            }
+            else if (Character.isWhitespace(current) || current == '-') {
+                if (!previousDash && anchor.length() > 0) {
+                    anchor.append('-');
+                    previousDash = true;
+                }
+            }
+        }
+        while (anchor.length() > 0 && anchor.charAt(anchor.length() - 1) == '-') {
+            anchor.setLength(anchor.length() - 1);
+        }
+        return anchor.toString();
+    }
+
+    private static boolean isExternal(String target) {
         return target.startsWith("http://")
                 || target.startsWith("https://")
-                || target.startsWith("mailto:")
-                || target.startsWith("#");
+                || target.startsWith("mailto:");
     }
 
     private static void assertVersionSnippets(Path markdown, String projectVersion) throws IOException {
@@ -103,24 +174,30 @@ class DocumentationReleaseArtifactTest {
         return document.getElementsByTagName("version").item(0).getTextContent();
     }
 
-    private static JsonNode metadata() throws IOException {
-        try (InputStream input = Thread.currentThread().getContextClassLoader()
-                .getResourceAsStream("META-INF/additional-spring-configuration-metadata.json")) {
-            assertThat(input).as("configuration metadata resource").isNotNull();
-            return OBJECT_MAPPER.readTree(input);
-        }
+    private static List<JsonNode> configurationMetadata(Path root) throws IOException {
+        return List.of(
+                metadata(root, "reactive-http-client-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json"),
+                metadata(root, "reactive-http-client-otel/src/main/resources/META-INF/additional-spring-configuration-metadata.json"));
     }
 
-    private static String configurationReferenceMarkdown(JsonNode metadata) throws IOException {
+    private static JsonNode metadata(Path root, String path) throws IOException {
+        return OBJECT_MAPPER.readTree(root.resolve(path).toFile());
+    }
+
+    private static String configurationReferenceMarkdown(List<JsonNode> metadataFiles) throws IOException {
         StringWriter out = new StringWriter();
         out.append("# Configuration Properties\n\n");
-        out.append("> Generated from `reactive-http-client-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json`.\n");
+        out.append("> Generated from:\n");
+        out.append("> - `reactive-http-client-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json`\n");
+        out.append("> - `reactive-http-client-otel/src/main/resources/META-INF/additional-spring-configuration-metadata.json`\n");
         out.append("> `DocumentationReleaseArtifactTest` fails when this file drifts from metadata.\n\n");
         out.append("| Property | Type | Default | Description | Deprecated |\n");
         out.append("|---|---|---|---|---|\n");
 
         List<JsonNode> properties = new ArrayList<>();
-        metadata.path("properties").forEach(properties::add);
+        for (JsonNode metadata : metadataFiles) {
+            metadata.path("properties").forEach(properties::add);
+        }
         properties.sort(Comparator.comparing(property -> property.path("name").asText()));
 
         for (JsonNode property : properties) {

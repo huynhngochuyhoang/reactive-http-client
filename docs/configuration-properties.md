@@ -1,6 +1,8 @@
 # Configuration Properties
 
-> Generated from `reactive-http-client-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json`.
+> Generated from:
+> - `reactive-http-client-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json`
+> - `reactive-http-client-otel/src/main/resources/META-INF/additional-spring-configuration-metadata.json`
 > `DocumentationReleaseArtifactTest` fails when this file drifts from metadata.
 
 | Property | Type | Default | Description | Deprecated |
@@ -103,3 +105,6 @@
 | `reactive.http.observability.log-request-body` | `java.lang.Boolean` | `false` | Include the request body in span events. Caution: may expose PII or large payloads. Default: false. |  |
 | `reactive.http.observability.log-response-body` | `java.lang.Boolean` | `false` | Include the response body in span events. Caution: may expose PII or large payloads. Default: false. |  |
 | `reactive.http.observability.metric-name` | `java.lang.String` | `"reactive.http.client.requests"` | Micrometer timer/counter name for outbound HTTP client requests. Default: reactive.http.client.requests. |  |
+| `reactive.http.observability.otel.enabled` | `java.lang.Boolean` | `true` | Master switch for OpenTelemetry observer and propagation auto-configuration when the reactive-http-client-otel module and an OpenTelemetry bean are present. Default: true. |  |
+| `reactive.http.observability.otel.propagation.enabled` | `java.lang.Boolean` | `true` | Enable inbound and outbound OpenTelemetry context propagation filters while keeping span recording independently configurable. Default: true. |  |
+| `reactive.http.observability.otel.spans.enabled` | `java.lang.Boolean` | `true` | Enable OpenTelemetry client span recording while keeping propagation independently configurable. Default: true. |  |

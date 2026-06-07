@@ -26,6 +26,11 @@ fixture script verifies that additive APIs pass while removal of a public
 constructor fails. Internal implementation classes and test fixtures are not
 part of the filtered public API comparison.
 
+The profile also fails during `validate` when
+`api.compatibility.baseline.version` equals the current reactor
+`project.version`. Keep the baseline pointed at the last published release so
+Maven cannot satisfy the old artifact from the current reactor or local build.
+
 For an intentional breaking change, target a future major release. Review the
 japicmp report, document the migration in `CHANGELOG.md`, update
 `api.compatibility.baseline.version` after the release-version bump is

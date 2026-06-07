@@ -1,0 +1,39 @@
+{
+  "groups": [
+    {
+      "name": "reactive.http.observability.otel",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.otel.OpenTelemetryHttpClientAutoConfiguration"
+    },
+    {
+      "name": "reactive.http.observability.otel.spans",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.otel.OpenTelemetryHttpClientAutoConfiguration$SpanConfiguration"
+    },
+    {
+      "name": "reactive.http.observability.otel.propagation",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.otel.OpenTelemetryHttpClientAutoConfiguration$PropagationConfiguration"
+    }
+  ],
+  "properties": [
+    {
+      "name": "reactive.http.observability.otel.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Master switch for OpenTelemetry observer and propagation auto-configuration when the reactive-http-client-otel module and an OpenTelemetry bean are present. Default: true.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.otel.OpenTelemetryHttpClientAutoConfiguration",
+      "defaultValue": true
+    },
+    {
+      "name": "reactive.http.observability.otel.spans.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable OpenTelemetry client span recording while keeping propagation independently configurable. Default: true.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.otel.OpenTelemetryHttpClientAutoConfiguration$SpanConfiguration",
+      "defaultValue": true
+    },
+    {
+      "name": "reactive.http.observability.otel.propagation.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable inbound and outbound OpenTelemetry context propagation filters while keeping span recording independently configurable. Default: true.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.otel.OpenTelemetryHttpClientAutoConfiguration$PropagationConfiguration",
+      "defaultValue": true
+    }
+  ]
+}

@@ -31,6 +31,7 @@
         <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
         <maven-deploy-plugin.version>3.1.4</maven-deploy-plugin.version>
         <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+        <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
         <japicmp-maven-plugin.version>0.26.0</japicmp-maven-plugin.version>
         <api.compatibility.baseline.version>2.7.0</api.compatibility.baseline.version>
@@ -178,6 +179,29 @@
             <id>api-compatibility</id>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <version>${maven-antrun-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>reject-current-api-baseline</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <condition property="api.compatibility.baseline.is-current">
+                                            <equals arg1="${api.compatibility.baseline.version}" arg2="${project.version}"/>
+                                        </condition>
+                                        <fail if="api.compatibility.baseline.is-current"
+                                              message="api.compatibility.baseline.version must point to the last published release, not the current reactor version ${project.version}."/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
                     <plugin>
                         <groupId>com.github.siom79.japicmp</groupId>
                         <artifactId>japicmp-maven-plugin</artifactId>

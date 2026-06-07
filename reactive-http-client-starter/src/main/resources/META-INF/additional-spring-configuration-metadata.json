@@ -35,6 +35,59 @@
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties"
     },
     {
+      "name": "reactive.http.clients.[name]",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties"
+    },
+    {
+      "name": "reactive.http.clients.[name].apis",
+      "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties.ApiConfig>",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "sourceMethod": "getApis()"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$AuthConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "sourceMethod": "getAuth()"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2ClientCredentialsAuthConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$AuthConfig",
+      "sourceMethod": "getOauth2ClientCredentials()"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.aws-sig-v4",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$AwsSigV4AuthConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$AuthConfig",
+      "sourceMethod": "getAwsSigV4()"
+    },
+    {
+      "name": "reactive.http.clients.[name].pool",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "sourceMethod": "getPool()"
+    },
+    {
+      "name": "reactive.http.clients.[name].proxy",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "sourceMethod": "getProxy()"
+    },
+    {
+      "name": "reactive.http.clients.[name].resilience",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "sourceMethod": "getResilience()"
+    },
+    {
+      "name": "reactive.http.clients.[name].tls",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "sourceMethod": "getTls()"
+    },
+    {
       "name": "reactive.http.observability",
       "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties",
