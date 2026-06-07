@@ -20,9 +20,18 @@ final class EffectiveHttpClientContractExporter {
                                                     String clientName,
                                                     ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                     MethodMetadataCache metadataCache) {
+        return export(clientInterface, clientName, clientConfig, metadataCache, null);
+    }
+
+    static List<EffectiveHttpClientContract> export(Class<?> clientInterface,
+                                                    String clientName,
+                                                    ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                    MethodMetadataCache metadataCache,
+                                                    ResilienceOperatorApplier resilienceOperatorApplier) {
         return Arrays.stream(clientInterface.getMethods())
                 .filter(EffectiveHttpClientContractExporter::isDeclarativeClientMethod)
-                .map(method -> contract(clientInterface, clientName, clientConfig, metadataCache, method))
+                .map(method -> contract(clientInterface, clientName, clientConfig, metadataCache,
+                        resilienceOperatorApplier, method))
                 .sorted(Comparator.comparing(EffectiveHttpClientContract::declaringInterface)
                         .thenComparing(EffectiveHttpClientContract::javaMethodSignature))
                 .toList();
@@ -32,6 +41,7 @@ final class EffectiveHttpClientContractExporter {
                                                         String clientName,
                                                         ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                         MethodMetadataCache metadataCache,
+                                                        ResilienceOperatorApplier resilienceOperatorApplier,
                                                         Method method) {
         MethodMetadata meta = metadataCache.get(method);
         RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
@@ -51,7 +61,7 @@ final class EffectiveHttpClientContractExporter {
                 plan.apiName(),
                 plan.apiRefName(),
                 timeoutPolicy(plan, effectiveApi, clientConfig),
-                resiliencePolicy(plan, effectiveApi.httpMethod(), clientConfig),
+                resiliencePolicy(plan, effectiveApi.httpMethod(), clientConfig, resilienceOperatorApplier),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 plan.bodyRepeatability());
     }
@@ -105,20 +115,35 @@ final class EffectiveHttpClientContractExporter {
     private static EffectiveHttpClientContract.ResiliencePolicy resiliencePolicy(
             RequestPlan plan,
             String httpMethod,
-            ReactiveHttpClientProperties.ClientConfig clientConfig) {
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            ResilienceOperatorApplier resilienceOperatorApplier) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null || !resilience.isEnabled()) {
             return new EffectiveHttpClientContract.ResiliencePolicy(
                     "disabled", "disabled", "disabled", "disabled");
         }
         String retry = isRetryableMethod(httpMethod, resilience)
-                ? resolve(plan.retryInstanceName(), resilience.getRetry())
+                ? operatorInstance(resilienceOperatorApplier, ResilienceOperatorApplier.InstanceType.RETRY,
+                        plan.retryInstanceName(), resilience.getRetry())
                 : "disabled";
         return new EffectiveHttpClientContract.ResiliencePolicy(
                 retry,
-                resolve(plan.rateLimiterInstanceName(), resilience.getRateLimiter()),
-                resolve(plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker()),
-                resolve(plan.bulkheadInstanceName(), resilience.getBulkhead()));
+                operatorInstance(resilienceOperatorApplier, ResilienceOperatorApplier.InstanceType.RATE_LIMITER,
+                        plan.rateLimiterInstanceName(), resilience.getRateLimiter()),
+                operatorInstance(resilienceOperatorApplier, ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER,
+                        plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker()),
+                operatorInstance(resilienceOperatorApplier, ResilienceOperatorApplier.InstanceType.BULKHEAD,
+                        plan.bulkheadInstanceName(), resilience.getBulkhead()));
+    }
+
+    private static String operatorInstance(ResilienceOperatorApplier resilienceOperatorApplier,
+                                           ResilienceOperatorApplier.InstanceType type,
+                                           String methodLevel,
+                                           String clientLevel) {
+        if (resilienceOperatorApplier != null && !resilienceOperatorApplier.isOperatorAvailable(type)) {
+            return "disabled";
+        }
+        return resolve(methodLevel, clientLevel);
     }
 
     private static boolean isRetryableMethod(String httpMethod, ReactiveHttpClientProperties.ResilienceConfig resilience) {

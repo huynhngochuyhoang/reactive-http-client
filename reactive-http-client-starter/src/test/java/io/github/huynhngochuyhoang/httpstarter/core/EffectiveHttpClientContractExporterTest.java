@@ -112,6 +112,24 @@ class EffectiveHttpClientContractExporterTest {
     }
 
     @Test
+    void reportsResilienceDisabledWhenOperatorsAreUnavailable() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = config.getResilience();
+        resilience.setEnabled(true);
+        resilience.setRetry("client-retry");
+        resilience.setRetryMethods(Set.of("POST"));
+        resilience.setRateLimiter("client-rate-limiter");
+        resilience.setCircuitBreaker("client-circuit-breaker");
+        resilience.setBulkhead("client-bulkhead");
+
+        EffectiveHttpClientContract contract = onlyContract(DirectClient.class, config,
+                new NoopResilienceOperatorApplier());
+
+        assertThat(contract.resilience()).isEqualTo(new EffectiveHttpClientContract.ResiliencePolicy(
+                "disabled", "disabled", "disabled", "disabled"));
+    }
+
+    @Test
     void exportDoesNotIncludeConfiguredSecretValues() {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setDefaultHeaders(Map.of("Authorization", "Bearer secret-token", "X-Tenant", "tenant-a"));
@@ -166,8 +184,14 @@ class EffectiveHttpClientContractExporterTest {
 
     private EffectiveHttpClientContract onlyContract(Class<?> clientInterface,
                                                      ReactiveHttpClientProperties.ClientConfig config) {
+        return onlyContract(clientInterface, config, null);
+    }
+
+    private EffectiveHttpClientContract onlyContract(Class<?> clientInterface,
+                                                     ReactiveHttpClientProperties.ClientConfig config,
+                                                     ResilienceOperatorApplier resilienceOperatorApplier) {
         List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
-                clientInterface, "diagnostic-client", config, metadataCache);
+                clientInterface, "diagnostic-client", config, metadataCache, resilienceOperatorApplier);
         assertThat(contracts).hasSize(1);
         return contracts.get(0);
     }
