@@ -57,19 +57,19 @@
 
 ## Priority 4 — Effective Contract Export for Diagnostics
 
-### [ ] 1.1 Effective contract export for diagnostics
-- [ ] Add an internal effective-contract model for each declarative method.
-- [ ] Include concrete client name, declaring interface, Java method signature,
+### [x] 1.1 Effective contract export for diagnostics
+- [x] Add an internal effective-contract model for each declarative method.
+- [x] Include concrete client name, declaring interface, Java method signature,
   effective HTTP method/path, API name, timeout source, resilience instances,
   redirect policy, and body repeatability classification.
-- [ ] Resolve `@ApiRef` entries against the concrete client's API map.
-- [ ] Identify inherited methods with both parent declaring interface and
+- [x] Resolve `@ApiRef` entries against the concrete client's API map.
+- [x] Identify inherited methods with both parent declaring interface and
   concrete child client.
-- [ ] Sanitize exported diagnostics so auth secrets, default header values,
+- [x] Sanitize exported diagnostics so auth secrets, default header values,
   proxy credentials, and request bodies are absent.
-- [ ] Keep the model limited to test/support diagnostics unless a stronger
+- [x] Keep the model limited to test/support diagnostics unless a stronger
   public API use case is proven.
-- [ ] Add tests for direct methods, inherited methods, `@ApiRef`, and sanitized
+- [x] Add tests for direct methods, inherited methods, `@ApiRef`, and sanitized
   output.
 
 ---

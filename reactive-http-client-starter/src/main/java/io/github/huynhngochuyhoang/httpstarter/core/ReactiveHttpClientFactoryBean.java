@@ -985,7 +985,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         return pathVarNames(meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta));
     }
 
-    private static Set<String> pathVarNames(RequestPlan plan) {
+    static Set<String> pathVarNames(RequestPlan plan) {
         Set<String> names = new LinkedHashSet<>();
         for (RequestPlan.NamedArgumentBinding binding : plan.pathVars()) {
             if (!names.add(binding.name())) {
@@ -996,7 +996,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         return names;
     }
 
-    private static void validatePathTemplate(String pathTemplate, Set<String> declaredPathVars, String context) {
+    static void validatePathTemplate(String pathTemplate, Set<String> declaredPathVars, String context) {
         if (!StringUtils.hasText(pathTemplate)) {
             return;
         }
