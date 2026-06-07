@@ -83,6 +83,47 @@ class ReactiveHttpClientConfigurationMetadataTest {
     }
 
     @Test
+    void configurationMetadataGroupsDoNotUseScalarValueTypes() throws IOException {
+        List<String> scalarGroups = new ArrayList<>();
+        for (Path metadataFile : metadataFiles(projectRoot())) {
+            JsonNode metadata = metadata(metadataFile);
+            for (JsonNode group : metadata.path("groups")) {
+                if ("java.lang.Boolean".equals(group.path("type").asText())) {
+                    scalarGroups.add(projectRoot().relativize(metadataFile) + " -> "
+                            + group.path("name").asText());
+                }
+            }
+        }
+
+        assertThat(scalarGroups).as("metadata groups typed as scalar values").isEmpty();
+    }
+
+    @Test
+    void configurationMetadataGroupSourceMethodsResolve() throws IOException {
+        List<String> invalidSourceMethods = new ArrayList<>();
+        for (Path metadataFile : metadataFiles(projectRoot())) {
+            JsonNode metadata = metadata(metadataFile);
+            for (JsonNode group : metadata.path("groups")) {
+                String sourceType = group.path("sourceType").asText("");
+                String sourceMethod = group.path("sourceMethod").asText("");
+                if (sourceType.isBlank() || sourceMethod.isBlank()) {
+                    continue;
+                }
+                String methodName = sourceMethod.replaceFirst("\\(.*\\)$", "");
+                try {
+                    Class.forName(sourceType).getMethod(methodName);
+                }
+                catch (ReflectiveOperationException ex) {
+                    invalidSourceMethods.add(projectRoot().relativize(metadataFile) + " -> "
+                            + group.path("name").asText() + " uses " + sourceType + "#" + sourceMethod);
+                }
+            }
+        }
+
+        assertThat(invalidSourceMethods).as("metadata group source methods that cannot be resolved").isEmpty();
+    }
+
+    @Test
     void documentedReactiveHttpPropertiesExistInGeneratedMetadata() throws IOException {
         Set<String> metadataNames = allMetadataNames(projectRoot());
         Map<String, Set<String>> missingByFile = new TreeMap<>();
