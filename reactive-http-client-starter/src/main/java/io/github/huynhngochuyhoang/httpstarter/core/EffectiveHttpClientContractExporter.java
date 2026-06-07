@@ -36,6 +36,10 @@ final class EffectiveHttpClientContractExporter {
         MethodMetadata meta = metadataCache.get(method);
         RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
         EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);
+        ReactiveHttpClientFactoryBean.validatePathTemplate(
+                effectiveApi.pathTemplate(),
+                ReactiveHttpClientFactoryBean.pathVarNames(plan),
+                pathTemplateContext(method, plan));
         return new EffectiveHttpClientContract(
                 clientName,
                 clientInterface.getName(),
@@ -50,6 +54,13 @@ final class EffectiveHttpClientContractExporter {
                 resiliencePolicy(plan, effectiveApi.httpMethod(), clientConfig),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 plan.bodyRepeatability());
+    }
+
+    private static String pathTemplateContext(Method method, RequestPlan plan) {
+        if (StringUtils.hasText(plan.apiRefName())) {
+            return ApiRefValidationSupport.apiRefContext(method, plan.apiRefName()) + " path template";
+        }
+        return "Method " + method + " path template";
     }
 
     private static EffectiveApi effectiveApi(RequestPlan plan,

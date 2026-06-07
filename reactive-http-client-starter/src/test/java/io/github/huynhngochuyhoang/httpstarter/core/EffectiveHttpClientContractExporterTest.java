@@ -138,6 +138,32 @@ class EffectiveHttpClientContractExporterTest {
                 .doesNotContain("proxy-secret");
     }
 
+    @Test
+    void failsDirectPathTemplateWithoutMatchingPathVar() {
+        assertThatThrownBy(() -> EffectiveHttpClientContractExporter.export(
+                DirectMissingPathVarClient.class, "diagnostic-client",
+                new ReactiveHttpClientProperties.ClientConfig(), metadataCache))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("URI template variables [id]")
+                .hasMessageContaining("without matching @PathVar parameters");
+    }
+
+    @Test
+    void failsApiRefPathTemplateWithoutMatchingPathVar() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("GET");
+        api.setPath("/configured/{id}");
+        config.setApis(Map.of("item.lookup", api));
+
+        assertThatThrownBy(() -> EffectiveHttpClientContractExporter.export(
+                ApiRefWithoutPathVarClient.class, "diagnostic-client", config, metadataCache))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("@ApiRef(\"item.lookup\")")
+                .hasMessageContaining("URI template variables [id]")
+                .hasMessageContaining("without matching @PathVar parameters");
+    }
+
     private EffectiveHttpClientContract onlyContract(Class<?> clientInterface,
                                                      ReactiveHttpClientProperties.ClientConfig config) {
         List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
@@ -174,6 +200,18 @@ class EffectiveHttpClientContractExporterTest {
 
         @POST("/items")
         Mono<String> create();
+    }
+
+    interface DirectMissingPathVarClient {
+
+        @GET("/items/{id}")
+        Mono<String> get();
+    }
+
+    interface ApiRefWithoutPathVarClient {
+
+        @ApiRef("item.lookup")
+        Mono<String> lookup();
     }
 
     interface ApiRefClient {
