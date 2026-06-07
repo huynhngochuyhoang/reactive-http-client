@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -96,7 +95,7 @@ class DocumentationReleaseArtifactTest {
         Path reference = projectRoot().resolve("docs/configuration-properties.md");
 
         assertThat(Files.readString(reference))
-                .isEqualTo(configurationReferenceMarkdown(metadata()));
+                .isEqualTo(configurationReferenceMarkdown(configurationMetadata(projectRoot())));
     }
 
     private static Stream<Path> markdownFiles(Path root) throws IOException {
@@ -175,24 +174,30 @@ class DocumentationReleaseArtifactTest {
         return document.getElementsByTagName("version").item(0).getTextContent();
     }
 
-    private static JsonNode metadata() throws IOException {
-        try (InputStream input = Thread.currentThread().getContextClassLoader()
-                .getResourceAsStream("META-INF/additional-spring-configuration-metadata.json")) {
-            assertThat(input).as("configuration metadata resource").isNotNull();
-            return OBJECT_MAPPER.readTree(input);
-        }
+    private static List<JsonNode> configurationMetadata(Path root) throws IOException {
+        return List.of(
+                metadata(root, "reactive-http-client-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json"),
+                metadata(root, "reactive-http-client-otel/src/main/resources/META-INF/additional-spring-configuration-metadata.json"));
     }
 
-    private static String configurationReferenceMarkdown(JsonNode metadata) throws IOException {
+    private static JsonNode metadata(Path root, String path) throws IOException {
+        return OBJECT_MAPPER.readTree(root.resolve(path).toFile());
+    }
+
+    private static String configurationReferenceMarkdown(List<JsonNode> metadataFiles) throws IOException {
         StringWriter out = new StringWriter();
         out.append("# Configuration Properties\n\n");
-        out.append("> Generated from `reactive-http-client-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json`.\n");
+        out.append("> Generated from:\n");
+        out.append("> - `reactive-http-client-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json`\n");
+        out.append("> - `reactive-http-client-otel/src/main/resources/META-INF/additional-spring-configuration-metadata.json`\n");
         out.append("> `DocumentationReleaseArtifactTest` fails when this file drifts from metadata.\n\n");
         out.append("| Property | Type | Default | Description | Deprecated |\n");
         out.append("|---|---|---|---|---|\n");
 
         List<JsonNode> properties = new ArrayList<>();
-        metadata.path("properties").forEach(properties::add);
+        for (JsonNode metadata : metadataFiles) {
+            metadata.path("properties").forEach(properties::add);
+        }
         properties.sort(Comparator.comparing(property -> property.path("name").asText()));
 
         for (JsonNode property : properties) {
