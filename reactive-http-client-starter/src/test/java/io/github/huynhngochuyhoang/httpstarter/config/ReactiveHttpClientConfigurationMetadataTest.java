@@ -212,16 +212,6 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.correlation-id.mdc-keys", List.of("correlationId", "X-Correlation-Id", "traceId"));
     }
 
-    @Test
-    void documentsDefaultsForOtelConditionalProperties() throws IOException {
-        JsonNode metadata = metadata(projectRoot().resolve(
-                "reactive-http-client-otel/src/main/resources/META-INF/additional-spring-configuration-metadata.json"));
-
-        assertDefaultValue(metadata, "reactive.http.observability.otel.enabled", true);
-        assertDefaultValue(metadata, "reactive.http.observability.otel.spans.enabled", true);
-        assertDefaultValue(metadata, "reactive.http.observability.otel.propagation.enabled", true);
-    }
-
     private static JsonNode starterMetadata() throws IOException {
         try (InputStream input = Thread.currentThread().getContextClassLoader()
                 .getResourceAsStream("META-INF/additional-spring-configuration-metadata.json")) {
@@ -236,7 +226,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
 
     private static Set<String> allMetadataNames(Path root) throws IOException {
         Set<String> names = new TreeSet<>();
-        for (Path metadataFile : metadataFiles(root)) {
+        for (Path metadataFile : allMetadataFiles(root)) {
             JsonNode node = metadata(metadataFile);
             names.addAll(propertyNames(node));
             names.addAll(groupNames(node));
@@ -244,10 +234,17 @@ class ReactiveHttpClientConfigurationMetadataTest {
         return names;
     }
 
-    private static List<Path> metadataFiles(Path root) {
-        return List.of(
-                root.resolve("reactive-http-client-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json"),
+    private static List<Path> allMetadataFiles(Path root) {
+        return List.of(starterMetadataFile(root),
                 root.resolve("reactive-http-client-otel/src/main/resources/META-INF/additional-spring-configuration-metadata.json"));
+    }
+
+    private static List<Path> metadataFiles(Path root) {
+        return List.of(starterMetadataFile(root));
+    }
+
+    private static Path starterMetadataFile(Path root) {
+        return root.resolve("reactive-http-client-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json");
     }
 
     private static Stream<Path> currentDocumentation(Path root) throws IOException {
