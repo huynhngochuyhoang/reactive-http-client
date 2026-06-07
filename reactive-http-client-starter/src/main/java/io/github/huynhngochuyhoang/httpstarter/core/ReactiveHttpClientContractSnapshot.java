@@ -4,6 +4,9 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.springframework.util.StringUtils;
 
+import java.lang.reflect.Method;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 
 /**
@@ -25,8 +28,8 @@ public final class ReactiveHttpClientContractSnapshot {
                                 ReactiveHttpClientProperties.ClientConfig clientConfig) {
         ReactiveHttpClient annotation = Objects.requireNonNull(clientInterface, "clientInterface")
                 .getAnnotation(ReactiveHttpClient.class);
-        if (annotation == null || !StringUtils.hasText(annotation.name())) {
-            throw new IllegalArgumentException("clientName is required when the interface is not annotated with @ReactiveHttpClient.");
+        if (annotation == null) {
+            throw new IllegalArgumentException("clientName is required when the interface is not annotated with ReactiveHttpClient.");
         }
         return client(clientInterface, annotation.name(), clientConfig);
     }
@@ -52,7 +55,10 @@ public final class ReactiveHttpClientContractSnapshot {
         public Client {
             Objects.requireNonNull(clientInterface, "clientInterface");
             if (!StringUtils.hasText(clientName)) {
-                throw new IllegalArgumentException("clientName must not be blank");
+                ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+                if (annotation == null || !StringUtils.hasText(annotation.baseUrl())) {
+                    throw new IllegalArgumentException("clientName must not be blank unless ReactiveHttpClient.baseUrl is configured");
+                }
             }
             clientConfig = clientConfig != null ? clientConfig : new ReactiveHttpClientProperties.ClientConfig();
         }
@@ -115,8 +121,7 @@ public final class ReactiveHttpClientContractSnapshot {
                             client.clientName(),
                             client.clientConfig(),
                             metadataCache,
-                            resilienceOperatorApplier).stream())
-                    .filter(this::matchesMethod)
+                            resilienceOperatorApplier, this::matchesMethod).stream())
                     .sorted(Comparator.comparing(EffectiveHttpClientContract::clientName)
                             .thenComparing(EffectiveHttpClientContract::declaringInterface)
                             .thenComparing(EffectiveHttpClientContract::javaMethodSignature))
@@ -134,7 +139,7 @@ public final class ReactiveHttpClientContractSnapshot {
                         .append(cell(contract.javaMethodSignature())).append(" | ")
                         .append(cell(contract.httpMethod())).append(" | ")
                         .append(cell(contract.pathTemplate())).append(" | ")
-                        .append(cell(contract.baseUrl())).append(" | ")
+                        .append(cell(redactedBaseUrl(contract.baseUrl()))).append(" | ")
                         .append(cell(contract.baseUrlSource())).append(" | ")
                         .append(cell(contract.apiName())).append(" | ")
                         .append(cell(contract.apiRef())).append(" | ")
@@ -150,18 +155,23 @@ public final class ReactiveHttpClientContractSnapshot {
             return clientNameFilters.isEmpty() || clientNameFilters.contains(client.clientName());
         }
 
-        private boolean matchesMethod(EffectiveHttpClientContract contract) {
+        private boolean matchesMethod(Method method) {
             if (methodNameFilters.isEmpty()) {
                 return true;
             }
-            return methodNameFilters.contains(methodName(contract.javaMethodSignature()))
-                    || methodNameFilters.contains(contract.javaMethodSignature());
+            String signature = methodSignature(method);
+            return methodNameFilters.contains(method.getName())
+                    || methodNameFilters.contains(signature);
         }
     }
 
-    private static String methodName(String javaMethodSignature) {
-        int parametersStart = javaMethodSignature.indexOf('(');
-        return parametersStart >= 0 ? javaMethodSignature.substring(0, parametersStart) : javaMethodSignature;
+    private static String methodSignature(Method method) {
+        return method.getName() + "("
+                + Arrays.stream(method.getGenericParameterTypes())
+                .map(type -> type.getTypeName())
+                .reduce((left, right) -> left + "," + right)
+                .orElse("")
+                + ")";
     }
 
     private static String timeout(EffectiveHttpClientContract.TimeoutPolicy timeout) {
@@ -173,6 +183,28 @@ public final class ReactiveHttpClientContractSnapshot {
                 + ", rateLimiter=" + resilience.rateLimiter()
                 + ", circuitBreaker=" + resilience.circuitBreaker()
                 + ", bulkhead=" + resilience.bulkhead();
+    }
+
+    private static String redactedBaseUrl(String baseUrl) {
+        if (!StringUtils.hasText(baseUrl)) {
+            return baseUrl;
+        }
+        try {
+            URI uri = new URI(baseUrl);
+            if (!StringUtils.hasText(uri.getRawUserInfo())) {
+                return baseUrl;
+            }
+            return new URI(
+                    uri.getScheme(),
+                    "REDACTED",
+                    uri.getHost(),
+                    uri.getPort(),
+                    uri.getPath(),
+                    uri.getQuery(),
+                    uri.getFragment()).toString();
+        } catch (URISyntaxException | IllegalArgumentException ex) {
+            return baseUrl.replaceFirst("(?i)^(https?://)[^@/]+@", "$1REDACTED@");
+        }
     }
 
     private static String cell(Object value) {

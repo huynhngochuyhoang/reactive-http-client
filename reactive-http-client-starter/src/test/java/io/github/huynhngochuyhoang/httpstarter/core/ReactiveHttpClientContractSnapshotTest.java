@@ -72,6 +72,43 @@ class ReactiveHttpClientContractSnapshotTest {
                 .contains("| ping() | GET | /ping | http://direct.example | property |");
     }
 
+    @Test
+    void rendersUrlOnlyAnnotatedClientWithBlankRuntimeName() {
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(UrlOnlyClient.class, new ReactiveHttpClientProperties.ClientConfig())
+                .render();
+
+        assertThat(snapshot)
+                .contains("|  | " + UrlOnlyClient.class.getName())
+                .contains("| ping() | GET | /ping | https://url-only.example | annotation |");
+    }
+
+    @Test
+    void methodFilterAvoidsValidatingUnselectedMethods() {
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(FocusedClient.class, "focused-client", new ReactiveHttpClientProperties.ClientConfig())
+                .filterMethod("good")
+                .render();
+
+        assertThat(snapshot)
+                .contains("| good() | GET | /good |")
+                .doesNotContain("bad()");
+    }
+
+    @Test
+    void redactsCredentialsEmbeddedInBaseUrl() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setBaseUrl("https://user:token@example.com");
+
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(DirectClient.class, config)
+                .render();
+
+        assertThat(snapshot)
+                .contains("https://REDACTED@example.com")
+                .doesNotContain("user:token");
+    }
+
     private ReactiveHttpClientProperties.ClientConfig clientConfig(String baseUrl,
                                                                   long timeoutMs,
                                                                   String method,
@@ -108,5 +145,21 @@ class ReactiveHttpClientContractSnapshotTest {
 
         @GET("/ping")
         Mono<String> ping();
+    }
+
+    @ReactiveHttpClient(name = "", baseUrl = "https://url-only.example")
+    interface UrlOnlyClient {
+
+        @GET("/ping")
+        Mono<String> ping();
+    }
+
+    interface FocusedClient {
+
+        @GET("/good")
+        Mono<String> good();
+
+        @GET("/bad/{id}")
+        Mono<String> bad();
     }
 }

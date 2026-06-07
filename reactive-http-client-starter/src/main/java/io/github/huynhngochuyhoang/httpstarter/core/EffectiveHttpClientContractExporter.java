@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Predicate;
 
 final class EffectiveHttpClientContractExporter {
 
@@ -29,8 +30,18 @@ final class EffectiveHttpClientContractExporter {
                                                     ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                     MethodMetadataCache metadataCache,
                                                     ResilienceOperatorApplier resilienceOperatorApplier) {
+        return export(clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier, null);
+    }
+
+    static List<EffectiveHttpClientContract> export(Class<?> clientInterface,
+                                                    String clientName,
+                                                    ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                    MethodMetadataCache metadataCache,
+                                                    ResilienceOperatorApplier resilienceOperatorApplier,
+                                                    Predicate<Method> methodFilter) {
         return Arrays.stream(clientInterface.getMethods())
                 .filter(EffectiveHttpClientContractExporter::isDeclarativeClientMethod)
+                .filter(method -> methodFilter == null || methodFilter.test(method))
                 .map(method -> contract(clientInterface, clientName, clientConfig, metadataCache,
                         resilienceOperatorApplier, method))
                 .sorted(Comparator.comparing(EffectiveHttpClientContract::declaringInterface)
