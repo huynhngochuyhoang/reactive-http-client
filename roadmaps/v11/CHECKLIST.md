@@ -107,16 +107,16 @@
 
 ## Priority 7 — Generated Configuration Examples from Metadata
 
-### [ ] 2.1 Generated configuration examples from metadata
-- [ ] Add a docs test or generation check that verifies key configuration
+### [x] 2.1 Generated configuration examples from metadata
+- [x] Add a docs test or generation check that verifies key configuration
   examples use valid property names.
-- [ ] Cover timeout, auth, resilience, proxy/TLS, redirect following, default
+- [x] Cover timeout, auth, resilience, proxy/TLS, redirect following, default
   headers, and API-map examples.
-- [ ] Keep generated checks focused and preserve narrative docs.
-- [ ] Verify docs fail fast when a referenced `reactive.http.*` property is not
+- [x] Keep generated checks focused and preserve narrative docs.
+- [x] Verify docs fail fast when a referenced `reactive.http.*` property is not
   present in configuration metadata.
-- [ ] Verify existing multi-client reuse examples remain valid.
-- [ ] Keep the check fast enough for normal `mvn test`.
+- [x] Verify existing multi-client reuse examples remain valid.
+- [x] Keep the check fast enough for normal `mvn test`.
 
 ---
 
