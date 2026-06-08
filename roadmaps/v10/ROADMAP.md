@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V10
 
-> **Status:** draft after `2.8.0`. V10 focuses on shared client contracts,
+> **Status:** completed and released as `2.9.0`. V10 focused on shared client contracts,
 > effective-policy diagnostics, and configuration ergonomics for applications
 > that reuse the same endpoint interface across multiple downstream clients.
 

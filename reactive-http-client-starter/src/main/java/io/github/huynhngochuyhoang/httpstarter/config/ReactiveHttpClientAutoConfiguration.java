@@ -6,6 +6,7 @@ import io.github.huynhngochuyhoang.httpstarter.auth.OAuth2ClientCredentialsAuthP
 import io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder;
 import io.github.huynhngochuyhoang.httpstarter.core.ErrorResponseMapper;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
 import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientHealthIndicator;
@@ -25,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -103,6 +105,15 @@ public class ReactiveHttpClientAutoConfiguration {
     @ConditionalOnMissingBean
     public MethodMetadataCache methodMetadataCache() {
         return new MethodMetadataCache();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ReactiveHttpClientDiagnosticsProvider reactiveHttpClientDiagnosticsProvider(
+            ConfigurableListableBeanFactory beanFactory,
+            ReactiveHttpClientProperties properties,
+            MethodMetadataCache metadataCache) {
+        return new ReactiveHttpClientDiagnosticsProvider(beanFactory, properties, metadataCache);
     }
 
     @Bean

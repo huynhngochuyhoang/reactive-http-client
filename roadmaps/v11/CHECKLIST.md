@@ -122,33 +122,33 @@
 
 ## Priority 8 — Runtime Diagnostics Provider
 
-### [ ] 1.3 Runtime diagnostics provider
-- [ ] Provide a bean-friendly diagnostics provider that returns sanitized client
+### [x] 1.3 Runtime diagnostics provider
+- [x] Provide a bean-friendly diagnostics provider that returns sanitized client
   summaries.
-- [ ] Include client name, base URL source, timeout summary, resilience summary,
+- [x] Include client name, base URL source, timeout summary, resilience summary,
   auth mode summary, redirect following, and registered endpoint count.
-- [ ] Report inherited endpoint counts correctly.
-- [ ] Keep the provider independent from Spring Boot Actuator.
-- [ ] Document a small optional Actuator endpoint wrapper that applications can
+- [x] Report inherited endpoint counts correctly.
+- [x] Keep the provider independent from Spring Boot Actuator.
+- [x] Document a small optional Actuator endpoint wrapper that applications can
   own.
-- [ ] Verify the provider does not expose secret values.
-- [ ] Verify the starter does not add a built-in endpoint or new web
+- [x] Verify the provider does not expose secret values.
+- [x] Verify the starter does not add a built-in endpoint or new web
   dependency.
 
 ---
 
 ## Priority 9 — Release Evidence Manifest
 
-### [ ] 2.2 Release evidence manifest
-- [ ] Add a small release evidence manifest under `target/` or generated docs
+### [x] 2.2 Release evidence manifest
+- [x] Add a small release evidence manifest under `target/` or generated docs
   output.
-- [ ] Capture project version, API compatibility baseline version, Java version,
+- [x] Capture project version, API compatibility baseline version, Java version,
   Spring Boot baseline, and pass/fail command names.
-- [ ] Make it obvious when the baseline equals the current reactor version.
-- [ ] Keep generated target files out of source by default.
-- [ ] Document how to attach or paste the manifest into release notes.
-- [ ] Verify `mvn test` can produce or verify the manifest.
-- [ ] Run `mvn test`.
-- [ ] Run `mvn -Papi-compatibility -DskipTests verify`.
-- [ ] Run API compatibility fixtures.
-- [ ] Run `git diff --check`.
+- [x] Make it obvious when the baseline equals the current reactor version.
+- [x] Keep generated target files out of source by default.
+- [x] Document how to attach or paste the manifest into release notes.
+- [x] Verify `mvn test` can produce or verify the manifest.
+- [x] Run `mvn test`.
+- [x] Run `mvn -Papi-compatibility -DskipTests verify`.
+- [x] Run API compatibility fixtures.
+- [x] Run `git diff --check`.
