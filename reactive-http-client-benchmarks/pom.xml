@@ -17,8 +17,6 @@
     <properties>
         <benchmark.result.dir>${project.build.directory}/benchmark-reports</benchmark.result.dir>
         <benchmark.commit>unknown</benchmark.commit>
-        <benchmark.spring-webflux.version>6.2.7</benchmark.spring-webflux.version>
-        <benchmark.reactor-netty.version>1.2.6</benchmark.reactor-netty.version>
     </properties>
 
     <dependencies>
@@ -77,6 +75,20 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>resolve-benchmark-dependency-paths</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.6.0</version>
                 <executions>
@@ -121,8 +133,8 @@
                                     <arguments>
                                         <argument>-Dbenchmark.project.version=${project.version}</argument>
                                         <argument>-Dbenchmark.spring-boot.version=${spring-boot.version}</argument>
-                                        <argument>-Dbenchmark.spring-webflux.version=${benchmark.spring-webflux.version}</argument>
-                                        <argument>-Dbenchmark.reactor-netty.version=${benchmark.reactor-netty.version}</argument>
+                                        <argument>-Dbenchmark.spring-webflux.artifact=${org.springframework:spring-webflux:jar}</argument>
+                                        <argument>-Dbenchmark.reactor-netty.artifact=${io.projectreactor.netty:reactor-netty-http:jar}</argument>
                                         <argument>-Dbenchmark.commit=${benchmark.commit}</argument>
                                         <argument>-jar</argument>
                                         <argument>${project.build.directory}/benchmarks.jar</argument>
@@ -170,8 +182,8 @@
                                     <arguments>
                                         <argument>-Dbenchmark.project.version=${project.version}</argument>
                                         <argument>-Dbenchmark.spring-boot.version=${spring-boot.version}</argument>
-                                        <argument>-Dbenchmark.spring-webflux.version=${benchmark.spring-webflux.version}</argument>
-                                        <argument>-Dbenchmark.reactor-netty.version=${benchmark.reactor-netty.version}</argument>
+                                        <argument>-Dbenchmark.spring-webflux.artifact=${org.springframework:spring-webflux:jar}</argument>
+                                        <argument>-Dbenchmark.reactor-netty.artifact=${io.projectreactor.netty:reactor-netty-http:jar}</argument>
                                         <argument>-Dbenchmark.commit=${benchmark.commit}</argument>
                                         <argument>-jar</argument>
                                         <argument>${project.build.directory}/benchmarks.jar</argument>

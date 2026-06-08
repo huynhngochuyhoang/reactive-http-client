@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.benchmarks;
 
 import org.openjdk.jmh.Main;
+import org.springframework.core.SpringVersion;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
@@ -38,10 +39,14 @@ public final class BenchmarkRunner {
         properties.setProperty("benchmarkCommit", System.getProperty("benchmark.commit", "unknown"));
         properties.setProperty("springBootVersion", System.getProperty("benchmark.spring-boot.version", "unknown"));
         properties.setProperty("springWebFluxVersion", System.getProperty("benchmark.spring-webflux.version",
-                mavenVersion("org.springframework", "spring-webflux")
+                artifactVersion("benchmark.spring-webflux.artifact", "spring-webflux")
+                        .or(() -> loadedSpringVersion())
+                        .or(() -> mavenVersion("org.springframework", "spring-webflux"))
                         .orElseGet(() -> packageVersion(WebClient.class))));
         properties.setProperty("reactorNettyVersion", System.getProperty("benchmark.reactor-netty.version",
-                mavenVersion("io.projectreactor.netty", "reactor-netty-http")
+                artifactVersion("benchmark.reactor-netty.artifact", "reactor-netty-http")
+                        .or(() -> loadedReactorNettyVersion())
+                        .or(() -> mavenVersion("io.projectreactor.netty", "reactor-netty-http"))
                         .orElseGet(() -> packageVersion(HttpClient.class))));
         properties.setProperty("javaVersion", System.getProperty("java.version", "unknown"));
         properties.setProperty("javaVm", System.getProperty("java.vm.name", "unknown"));
@@ -66,10 +71,45 @@ public final class BenchmarkRunner {
         return null;
     }
 
+    private static Optional<String> loadedSpringVersion() {
+        return usableVersion(SpringVersion.getVersion());
+    }
+
+    private static Optional<String> loadedReactorNettyVersion() {
+        try {
+            java.lang.reflect.Method method = HttpClient.class.getDeclaredMethod("reactorNettyVersion");
+            method.setAccessible(true);
+            Object version = method.invoke(null);
+            return version instanceof String value ? usableVersion(value) : Optional.empty();
+        } catch (ReflectiveOperationException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<String> artifactVersion(String propertyName, String artifactId) {
+        String artifactPath = System.getProperty(propertyName);
+        if (artifactPath == null || artifactPath.isBlank()) {
+            return Optional.empty();
+        }
+        String fileName = Path.of(artifactPath).getFileName().toString();
+        String prefix = artifactId + "-";
+        if (!fileName.startsWith(prefix) || !fileName.endsWith(".jar")) {
+            return Optional.empty();
+        }
+        return usableVersion(fileName.substring(prefix.length(), fileName.length() - ".jar".length()));
+    }
+
+    private static Optional<String> usableVersion(String version) {
+        if (version == null || version.isBlank() || "unknown".equalsIgnoreCase(version) || "dev".equalsIgnoreCase(version)) {
+            return Optional.empty();
+        }
+        return Optional.of(version);
+    }
+
     private static String packageVersion(Class<?> type) {
         Package packageInfo = type.getPackage();
         String version = packageInfo != null ? packageInfo.getImplementationVersion() : null;
-        return version != null ? version : "unknown";
+        return usableVersion(version).orElse("unknown");
     }
 
     private static Optional<String> mavenVersion(String groupId, String artifactId) {
@@ -80,7 +120,7 @@ public final class BenchmarkRunner {
             }
             Properties properties = new Properties();
             properties.load(input);
-            return Optional.ofNullable(properties.getProperty("version"));
+            return usableVersion(properties.getProperty("version"));
         } catch (IOException ignored) {
             return Optional.empty();
         }
