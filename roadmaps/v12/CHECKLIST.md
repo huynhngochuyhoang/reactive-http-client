@@ -7,23 +7,23 @@
 
 ## Priority 1 — Benchmark Module and Repeatable Harness
 
-### [ ] 1.1 Benchmark module and repeatable harness
-- [ ] Add a dedicated benchmark module or Maven profile that is excluded from
+### [x] 1.1 Benchmark module and repeatable harness
+- [x] Add a dedicated benchmark module or Maven profile that is excluded from
       normal `mvn test`.
-- [ ] Add JMH microbenchmarks for proxy invocation, argument resolution,
+- [x] Add JMH microbenchmarks for proxy invocation, argument resolution,
       metadata lookup, and request construction.
-- [ ] Add an end-to-end benchmark harness against a local in-process or loopback
+- [x] Add an end-to-end benchmark harness against a local in-process or loopback
       server with fixed response bodies.
-- [ ] Build equivalent raw `WebClient`, Spring HTTP Interface, and starter
+- [x] Build equivalent raw `WebClient`, Spring HTTP Interface, and starter
       clients with the same transport, codecs, base URL, request model, and
       server.
-- [ ] Add a quick benchmark command that acts only as a harness smoke check.
-- [ ] Ensure quick benchmark output is labeled smoke-only and excluded from
+- [x] Add a quick benchmark command that acts only as a harness smoke check.
+- [x] Ensure quick benchmark output is labeled smoke-only and excluded from
       publishable benchmark reports.
-- [ ] Add a longer release-quality benchmark command for maintainers.
-- [ ] Capture environment metadata: Java version, OS, CPU, Spring Boot version,
+- [x] Add a longer release-quality benchmark command for maintainers.
+- [x] Capture environment metadata: Java version, OS, CPU, Spring Boot version,
       Reactor Netty version, project version, and benchmark commit.
-- [ ] Document benchmark commands and keep them out of default CI.
+- [x] Document benchmark commands and keep them out of default CI.
 
 ---
 
