@@ -108,7 +108,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
-    void debugStartupDiagnosticsReportInheritedMethodPolicyPerConcreteClient(CapturedOutput output) throws Exception {
+    void debugStartupDiagnosticsReportMethodPolicyPerConcreteClient(CapturedOutput output) throws Exception {
         Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
         Level previousLevel = logger.getLevel();
         logger.setLevel(Level.DEBUG);
@@ -130,14 +130,14 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
             partnerFactory.getObject();
 
             assertThat(output.getOut())
-                    .contains("Reactive HTTP client [internal-policy-client] inherited method policy")
+                    .contains("Reactive HTTP client [internal-policy-client] method policy")
                     .contains("method=[InheritedPolicyOperations#getUser]")
                     .contains("declaredBy=" + InheritedPolicyOperations.class.getName())
                     .contains("concreteClient=" + InternalPolicyClient.class.getName())
                     .contains("inherited=true")
                     .contains("baseUrl=http://internal.example (source=property)")
                     .contains("requestTimeout=client request-timeout-ms(1000ms)")
-                    .contains("Reactive HTTP client [partner-policy-client] inherited method policy")
+                    .contains("Reactive HTTP client [partner-policy-client] method policy")
                     .contains("concreteClient=" + PartnerPolicyClient.class.getName())
                     .contains("baseUrl=http://partner.example (source=property)")
                     .contains("requestTimeout=client request-timeout-ms(2000ms)");
@@ -145,6 +145,67 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
             logger.setLevel(previousLevel);
             internalFactory.destroy();
             partnerFactory.destroy();
+        }
+    }
+
+    @Test
+    void methodPolicyDiagnosticsUseStableFieldsForDirectAndInheritedMethods(CapturedOutput output) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig direct = clientConfig("http://direct-policy.example");
+        properties.getClients().put("diagnostic-client", direct);
+        ReactiveHttpClientProperties.ClientConfig inherited = clientConfig("http://inherited-policy.example");
+        inherited.setFollowRedirects(true);
+        inherited.setRequestTimeoutMs(1000);
+        properties.getClients().put("internal-policy-client", inherited);
+
+        ReactiveHttpClientFactoryBean<DiagnosticClient> directFactory =
+                buildFactoryBean(properties, DiagnosticClient.class);
+        ReactiveHttpClientFactoryBean<InternalPolicyClient> inheritedFactory =
+                buildFactoryBean(properties, InternalPolicyClient.class);
+        try {
+            directFactory.getObject();
+            inheritedFactory.getObject();
+
+            assertThat(output.getOut().lines()
+                    .filter(line -> line.contains("Reactive HTTP client [diagnostic-client] method policy"))
+                    .findFirst())
+                    .hasValueSatisfying(line -> assertThat(line)
+                            .contains("method=[DiagnosticClient#ping]")
+                            .contains("declaredBy=" + DiagnosticClient.class.getName())
+                            .contains("concreteClient=" + DiagnosticClient.class.getName())
+                            .contains("inherited=false")
+                            .contains("apiRef=none")
+                            .contains("httpMethod=GET")
+                            .contains("pathTemplate=/ping")
+                            .contains("baseUrl=http://direct-policy.example (source=property)")
+                            .contains("requestTimeout=disabled")
+                            .contains("redirectPolicy=manual")
+                            .contains("retrySafety=SAFE_METHOD")
+                            .contains("bodyRepeatability=NONE"));
+            assertThat(output.getOut().lines()
+                    .filter(line -> line.contains("Reactive HTTP client [internal-policy-client] method policy"))
+                    .findFirst())
+                    .hasValueSatisfying(line -> assertThat(line)
+                            .contains("method=[InheritedPolicyOperations#getUser]")
+                            .contains("declaredBy=" + InheritedPolicyOperations.class.getName())
+                            .contains("concreteClient=" + InternalPolicyClient.class.getName())
+                            .contains("inherited=true")
+                            .contains("apiRef=none")
+                            .contains("httpMethod=GET")
+                            .contains("pathTemplate=/users/{id}")
+                            .contains("baseUrl=http://inherited-policy.example (source=property)")
+                            .contains("requestTimeout=client request-timeout-ms(1000ms)")
+                            .contains("redirectPolicy=follow")
+                            .contains("retrySafety=SAFE_METHOD")
+                            .contains("bodyRepeatability=NONE"));
+        } finally {
+            logger.setLevel(previousLevel);
+            directFactory.destroy();
+            inheritedFactory.destroy();
         }
     }
 
@@ -165,7 +226,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
             factoryBean.getObject();
 
             assertThat(output.getOut())
-                    .contains("Reactive HTTP client [method-timeout-policy-client] inherited method policy")
+                    .contains("Reactive HTTP client [method-timeout-policy-client] method policy")
                     .contains("baseUrl=http://method-timeout.annotation (source=annotation)")
                     .contains("method=[MethodTimeoutPolicyOperations#getUser]")
                     .contains("requestTimeout=method @TimeoutMs(350ms)")
@@ -209,12 +270,14 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
             disabledFactory.getObject();
 
             assertThat(output.getOut())
-                    .contains("Reactive HTTP client [api-ref-policy-client] inherited method policy")
+                    .contains("Reactive HTTP client [api-ref-policy-client] method policy")
+                    .contains("apiRef=user.lookup")
+                    .contains("httpMethod=GET")
                     .contains("pathTemplate=/api-ref-users/{id}")
                     .contains("requestTimeout=@ApiRef timeout-ms(1200ms)")
-                    .contains("Reactive HTTP client [deprecated-timeout-policy-client] inherited method policy")
+                    .contains("Reactive HTTP client [deprecated-timeout-policy-client] method policy")
                     .contains("requestTimeout=deprecated resilience.timeout-ms(1800ms)")
-                    .contains("Reactive HTTP client [disabled-timeout-policy-client] inherited method policy")
+                    .contains("Reactive HTTP client [disabled-timeout-policy-client] method policy")
                     .contains("requestTimeout=disabled");
         } finally {
             logger.setLevel(previousLevel);
@@ -225,7 +288,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
-    void inheritedMethodPolicyDiagnosticsStayOutOfInfoLogs(CapturedOutput output) throws Exception {
+    void methodPolicyDiagnosticsStayOutOfInfoLogs(CapturedOutput output) throws Exception {
         Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
         Level previousLevel = logger.getLevel();
         logger.setLevel(Level.INFO);
@@ -240,7 +303,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         try {
             factoryBean.getObject();
 
-            assertThat(output.getOut()).doesNotContain("inherited method policy");
+            assertThat(output.getOut()).doesNotContain("method policy");
         } finally {
             logger.setLevel(previousLevel);
             factoryBean.destroy();
