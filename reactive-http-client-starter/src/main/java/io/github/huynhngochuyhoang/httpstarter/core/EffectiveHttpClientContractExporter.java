@@ -7,6 +7,8 @@ import org.springframework.util.StringUtils;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -71,7 +73,7 @@ final class EffectiveHttpClientContractExporter {
                 methodSignature(method),
                 effectiveApi.httpMethod(),
                 effectiveApi.pathTemplate(),
-                effectiveBaseUrl.value(),
+                redactedBaseUrl(effectiveBaseUrl.value()),
                 effectiveBaseUrl.source(),
                 plan.apiName(),
                 plan.apiRefName(),
@@ -91,6 +93,22 @@ final class EffectiveHttpClientContractExporter {
             return new BaseUrl(clientConfig.getBaseUrl(), "property");
         }
         return new BaseUrl(null, "missing");
+    }
+
+    private static String redactedBaseUrl(String baseUrl) {
+        if (!StringUtils.hasText(baseUrl)) {
+            return baseUrl;
+        }
+        try {
+            URI uri = new URI(baseUrl);
+            if (!StringUtils.hasText(uri.getRawUserInfo())) {
+                return baseUrl;
+            }
+            return new URI(uri.getScheme(), "REDACTED", uri.getHost(), uri.getPort(),
+                    uri.getPath(), uri.getQuery(), uri.getFragment()).toString();
+        } catch (URISyntaxException | IllegalArgumentException ex) {
+            return baseUrl.replaceFirst("(?i)^(https?://)[^@/]+@", "$1REDACTED@");
+        }
     }
 
     private static String pathTemplateContext(Method method, RequestPlan plan) {
