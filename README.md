@@ -220,6 +220,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Lifecycle Hooks](docs/19-lifecycle-hooks.md) | Ordered invocation callbacks |
 | [Native Image and Release Compatibility](docs/20-native-release-compatibility.md) | AOT support and smoke matrix |
 | [Diagnostic Context Contracts](docs/21-diagnostic-contexts.md) | Extension-point capability matrix |
+| [Benchmarks](docs/22-benchmarks.md) | Benchmark harness and commands |
 | [Configuration Properties](docs/configuration-properties.md) | Generated property reference |
 | [Examples](docs/examples/README.md) | Copy-paste snippets |
 
