@@ -132,6 +132,7 @@ class EffectiveHttpClientContractExporterTest {
     @Test
     void exportDoesNotIncludeConfiguredSecretValues() {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setBaseUrl("https://user:token@example.com");
         config.setDefaultHeaders(Map.of("Authorization", "Bearer secret-token", "X-Tenant", "tenant-a"));
         config.setAuthProvider("secretAuthProviderBean");
         ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
@@ -144,9 +145,12 @@ class EffectiveHttpClientContractExporterTest {
         proxy.setPassword("proxy-secret");
         config.setProxy(proxy);
 
-        String exported = onlyContract(DirectClient.class, config).toString();
+        EffectiveHttpClientContract contract = onlyContract(DirectClient.class, config);
+        String exported = contract.toString();
 
+        assertThat(contract.baseUrl()).isEqualTo("https://REDACTED@example.com");
         assertThat(exported)
+                .doesNotContain("user:token")
                 .doesNotContain("secret-token")
                 .doesNotContain("tenant-a")
                 .doesNotContain("secretAuthProviderBean")

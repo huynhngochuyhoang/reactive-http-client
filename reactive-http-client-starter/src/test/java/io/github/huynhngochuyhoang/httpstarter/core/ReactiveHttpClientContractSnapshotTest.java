@@ -1,0 +1,165 @@
+package io.github.huynhngochuyhoang.httpstarter.core;
+
+import io.github.huynhngochuyhoang.httpstarter.annotation.ApiRef;
+import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
+import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
+import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
+
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ReactiveHttpClientContractSnapshotTest {
+
+    @Test
+    void rendersDeterministicMarkdownForSharedApiRefContracts() {
+        ReactiveHttpClientProperties.ClientConfig internal = clientConfig(
+                "http://internal.example", 1000, "GET", "/internal-users/{id}");
+        ReactiveHttpClientProperties.ClientConfig partner = clientConfig(
+                "http://partner.example", 2000, "GET", "/partner-users/{id}");
+
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(PartnerUserClient.class, partner)
+                .client(InternalUserClient.class, internal)
+                .filterMethod("getUser")
+                .render();
+
+        assertThat(snapshot).isEqualTo("""
+                | Client | Interface | Declared By | Inherited | Method | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Timeout | Resilience | Redirect | Body |
+                |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+                | internal-users | %s | %s | true | getUser(java.lang.String) | GET | /internal-users/{id} | http://internal.example | property | users.get | users.get | client:1000ms | retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled | manual | NONE |
+                | partner-users | %s | %s | true | getUser(java.lang.String) | GET | /partner-users/{id} | http://partner.example | property | users.get | users.get | client:2000ms | retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled | manual | NONE |
+                """.formatted(
+                InternalUserClient.class.getName(), SharedUserOperations.class.getName(),
+                PartnerUserClient.class.getName(), SharedUserOperations.class.getName()));
+    }
+
+    @Test
+    void filtersByClientNameAndMethodName() {
+        ReactiveHttpClientProperties.ClientConfig internal = clientConfig(
+                "http://internal.example", 1000, "GET", "/internal-users/{id}");
+        ReactiveHttpClientProperties.ClientConfig partner = clientConfig(
+                "http://partner.example", 2000, "GET", "/partner-users/{id}");
+
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(InternalUserClient.class, internal)
+                .client(PartnerUserClient.class, partner)
+                .filterClient("partner-users")
+                .filterMethod("getUser")
+                .render();
+
+        assertThat(snapshot)
+                .contains("| partner-users |")
+                .contains("| getUser(java.lang.String) |")
+                .doesNotContain("| internal-users |")
+                .doesNotContain("| listUsers() |");
+    }
+
+    @Test
+    void canRenderAnnotatedDirectClientWithoutSpringContext() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setBaseUrl("http://direct.example");
+
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(DirectClient.class, config)
+                .render();
+
+        assertThat(snapshot)
+                .contains("| direct-client |")
+                .contains("| ping() | GET | /ping | http://direct.example | property |");
+    }
+
+    @Test
+    void rendersUrlOnlyAnnotatedClientWithBlankRuntimeName() {
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(UrlOnlyClient.class, new ReactiveHttpClientProperties.ClientConfig())
+                .render();
+
+        assertThat(snapshot)
+                .contains("|  | " + UrlOnlyClient.class.getName())
+                .contains("| ping() | GET | /ping | https://url-only.example | annotation |");
+    }
+
+    @Test
+    void methodFilterAvoidsValidatingUnselectedMethods() {
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(FocusedClient.class, "focused-client", new ReactiveHttpClientProperties.ClientConfig())
+                .filterMethod("good")
+                .render();
+
+        assertThat(snapshot)
+                .contains("| good() | GET | /good |")
+                .doesNotContain("bad()");
+    }
+
+    @Test
+    void redactsCredentialsEmbeddedInBaseUrl() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setBaseUrl("https://user:token@example.com");
+
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(DirectClient.class, config)
+                .render();
+
+        assertThat(snapshot)
+                .contains("https://REDACTED@example.com")
+                .doesNotContain("user:token");
+    }
+
+    private ReactiveHttpClientProperties.ClientConfig clientConfig(String baseUrl,
+                                                                  long timeoutMs,
+                                                                  String method,
+                                                                  String path) {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setBaseUrl(baseUrl);
+        config.setRequestTimeoutMs(timeoutMs);
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod(method);
+        api.setPath(path);
+        config.setApis(Map.of("users.get", api));
+        return config;
+    }
+
+    interface SharedUserOperations {
+
+        @ApiRef("users.get")
+        Mono<String> getUser(@PathVar("id") String id);
+
+        @GET("/users")
+        Mono<String> listUsers();
+    }
+
+    @ReactiveHttpClient(name = "internal-users")
+    interface InternalUserClient extends SharedUserOperations {
+    }
+
+    @ReactiveHttpClient(name = "partner-users")
+    interface PartnerUserClient extends SharedUserOperations {
+    }
+
+    @ReactiveHttpClient(name = "direct-client")
+    interface DirectClient {
+
+        @GET("/ping")
+        Mono<String> ping();
+    }
+
+    @ReactiveHttpClient(name = "", baseUrl = "https://url-only.example")
+    interface UrlOnlyClient {
+
+        @GET("/ping")
+        Mono<String> ping();
+    }
+
+    interface FocusedClient {
+
+        @GET("/good")
+        Mono<String> good();
+
+        @GET("/bad/{id}")
+        Mono<String> bad();
+    }
+}

@@ -1,15 +1,19 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Predicate;
 
 final class EffectiveHttpClientContractExporter {
 
@@ -28,8 +32,18 @@ final class EffectiveHttpClientContractExporter {
                                                     ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                     MethodMetadataCache metadataCache,
                                                     ResilienceOperatorApplier resilienceOperatorApplier) {
+        return export(clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier, null);
+    }
+
+    static List<EffectiveHttpClientContract> export(Class<?> clientInterface,
+                                                    String clientName,
+                                                    ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                    MethodMetadataCache metadataCache,
+                                                    ResilienceOperatorApplier resilienceOperatorApplier,
+                                                    Predicate<Method> methodFilter) {
         return Arrays.stream(clientInterface.getMethods())
                 .filter(EffectiveHttpClientContractExporter::isDeclarativeClientMethod)
+                .filter(method -> methodFilter == null || methodFilter.test(method))
                 .map(method -> contract(clientInterface, clientName, clientConfig, metadataCache,
                         resilienceOperatorApplier, method))
                 .sorted(Comparator.comparing(EffectiveHttpClientContract::declaringInterface)
@@ -46,6 +60,7 @@ final class EffectiveHttpClientContractExporter {
         MethodMetadata meta = metadataCache.get(method);
         RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
         EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);
+        BaseUrl effectiveBaseUrl = effectiveBaseUrl(clientInterface, clientConfig);
         ReactiveHttpClientFactoryBean.validatePathTemplate(
                 effectiveApi.pathTemplate(),
                 ReactiveHttpClientFactoryBean.pathVarNames(plan),
@@ -58,12 +73,42 @@ final class EffectiveHttpClientContractExporter {
                 methodSignature(method),
                 effectiveApi.httpMethod(),
                 effectiveApi.pathTemplate(),
+                redactedBaseUrl(effectiveBaseUrl.value()),
+                effectiveBaseUrl.source(),
                 plan.apiName(),
                 plan.apiRefName(),
                 timeoutPolicy(plan, effectiveApi, clientConfig),
                 resiliencePolicy(plan, effectiveApi.httpMethod(), clientConfig, resilienceOperatorApplier),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 plan.bodyRepeatability());
+    }
+
+    private static BaseUrl effectiveBaseUrl(Class<?> clientInterface,
+                                            ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+        if (annotation != null && StringUtils.hasText(annotation.baseUrl())) {
+            return new BaseUrl(annotation.baseUrl(), "annotation");
+        }
+        if (clientConfig != null && StringUtils.hasText(clientConfig.getBaseUrl())) {
+            return new BaseUrl(clientConfig.getBaseUrl(), "property");
+        }
+        return new BaseUrl(null, "missing");
+    }
+
+    private static String redactedBaseUrl(String baseUrl) {
+        if (!StringUtils.hasText(baseUrl)) {
+            return baseUrl;
+        }
+        try {
+            URI uri = new URI(baseUrl);
+            if (!StringUtils.hasText(uri.getRawUserInfo())) {
+                return baseUrl;
+            }
+            return new URI(uri.getScheme(), "REDACTED", uri.getHost(), uri.getPort(),
+                    uri.getPath(), uri.getQuery(), uri.getFragment()).toString();
+        } catch (URISyntaxException | IllegalArgumentException ex) {
+            return baseUrl.replaceFirst("(?i)^(https?://)[^@/]+@", "$1REDACTED@");
+        }
     }
 
     private static String pathTemplateContext(Method method, RequestPlan plan) {
@@ -167,6 +212,9 @@ final class EffectiveHttpClientContractExporter {
 
     private static String typeName(Type type) {
         return type.getTypeName();
+    }
+
+    private record BaseUrl(String value, String source) {
     }
 
     private static boolean isDeclarativeClientMethod(Method method) {

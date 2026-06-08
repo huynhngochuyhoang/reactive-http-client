@@ -76,16 +76,16 @@
 
 ## Priority 5 — Contract Snapshot Test Helper
 
-### [ ] 1.2 Contract snapshot test helper
-- [ ] Add a test helper that renders effective contracts as deterministic JSON
+### [x] 1.2 Contract snapshot test helper
+- [x] Add a test helper that renders effective contracts as deterministic JSON
   or Markdown.
-- [ ] Keep method and client ordering stable across JVMs and runs.
-- [ ] Support filtering by client name and method name.
-- [ ] Distinguish two concrete clients that share a parent interface but use
+- [x] Keep method and client ordering stable across JVMs and runs.
+- [x] Support filtering by client name and method name.
+- [x] Distinguish two concrete clients that share a parent interface but use
   different base URLs, timeouts, or API-map paths.
-- [ ] Add docs showing a small snapshot test for shared parent contracts and
+- [x] Add docs showing a small snapshot test for shared parent contracts and
   `@ApiRef` clients.
-- [ ] Verify the helper can run without requiring a Spring context.
+- [x] Verify the helper can run without requiring a Spring context.
 
 ---
 

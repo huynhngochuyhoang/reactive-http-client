@@ -8,6 +8,8 @@ record EffectiveHttpClientContract(
         String javaMethodSignature,
         String httpMethod,
         String pathTemplate,
+        String baseUrl,
+        String baseUrlSource,
         String apiName,
         String apiRef,
         TimeoutPolicy timeout,
