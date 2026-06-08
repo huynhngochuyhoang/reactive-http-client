@@ -29,21 +29,21 @@
 
 ## Priority 2 — Benchmark Fairness Guardrails
 
-### [ ] 3.1 Benchmark fairness guardrails
-- [ ] Ensure compared clients use equivalent connection providers, codecs, base
+### [x] 3.1 Benchmark fairness guardrails
+- [x] Ensure compared clients use equivalent connection providers, codecs, base
       URLs, headers, serialization settings, and response decoding.
-- [ ] Add assertions that every compared client receives the same status,
+- [x] Add assertions that every compared client receives the same status,
       headers of interest, and body shape.
-- [ ] Ensure every benchmark consumes the response so client work is not
+- [x] Ensure every benchmark consumes the response so client work is not
       optimized away.
-- [ ] Add warmup before measured runs.
-- [ ] Avoid measuring server bottlenecks as client overhead by using a cheap
+- [x] Add warmup before measured runs.
+- [x] Avoid measuring server bottlenecks as client overhead by using a cheap
       local handler or reporting server saturation indicators.
-- [ ] Fail benchmarks when a scenario configures different payloads or headers
+- [x] Fail benchmarks when a scenario configures different payloads or headers
       across clients.
-- [ ] Document known limits such as loopback transport cost and local machine
+- [x] Document known limits such as loopback transport cost and local machine
       variability.
-- [ ] Keep benchmark output positioned as trend evidence, not exact universal
+- [x] Keep benchmark output positioned as trend evidence, not exact universal
       nanosecond claims.
 
 ---
