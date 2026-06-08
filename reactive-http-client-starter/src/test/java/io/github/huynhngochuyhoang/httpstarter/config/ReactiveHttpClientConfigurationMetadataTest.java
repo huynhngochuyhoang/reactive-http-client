@@ -20,6 +20,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final Pattern REACTIVE_HTTP_PROPERTY = Pattern.compile(
             "reactive\\.http\\.[A-Za-z0-9_.<>\\[\\]{}*-]+(?:\\[[^]\\s`)]*])?(?:\\.[A-Za-z0-9_.<>\\[\\]{}*-]+)*");
+    private static final Set<String> CONFIGURATION_EXAMPLE_LANGUAGES = Set.of("properties", "yaml", "yml");
     private static final Set<String> METRIC_NAME_PREFIXES = Set.of(
             "reactive.http.client.requests");
 
@@ -146,6 +147,45 @@ class ReactiveHttpClientConfigurationMetadataTest {
         }
 
         assertThat(missingByFile).as("documented reactive.http.* properties missing from metadata").isEmpty();
+    }
+
+    @Test
+    void documentedConfigurationExamplesUseMetadataPropertyNames() throws IOException {
+        Set<String> metadataNames = allMetadataNames(projectRoot());
+        Map<String, Set<String>> missingByFile = new TreeMap<>();
+        Set<String> documentedExampleProperties = new TreeSet<>();
+
+        try (Stream<Path> markdown = currentDocumentation(projectRoot())) {
+            for (Path file : markdown.toList()) {
+                Set<String> exampleProperties = configurationExampleProperties(Files.readAllLines(file));
+                documentedExampleProperties.addAll(exampleProperties);
+                Set<String> missing = new TreeSet<>(exampleProperties);
+                missing.removeAll(metadataNames);
+                if (!missing.isEmpty()) {
+                    missingByFile.put(projectRoot().relativize(file).toString(), missing);
+                }
+            }
+        }
+
+        assertThat(missingByFile).as("reactive.http.* configuration example properties missing from metadata").isEmpty();
+        assertThat(documentedExampleProperties).contains(
+                "reactive.http.network.connect-timeout-ms",
+                "reactive.http.network.network-read-timeout-ms",
+                "reactive.http.network.network-write-timeout-ms",
+                "reactive.http.clients.[name].request-timeout-ms",
+                "reactive.http.clients.[name].auth-provider",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.token-uri",
+                "reactive.http.clients.[name].auth.aws-sig-v4.region",
+                "reactive.http.clients.[name].resilience.enabled",
+                "reactive.http.clients.[name].resilience.retry",
+                "reactive.http.clients.[name].proxy.host",
+                "reactive.http.clients.[name].tls.trust-store",
+                "reactive.http.clients.[name].follow-redirects",
+                "reactive.http.clients.[name].default-headers",
+                "reactive.http.clients.[name].apis.[api-name].method",
+                "reactive.http.clients.[name].apis.[api-name].path",
+                "reactive.http.clients.[name].apis.[api-name].timeout-ms"
+        );
     }
 
     @Test
@@ -281,7 +321,144 @@ class ReactiveHttpClientConfigurationMetadataTest {
         value = value.replaceAll("\\.apis\\[[^]]+](?=\\.)", ".apis.[api-name]");
         value = value.replaceAll("\\.apis\\[[^]]+]$", ".apis");
         value = value.replaceAll("\\.apis\\.<api>(?=\\.|$)", ".apis.[api-name]");
+        value = value.replaceAll("\\.apis\\.\\[[^]]+](?=\\.)", ".apis.[api-name]");
+        value = value.replaceAll("\\.apis\\.\\[[^]]+]$", ".apis");
+        value = value.replaceAll("\\.apis\\.[^.]+(?=\\.)", ".apis.[api-name]");
+        value = value.replaceAll("\\.apis\\.[^.]+$", ".apis");
+        value = value.replaceAll("\\.default-headers\\..+$", ".default-headers");
+        value = value.replaceAll("\\.default-query-params\\..+$", ".default-query-params");
         return value;
+    }
+
+    private static Set<String> configurationExampleProperties(List<String> lines) {
+        Set<String> properties = new TreeSet<>();
+        String language = "";
+        List<String> block = new ArrayList<>();
+        boolean inFence = false;
+
+        for (String line : lines) {
+            if (line.startsWith("```")) {
+                if (inFence) {
+                    properties.addAll(configurationExampleProperties(language, block));
+                    block.clear();
+                    language = "";
+                    inFence = false;
+                }
+                else {
+                    language = line.substring(3).trim().split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
+                    inFence = true;
+                }
+                continue;
+            }
+            if (inFence) {
+                block.add(line);
+            }
+        }
+        return properties;
+    }
+
+    private static Set<String> configurationExampleProperties(String language, List<String> lines) {
+        if (!CONFIGURATION_EXAMPLE_LANGUAGES.contains(language)) {
+            return Set.of();
+        }
+        if ("properties".equals(language)) {
+            return propertiesExampleProperties(lines);
+        }
+        return yamlExampleProperties(lines);
+    }
+
+    private static Set<String> propertiesExampleProperties(List<String> lines) {
+        Set<String> properties = new TreeSet<>();
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isBlank() || trimmed.startsWith("#")) {
+                continue;
+            }
+            int separator = firstSeparator(trimmed);
+            if (separator < 0) {
+                continue;
+            }
+            addConfigurationExampleProperty(properties, trimmed.substring(0, separator).trim());
+        }
+        return properties;
+    }
+
+    private static Set<String> yamlExampleProperties(List<String> lines) {
+        Set<String> properties = new TreeSet<>();
+        List<YamlPath> stack = new ArrayList<>();
+        for (String line : lines) {
+            String withoutComment = stripYamlComment(line);
+            if (withoutComment.trim().isBlank()) {
+                continue;
+            }
+            int indent = leadingSpaces(withoutComment);
+            String trimmed = withoutComment.trim();
+            if (trimmed.startsWith("- ")) {
+                continue;
+            }
+            int separator = trimmed.indexOf(":");
+            if (separator < 0) {
+                continue;
+            }
+            String key = unquoteYamlKey(trimmed.substring(0, separator).trim());
+            if (key.isBlank()) {
+                continue;
+            }
+            while (!stack.isEmpty() && stack.get(stack.size() - 1).indent() >= indent) {
+                stack.remove(stack.size() - 1);
+            }
+            String path = stack.isEmpty() ? key : stack.get(stack.size() - 1).path() + "." + key;
+            addConfigurationExampleProperty(properties, path);
+            if (trimmed.substring(separator + 1).trim().isBlank()) {
+                stack.add(new YamlPath(indent, path));
+            }
+        }
+        return properties;
+    }
+
+    private static void addConfigurationExampleProperty(Set<String> properties, String raw) {
+        if (!raw.startsWith("reactive.http")) {
+            return;
+        }
+        String normalized = normalizeDocumentedProperty(raw);
+        if (normalized != null) {
+            properties.add(normalized);
+        }
+    }
+
+    private static int firstSeparator(String value) {
+        int equals = value.indexOf("=");
+        int colon = value.indexOf(":");
+        if (equals < 0) {
+            return colon;
+        }
+        if (colon < 0) {
+            return equals;
+        }
+        return Math.min(equals, colon);
+    }
+
+    private static String stripYamlComment(String line) {
+        int comment = line.indexOf(" #");
+        return comment < 0 ? line : line.substring(0, comment);
+    }
+
+    private static int leadingSpaces(String line) {
+        int count = 0;
+        while (count < line.length() && line.substring(count, count + 1).equals(" ")) {
+            count++;
+        }
+        return count;
+    }
+
+    private static String unquoteYamlKey(String key) {
+        if ((key.startsWith("\"") && key.endsWith("\"")) || (key.length() >= 2 && key.charAt(0) == 39 && key.charAt(key.length() - 1) == 39)) {
+            return key.substring(1, key.length() - 1);
+        }
+        return key;
+    }
+
+    private record YamlPath(int indent, String path) {
     }
 
     private static boolean hasPrefix(String value, Set<String> prefixes) {
