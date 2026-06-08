@@ -151,7 +151,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
 
     @Test
     void documentedConfigurationExamplesUseMetadataPropertyNames() throws IOException {
-        Set<String> metadataNames = allMetadataNames(projectRoot());
+        Set<String> metadataNames = allMetadataPropertyNames(projectRoot());
         Map<String, Set<String>> missingByFile = new TreeMap<>();
         Set<String> documentedExampleProperties = new TreeSet<>();
 
@@ -185,6 +185,31 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "reactive.http.clients.[name].apis.[api-name].method",
                 "reactive.http.clients.[name].apis.[api-name].path",
                 "reactive.http.clients.[name].apis.[api-name].timeout-ms"
+        );
+    }
+
+    @Test
+    void documentedConfigurationExampleExtractionRejectsGroupsAndMalformedApiMapLeaves() throws IOException {
+        Set<String> metadataNames = allMetadataPropertyNames(projectRoot());
+        Set<String> exampleProperties = configurationExampleProperties(List.of(
+                "```yaml",
+                "reactive:",
+                "  http:",
+                "    clients:",
+                "      user-service:",
+                "        proxy: http://proxy.example",
+                "        apis:",
+                "          timeout-ms: 1000",
+                "```",
+                "```properties",
+                "reactive.http.clients.user-service.proxy=http://proxy.example",
+                "```"));
+        Set<String> missing = new TreeSet<>(exampleProperties);
+        missing.removeAll(metadataNames);
+
+        assertThat(missing).contains(
+                "reactive.http.clients.[name].proxy",
+                "reactive.http.clients.[name].apis.timeout-ms"
         );
     }
 
@@ -274,6 +299,14 @@ class ReactiveHttpClientConfigurationMetadataTest {
         return names;
     }
 
+    private static Set<String> allMetadataPropertyNames(Path root) throws IOException {
+        Set<String> names = new TreeSet<>();
+        for (Path metadataFile : allMetadataFiles(root)) {
+            names.addAll(propertyNames(metadata(metadataFile)));
+        }
+        return names;
+    }
+
     private static List<Path> allMetadataFiles(Path root) {
         return List.of(starterMetadataFile(root),
                 root.resolve("reactive-http-client-otel/src/main/resources/META-INF/additional-spring-configuration-metadata.json"));
@@ -309,6 +342,14 @@ class ReactiveHttpClientConfigurationMetadataTest {
     }
 
     private static String normalizeDocumentedProperty(String raw) {
+        return normalizeDocumentedProperty(raw, true);
+    }
+
+    private static String normalizeConfigurationExampleProperty(String raw) {
+        return normalizeDocumentedProperty(raw, false);
+    }
+
+    private static String normalizeDocumentedProperty(String raw, boolean allowApiMapContainer) {
         String value = raw
                 .replace("{", "")
                 .replace("}", "")
@@ -319,12 +360,14 @@ class ReactiveHttpClientConfigurationMetadataTest {
         value = value.replaceAll("reactive\\.http\\.clients\\.(?:<name>|<client>|\\*|[A-Za-z0-9_-]+)(?=\\.|$)",
                 "reactive.http.clients.[name]");
         value = value.replaceAll("\\.apis\\[[^]]+](?=\\.)", ".apis.[api-name]");
-        value = value.replaceAll("\\.apis\\[[^]]+]$", ".apis");
         value = value.replaceAll("\\.apis\\.<api>(?=\\.|$)", ".apis.[api-name]");
         value = value.replaceAll("\\.apis\\.\\[[^]]+](?=\\.)", ".apis.[api-name]");
-        value = value.replaceAll("\\.apis\\.\\[[^]]+]$", ".apis");
         value = value.replaceAll("\\.apis\\.[^.]+(?=\\.)", ".apis.[api-name]");
-        value = value.replaceAll("\\.apis\\.[^.]+$", ".apis");
+        if (allowApiMapContainer) {
+            value = value.replaceAll("\\.apis\\[[^]]+]$", ".apis");
+            value = value.replaceAll("\\.apis\\.\\[[^]]+]$", ".apis");
+            value = value.replaceAll("\\.apis\\.[^.]+$", ".apis");
+        }
         value = value.replaceAll("\\.default-headers\\..+$", ".default-headers");
         value = value.replaceAll("\\.default-query-params\\..+$", ".default-query-params");
         return value;
@@ -408,9 +451,12 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 stack.remove(stack.size() - 1);
             }
             String path = stack.isEmpty() ? key : stack.get(stack.size() - 1).path() + "." + key;
-            addConfigurationExampleProperty(properties, path);
-            if (trimmed.substring(separator + 1).trim().isBlank()) {
+            String value = trimmed.substring(separator + 1).trim();
+            if (value.isBlank()) {
                 stack.add(new YamlPath(indent, path));
+            }
+            else {
+                addConfigurationExampleProperty(properties, path);
             }
         }
         return properties;
@@ -420,7 +466,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
         if (!raw.startsWith("reactive.http")) {
             return;
         }
-        String normalized = normalizeDocumentedProperty(raw);
+        String normalized = normalizeConfigurationExampleProperty(raw);
         if (normalized != null) {
             properties.add(normalized);
         }
