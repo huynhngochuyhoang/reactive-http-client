@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.benchmarks.client;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -14,6 +15,12 @@ public interface SpringHttpExchangeBenchmarkClient {
 
     @GetExchange("/users/{id}")
     Mono<BenchmarkUser> findUser(
+            @PathVariable("id") String id,
+            @RequestParam("expand") String expand,
+            @RequestHeader("X-Tenant") String tenant);
+
+    @GetExchange("/users/{id}")
+    Mono<ResponseEntity<BenchmarkUser>> findUserEntity(
             @PathVariable("id") String id,
             @RequestParam("expand") String expand,
             @RequestHeader("X-Tenant") String tenant);
