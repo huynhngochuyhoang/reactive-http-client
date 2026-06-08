@@ -12,8 +12,8 @@ is documented as supported.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. While the project version remains `2.8.0`,
-the baseline stays on `2.7.0`:
+from the current reactor version. While the project version remains `2.9.0`,
+the baseline stays on `2.8.0`:
 
 ```bash
 mvn -Papi-compatibility -DskipTests verify
@@ -68,6 +68,18 @@ Limits:
   includes AOT smoke coverage that processes a minimal annotated client context,
   verifies inherited-method proxy hints, and tolerates unrelated unresolvable
   factory metadata.
+
+## Release evidence manifest
+
+`DocumentationReleaseArtifactTest` writes a target-only release evidence manifest when `mvn test` runs:
+
+```text
+target/release-evidence/reactive-http-client-release-evidence.json
+```
+
+The manifest includes the project version, API compatibility baseline version, whether that baseline equals the current reactor version, the Java runtime used by the test, the configured Java baseline, the Spring Boot baseline, and the release-check command names. The `mvn test` entry is marked `pass` when this test generated the manifest; compatibility, fixture, and diff-check entries remain `pending` until the release maintainer runs them.
+
+Before publishing, run the pending commands, then attach the JSON file to the release notes or paste its contents into the release checklist. Do not commit files from `target/release-evidence/`; regenerate them from the release candidate checkout.
 
 ## Release smoke matrix
 

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-06-08
+
 ### Added
 
 - **Configuration metadata drift checks.** Metadata tests now verify documented
@@ -19,11 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fails during `validate` when the configured baseline equals the current
   reactor version, preventing japicmp self-comparisons against local builds.
 - **Inherited client policy diagnostics.** DEBUG startup diagnostics now report inherited endpoint policy per concrete client, including the parent declaring interface, concrete child client, base URL source, and effective request-timeout source.
+- **Runtime diagnostics provider.** Added an injectable `ReactiveHttpClientDiagnosticsProvider` that reports sanitized registered-client summaries without adding an Actuator endpoint.
+- **Release evidence manifest.** `mvn test` now generates `target/release-evidence/reactive-http-client-release-evidence.json` with version, baseline, Java, Spring Boot, and release-check command status.
 
 ### Changed
 
 - **Inherited endpoint validation messages.** Startup validation failures for inherited endpoint methods now include both the parent declaring interface and the concrete `@ReactiveHttpClient` child context while preserving the existing exception categories.
-- **API compatibility baseline.** Kept the public API compatibility baseline off the current reactor version so japicmp cannot self-compare against locally built `2.8.0` artifacts.
+- **API compatibility baseline.** Public API compatibility now compares against published `2.8.0` artifacts and keeps the baseline guard to prevent self-comparisons against current reactor builds.
 
 ### Docs
 
@@ -1119,7 +1123,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.5.0...v2.6.0

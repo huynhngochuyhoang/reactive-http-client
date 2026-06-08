@@ -39,5 +39,28 @@ Lifecycle hooks receive prepared resolved request headers before later
 Custom extension points that persist header values must apply their own
 redaction policy.
 
+## Runtime diagnostics provider
+
+Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, timeout summary, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
+
+The starter registers this provider as a normal bean and does not publish an Actuator endpoint. If an application wants one, keep endpoint exposure local to the app:
+
+```java
+@Endpoint(id = "reactive-http-clients")
+class ReactiveHttpClientsEndpoint {
+
+    private final ReactiveHttpClientDiagnosticsProvider diagnostics;
+
+    ReactiveHttpClientsEndpoint(ReactiveHttpClientDiagnosticsProvider diagnostics) {
+        this.diagnostics = diagnostics;
+    }
+
+    @ReadOperation
+    List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> clients() {
+        return diagnostics.clientSummaries();
+    }
+}
+```
+
 See [Exchange Logging](13-exchange-logging.md), [Lifecycle Hooks](19-lifecycle-hooks.md),
 and [Error Handling](03-error-handling.md) for extension-point-specific guidance.

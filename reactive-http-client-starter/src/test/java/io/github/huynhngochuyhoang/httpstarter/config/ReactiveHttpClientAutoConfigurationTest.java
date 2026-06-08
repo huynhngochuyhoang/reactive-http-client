@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.auth.OAuth2ClientCredentialsAuthProviderFactory;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientHealthIndicator;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
@@ -94,6 +95,14 @@ class ReactiveHttpClientAutoConfigurationTest {
                     .as("prototype scope must hand out a distinct builder per pull — "
                             + "shared instance is the 1.8.1 auth-leak regression")
                     .isNotSameAs(second);
+        });
+    }
+
+    @Test
+    void diagnosticsProviderIsRegisteredWithoutActuatorEndpoint() {
+        runner.run(context -> {
+            assertThat(context).hasSingleBean(ReactiveHttpClientDiagnosticsProvider.class);
+            assertThat(context).doesNotHaveBean("reactiveHttpClientDiagnosticsEndpoint");
         });
     }
 

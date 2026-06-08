@@ -1,0 +1,187 @@
+package io.github.huynhngochuyhoang.httpstarter.core;
+
+import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import org.springframework.beans.factory.FactoryBean;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.util.ClassUtils;
+import org.springframework.util.StringUtils;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Provides sanitized runtime summaries for registered {@link ReactiveHttpClient}
+ * clients.
+ *
+ * <p>The provider is intentionally independent from Spring Boot Actuator. Apps
+ * that want an endpoint can wrap this bean in their own controller or Actuator
+ * endpoint and keep endpoint exposure policy local to the application.
+ */
+public class ReactiveHttpClientDiagnosticsProvider {
+
+    private final ConfigurableListableBeanFactory beanFactory;
+    private final ReactiveHttpClientProperties properties;
+    private final MethodMetadataCache metadataCache;
+
+    public ReactiveHttpClientDiagnosticsProvider(ConfigurableListableBeanFactory beanFactory,
+                                                 ReactiveHttpClientProperties properties,
+                                                 MethodMetadataCache metadataCache) {
+        this.beanFactory = beanFactory;
+        this.properties = properties != null ? properties : new ReactiveHttpClientProperties();
+        this.metadataCache = metadataCache != null ? metadataCache : new MethodMetadataCache();
+    }
+
+    public List<ClientSummary> clientSummaries() {
+        ResilienceOperatorApplier resilienceOperatorApplier = resilienceOperatorApplier();
+        return List.of(beanFactory.getBeanDefinitionNames()).stream()
+                .map(this::clientInterface)
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(clientInterface -> clientSummary(clientInterface, resilienceOperatorApplier))
+                .sorted(Comparator.comparing(ClientSummary::clientName)
+                        .thenComparing(ClientSummary::clientInterface))
+                .toList();
+    }
+
+    private ClientSummary clientSummary(Class<?> clientInterface,
+                                        ResilienceOperatorApplier resilienceOperatorApplier) {
+        ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+        String clientName = annotation != null ? annotation.name() : "";
+        ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
+                .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
+        List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
+                clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
+        long inherited = contracts.stream()
+                .filter(EffectiveHttpClientContract::inherited)
+                .count();
+        EffectiveHttpClientContract.TimeoutPolicy timeout = representativeTimeout(contracts);
+        EffectiveHttpClientContract.ResiliencePolicy resilience = representativeResilience(contracts);
+
+        return new ClientSummary(
+                clientName,
+                clientInterface.getName(),
+                baseUrlSource(annotation, clientConfig),
+                new TimeoutSummary(timeout.source(), timeout.timeoutMs()),
+                new ResilienceSummary(
+                        clientConfig.getResilience() != null && clientConfig.getResilience().isEnabled(),
+                        resilience.retry(),
+                        resilience.rateLimiter(),
+                        resilience.circuitBreaker(),
+                        resilience.bulkhead()),
+                authMode(clientConfig),
+                clientConfig.isFollowRedirects(),
+                contracts.size(),
+                Math.toIntExact(inherited));
+    }
+
+    private Class<?> clientInterface(String beanName) {
+        BeanDefinition definition = beanFactory.getBeanDefinition(beanName);
+        Object objectType = definition.getAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
+        if (objectType instanceof Class<?> clazz && clazz.isInterface()
+                && clazz.isAnnotationPresent(ReactiveHttpClient.class)) {
+            return clazz;
+        }
+        if (objectType instanceof String className) {
+            try {
+                Class<?> clazz = ClassUtils.resolveClassName(className, beanFactory.getBeanClassLoader());
+                if (clazz.isInterface() && clazz.isAnnotationPresent(ReactiveHttpClient.class)) {
+                    return clazz;
+                }
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private EffectiveHttpClientContract.TimeoutPolicy representativeTimeout(List<EffectiveHttpClientContract> contracts) {
+        return contracts.stream()
+                .map(EffectiveHttpClientContract::timeout)
+                .filter(timeout -> !"disabled".equals(timeout.source()))
+                .findFirst()
+                .orElse(new EffectiveHttpClientContract.TimeoutPolicy("disabled", 0));
+    }
+
+    private EffectiveHttpClientContract.ResiliencePolicy representativeResilience(List<EffectiveHttpClientContract> contracts) {
+        return contracts.stream()
+                .map(EffectiveHttpClientContract::resilience)
+                .filter(resilience -> !"disabled".equals(resilience.retry())
+                        || !"disabled".equals(resilience.rateLimiter())
+                        || !"disabled".equals(resilience.circuitBreaker())
+                        || !"disabled".equals(resilience.bulkhead()))
+                .findFirst()
+                .orElse(new EffectiveHttpClientContract.ResiliencePolicy(
+                        "disabled", "disabled", "disabled", "disabled"));
+    }
+
+    private String baseUrlSource(ReactiveHttpClient annotation,
+                                 ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (annotation != null && StringUtils.hasText(annotation.baseUrl())) {
+            return "annotation";
+        }
+        if (StringUtils.hasText(clientConfig.getBaseUrl())) {
+            return "property";
+        }
+        return "missing";
+    }
+
+    private String authMode(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (StringUtils.hasText(clientConfig.getAuthProvider())) {
+            return "provider-bean";
+        }
+        if (clientConfig.getAuth() != null && StringUtils.hasText(clientConfig.getAuth().getType())) {
+            return clientConfig.getAuth().getType();
+        }
+        return "none";
+    }
+
+    private ResilienceOperatorApplier resilienceOperatorApplier() {
+        Object circuitBreakerRegistry = bean("io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry");
+        Object retryRegistry = bean("io.github.resilience4j.retry.RetryRegistry");
+        Object bulkheadRegistry = bean("io.github.resilience4j.bulkhead.BulkheadRegistry");
+        Object rateLimiterRegistry = bean("io.github.resilience4j.ratelimiter.RateLimiterRegistry");
+        try {
+            return new Resilience4jOperatorApplier(
+                    circuitBreakerRegistry, retryRegistry, bulkheadRegistry, rateLimiterRegistry);
+        } catch (LinkageError error) {
+            return new NoopResilienceOperatorApplier();
+        }
+    }
+
+    private Object bean(String className) {
+        try {
+            Class<?> type = ClassUtils.forName(className, beanFactory.getBeanClassLoader());
+            return beanFactory.getBeanProvider(type).getIfAvailable();
+        } catch (ClassNotFoundException | LinkageError ex) {
+            return null;
+        }
+    }
+
+    public record ClientSummary(
+            String clientName,
+            String clientInterface,
+            String baseUrlSource,
+            TimeoutSummary timeout,
+            ResilienceSummary resilience,
+            String authMode,
+            boolean followRedirects,
+            int endpointCount,
+            int inheritedEndpointCount
+    ) {
+    }
+
+    public record TimeoutSummary(String source, long timeoutMs) {
+    }
+
+    public record ResilienceSummary(
+            boolean configured,
+            String retry,
+            String rateLimiter,
+            String circuitBreaker,
+            String bulkhead
+    ) {
+    }
+}

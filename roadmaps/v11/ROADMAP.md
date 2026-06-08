@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V11
 
-> **Status:** draft after V10 checklist completion. V11 focuses on contract
+> **Status:** completed and released as `2.9.0`. V11 focused on contract
 > drift prevention, generated reference material, and production diagnostics that
 > make declarative client behavior easier to audit before and after release.
 
