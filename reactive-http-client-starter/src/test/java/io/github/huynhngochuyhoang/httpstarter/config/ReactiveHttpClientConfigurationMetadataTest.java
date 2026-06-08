@@ -214,6 +214,27 @@ class ReactiveHttpClientConfigurationMetadataTest {
     }
 
     @Test
+    void documentedConfigurationExampleExtractionIncludesYamlBlockListProperties() throws IOException {
+        Set<String> metadataNames = allMetadataPropertyNames(projectRoot());
+        Set<String> exampleProperties = configurationExampleProperties(List.of(
+                "```yaml",
+                "reactive:",
+                "  http:",
+                "    network:",
+                "      tls:",
+                "        ciphers:",
+                "          - TLS_AES_256_GCM_SHA384",
+                "        cipherz:",
+                "          - TLS_AES_128_GCM_SHA256",
+                "```"));
+        Set<String> missing = new TreeSet<>(exampleProperties);
+        missing.removeAll(metadataNames);
+
+        assertThat(exampleProperties).contains("reactive.http.network.tls.ciphers");
+        assertThat(missing).contains("reactive.http.network.tls.cipherz");
+    }
+
+    @Test
     void deprecatedAliasesDeclareReplacementMetadata() throws IOException {
         JsonNode metadata = starterMetadata();
 
@@ -437,6 +458,9 @@ class ReactiveHttpClientConfigurationMetadataTest {
             int indent = leadingSpaces(withoutComment);
             String trimmed = withoutComment.trim();
             if (trimmed.startsWith("- ")) {
+                if (!stack.isEmpty()) {
+                    addConfigurationExampleProperty(properties, stack.get(stack.size() - 1).path());
+                }
                 continue;
             }
             int separator = trimmed.indexOf(":");
