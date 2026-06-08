@@ -100,7 +100,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 config,
                 properties.getNetwork(),
                 properties.getObservability());
-        logInheritedMethodPolicyDiagnostics(
+        logMethodPolicyDiagnostics(
                 type,
                 metadataCache,
                 config,
@@ -505,33 +505,40 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 config.getLogPreset().name().toLowerCase(Locale.ROOT).replace('_', '-'));
     }
 
-    private void logInheritedMethodPolicyDiagnostics(Class<?> clientInterface,
-                                                     MethodMetadataCache metadataCache,
-                                                     ReactiveHttpClientProperties.ClientConfig clientConfig,
-                                                     String clientName,
-                                                     String baseUrl,
-                                                     String baseUrlSource) {
+    private void logMethodPolicyDiagnostics(Class<?> clientInterface,
+                                            MethodMetadataCache metadataCache,
+                                            ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                            String clientName,
+                                            String baseUrl,
+                                            String baseUrlSource) {
         if (!log.isDebugEnabled()) {
             return;
         }
         for (Method method : clientInterface.getMethods()) {
-            if (!isDeclarativeClientMethod(method) || method.getDeclaringClass() == clientInterface) continue;
+            if (!isDeclarativeClientMethod(method)) continue;
             MethodMetadata meta = metadataCache.get(method);
             RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
             EffectiveApi effectiveApi = diagnosticEffectiveApi(plan, clientConfig);
-            log.debug("Reactive HTTP client [{}] inherited method policy: method=[{}#{}], declaredBy={}, "
-                            + "concreteClient={}, inherited=true, httpMethod={}, pathTemplate={}, baseUrl={} (source={}), "
-                            + "requestTimeout={}",
+            boolean inherited = method.getDeclaringClass() != clientInterface;
+            log.debug("Reactive HTTP client [{}] method policy: method=[{}#{}], declaredBy={}, "
+                            + "concreteClient={}, inherited={}, apiRef={}, httpMethod={}, pathTemplate={}, "
+                            + "baseUrl={} (source={}), requestTimeout={}, redirectPolicy={}, retrySafety={}, "
+                            + "bodyRepeatability={}",
                     clientName,
                     method.getDeclaringClass().getSimpleName(),
                     method.getName(),
                     method.getDeclaringClass().getName(),
                     clientInterface.getName(),
+                    inherited,
+                    StringUtils.hasText(plan.apiRefName()) ? plan.apiRefName() : "none",
                     effectiveApi.httpMethod(),
                     effectiveApi.pathTemplate(),
                     baseUrl,
                     baseUrlSource,
-                    requestTimeoutSummary(plan, effectiveApi, clientConfig));
+                    requestTimeoutSummary(plan, effectiveApi, clientConfig),
+                    clientConfig.isFollowRedirects() ? "follow" : "manual",
+                    diagnosticRetrySafety(plan, effectiveApi.httpMethod(), clientConfig),
+                    plan.bodyRepeatability());
         }
     }
 

@@ -91,17 +91,17 @@
 
 ## Priority 6 — Startup Diagnostics Consistency
 
-### [ ] 2.3 Startup diagnostics consistency
-- [ ] Audit startup DEBUG diagnostics for consistent client and method
+### [x] 2.3 Startup diagnostics consistency
+- [x] Audit startup DEBUG diagnostics for consistent client and method
   identifiers.
-- [ ] Align field names across direct methods, inherited methods, and `@ApiRef`
+- [x] Align field names across direct methods, inherited methods, and `@ApiRef`
   methods.
-- [ ] Keep retry safety, body repeatability, timeout source, base URL source,
+- [x] Keep retry safety, body repeatability, timeout source, base URL source,
   and redirect policy names stable.
-- [ ] Ensure `@ApiRef` diagnostics include the API key and effective
+- [x] Ensure `@ApiRef` diagnostics include the API key and effective
   method/path.
-- [ ] Verify valid clients emit no new INFO/WARN logs.
-- [ ] Add tests that fail on accidental field-name drift.
+- [x] Verify valid clients emit no new INFO/WARN logs.
+- [x] Add tests that fail on accidental field-name drift.
 
 ---
 
