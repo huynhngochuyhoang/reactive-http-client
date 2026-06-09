@@ -156,7 +156,7 @@ and commit metadata. Override only the JMH include pattern and result directory:
 ```bash
 mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify \
   -Dbenchmark.commit=$(git rev-parse --short HEAD) \
-  -Dbenchmark.include='.*(clientSideOverheadRawWebClientGetNoBody|clientSideOverheadSpringHttpExchangeGetNoBody|clientSideOverheadStarterGetNoBody|clientSideOverheadRawWebClientPostJson|clientSideOverheadSpringHttpExchangePostJson|clientSideOverheadStarterPostJson).*' \
+  -Dbenchmark.include='.*(clientSideOverhead.*(GetNoBody|GetPathQueryHeader|PostJson|ResponseEntity|ClientErrorSmallBody|ServerErrorSmallBody)|starterErrorMappingProblemDetailSmallBody).*' \
   -Dbenchmark.result.dir=target/benchmark-reports/release-note
 ```
 

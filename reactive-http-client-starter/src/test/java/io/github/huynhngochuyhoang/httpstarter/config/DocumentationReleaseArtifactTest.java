@@ -136,8 +136,12 @@ class DocumentationReleaseArtifactTest {
                 .contains("Published baseline report")
                 .contains("Scenarios cited")
                 .contains("benchmark.include")
-                .contains("clientSideOverheadRawWebClientGetNoBody")
-                .contains("clientSideOverheadSpringHttpExchangePostJson")
+                .contains("clientSideOverhead.*")
+                .contains("GetPathQueryHeader")
+                .contains("ResponseEntity")
+                .contains("ClientErrorSmallBody")
+                .contains("ServerErrorSmallBody")
+                .contains("starterErrorMappingProblemDetailSmallBody")
                 .contains("target/benchmark-reports/release-note")
                 .contains("generated release evidence manifest is not enough");
 
@@ -279,16 +283,25 @@ class DocumentationReleaseArtifactTest {
                         + pomProperty(pomXml, "api.compatibility.baseline.version") + "/release-jmh.md");
         assertThat(benchmarkEvidence.path("releaseNoteScenarioNames"))
                 .extracting(JsonNode::asText)
-                .contains("Get No Body", "Post Json", "Problem Detail Small Body");
+                .containsExactly(
+                        "Get No Body",
+                        "Get Path Query Header",
+                        "Post Json",
+                        "Response Entity",
+                        "Client Error Small Body",
+                        "Server Error Small Body",
+                        "Problem Detail Small Body");
         assertThat(benchmarkEvidence.path("releaseNoteScenarioRerunCommand").asText())
                 .contains("benchmark-release")
                 .contains("benchmark.include")
-                .contains("clientSideOverheadRawWebClientGetNoBody")
-                .contains("clientSideOverheadSpringHttpExchangeGetNoBody")
-                .contains("clientSideOverheadStarterGetNoBody")
-                .contains("clientSideOverheadRawWebClientPostJson")
-                .contains("clientSideOverheadSpringHttpExchangePostJson")
-                .contains("clientSideOverheadStarterPostJson")
+                .contains("clientSideOverhead.*")
+                .contains("GetNoBody")
+                .contains("GetPathQueryHeader")
+                .contains("PostJson")
+                .contains("ResponseEntity")
+                .contains("ClientErrorSmallBody")
+                .contains("ServerErrorSmallBody")
+                .contains("starterErrorMappingProblemDetailSmallBody")
                 .contains("target/benchmark-reports/release-note")
                 .doesNotContain("reactive-http-client-benchmarks/target/benchmarks.jar");
         assertThat(benchmarkEvidence.path("requiresPromotedReportForPerformanceClaims").asBoolean()).isTrue();
@@ -453,12 +466,10 @@ class DocumentationReleaseArtifactTest {
         evidence.put("releaseNoteScenarioRerunCommand",
                 "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify "
                         + "-Dbenchmark.commit=$(git rev-parse --short HEAD) "
-                        + "-Dbenchmark.include='.*(clientSideOverheadRawWebClientGetNoBody|"
-                        + "clientSideOverheadSpringHttpExchangeGetNoBody|"
-                        + "clientSideOverheadStarterGetNoBody|"
-                        + "clientSideOverheadRawWebClientPostJson|"
-                        + "clientSideOverheadSpringHttpExchangePostJson|"
-                        + "clientSideOverheadStarterPostJson).*' "
+                        + "-Dbenchmark.include='.*(clientSideOverhead.*(GetNoBody|"
+                        + "GetPathQueryHeader|PostJson|ResponseEntity|"
+                        + "ClientErrorSmallBody|ServerErrorSmallBody)|"
+                        + "starterErrorMappingProblemDetailSmallBody).*' "
                         + "-Dbenchmark.result.dir=target/benchmark-reports/release-note");
         evidence.put("requiresPromotedReportForPerformanceClaims", true);
         evidence.put("pendingEvidenceCanSupportPerformanceClaims", false);
