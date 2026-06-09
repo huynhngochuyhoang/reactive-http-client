@@ -36,7 +36,9 @@ reactive-http-client-benchmarks/target/benchmark-reports/
 
 Each run also writes an adjacent `*.environment.properties` file with Java,
 OS, CPU, Spring Boot, Reactor Netty, project version, and benchmark commit
-metadata.
+metadata. Profile-backed runs redirect benchmark logger output to
+`reactive-http-client-benchmarks/target/benchmark-logger.log` so the real
+metadata exchange logger can be measured without flooding stderr.
 
 ## Current Scope
 
