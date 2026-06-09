@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Benchmark-backed release evidence.** The release evidence manifest now lists
+  benchmark smoke and release commands, generated benchmark report paths, and
+  the request-path changes that require refreshed benchmark numbers before
+  publishing performance claims.
+
 ## [2.9.0] - 2026-06-08
 
 ### Added

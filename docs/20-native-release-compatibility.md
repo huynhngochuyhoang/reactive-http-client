@@ -77,9 +77,25 @@ Limits:
 target/release-evidence/reactive-http-client-release-evidence.json
 ```
 
-The manifest includes the project version, API compatibility baseline version, whether that baseline equals the current reactor version, the Java runtime used by the test, the configured Java baseline, the Spring Boot baseline, and the release-check command names. The `mvn test` entry is marked `pass` when this test generated the manifest; compatibility, fixture, and diff-check entries remain `pending` until the release maintainer runs them.
+The manifest includes the project version, API compatibility baseline version,
+whether that baseline equals the current reactor version, the Java runtime used by
+the test, the configured Java baseline, the Spring Boot baseline, release-check
+command names, and benchmark evidence metadata. The benchmark metadata records
+the manual/profile-gated smoke and release commands, generated report paths, and
+the conditions that require refreshed numbers. The `mvn test` entry is marked
+`pass` when this test generated the manifest; compatibility, fixture, diff-check,
+and benchmark entries remain `pending` until the release maintainer runs them.
 
-Before publishing, run the pending commands, then attach the JSON file to the release notes or paste its contents into the release checklist. Do not commit files from `target/release-evidence/`; regenerate them from the release candidate checkout.
+Before publishing, run the pending commands. If the release changes request
+construction, observability, resilience wrapping, transport/client-builder
+behavior, or includes public performance claims, also run the release benchmark
+command and attach or link
+`reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md` in
+the release notes. The smoke benchmark proves the harness starts; do not publish
+smoke-only numbers as performance evidence. Attach the JSON manifest to the
+release notes or paste its contents into the release checklist. Do not commit
+files from `target/release-evidence/`; regenerate them from the release
+candidate checkout.
 
 ## Release smoke matrix
 
