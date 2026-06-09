@@ -33,6 +33,8 @@ Current promoted report:
 - [Benchmark Report 2.9.0](benchmark-report-2.9.0.md) is release-quality
   evidence for starter `2.9.0`, generated from the current workspace benchmark
   profile. Use it only for the named scenarios and environment it records.
+- [Performance Summary](23-performance-summary.md) explains how to read the
+  promoted report without turning scenario-specific data into broad claims.
 
 ## Comparison Model
 
