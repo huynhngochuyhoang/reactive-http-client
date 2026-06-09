@@ -28,23 +28,23 @@
 
 ## Priority 2 — Add Performance Summary Documentation
 
-### [ ] 1.2 Add performance summary documentation
-- [ ] Add `docs/23-performance-summary.md` or an equivalent public documentation
+### [x] 1.2 Add performance summary documentation
+- [x] Add `docs/23-performance-summary.md` or an equivalent public documentation
       section.
-- [ ] Link the performance summary from `docs/22-benchmarks.md`.
-- [ ] Explain benchmark methodology before publishing numbers.
-- [ ] Summarize raw `WebClient`, Spring HTTP Interface, starter default path,
+- [x] Link the performance summary from `docs/22-benchmarks.md`.
+- [x] Explain benchmark methodology before publishing numbers.
+- [x] Summarize raw `WebClient`, Spring HTTP Interface, starter default path,
       starter optional features, and starter-only error mapping separately.
-- [ ] Summarize measured findings using named scenarios, not broad claims.
-- [ ] Explain expected starter overhead sources: proxy dispatch,
+- [x] Summarize measured findings using named scenarios, not broad claims.
+- [x] Explain expected starter overhead sources: proxy dispatch,
       metadata/request planning, annotation argument resolution, diagnostics
       hooks, resilience wrappers, and response envelope handling.
-- [ ] State when the available report measures starter `2.8.0` and when
+- [x] State when the available report measures starter `2.8.0` and when
       current-release claims require a refreshed current-workspace report.
-- [ ] Verify optional feature overhead is separated from default-path overhead.
-- [ ] Verify Problem Detail mapping is labeled as starter-only error-mapping
+- [x] Verify optional feature overhead is separated from default-path overhead.
+- [x] Verify Problem Detail mapping is labeled as starter-only error-mapping
       overhead.
-- [ ] Verify quick benchmark output is not described as performance evidence.
+- [x] Verify quick benchmark output is not described as performance evidence.
 
 ---
 

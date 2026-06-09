@@ -222,6 +222,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Diagnostic Context Contracts](docs/21-diagnostic-contexts.md) | Extension-point capability matrix |
 | [Benchmarks](docs/22-benchmarks.md) | Benchmark harness and commands |
 | [Benchmark Report 2.9.0](docs/benchmark-report-2.9.0.md) | Promoted release-quality benchmark report |
+| [Performance Summary](docs/23-performance-summary.md) | Interpreting benchmark data |
 | [Configuration Properties](docs/configuration-properties.md) | Generated property reference |
 | [Examples](docs/examples/README.md) | Copy-paste snippets |
 

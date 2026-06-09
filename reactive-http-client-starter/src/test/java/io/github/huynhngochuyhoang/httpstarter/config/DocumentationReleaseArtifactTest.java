@@ -110,6 +110,7 @@ class DocumentationReleaseArtifactTest {
         Path promotedReport = root.resolve("docs/benchmark-report-" + projectVersion + ".md");
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         String promotedReportDocs = Files.readString(promotedReport);
+        String performanceSummaryDocs = Files.readString(root.resolve("docs/23-performance-summary.md"));
 
         assertThat(benchmarkDocs)
                 .contains("## Methodology and Limits")
@@ -122,7 +123,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("exact JMH scenario name")
                 .contains("Avoid broad wording such as")
                 .contains("smoke-only report links")
-                .contains("Benchmark Report " + projectVersion);
+                .contains("Benchmark Report " + projectVersion)
+                .contains("Performance Summary");
 
         assertThat(promotedReport).exists();
         assertThat(promotedReportDocs)
@@ -137,6 +139,28 @@ class DocumentationReleaseArtifactTest {
                 .contains("| `availableProcessors` |")
                 .contains("## Comparison Summary")
                 .doesNotContain("/home/");
+
+        assertThat(performanceSummaryDocs)
+                .contains("## Methodology First")
+                .contains("Quick benchmark output is smoke-only")
+                .contains("Raw `WebClient`")
+                .contains("Spring HTTP Interface")
+                .contains("Starter default path")
+                .contains("Starter optional features")
+                .contains("Starter error mapping")
+                .contains("`Get No Body`")
+                .contains("`Post Json`")
+                .contains("Proxy dispatch")
+                .contains("metadata and request-plan lookup")
+                .contains("Annotation argument resolution")
+                .contains("Diagnostics hook checks")
+                .contains("Resilience wrapper selection")
+                .contains("Response envelope handling")
+                .contains("starter-only error-mapping overhead")
+                .contains("starter `" + projectVersion + "`")
+                .doesNotContain("near zero overhead")
+                .doesNotContain("always faster")
+                .doesNotContain("same performance as raw `WebClient`");
 
         List<String> invalidReportLinks = new ArrayList<>();
         List<String> promotedReportLinks = new ArrayList<>();
