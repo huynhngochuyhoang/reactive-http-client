@@ -56,6 +56,9 @@ The benchmark module currently includes:
   metadata-only exchange logging, Micrometer observation, retry wrapping, and
   circuit-breaker wrapping. These are not compared against baseline clients that
   omit equivalent feature work.
+- A no-network optional diagnostics audit for disabled diagnostics,
+  metadata-only exchange logging, Micrometer observation with `SimpleMeterRegistry`,
+  and the on-demand runtime diagnostics provider.
 
 Both smoke and release-quality commands write a Markdown report next to the JMH
 JSON. For example, the smoke profile writes `smoke-only-jmh.md` and the
@@ -77,6 +80,22 @@ scenarios catch and validate the mapped exception instead of failing the JMH run
 unexpected benchmark failures remain visible as JMH errors. The loopback server
 also tracks invalid request counts and reports the first mismatch when a client
 does not send the shared scenario shape.
+
+## Optional Diagnostics Overhead
+
+Optional diagnostics are measured in two separate buckets. Request-path
+diagnostics benchmarks exercise proxy calls with no network I/O, so disabled
+exchange logging and observer paths can be compared with metadata-only exchange
+logging and Micrometer recording. Runtime diagnostics provider calls are measured
+separately because `ReactiveHttpClientDiagnosticsProvider.clientSummaries()` is an
+on-demand inspection API, not part of proxy invocation.
+
+Recommended production defaults are to keep exchange logging disabled unless an
+app needs request auditing, use `METADATA_ONLY` before enabling body capture, and
+leave extra Micrometer body/histogram settings disabled unless the operational
+question needs them. The local audit notes live in
+[`roadmaps/v12/DIAGNOSTICS_OVERHEAD_AUDIT.md`](../roadmaps/v12/DIAGNOSTICS_OVERHEAD_AUDIT.md)
+and remain smoke-only evidence.
 
 ## Fairness Guardrails
 

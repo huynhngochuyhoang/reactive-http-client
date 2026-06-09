@@ -112,17 +112,17 @@
 
 ## Priority 6 — Optional Diagnostics Overhead Audit
 
-### [ ] 2.2 Optional diagnostics overhead audit
-- [ ] Benchmark default observer and exchange-log disabled paths.
-- [ ] Benchmark metadata-only exchange logging without body capture.
-- [ ] Benchmark Micrometer observer recording with a simple in-memory registry.
-- [ ] Verify runtime diagnostics provider calls are on-demand and not part of
+### [x] 2.2 Optional diagnostics overhead audit
+- [x] Benchmark default observer and exchange-log disabled paths.
+- [x] Benchmark metadata-only exchange logging without body capture.
+- [x] Benchmark Micrometer observer recording with a simple in-memory registry.
+- [x] Verify runtime diagnostics provider calls are on-demand and not part of
       the request path.
-- [ ] Check disabled diagnostics do not allocate large per-request diagnostic
+- [x] Check disabled diagnostics do not allocate large per-request diagnostic
       structures.
-- [ ] Document measurable enabled-diagnostics overhead and recommended
+- [x] Document measurable enabled-diagnostics overhead and recommended
       production defaults.
-- [ ] Distinguish request-path overhead from startup or diagnostic-query
+- [x] Distinguish request-path overhead from startup or diagnostic-query
       overhead in docs.
 
 ---
