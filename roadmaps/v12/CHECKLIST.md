@@ -160,18 +160,18 @@
 
 ## Priority 9 — Documentation Claims Tied to Benchmark Data
 
-### [ ] 3.3 Documentation claims tied to benchmark data
-- [ ] Add public documentation that explains benchmark methodology before
+### [x] 3.3 Documentation claims tied to benchmark data
+- [x] Add public documentation that explains benchmark methodology before
       numbers.
-- [ ] Include benchmark limitations: local loopback, machine variability,
+- [x] Include benchmark limitations: local loopback, machine variability,
       warmup, and scenario-specific conclusions.
-- [ ] Add a clear comparison table for raw `WebClient`, Spring HTTP Interface,
+- [x] Add a clear comparison table for raw `WebClient`, Spring HTTP Interface,
       and the starter.
-- [ ] Scope every performance claim to a named scenario and report version.
-- [ ] Avoid broad claims such as "near zero overhead" unless directly supported
+- [x] Scope every performance claim to a named scenario and report version.
+- [x] Avoid broad claims such as "near zero overhead" unless directly supported
       by a measured scenario.
-- [ ] Add a docs test or checklist check that prevents stale benchmark report
+- [x] Add a docs test or checklist check that prevents stale benchmark report
       links.
-- [ ] Verify public docs do not publish quick smoke benchmark numbers as real
+- [x] Verify public docs do not publish quick smoke benchmark numbers as real
       performance evidence.
 

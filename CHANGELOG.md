@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version under test, resolved baseline library versions, and dependency
   management source; release evidence also lists published baseline artifacts
   that must resolve before benchmark or API compatibility evidence is accepted.
+- **Benchmark claim guardrails.** Public benchmark docs now require methodology,
+  scenario names, and release-quality report links before publishing performance
+  claims, with tests preventing generated target or smoke-only reports from being
+  linked as evidence.
 
 ## [2.9.0] - 2026-06-08
 
