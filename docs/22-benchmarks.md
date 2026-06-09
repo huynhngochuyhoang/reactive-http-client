@@ -22,11 +22,25 @@ The smoke command is only a harness check. It proves the benchmark classes
 compile, start, execute, and write result files. Do not publish smoke numbers as
 project performance evidence.
 
-Run a longer release-quality benchmark:
+Run a longer release-quality benchmark for the current workspace. The `-am` flag
+intentionally builds the reactor starter under test:
 
 ```bash
 mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)
 ```
+
+Run the same benchmark harness against the last published starter artifact by
+setting `benchmark.starter.version` and omitting `-am` so Maven resolves the
+published dependency instead of the current reactor module:
+
+```bash
+mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks verify -Dbenchmark.starter.version=2.8.0 -Dbenchmark.commit=2.8.0
+```
+
+That command uses the current benchmark harness and current managed Spring Boot
+BOM to compare starter versions under the same dependency-management baseline.
+For an exact historical release environment, check out the release tag and run
+the current-workspace command from that checkout.
 
 Release-quality runs write JMH JSON under:
 
@@ -35,8 +49,10 @@ reactive-http-client-benchmarks/target/benchmark-reports/
 ```
 
 Each run also writes an adjacent `*.environment.properties` file with Java,
-OS, CPU, Spring Boot, Reactor Netty, project version, and benchmark commit
-metadata. Profile-backed runs redirect benchmark logger output to
+OS, CPU, Spring Boot, Spring WebFlux, Reactor Netty, project version, starter
+version under test, API compatibility baseline version, dependency-management
+source, and benchmark commit metadata. Profile-backed runs redirect benchmark
+logger output to
 `reactive-http-client-benchmarks/target/benchmark-logger.log` so the real
 metadata exchange logger can be measured without flooding stderr.
 
@@ -44,8 +60,9 @@ metadata exchange logger can be measured without flooding stderr.
 
 `DocumentationReleaseArtifactTest` includes benchmark evidence in
 `target/release-evidence/reactive-http-client-release-evidence.json`. The
-manifest keeps benchmark execution manual or profile-gated and lists these
-generated report paths:
+manifest keeps benchmark execution manual or profile-gated, records the benchmark
+dependency-management baseline, lists the published baseline artifacts that must
+resolve before release, and lists these generated report paths:
 
 - `reactive-http-client-benchmarks/target/benchmark-reports/smoke-only-jmh.md`
   for the smoke harness check.
@@ -58,7 +75,10 @@ release notes make public performance claims. Before publishing those claims,
 attach or link the release report from the release notes. A pending benchmark
 entry in the release evidence manifest is intentional for releases with no
 request-path change; for benchmark-relevant releases it is the visible reminder
-that release evidence still needs to be produced.
+that release evidence still needs to be produced. Published baseline artifact
+entries include `mvn dependency:get -Dartifact=...` commands; a resolution
+failure is a release blocker because the benchmark or API compatibility baseline
+would no longer be reproducible.
 
 ## Current Scope
 

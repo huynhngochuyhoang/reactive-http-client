@@ -80,13 +80,18 @@ target/release-evidence/reactive-http-client-release-evidence.json
 The manifest includes the project version, API compatibility baseline version,
 whether that baseline equals the current reactor version, the Java runtime used by
 the test, the configured Java baseline, the Spring Boot baseline, release-check
-command names, and benchmark evidence metadata. The benchmark metadata records
-the manual/profile-gated smoke and release commands, generated report paths, and
-the conditions that require refreshed numbers. The `mvn test` entry is marked
+command names, published baseline artifacts, benchmark dependency-management
+metadata, and benchmark evidence metadata. The benchmark metadata records the
+manual/profile-gated smoke and release commands, generated report paths, starter
+version under test, baseline library versions, and the conditions that require
+refreshed numbers. The `mvn test` entry is marked
 `pass` when this test generated the manifest; compatibility, fixture, diff-check,
 and benchmark entries remain `pending` until the release maintainer runs them.
 
-Before publishing, run the pending commands. If the release changes request
+Before publishing, run the pending commands and resolve every published baseline
+artifact command listed in the manifest. An unresolved baseline artifact is a
+release blocker because API compatibility or published-starter benchmark evidence
+would not be reproducible. If the release changes request
 construction, observability, resilience wrapping, transport/client-builder
 behavior, or includes public performance claims, also run the release benchmark
 command and attach or link

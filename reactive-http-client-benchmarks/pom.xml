@@ -17,13 +17,14 @@
     <properties>
         <benchmark.result.dir>${project.build.directory}/benchmark-reports</benchmark.result.dir>
         <benchmark.commit>unknown</benchmark.commit>
+        <benchmark.starter.version>${project.version}</benchmark.starter.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>reactive-http-client-starter</artifactId>
-            <version>${project.version}</version>
+            <version>${benchmark.starter.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
@@ -148,6 +149,8 @@
                                     <executable>${java.home}/bin/java</executable>
                                     <arguments>
                                         <argument>-Dbenchmark.project.version=${project.version}</argument>
+                                        <argument>-Dbenchmark.starter.version=${benchmark.starter.version}</argument>
+                                        <argument>-Dbenchmark.api.compatibility.baseline.version=${api.compatibility.baseline.version}</argument>
                                         <argument>-Dbenchmark.spring-boot.version=${spring-boot.version}</argument>
                                         <argument>-Dbenchmark.spring-webflux.artifact=${org.springframework:spring-webflux:jar}</argument>
                                         <argument>-Dbenchmark.reactor-netty.artifact=${io.projectreactor.netty:reactor-netty-http:jar}</argument>
@@ -198,6 +201,8 @@
                                     <executable>${java.home}/bin/java</executable>
                                     <arguments>
                                         <argument>-Dbenchmark.project.version=${project.version}</argument>
+                                        <argument>-Dbenchmark.starter.version=${benchmark.starter.version}</argument>
+                                        <argument>-Dbenchmark.api.compatibility.baseline.version=${api.compatibility.baseline.version}</argument>
                                         <argument>-Dbenchmark.spring-boot.version=${spring-boot.version}</argument>
                                         <argument>-Dbenchmark.spring-webflux.artifact=${org.springframework:spring-webflux:jar}</argument>
                                         <argument>-Dbenchmark.reactor-netty.artifact=${io.projectreactor.netty:reactor-netty-http:jar}</argument>

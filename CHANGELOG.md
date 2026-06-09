@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   benchmark smoke and release commands, generated benchmark report paths, and
   the request-path changes that require refreshed benchmark numbers before
   publishing performance claims.
+- **Benchmark baseline drift evidence.** Benchmark reports now record the starter
+  version under test, resolved baseline library versions, and dependency
+  management source; release evidence also lists published baseline artifacts
+  that must resolve before benchmark or API compatibility evidence is accepted.
 
 ## [2.9.0] - 2026-06-08
 
