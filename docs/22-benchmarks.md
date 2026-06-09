@@ -127,6 +127,44 @@ entries include `mvn dependency:get -Dartifact=...` commands; a resolution
 failure is a release blocker because the benchmark or API compatibility baseline
 would no longer be reproducible.
 
+## Release-Note Benchmark Evidence
+
+When release notes include performance claims, add a benchmark evidence block near
+the claim or in the release checklist:
+
+```markdown
+Benchmark evidence:
+- Promoted report: [Benchmark Report 2.9.0](benchmark-report-2.9.0.md)
+- Current candidate command: `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`
+- Published baseline command: `mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.8.0 -Dbenchmark.commit=2.8.0`
+- Current candidate report: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
+- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.8.0/release-jmh.md`
+- Scenarios cited: `Get No Body`, `Post Json`
+```
+
+The promoted report link is required for public performance claims. Use the
+manifest `promotedReport` value, such as `docs/benchmark-report-2.9.0.md`,
+when citing the report from `CHANGELOG.md` or release notes. A pending
+benchmark entry in the generated release evidence manifest is not enough for a
+release that publishes performance wording; run the current candidate benchmark,
+promote the report, and cite the promoted report from the release notes.
+
+To rerun only the benchmark methods used by a release-note claim, first build the
+shaded benchmark jar, then pass a JMH include pattern for the cited scenarios:
+
+```bash
+mvn -Pbenchmarks -pl reactive-http-client-benchmarks -am package
+java -Dorg.slf4j.simpleLogger.logFile=reactive-http-client-benchmarks/target/benchmark-logger.log \
+  -jar reactive-http-client-benchmarks/target/benchmarks.jar \
+  '.*(clientSideOverheadStarterGetNoBody|clientSideOverheadStarterPostJson).*' \
+  -wi 5 -i 5 -f 2 -prof gc -rf json \
+  -rff reactive-http-client-benchmarks/target/benchmark-reports/release-note-jmh.json
+```
+
+Keep current-candidate and published-baseline reports in separate paths when
+comparing releases. Release notes should name the starter versions and scenario
+names being compared so readers can reproduce each claim from the cited report.
+
 ## Publishing Performance Claims
 
 Every public performance claim must include:
