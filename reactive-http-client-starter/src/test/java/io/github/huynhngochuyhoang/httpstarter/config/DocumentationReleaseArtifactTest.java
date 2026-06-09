@@ -35,7 +35,7 @@ class DocumentationReleaseArtifactTest {
 
         try (Stream<Path> files = markdownFiles(root)) {
             for (Path markdown : files.toList()) {
-                Matcher matcher = MARKDOWN_LINK.matcher(Files.readString(markdown));
+                Matcher matcher = MARKDOWN_LINK.matcher(markdownWithoutFencedCode(Files.readString(markdown)));
                 while (matcher.find()) {
                     String target = matcher.group(1);
                     if (isExternal(target)) {
@@ -113,6 +113,7 @@ class DocumentationReleaseArtifactTest {
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         String promotedReportDocs = Files.readString(promotedReport);
         String performanceSummaryDocs = Files.readString(root.resolve("docs/23-performance-summary.md"));
+        String releaseCompatibilityDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
 
         assertThat(benchmarkDocs)
                 .contains("## Methodology and Limits")
@@ -129,7 +130,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("Performance Summary")
                 .contains("## Release-Note Benchmark Evidence")
                 .contains("Benchmark evidence:")
-                .contains("Promoted report: [Benchmark Report " + projectVersion + "]")
+                .contains("Promoted report: [Benchmark Report " + projectVersion + "](docs/benchmark-report-" + projectVersion + ".md)")
+                .contains("paths relative\nto the repository root")
                 .contains("Current candidate command")
                 .contains("Published baseline command")
                 .contains("Current candidate report")
@@ -180,6 +182,12 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("near zero overhead")
                 .doesNotContain("always faster")
                 .doesNotContain("same performance as raw `WebClient`");
+
+        assertThat(releaseCompatibilityDocs)
+                .contains("promote the release-quality report into")
+                .contains("docs/benchmark-report-<version>.md")
+                .contains("do not link generated `target/` reports directly")
+                .doesNotContain("reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md` in");
 
         List<String> invalidReportLinks = new ArrayList<>();
         List<String> promotedReportLinks = new ArrayList<>();
@@ -371,6 +379,23 @@ class DocumentationReleaseArtifactTest {
             anchor.setLength(anchor.length() - 1);
         }
         return anchor.toString();
+    }
+
+    private static String markdownWithoutFencedCode(String markdown) {
+        StringBuilder out = new StringBuilder(markdown.length());
+        boolean fenced = false;
+        for (String line : markdown.split("\\R", -1)) {
+            if (line.startsWith("```")) {
+                fenced = !fenced;
+                out.append('\n');
+                continue;
+            }
+            if (!fenced) {
+                out.append(line);
+            }
+            out.append('\n');
+        }
+        return out.toString();
     }
 
     private static boolean isExternal(String target) {

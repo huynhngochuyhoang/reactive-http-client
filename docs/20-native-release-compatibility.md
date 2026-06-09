@@ -94,10 +94,11 @@ release blocker because API compatibility or published-starter benchmark evidenc
 would not be reproducible. If the release changes request
 construction, observability, resilience wrapping, transport/client-builder
 behavior, or includes public performance claims, also run the release benchmark
-command and attach or link
-`reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md` in
-the release notes. The smoke benchmark proves the harness starts; do not publish
-smoke-only numbers as performance evidence. Attach the JSON manifest to the
+command. For public performance claims, promote the release-quality report into
+`docs/benchmark-report-<version>.md` and cite that source-controlled report from
+the release notes; do not link generated `target/` reports directly. The smoke
+benchmark proves the harness starts; do not publish smoke-only numbers as
+performance evidence. Attach the JSON manifest to the
 release notes or paste its contents into the release checklist. Do not commit
 files from `target/release-evidence/`; regenerate them from the release
 candidate checkout.
