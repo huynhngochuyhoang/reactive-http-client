@@ -91,6 +91,19 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void benchmarkModuleUsesStarterDependencyManagement() throws IOException {
+        String benchmarkPom = Files.readString(projectRoot().resolve("reactive-http-client-benchmarks/pom.xml"));
+
+        assertThat(benchmarkPom)
+                .contains("<benchmark.starter.version>")
+                .contains("benchmark.starter.version")
+                .contains("benchmark.spring-webflux.artifact")
+                .contains("benchmark.reactor-netty.artifact");
+        assertThat(dependencyBlock(benchmarkPom, "spring-webflux")).doesNotContain("<version>");
+        assertThat(dependencyBlock(benchmarkPom, "reactor-netty-http")).doesNotContain("<version>");
+    }
+
+    @Test
     void generatedConfigurationReferenceMatchesMetadata() throws IOException {
         Path reference = projectRoot().resolve("docs/configuration-properties.md");
 
@@ -114,6 +127,22 @@ class DocumentationReleaseArtifactTest {
         assertThat(generated.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(pomProperty(pomXml, "api.compatibility.baseline.version"));
         assertThat(generated.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
+        assertThat(generated.path("benchmarkDependencyManagement").path("springBootVersion").asText())
+                .isEqualTo(pomProperty(pomXml, "spring-boot.version"));
+        assertThat(generated.path("benchmarkDependencyManagement").path("reactorNettyVersionSource").asText())
+                .contains("spring-boot-dependencies");
+        assertThat(generated.path("publishedBaselineArtifacts"))
+                .extracting(artifact -> artifact.path("artifact").asText())
+                .containsExactly(
+                        "io.github.huynhngochuyhoang:reactive-http-client-starter:"
+                                + pomProperty(pomXml, "api.compatibility.baseline.version"),
+                        "io.github.huynhngochuyhoang:reactive-http-client-test:"
+                                + pomProperty(pomXml, "api.compatibility.baseline.version"),
+                        "io.github.huynhngochuyhoang:reactive-http-client-otel:"
+                                + pomProperty(pomXml, "api.compatibility.baseline.version"));
+        assertThat(generated.path("publishedBaselineArtifacts"))
+                .extracting(artifact -> artifact.path("status").asText())
+                .containsOnly("pending");
         assertThat(generated.path("checks"))
                 .extracting(check -> check.path("command").asText())
                 .containsExactly(
@@ -126,10 +155,21 @@ class DocumentationReleaseArtifactTest {
                         "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)");
         JsonNode benchmarkEvidence = generated.path("benchmarkEvidence");
         assertThat(benchmarkEvidence.path("manualOrProfileGated").asBoolean()).isTrue();
+        assertThat(benchmarkEvidence.path("currentWorkspaceCommand").asText())
+                .contains("benchmark-release")
+                .contains("-am verify");
+        assertThat(benchmarkEvidence.path("publishedStarterCommand").asText())
+                .contains("-Pbenchmarks,benchmark-release,benchmark-published-baseline")
+                .contains("-Dbenchmark.starter.version=" + pomProperty(pomXml, "api.compatibility.baseline.version"))
+                .contains(" clean verify ")
+                .doesNotContain(" -am ");
         assertThat(benchmarkEvidence.path("reportDirectory").asText())
                 .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/");
         assertThat(benchmarkEvidence.path("releaseReport").asText())
                 .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
+        assertThat(benchmarkEvidence.path("publishedStarterReleaseReport").asText())
+                .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
+                        + pomProperty(pomXml, "api.compatibility.baseline.version") + "/release-jmh.md");
         assertThat(benchmarkEvidence.path("refreshRequiredWhen"))
                 .extracting(JsonNode::asText)
                 .containsExactly(
@@ -209,6 +249,17 @@ class DocumentationReleaseArtifactTest {
                 .containsOnly(projectVersion);
     }
 
+    private static String dependencyBlock(String pom, String artifactId) {
+        Matcher matcher = Pattern.compile("<dependency>\\s*(?:(?!</dependency>).)*?<artifactId>"
+                        + Pattern.quote(artifactId) + "</artifactId>(?:(?!</dependency>).)*?</dependency>",
+                Pattern.DOTALL)
+                .matcher(pom);
+        if (!matcher.find()) {
+            throw new IllegalStateException("Missing benchmark dependency: " + artifactId);
+        }
+        return matcher.group();
+    }
+
     private static String projectVersion(Path pom) throws Exception {
         var factory = DocumentBuilderFactory.newInstance();
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -227,7 +278,9 @@ class DocumentationReleaseArtifactTest {
         manifest.put("javaVersion", System.getProperty("java.version"));
         manifest.put("javaBaseline", pomProperty(pomXml, "java.version"));
         manifest.put("springBootBaseline", pomProperty(pomXml, "spring-boot.version"));
-        manifest.put("benchmarkEvidence", benchmarkEvidence());
+        manifest.put("benchmarkDependencyManagement", benchmarkDependencyManagement(pomXml));
+        manifest.put("publishedBaselineArtifacts", publishedBaselineArtifacts(baselineVersion));
+        manifest.put("benchmarkEvidence", benchmarkEvidence(baselineVersion));
         manifest.put("checks", List.of(
                 check("mvn test", "pass", "Generated by DocumentationReleaseArtifactTest during the current test run."),
                 check("mvn -Papi-compatibility -DskipTests verify", "pending", "Run before release."),
@@ -242,12 +295,19 @@ class DocumentationReleaseArtifactTest {
         return manifest;
     }
 
-    private static Map<String, Object> benchmarkEvidence() {
+    private static Map<String, Object> benchmarkEvidence(String baselineVersion) {
         LinkedHashMap<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("manualOrProfileGated", true);
+        evidence.put("currentWorkspaceCommand",
+                "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)");
+        evidence.put("publishedStarterCommand",
+                "mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version="
+                        + baselineVersion + " -Dbenchmark.commit=" + baselineVersion);
         evidence.put("reportDirectory", "reactive-http-client-benchmarks/target/benchmark-reports/");
         evidence.put("smokeReport", "reactive-http-client-benchmarks/target/benchmark-reports/smoke-only-jmh.md");
         evidence.put("releaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
+        evidence.put("publishedStarterReleaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
+                + baselineVersion + "/release-jmh.md");
         evidence.put("refreshRequiredWhen", List.of(
                 "request construction changes",
                 "observability changes",
@@ -257,6 +317,32 @@ class DocumentationReleaseArtifactTest {
         evidence.put("releaseNotesInstruction",
                 "Attach or link the release report when publishing performance claims; never publish smoke-only numbers.");
         return evidence;
+    }
+
+    private static Map<String, Object> benchmarkDependencyManagement(String pomXml) {
+        LinkedHashMap<String, Object> dependencyManagement = new LinkedHashMap<>();
+        dependencyManagement.put("source", "root spring-boot-dependencies BOM");
+        dependencyManagement.put("springBootVersion", pomProperty(pomXml, "spring-boot.version"));
+        dependencyManagement.put("reactorNettyVersionSource", "resolved from spring-boot-dependencies");
+        dependencyManagement.put("benchmarkModuleUsesStarterParent", true);
+        return dependencyManagement;
+    }
+
+    private static List<Map<String, String>> publishedBaselineArtifacts(String baselineVersion) {
+        return List.of(
+                baselineArtifact("reactive-http-client-starter", baselineVersion),
+                baselineArtifact("reactive-http-client-test", baselineVersion),
+                baselineArtifact("reactive-http-client-otel", baselineVersion));
+    }
+
+    private static Map<String, String> baselineArtifact(String artifactId, String baselineVersion) {
+        String gav = "io.github.huynhngochuyhoang:" + artifactId + ":" + baselineVersion;
+        LinkedHashMap<String, String> artifact = new LinkedHashMap<>();
+        artifact.put("artifact", gav);
+        artifact.put("status", "pending");
+        artifact.put("resolutionCommand", "mvn dependency:get -Dartifact=" + gav);
+        artifact.put("note", "Run before release; unresolved published artifacts are release blockers.");
+        return artifact;
     }
 
     private static Map<String, String> check(String command, String status, String note) {

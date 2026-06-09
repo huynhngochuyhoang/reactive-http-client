@@ -147,14 +147,14 @@
 
 ## Priority 8 — Baseline Availability and Dependency Drift
 
-### [ ] 3.2 Baseline availability and dependency drift
-- [ ] Record starter version and baseline library versions in benchmark reports.
-- [ ] Verify the benchmark module uses the same Spring Boot and Reactor Netty
+### [x] 3.2 Baseline availability and dependency drift
+- [x] Record starter version and baseline library versions in benchmark reports.
+- [x] Verify the benchmark module uses the same Spring Boot and Reactor Netty
       dependency management as the starter.
-- [ ] Document how to benchmark the current workspace.
-- [ ] Document how to benchmark against the last published starter release.
-- [ ] Make unresolved published baseline artifacts visible in release evidence.
-- [ ] Keep benchmark and API compatibility baseline warnings actionable.
+- [x] Document how to benchmark the current workspace.
+- [x] Document how to benchmark against the last published starter release.
+- [x] Make unresolved published baseline artifacts visible in release evidence.
+- [x] Keep benchmark and API compatibility baseline warnings actionable.
 
 ---
 

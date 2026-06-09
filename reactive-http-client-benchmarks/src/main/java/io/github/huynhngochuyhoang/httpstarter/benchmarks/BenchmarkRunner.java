@@ -37,6 +37,10 @@ public final class BenchmarkRunner {
         Properties properties = new Properties();
         properties.setProperty("generatedAt", Instant.now().toString());
         properties.setProperty("projectVersion", System.getProperty("benchmark.project.version", "unknown"));
+        properties.setProperty("starterVersion", System.getProperty("benchmark.starter.version",
+                properties.getProperty("projectVersion", "unknown")));
+        properties.setProperty("apiCompatibilityBaselineVersion",
+                System.getProperty("benchmark.api.compatibility.baseline.version", "unknown"));
         properties.setProperty("benchmarkCommit", System.getProperty("benchmark.commit", "unknown"));
         properties.setProperty("springBootVersion", System.getProperty("benchmark.spring-boot.version", "unknown"));
         properties.setProperty("springWebFluxVersion", System.getProperty("benchmark.spring-webflux.version",
@@ -49,6 +53,10 @@ public final class BenchmarkRunner {
                         .or(() -> loadedReactorNettyVersion())
                         .or(() -> mavenVersion("io.projectreactor.netty", "reactor-netty-http"))
                         .orElseGet(() -> packageVersion(HttpClient.class))));
+        properties.setProperty("baselineSpringWebFluxVersion", properties.getProperty("springWebFluxVersion", "unknown"));
+        properties.setProperty("baselineReactorNettyVersion", properties.getProperty("reactorNettyVersion", "unknown"));
+        properties.setProperty("dependencyManagement",
+                "spring-boot-dependencies:" + properties.getProperty("springBootVersion", "unknown"));
         properties.setProperty("javaVersion", System.getProperty("java.version", "unknown"));
         properties.setProperty("javaVm", System.getProperty("java.vm.name", "unknown"));
         properties.setProperty("osName", System.getProperty("os.name", "unknown"));
