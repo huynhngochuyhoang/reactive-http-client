@@ -129,19 +129,19 @@
 
 ## Priority 7 — Benchmark-Backed Release Evidence
 
-### [ ] 2.3 Benchmark-backed release evidence
-- [ ] Add benchmark command names and generated report paths to release
+### [x] 2.3 Benchmark-backed release evidence
+- [x] Add benchmark command names and generated report paths to release
       evidence.
-- [ ] Keep benchmark execution manual or profile-gated.
-- [ ] Add a lightweight smoke check that verifies benchmark classes compile and
+- [x] Keep benchmark execution manual or profile-gated.
+- [x] Add a lightweight smoke check that verifies benchmark classes compile and
       the quick benchmark command can start.
-- [ ] Define when benchmark numbers must be refreshed: request construction,
+- [x] Define when benchmark numbers must be refreshed: request construction,
       observability, resilience wrapping, transport/client-builder changes, or
       public performance claims.
-- [ ] Ensure normal CI remains fast.
-- [ ] Make missing benchmark evidence visible before publishing a release that
+- [x] Ensure normal CI remains fast.
+- [x] Make missing benchmark evidence visible before publishing a release that
       changes request-path behavior.
-- [ ] Document how maintainers attach benchmark evidence to release notes.
+- [x] Document how maintainers attach benchmark evidence to release notes.
 
 ---
 

@@ -40,6 +40,26 @@ metadata. Profile-backed runs redirect benchmark logger output to
 `reactive-http-client-benchmarks/target/benchmark-logger.log` so the real
 metadata exchange logger can be measured without flooding stderr.
 
+## Release Evidence
+
+`DocumentationReleaseArtifactTest` includes benchmark evidence in
+`target/release-evidence/reactive-http-client-release-evidence.json`. The
+manifest keeps benchmark execution manual or profile-gated and lists these
+generated report paths:
+
+- `reactive-http-client-benchmarks/target/benchmark-reports/smoke-only-jmh.md`
+  for the smoke harness check.
+- `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
+  for release-quality evidence.
+
+Refresh release benchmark numbers when a release changes request construction,
+observability, resilience wrapping, transport or client-builder behavior, or when
+release notes make public performance claims. Before publishing those claims,
+attach or link the release report from the release notes. A pending benchmark
+entry in the release evidence manifest is intentional for releases with no
+request-path change; for benchmark-relevant releases it is the visible reminder
+that release evidence still needs to be produced.
+
 ## Current Scope
 
 The benchmark module currently includes:
