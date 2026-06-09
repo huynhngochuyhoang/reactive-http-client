@@ -6,7 +6,6 @@ import io.github.huynhngochuyhoang.httpstarter.benchmarks.client.StarterBenchmar
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder;
 import io.github.huynhngochuyhoang.httpstarter.core.DefaultHttpExchangeLogger;
-import io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogContext;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.NoopResilienceOperatorApplier;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveClientInvocationHandler;
@@ -55,7 +54,7 @@ public class StarterDiagnosticsOverheadBenchmark {
         exchangeLoggingClient = createClient(config -> {
             config.setLogExchange(true);
             config.setLogPreset(ReactiveHttpClientProperties.LogPreset.METADATA_ONLY);
-        }, context -> context.registerBean(DefaultHttpExchangeLogger.class, MetadataOnlyExchangeLogger::new));
+        }, context -> context.registerBean(DefaultHttpExchangeLogger.class, DefaultHttpExchangeLogger::new));
         micrometerClient = createClient(config -> {}, context -> context.registerBean(HttpClientObserver.class, () ->
                 new MicrometerHttpClientObserver(new SimpleMeterRegistry(), new ReactiveHttpClientProperties.ObservabilityConfig())));
         diagnosticsProvider = createDiagnosticsProvider();
@@ -163,14 +162,5 @@ public class StarterDiagnosticsOverheadBenchmark {
     @FunctionalInterface
     private interface ContextCustomizer {
         void customize(GenericApplicationContext context);
-    }
-
-    private static final class MetadataOnlyExchangeLogger extends DefaultHttpExchangeLogger {
-        @Override
-        public void log(HttpExchangeLogContext context) {
-            if (context.clientName() == null || context.httpMethod() == null || context.pathTemplate() == null) {
-                throw new IllegalStateException("Exchange log context missed required metadata");
-            }
-        }
     }
 }
