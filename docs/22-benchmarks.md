@@ -42,8 +42,9 @@ metadata.
 
 The benchmark module currently includes:
 
-- A no-network starter invocation benchmark for metadata lookup, proxy
-  invocation, argument resolution, and mock-exchange request construction.
+- A no-network starter invocation benchmark for metadata lookup, cached
+  request-plan lookup, proxy invocation, scalar path/query/header argument
+  resolution, and mock-exchange request construction.
 - Client-side loopback overhead scenarios across raw `WebClient`, Spring HTTP
   Interface, and the starter for `GET` with no body, `GET` with path/query/header
   arguments, `POST` JSON, `Mono<ResponseEntity<T>>`, 4xx with a small bounded

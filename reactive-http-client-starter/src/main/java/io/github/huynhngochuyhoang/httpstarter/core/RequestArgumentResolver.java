@@ -102,8 +102,8 @@ public class RequestArgumentResolver {
     }
 
     private List<String> toHeaderValueList(String headerName, Object value) {
-        List<String> values = new ArrayList<>();
         if (value instanceof Collection<?> collection) {
+            List<String> values = new ArrayList<>();
             for (Object item : collection) {
                 addHeaderValue(values, headerName, item);
             }
@@ -111,13 +111,18 @@ public class RequestArgumentResolver {
         }
         if (value != null && value.getClass().isArray()) {
             int len = Array.getLength(value);
+            List<String> values = new ArrayList<>(len);
             for (int i = 0; i < len; i++) {
                 addHeaderValue(values, headerName, Array.get(value, i));
             }
             return values;
         }
-        addHeaderValue(values, headerName, value);
-        return values;
+        if (value == null) {
+            return List.of();
+        }
+        String headerValue = String.valueOf(value);
+        validateHeaderValue(headerName, headerValue);
+        return List.of(headerValue);
     }
 
     private void addHeaderValue(List<String> values, String headerName, Object value) {
