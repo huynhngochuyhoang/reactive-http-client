@@ -7,22 +7,22 @@
 
 ## Priority 1 — Promote a Versioned Benchmark Report
 
-### [ ] 1.1 Promote a versioned benchmark report
-- [ ] Run the current-workspace release-quality benchmark for the candidate
+### [x] 1.1 Promote a versioned benchmark report
+- [x] Run the current-workspace release-quality benchmark for the candidate
       version.
-- [ ] Promote the selected Markdown report into `docs/` with a versioned
+- [x] Promote the selected Markdown report into `docs/` with a versioned
       filename such as `docs/benchmark-report-2.10.0.md`.
-- [ ] Keep generated JSON and environment metadata referenced in release
+- [x] Keep generated JSON and environment metadata referenced in release
       evidence without committing `target/` artifacts.
-- [ ] Add report metadata for report version, starter version under test,
+- [x] Add report metadata for report version, starter version under test,
       benchmark commit, Java version, Spring Boot version, and machine limits.
-- [ ] Link the promoted report from `docs/22-benchmarks.md`, `README.md`, and
+- [x] Link the promoted report from `docs/22-benchmarks.md`, `README.md`, and
       the changelog only after the report is source-controlled.
-- [ ] Verify the report states that it is release-quality evidence, not smoke
+- [x] Verify the report states that it is release-quality evidence, not smoke
       evidence.
-- [ ] Verify public docs link only the promoted report, never
+- [x] Verify public docs link only the promoted report, never
       `target/benchmark-reports`.
-- [ ] Verify documentation tests fail if the promoted report link becomes stale.
+- [x] Verify documentation tests fail if the promoted report link becomes stale.
 
 ---
 
