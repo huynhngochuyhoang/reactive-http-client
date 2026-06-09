@@ -152,6 +152,7 @@
                                         <argument>-Dbenchmark.spring-webflux.artifact=${org.springframework:spring-webflux:jar}</argument>
                                         <argument>-Dbenchmark.reactor-netty.artifact=${io.projectreactor.netty:reactor-netty-http:jar}</argument>
                                         <argument>-Dbenchmark.commit=${benchmark.commit}</argument>
+                                        <argument>-Dorg.slf4j.simpleLogger.logFile=${project.build.directory}/benchmark-logger.log</argument>
                                         <argument>-jar</argument>
                                         <argument>${project.build.directory}/benchmarks.jar</argument>
                                         <argument>.*Benchmark.*</argument>
@@ -201,6 +202,7 @@
                                         <argument>-Dbenchmark.spring-webflux.artifact=${org.springframework:spring-webflux:jar}</argument>
                                         <argument>-Dbenchmark.reactor-netty.artifact=${io.projectreactor.netty:reactor-netty-http:jar}</argument>
                                         <argument>-Dbenchmark.commit=${benchmark.commit}</argument>
+                                        <argument>-Dorg.slf4j.simpleLogger.logFile=${project.build.directory}/benchmark-logger.log</argument>
                                         <argument>-jar</argument>
                                         <argument>${project.build.directory}/benchmarks.jar</argument>
                                         <argument>.*Benchmark.*</argument>
