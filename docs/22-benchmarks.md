@@ -56,8 +56,13 @@ The benchmark module currently includes:
   circuit-breaker wrapping. These are not compared against baseline clients that
   omit equivalent feature work.
 
-Generated Markdown reports and release evidence integration are tracked in the
-V12 roadmap checklist.
+Both smoke and release-quality commands write a Markdown report next to the JMH
+JSON. For example, the smoke profile writes `smoke-only-jmh.md` and the
+release profile writes `release-jmh.md` under the benchmark report directory.
+Generated files stay under `target/` unless a maintainer intentionally promotes
+a release-quality report into `docs/` with a versioned filename. Only link a
+promoted report from release notes when the release makes performance claims
+backed by that report.
 
 ## Metrics
 
