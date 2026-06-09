@@ -94,18 +94,19 @@
 
 ## Priority 5 — Invocation Overhead Audit
 
-### [ ] 2.1 Invocation overhead audit
-- [ ] Measure proxy invocation overhead without network I/O.
-- [ ] Measure cached `MethodMetadata`, request planning, and
+### [x] 2.1 Invocation overhead audit
+- [x] Measure proxy invocation overhead without network I/O.
+- [x] Measure cached `MethodMetadata`, request planning, and
       argument-resolution paths.
-- [ ] Audit allocation hot spots for common scalar path, query, and header
+- [x] Audit allocation hot spots for common scalar path, query, and header
       arguments.
-- [ ] Identify the top per-invocation allocation or CPU contributors.
-- [ ] Apply only simple, measured optimizations that preserve validation and
+- [x] Identify the top per-invocation allocation or CPU contributors.
+- [x] Apply only simple, measured optimizations that preserve validation and
       diagnostics contracts.
-- [ ] Record before/after benchmark numbers for every optimization.
-- [ ] Verify existing behavior tests pass unchanged.
-- [ ] Verify startup validation and diagnostics remain precise.
+- [x] Record before/after benchmark numbers for every optimization in
+      [`INVOCATION_OVERHEAD_AUDIT.md`](INVOCATION_OVERHEAD_AUDIT.md).
+- [x] Verify existing behavior tests pass unchanged.
+- [x] Verify startup validation and diagnostics remain precise.
 
 ---
 
