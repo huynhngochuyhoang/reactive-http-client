@@ -50,25 +50,25 @@
 
 ## Priority 3 — Core Scenario Matrix
 
-### [ ] 1.2 Core scenario matrix
-- [ ] Split scenarios into client-side overhead benchmarks and feature-parity
+### [x] 1.2 Core scenario matrix
+- [x] Split scenarios into client-side overhead benchmarks and feature-parity
       benchmarks.
-- [ ] Use an extremely light local loopback server for client-side overhead
+- [x] Use an extremely light local loopback server for client-side overhead
       scenarios.
-- [ ] Add successful call scenarios for `GET` with no body, `GET` with path,
+- [x] Add successful call scenarios for `GET` with no body, `GET` with path,
       query, and header arguments, `POST` JSON, and `Mono<ResponseEntity<T>>`.
-- [ ] Add error scenarios for 4xx/5xx with a small bounded error body.
-- [ ] Add `application/problem+json` as starter error-mapping overhead unless
+- [x] Add error scenarios for 4xx/5xx with a small bounded error body.
+- [x] Add `application/problem+json` as starter error-mapping overhead unless
       baselines implement equivalent Problem Detail mapping.
-- [ ] Add optional feature scenarios one feature at a time: exchange logging,
+- [x] Add optional feature scenarios one feature at a time: exchange logging,
       Micrometer observer, retry, and circuit breaker.
-- [ ] Do not compare starter feature work against raw `WebClient` or Spring HTTP
+- [x] Do not compare starter feature work against raw `WebClient` or Spring HTTP
       Interface baselines that omit the same work.
-- [ ] Include Spring HTTP Interface only where the framework can support the
+- [x] Include Spring HTTP Interface only where the framework can support the
       scenario without custom code that changes the comparison.
-- [ ] Record throughput, average latency, p50/p95/p99 latency, allocation rate,
+- [x] Record throughput, average latency, p50/p95/p99 latency, allocation rate,
       and error count where reliable.
-- [ ] Keep scenario names and result columns stable for release-to-release
+- [x] Keep scenario names and result columns stable for release-to-release
       diffs.
 
 ---

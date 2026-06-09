@@ -19,15 +19,25 @@ final class LoopbackBenchmarkServer implements AutoCloseable {
 
     static final String SCENARIO_HEADER = "X-Benchmark-Scenario";
     static final String BODY_SHAPE_HEADER = "X-Benchmark-Body-Shape";
+    static final String BODY_SHAPE = "BenchmarkUser{id,name}";
+    static final BenchmarkUser CURRENT_USER = new BenchmarkUser("current", "current-user");
+    static final BenchmarkUser BENCHMARK_USER = new BenchmarkUser("42", "benchmark-user");
     static final Scenario GET_USER_SCENARIO = new Scenario(
-            "get-user",
+            "get-user-path-query-header",
             "42",
             "summary",
             "benchmark",
-            new BenchmarkUser("42", "benchmark-user"));
+            BENCHMARK_USER);
+    static final String CLIENT_ERROR_BODY = "bounded client error body";
+    static final String SERVER_ERROR_BODY = "bounded server error body";
+    static final String PROBLEM_DETAIL_BODY = "{\"type\":\"https://example.com/problems/benchmark\","
+            + "\"title\":\"Benchmark problem\","
+            + "\"status\":400,"
+            + "\"detail\":\"bounded problem detail body\"}";
 
+    private static final String CURRENT_USER_JSON = "{\"id\":\"current\",\"name\":\"current-user\"}";
     private static final String USER_JSON = "{\"id\":\"42\",\"name\":\"benchmark-user\"}";
-    private static final String BODY_SHAPE = "BenchmarkUser{id,name}";
+    private static final String CREATE_USER_REQUEST_JSON = "{\"name\":\"benchmark-user\"}";
 
     private final DisposableServer server;
     private final Stats stats;
@@ -43,19 +53,38 @@ final class LoopbackBenchmarkServer implements AutoCloseable {
                 .host("127.0.0.1")
                 .port(0)
                 .route(routes -> routes
+                        .get("/users/current", (request, response) -> handleFixedSuccess(
+                                stats, response, "get-no-body", CURRENT_USER_JSON, HttpResponseStatus.OK))
                         .get("/users/{id}", (request, response) -> handleGetUser(stats, request, response))
-                        .post("/users", (request, response) -> request.receive()
-                                .aggregate()
-                                .asString()
-                                .defaultIfEmpty("")
-                                .then(response.status(HttpResponseStatus.CREATED)
-                                        .header(HttpHeaderNames.CONTENT_TYPE, "application/json")
-                                        .header(SCENARIO_HEADER, "create-user")
-                                        .header(BODY_SHAPE_HEADER, BODY_SHAPE)
-                                        .sendString(Mono.just(USER_JSON))
-                                        .then())))
+                        .post("/users", (request, response) -> handleCreateUser(stats, request, response))
+                        .get("/errors/client", (request, response) -> handleError(
+                                stats, response, "client-error-small-body", HttpResponseStatus.NOT_FOUND,
+                                "text/plain", CLIENT_ERROR_BODY))
+                        .get("/errors/server", (request, response) -> handleError(
+                                stats, response, "server-error-small-body", HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                                "text/plain", SERVER_ERROR_BODY))
+                        .get("/errors/problem", (request, response) -> handleError(
+                                stats, response, "problem-detail-error-mapping", HttpResponseStatus.BAD_REQUEST,
+                                "application/problem+json", PROBLEM_DETAIL_BODY)))
                 .bindNow();
         return new LoopbackBenchmarkServer(server, stats);
+    }
+
+    private static Mono<Void> handleFixedSuccess(
+            Stats stats,
+            HttpServerResponse response,
+            String scenario,
+            String body,
+            HttpResponseStatus status) {
+        int activeRequests = stats.startRequest();
+        return response.status(status)
+                .header(HttpHeaderNames.CONTENT_TYPE, "application/json")
+                .header(SCENARIO_HEADER, scenario)
+                .header(BODY_SHAPE_HEADER, BODY_SHAPE)
+                .header("X-Benchmark-Server-In-Flight", String.valueOf(activeRequests))
+                .sendString(Mono.just(body))
+                .then()
+                .doFinally(signal -> stats.finishRequest());
     }
 
     private static Mono<Void> handleGetUser(Stats stats, HttpServerRequest request, HttpServerResponse response) {
@@ -70,7 +99,8 @@ final class LoopbackBenchmarkServer implements AutoCloseable {
                         .then()
                         .doFinally(signal -> stats.finishRequest());
             }
-            return response.header(HttpHeaderNames.CONTENT_TYPE, "application/json")
+            return response.status(HttpResponseStatus.OK)
+                    .header(HttpHeaderNames.CONTENT_TYPE, "application/json")
                     .header(SCENARIO_HEADER, GET_USER_SCENARIO.name())
                     .header(BODY_SHAPE_HEADER, BODY_SHAPE)
                     .header("X-Benchmark-Server-In-Flight", String.valueOf(activeRequests))
@@ -83,6 +113,49 @@ final class LoopbackBenchmarkServer implements AutoCloseable {
         }
     }
 
+    private static Mono<Void> handleCreateUser(Stats stats, HttpServerRequest request, HttpServerResponse response) {
+        int activeRequests = stats.startRequest();
+        return request.receive()
+                .aggregate()
+                .asString()
+                .defaultIfEmpty("")
+                .flatMap(body -> {
+                    if (!CREATE_USER_REQUEST_JSON.equals(body)) {
+                        String error = "expected create-user JSON body [" + CREATE_USER_REQUEST_JSON + "] but got [" + body + "]";
+                        stats.recordInvalidRequest(error);
+                        return response.status(HttpResponseStatus.BAD_REQUEST)
+                                .header(HttpHeaderNames.CONTENT_TYPE, "text/plain")
+                                .sendString(Mono.just(error))
+                                .then();
+                    }
+                    return response.status(HttpResponseStatus.CREATED)
+                            .header(HttpHeaderNames.CONTENT_TYPE, "application/json")
+                            .header(SCENARIO_HEADER, "post-json")
+                            .header(BODY_SHAPE_HEADER, BODY_SHAPE)
+                            .header("X-Benchmark-Server-In-Flight", String.valueOf(activeRequests))
+                            .sendString(Mono.just(USER_JSON))
+                            .then();
+                })
+                .doFinally(signal -> stats.finishRequest());
+    }
+
+    private static Mono<Void> handleError(
+            Stats stats,
+            HttpServerResponse response,
+            String scenario,
+            HttpResponseStatus status,
+            String contentType,
+            String body) {
+        stats.startRequest();
+        stats.recordExpectedError();
+        return response.status(status)
+                .header(HttpHeaderNames.CONTENT_TYPE, contentType)
+                .header(SCENARIO_HEADER, scenario)
+                .sendString(Mono.just(body))
+                .then()
+                .doFinally(signal -> stats.finishRequest());
+    }
+
     String baseUrl() {
         return "http://127.0.0.1:" + server.port();
     }
@@ -93,6 +166,7 @@ final class LoopbackBenchmarkServer implements AutoCloseable {
             throw new IllegalStateException("Loopback benchmark received " + invalidRequests
                     + " request(s) that did not match the shared scenario. First mismatch: "
                     + stats.firstInvalidRequest + "; totalRequests=" + stats.totalRequests.sum()
+                    + "; expectedErrorResponses=" + stats.expectedErrorResponses.sum()
                     + "; maxConcurrentRequests=" + stats.maxConcurrentRequests.get());
         }
     }
@@ -148,6 +222,7 @@ final class LoopbackBenchmarkServer implements AutoCloseable {
         private final AtomicInteger inFlightRequests = new AtomicInteger();
         private final AtomicInteger maxConcurrentRequests = new AtomicInteger();
         private final LongAdder totalRequests = new LongAdder();
+        private final LongAdder expectedErrorResponses = new LongAdder();
         private final LongAdder invalidRequests = new LongAdder();
         private volatile String firstInvalidRequest = "none";
 
@@ -160,6 +235,10 @@ final class LoopbackBenchmarkServer implements AutoCloseable {
 
         void finishRequest() {
             inFlightRequests.decrementAndGet();
+        }
+
+        void recordExpectedError() {
+            expectedErrorResponses.increment();
         }
 
         void recordInvalidRequest(String message) {
