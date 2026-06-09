@@ -75,19 +75,19 @@
 
 ## Priority 4 — Generated Benchmark Report
 
-### [ ] 1.3 Generated benchmark report
-- [ ] Generate a Markdown benchmark report under `target/benchmark-reports/` by
+### [x] 1.3 Generated benchmark report
+- [x] Generate a Markdown benchmark report under `target/benchmark-reports/` by
       default.
-- [ ] Include raw result tables plus a short interpretation section.
-- [ ] Include environment metadata in the report.
-- [ ] Add comparison summaries against raw `WebClient` and Spring HTTP
+- [x] Include raw result tables plus a short interpretation section.
+- [x] Include environment metadata in the report.
+- [x] Add comparison summaries against raw `WebClient` and Spring HTTP
       Interface for each valid scenario.
-- [ ] Label smoke-only results, optional starter features, starter-only overhead
+- [x] Label smoke-only results, optional starter features, starter-only overhead
       scenarios, and release-quality runs clearly.
-- [ ] Keep generated benchmark files out of source unless intentionally
+- [x] Keep generated benchmark files out of source unless intentionally
       promoted.
-- [ ] Document how maintainers promote a selected release report into `docs/`.
-- [ ] Link promoted benchmark reports from release notes when performance
+- [x] Document how maintainers promote a selected release report into `docs/`.
+- [x] Link promoted benchmark reports from release notes when performance
       claims are included.
 
 ---

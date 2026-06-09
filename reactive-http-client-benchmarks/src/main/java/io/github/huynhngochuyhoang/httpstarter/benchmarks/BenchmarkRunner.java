@@ -23,6 +23,7 @@ public final class BenchmarkRunner {
     public static void main(String[] args) throws Exception {
         writeEnvironmentMetadata(args);
         Main.main(args);
+        BenchmarkMarkdownReport.writeIfResultFilePresent(args);
     }
 
     private static void writeEnvironmentMetadata(String[] args) throws IOException {
