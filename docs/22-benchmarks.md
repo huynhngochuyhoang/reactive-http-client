@@ -30,15 +30,17 @@ mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verif
 ```
 
 Run the same benchmark harness against the last published starter artifact by
-setting `benchmark.starter.version` and omitting `-am` so Maven resolves the
-published dependency instead of the current reactor module:
+setting `benchmark.starter.version`, enabling `benchmark-published-baseline`, and
+omitting `-am` so Maven resolves the published dependency instead of the current
+reactor module:
 
 ```bash
-mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks verify -Dbenchmark.starter.version=2.8.0 -Dbenchmark.commit=2.8.0
+mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks verify -Dbenchmark.starter.version=2.8.0 -Dbenchmark.commit=2.8.0
 ```
 
 That command uses the current benchmark harness and current managed Spring Boot
-BOM to compare starter versions under the same dependency-management baseline.
+BOM, excluding current-only diagnostics-provider benchmarks that cannot compile
+against the published baseline artifact.
 For an exact historical release environment, check out the release tag and run
 the current-workspace command from that checkout.
 
