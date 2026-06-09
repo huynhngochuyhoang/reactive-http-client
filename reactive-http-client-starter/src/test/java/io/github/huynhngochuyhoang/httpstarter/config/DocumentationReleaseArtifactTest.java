@@ -104,9 +104,12 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void benchmarkDocumentationScopesPerformanceClaimsToReleaseQualityReports() throws IOException {
+    void benchmarkDocumentationScopesPerformanceClaimsToReleaseQualityReports() throws Exception {
         Path root = projectRoot();
+        String projectVersion = projectVersion(root.resolve("pom.xml"));
+        Path promotedReport = root.resolve("docs/benchmark-report-" + projectVersion + ".md");
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
+        String promotedReportDocs = Files.readString(promotedReport);
 
         assertThat(benchmarkDocs)
                 .contains("## Methodology and Limits")
@@ -118,9 +121,25 @@ class DocumentationReleaseArtifactTest {
                 .contains("release-quality report version")
                 .contains("exact JMH scenario name")
                 .contains("Avoid broad wording such as")
-                .contains("smoke-only report links");
+                .contains("smoke-only report links")
+                .contains("Benchmark Report " + projectVersion);
+
+        assertThat(promotedReport).exists();
+        assertThat(promotedReportDocs)
+                .contains("## Promotion Metadata")
+                .contains("Report version: `" + projectVersion + "`")
+                .contains("Starter version under test: `" + projectVersion + "`")
+                .contains("Evidence level: **Release-quality**, not smoke evidence.")
+                .contains("| `starterVersion` | " + projectVersion + " |")
+                .contains("| `benchmarkCommit` |")
+                .contains("| `javaVersion` |")
+                .contains("| `springBootVersion` |")
+                .contains("| `availableProcessors` |")
+                .contains("## Comparison Summary")
+                .doesNotContain("/home/");
 
         List<String> invalidReportLinks = new ArrayList<>();
+        List<String> promotedReportLinks = new ArrayList<>();
         try (Stream<Path> files = publicMarkdownFiles(root)) {
             for (Path markdown : files.toList()) {
                 Matcher matcher = MARKDOWN_LINK.matcher(Files.readString(markdown));
@@ -129,6 +148,9 @@ class DocumentationReleaseArtifactTest {
                     if (target.contains("benchmark-reports/") || target.contains("smoke-only-jmh.md")) {
                         invalidReportLinks.add(root.relativize(markdown) + " -> " + target);
                     }
+                    if (target.contains("benchmark-report-")) {
+                        promotedReportLinks.add(target);
+                    }
                 }
             }
         }
@@ -136,6 +158,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(invalidReportLinks)
                 .as("public docs must link promoted release-quality benchmark reports, not target or smoke reports")
                 .isEmpty();
+        assertThat(promotedReportLinks)
+                .as("public docs should link the promoted current-version benchmark report")
+                .contains("docs/benchmark-report-" + projectVersion + ".md",
+                        "benchmark-report-" + projectVersion + ".md");
     }
 
     @Test

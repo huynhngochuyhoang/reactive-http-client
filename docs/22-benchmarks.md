@@ -28,6 +28,12 @@ Known limits:
   baseline client installs an equivalent Problem Detail mapper.
 - Conclusions must name the scenario and report version that produced the data.
 
+Current promoted report:
+
+- [Benchmark Report 2.9.0](benchmark-report-2.9.0.md) is release-quality
+  evidence for starter `2.9.0`, generated from the current workspace benchmark
+  profile. Use it only for the named scenarios and environment it records.
+
 ## Comparison Model
 
 | Surface | Benchmark role | Equivalent work required | Supported claim scope |

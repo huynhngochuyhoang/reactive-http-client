@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scenario names, and release-quality report links before publishing performance
   claims, with tests preventing generated target or smoke-only reports from being
   linked as evidence.
+- **Promoted benchmark report.** Added
+  [Benchmark Report 2.9.0](docs/benchmark-report-2.9.0.md) as source-controlled
+  release-quality evidence for starter `2.9.0` benchmark scenarios.
 
 ## [2.9.0] - 2026-06-08
 
