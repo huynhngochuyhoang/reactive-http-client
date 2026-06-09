@@ -104,6 +104,41 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void benchmarkDocumentationScopesPerformanceClaimsToReleaseQualityReports() throws IOException {
+        Path root = projectRoot();
+        String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
+
+        assertThat(benchmarkDocs)
+                .contains("## Methodology and Limits")
+                .contains("## Comparison Model")
+                .contains("| Raw `WebClient` |")
+                .contains("| Spring HTTP Interface |")
+                .contains("| Starter |")
+                .contains("## Publishing Performance Claims")
+                .contains("release-quality report version")
+                .contains("exact JMH scenario name")
+                .contains("Avoid broad wording such as")
+                .contains("smoke-only report links");
+
+        List<String> invalidReportLinks = new ArrayList<>();
+        try (Stream<Path> files = publicMarkdownFiles(root)) {
+            for (Path markdown : files.toList()) {
+                Matcher matcher = MARKDOWN_LINK.matcher(Files.readString(markdown));
+                while (matcher.find()) {
+                    String target = URLDecoder.decode(matcher.group(1), StandardCharsets.UTF_8);
+                    if (target.contains("benchmark-reports/") || target.contains("smoke-only-jmh.md")) {
+                        invalidReportLinks.add(root.relativize(markdown) + " -> " + target);
+                    }
+                }
+            }
+        }
+
+        assertThat(invalidReportLinks)
+                .as("public docs must link promoted release-quality benchmark reports, not target or smoke reports")
+                .isEmpty();
+    }
+
+    @Test
     void generatedConfigurationReferenceMatchesMetadata() throws IOException {
         Path reference = projectRoot().resolve("docs/configuration-properties.md");
 
@@ -186,6 +221,13 @@ class DocumentationReleaseArtifactTest {
                         Files.walk(root.resolve("docs")),
                         Files.walk(root.resolve("roadmaps")))
                 .flatMap(stream -> stream)
+                .filter(path -> path.toString().endsWith(".md"));
+    }
+
+    private static Stream<Path> publicMarkdownFiles(Path root) throws IOException {
+        return Stream.concat(
+                        Stream.of(root.resolve("README.md"), root.resolve("CHANGELOG.md")),
+                        Files.walk(root.resolve("docs")))
                 .filter(path -> path.toString().endsWith(".md"));
     }
 

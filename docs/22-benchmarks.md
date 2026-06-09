@@ -4,6 +4,38 @@ The benchmark harness compares the starter with raw `WebClient` and Spring HTTP
 Interface clients under equivalent local conditions. It is intentionally outside
 the default reactor so normal unit tests and release smoke tests stay fast.
 
+## Methodology and Limits
+
+Benchmark methodology comes before benchmark numbers. A release-quality report is
+only evidence for the named scenarios it contains, the dependency versions it
+records, and the machine/JVM environment that produced it. Do not generalize one
+local run into a universal performance claim.
+
+The client-side overhead scenarios use a cheap local loopback server so request
+construction, argument resolution, response decoding, and client abstraction cost
+are easier to inspect. Optional starter features are enabled one at a time. A
+feature scenario is compared with raw `WebClient` or Spring HTTP Interface only
+when the baseline client performs equivalent work; otherwise it is labeled as
+starter-only overhead.
+
+Known limits:
+
+- Local loopback still includes transport, Netty event-loop scheduling, CPU
+  scheduling, JVM warmup, and machine variability.
+- Quick benchmark output is smoke-only. It proves the harness starts and writes
+  files; it is not publishable performance evidence.
+- `application/problem+json` mapping is starter error-mapping overhead unless a
+  baseline client installs an equivalent Problem Detail mapper.
+- Conclusions must name the scenario and report version that produced the data.
+
+## Comparison Model
+
+| Surface | Benchmark role | Equivalent work required | Supported claim scope |
+|---|---|---|---|
+| Raw `WebClient` | Baseline client-side overhead comparison. | Same transport, codecs, base URL, request metadata, response decoding, and consumed body. | Only the named loopback scenario and report version. |
+| Spring HTTP Interface | Framework proxy comparison where the scenario is supported without custom glue that changes the comparison. | Same transport, codecs, base URL, request metadata, response decoding, and consumed body. | Only the named loopback scenario and report version. |
+| Starter | Declarative client under test, including starter-only feature and error-mapping overhead scenarios. | Default scenarios match the baselines; optional features are measured separately or against baselines doing equivalent work. | Only the named starter scenario and report version. |
+
 ## Commands
 
 Compile the benchmark module without running benchmarks:
@@ -86,6 +118,23 @@ that release evidence still needs to be produced. Published baseline artifact
 entries include `mvn dependency:get -Dartifact=...` commands; a resolution
 failure is a release blocker because the benchmark or API compatibility baseline
 would no longer be reproducible.
+
+## Publishing Performance Claims
+
+Every public performance claim must include:
+
+- The release-quality report version or promoted report link.
+- The exact JMH scenario name or scenario group.
+- The compared surfaces, such as raw `WebClient`, Spring HTTP Interface, or the
+  starter.
+- The measured dimension being discussed, such as throughput, average latency,
+  percentile latency, or allocation rate.
+
+Avoid broad wording such as "near zero overhead", "always faster", or "same
+performance as raw `WebClient`" unless a release-quality report directly supports
+that wording for the named scenario. Stale promoted benchmark report links fail
+documentation checks, and smoke-only report links must not be used as performance
+evidence.
 
 ## Current Scope
 
