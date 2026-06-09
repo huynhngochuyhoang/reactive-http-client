@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   report links, current-candidate and published-baseline commands, report paths,
   and cited scenario names.
 
+### Fixed
+
+- **Release-note benchmark reruns.** The selective rerun guidance now uses the
+  Maven benchmark release profile so metadata is preserved, and its include
+  pattern covers raw `WebClient`, Spring HTTP Interface, and starter rows for
+  cited comparison scenarios.
+
 ## [2.9.0] - 2026-06-08
 
 ### Added

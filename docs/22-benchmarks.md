@@ -149,16 +149,15 @@ benchmark entry in the generated release evidence manifest is not enough for a
 release that publishes performance wording; run the current candidate benchmark,
 promote the report, and cite the promoted report from the release notes.
 
-To rerun only the benchmark methods used by a release-note claim, first build the
-shaded benchmark jar, then pass a JMH include pattern for the cited scenarios:
+To rerun only the benchmark methods used by a release-note claim, keep the
+Maven release profile so the generated report keeps project, starter, dependency,
+and commit metadata. Override only the JMH include pattern and result directory:
 
 ```bash
-mvn -Pbenchmarks -pl reactive-http-client-benchmarks -am package
-java -Dorg.slf4j.simpleLogger.logFile=reactive-http-client-benchmarks/target/benchmark-logger.log \
-  -jar reactive-http-client-benchmarks/target/benchmarks.jar \
-  '.*(clientSideOverheadStarterGetNoBody|clientSideOverheadStarterPostJson).*' \
-  -wi 5 -i 5 -f 2 -prof gc -rf json \
-  -rff reactive-http-client-benchmarks/target/benchmark-reports/release-note-jmh.json
+mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify \
+  -Dbenchmark.commit=$(git rev-parse --short HEAD) \
+  -Dbenchmark.include='.*(clientSideOverheadRawWebClientGetNoBody|clientSideOverheadSpringHttpExchangeGetNoBody|clientSideOverheadStarterGetNoBody|clientSideOverheadRawWebClientPostJson|clientSideOverheadSpringHttpExchangePostJson|clientSideOverheadStarterPostJson).*' \
+  -Dbenchmark.result.dir=target/benchmark-reports/release-note
 ```
 
 Keep current-candidate and published-baseline reports in separate paths when

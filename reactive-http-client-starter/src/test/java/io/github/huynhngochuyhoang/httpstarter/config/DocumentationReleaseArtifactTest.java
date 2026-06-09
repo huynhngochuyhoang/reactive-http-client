@@ -97,6 +97,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkPom)
                 .contains("<benchmark.starter.version>")
                 .contains("benchmark.starter.version")
+                .contains("benchmark.include")
+                .contains("${benchmark.include}")
                 .contains("benchmark.spring-webflux.artifact")
                 .contains("benchmark.reactor-netty.artifact");
         assertThat(dependencyBlock(benchmarkPom, "spring-webflux")).doesNotContain("<version>");
@@ -133,7 +135,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("Current candidate report")
                 .contains("Published baseline report")
                 .contains("Scenarios cited")
-                .contains("release-note-jmh.json")
+                .contains("benchmark.include")
+                .contains("clientSideOverheadRawWebClientGetNoBody")
+                .contains("clientSideOverheadSpringHttpExchangePostJson")
+                .contains("target/benchmark-reports/release-note")
                 .contains("generated release evidence manifest is not enough");
 
         assertThat(promotedReport).exists();
@@ -276,9 +281,16 @@ class DocumentationReleaseArtifactTest {
                 .extracting(JsonNode::asText)
                 .contains("Get No Body", "Post Json", "Problem Detail Small Body");
         assertThat(benchmarkEvidence.path("releaseNoteScenarioRerunCommand").asText())
-                .contains("reactive-http-client-benchmarks/target/benchmarks.jar")
+                .contains("benchmark-release")
+                .contains("benchmark.include")
+                .contains("clientSideOverheadRawWebClientGetNoBody")
+                .contains("clientSideOverheadSpringHttpExchangeGetNoBody")
                 .contains("clientSideOverheadStarterGetNoBody")
-                .contains("release-note-jmh.json");
+                .contains("clientSideOverheadRawWebClientPostJson")
+                .contains("clientSideOverheadSpringHttpExchangePostJson")
+                .contains("clientSideOverheadStarterPostJson")
+                .contains("target/benchmark-reports/release-note")
+                .doesNotContain("reactive-http-client-benchmarks/target/benchmarks.jar");
         assertThat(benchmarkEvidence.path("requiresPromotedReportForPerformanceClaims").asBoolean()).isTrue();
         assertThat(benchmarkEvidence.path("pendingEvidenceCanSupportPerformanceClaims").asBoolean()).isFalse();
         assertThat(benchmarkEvidence.path("refreshRequiredWhen"))
@@ -439,12 +451,15 @@ class DocumentationReleaseArtifactTest {
                 "Server Error Small Body",
                 "Problem Detail Small Body"));
         evidence.put("releaseNoteScenarioRerunCommand",
-                "mvn -Pbenchmarks -pl reactive-http-client-benchmarks -am package && "
-                        + "java -Dorg.slf4j.simpleLogger.logFile=reactive-http-client-benchmarks/target/benchmark-logger.log "
-                        + "-jar reactive-http-client-benchmarks/target/benchmarks.jar "
-                        + "'.*(clientSideOverheadStarterGetNoBody|clientSideOverheadStarterPostJson).*' "
-                        + "-wi 5 -i 5 -f 2 -prof gc -rf json "
-                        + "-rff reactive-http-client-benchmarks/target/benchmark-reports/release-note-jmh.json");
+                "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify "
+                        + "-Dbenchmark.commit=$(git rev-parse --short HEAD) "
+                        + "-Dbenchmark.include='.*(clientSideOverheadRawWebClientGetNoBody|"
+                        + "clientSideOverheadSpringHttpExchangeGetNoBody|"
+                        + "clientSideOverheadStarterGetNoBody|"
+                        + "clientSideOverheadRawWebClientPostJson|"
+                        + "clientSideOverheadSpringHttpExchangePostJson|"
+                        + "clientSideOverheadStarterPostJson).*' "
+                        + "-Dbenchmark.result.dir=target/benchmark-reports/release-note");
         evidence.put("requiresPromotedReportForPerformanceClaims", true);
         evidence.put("pendingEvidenceCanSupportPerformanceClaims", false);
         evidence.put("refreshRequiredWhen", List.of(
