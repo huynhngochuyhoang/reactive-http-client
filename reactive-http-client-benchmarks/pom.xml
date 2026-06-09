@@ -234,6 +234,7 @@
         <profile>
             <id>benchmark-published-baseline</id>
             <properties>
+                <benchmark.result.dir>${project.build.directory}/benchmark-reports/published-starter-${benchmark.starter.version}</benchmark.result.dir>
                 <maven.javadoc.skip>true</maven.javadoc.skip>
             </properties>
             <build>

@@ -161,11 +161,15 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkEvidence.path("publishedStarterCommand").asText())
                 .contains("-Pbenchmarks,benchmark-release,benchmark-published-baseline")
                 .contains("-Dbenchmark.starter.version=" + pomProperty(pomXml, "api.compatibility.baseline.version"))
+                .contains(" clean verify ")
                 .doesNotContain(" -am ");
         assertThat(benchmarkEvidence.path("reportDirectory").asText())
                 .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/");
         assertThat(benchmarkEvidence.path("releaseReport").asText())
                 .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
+        assertThat(benchmarkEvidence.path("publishedStarterReleaseReport").asText())
+                .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
+                        + pomProperty(pomXml, "api.compatibility.baseline.version") + "/release-jmh.md");
         assertThat(benchmarkEvidence.path("refreshRequiredWhen"))
                 .extracting(JsonNode::asText)
                 .containsExactly(
@@ -297,11 +301,13 @@ class DocumentationReleaseArtifactTest {
         evidence.put("currentWorkspaceCommand",
                 "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)");
         evidence.put("publishedStarterCommand",
-                "mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks verify -Dbenchmark.starter.version="
+                "mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version="
                         + baselineVersion + " -Dbenchmark.commit=" + baselineVersion);
         evidence.put("reportDirectory", "reactive-http-client-benchmarks/target/benchmark-reports/");
         evidence.put("smokeReport", "reactive-http-client-benchmarks/target/benchmark-reports/smoke-only-jmh.md");
         evidence.put("releaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
+        evidence.put("publishedStarterReleaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
+                + baselineVersion + "/release-jmh.md");
         evidence.put("refreshRequiredWhen", List.of(
                 "request construction changes",
                 "observability changes",

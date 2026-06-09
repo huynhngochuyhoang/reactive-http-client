@@ -35,12 +35,15 @@ omitting `-am` so Maven resolves the published dependency instead of the current
 reactor module:
 
 ```bash
-mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks verify -Dbenchmark.starter.version=2.8.0 -Dbenchmark.commit=2.8.0
+mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.8.0 -Dbenchmark.commit=2.8.0
 ```
 
-That command uses the current benchmark harness and current managed Spring Boot
-BOM, excluding current-only diagnostics-provider benchmarks that cannot compile
-against the published baseline artifact.
+That command cleans the benchmark module before compiling, uses the current
+benchmark harness and current managed Spring Boot BOM, and excludes current-only
+diagnostics-provider benchmarks that cannot compile against the published baseline
+artifact. Its report is written under
+`reactive-http-client-benchmarks/target/benchmark-reports/published-starter-<version>/`
+so it does not overwrite the current-workspace release report.
 For an exact historical release environment, check out the release tag and run
 the current-workspace command from that checkout.
 
@@ -69,7 +72,9 @@ resolve before release, and lists these generated report paths:
 - `reactive-http-client-benchmarks/target/benchmark-reports/smoke-only-jmh.md`
   for the smoke harness check.
 - `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
-  for release-quality evidence.
+  for current-workspace release-quality evidence.
+- `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-<version>/release-jmh.md`
+  for published-starter baseline release-quality evidence.
 
 Refresh release benchmark numbers when a release changes request construction,
 observability, resilience wrapping, transport or client-builder behavior, or when
