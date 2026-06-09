@@ -13,6 +13,12 @@ import reactor.core.publisher.Mono;
 @HttpExchange
 public interface SpringHttpExchangeBenchmarkClient {
 
+    @GetExchange("/users/current")
+    Mono<BenchmarkUser> currentUser();
+
+    @GetExchange("/users/current")
+    Mono<ResponseEntity<BenchmarkUser>> currentUserEntity();
+
     @GetExchange("/users/{id}")
     Mono<BenchmarkUser> findUser(
             @PathVariable("id") String id,
@@ -27,4 +33,13 @@ public interface SpringHttpExchangeBenchmarkClient {
 
     @PostExchange("/users")
     Mono<BenchmarkUser> createUser(@RequestBody CreateUserRequest request);
+
+    @PostExchange("/users")
+    Mono<ResponseEntity<BenchmarkUser>> createUserEntity(@RequestBody CreateUserRequest request);
+
+    @GetExchange("/errors/client")
+    Mono<BenchmarkUser> clientError();
+
+    @GetExchange("/errors/server")
+    Mono<BenchmarkUser> serverError();
 }

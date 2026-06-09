@@ -34,6 +34,22 @@
             <artifactId>reactor-netty-http</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-reactor</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-retry</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-core</artifactId>
             <version>${jmh.version}</version>
@@ -194,6 +210,8 @@
                                         <argument>5</argument>
                                         <argument>-f</argument>
                                         <argument>2</argument>
+                                        <argument>-prof</argument>
+                                        <argument>gc</argument>
                                         <argument>-rf</argument>
                                         <argument>json</argument>
                                         <argument>-rff</argument>

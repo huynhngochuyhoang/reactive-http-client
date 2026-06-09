@@ -40,15 +40,37 @@ metadata.
 
 ## Current Scope
 
-The first harness includes:
+The benchmark module currently includes:
 
 - A no-network starter invocation benchmark for metadata lookup, proxy
   invocation, argument resolution, and mock-exchange request construction.
-- A local loopback comparison for one equivalent `GET` call across raw
-  `WebClient`, Spring HTTP Interface, and the starter.
+- Client-side loopback overhead scenarios across raw `WebClient`, Spring HTTP
+  Interface, and the starter for `GET` with no body, `GET` with path/query/header
+  arguments, `POST` JSON, `Mono<ResponseEntity<T>>`, 4xx with a small bounded
+  body, and 5xx with a small bounded body.
+- A starter-only `application/problem+json` scenario labeled as error-mapping
+  overhead, because the raw `WebClient` and Spring HTTP Interface baselines do
+  not install the starter Problem Detail mapper.
+- Starter-only optional feature scenarios that enable one feature at a time:
+  metadata-only exchange logging, Micrometer observation, retry wrapping, and
+  circuit-breaker wrapping. These are not compared against baseline clients that
+  omit equivalent feature work.
 
-The full scenario matrix, generated Markdown reports, and release evidence
-integration are tracked in the V12 roadmap checklist.
+Generated Markdown reports and release evidence integration are tracked in the
+V12 roadmap checklist.
+
+## Metrics
+
+Loopback benchmarks use stable JMH benchmark names for release-to-release diffs
+and run in throughput, average-time, and sample-time modes. The sample-time mode
+emits percentile rows such as `p0.50`, `p0.95`, and `p0.99` in the JMH output.
+
+The release-quality profile adds the JMH GC profiler so allocation rate is present
+in the release JSON where the JVM can report it reliably. Expected HTTP error
+scenarios catch and validate the mapped exception instead of failing the JMH run;
+unexpected benchmark failures remain visible as JMH errors. The loopback server
+also tracks invalid request counts and reports the first mismatch when a client
+does not send the shared scenario shape.
 
 ## Fairness Guardrails
 

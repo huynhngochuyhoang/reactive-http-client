@@ -13,6 +13,12 @@ import reactor.core.publisher.Mono;
 @ReactiveHttpClient(name = "benchmark-starter")
 public interface StarterBenchmarkClient {
 
+    @GET("/users/current")
+    Mono<BenchmarkUser> currentUser();
+
+    @GET("/users/current")
+    Mono<ResponseEntity<BenchmarkUser>> currentUserEntity();
+
     @GET("/users/{id}")
     Mono<BenchmarkUser> findUser(
             @PathVar("id") String id,
@@ -27,4 +33,16 @@ public interface StarterBenchmarkClient {
 
     @POST("/users")
     Mono<BenchmarkUser> createUser(@Body CreateUserRequest request);
+
+    @POST("/users")
+    Mono<ResponseEntity<BenchmarkUser>> createUserEntity(@Body CreateUserRequest request);
+
+    @GET("/errors/client")
+    Mono<BenchmarkUser> clientError();
+
+    @GET("/errors/server")
+    Mono<BenchmarkUser> serverError();
+
+    @GET("/errors/problem")
+    Mono<BenchmarkUser> problemDetailError();
 }
