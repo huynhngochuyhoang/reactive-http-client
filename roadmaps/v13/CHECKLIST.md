@@ -167,19 +167,44 @@ Evidence:
 
 ## Priority 7 — Optimize `ResponseEntity` Envelope Handling
 
-### [ ] 2.3 Optimize `ResponseEntity` envelope handling
-- [ ] Audit response-header copying and status/body envelope construction.
-- [ ] Avoid duplicate response metadata snapshots when observers, lifecycle
+### [x] 2.3 Optimize `ResponseEntity` envelope handling
+- [x] Audit response-header copying and status/body envelope construction.
+- [x] Avoid duplicate response metadata snapshots when observers, lifecycle
       hooks, and exchange logging are disabled.
-- [ ] Keep final outbound request diagnostics intact.
-- [ ] Keep streaming ownership semantics intact.
-- [ ] Measure `Mono<ResponseEntity<T>>` separately from streaming
+- [x] Keep final outbound request diagnostics intact.
+- [x] Keep streaming ownership semantics intact.
+- [x] Measure `Mono<ResponseEntity<T>>` separately from streaming
       `ResponseEntity<Flux<DataBuffer>>`.
-- [ ] Record `Response Entity` before/after numbers.
-- [ ] Verify streaming response ownership tests still pass.
-- [ ] Verify observer and exchange-log contexts still receive documented
+- [x] Record `Response Entity` before/after numbers.
+- [x] Verify streaming response ownership tests still pass.
+- [x] Verify observer and exchange-log contexts still receive documented
       metadata.
-- [ ] Verify no optimization releases a body before the consumer owns it.
+- [x] Verify no optimization releases a body before the consumer owns it.
+
+Evidence:
+- Code change: non-streaming `Mono<ResponseEntity<T>>` now delegates envelope
+  construction to `ClientResponse.toEntity(...)`; `Mono<ResponseEntity<Void>>`
+  delegates to `toBodilessEntity()`. Generic body types still use
+  `ParameterizedTypeReference`, and `Mono<ResponseEntity<Flux<DataBuffer>>>`
+  stays on the streaming ownership path introduced in V9.
+- Stateless default calls still avoid subscription reporting state when observer,
+  lifecycle hooks, exchange logging, auth, resilience, and generated idempotency
+  keys are inactive; stateful diagnostics still capture response status/headers
+  before decoding.
+- Tests: `mvn -pl reactive-http-client-starter -Dtest=ResponseEntitySupportTest,StreamingResponseTest,SubscriptionLocalReportingStateTest test`
+  passed 22 tests.
+- Tests: `mvn -pl reactive-http-client-starter -Dtest=DiagnosticContextContractTest,ExchangeLogSubscriptionAttemptCountTest,ReactiveHttpClientLifecycleHookTest test`
+  passed 21 tests.
+- Focused release-profile benchmark report:
+  `reactive-http-client-benchmarks/target/benchmark-reports/v13-priority7/release-jmh.md`.
+- Pre-change promoted 2.9.0 report row for `clientSideOverheadStarterResponseEntity`:
+  `128.981 us/op` average time, `109.773 us/op` sample mean, and
+  `34304.518 B/op` sample allocation.
+- Post-change focused report measured `clientSideOverheadStarterResponseEntity`
+  at `145.728 us/op` average time with high local variance, `68.731 us/op`
+  sample mean, `27505.814 B/op` throughput allocation, and `27529.242 B/op`
+  sample allocation. Treat this as allocation-focused evidence until a promoted
+  full report refreshes all V13 rows.
 
 ---
 

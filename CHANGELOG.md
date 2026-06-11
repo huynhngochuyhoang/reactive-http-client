@@ -41,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **ResponseEntity envelope decode path.** Non-streaming `Mono<ResponseEntity<T>>`
+  responses now delegate to Spring WebClient `ClientResponse.toEntity(...)`/
+  `toBodilessEntity()` so status, headers, and body envelope construction stay
+  on the native response path while streaming `ResponseEntity<Flux<DataBuffer>>`
+  ownership remains unchanged.
 - **JSON response decode path.** Simple concrete DTO responses now use
   WebClient class-based `bodyToMono`/`bodyToFlux` decoding instead of creating a
   `ParameterizedTypeReference`; generic response types keep the existing
