@@ -267,48 +267,130 @@ Evidence:
 
 ## Priority 9 — Audit Problem Detail Error-Mapping Overhead
 
-### [ ] 2.5 Audit Problem Detail error-mapping overhead
-- [ ] Confirm current-workspace Problem Detail overhead after V12 error-body
+### [x] 2.5 Audit Problem Detail error-mapping overhead
+- [x] Confirm current-workspace Problem Detail overhead after V12 error-body
       changes.
-- [ ] Audit JSON parse allocation in Problem Detail mapping.
-- [ ] Audit exception construction allocation in Problem Detail mapping.
-- [ ] Preserve truncation metadata.
-- [ ] Preserve bounded body capture behavior.
-- [ ] Preserve fallback behavior for malformed or truncated bodies.
-- [ ] Avoid comparing Problem Detail rows against raw clients unless baselines
+- [x] Audit JSON parse allocation in Problem Detail mapping.
+- [x] Audit exception construction allocation in Problem Detail mapping.
+- [x] Preserve truncation metadata.
+- [x] Preserve bounded body capture behavior.
+- [x] Preserve fallback behavior for malformed or truncated bodies.
+- [x] Avoid comparing Problem Detail rows against raw clients unless baselines
       install equivalent Problem Detail mapping.
-- [ ] Record Problem Detail before/after numbers if code changes.
-- [ ] Verify mapper fallback behavior remains covered by tests.
-- [ ] Verify docs continue to label this as starter-only error-mapping overhead.
+- [x] Record Problem Detail before/after numbers if code changes.
+- [x] Verify mapper fallback behavior remains covered by tests.
+- [x] Verify docs continue to label this as starter-only error-mapping overhead.
+
+Evidence:
+- Audit result: no mapper code change was made. The current path already keeps
+  the costly work explicit and contract-bound: bounded response-body capture,
+  Jackson `ProblemDetail` parsing, and typed Problem Detail exception
+  construction. Removing any of those would weaken the opt-in mapper contract.
+- Audit result: JSON parse allocation is dominated by parsing the captured
+  `application/problem+json` string into Spring `ProblemDetail`; the mapper
+  already reuses the injected `ObjectMapper` and does not create a mapper per
+  call.
+- Audit result: exception construction allocation is expected and preserves the
+  public typed exception surface, request metadata, error category, and the
+  bounded `getResponseBody()` inherited from the generic exception types.
+- Safety result: `DefaultErrorDecoder` still selects the 64 KiB capture cap only
+  for valid `application/problem+json` responses, preserves
+  `responseBodyTruncated()` and `retainedResponseBodyBytes()` in
+  `ErrorResponseContext`, and falls back to the generic decoder when the mapper
+  cannot parse malformed or truncated Problem Detail JSON.
+- Labeling result: generated reports and public docs continue to label
+  `starterErrorMappingProblemDetailSmallBody` as
+  `Starter-only error-mapping overhead`; the row is not compared against raw
+  `WebClient` or Spring HTTP Interface because those baselines do not install an
+  equivalent Problem Detail mapper.
+- Tests: the release-profile benchmark build ran the full starter suite and
+  passed 586 tests; targeted mapper/fallback coverage remains in
+  `ProblemDetailErrorResponseMapperTest`, `ErrorBodyCaptureTest`, and
+  `DefaultErrorDecoderTest`.
+- Focused release-profile benchmark report:
+  `reactive-http-client-benchmarks/target/benchmark-reports/v13-priority9/release-jmh.md`.
+- Focused current-workspace row:
+  `starterErrorMappingProblemDetailSmallBody` `79.29 us/op` average,
+  `86.985 us/op` sample mean, `70.272 us/op` sample p50,
+  `161.792 us/op` sample p95, `271.36 us/op` sample p99, and
+  `92398.453 B/op` sample allocation.
+- Promoted 2.9.0 report row for the same scenario:
+  `124.544 us/op` average, `120.855 us/op` sample mean, and
+  `95326.163 B/op` sample allocation. Treat the focused run as audit evidence
+  only until a promoted full report refreshes all V13 rows together.
 
 ---
 
 ## Priority 10 — Benchmark Threshold Guidance Without Hard Gates
 
-### [ ] 3.2 Benchmark threshold guidance without hard gates
-- [ ] Add guidance for comparing scenario trends across release reports.
-- [ ] Define review triggers for large relative changes.
-- [ ] Define review triggers for allocation spikes.
-- [ ] Define review triggers for optional feature overhead jumps.
-- [ ] Keep normal CI free of long-running performance gates.
-- [ ] Prefer manual release review over flaky automated pass/fail thresholds.
-- [ ] Verify docs describe report comparison without treating one run as
+### [x] 3.2 Benchmark threshold guidance without hard gates
+- [x] Add guidance for comparing scenario trends across release reports.
+- [x] Define review triggers for large relative changes.
+- [x] Define review triggers for allocation spikes.
+- [x] Define review triggers for optional feature overhead jumps.
+- [x] Keep normal CI free of long-running performance gates.
+- [x] Prefer manual release review over flaky automated pass/fail thresholds.
+- [x] Verify docs describe report comparison without treating one run as
       universal.
-- [ ] Verify release checklist tells maintainers when to rerun benchmarks.
-- [ ] Verify performance docs remain honest about machine variability.
+- [x] Verify release checklist tells maintainers when to rerun benchmarks.
+- [x] Verify performance docs remain honest about machine variability.
+
+Evidence:
+- Documentation: `docs/22-benchmarks.md` now includes `Benchmark Review
+  Triggers`, explicitly classifying thresholds as manual review triggers instead
+  of CI gates or automatic release blockers.
+- Documentation: the trigger guidance covers roughly 20% latency movement, 15%
+  allocation growth or more than 4 KiB/op persistent allocation growth, 25%
+  optional-feature movement, and material error-mapping movement after relevant
+  code changes.
+- Documentation: `docs/23-performance-summary.md` repeats the no-hard-gate
+  summary and requires same-machine reruns before treating movement as a trend.
+- Release workflow: `docs/20-native-release-compatibility.md` now says the
+  release evidence manifest records review-trigger thresholds and that threshold
+  crossings require manual review rather than automatic failure.
+- Release evidence: `DocumentationReleaseArtifactTest` now emits and verifies a
+  `benchmarkEvidence.reviewTriggers` object with `hardGate=false`,
+  `normalCiRunsBenchmarks=false`, and the latency/allocation/optional-feature
+  trigger values.
+- Changelog: Unreleased notes now include benchmark review triggers as a release
+  process change.
+- Verification: `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed 7 tests, and `git diff --check` passed.
 
 ---
 
 ## Priority 11 — Public Documentation Consistency
 
-### [ ] 3.3 Public documentation consistency
-- [ ] Extend documentation tests to validate promoted report links.
-- [ ] Extend documentation tests to validate promoted report headers.
-- [ ] Check public docs do not link `target/benchmark-reports`.
-- [ ] Check public docs do not link smoke-only artifacts as evidence.
-- [ ] Keep README, benchmark docs, changelog, and release compatibility docs
+### [x] 3.3 Public documentation consistency
+- [x] Extend documentation tests to validate promoted report links.
+- [x] Extend documentation tests to validate promoted report headers.
+- [x] Check public docs do not link `target/benchmark-reports`.
+- [x] Check public docs do not link smoke-only artifacts as evidence.
+- [x] Keep README, benchmark docs, changelog, and release compatibility docs
       aligned on benchmark commands and evidence rules.
-- [ ] Add a release-maintainer checklist for writing performance claims.
-- [ ] Verify changelog performance claims cite a scenario and report.
-- [ ] Verify README points to benchmark docs and the promoted report when
+- [x] Add a release-maintainer checklist for writing performance claims.
+- [x] Verify changelog performance claims cite a scenario and report.
+- [x] Verify README points to benchmark docs and the promoted report when
       available.
+
+Evidence:
+- Documentation: `docs/22-benchmarks.md` now includes a
+  `Release-Maintainer Performance Claim Checklist` requiring promoted report
+  links, scenario names, compared surfaces, metric names, separate current and
+  published-baseline reports, same-machine reruns for review-trigger movement,
+  and removal of broad unsupported performance wording.
+- Test coverage: `DocumentationReleaseArtifactTest` now verifies README links to
+  benchmark docs, the promoted report, and the performance summary.
+- Test coverage: `DocumentationReleaseArtifactTest` now verifies CHANGELOG
+  benchmark wording cites the promoted report, scenario scope, and smoke-only
+  evidence guardrails while rejecting broad unsupported performance claims.
+- Test coverage: promoted benchmark report validation now checks the report
+  starts with `# Reactive HTTP Client Benchmark Report` and includes the expected
+  release-quality headings: promotion metadata, interpretation, report pairing,
+  environment, comparison summary, starter-only rows, raw results, and promotion
+  notes.
+- Existing guard retained: public Markdown link checks still reject links to
+  generated `benchmark-reports/` paths and `smoke-only-jmh.md`, while requiring
+  the current-version promoted report links.
+- Verification: `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed 7 tests, and `git diff --check` passed.

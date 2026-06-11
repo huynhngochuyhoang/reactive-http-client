@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now name current-candidate and published-baseline report paths together, require
   baseline artifact resolution before promotion, and prevent promoted reports from
   mixing candidate numbers with baseline labels.
+- **Benchmark review triggers.** Benchmark docs and release evidence now define
+  latency, allocation, and optional-feature review triggers while keeping
+  benchmark thresholds manual and outside normal CI hard gates.
 
 ### Changed
 
