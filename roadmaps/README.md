@@ -23,7 +23,9 @@ Planning documents for the project:
 - [v10/CHECKLIST.md](v10/CHECKLIST.md) — V10 execution checklist
 - [v11/ROADMAP.md](v11/ROADMAP.md) — V11 roadmap, released as `2.9.0`
 - [v11/CHECKLIST.md](v11/CHECKLIST.md) — V11 execution checklist
-- [v12/ROADMAP.md](v12/ROADMAP.md) — V12 draft roadmap
+- [v12/ROADMAP.md](v12/ROADMAP.md) — V12 completed roadmap, proposed for `2.10.0`
 - [v12/CHECKLIST.md](v12/CHECKLIST.md) — V12 execution checklist
-- [v13/ROADMAP.md](v13/ROADMAP.md) — V13 draft roadmap
+- [v13/ROADMAP.md](v13/ROADMAP.md) — V13 completed roadmap, proposed for `2.10.0`
 - [v13/CHECKLIST.md](v13/CHECKLIST.md) — V13 execution checklist
+- [v14/ROADMAP.md](v14/ROADMAP.md) — V14 draft roadmap
+- [v14/CHECKLIST.md](v14/CHECKLIST.md) — V14 execution checklist
