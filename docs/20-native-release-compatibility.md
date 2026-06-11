@@ -12,8 +12,8 @@ is documented as supported.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. While the project version remains `2.9.0`,
-the baseline stays on `2.8.0`:
+from the current reactor version. While the project version remains `2.10.0`,
+the baseline stays on `2.9.0`:
 
 ```bash
 mvn -Papi-compatibility -DskipTests verify

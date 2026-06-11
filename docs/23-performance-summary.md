@@ -1,8 +1,8 @@
 # Performance Summary
 
 This page summarizes the current promoted release-quality benchmark report:
-[Benchmark Report 2.9.0](benchmark-report-2.9.0.md). The numbers are evidence
-for starter `2.9.0` under the report's local loopback environment only. They are
+[Benchmark Report 2.10.0](benchmark-report-2.10.0.md). The numbers are evidence
+for starter `2.10.0` under the report's local loopback environment only. They are
 not a general claim about every application, payload, network, JVM, or deployment.
 
 ## Methodology First
@@ -29,20 +29,21 @@ notes or public documentation.
 
 ## Current Findings
 
-The promoted `2.9.0` report contains these average-time loopback rows:
+The promoted `2.10.0` report contains these average-time loopback rows:
 
 | Scenario | Starter avg | Scope |
 |---|---:|---|
-| `Get No Body` | 75.746 us/op | Default success path with no request body. |
-| `Get Path Query Header` | 112.547 us/op | Default success path with path, query, and header argument resolution. |
-| `Post Json` | 154.017 us/op | Default JSON request/response path. |
-| `Response Entity` | 128.981 us/op | Default `Mono<ResponseEntity<T>>` envelope path. |
-| `Client Error Small Body` | 80.371 us/op | Default bounded 4xx error path. |
-| `Server Error Small Body` | 91.668 us/op | Default bounded 5xx error path. |
+| `Get No Body` | 47.44 us/op | Default success path with no request body. |
+| `Get Path Query Header` | 54.238 us/op | Default success path with path, query, and header argument resolution. |
+| `Post Json` | 62.964 us/op | Default JSON request/response path. |
+| `Response Entity` | 54.659 us/op | Default `Mono<ResponseEntity<T>>` envelope path. |
+| `Client Error Small Body` | 50.853 us/op | Default bounded 4xx error path. |
+| `Server Error Small Body` | 50.342 us/op | Default bounded 5xx error path. |
 
 In this run, the starter default path is close to Spring HTTP Interface for
 `Get No Body` and `Response Entity`, slower than raw `WebClient` on success-path
-rows that do additional declarative work, and faster than both baselines on the
+rows that do additional declarative work, faster than Spring HTTP Interface for
+`Get Path Query Header` in this run, and faster than both baselines on the
 small bounded error rows. Treat those as scenario-specific observations from the
 named report, not as universal ordering.
 
@@ -68,10 +69,10 @@ Optional feature rows enable one starter feature at a time:
 
 | Scenario | Average | Meaning |
 |---|---:|---|
-| `Exchange Logging Metadata Only Get No Body` | 84.506 us/op | Metadata-only exchange logging enabled. |
-| `Micrometer Observer Get No Body` | 97.935 us/op | Micrometer observer enabled. |
-| `Retry Wrapper Get No Body` | 122.822 us/op | Retry wrapper enabled for the request. |
-| `Circuit Breaker Wrapper Get No Body` | 80.893 us/op | Circuit-breaker wrapper enabled for the request. |
+| `Exchange Logging Metadata Only Get No Body` | 48.815 us/op | Metadata-only exchange logging enabled. |
+| `Micrometer Observer Get No Body` | 57.359 us/op | Micrometer observer enabled. |
+| `Retry Wrapper Get No Body` | 51.291 us/op | Retry wrapper enabled for the request. |
+| `Circuit Breaker Wrapper Get No Body` | 51.454 us/op | Circuit-breaker wrapper enabled for the request. |
 
 These are starter optional-feature overhead rows. Do not compare them to raw
 `WebClient` unless the raw baseline performs equivalent logging, observation, or
@@ -80,30 +81,30 @@ resilience work.
 ## Starter Error Mapping
 
 `Problem Detail Small Body` is labeled starter-only error-mapping overhead in the
-promoted report. Its average-time row is 124.544 us/op for a small
+promoted report. Its average-time row is 61.123 us/op for a small
 `application/problem+json` response. Raw `WebClient` and Spring HTTP Interface
 do not provide the same Problem Detail mapper in this harness, so this row is
 not a raw-client parity comparison.
 
 ## Version Scope
 
-The available promoted report measures starter `2.9.0`. If a future release
+The available promoted report measures starter `2.10.0`. If a future release
 changes request construction, JSON body handling, response envelope handling,
 observability, resilience wrapping, transport, or client-builder behavior, refresh
 the current-workspace release benchmark before making current-release performance
 claims.
 
-A published-baseline report generated with `benchmark.starter.version=2.8.0`
-measures the published `2.8.0` artifact, not the current workspace. When
+A published-baseline report generated with `benchmark.starter.version=2.9.0`
+measures the published `2.9.0` artifact, not the current workspace. When
 comparing a current candidate to that baseline, keep the reports separate and
-name both versions. Do not reuse the `2.9.0` report as evidence for a different
+name both versions. Do not reuse the `2.10.0` report as evidence for a different
 starter version.
 
 Current-vs-baseline comparisons should use the paired report paths from the
 release evidence manifest: the current candidate report under
 `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md` and
 the published baseline report under
-`reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.8.0/release-jmh.md`.
+`reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.9.0/release-jmh.md`.
 Resolve the published baseline artifacts before promoting a comparison, and cite
 only a source-controlled promoted report from public release notes.
 

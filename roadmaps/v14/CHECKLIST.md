@@ -8,28 +8,45 @@ release blocker requires reordering.
 ## Priority 1 — Release `2.10.0` From Completed V12/V13 Work
 
 ### [ ] 0.1 Release as `2.10.0`
-- [ ] Move Unreleased changelog entries into a dated `2.10.0` section.
-- [ ] Bump root and module Maven versions from `2.9.0` to `2.10.0`.
-- [ ] Update README dependency snippets to `2.10.0`.
-- [ ] Update quick-start dependency snippets to `2.10.0`.
-- [ ] Update generated configuration or release documentation references that
+- [x] Move Unreleased changelog entries into a dated `2.10.0` section.
+- [x] Bump root and module Maven versions from `2.9.0` to `2.10.0`.
+- [x] Update README dependency snippets to `2.10.0`.
+- [x] Update quick-start dependency snippets to `2.10.0`.
+- [x] Update generated configuration or release documentation references that
       include the current project version.
-- [ ] Set `api.compatibility.baseline.version` to `2.9.0` after published
+- [x] Set `api.compatibility.baseline.version` to `2.9.0` after published
       `2.9.0` artifacts are available.
-- [ ] Verify the API compatibility baseline does not equal the current reactor
+- [x] Verify the API compatibility baseline does not equal the current reactor
       version.
-- [ ] Refresh or promote `docs/benchmark-report-2.10.0.md` for the release.
-- [ ] Update benchmark docs to point at the `2.10.0` promoted report.
-- [ ] Update performance summary to describe the `2.10.0` promoted report.
-- [ ] Update changelog comparison links for `2.10.0`.
-- [ ] Run normal tests.
+- [x] Refresh or promote `docs/benchmark-report-2.10.0.md` for the release.
+- [x] Update benchmark docs to point at the `2.10.0` promoted report.
+- [x] Update performance summary to describe the `2.10.0` promoted report.
+- [x] Update changelog comparison links for `2.10.0`.
+- [x] Run normal tests.
 - [ ] Run API compatibility against published `2.9.0`.
-- [ ] Run `git diff --check`.
-- [ ] Run benchmark smoke.
-- [ ] Run release-quality benchmark when release notes include performance
+- [x] Run `git diff --check`.
+- [x] Run benchmark smoke.
+- [x] Run release-quality benchmark when release notes include performance
       wording.
-- [ ] Verify release evidence manifest lists current and baseline benchmark
+- [x] Verify release evidence manifest lists current and baseline benchmark
       paths.
+
+Evidence:
+
+- `mvn test` passed for the root reactor on `2.10.0`.
+- `mvn -Papi-compatibility -DskipTests verify` completed successfully and the
+  baseline guard accepted `api.compatibility.baseline.version=2.9.0` with
+  `project.version=2.10.0`, but published `2.9.0` resolution for some companion
+  modules could not be verified because the configured Maven repository host did
+  not resolve in this environment.
+- `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.9.0`
+  failed with `Unknown host artifacts.mservice.com.vn`, including when retried
+  with network escalation.
+- `mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify`
+  passed and wrote smoke-only benchmark output with project/starter `2.10.0`
+  and API baseline `2.9.0`.
+- `git diff --check` passed.
+- `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=1000 4 24 27 30 46 100 114 984 1000git rev-parse --short HEAD)` produced the promoted `2.10.0` release-quality report from benchmark commit `04aeb61`.
 
 ---
 
