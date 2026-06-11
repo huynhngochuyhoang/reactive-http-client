@@ -576,14 +576,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private Mono<?> buildResponseEntityMono(ClientResponse response, Type bodyType) {
-        ResponseEntity.BodyBuilder builder = ResponseEntity.status(response.statusCode())
-                .headers(response.headers().asHttpHeaders());
         if (Void.class.equals(bodyType) || void.class.equals(bodyType)) {
-            return response.releaseBody().thenReturn(builder.build());
+            return response.toBodilessEntity();
         }
-        return bodyToMono(response, bodyType)
-                .map(body -> builder.body(body))
-                .switchIfEmpty(Mono.fromSupplier(builder::build));
+        if (bodyType instanceof Class<?> responseClass) {
+            return response.toEntity(responseClass);
+        }
+        return response.toEntity(ParameterizedTypeReference.forType(bodyType));
     }
 
     private Mono<?> bodyToMono(ClientResponse response, Type responseType) {

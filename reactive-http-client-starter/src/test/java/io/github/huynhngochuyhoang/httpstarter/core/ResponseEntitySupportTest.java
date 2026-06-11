@@ -54,6 +54,31 @@ class ResponseEntitySupportTest {
     }
 
     @Test
+    void monoResponseEntityStringDelegatesEnvelopeToClientResponseToEntity() {
+        ClientResponse response = mock(ClientResponse.class);
+        when(response.statusCode()).thenReturn(HttpStatus.OK);
+        when(response.toEntity(String.class)).thenReturn(Mono.just(ResponseEntity.ok()
+                .header("X-Entity", "yes")
+                .body("created")));
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://entity.test")
+                .exchangeFunction(req -> Mono.just(response))
+                .build();
+
+        StepVerifier.create(invokeStringEntity(createHandler(webClient, new DefaultErrorDecoder())))
+                .assertNext(entity -> {
+                    assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
+                    assertThat(entity.getHeaders().getFirst("X-Entity")).isEqualTo("yes");
+                    assertThat(entity.getBody()).isEqualTo("created");
+                })
+                .verifyComplete();
+
+        verify(response).toEntity(String.class);
+        verify(response, never()).bodyToMono(String.class);
+        verify(response, never()).headers();
+    }
+
+    @Test
     void monoResponseEntityVoidExposesStatusAndHeaders() {
         WebClient webClient = WebClient.builder()
                 .baseUrl("http://entity.test")
@@ -72,7 +97,7 @@ class ResponseEntitySupportTest {
     }
 
     @Test
-    void monoResponseEntityVoidReleasesUnexpectedResponseBody() {
+    void monoResponseEntityVoidUsesBodilessEntityDecoder() {
         ClientResponse response = mockBodilessResponse();
         WebClient webClient = WebClient.builder()
                 .baseUrl("http://entity.test")
@@ -86,7 +111,7 @@ class ResponseEntitySupportTest {
                 })
                 .verifyComplete();
 
-        verify(response).releaseBody();
+        verify(response).toBodilessEntity();
         verify(response, never()).bodyToMono(Void.class);
     }
 
@@ -234,6 +259,7 @@ class ResponseEntitySupportTest {
         when(response.headers()).thenReturn(headers);
         when(headers.asHttpHeaders()).thenReturn(HttpHeaders.EMPTY);
         when(response.releaseBody()).thenReturn(Mono.empty());
+        when(response.toBodilessEntity()).thenReturn(Mono.just(ResponseEntity.ok().build()));
         return response;
     }
 
