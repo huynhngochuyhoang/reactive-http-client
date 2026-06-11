@@ -232,70 +232,22 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         HttpClientObserver observer = getObserver();
         List<ReactiveHttpClientLifecycleHook> lifecycleHooks = getLifecycleHooks();
 
-        // Cache the serialized body so retries reuse the bytes without re-serializing.
-        Mono<SerializedRequestBody> serializedBodyMono = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader).cache();
-        Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = Mono.deferContextual(context -> {
-            SubscriptionState state = subscriptionState(context);
-            RequestArgumentResolver.ResolvedArgs preparedResolved = applyIdempotencyKey(
-                    plan, resolved, context, state.generatedIdempotencyKey);
-            state.preparedResolved.set(preparedResolved);
-            int attempt = state.attemptCount.incrementAndGet();
-            state.start.compareAndSet(0L, System.currentTimeMillis());
-            state.responseStatus.set(null);
-            state.responseHeaders.set(Map.of());
-            state.terminalError.set(null);
-            notifyLifecycleAttempt(lifecycleHooks, plan, effectiveApi, preparedResolved, state.requestUrl.get(), null, null, attempt);
-            if (exchangeLogger == null && state.firstAttempt.compareAndSet(true, false)) {
-                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.start.get());
-            }
-
-            return serializedBodyMono.map(serializedRequestBody -> {
-                    WebClient.RequestBodySpec preparedRequestSpec = webClient
-                            .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
-                            .uri(uriBuilder -> buildRequestUri(uriBuilder, effectiveApi.pathTemplate(), resolved));
-                    if (!hasAcceptHeader) {
-                        preparedRequestSpec = preparedRequestSpec.accept(MediaType.APPLICATION_JSON);
-                    }
-                    if (serializedRequestBody.originalBody() != null) {
-                        preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, serializedRequestBody.originalBody());
-                    }
-                    if (serializedRequestBody.rawBody() != null) {
-                        preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, serializedRequestBody.rawBody());
-                    }
-
-                    for (Map.Entry<String, List<String>> header : preparedResolved.headers().entrySet()) {
-                        preparedRequestSpec.header(header.getKey(), header.getValue().toArray(String[]::new));
-                    }
-
-                    WebClient.RequestHeadersSpec<?> requestHeadersSpec;
-                    if (multipartBody != null) {
-                        requestHeadersSpec = preparedRequestSpec.body(BodyInserters.fromMultipartData(multipartBody));
-                    } else if (serializedRequestBody.bodyToWrite() instanceof Publisher<?> publisher) {
-                        requestHeadersSpec = requestFromPublisher(preparedRequestSpec, publisher, plan.bodyType(), hasContentTypeHeader);
-                    } else if (serializedRequestBody.originalBody() != null) {
-                        WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
-                        if (!hasContentTypeHeader) {
-                            requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_JSON);
-                        }
-                        requestHeadersSpec = requestWithBodySpec.bodyValue(serializedRequestBody.bodyToWrite());
-                    } else {
-                        requestHeadersSpec = preparedRequestSpec;
-                    }
-                    requestHeadersSpec = requestHeadersSpec
-                            .attribute(OBSERVED_REQUEST_URL_ATTRIBUTE, state.requestUrl)
-                            .attribute(FINAL_REQUEST_OBSERVATION_ATTRIBUTE, state.finalRequestObservation);
-                    // Apply when: (a) caller set an explicit @TimeoutMs (including 0 to disable), or (b) a resilience timeout resolved to > 0.
-                    boolean shouldApplyResponseTimeout = plan.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET
-                            || effectiveApi.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET
-                            || isClientLevelRequestTimeoutConfigured()
-                            || timeoutMs > 0;
-                    return configureNativeRequest(requestHeadersSpec, timeoutMs, shouldApplyResponseTimeout, state.requestUrl);
-                });
-        });
+        // Apply when: (a) caller set an explicit @TimeoutMs (including 0 to disable), or (b) a resilience timeout resolved to > 0.
+        boolean shouldApplyResponseTimeout = plan.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET
+                || effectiveApi.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET
+                || isClientLevelRequestTimeoutConfigured()
+                || timeoutMs > 0;
+        boolean usesSubscriptionState = usesSubscriptionState(plan, exchangeLogger, observer, lifecycleHooks);
+        Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = usesSubscriptionState
+                ? statefulRequestHeadersSpec(plan, effectiveApi, resolved, contentTypeHeader, hasAcceptHeader,
+                hasContentTypeHeader, multipartBody, lifecycleHooks, exchangeLogger, timeoutMs, shouldApplyResponseTimeout)
+                : statelessRequestHeadersSpec(plan, effectiveApi, resolved, hasAcceptHeader, hasContentTypeHeader,
+                multipartBody, timeoutMs, shouldApplyResponseTimeout);
 
         if (plan.returnsFlux()) {
-            Flux<?> flux = exchange(requestHeadersSpecMono,
-                    response -> buildFlux(response, plan.responseType()));
+            Flux<?> flux = usesSubscriptionState
+                    ? exchange(requestHeadersSpecMono, response -> buildFlux(response, plan.responseType()))
+                    : exchangeStateless(requestHeadersSpecMono, response -> buildFlux(response, plan.responseType()));
             flux = applyResilienceFlux(flux, plan, effectiveApi.httpMethod(), resolved);
             if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
                 Flux<?> capturedFlux = flux;
@@ -328,14 +280,17 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                             });
                 });
             }
-            return flux.contextWrite(context -> withSubscriptionState(context, resolved));
+            return usesSubscriptionState ? flux.contextWrite(context -> withSubscriptionState(context, resolved)) : flux;
         }
 
         Mono<?> mono = isResponseEntityOfFluxDataBuffer(plan.responseType())
+                ? (usesSubscriptionState
                 ? exchangeStreamingResponseEntity(requestHeadersSpecMono)
-                : exchange(requestHeadersSpecMono,
-                        response -> buildMono(response, plan.responseType()))
-                        .next();
+                : exchangeStreamingResponseEntityStateless(requestHeadersSpecMono))
+                : (usesSubscriptionState
+                ? exchange(requestHeadersSpecMono, response -> buildMono(response, plan.responseType()))
+                : exchangeStateless(requestHeadersSpecMono, response -> buildMono(response, plan.responseType())))
+                .next();
         mono = applyResilienceMono(mono, plan, effectiveApi.httpMethod(), resolved);
         if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
             Mono<?> capturedMono = mono;
@@ -372,12 +327,153 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         });
             });
         }
-        return mono.contextWrite(context -> withSubscriptionState(context, resolved));
+        return usesSubscriptionState ? mono.contextWrite(context -> withSubscriptionState(context, resolved)) : mono;
     }
 
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    private boolean usesSubscriptionState(RequestPlan plan,
+                                          HttpExchangeLogger exchangeLogger,
+                                          HttpClientObserver observer,
+                                          List<ReactiveHttpClientLifecycleHook> lifecycleHooks) {
+        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
+        return exchangeLogger != null
+                || observer != null
+                || !lifecycleHooks.isEmpty()
+                || clientConfig.hasAuthConfigured()
+                || (resilience != null && resilience.isEnabled())
+                || StringUtils.hasText(plan.generatedIdempotencyKeyHeader());
+    }
+
+    private Mono<WebClient.RequestHeadersSpec<?>> statefulRequestHeadersSpec(
+            RequestPlan plan,
+            EffectiveApi effectiveApi,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            String contentTypeHeader,
+            boolean hasAcceptHeader,
+            boolean hasContentTypeHeader,
+            MultiValueMap<String, HttpEntity<?>> multipartBody,
+            List<ReactiveHttpClientLifecycleHook> lifecycleHooks,
+            HttpExchangeLogger exchangeLogger,
+            long timeoutMs,
+            boolean shouldApplyResponseTimeout) {
+        // Cache the serialized body so retries reuse the bytes without re-serializing.
+        Mono<SerializedRequestBody> serializedBodyMono = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader).cache();
+        return Mono.deferContextual(context -> {
+            SubscriptionState state = subscriptionState(context);
+            RequestArgumentResolver.ResolvedArgs preparedResolved = applyIdempotencyKey(
+                    plan, resolved, context, state.generatedIdempotencyKey);
+            state.preparedResolved.set(preparedResolved);
+            int attempt = state.attemptCount.incrementAndGet();
+            state.start.compareAndSet(0L, System.currentTimeMillis());
+            state.responseStatus.set(null);
+            state.responseHeaders.set(Map.of());
+            state.terminalError.set(null);
+            notifyLifecycleAttempt(lifecycleHooks, plan, effectiveApi, preparedResolved, state.requestUrl.get(), null, null, attempt);
+            if (exchangeLogger == null && state.firstAttempt.compareAndSet(true, false)) {
+                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.start.get());
+            }
+
+            return serializedBodyMono.map(serializedRequestBody -> buildRequestHeadersSpec(
+                    plan,
+                    effectiveApi,
+                    preparedResolved,
+                    serializedRequestBody,
+                    hasAcceptHeader,
+                    hasContentTypeHeader,
+                    multipartBody,
+                    timeoutMs,
+                    shouldApplyResponseTimeout,
+                    state.requestUrl,
+                    state.finalRequestObservation));
+        });
+    }
+
+    private Mono<WebClient.RequestHeadersSpec<?>> statelessRequestHeadersSpec(
+            RequestPlan plan,
+            EffectiveApi effectiveApi,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            boolean hasAcceptHeader,
+            boolean hasContentTypeHeader,
+            MultiValueMap<String, HttpEntity<?>> multipartBody,
+            long timeoutMs,
+            boolean shouldApplyResponseTimeout) {
+        return Mono.deferContextual(context -> {
+            if (log.isDebugEnabled()) {
+                long startMs = System.currentTimeMillis();
+                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), startMs);
+            }
+            RequestArgumentResolver.ResolvedArgs preparedResolved = applyContextIdempotencyKey(plan, resolved, context);
+            SerializedRequestBody requestBody = new SerializedRequestBody(
+                    preparedResolved.body(), preparedResolved.body(), null);
+            return Mono.just(buildRequestHeadersSpec(
+                    plan,
+                    effectiveApi,
+                    preparedResolved,
+                    requestBody,
+                    hasAcceptHeader,
+                    hasContentTypeHeader,
+                    multipartBody,
+                    timeoutMs,
+                    shouldApplyResponseTimeout,
+                    null,
+                    null));
+        });
+    }
+
+    private WebClient.RequestHeadersSpec<?> buildRequestHeadersSpec(
+            RequestPlan plan,
+            EffectiveApi effectiveApi,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            SerializedRequestBody serializedRequestBody,
+            boolean hasAcceptHeader,
+            boolean hasContentTypeHeader,
+            MultiValueMap<String, HttpEntity<?>> multipartBody,
+            long timeoutMs,
+            boolean shouldApplyResponseTimeout,
+            AtomicReference<URI> requestUrl,
+            AtomicReference<FinalRequestObservation> finalRequestObservation) {
+        WebClient.RequestBodySpec preparedRequestSpec = webClient
+                .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
+                .uri(uriBuilder -> buildRequestUri(uriBuilder, effectiveApi.pathTemplate(), resolved));
+        if (!hasAcceptHeader) {
+            preparedRequestSpec = preparedRequestSpec.accept(MediaType.APPLICATION_JSON);
+        }
+        if (serializedRequestBody.originalBody() != null) {
+            preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, serializedRequestBody.originalBody());
+        }
+        if (serializedRequestBody.rawBody() != null) {
+            preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, serializedRequestBody.rawBody());
+        }
+
+        for (Map.Entry<String, List<String>> header : resolved.headers().entrySet()) {
+            preparedRequestSpec.header(header.getKey(), header.getValue().toArray(String[]::new));
+        }
+
+        WebClient.RequestHeadersSpec<?> requestHeadersSpec;
+        if (multipartBody != null) {
+            requestHeadersSpec = preparedRequestSpec.body(BodyInserters.fromMultipartData(multipartBody));
+        } else if (serializedRequestBody.bodyToWrite() instanceof Publisher<?> publisher) {
+            requestHeadersSpec = requestFromPublisher(preparedRequestSpec, publisher, plan.bodyType(), hasContentTypeHeader);
+        } else if (serializedRequestBody.originalBody() != null) {
+            WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
+            if (!hasContentTypeHeader) {
+                requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_JSON);
+            }
+            requestHeadersSpec = requestWithBodySpec.bodyValue(serializedRequestBody.bodyToWrite());
+        } else {
+            requestHeadersSpec = preparedRequestSpec;
+        }
+        if (requestUrl != null) {
+            requestHeadersSpec = requestHeadersSpec.attribute(OBSERVED_REQUEST_URL_ATTRIBUTE, requestUrl);
+        }
+        if (finalRequestObservation != null) {
+            requestHeadersSpec = requestHeadersSpec.attribute(FINAL_REQUEST_OBSERVATION_ATTRIBUTE, finalRequestObservation);
+        }
+        return configureNativeRequest(requestHeadersSpec, timeoutMs, shouldApplyResponseTimeout, requestUrl);
+    }
 
     private <T> Flux<T> exchange(
             Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono,
@@ -394,6 +490,17 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 return Flux.from(successResponseHandler.apply(clientResponse));
             }));
         });
+    }
+
+    private <T> Flux<T> exchangeStateless(
+            Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono,
+            Function<ClientResponse, Publisher<T>> successResponseHandler) {
+        return requestHeadersSpecMono.flatMapMany(requestHeadersSpec -> requestHeadersSpec.exchangeToFlux(clientResponse -> {
+            if (clientResponse.statusCode().isError()) {
+                return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
+            }
+            return Flux.from(successResponseHandler.apply(clientResponse));
+        }));
     }
 
     // exchangeToMono/exchangeToFlux release unconsumed bodies when their handler completes;
@@ -413,6 +520,17 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 return buildStreamingResponseEntity(clientResponse);
             }));
         });
+    }
+
+    @SuppressWarnings("deprecation")
+    private Mono<ResponseEntity<Flux<DataBuffer>>> exchangeStreamingResponseEntityStateless(
+            Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono) {
+        return requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.exchange().flatMap(clientResponse -> {
+            if (clientResponse.statusCode().isError()) {
+                return decodeErrorResponse(clientResponse).flatMap(Mono::error);
+            }
+            return buildStreamingResponseEntity(clientResponse);
+        }));
     }
 
     private URI buildRequestUri(
@@ -771,8 +889,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
             AtomicReference<URI> requestUrl) {
+        if (!shouldApplyResponseTimeout && requestUrl == null) {
+            return requestHeadersSpec;
+        }
         return requestHeadersSpec.httpRequest(httpRequest -> {
-            requestUrl.set(httpRequest.getURI());
+            if (requestUrl != null) {
+                requestUrl.set(httpRequest.getURI());
+            }
             Object nativeRequest = httpRequest.getNativeRequest();
             if (shouldApplyResponseTimeout && nativeRequest instanceof HttpClientRequest reactorRequest) {
                 reactorRequest.responseTimeout(timeoutMs > 0 ? Duration.ofMillis(timeoutMs) : null);

@@ -39,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   baseline artifact resolution before promotion, and prevent promoted reports from
   mixing candidate numbers with baseline labels.
 
+### Changed
+
+- **Default success-path request construction.** Plain unauthenticated success-path
+  calls now use a stateless request-construction branch when auth, resilience,
+  generated idempotency keys, lifecycle hooks, exchange logging, observers, and
+  timeout request customization are inactive. Feature-enabled calls keep the
+  existing stateful reporting path.
+
 ### Fixed
 
 - **Release-note benchmark reruns.** The selective rerun guidance now uses the

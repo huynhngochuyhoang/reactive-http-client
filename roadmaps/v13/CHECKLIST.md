@@ -88,25 +88,38 @@
 
 ## Priority 5 — Optimize Default Success-Path Overhead
 
-### [ ] 2.1 Optimize default success-path overhead
-- [ ] Refresh the current-workspace release benchmark before changing request
+### [x] 2.1 Optimize default success-path overhead
+- [x] Refresh the current-workspace release benchmark before changing request
       path code.
-- [ ] Use no-network invocation rows to identify allocation and CPU contributors
+- [x] Use no-network invocation rows to identify allocation and CPU contributors
       in proxy invocation, request planning, argument resolution, and response
       handling.
-- [ ] Inspect redundant immutable map/list copying during request argument
+- [x] Inspect redundant immutable map/list copying during request argument
       resolution.
-- [ ] Inspect repeated header, query, and path expansion work after
+- [x] Inspect repeated header, query, and path expansion work after
       `RequestPlan` lookup.
-- [ ] Inspect per-subscription state allocation on success paths that do not use
+- [x] Inspect per-subscription state allocation on success paths that do not use
       retry, idempotency, lifecycle hooks, exchange logging, or observers.
-- [ ] Inspect response envelope mapping overhead for `Mono<ResponseEntity<T>>`.
-- [ ] Apply only simple default-path improvements that preserve public behavior.
-- [ ] Record before/after JMH rows for every changed scenario.
-- [ ] Verify behavior tests pass unchanged.
-- [ ] Verify diagnostics, lifecycle, retry, idempotency, and validation contracts
+- [x] Inspect response envelope mapping overhead for `Mono<ResponseEntity<T>>`.
+- [x] Apply only simple default-path improvements that preserve public behavior.
+- [x] Record before/after JMH rows for every changed scenario.
+- [x] Verify behavior tests pass unchanged.
+- [x] Verify diagnostics, lifecycle, retry, idempotency, and validation contracts
       remain covered by tests.
-- [ ] Document improvements as scenario-specific, not universal parity.
+- [x] Document improvements as scenario-specific, not universal parity.
+
+Evidence:
+- Pre-change current-workspace rows came from the promoted 2.9.0 report:
+  `proxyInvocationCreatesPublisher` `2193116.621 ops/s`, `1712.001 B/op`;
+  `proxyInvocationWithMockExchange` `110578.649 ops/s`, `15248.011 B/op`.
+- Post-change focused release-profile report:
+  `reactive-http-client-benchmarks/target/benchmark-reports/v13-priority5/release-jmh.md`.
+  It measured `proxyInvocationCreatesPublisher` at `2362733.313 ops/s`,
+  `1600.001 B/op`, and `proxyInvocationWithMockExchange` at
+  `137029.961 ops/s`, `13932.008 B/op`.
+- Scope: default unauthenticated success path only. Calls using auth, resilience,
+  generated idempotency keys, lifecycle hooks, exchange logging, observers, or
+  timeout request customization stay on the existing stateful path.
 
 ---
 
