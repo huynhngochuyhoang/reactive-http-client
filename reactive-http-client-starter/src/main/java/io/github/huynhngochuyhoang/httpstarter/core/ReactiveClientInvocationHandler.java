@@ -599,6 +599,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (responseType == DataBuffer.class) {
             return response.bodyToMono(DataBuffer.class);
         }
+        if (responseType instanceof Class<?> responseClass) {
+            return response.bodyToMono(responseClass);
+        }
         return response.bodyToMono(ParameterizedTypeReference.forType(responseType));
     }
 
@@ -623,6 +626,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             // DataBufferDecoder, so the codec-max-in-memory-size limit does not apply
             // — buffers are emitted as they arrive.
             return streamingDataBuffers(response);
+        }
+        if (responseType instanceof Class<?> responseClass) {
+            return response.bodyToFlux(responseClass);
         }
         return response.bodyToFlux(ParameterizedTypeReference.forType(responseType));
     }
