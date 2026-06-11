@@ -111,10 +111,26 @@ class DocumentationReleaseArtifactTest {
         String projectVersion = projectVersion(root.resolve("pom.xml"));
         String baselineVersion = pomProperty(Files.readString(root.resolve("pom.xml")), "api.compatibility.baseline.version");
         Path promotedReport = root.resolve("docs/benchmark-report-" + projectVersion + ".md");
+        String readmeDocs = Files.readString(root.resolve("README.md"));
+        String changelogDocs = Files.readString(root.resolve("CHANGELOG.md"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         String promotedReportDocs = Files.readString(promotedReport);
         String performanceSummaryDocs = Files.readString(root.resolve("docs/23-performance-summary.md"));
         String releaseCompatibilityDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+
+        assertThat(readmeDocs)
+                .contains("[Benchmarks](docs/22-benchmarks.md)")
+                .contains("[Benchmark Report " + projectVersion + "](docs/benchmark-report-" + projectVersion + ".md)")
+                .contains("[Performance Summary](docs/23-performance-summary.md)");
+
+        assertThat(changelogDocs)
+                .contains("[Benchmark Report " + projectVersion + "](docs/benchmark-report-" + projectVersion + ".md)")
+                .contains("release-quality evidence for starter `" + projectVersion + "` benchmark scenarios")
+                .contains("scenario names, and release-quality report links")
+                .contains("smoke-only reports from being")
+                .doesNotContain("near zero overhead")
+                .doesNotContain("always faster")
+                .doesNotContain("same performance as raw `WebClient`");
 
         assertThat(benchmarkDocs)
                 .contains("## Methodology and Limits")
@@ -151,11 +167,27 @@ class DocumentationReleaseArtifactTest {
                 .contains("ServerErrorSmallBody")
                 .contains("starterErrorMappingProblemDetailSmallBody")
                 .contains("target/benchmark-reports/release-note")
-                .contains("generated release evidence manifest is not enough");
+                .contains("generated release evidence manifest is not enough")
+                .contains("## Release-Maintainer Performance Claim Checklist")
+                .contains("Before adding or approving a public performance claim")
+                .contains("not a generated\n  `target/benchmark-reports` file and not a smoke-only report")
+                .contains("exact scenario or scenario group")
+                .contains("compared surfaces")
+                .contains("allocation per operation")
+                .contains("review-trigger movement is rerun on the same machine")
+                .contains("Broad claims such as");
 
         assertThat(promotedReport).exists();
         assertThat(promotedReportDocs)
+                .startsWith("# Reactive HTTP Client Benchmark Report")
                 .contains("## Promotion Metadata")
+                .contains("## Interpretation")
+                .contains("## Report Pairing")
+                .contains("## Environment")
+                .contains("## Comparison Summary")
+                .contains("## Starter-Only and Optional Feature Rows")
+                .contains("## Raw Results")
+                .contains("## Promotion Notes")
                 .contains("Report version: `" + projectVersion + "`")
                 .contains("Starter version under test: `" + projectVersion + "`")
                 .contains("Evidence level: **Release-quality**, not smoke evidence.")
@@ -341,6 +373,20 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("reactive-http-client-benchmarks/target/benchmarks.jar");
         assertThat(benchmarkEvidence.path("requiresPromotedReportForPerformanceClaims").asBoolean()).isTrue();
         assertThat(benchmarkEvidence.path("pendingEvidenceCanSupportPerformanceClaims").asBoolean()).isFalse();
+        JsonNode reviewTriggers = benchmarkEvidence.path("reviewTriggers");
+        assertThat(reviewTriggers.path("hardGate").asBoolean()).isFalse();
+        assertThat(reviewTriggers.path("normalCiRunsBenchmarks").asBoolean()).isFalse();
+        assertThat(reviewTriggers.path("rerunBeforeClaimingTrend").asBoolean()).isTrue();
+        assertThat(reviewTriggers.path("latencyPercentChange").asInt()).isEqualTo(20);
+        assertThat(reviewTriggers.path("allocationPercentChange").asInt()).isEqualTo(15);
+        assertThat(reviewTriggers.path("allocationBytesPerOperationChange").asInt()).isEqualTo(4096);
+        assertThat(reviewTriggers.path("optionalFeaturePercentChange").asInt()).isEqualTo(25);
+        assertThat(reviewTriggers.path("dimensions"))
+                .extracting(JsonNode::asText)
+                .containsExactly("average time", "p50", "p95", "p99", "allocation per operation");
+        assertThat(reviewTriggers.path("instruction").asText())
+                .contains("review trigger")
+                .contains("not an automatic release blocker");
         assertThat(benchmarkEvidence.path("refreshRequiredWhen"))
                 .extracting(JsonNode::asText)
                 .containsExactly(
@@ -529,6 +575,7 @@ class DocumentationReleaseArtifactTest {
                         + "-Dbenchmark.result.dir=target/benchmark-reports/release-note");
         evidence.put("requiresPromotedReportForPerformanceClaims", true);
         evidence.put("pendingEvidenceCanSupportPerformanceClaims", false);
+        evidence.put("reviewTriggers", benchmarkReviewTriggers());
         evidence.put("refreshRequiredWhen", List.of(
                 "request construction changes",
                 "observability changes",
@@ -538,6 +585,21 @@ class DocumentationReleaseArtifactTest {
         evidence.put("releaseNotesInstruction",
                 "Attach or link the promoted report when publishing performance claims; never publish smoke-only numbers.");
         return evidence;
+    }
+
+    private static Map<String, Object> benchmarkReviewTriggers() {
+        LinkedHashMap<String, Object> triggers = new LinkedHashMap<>();
+        triggers.put("hardGate", false);
+        triggers.put("normalCiRunsBenchmarks", false);
+        triggers.put("rerunBeforeClaimingTrend", true);
+        triggers.put("latencyPercentChange", 20);
+        triggers.put("allocationPercentChange", 15);
+        triggers.put("allocationBytesPerOperationChange", 4096);
+        triggers.put("optionalFeaturePercentChange", 25);
+        triggers.put("dimensions", List.of("average time", "p50", "p95", "p99", "allocation per operation"));
+        triggers.put("instruction",
+                "Treat threshold crossings as review triggers, not an automatic release blocker; rerun current and baseline reports on the same machine before publishing performance claims.");
+        return triggers;
     }
 
     private static Map<String, Object> comparisonPair(String projectVersion, String baselineVersion,

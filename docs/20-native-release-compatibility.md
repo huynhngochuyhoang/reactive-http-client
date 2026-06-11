@@ -83,8 +83,8 @@ the test, the configured Java baseline, the Spring Boot baseline, release-check
 command names, published baseline artifacts, benchmark dependency-management
 metadata, and benchmark evidence metadata. The benchmark metadata records the
 manual/profile-gated smoke and release commands, generated report paths, starter
-version under test, baseline library versions, and the conditions that require
-refreshed numbers. The `mvn test` entry is marked
+version under test, baseline library versions, review-trigger thresholds, and the
+conditions that require refreshed numbers. The `mvn test` entry is marked
 `pass` when this test generated the manifest; compatibility, fixture, diff-check,
 and benchmark entries remain `pending` until the release maintainer runs them.
 
@@ -101,7 +101,9 @@ benchmark proves the harness starts; do not publish smoke-only numbers as
 performance evidence. When comparing against a published baseline, keep the
 current candidate and published-baseline reports at the distinct paths recorded
 in the manifest and resolve the listed baseline artifacts before report
-promotion. Attach the JSON manifest to the
+promotion. Benchmark threshold crossings are manual review triggers, not hard
+gates; rerun the relevant current and baseline methods on the same machine
+before treating a movement as a release trend. Attach the JSON manifest to the
 release notes or paste its contents into the release checklist. Do not commit
 files from `target/release-evidence/`; regenerate them from the release
 candidate checkout.

@@ -152,6 +152,27 @@ benchmark entry in the generated release evidence manifest is not enough for a
 release that publishes performance wording; run the current candidate benchmark,
 promote the report, and cite the promoted report from the release notes.
 
+## Release-Maintainer Performance Claim Checklist
+
+Before adding or approving a public performance claim in `CHANGELOG.md`, release
+notes, README, or docs, verify all of the following:
+
+- The claim names the promoted release-quality report, not a generated
+  `target/benchmark-reports` file and not a smoke-only report.
+- The claim names the exact scenario or scenario group, such as `Get No Body`,
+  `Post Json`, or `Problem Detail Small Body`.
+- The claim names the compared surfaces, such as starter, raw `WebClient`, or
+  Spring HTTP Interface.
+- The claim names the metric being discussed: average time, p50, p95, p99,
+  throughput, or allocation per operation.
+- Current-candidate and published-baseline reports are kept in separate paths and
+  the published baseline artifacts resolved before comparison.
+- Any review-trigger movement is rerun on the same machine and either optimized
+  or documented as expected before publication.
+- Broad claims such as "near zero overhead", "always faster", or "same
+  performance as raw WebClient" are removed unless the cited report directly
+  supports that exact wording for the named scenario.
+
 ## Current vs Published Baseline Pairing
 
 Keep the current candidate report and published-baseline report as a pair when
@@ -183,6 +204,34 @@ mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verif
 Keep current-candidate and published-baseline reports in separate paths when
 comparing releases. Release notes should name the starter versions and scenario
 names being compared so readers can reproduce each claim from the cited report.
+
+## Benchmark Review Triggers
+
+Benchmark thresholds are review triggers, not CI gates and not automatic release
+blockers. Normal CI stays free of long-running benchmark pass/fail checks; run
+release-quality benchmarks manually or through the benchmark profiles when a
+release changes request-path behavior or makes performance claims.
+
+When comparing a current-candidate report with a promoted or published-baseline
+report, investigate these signals before publishing a performance claim:
+
+- Average-time, p50, p95, or p99 movement of about 20% or more in a named
+  client-side scenario. Rerun the pair on the same machine before treating it as
+  a trend.
+- Allocation growth of about 15% or more, or a persistent increase larger than
+  4 KiB/op, in a scenario whose request/response shape did not intentionally
+  change.
+- Optional-feature rows moving about 25% or more, or growing more than 4 KiB/op,
+  compared with the previous release-quality report for the same feature row.
+- Error-mapping rows moving materially after body-capture, mapper, exception, or
+  fallback behavior changes. Keep Problem Detail rows starter-only unless a
+  baseline installs equivalent mapping.
+
+A triggered review should identify the changed code path, rerun the relevant
+current and baseline methods, and either optimize the regression or document why
+the change is expected. Do not fail a release solely because one local benchmark
+run crosses a threshold; benchmark variance, JVM warmup, and local scheduling
+remain part of the evidence.
 
 ## Publishing Performance Claims
 

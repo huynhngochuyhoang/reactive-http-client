@@ -106,3 +106,11 @@ the published baseline report under
 `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.8.0/release-jmh.md`.
 Resolve the published baseline artifacts before promoting a comparison, and cite
 only a source-controlled promoted report from public release notes.
+
+Use benchmark thresholds as review triggers, not hard gates. A release-quality
+comparison should prompt investigation when a named scenario moves about 20% in
+latency percentiles, grows about 15% in allocation, adds more than 4 KiB/op
+without an intentional request-shape change, or when an optional-feature row
+jumps about 25%. Rerun the current and baseline methods on the same machine
+before treating that movement as a trend, then either optimize the changed path
+or document why the cost is expected.
