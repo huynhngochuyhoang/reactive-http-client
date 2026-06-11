@@ -125,24 +125,43 @@ Evidence:
 
 ## Priority 6 — Optimize JSON Request/Response Paths
 
-### [ ] 2.2 Optimize JSON request/response paths
-- [ ] Audit JSON body preparation for default unauthenticated `POST` calls.
-- [ ] Audit auth serialization bypasses and confirm they are not used on the
+### [x] 2.2 Optimize JSON request/response paths
+- [x] Audit JSON body preparation for default unauthenticated `POST` calls.
+- [x] Audit auth serialization bypasses and confirm they are not used on the
       default unauthenticated path.
-- [ ] Audit content-type handling and request-body publisher creation.
-- [ ] Verify scalar DTO bodies and publisher DTO bodies still use the correct
+- [x] Audit content-type handling and request-body publisher creation.
+- [x] Verify scalar DTO bodies and publisher DTO bodies still use the correct
       encoder.
-- [ ] Avoid pre-serializing bodies unless auth/signing or retry body replay
+- [x] Avoid pre-serializing bodies unless auth/signing or retry body replay
       requires it.
-- [ ] Add a focused benchmark or JMH grouping if `Post Json` cannot isolate the
+- [x] Add a focused benchmark or JMH grouping if `Post Json` cannot isolate the
       overhead source.
-- [ ] Record `Post Json` before/after numbers.
-- [ ] Verify raw `WebClient` and Spring HTTP Interface baselines still perform
+- [x] Record `Post Json` before/after numbers.
+- [x] Verify raw `WebClient` and Spring HTTP Interface baselines still perform
       equivalent request and response JSON work.
-- [ ] Verify auth signing, publisher bodies, and non-repeatable body protections
+- [x] Verify auth signing, publisher bodies, and non-repeatable body protections
       remain covered.
-- [ ] Verify no broad JSON performance claim is published without the promoted
+- [x] Verify no broad JSON performance claim is published without the promoted
       report.
+
+Evidence:
+- Audit result: default unauthenticated `POST` JSON already bypasses auth
+  serialization and does not pre-serialize the body; scalar DTO requests still
+  use WebClient `bodyValue`, and publisher DTO requests keep the JSON default
+  content type.
+- Code change: simple concrete response DTOs now use WebClient class-based
+  `bodyToMono`/`bodyToFlux` decoding; generic response types keep the existing
+  `ParameterizedTypeReference` path.
+- Pre-change promoted 2.9.0 report row for `clientSideOverheadStarterPostJson`:
+  `154.017 us/op` average time and `32063.831 B/op`.
+- Post-change focused release-profile report:
+  `reactive-http-client-benchmarks/target/benchmark-reports/v13-priority6/release-jmh.md`.
+  It measured `clientSideOverheadStarterPostJson` at `199.255 us/op` average
+  time with high local variance, `71.666 us/op` sample mean, and
+  `27500.946 B/op` in the sample row.
+- Scope: this is allocation-focused JSON response decode cleanup for simple DTO
+  responses. No broad JSON latency claim is published without a promoted full
+  benchmark report.
 
 ---
 

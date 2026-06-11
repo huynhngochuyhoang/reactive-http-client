@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **JSON response decode path.** Simple concrete DTO responses now use
+  WebClient class-based `bodyToMono`/`bodyToFlux` decoding instead of creating a
+  `ParameterizedTypeReference`; generic response types keep the existing
+  type-reference decode path.
 - **Default success-path request construction.** Plain unauthenticated success-path
   calls now use a stateless request-construction branch when auth, resilience,
   generated idempotency keys, lifecycle hooks, exchange logging, observers, and
