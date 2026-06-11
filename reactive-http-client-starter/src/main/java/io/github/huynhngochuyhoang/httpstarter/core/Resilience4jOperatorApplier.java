@@ -9,6 +9,8 @@ import io.github.resilience4j.retry.RetryRegistry;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Resilience4j-backed operator applier.
  */
@@ -18,6 +20,9 @@ public class Resilience4jOperatorApplier implements ResilienceOperatorApplier {
     private final RetryRegistry retryRegistry;
     private final BulkheadRegistry bulkheadRegistry;
     private final RateLimiterOperatorAdapter rateLimiterOperatorAdapter;
+    private final ConcurrentHashMap<String, CircuitBreakerOperator<Object>> circuitBreakerOperators = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, RetryOperator<Object>> retryOperators = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, BulkheadOperator<Object>> bulkheadOperators = new ConcurrentHashMap<>();
 
     public Resilience4jOperatorApplier(
             Object circuitBreakerRegistry,
@@ -35,7 +40,7 @@ public class Resilience4jOperatorApplier implements ResilienceOperatorApplier {
         if (circuitBreakerRegistry == null) {
             return mono;
         }
-        return mono.transformDeferred(CircuitBreakerOperator.of(circuitBreakerRegistry.circuitBreaker(instanceName)));
+        return mono.transformDeferred(circuitBreakerOperator(instanceName));
     }
 
     @Override
@@ -43,7 +48,7 @@ public class Resilience4jOperatorApplier implements ResilienceOperatorApplier {
         if (circuitBreakerRegistry == null) {
             return flux;
         }
-        return flux.transformDeferred(CircuitBreakerOperator.of(circuitBreakerRegistry.circuitBreaker(instanceName)));
+        return flux.transformDeferred(circuitBreakerOperator(instanceName));
     }
 
     @Override
@@ -51,7 +56,7 @@ public class Resilience4jOperatorApplier implements ResilienceOperatorApplier {
         if (retryRegistry == null) {
             return mono;
         }
-        return mono.transformDeferred(RetryOperator.of(retryRegistry.retry(instanceName)));
+        return mono.transformDeferred(retryOperator(instanceName));
     }
 
     @Override
@@ -59,7 +64,7 @@ public class Resilience4jOperatorApplier implements ResilienceOperatorApplier {
         if (retryRegistry == null) {
             return flux;
         }
-        return flux.transformDeferred(RetryOperator.of(retryRegistry.retry(instanceName)));
+        return flux.transformDeferred(retryOperator(instanceName));
     }
 
     @Override
@@ -67,7 +72,7 @@ public class Resilience4jOperatorApplier implements ResilienceOperatorApplier {
         if (bulkheadRegistry == null) {
             return mono;
         }
-        return mono.transformDeferred(BulkheadOperator.of(bulkheadRegistry.bulkhead(instanceName)));
+        return mono.transformDeferred(bulkheadOperator(instanceName));
     }
 
     @Override
@@ -75,7 +80,7 @@ public class Resilience4jOperatorApplier implements ResilienceOperatorApplier {
         if (bulkheadRegistry == null) {
             return flux;
         }
-        return flux.transformDeferred(BulkheadOperator.of(bulkheadRegistry.bulkhead(instanceName)));
+        return flux.transformDeferred(bulkheadOperator(instanceName));
     }
 
     @Override
@@ -92,6 +97,24 @@ public class Resilience4jOperatorApplier implements ResilienceOperatorApplier {
             return flux;
         }
         return rateLimiterOperatorAdapter.apply(flux, instanceName);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private <T> CircuitBreakerOperator<T> circuitBreakerOperator(String instanceName) {
+        return (CircuitBreakerOperator) circuitBreakerOperators.computeIfAbsent(instanceName, name ->
+                CircuitBreakerOperator.of(circuitBreakerRegistry.circuitBreaker(name)));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private <T> RetryOperator<T> retryOperator(String instanceName) {
+        return (RetryOperator) retryOperators.computeIfAbsent(instanceName, name ->
+                RetryOperator.of(retryRegistry.retry(name)));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private <T> BulkheadOperator<T> bulkheadOperator(String instanceName) {
+        return (BulkheadOperator) bulkheadOperators.computeIfAbsent(instanceName, name ->
+                BulkheadOperator.of(bulkheadRegistry.bulkhead(name)));
     }
 
     @Override

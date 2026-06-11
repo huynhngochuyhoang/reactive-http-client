@@ -210,21 +210,58 @@ Evidence:
 
 ## Priority 8 — Audit Optional Feature Overhead
 
-### [ ] 2.4 Audit optional feature overhead
-- [ ] Refresh optional feature rows after default-path changes.
-- [ ] Audit Micrometer tag creation for avoidable per-call allocation.
-- [ ] Audit retry wrapper setup for avoidable per-call allocation.
-- [ ] Verify metadata-only exchange logging keeps using the production logger.
-- [ ] Verify metadata-only exchange logging remains separate from body-capture
+### [x] 2.4 Audit optional feature overhead
+- [x] Refresh optional feature rows after default-path changes.
+- [x] Audit Micrometer tag creation for avoidable per-call allocation.
+- [x] Audit retry wrapper setup for avoidable per-call allocation.
+- [x] Verify metadata-only exchange logging keeps using the production logger.
+- [x] Verify metadata-only exchange logging remains separate from body-capture
       logging.
-- [ ] Keep feature comparisons labeled starter-only unless baselines perform the
+- [x] Keep feature comparisons labeled starter-only unless baselines perform the
       same work.
-- [ ] Document optional feature overhead with refreshed release-quality numbers.
-- [ ] Verify disabled diagnostics remain cheap on the default path.
-- [ ] Update enabled feature recommendations only when backed by release-quality
+- [x] Document optional feature overhead with refreshed release-quality numbers.
+- [x] Verify disabled diagnostics remain cheap on the default path.
+- [x] Update enabled feature recommendations only when backed by release-quality
       data.
-- [ ] Verify no optional feature benchmark is presented as default starter
+- [x] Verify no optional feature benchmark is presented as default starter
       overhead.
+
+Evidence:
+- Code change: `MicrometerHttpClientObserver` now builds common low-cardinality
+  tags once per event and reuses them for the main timer, attempt/size summaries,
+  and optional histogram timer lookup.
+- Code change: `Resilience4jOperatorApplier` and the rate-limiter adapter now
+  cache Reactor operators by Resilience4j instance name, so enabled retry,
+  circuit-breaker, bulkhead, and rate-limiter paths do not recreate wrapper
+  operators for every invocation.
+- Audit result: metadata-only exchange logging still registers and invokes the
+  production `DefaultHttpExchangeLogger`; the benchmark uses
+  `LogPreset.METADATA_ONLY`, so it remains separate from body-capture logging.
+- Audit result: generated benchmark reports classify `starterFeature*` rows as
+  `Optional starter feature`; no optional feature row is presented as default
+  starter overhead or compared against baselines that do not perform the same
+  work.
+- Tests: `mvn -pl reactive-http-client-starter -Dtest=MicrometerHttpClientObserverTest,ResilienceOperatorApplierTest,ReactiveClientInvocationHandlerRetryMethodsTest,ReactiveClientInvocationHandlerRetrySafetyTest test`
+  passed 78 tests.
+- Focused release-profile benchmark report:
+  `reactive-http-client-benchmarks/target/benchmark-reports/v13-priority8/release-jmh.md`.
+- Loopback optional feature rows from the focused report:
+  `Exchange Logging Metadata Only Get No Body` `56.711 us/op` average,
+  `61.067 us/op` sample, `27227.209 B/op` sample allocation;
+  `Micrometer Observer Get No Body` `81.586 us/op` average with local variance,
+  `69.300 us/op` sample, `29671.329 B/op` sample allocation;
+  `Retry Wrapper Get No Body` `61.642 us/op` average, `64.258 us/op` sample,
+  `27669.503 B/op` sample allocation; `Circuit Breaker Wrapper Get No Body`
+  `57.035 us/op` average, `60.907 us/op` sample, `26666.085 B/op` sample allocation.
+- No-network diagnostics rows from the focused report: disabled diagnostics
+  `183031.141 ops/s` and `11108.006 B/op`; metadata-only exchange logging
+  `88358.342 ops/s` and `16924.016 B/op`; Micrometer observer
+  `107016.260 ops/s` and `16260.012 B/op`; runtime diagnostics provider
+  `40768.109 ops/s` and `44668.052 B/op` as an on-demand inspection API.
+- Documentation recommendation: keep current production guidance unchanged until
+  a promoted full benchmark report is selected for release notes; this focused
+  run is recorded as Priority 8 evidence and not promoted as the default starter
+  performance report.
 
 ---
 

@@ -113,13 +113,13 @@ public class MicrometerHttpClientObserver implements HttpClientObserver {
             return;
         }
         try {
-            Tags tags = buildTags(event);
+            Tags lowCardinalityTags = buildLowCardinalityTags(event);
+            Tags tags = buildTags(event, lowCardinalityTags);
             // meterRegistry.timer() is idempotent – returns existing timer for the same
             // name+tags combination, avoiding repeated Timer.builder() allocation overhead.
             meterRegistry.timer(config.getMetricName(), tags)
                     .record(event.getDurationMs(), TimeUnit.MILLISECONDS);
 
-            Tags lowCardinalityTags = buildLowCardinalityTags(event);
             meterRegistry.summary(config.getMetricName() + ".attempts", lowCardinalityTags)
                     .record(event.getAttemptCount());
 
@@ -159,11 +159,7 @@ public class MicrometerHttpClientObserver implements HttpClientObserver {
         return commonTags(event);
     }
 
-    private Tags buildTags(HttpClientObserverEvent event) {
-        String uri = config.isIncludeUrlPath() && event.getUriPath() != null
-                ? event.getUriPath()
-                : "NONE";
-
+    private Tags buildTags(HttpClientObserverEvent event, Tags commonTags) {
         String statusCode = event.getStatusCode() != null
                 ? String.valueOf(event.getStatusCode())
                 : "NONE";
@@ -176,7 +172,7 @@ public class MicrometerHttpClientObserver implements HttpClientObserver {
                 ? event.getErrorCategory().name()
                 : "none";
 
-        return commonTags(event).and(
+        return commonTags.and(
                 "http.status_code", statusCode,
                 "outcome", outcome,
                 "exception", exception,
