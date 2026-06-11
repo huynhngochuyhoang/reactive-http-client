@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `toBodilessEntity()` so status, headers, and body envelope construction stay
   on the native response path while streaming `ResponseEntity<Flux<DataBuffer>>`
   ownership remains unchanged.
+- **Optional feature overhead paths.** Micrometer observation now builds the
+  low-cardinality tag set once per event, and Resilience4j-backed retry,
+  circuit-breaker, bulkhead, and rate-limiter paths reuse per-instance Reactor
+  operators instead of recreating wrappers on every call.
 - **JSON response decode path.** Simple concrete DTO responses now use
   WebClient class-based `bodyToMono`/`bodyToFlux` decoding instead of creating a
   `ParameterizedTypeReference`; generic response types keep the existing
