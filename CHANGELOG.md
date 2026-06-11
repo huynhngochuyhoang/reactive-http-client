@@ -26,11 +26,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Promoted benchmark report.** Added
   [Benchmark Report 2.9.0](docs/benchmark-report-2.9.0.md) as source-controlled
   release-quality evidence for starter `2.9.0` benchmark scenarios.
-
 - **Performance summary.** Added
   [Performance Summary](docs/23-performance-summary.md) to explain benchmark
   methodology, named scenario findings, expected starter overhead sources, and
   starter-only optional feature/error-mapping rows.
+- **Release-note benchmark evidence workflow.** Added benchmark evidence
+  guidance for release notes that publish performance claims, including promoted
+  report links, current-candidate and published-baseline commands, report paths,
+  and cited scenario names.
+
+### Fixed
+
+- **Release-note benchmark reruns.** The selective rerun guidance now uses the
+  Maven benchmark release profile so metadata is preserved, and its include
+  pattern covers raw `WebClient`, Spring HTTP Interface, and starter rows for
+  cited comparison scenarios, plus the starter-only Problem Detail row.
 
 ## [2.9.0] - 2026-06-08
 

@@ -119,13 +119,53 @@ resolve before release, and lists these generated report paths:
 Refresh release benchmark numbers when a release changes request construction,
 observability, resilience wrapping, transport or client-builder behavior, or when
 release notes make public performance claims. Before publishing those claims,
-attach or link the release report from the release notes. A pending benchmark
-entry in the release evidence manifest is intentional for releases with no
-request-path change; for benchmark-relevant releases it is the visible reminder
+promote the release-quality report into `docs/` and cite that source-controlled
+promoted report from the release notes. A pending benchmark entry in the
+release evidence manifest is intentional for releases with no request-path
+change; for benchmark-relevant releases it is the visible reminder
 that release evidence still needs to be produced. Published baseline artifact
 entries include `mvn dependency:get -Dartifact=...` commands; a resolution
 failure is a release blocker because the benchmark or API compatibility baseline
 would no longer be reproducible.
+
+## Release-Note Benchmark Evidence
+
+When release notes include performance claims, add a benchmark evidence block near
+the claim or in the release checklist. This copyable example uses paths relative
+to the repository root, as they should appear in `CHANGELOG.md` or root-level
+release notes:
+
+```markdown
+Benchmark evidence:
+- Promoted report: [Benchmark Report 2.9.0](docs/benchmark-report-2.9.0.md)
+- Current candidate command: `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`
+- Published baseline command: `mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.8.0 -Dbenchmark.commit=2.8.0`
+- Current candidate report: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
+- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.8.0/release-jmh.md`
+- Scenarios cited: `Get No Body`, `Post Json`
+```
+
+The promoted report link is required for public performance claims. Use the
+manifest `promotedReport` value, such as `docs/benchmark-report-2.9.0.md`,
+when citing the report from `CHANGELOG.md` or release notes. A pending
+benchmark entry in the generated release evidence manifest is not enough for a
+release that publishes performance wording; run the current candidate benchmark,
+promote the report, and cite the promoted report from the release notes.
+
+To rerun only the benchmark methods used by a release-note claim, keep the
+Maven release profile so the generated report keeps project, starter, dependency,
+and commit metadata. Override only the JMH include pattern and result directory:
+
+```bash
+mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify \
+  -Dbenchmark.commit=$(git rev-parse --short HEAD) \
+  -Dbenchmark.include='.*(clientSideOverhead.*(GetNoBody|GetPathQueryHeader|PostJson|ResponseEntity|ClientErrorSmallBody|ServerErrorSmallBody)|starterErrorMappingProblemDetailSmallBody).*' \
+  -Dbenchmark.result.dir=target/benchmark-reports/release-note
+```
+
+Keep current-candidate and published-baseline reports in separate paths when
+comparing releases. Release notes should name the starter versions and scenario
+names being compared so readers can reproduce each claim from the cited report.
 
 ## Publishing Performance Claims
 

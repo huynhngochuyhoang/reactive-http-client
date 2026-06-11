@@ -50,21 +50,21 @@
 
 ## Priority 3 — Release-Note Benchmark Evidence Workflow
 
-### [ ] 1.3 Release-note benchmark evidence workflow
-- [ ] Extend release evidence or changelog guidance with a benchmark evidence
+### [x] 1.3 Release-note benchmark evidence workflow
+- [x] Extend release evidence or changelog guidance with a benchmark evidence
       block.
-- [ ] Include promoted report link, current-workspace command,
+- [x] Include promoted report link, current-workspace command,
       published-baseline command, and scenario names used by release notes.
-- [ ] Require a promoted report link when the changelog includes performance
+- [x] Require a promoted report link when the changelog includes performance
       claims.
-- [ ] Include both current candidate and published-baseline report paths for
+- [x] Include both current candidate and published-baseline report paths for
       release-to-release trend comparisons.
-- [ ] Document how to rerun only the benchmark scenarios cited by release notes.
-- [ ] Verify release notes can cite the promoted report without manual path
+- [x] Document how to rerun only the benchmark scenarios cited by release notes.
+- [x] Verify release notes can cite the promoted report without manual path
       rewriting.
-- [ ] Verify release evidence distinguishes current candidate and published
+- [x] Verify release evidence distinguishes current candidate and published
       baseline reports.
-- [ ] Verify a release with performance claims cannot rely only on a pending
+- [x] Verify a release with performance claims cannot rely only on a pending
       benchmark evidence entry.
 
 ---

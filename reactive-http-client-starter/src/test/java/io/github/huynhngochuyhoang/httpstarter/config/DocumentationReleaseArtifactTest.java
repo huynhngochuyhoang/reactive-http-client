@@ -35,7 +35,7 @@ class DocumentationReleaseArtifactTest {
 
         try (Stream<Path> files = markdownFiles(root)) {
             for (Path markdown : files.toList()) {
-                Matcher matcher = MARKDOWN_LINK.matcher(Files.readString(markdown));
+                Matcher matcher = MARKDOWN_LINK.matcher(markdownWithoutFencedCode(Files.readString(markdown)));
                 while (matcher.find()) {
                     String target = matcher.group(1);
                     if (isExternal(target)) {
@@ -97,6 +97,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkPom)
                 .contains("<benchmark.starter.version>")
                 .contains("benchmark.starter.version")
+                .contains("benchmark.include")
+                .contains("${benchmark.include}")
                 .contains("benchmark.spring-webflux.artifact")
                 .contains("benchmark.reactor-netty.artifact");
         assertThat(dependencyBlock(benchmarkPom, "spring-webflux")).doesNotContain("<version>");
@@ -111,6 +113,7 @@ class DocumentationReleaseArtifactTest {
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         String promotedReportDocs = Files.readString(promotedReport);
         String performanceSummaryDocs = Files.readString(root.resolve("docs/23-performance-summary.md"));
+        String releaseCompatibilityDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
 
         assertThat(benchmarkDocs)
                 .contains("## Methodology and Limits")
@@ -124,7 +127,25 @@ class DocumentationReleaseArtifactTest {
                 .contains("Avoid broad wording such as")
                 .contains("smoke-only report links")
                 .contains("Benchmark Report " + projectVersion)
-                .contains("Performance Summary");
+                .contains("Performance Summary")
+                .contains("## Release-Note Benchmark Evidence")
+                .contains("Benchmark evidence:")
+                .contains("Promoted report: [Benchmark Report " + projectVersion + "](docs/benchmark-report-" + projectVersion + ".md)")
+                .contains("paths relative\nto the repository root")
+                .contains("Current candidate command")
+                .contains("Published baseline command")
+                .contains("Current candidate report")
+                .contains("Published baseline report")
+                .contains("Scenarios cited")
+                .contains("benchmark.include")
+                .contains("clientSideOverhead.*")
+                .contains("GetPathQueryHeader")
+                .contains("ResponseEntity")
+                .contains("ClientErrorSmallBody")
+                .contains("ServerErrorSmallBody")
+                .contains("starterErrorMappingProblemDetailSmallBody")
+                .contains("target/benchmark-reports/release-note")
+                .contains("generated release evidence manifest is not enough");
 
         assertThat(promotedReport).exists();
         assertThat(promotedReportDocs)
@@ -161,6 +182,12 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("near zero overhead")
                 .doesNotContain("always faster")
                 .doesNotContain("same performance as raw `WebClient`");
+
+        assertThat(releaseCompatibilityDocs)
+                .contains("promote the release-quality report into")
+                .contains("docs/benchmark-report-<version>.md")
+                .contains("do not link generated `target/` reports directly")
+                .doesNotContain("reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md` in");
 
         List<String> invalidReportLinks = new ArrayList<>();
         List<String> promotedReportLinks = new ArrayList<>();
@@ -255,6 +282,38 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkEvidence.path("publishedStarterReleaseReport").asText())
                 .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
                         + pomProperty(pomXml, "api.compatibility.baseline.version") + "/release-jmh.md");
+        assertThat(benchmarkEvidence.path("promotedReport").asText())
+                .isEqualTo("docs/benchmark-report-" + generated.path("projectVersion").asText() + ".md");
+        assertThat(benchmarkEvidence.path("currentCandidateReport").asText())
+                .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
+        assertThat(benchmarkEvidence.path("publishedBaselineReport").asText())
+                .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
+                        + pomProperty(pomXml, "api.compatibility.baseline.version") + "/release-jmh.md");
+        assertThat(benchmarkEvidence.path("releaseNoteScenarioNames"))
+                .extracting(JsonNode::asText)
+                .containsExactly(
+                        "Get No Body",
+                        "Get Path Query Header",
+                        "Post Json",
+                        "Response Entity",
+                        "Client Error Small Body",
+                        "Server Error Small Body",
+                        "Problem Detail Small Body");
+        assertThat(benchmarkEvidence.path("releaseNoteScenarioRerunCommand").asText())
+                .contains("benchmark-release")
+                .contains("benchmark.include")
+                .contains("clientSideOverhead.*")
+                .contains("GetNoBody")
+                .contains("GetPathQueryHeader")
+                .contains("PostJson")
+                .contains("ResponseEntity")
+                .contains("ClientErrorSmallBody")
+                .contains("ServerErrorSmallBody")
+                .contains("starterErrorMappingProblemDetailSmallBody")
+                .contains("target/benchmark-reports/release-note")
+                .doesNotContain("reactive-http-client-benchmarks/target/benchmarks.jar");
+        assertThat(benchmarkEvidence.path("requiresPromotedReportForPerformanceClaims").asBoolean()).isTrue();
+        assertThat(benchmarkEvidence.path("pendingEvidenceCanSupportPerformanceClaims").asBoolean()).isFalse();
         assertThat(benchmarkEvidence.path("refreshRequiredWhen"))
                 .extracting(JsonNode::asText)
                 .containsExactly(
@@ -322,6 +381,23 @@ class DocumentationReleaseArtifactTest {
         return anchor.toString();
     }
 
+    private static String markdownWithoutFencedCode(String markdown) {
+        StringBuilder out = new StringBuilder(markdown.length());
+        boolean fenced = false;
+        for (String line : markdown.split("\\R", -1)) {
+            if (line.startsWith("```")) {
+                fenced = !fenced;
+                out.append('\n');
+                continue;
+            }
+            if (!fenced) {
+                out.append(line);
+            }
+            out.append('\n');
+        }
+        return out.toString();
+    }
+
     private static boolean isExternal(String target) {
         return target.startsWith("http://")
                 || target.startsWith("https://")
@@ -372,7 +448,7 @@ class DocumentationReleaseArtifactTest {
         manifest.put("springBootBaseline", pomProperty(pomXml, "spring-boot.version"));
         manifest.put("benchmarkDependencyManagement", benchmarkDependencyManagement(pomXml));
         manifest.put("publishedBaselineArtifacts", publishedBaselineArtifacts(baselineVersion));
-        manifest.put("benchmarkEvidence", benchmarkEvidence(baselineVersion));
+        manifest.put("benchmarkEvidence", benchmarkEvidence(projectVersion, baselineVersion));
         manifest.put("checks", List.of(
                 check("mvn test", "pass", "Generated by DocumentationReleaseArtifactTest during the current test run."),
                 check("mvn -Papi-compatibility -DskipTests verify", "pending", "Run before release."),
@@ -387,7 +463,7 @@ class DocumentationReleaseArtifactTest {
         return manifest;
     }
 
-    private static Map<String, Object> benchmarkEvidence(String baselineVersion) {
+    private static Map<String, Object> benchmarkEvidence(String projectVersion, String baselineVersion) {
         LinkedHashMap<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("manualOrProfileGated", true);
         evidence.put("currentWorkspaceCommand",
@@ -400,6 +476,28 @@ class DocumentationReleaseArtifactTest {
         evidence.put("releaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
         evidence.put("publishedStarterReleaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
                 + baselineVersion + "/release-jmh.md");
+        evidence.put("promotedReport", "docs/benchmark-report-" + projectVersion + ".md");
+        evidence.put("currentCandidateReport", "reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
+        evidence.put("publishedBaselineReport", "reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
+                + baselineVersion + "/release-jmh.md");
+        evidence.put("releaseNoteScenarioNames", List.of(
+                "Get No Body",
+                "Get Path Query Header",
+                "Post Json",
+                "Response Entity",
+                "Client Error Small Body",
+                "Server Error Small Body",
+                "Problem Detail Small Body"));
+        evidence.put("releaseNoteScenarioRerunCommand",
+                "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify "
+                        + "-Dbenchmark.commit=$(git rev-parse --short HEAD) "
+                        + "-Dbenchmark.include='.*(clientSideOverhead.*(GetNoBody|"
+                        + "GetPathQueryHeader|PostJson|ResponseEntity|"
+                        + "ClientErrorSmallBody|ServerErrorSmallBody)|"
+                        + "starterErrorMappingProblemDetailSmallBody).*' "
+                        + "-Dbenchmark.result.dir=target/benchmark-reports/release-note");
+        evidence.put("requiresPromotedReportForPerformanceClaims", true);
+        evidence.put("pendingEvidenceCanSupportPerformanceClaims", false);
         evidence.put("refreshRequiredWhen", List.of(
                 "request construction changes",
                 "observability changes",
@@ -407,7 +505,7 @@ class DocumentationReleaseArtifactTest {
                 "transport or client-builder changes",
                 "public performance claims"));
         evidence.put("releaseNotesInstruction",
-                "Attach or link the release report when publishing performance claims; never publish smoke-only numbers.");
+                "Attach or link the promoted report when publishing performance claims; never publish smoke-only numbers.");
         return evidence;
     }
 
