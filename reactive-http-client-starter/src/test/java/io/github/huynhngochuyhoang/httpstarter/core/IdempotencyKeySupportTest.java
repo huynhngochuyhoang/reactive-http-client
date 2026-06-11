@@ -89,6 +89,19 @@ class IdempotencyKeySupportTest {
     }
 
     @Test
+    void requestContextAppliesToPlainStatelessRequest() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        ReactiveClientInvocationHandler handler = createHandler(captureRequestWebClient(captured));
+
+        StepVerifier.create(invoke(handler, "createPlain")
+                        .contextWrite(ctx -> RequestContext.withIdempotencyKey(ctx, "context-key")))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertEquals("context-key", captured.get().headers().getFirst("Idempotency-Key"));
+    }
+
+    @Test
     void generatedIdempotencyKeysAreScopedToOneInvocation() {
         Set<String> keys = ConcurrentHashMap.newKeySet();
         WebClient webClient = WebClient.builder()
@@ -408,6 +421,9 @@ class IdempotencyKeySupportTest {
     }
 
     interface IdempotencyClient {
+        @POST("/items")
+        Mono<String> createPlain();
+
         @POST("/items")
         Mono<String> createWithTypedKey(@IdempotencyKey String key);
 
