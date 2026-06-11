@@ -98,7 +98,10 @@ command. For public performance claims, promote the release-quality report into
 `docs/benchmark-report-<version>.md` and cite that source-controlled report from
 the release notes; do not link generated `target/` reports directly. The smoke
 benchmark proves the harness starts; do not publish smoke-only numbers as
-performance evidence. Attach the JSON manifest to the
+performance evidence. When comparing against a published baseline, keep the
+current candidate and published-baseline reports at the distinct paths recorded
+in the manifest and resolve the listed baseline artifacts before report
+promotion. Attach the JSON manifest to the
 release notes or paste its contents into the release checklist. Do not commit
 files from `target/release-evidence/`; regenerate them from the release
 candidate checkout.

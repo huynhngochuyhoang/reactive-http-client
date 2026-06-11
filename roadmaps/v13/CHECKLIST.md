@@ -71,18 +71,18 @@
 
 ## Priority 4 — Current-vs-Baseline Report Pairing
 
-### [ ] 3.1 Current-vs-baseline report pairing
-- [ ] Ensure current candidate and published-baseline report paths are distinct
+### [x] 3.1 Current-vs-baseline report pairing
+- [x] Ensure current candidate and published-baseline report paths are distinct
       in release evidence.
-- [ ] Ensure current candidate and published-baseline report paths are distinct
+- [x] Ensure current candidate and published-baseline report paths are distinct
       in public documentation.
-- [ ] Add a generated or manual comparison note that names the starter versions
+- [x] Add a generated or manual comparison note that names the starter versions
       being compared.
-- [ ] Make baseline artifact resolution failure visible before report promotion.
-- [ ] Verify promoted docs do not mix current candidate numbers with published
+- [x] Make baseline artifact resolution failure visible before report promotion.
+- [x] Verify promoted docs do not mix current candidate numbers with published
       baseline labels.
-- [ ] Verify current and baseline reports can coexist under stable paths.
-- [ ] Verify docs tests catch stale or mismatched promoted report links.
+- [x] Verify current and baseline reports can coexist under stable paths.
+- [x] Verify docs tests catch stale or mismatched promoted report links.
 
 ---
 

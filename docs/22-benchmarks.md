@@ -152,6 +152,23 @@ benchmark entry in the generated release evidence manifest is not enough for a
 release that publishes performance wording; run the current candidate benchmark,
 promote the report, and cite the promoted report from the release notes.
 
+## Current vs Published Baseline Pairing
+
+Keep the current candidate report and published-baseline report as a pair when
+reviewing release-to-release trends. The current candidate run writes
+`reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`; the
+published-baseline run writes
+`reactive-http-client-benchmarks/target/benchmark-reports/published-starter-<version>/release-jmh.md`.
+Those paths must remain distinct so one run cannot overwrite the other.
+
+Before promoting a comparison, resolve every published baseline artifact listed
+in `target/release-evidence/reactive-http-client-release-evidence.json`. A
+baseline artifact resolution failure means the published-baseline report cannot
+be reproduced and blocks promotion. Promoted reports must name the starter
+version under test and the published baseline version separately; do not label
+current candidate numbers as baseline numbers or reuse one report for both
+versions.
+
 To rerun only the benchmark methods used by a release-note claim, keep the
 Maven release profile so the generated report keeps project, starter, dependency,
 and commit metadata. Override only the JMH include pattern and result directory:

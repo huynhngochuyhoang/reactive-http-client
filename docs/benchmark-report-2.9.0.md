@@ -21,6 +21,13 @@
 - Starter-only rows measure starter-specific work, such as Problem Detail error mapping, where the baselines do not install equivalent behavior.
 - Local loopback, JVM warmup, CPU scheduling, and Netty event-loop behavior affect the numbers; use this report as trend evidence for named scenarios.
 
+## Report Pairing
+
+- Current candidate: this promoted report measures starter `2.9.0`; its generated source report is `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`.
+- Published baseline: the paired baseline report path is `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.8.0/release-jmh.md`, which measures the published starter `2.8.0` artifact when regenerated.
+- Baseline artifacts must resolve before this report is used for release-to-release comparison.
+- Numeric rows in this promoted report are current-candidate `2.9.0` rows unless a row explicitly names another starter version.
+
 ## Environment
 
 | Key | Value |

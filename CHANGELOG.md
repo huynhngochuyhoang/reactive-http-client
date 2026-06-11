@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guidance for release notes that publish performance claims, including promoted
   report links, current-candidate and published-baseline commands, report paths,
   and cited scenario names.
+- **Current-vs-baseline benchmark pairing.** Release evidence and benchmark docs
+  now name current-candidate and published-baseline report paths together, require
+  baseline artifact resolution before promotion, and prevent promoted reports from
+  mixing candidate numbers with baseline labels.
 
 ### Fixed
 

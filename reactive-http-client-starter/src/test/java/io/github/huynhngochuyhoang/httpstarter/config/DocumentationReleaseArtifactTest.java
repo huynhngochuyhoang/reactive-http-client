@@ -109,6 +109,7 @@ class DocumentationReleaseArtifactTest {
     void benchmarkDocumentationScopesPerformanceClaimsToReleaseQualityReports() throws Exception {
         Path root = projectRoot();
         String projectVersion = projectVersion(root.resolve("pom.xml"));
+        String baselineVersion = pomProperty(Files.readString(root.resolve("pom.xml")), "api.compatibility.baseline.version");
         Path promotedReport = root.resolve("docs/benchmark-report-" + projectVersion + ".md");
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         String promotedReportDocs = Files.readString(promotedReport);
@@ -137,6 +138,11 @@ class DocumentationReleaseArtifactTest {
                 .contains("Current candidate report")
                 .contains("Published baseline report")
                 .contains("Scenarios cited")
+                .contains("## Current vs Published Baseline Pairing")
+                .contains("current candidate report and published-baseline report as a pair")
+                .contains("published-starter-<version>/release-jmh.md")
+                .contains("resolve every published baseline artifact")
+                .contains("do not label\ncurrent candidate numbers as baseline numbers")
                 .contains("benchmark.include")
                 .contains("clientSideOverhead.*")
                 .contains("GetPathQueryHeader")
@@ -159,6 +165,11 @@ class DocumentationReleaseArtifactTest {
                 .contains("| `springBootVersion` |")
                 .contains("| `availableProcessors` |")
                 .contains("## Comparison Summary")
+                .contains("## Report Pairing")
+                .contains("Current candidate: this promoted report measures starter `" + projectVersion + "`")
+                .contains("Published baseline: the paired baseline report path is `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
+                        + baselineVersion + "/release-jmh.md`")
+                .contains("Numeric rows in this promoted report are current-candidate `" + projectVersion + "` rows")
                 .doesNotContain("/home/");
 
         assertThat(performanceSummaryDocs)
@@ -179,6 +190,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("Response envelope handling")
                 .contains("starter-only error-mapping overhead")
                 .contains("starter `" + projectVersion + "`")
+                .contains("Current-vs-baseline comparisons should use the paired report paths")
+                .contains("published-starter-" + baselineVersion + "/release-jmh.md")
+                .contains("Resolve the published baseline artifacts before promoting a comparison")
                 .doesNotContain("near zero overhead")
                 .doesNotContain("always faster")
                 .doesNotContain("same performance as raw `WebClient`");
@@ -187,6 +201,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("promote the release-quality report into")
                 .contains("docs/benchmark-report-<version>.md")
                 .contains("do not link generated `target/` reports directly")
+                .contains("current candidate and published-baseline reports at the distinct paths")
+                .contains("resolve the listed baseline artifacts before report\npromotion")
                 .doesNotContain("reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md` in");
 
         List<String> invalidReportLinks = new ArrayList<>();
@@ -289,6 +305,17 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkEvidence.path("publishedBaselineReport").asText())
                 .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
                         + pomProperty(pomXml, "api.compatibility.baseline.version") + "/release-jmh.md");
+        JsonNode comparisonPair = benchmarkEvidence.path("comparisonPair");
+        assertThat(comparisonPair.path("currentStarterVersion").asText())
+                .isEqualTo(generated.path("projectVersion").asText());
+        assertThat(comparisonPair.path("publishedBaselineStarterVersion").asText())
+                .isEqualTo(pomProperty(pomXml, "api.compatibility.baseline.version"));
+        assertThat(comparisonPair.path("currentCandidateReport").asText())
+                .isEqualTo(benchmarkEvidence.path("currentCandidateReport").asText());
+        assertThat(comparisonPair.path("publishedBaselineReport").asText())
+                .isEqualTo(benchmarkEvidence.path("publishedBaselineReport").asText());
+        assertThat(comparisonPair.path("reportsSharePath").asBoolean()).isFalse();
+        assertThat(comparisonPair.path("baselineArtifactsMustResolveBeforePromotion").asBoolean()).isTrue();
         assertThat(benchmarkEvidence.path("releaseNoteScenarioNames"))
                 .extracting(JsonNode::asText)
                 .containsExactly(
@@ -480,6 +507,10 @@ class DocumentationReleaseArtifactTest {
         evidence.put("currentCandidateReport", "reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
         evidence.put("publishedBaselineReport", "reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
                 + baselineVersion + "/release-jmh.md");
+        evidence.put("comparisonPair", comparisonPair(projectVersion, baselineVersion,
+                (String) evidence.get("currentCandidateReport"),
+                (String) evidence.get("publishedBaselineReport"),
+                (String) evidence.get("promotedReport")));
         evidence.put("releaseNoteScenarioNames", List.of(
                 "Get No Body",
                 "Get Path Query Header",
@@ -507,6 +538,22 @@ class DocumentationReleaseArtifactTest {
         evidence.put("releaseNotesInstruction",
                 "Attach or link the promoted report when publishing performance claims; never publish smoke-only numbers.");
         return evidence;
+    }
+
+    private static Map<String, Object> comparisonPair(String projectVersion, String baselineVersion,
+                                                      String currentReport, String baselineReport,
+                                                      String promotedReport) {
+        LinkedHashMap<String, Object> pair = new LinkedHashMap<>();
+        pair.put("currentStarterVersion", projectVersion);
+        pair.put("publishedBaselineStarterVersion", baselineVersion);
+        pair.put("currentCandidateReport", currentReport);
+        pair.put("publishedBaselineReport", baselineReport);
+        pair.put("promotedReport", promotedReport);
+        pair.put("reportsSharePath", currentReport.equals(baselineReport));
+        pair.put("baselineArtifactsMustResolveBeforePromotion", true);
+        pair.put("comparisonNote", "Compare starter " + projectVersion + " current-candidate report with starter "
+                + baselineVersion + " published-baseline report; do not reuse one report for both labels.");
+        return pair;
     }
 
     private static Map<String, Object> benchmarkDependencyManagement(String pomXml) {

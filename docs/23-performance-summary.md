@@ -98,3 +98,11 @@ measures the published `2.8.0` artifact, not the current workspace. When
 comparing a current candidate to that baseline, keep the reports separate and
 name both versions. Do not reuse the `2.9.0` report as evidence for a different
 starter version.
+
+Current-vs-baseline comparisons should use the paired report paths from the
+release evidence manifest: the current candidate report under
+`reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md` and
+the published baseline report under
+`reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.8.0/release-jmh.md`.
+Resolve the published baseline artifacts before promoting a comparison, and cite
+only a source-controlled promoted report from public release notes.
