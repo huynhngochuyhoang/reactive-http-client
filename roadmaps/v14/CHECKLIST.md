@@ -7,7 +7,7 @@ release blocker requires reordering.
 
 ## Priority 1 — Release `2.10.0` From Completed V12/V13 Work
 
-### [ ] 0.1 Release as `2.10.0`
+### [x] 0.1 Release as `2.10.0`
 - [x] Move Unreleased changelog entries into a dated `2.10.0` section.
 - [x] Bump root and module Maven versions from `2.9.0` to `2.10.0`.
 - [x] Update README dependency snippets to `2.10.0`.
@@ -23,7 +23,7 @@ release blocker requires reordering.
 - [x] Update performance summary to describe the `2.10.0` promoted report.
 - [x] Update changelog comparison links for `2.10.0`.
 - [x] Run normal tests.
-- [ ] Run API compatibility against published `2.9.0`.
+- [x] Run API compatibility against published `2.9.0`.
 - [x] Run `git diff --check`.
 - [x] Run benchmark smoke.
 - [x] Run release-quality benchmark when release notes include performance
@@ -34,19 +34,20 @@ release blocker requires reordering.
 Evidence:
 
 - `mvn test` passed for the root reactor on `2.10.0`.
-- `mvn -Papi-compatibility -DskipTests verify` completed successfully and the
-  baseline guard accepted `api.compatibility.baseline.version=2.9.0` with
-  `project.version=2.10.0`, but published `2.9.0` resolution for some companion
-  modules could not be verified because the configured Maven repository host did
-  not resolve in this environment.
-- `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.9.0`
-  failed with `Unknown host artifacts.mservice.com.vn`, including when retried
-  with network escalation.
+- Published baseline artifacts resolved after VPN was connected:
+  `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.9.0`,
+  `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.9.0`,
+  and `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.9.0`.
+- `mvn -Papi-compatibility -DskipTests verify` passed after the published
+  `2.9.0` baseline artifacts resolved.
 - `mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify`
   passed and wrote smoke-only benchmark output with project/starter `2.10.0`
   and API baseline `2.9.0`.
 - `git diff --check` passed.
-- `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=1000 4 24 27 30 46 100 114 984 1000git rev-parse --short HEAD)` produced the promoted `2.10.0` release-quality report from benchmark commit `04aeb61`.
+- `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`
+  produced the promoted `2.10.0` release-quality report. The report records
+  release input commit `6b46be8`; the original runner property was `04aeb61`
+  from the pre-commit release-prep workspace.
 
 ---
 

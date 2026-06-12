@@ -4,7 +4,8 @@
 
 - Report version: `2.10.0`.
 - Starter version under test: `2.10.0`.
-- Benchmark commit: `04aeb61`.
+- Benchmark input commit: `6b46be8`.
+- Benchmark runner property: `04aeb61` from the pre-commit release-prep workspace; the same release inputs are present in `6b46be8`.
 - Evidence level: **Release-quality**, not smoke evidence.
 - Machine limits: local loopback run on Linux/amd64 with `8` available processors; JVM warmup, CPU scheduling, and Netty event-loop scheduling affect the numbers.
 - Generated source artifacts are retained during release evidence collection but are not committed: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json` and its adjacent environment properties file.
@@ -36,7 +37,7 @@
 | `projectVersion` | 2.10.0 |
 | `starterVersion` | 2.10.0 |
 | `apiCompatibilityBaselineVersion` | 2.9.0 |
-| `benchmarkCommit` | 04aeb61 |
+| `benchmarkCommit` | 6b46be8 (release input tree; runner property was 04aeb61 before release-prep edits were committed) |
 | `springBootVersion` | 3.5.0 |
 | `springWebFluxVersion` | 6.2.7 |
 | `reactorNettyVersion` | 1.2.6 |
