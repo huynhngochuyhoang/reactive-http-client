@@ -30,8 +30,8 @@ Known limits:
 
 Current promoted report:
 
-- [Benchmark Report 2.9.0](benchmark-report-2.9.0.md) is release-quality
-  evidence for starter `2.9.0`, generated from the current workspace benchmark
+- [Benchmark Report 2.10.0](benchmark-report-2.10.0.md) is release-quality
+  evidence for starter `2.10.0`, generated from the current workspace benchmark
   profile. Use it only for the named scenarios and environment it records.
 - [Performance Summary](23-performance-summary.md) explains how to read the
   promoted report without turning scenario-specific data into broad claims.
@@ -75,7 +75,7 @@ omitting `-am` so Maven resolves the published dependency instead of the current
 reactor module:
 
 ```bash
-mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.8.0 -Dbenchmark.commit=2.8.0
+mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.9.0 -Dbenchmark.commit=2.9.0
 ```
 
 That command cleans the benchmark module before compiling, uses the current
@@ -137,16 +137,16 @@ release notes:
 
 ```markdown
 Benchmark evidence:
-- Promoted report: [Benchmark Report 2.9.0](docs/benchmark-report-2.9.0.md)
+- Promoted report: [Benchmark Report 2.10.0](docs/benchmark-report-2.10.0.md)
 - Current candidate command: `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`
-- Published baseline command: `mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.8.0 -Dbenchmark.commit=2.8.0`
+- Published baseline command: `mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.9.0 -Dbenchmark.commit=2.9.0`
 - Current candidate report: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
-- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.8.0/release-jmh.md`
+- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.9.0/release-jmh.md`
 - Scenarios cited: `Get No Body`, `Post Json`
 ```
 
 The promoted report link is required for public performance claims. Use the
-manifest `promotedReport` value, such as `docs/benchmark-report-2.9.0.md`,
+manifest `promotedReport` value, such as `docs/benchmark-report-2.10.0.md`,
 when citing the report from `CHANGELOG.md` or release notes. A pending
 benchmark entry in the generated release evidence manifest is not enough for a
 release that publishes performance wording; run the current candidate benchmark,

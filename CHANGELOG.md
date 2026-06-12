@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-06-11
+
 ### Added
 
 - **Benchmark-backed release evidence.** The release evidence manifest now lists
@@ -24,8 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   claims, with tests preventing generated target or smoke-only reports from being
   linked as evidence.
 - **Promoted benchmark report.** Added
-  [Benchmark Report 2.9.0](docs/benchmark-report-2.9.0.md) as source-controlled
-  release-quality evidence for starter `2.9.0` benchmark scenarios.
+  [Benchmark Report 2.10.0](docs/benchmark-report-2.10.0.md) as source-controlled
+  release-quality evidence for starter `2.10.0` benchmark scenarios.
 - **Performance summary.** Added
   [Performance Summary](docs/23-performance-summary.md) to explain benchmark
   methodology, named scenario findings, expected starter overhead sources, and
@@ -1184,7 +1186,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.6.0...v2.7.0

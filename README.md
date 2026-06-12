@@ -77,7 +77,7 @@ Add the starter:
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-starter</artifactId>
-  <version>2.9.0</version>
+  <version>2.10.0</version>
 </dependency>
 ```
 
@@ -143,7 +143,7 @@ reactive:
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-test</artifactId>
-  <version>2.9.0</version>
+  <version>2.10.0</version>
   <scope>test</scope>
 </dependency>
 ```
@@ -172,7 +172,7 @@ class UserApiClientTest {
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-otel</artifactId>
-  <version>2.9.0</version>
+  <version>2.10.0</version>
 </dependency>
 ```
 
@@ -221,7 +221,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Native Image and Release Compatibility](docs/20-native-release-compatibility.md) | AOT support and smoke matrix |
 | [Diagnostic Context Contracts](docs/21-diagnostic-contexts.md) | Extension-point capability matrix |
 | [Benchmarks](docs/22-benchmarks.md) | Benchmark harness and commands |
-| [Benchmark Report 2.9.0](docs/benchmark-report-2.9.0.md) | Promoted release-quality benchmark report |
+| [Benchmark Report 2.10.0](docs/benchmark-report-2.10.0.md) | Promoted release-quality benchmark report |
 | [Performance Summary](docs/23-performance-summary.md) | Interpreting benchmark data |
 | [Configuration Properties](docs/configuration-properties.md) | Generated property reference |
 | [Examples](docs/examples/README.md) | Copy-paste snippets |
