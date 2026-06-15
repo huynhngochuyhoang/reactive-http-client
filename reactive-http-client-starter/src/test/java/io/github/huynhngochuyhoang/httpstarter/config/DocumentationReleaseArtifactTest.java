@@ -99,6 +99,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("benchmark.starter.version")
                 .contains("benchmark.include")
                 .contains("${benchmark.include}")
+                .contains("benchmark-compare")
+                .contains("benchmark.compare.current")
+                .contains("BenchmarkReportComparator")
                 .contains("benchmark.spring-webflux.artifact")
                 .contains("benchmark.reactor-netty.artifact");
         assertThat(dependencyBlock(benchmarkPom, "spring-webflux")).doesNotContain("<version>");
@@ -158,6 +161,12 @@ class DocumentationReleaseArtifactTest {
                 .contains("current candidate report and published-baseline report as a pair")
                 .contains("published-starter-<version>/release-jmh.md")
                 .contains("resolve every published baseline artifact")
+                .contains("benchmark-compare")
+                .contains("benchmark.compare.current")
+                .contains("benchmark.compare.baseline")
+                .contains("benchmark-comparison.md")
+                .contains("fail-on-review")
+                .contains("exits successfully by default")
                 .contains("do not label\ncurrent candidate numbers as baseline numbers")
                 .contains("benchmark.include")
                 .contains("clientSideOverhead.*")

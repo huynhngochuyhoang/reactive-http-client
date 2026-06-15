@@ -67,6 +67,11 @@
             <artifactId>slf4j-simple</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -252,6 +257,46 @@
                 </plugins>
             </build>
         </profile>
+        <profile>
+            <id>benchmark-compare</id>
+            <properties>
+                <benchmark.compare.current>${benchmark.result.dir}/release-jmh.json</benchmark.compare.current>
+                <benchmark.compare.baseline>${benchmark.result.dir}/published-starter-${api.compatibility.baseline.version}/release-jmh.json</benchmark.compare.baseline>
+                <benchmark.compare.output>${benchmark.result.dir}/benchmark-comparison.md</benchmark.compare.output>
+                <benchmark.compare.fail-on-review>false</benchmark.compare.fail-on-review>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <executions>
+                            <execution>
+                                <id>compare-benchmark-reports</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <mainClass>io.github.huynhngochuyhoang.httpstarter.benchmarks.BenchmarkReportComparator</mainClass>
+                                    <arguments>
+                                        <argument>--current</argument>
+                                        <argument>${benchmark.compare.current}</argument>
+                                        <argument>--baseline</argument>
+                                        <argument>${benchmark.compare.baseline}</argument>
+                                        <argument>--output</argument>
+                                        <argument>${benchmark.compare.output}</argument>
+                                        <argument>--fail-on-review=${benchmark.compare.fail-on-review}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
 
     </profiles>
 </project>
