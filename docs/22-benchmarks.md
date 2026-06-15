@@ -145,6 +145,8 @@ Benchmark evidence:
 - Scenarios cited: `Get No Body`, `Post Json`
 ```
 
+`DocumentationReleaseArtifactTest` also writes `target/release-evidence/reactive-http-client-benchmark-evidence.md` from the same manifest data. Use that generated target-only snippet as the release-note starting point, then paste it only after the promoted `docs/benchmark-report-<version>.md` file exists.
+
 The promoted report link is required for public performance claims. Use the
 manifest `promotedReport` value, such as `docs/benchmark-report-2.10.0.md`,
 when citing the report from `CHANGELOG.md` or release notes. A pending

@@ -177,6 +177,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("starterErrorMappingProblemDetailSmallBody")
                 .contains("target/benchmark-reports/release-note")
                 .contains("generated release evidence manifest is not enough")
+                .contains("reactive-http-client-benchmark-evidence.md")
+                .contains("target/release-evidence")
+                .contains("same manifest data")
                 .contains("## Release-Maintainer Performance Claim Checklist")
                 .contains("Before adding or approving a public performance claim")
                 .contains("not a generated\n  `target/benchmark-reports` file and not a smoke-only report")
@@ -284,14 +287,18 @@ class DocumentationReleaseArtifactTest {
     void releaseEvidenceManifestIsGeneratedUnderTarget() throws Exception {
         Path root = projectRoot();
         Path manifest = root.resolve("target/release-evidence/reactive-http-client-release-evidence.json");
+        Path benchmarkEvidenceSnippet = root.resolve("target/release-evidence/reactive-http-client-benchmark-evidence.md");
         String pomXml = Files.readString(root.resolve("pom.xml"));
         Files.createDirectories(manifest.getParent());
         OBJECT_MAPPER.writerWithDefaultPrettyPrinter()
                 .writeValue(manifest.toFile(), releaseEvidenceManifest(root.resolve("pom.xml")));
 
         JsonNode generated = OBJECT_MAPPER.readTree(manifest.toFile());
+        Files.writeString(benchmarkEvidenceSnippet, releaseNoteBenchmarkEvidenceMarkdown(generated));
+        String benchmarkEvidenceMarkdown = Files.readString(benchmarkEvidenceSnippet);
 
         assertThat(manifest.normalize()).startsWith(root.resolve("target"));
+        assertThat(benchmarkEvidenceSnippet.normalize()).startsWith(root.resolve("target"));
         assertThat(generated.path("projectVersion").asText()).isEqualTo(projectVersion(root.resolve("pom.xml")));
         assertThat(generated.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(pomProperty(pomXml, "api.compatibility.baseline.version"));
@@ -404,6 +411,44 @@ class DocumentationReleaseArtifactTest {
                         "resilience wrapping changes",
                         "transport or client-builder changes",
                         "public performance claims");
+        assertThat(benchmarkEvidenceMarkdown)
+                .startsWith("Benchmark evidence:\n")
+                .contains("Promoted report: [Benchmark Report " + generated.path("projectVersion").asText()
+                        + "](docs/benchmark-report-" + generated.path("projectVersion").asText() + ".md)")
+                .contains("Current candidate command: `" + benchmarkEvidence.path("currentWorkspaceCommand").asText() + "`")
+                .contains("Published baseline command: `" + benchmarkEvidence.path("publishedStarterCommand").asText() + "`")
+                .contains("Current candidate report: `" + benchmarkEvidence.path("currentCandidateReport").asText() + "`")
+                .contains("Published baseline report: `" + benchmarkEvidence.path("publishedBaselineReport").asText() + "`")
+                .contains("Scenarios cited: `Get No Body`, `Get Path Query Header`, `Post Json`, `Response Entity`, `Client Error Small Body`, `Server Error Small Body`, `Problem Detail Small Body`")
+                .contains("Paste this block only after the promoted report exists")
+                .contains("starter `" + generated.path("projectVersion").asText() + "`")
+                .contains("published baseline `" + generated.path("apiCompatibilityBaselineVersion").asText() + "`")
+                .doesNotContain("smoke-only-jmh")
+                .doesNotContain("smokeReport");
+    }
+
+    private static String releaseNoteBenchmarkEvidenceMarkdown(JsonNode manifest) {
+        JsonNode evidence = manifest.path("benchmarkEvidence");
+        String projectVersion = manifest.path("projectVersion").asText();
+        String baselineVersion = manifest.path("apiCompatibilityBaselineVersion").asText();
+        String scenarios = inlineCodeList(evidence.path("releaseNoteScenarioNames"));
+
+        return "Benchmark evidence:\n"
+                + "- Promoted report: [Benchmark Report " + projectVersion + "]("
+                + evidence.path("promotedReport").asText() + ")\n"
+                + "- Current candidate command: `" + evidence.path("currentWorkspaceCommand").asText() + "`\n"
+                + "- Published baseline command: `" + evidence.path("publishedStarterCommand").asText() + "`\n"
+                + "- Current candidate report: `" + evidence.path("currentCandidateReport").asText() + "`\n"
+                + "- Published baseline report: `" + evidence.path("publishedBaselineReport").asText() + "`\n"
+                + "- Scenarios cited: " + scenarios + "\n"
+                + "- Note: Paste this block only after the promoted report exists for starter `"
+                + projectVersion + "` and published baseline `" + baselineVersion + "`.\n";
+    }
+
+    private static String inlineCodeList(JsonNode values) {
+        List<String> rendered = new ArrayList<>();
+        values.forEach(value -> rendered.add("`" + value.asText() + "`"));
+        return String.join(", ", rendered);
     }
 
     private static Stream<Path> markdownFiles(Path root) throws IOException {

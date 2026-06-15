@@ -77,24 +77,24 @@ Evidence:
 
 ## Priority 3 — Generated Release-Note Benchmark Evidence
 
-### [ ] 1.2 Generate release-note benchmark evidence from manifest data
-- [ ] Generate a Markdown benchmark evidence snippet from the release evidence
+### [x] 1.2 Generate release-note benchmark evidence from manifest data
+- [x] Generate a Markdown benchmark evidence snippet from the release evidence
       manifest.
-- [ ] Include the promoted report path.
-- [ ] Include the current candidate benchmark command.
-- [ ] Include the published baseline benchmark command.
-- [ ] Include the current candidate report path.
-- [ ] Include the published baseline report path.
-- [ ] Include release-note scenario names.
-- [ ] Keep the generated snippet under `target/release-evidence/`.
-- [ ] Ensure the generated snippet uses the current project version.
-- [ ] Ensure the generated snippet uses the configured baseline version.
-- [ ] Ensure the generated snippet never presents smoke-only reports as promoted
+- [x] Include the promoted report path.
+- [x] Include the current candidate benchmark command.
+- [x] Include the published baseline benchmark command.
+- [x] Include the current candidate report path.
+- [x] Include the published baseline report path.
+- [x] Include release-note scenario names.
+- [x] Keep the generated snippet under `target/release-evidence/`.
+- [x] Ensure the generated snippet uses the current project version.
+- [x] Ensure the generated snippet uses the configured baseline version.
+- [x] Ensure the generated snippet never presents smoke-only reports as promoted
       evidence.
-- [ ] Document that maintainers paste the generated block only after the promoted
+- [x] Document that maintainers paste the generated block only after the promoted
       report exists.
-- [ ] Extend documentation tests to verify required generated fields.
-- [ ] Verify generated evidence remains target-only and is not committed.
+- [x] Extend documentation tests to verify required generated fields.
+- [x] Verify generated evidence remains target-only and is not committed.
 
 ---
 
