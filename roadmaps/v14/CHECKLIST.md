@@ -53,24 +53,24 @@ Evidence:
 
 ## Priority 2 — Benchmark Report Comparison Helper
 
-### [ ] 1.1 Add a benchmark report comparison helper
-- [ ] Choose a small implementation surface for report comparison.
-- [ ] Parse two JMH JSON reports by stable benchmark method name.
-- [ ] Compare rows by benchmark method and mode.
-- [ ] Print current value, baseline value, absolute delta, and relative delta.
-- [ ] Include average time when present.
-- [ ] Include p50, p95, and p99 when present.
-- [ ] Include throughput when present.
-- [ ] Include allocation per operation when present.
-- [ ] Mark V13 review-trigger crossings as `review`.
-- [ ] Keep the default command exit status successful for review-trigger rows.
-- [ ] Add an opt-in flag for non-zero exit on review-trigger rows if useful for
+### [x] 1.1 Add a benchmark report comparison helper
+- [x] Choose a small implementation surface for report comparison.
+- [x] Parse two JMH JSON reports by stable benchmark method name.
+- [x] Compare rows by benchmark method and mode.
+- [x] Print current value, baseline value, absolute delta, and relative delta.
+- [x] Include average time when present.
+- [x] Include p50, p95, and p99 when present.
+- [x] Include throughput when present.
+- [x] Include allocation per operation when present.
+- [x] Mark V13 review-trigger crossings as `review`.
+- [x] Keep the default command exit status successful for review-trigger rows.
+- [x] Add an opt-in flag for non-zero exit on review-trigger rows if useful for
       local release review.
-- [ ] Keep generated comparison output under `target/`.
-- [ ] Document the comparison command in benchmark docs.
-- [ ] Document how to attach comparison output to release notes.
-- [ ] Verify normal CI does not run the comparison as a hard gate.
-- [ ] Add tests or fixtures for matching rows, missing rows, and review-trigger
+- [x] Keep generated comparison output under `target/`.
+- [x] Document the comparison command in benchmark docs.
+- [x] Document how to attach comparison output to release notes.
+- [x] Verify normal CI does not run the comparison as a hard gate.
+- [x] Add tests or fixtures for matching rows, missing rows, and review-trigger
       output.
 
 ---
