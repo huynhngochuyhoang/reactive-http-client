@@ -5,6 +5,9 @@ This page summarizes the current promoted release-quality benchmark report:
 for starter `2.10.0` under the report's local loopback environment only. They are
 not a general claim about every application, payload, network, JVM, or deployment.
 
+For production latency investigation, use the [Performance Troubleshooting](25-performance-troubleshooting.md)
+guide before comparing an application workload with benchmark rows.
+
 ## Methodology First
 
 The benchmark harness measures named scenarios before making any performance

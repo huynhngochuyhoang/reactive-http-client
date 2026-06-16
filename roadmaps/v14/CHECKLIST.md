@@ -120,24 +120,24 @@ Evidence:
 
 ## Priority 5 — Performance Troubleshooting Guide
 
-### [ ] 2.2 Add a performance troubleshooting guide
-- [ ] Add a troubleshooting guide for high outbound latency.
-- [ ] Distinguish starter client abstraction overhead from downstream service
+### [x] 2.2 Add a performance troubleshooting guide
+- [x] Add a troubleshooting guide for high outbound latency.
+- [x] Distinguish starter client abstraction overhead from downstream service
       latency.
-- [ ] Distinguish network latency from app serialization and body processing.
-- [ ] Explain when to inspect exchange logging metadata.
-- [ ] Recommend `METADATA_ONLY` before body capture.
-- [ ] Explain Micrometer tags and how to keep cardinality bounded.
-- [ ] Explain lifecycle hooks and retry attempts as diagnostic signals.
-- [ ] Explain timeout source diagnostics.
-- [ ] Explain request and response body-size effects.
-- [ ] Include a checklist for comparing user workload shape with benchmark rows.
-- [ ] Link to observability docs.
-- [ ] Link to exchange logging docs.
-- [ ] Link to lifecycle hooks docs.
-- [ ] Link to benchmark docs.
-- [ ] Avoid universal performance promises.
-- [ ] Add documentation tests for links and required guidance.
+- [x] Distinguish network latency from app serialization and body processing.
+- [x] Explain when to inspect exchange logging metadata.
+- [x] Recommend `METADATA_ONLY` before body capture.
+- [x] Explain Micrometer tags and how to keep cardinality bounded.
+- [x] Explain lifecycle hooks and retry attempts as diagnostic signals.
+- [x] Explain timeout source diagnostics.
+- [x] Explain request and response body-size effects.
+- [x] Include a checklist for comparing user workload shape with benchmark rows.
+- [x] Link to observability docs.
+- [x] Link to exchange logging docs.
+- [x] Link to lifecycle hooks docs.
+- [x] Link to benchmark docs.
+- [x] Avoid universal performance promises.
+- [x] Add documentation tests for links and required guidance.
 
 ---
 
