@@ -120,6 +120,7 @@ class DocumentationReleaseArtifactTest {
         String benchmarkConsumerDocs = Files.readString(root.resolve("docs/24-benchmark-consumer-examples.md"));
         String promotedReportDocs = Files.readString(promotedReport);
         String performanceSummaryDocs = Files.readString(root.resolve("docs/23-performance-summary.md"));
+        String performanceTroubleshootingDocs = Files.readString(root.resolve("docs/25-performance-troubleshooting.md"));
         String releaseCompatibilityDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
 
         assertThat(readmeDocs)
@@ -240,6 +241,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("Current-vs-baseline comparisons should use the paired report paths")
                 .contains("published-starter-" + baselineVersion + "/release-jmh.md")
                 .contains("Resolve the published baseline artifacts before promoting a comparison")
+                .contains("Performance Troubleshooting")
+                .contains("25-performance-troubleshooting.md")
                 .doesNotContain("near zero overhead")
                 .doesNotContain("always faster")
                 .doesNotContain("same performance as raw `WebClient`");
@@ -267,6 +270,39 @@ class DocumentationReleaseArtifactTest {
                 .contains("same extra work")
                 .contains("Problem Detail rows are also starter-only unless the baseline installs an")
                 .contains("equivalent `application/problem+json` mapper")
+                .doesNotContain("near zero overhead")
+                .doesNotContain("always faster")
+                .doesNotContain("same performance as raw WebClient");
+
+        assertThat(performanceTroubleshootingDocs)
+                .startsWith("# Performance Troubleshooting")
+                .contains("[Benchmarks](22-benchmarks.md)")
+                .contains("[Performance Summary](23-performance-summary.md)")
+                .contains("[Observability](08-observability.md)")
+                .contains("[Exchange Logging](13-exchange-logging.md)")
+                .contains("[Lifecycle Hooks](19-lifecycle-hooks.md)")
+                .contains("## Locate the Time")
+                .contains("Starter client abstraction overhead")
+                .contains("Downstream service latency")
+                .contains("Network latency")
+                .contains("Application serialization and body processing")
+                .contains("## Inspect Metadata First")
+                .contains("metadata-only")
+                .contains("METADATA_ONLY")
+                .contains("## Use Observability Signals")
+                .contains("Keep tag cardinality bounded")
+                .contains("## Read Lifecycle Attempts Carefully")
+                .contains("logical subscription attempts")
+                .contains("## Check Timeout Source")
+                .contains("Timeout diagnostics")
+                .contains("lifecycle hooks and observer events do not expose response\n  headers")
+                .contains("## Account for Body Size")
+                .contains("JSON request bodies")
+                .contains("Error body capture is bounded")
+                .contains("Streaming responses")
+                .contains("## Compare Workload Shape")
+                .contains("Does the baseline client perform the same optional work?")
+                .contains("## Investigation Checklist")
                 .doesNotContain("near zero overhead")
                 .doesNotContain("always faster")
                 .doesNotContain("same performance as raw WebClient");
