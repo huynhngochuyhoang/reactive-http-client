@@ -100,21 +100,21 @@ Evidence:
 
 ## Priority 4 — Benchmark Consumer Example
 
-### [ ] 2.1 Add a small benchmark consumer example
-- [ ] Add a documentation page or example section for benchmark client shapes.
-- [ ] Show the raw `WebClient` version of one success-path scenario.
-- [ ] Show the Spring HTTP Interface version of the same scenario.
-- [ ] Show the starter interface version of the same scenario.
-- [ ] Explain which request and response work is equivalent across the compared
+### [x] 2.1 Add a small benchmark consumer example
+- [x] Add a documentation page or example section for benchmark client shapes.
+- [x] Show the raw `WebClient` version of one success-path scenario.
+- [x] Show the Spring HTTP Interface version of the same scenario.
+- [x] Show the starter interface version of the same scenario.
+- [x] Explain which request and response work is equivalent across the compared
       clients.
-- [ ] Explain why optional feature rows are starter-only unless baselines do the
+- [x] Explain why optional feature rows are starter-only unless baselines do the
       same feature work.
-- [ ] Explain why Problem Detail rows are starter-only unless baselines install an
+- [x] Explain why Problem Detail rows are starter-only unless baselines install an
       equivalent mapper.
-- [ ] Link to benchmark methodology.
-- [ ] Link to the promoted benchmark report.
-- [ ] Avoid broad performance claims.
-- [ ] Add documentation tests for links and required headings.
+- [x] Link to benchmark methodology.
+- [x] Link to the promoted benchmark report.
+- [x] Avoid broad performance claims.
+- [x] Add documentation tests for links and required headings.
 
 ---
 
