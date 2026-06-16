@@ -117,6 +117,7 @@ class DocumentationReleaseArtifactTest {
         String readmeDocs = Files.readString(root.resolve("README.md"));
         String changelogDocs = Files.readString(root.resolve("CHANGELOG.md"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
+        String benchmarkConsumerDocs = Files.readString(root.resolve("docs/24-benchmark-consumer-examples.md"));
         String promotedReportDocs = Files.readString(promotedReport);
         String performanceSummaryDocs = Files.readString(root.resolve("docs/23-performance-summary.md"));
         String releaseCompatibilityDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
@@ -148,6 +149,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("smoke-only report links")
                 .contains("Benchmark Report " + projectVersion)
                 .contains("Performance Summary")
+                .contains("Benchmark Consumer Examples")
+                .contains("24-benchmark-consumer-examples.md")
                 .contains("## Release-Note Benchmark Evidence")
                 .contains("Benchmark evidence:")
                 .contains("Promoted report: [Benchmark Report " + projectVersion + "](docs/benchmark-report-" + projectVersion + ".md)")
@@ -240,6 +243,33 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("near zero overhead")
                 .doesNotContain("always faster")
                 .doesNotContain("same performance as raw `WebClient`");
+
+        assertThat(benchmarkConsumerDocs)
+                .startsWith("# Benchmark Consumer Examples")
+                .contains("[benchmark methodology](22-benchmarks.md#methodology-and-limits)")
+                .contains("[2.10.0 promoted report](benchmark-report-" + projectVersion + ".md)")
+                .contains("## Equivalent Success Path")
+                .contains("## Raw WebClient")
+                .contains("webClient.get()")
+                .contains(".queryParam(\"expand\", \"summary\")")
+                .contains(".header(\"X-Tenant\", \"benchmark\")")
+                .contains("## Spring HTTP Interface")
+                .contains("@HttpExchange")
+                .contains("@GetExchange(\"/users/{id}\")")
+                .contains("## Starter Interface")
+                .contains("@ReactiveHttpClient(name = \"benchmark-starter\")")
+                .contains("@GET(\"/users/{id}\")")
+                .contains("Same local loopback server and base URL")
+                .contains("Same HTTP method, path variable, query parameter, and request header")
+                .contains("Same response-body type and terminal consumption")
+                .contains("## Starter-Only Rows")
+                .contains("Optional feature rows are starter-only unless the baseline client performs the")
+                .contains("same extra work")
+                .contains("Problem Detail rows are also starter-only unless the baseline installs an")
+                .contains("equivalent `application/problem+json` mapper")
+                .doesNotContain("near zero overhead")
+                .doesNotContain("always faster")
+                .doesNotContain("same performance as raw WebClient");
 
         assertThat(releaseCompatibilityDocs)
                 .contains("promote the release-quality report into")
