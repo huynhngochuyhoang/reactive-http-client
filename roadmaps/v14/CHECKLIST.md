@@ -143,79 +143,170 @@ Evidence:
 
 ## Priority 6 — Re-Audit Default Success Path After `2.10.0`
 
-### [ ] 3.1 Re-audit default success path after `2.10.0`
-- [ ] Resolve published `2.10.0` artifacts before comparing.
-- [ ] Run the current V14 workspace release-quality benchmark.
-- [ ] Run the published `2.10.0` baseline benchmark.
-- [ ] Keep current and baseline reports in distinct paths.
-- [ ] Compare `Get No Body` rows.
-- [ ] Compare `Get Path Query Header` rows.
-- [ ] Compare `Post Json` rows.
-- [ ] Compare `Response Entity` rows.
-- [ ] Apply V13 review triggers as review-only signals.
-- [ ] Prioritize only persistent movements that cross review triggers.
-- [ ] Record before/after evidence for every code change.
-- [ ] Verify diagnostics contracts remain covered.
-- [ ] Verify lifecycle contracts remain covered.
-- [ ] Verify retry and idempotency contracts remain covered.
-- [ ] Verify streaming response ownership remains covered.
+### [x] 3.1 Re-audit default success path after `2.10.0`
+- [x] Resolve published `2.10.0` artifacts before comparing.
+- [x] Run the current V14 workspace release-quality benchmark.
+- [x] Run the published `2.10.0` baseline benchmark.
+- [x] Keep current and baseline reports in distinct paths.
+- [x] Compare `Get No Body` rows.
+- [x] Compare `Get Path Query Header` rows.
+- [x] Compare `Post Json` rows.
+- [x] Compare `Response Entity` rows.
+- [x] Apply V13 review triggers as review-only signals.
+- [x] Prioritize only persistent movements that cross review triggers.
+- [x] Record before/after evidence for every code change.
+- [x] Verify diagnostics contracts remain covered.
+- [x] Verify lifecycle contracts remain covered.
+- [x] Verify retry and idempotency contracts remain covered.
+- [x] Verify streaming response ownership remains covered.
+
+Evidence:
+
+- Published `2.10.0` artifacts resolved before comparison:
+  `reactive-http-client-starter`, `reactive-http-client-test`, and
+  `reactive-http-client-otel`.
+- Published `2.10.0` benchmark baseline was generated from
+  `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.10.0/release-jmh.json`
+  and records `starterVersion=2.10.0`, `projectVersion=2.10.0`, and
+  `benchmarkCommit=2.10.0`.
+- Current V14 workspace benchmark was generated from
+  `reactive-http-client-benchmarks/target/benchmark-reports/v14-current/release-jmh.json`
+  and records `starterVersion=2.10.0`, `projectVersion=2.10.0`, and
+  `benchmarkCommit=ce5baf0`.
+- Comparison output:
+  `reactive-http-client-benchmarks/target/benchmark-reports/v14-current-vs-published-2.10.0.md`.
+- The comparison covers `Get No Body`, `Get Path Query Header`, `Post Json`,
+  and `Response Entity` rows for raw `WebClient`, Spring HTTP Interface, and
+  the starter. V13 threshold crossings are reported with `review` status and
+  remain informational.
+- Requested starter default success-path rows show no allocation regression that
+  crosses the V13 allocation review trigger. Review-trigger timing rows were not
+  treated as a release blocker because this priority made no runtime code change
+  and the movements need a same-machine rerun before being treated as persistent.
+- No before/after code evidence is attached because this priority was an audit
+  only; no runtime code was changed.
+- Contract verification:
+  `mvn -pl reactive-http-client-starter -Dtest=ReactiveHttpClientFactoryBeanDiagnosticsTest,ReactiveHttpClientLifecycleHookTest,ReactiveClientInvocationHandlerRetrySafetyTest,IdempotencyKeySupportTest,StreamingResponseTest,SubscriptionLocalReportingStateTest,ResponseEntitySupportTest test`
+  passed with 108 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 
 ## Priority 7 — Request Argument Expansion Allocation Audit
 
-### [ ] 3.2 Audit object allocation in request argument expansion
-- [ ] Capture `Get Path Query Header` evidence before changing code.
-- [ ] Inspect per-call allocation in path variable expansion.
-- [ ] Inspect per-call allocation in query parameter expansion.
-- [ ] Inspect per-call allocation in header parameter expansion.
-- [ ] Reuse cached request-plan metadata where safe.
-- [ ] Avoid changing URI-template validation behavior.
-- [ ] Avoid changing query encoding behavior.
-- [ ] Avoid changing multi-value header behavior.
-- [ ] Avoid changing header precedence behavior.
-- [ ] Avoid changing parameter validation behavior.
-- [ ] Add no-network microbenchmark coverage only if current rows cannot isolate
+### [x] 3.2 Audit object allocation in request argument expansion
+- [x] Capture `Get Path Query Header` evidence before changing code.
+- [x] Inspect per-call allocation in path variable expansion.
+- [x] Inspect per-call allocation in query parameter expansion.
+- [x] Inspect per-call allocation in header parameter expansion.
+- [x] Reuse cached request-plan metadata where safe.
+- [x] Avoid changing URI-template validation behavior.
+- [x] Avoid changing query encoding behavior.
+- [x] Avoid changing multi-value header behavior.
+- [x] Avoid changing header precedence behavior.
+- [x] Avoid changing parameter validation behavior.
+- [x] Add no-network microbenchmark coverage only if current rows cannot isolate
       the overhead source.
-- [ ] Keep any helper internal.
-- [ ] Run URI-template tests.
-- [ ] Run multi-value header tests.
-- [ ] Document any improvement as scenario-specific.
-- [ ] Do not claim universal raw `WebClient` parity.
+- [x] Keep any helper internal.
+- [x] Run URI-template tests.
+- [x] Run multi-value header tests.
+- [x] Document any improvement as scenario-specific.
+- [x] Do not claim universal raw `WebClient` parity.
+
+Evidence:
+
+- Before evidence came from the V14 current release-quality benchmark:
+  `reactive-http-client-benchmarks/target/benchmark-reports/v14-current/release-jmh.md`.
+  `clientSideOverheadStarterGetPathQueryHeader` measured 27,484.809 B/op
+  in throughput mode, 27,039.796 B/op in average-time mode, and
+  27,350.477 B/op in sample mode.
+- Isolated request-argument evidence already exists in the same report:
+  `argumentResolutionPathQueryHeaderFromMetadata` and
+  `argumentResolutionPathQueryHeaderFromPlan` both measured 984 B/op. This
+  isolates path-variable, query-parameter, and header-parameter resolution from
+  WebClient transport and URI-building costs.
+- Inspection confirmed the invocation path resolves arguments from cached
+  `RequestPlan` metadata when available. No extra no-network benchmark was added
+  because the existing `argumentResolutionPathQueryHeaderFromPlan` row already
+  isolates the requested overhead source.
+- No runtime code changed in this audit. That preserves URI-template validation,
+  query encoding, multi-value header behavior, header precedence, and parameter
+  validation semantics.
+- Verification: `mvn -pl reactive-http-client-starter -Dtest=ReactiveClientInvocationHandlerBehaviorTest,HeaderParamMapSupportTest,MethodMetadataValidationTest,ReactiveHttpClientFactoryBeanDiagnosticsTest test`
+  passed with 94 tests, 0 failures, 0 errors, and 0 skipped.
+- No performance claim is made beyond this scenario-specific audit evidence.
 
 ---
 
 ## Priority 8 — Release Version and Benchmark Report Consistency
 
-### [ ] 4.1 Guard release version and benchmark report consistency
-- [ ] Extend documentation tests to verify the promoted report filename matches
+### [x] 4.1 Guard release version and benchmark report consistency
+- [x] Extend documentation tests to verify the promoted report filename matches
       the project version for release candidates.
-- [ ] Verify promoted report `projectVersion` matches the current project version
+- [x] Verify promoted report `projectVersion` matches the current project version
       when performance claims are present.
-- [ ] Verify promoted report `starterVersion` matches the current project version
+- [x] Verify promoted report `starterVersion` matches the current project version
       when performance claims are present.
-- [ ] Verify README benchmark report links match the current project version.
-- [ ] Verify changelog benchmark report links match the release being drafted.
-- [ ] Verify performance summary links match the current promoted report.
-- [ ] Allow historical benchmark reports to remain under `docs/`.
-- [ ] Prevent updating an old promoted report in place for a new version.
-- [ ] Add tests for stale promoted report links.
-- [ ] Add tests for mismatched promoted report metadata.
+- [x] Verify README benchmark report links match the current project version.
+- [x] Verify changelog benchmark report links match the release being drafted.
+- [x] Verify performance summary links match the current promoted report.
+- [x] Allow historical benchmark reports to remain under `docs/`.
+- [x] Prevent updating an old promoted report in place for a new version.
+- [x] Add tests for stale promoted report links.
+- [x] Add tests for mismatched promoted report metadata.
+
+Evidence:
+
+- Added `promotedBenchmarkReportVersionsMatchReleaseDocumentation()` to
+  `DocumentationReleaseArtifactTest`. The test validates that the current
+  promoted report path is `docs/benchmark-report-<projectVersion>.md`, that
+  README, benchmark docs, performance summary, benchmark consumer examples, and
+  the current changelog release section reference only the current project
+  version report, and that stale `benchmark-report-*.md` references fail.
+- The same test scans every source-controlled `docs/benchmark-report-*.md` file
+  and verifies its filename version matches its `Report version`, `projectVersion`,
+  `Starter version under test`, and `starterVersion` metadata. That keeps
+  historical reports allowed while preventing an old promoted report from being
+  edited in place for a new release.
+- Verification: `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed with 8 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 
 ## Priority 9 — API Compatibility Baseline Release Awareness
 
-### [ ] 4.2 Keep API compatibility baseline release-aware
-- [ ] Document the exact sequence for cutting `2.10.0`.
-- [ ] Document when to update `api.compatibility.baseline.version` after release.
-- [ ] Keep the baseline guard dynamic.
-- [ ] Keep the baseline guard profile-scoped.
-- [ ] Verify module-scoped API compatibility still runs the guard.
-- [ ] Align benchmark published-baseline commands with the API baseline version.
-- [ ] Verify release evidence lists baseline artifacts for every published
+### [x] 4.2 Keep API compatibility baseline release-aware
+- [x] Document the exact sequence for cutting `2.10.0`.
+- [x] Document when to update `api.compatibility.baseline.version` after release.
+- [x] Keep the baseline guard dynamic.
+- [x] Keep the baseline guard profile-scoped.
+- [x] Verify module-scoped API compatibility still runs the guard.
+- [x] Align benchmark published-baseline commands with the API baseline version.
+- [x] Verify release evidence lists baseline artifacts for every published
       module.
-- [ ] Verify self-comparison is still rejected.
-- [ ] Verify published baseline artifact resolution commands use the configured
+- [x] Verify self-comparison is still rejected.
+- [x] Verify published baseline artifact resolution commands use the configured
       baseline version.
-- [ ] Update docs if the next development cycle changes the baseline sequence.
+- [x] Update docs if the next development cycle changes the baseline sequence.
+
+Evidence:
+
+- `docs/20-native-release-compatibility.md` now documents the `2.10.0` release
+  baseline sequence: keep `api.compatibility.baseline.version=2.9.0` while
+  cutting `2.10.0`, resolve all published `2.9.0` baseline artifacts, run root
+  and module-scoped API compatibility, and move the baseline to `2.10.0` only
+  after `2.10.0` artifacts are published and the next development version is
+  active.
+- `docs/22-benchmarks.md` now states that the published-starter benchmark
+  version must match the root `api.compatibility.baseline.version` and that the
+  `published-starter-<version>` report paths must move with that property.
+- Added `apiCompatibilityBaselineReleaseDocsStayAlignedWithPom()` to
+  `DocumentationReleaseArtifactTest`. It verifies release docs, benchmark docs,
+  generated release evidence artifact-resolution commands, and published-starter
+  benchmark commands all use the configured API baseline version.
+- `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed with 9 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests validate`
+  passed and executed `reject-current-api-baseline` in the selected module.
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.10.0 validate`
+  failed as expected with the baseline guard message rejecting the current
+  reactor version as the API baseline.

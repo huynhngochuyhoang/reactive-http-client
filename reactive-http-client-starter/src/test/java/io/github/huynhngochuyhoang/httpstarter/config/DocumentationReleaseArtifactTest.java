@@ -91,6 +91,58 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void apiCompatibilityBaselineReleaseDocsStayAlignedWithPom() throws Exception {
+        Path root = projectRoot();
+        String pomXml = Files.readString(root.resolve("pom.xml"));
+        String projectVersion = projectVersion(root.resolve("pom.xml"));
+        String baselineVersion = pomProperty(pomXml, "api.compatibility.baseline.version");
+        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
+        JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
+
+        assertThat(projectVersion).isNotEqualTo(baselineVersion);
+        assertThat(releaseDocs)
+                .contains("While the project version remains `" + projectVersion + "`")
+                .contains("the baseline stays on `" + baselineVersion + "`")
+                .contains("mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests validate")
+                .contains("mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify")
+                .contains("guard must reject\n`-Dapi.compatibility.baseline.version=" + projectVersion + "`")
+                .contains("self-comparison is never\nvalid release evidence")
+                .contains("While cutting `" + projectVersion + "`, keep `api.compatibility.baseline.version` on `"
+                        + baselineVersion + "`")
+                .contains("until the `" + projectVersion + "` artifacts are published and resolve")
+                .contains("next development\ncycle may bump the reactor to the next version")
+                .contains("update\n`api.compatibility.baseline.version` to `" + projectVersion + "`")
+                .contains("Update benchmark\npublished-baseline commands")
+                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
+                        + baselineVersion)
+                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:"
+                        + baselineVersion)
+                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
+                        + baselineVersion);
+
+        assertThat(benchmarkDocs)
+                .contains("The example version must match the root `api.compatibility.baseline.version`")
+                .contains("(`" + baselineVersion + "` for this release line)")
+                .contains("-Dbenchmark.starter.version=" + baselineVersion)
+                .contains("-Dbenchmark.commit=" + baselineVersion)
+                .contains("published-starter-" + baselineVersion + "/release-jmh.md");
+
+        assertThat(manifest.path("publishedBaselineArtifacts"))
+                .extracting(artifact -> artifact.path("resolutionCommand").asText())
+                .containsExactly(
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
+                                + baselineVersion,
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:"
+                                + baselineVersion,
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
+                                + baselineVersion);
+        assertThat(manifest.path("benchmarkEvidence").path("publishedStarterCommand").asText())
+                .contains("-Dbenchmark.starter.version=" + baselineVersion)
+                .contains("-Dbenchmark.commit=" + baselineVersion);
+    }
+
+    @Test
     void benchmarkModuleUsesStarterDependencyManagement() throws IOException {
         String benchmarkPom = Files.readString(projectRoot().resolve("reactive-http-client-benchmarks/pom.xml"));
 
@@ -342,6 +394,37 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void promotedBenchmarkReportVersionsMatchReleaseDocumentation() throws Exception {
+        Path root = projectRoot();
+        String projectVersion = projectVersion(root.resolve("pom.xml"));
+        Path currentReport = root.resolve("docs/benchmark-report-" + projectVersion + ".md");
+
+        assertPromotedReportMetadata(currentReport, projectVersion);
+
+        assertCurrentBenchmarkReportReferences(root.resolve("README.md"), projectVersion);
+        assertCurrentBenchmarkReportReferences(root.resolve("docs/22-benchmarks.md"), projectVersion);
+        assertCurrentBenchmarkReportReferences(root.resolve("docs/23-performance-summary.md"), projectVersion);
+        assertCurrentBenchmarkReportReferences(root.resolve("docs/24-benchmark-consumer-examples.md"), projectVersion);
+
+        String changelog = Files.readString(root.resolve("CHANGELOG.md"));
+        String releaseSection = changelogSection(changelog, projectVersion);
+        assertThat(releaseSection)
+                .contains("[Benchmark Report " + projectVersion + "](docs/benchmark-report-" + projectVersion + ".md)");
+        assertBenchmarkReportReferences("CHANGELOG.md release " + projectVersion, releaseSection, projectVersion);
+
+        try (Stream<Path> reports = Files.list(root.resolve("docs"))) {
+            for (Path report : reports
+                    .filter(path -> path.getFileName().toString().matches("benchmark-report-\\d+\\.\\d+\\.\\d+\\.md"))
+                    .toList()) {
+                String fileName = report.getFileName().toString();
+                String reportVersion = fileName.substring("benchmark-report-".length(),
+                        fileName.length() - ".md".length());
+                assertPromotedReportMetadata(report, reportVersion);
+            }
+        }
+    }
+
+    @Test
     void generatedConfigurationReferenceMatchesMetadata() throws IOException {
         Path reference = projectRoot().resolve("docs/configuration-properties.md");
 
@@ -515,6 +598,52 @@ class DocumentationReleaseArtifactTest {
         List<String> rendered = new ArrayList<>();
         values.forEach(value -> rendered.add("`" + value.asText() + "`"));
         return String.join(", ", rendered);
+    }
+
+    private static void assertPromotedReportMetadata(Path report, String expectedVersion) throws IOException {
+        String reportDocs = Files.readString(report);
+
+        assertThat(report).exists();
+        assertThat(report.getFileName().toString())
+                .as("promoted benchmark report filename")
+                .isEqualTo("benchmark-report-" + expectedVersion + ".md");
+        assertThat(reportDocs)
+                .contains("- Report version: `" + expectedVersion + "`.")
+                .contains("- Starter version under test: `" + expectedVersion + "`.")
+                .contains("| `projectVersion` | " + expectedVersion + " |")
+                .contains("| `starterVersion` | " + expectedVersion + " |");
+    }
+
+    private static void assertCurrentBenchmarkReportReferences(Path markdown, String projectVersion) throws IOException {
+        assertBenchmarkReportReferences(markdown.toString(), Files.readString(markdown), projectVersion);
+    }
+
+    private static void assertBenchmarkReportReferences(String source, String text, String projectVersion) {
+        List<String> versions = benchmarkReportVersions(text);
+
+        assertThat(versions)
+                .as(source + " benchmark report references")
+                .isNotEmpty()
+                .containsOnly(projectVersion);
+    }
+
+    private static List<String> benchmarkReportVersions(String text) {
+        Matcher matcher = Pattern.compile("benchmark-report-(\\d+\\.\\d+\\.\\d+)\\.md").matcher(text);
+        List<String> versions = new ArrayList<>();
+        while (matcher.find()) {
+            versions.add(matcher.group(1));
+        }
+        return versions;
+    }
+
+    private static String changelogSection(String changelog, String version) {
+        String heading = "## [" + version + "]";
+        int start = changelog.indexOf(heading);
+        if (start < 0) {
+            throw new IllegalStateException("Missing changelog section for " + version);
+        }
+        int end = changelog.indexOf("\n## [", start + heading.length());
+        return end < 0 ? changelog.substring(start) : changelog.substring(start, end);
     }
 
     private static Stream<Path> markdownFiles(Path root) throws IOException {
