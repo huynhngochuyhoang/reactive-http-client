@@ -81,6 +81,11 @@ reactor module:
 mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.9.0 -Dbenchmark.commit=2.9.0
 ```
 
+The example version must match the root `api.compatibility.baseline.version`
+(`2.9.0` for this release line). When that property changes for the next
+development cycle, update this command and the `published-starter-<version>`
+report paths together.
+
 That command cleans the benchmark module before compiling, uses the current
 benchmark harness and current managed Spring Boot BOM, and excludes current-only
 diagnostics-provider benchmarks that cannot compile against the published baseline

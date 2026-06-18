@@ -20,6 +20,14 @@ mvn -Papi-compatibility -DskipTests verify
 bash scripts/verify-api-compatibility-fixtures.sh
 ```
 
+For module-scoped compatibility checks, the inherited baseline guard must still
+run before japicmp:
+
+```bash
+mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests validate
+mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify
+```
+
 The Maven profile produces japicmp reports under each module's
 `target/japicmp/` directory and fails for binary-incompatible changes. The
 fixture script verifies that additive APIs pass while removal of a public
@@ -30,6 +38,30 @@ The profile also fails during `validate` when
 `api.compatibility.baseline.version` equals the current reactor
 `project.version`. Keep the baseline pointed at the last published release so
 Maven cannot satisfy the old artifact from the current reactor or local build.
+For the `2.10.0` reactor, the guard must reject
+`-Dapi.compatibility.baseline.version=2.10.0`; that self-comparison is never
+valid release evidence.
+
+### Release baseline sequence
+
+While cutting `2.10.0`, keep `api.compatibility.baseline.version` on `2.9.0`
+until the `2.10.0` artifacts are published and resolve. Before publishing,
+resolve every published `2.9.0` baseline artifact that the release evidence
+manifest lists:
+
+```bash
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.9.0
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.9.0
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.9.0
+```
+
+Run the root API compatibility command and at least one module-scoped
+compatibility command before release so the inherited guard is exercised outside
+the full reactor. After `2.10.0` is published and resolves, the next development
+cycle may bump the reactor to the next version and update
+`api.compatibility.baseline.version` to `2.10.0`. Update benchmark
+published-baseline commands, release evidence docs, and promoted-report pairing
+wording in the same change whenever that baseline property changes.
 
 For an intentional breaking change, target a future major release. Review the
 japicmp report, document the migration in `CHANGELOG.md`, update
