@@ -85,6 +85,10 @@ The example version must match the root `api.compatibility.baseline.version`
 (`2.9.0` for this release line). When that property changes for the next
 development cycle, update this command and the `published-starter-<version>`
 report paths together.
+For the V15 minor transition, keep this example on `2.9.0` while the reactor
+remains `2.10.0`; after the reactor is bumped to `2.11.0` and published
+`2.10.0` artifacts resolve, move both `benchmark.starter.version` and
+`published-starter-<version>` paths to `2.10.0`.
 
 That command cleans the benchmark module before compiling, uses the current
 benchmark harness and current managed Spring Boot BOM, and excludes current-only

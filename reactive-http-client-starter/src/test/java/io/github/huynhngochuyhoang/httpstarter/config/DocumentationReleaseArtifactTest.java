@@ -96,6 +96,8 @@ class DocumentationReleaseArtifactTest {
         String pomXml = Files.readString(root.resolve("pom.xml"));
         String projectVersion = projectVersion(root.resolve("pom.xml"));
         String baselineVersion = pomProperty(pomXml, "api.compatibility.baseline.version");
+        String nextMinorVersion = nextMinorVersion(projectVersion);
+        String nextPatchVersion = nextPatchVersion(projectVersion);
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
@@ -119,14 +121,36 @@ class DocumentationReleaseArtifactTest {
                 .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:"
                         + baselineVersion)
                 .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
-                        + baselineVersion);
+                        + baselineVersion)
+                .contains("V15 is planned as a minor `" + nextMinorVersion + "` cycle")
+                .contains("While the reactor still declares\n`" + projectVersion + "`, keep `api.compatibility.baseline.version` on `"
+                        + baselineVersion + "`")
+                .contains("When the reactor is bumped to `" + nextMinorVersion + "`, first verify the published `"
+                        + projectVersion + "`\nbaseline artifacts resolve")
+                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
+                        + projectVersion)
+                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:"
+                        + projectVersion)
+                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
+                        + projectVersion)
+                .contains("Only after those artifacts resolve should `api.compatibility.baseline.version`\nmove to `"
+                        + projectVersion + "`")
+                .contains("`published-starter-" + projectVersion + "` report paths")
+                .contains("patch-only `" + nextPatchVersion + "` scope")
+                .contains("keep the API compatibility baseline on `" + baselineVersion + "`");
 
         assertThat(benchmarkDocs)
                 .contains("The example version must match the root `api.compatibility.baseline.version`")
                 .contains("(`" + baselineVersion + "` for this release line)")
                 .contains("-Dbenchmark.starter.version=" + baselineVersion)
                 .contains("-Dbenchmark.commit=" + baselineVersion)
-                .contains("published-starter-" + baselineVersion + "/release-jmh.md");
+                .contains("published-starter-" + baselineVersion + "/release-jmh.md")
+                .contains("For the V15 minor transition")
+                .contains("reactor\nremains `" + projectVersion + "`")
+                .contains("bumped to `" + nextMinorVersion + "`")
+                .contains("published\n`" + projectVersion + "` artifacts resolve")
+                .contains("move both `benchmark.starter.version` and\n`published-starter-<version>` paths to `"
+                        + projectVersion + "`");
 
         assertThat(manifest.path("publishedBaselineArtifacts"))
                 .extracting(artifact -> artifact.path("resolutionCommand").asText())
@@ -755,6 +779,28 @@ class DocumentationReleaseArtifactTest {
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         var document = factory.newDocumentBuilder().parse(pom.toFile());
         return document.getElementsByTagName("version").item(0).getTextContent();
+    }
+
+    private static String nextMinorVersion(String version) {
+        int[] parts = semanticVersionParts(version);
+        return parts[0] + "." + (parts[1] + 1) + ".0";
+    }
+
+    private static String nextPatchVersion(String version) {
+        int[] parts = semanticVersionParts(version);
+        return parts[0] + "." + parts[1] + "." + (parts[2] + 1);
+    }
+
+    private static int[] semanticVersionParts(String version) {
+        String[] parts = version.split("\\.");
+        if (parts.length != 3) {
+            throw new IllegalArgumentException("Expected semantic version MAJOR.MINOR.PATCH but was " + version);
+        }
+        return new int[] {
+                Integer.parseInt(parts[0]),
+                Integer.parseInt(parts[1]),
+                Integer.parseInt(parts[2])
+        };
     }
 
     private static Map<String, Object> releaseEvidenceManifest(Path pom) throws Exception {

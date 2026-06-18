@@ -63,6 +63,29 @@ cycle may bump the reactor to the next version and update
 published-baseline commands, release evidence docs, and promoted-report pairing
 wording in the same change whenever that baseline property changes.
 
+### V15 baseline transition
+
+V15 is planned as a minor `2.11.0` cycle if the drafted public diagnostics,
+auth, health, and test-helper work ships. While the reactor still declares
+`2.10.0`, keep `api.compatibility.baseline.version` on `2.9.0`; setting it to
+`2.10.0` before the reactor version changes would compare the current build to
+itself once the local artifact is present.
+
+When the reactor is bumped to `2.11.0`, first verify the published `2.10.0`
+baseline artifacts resolve:
+
+```bash
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.10.0
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.10.0
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.10.0
+```
+
+Only after those artifacts resolve should `api.compatibility.baseline.version`
+move to `2.10.0`. Move the benchmark published-baseline command and
+`published-starter-2.10.0` report paths in the same change. If V15 is reduced to
+a patch-only `2.10.1` scope, keep the API compatibility baseline on `2.9.0`
+unless the release policy explicitly changes patch-line baselines.
+
 For an intentional breaking change, target a future major release. Review the
 japicmp report, document the migration in `CHANGELOG.md`, update
 `api.compatibility.baseline.version` after the release-version bump is

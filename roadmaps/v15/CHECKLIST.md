@@ -7,46 +7,95 @@ release blocker requires reordering.
 
 ## Priority 1 — Prepare the Next Release Baseline Transition
 
-### [ ] 4.1 Prepare the next release baseline transition
-- [ ] Decide whether V15 is a patch or minor release after scope is finalized.
-- [ ] Document the chosen next version in release compatibility docs.
-- [ ] Document whether the API baseline remains `2.9.0` or moves to published
+### [x] 4.1 Prepare the next release baseline transition
+- [x] Decide whether V15 is a patch or minor release after scope is finalized.
+- [x] Document the chosen next version in release compatibility docs.
+- [x] Document whether the API baseline remains `2.9.0` or moves to published
       `2.10.0`.
-- [ ] Resolve published baseline artifacts for `reactive-http-client-starter`.
-- [ ] Resolve published baseline artifacts for `reactive-http-client-test`.
-- [ ] Resolve published baseline artifacts for `reactive-http-client-otel`.
-- [ ] Keep `api.compatibility.baseline.version` different from the current
+- [x] Resolve published baseline artifacts for `reactive-http-client-starter`.
+- [x] Resolve published baseline artifacts for `reactive-http-client-test`.
+- [x] Resolve published baseline artifacts for `reactive-http-client-otel`.
+- [x] Keep `api.compatibility.baseline.version` different from the current
       reactor version.
-- [ ] Verify root API compatibility rejects self-comparison.
-- [ ] Verify module-scoped API compatibility rejects self-comparison.
-- [ ] Update benchmark published-baseline commands if the baseline changes.
-- [ ] Update benchmark published-baseline report paths if the baseline changes.
-- [ ] Update release evidence docs with the selected version and baseline.
-- [ ] Run focused documentation release tests.
-- [ ] Run `git diff --check`.
+- [x] Verify root API compatibility rejects self-comparison.
+- [x] Verify module-scoped API compatibility rejects self-comparison.
+- [x] Update benchmark published-baseline commands if the baseline changes.
+- [x] Update benchmark published-baseline report paths if the baseline changes.
+- [x] Update release evidence docs with the selected version and baseline.
+- [x] Run focused documentation release tests.
+- [x] Run `git diff --check`.
+
+Evidence:
+
+- V15 is documented as a planned minor `2.11.0` cycle if the drafted public
+  diagnostics, auth, health, and test-helper work ships. The current reactor
+  remains `2.10.0`, so `api.compatibility.baseline.version` remains `2.9.0`
+  until the reactor version moves off `2.10.0`.
+- Release compatibility docs now document the exact transition: resolve
+  published `2.10.0` artifacts first, then move the API baseline and benchmark
+  published-baseline paths to `2.10.0` in the same change after the reactor is
+  bumped to `2.11.0`.
+- Benchmark docs now state that the V15 published-baseline command stays on
+  `2.9.0` while the reactor remains `2.10.0`, then moves to `2.10.0` with the
+  baseline property after the `2.11.0` reactor bump.
+- Published `2.10.0` artifacts resolved successfully:
+  `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.10.0`,
+  `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.10.0`,
+  and `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.10.0`.
+- `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed with 9 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -Papi-compatibility -DskipTests validate` passed with the configured
+  `2.9.0` baseline and executed the guard in the root, starter, test, and OTel
+  modules.
+- `mvn -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.10.0 validate`
+  failed as expected with the guard rejecting current-reactor self-comparison.
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.10.0 validate`
+  failed as expected with the module-scoped guard rejecting current-reactor
+  self-comparison.
 
 ---
 
 ## Priority 2 — Optional Diagnostics Snapshot Export Helpers
 
-### [ ] 1.1 Add optional diagnostics snapshot export helpers
-- [ ] Choose the smallest public helper surface for diagnostics snapshot export.
-- [ ] Render `ReactiveHttpClientDiagnosticsProvider` summaries as deterministic
+### [x] 1.1 Add optional diagnostics snapshot export helpers
+- [x] Choose the smallest public helper surface for diagnostics snapshot export.
+- [x] Render `ReactiveHttpClientDiagnosticsProvider` summaries as deterministic
       Markdown or JSON.
-- [ ] Include project version, client count, endpoint count, and inherited
+- [x] Include project version, client count, endpoint count, and inherited
       endpoint count.
-- [ ] Include auth mode, redirect flag, timeout source summary, and resilience
+- [x] Include auth mode, redirect flag, timeout source summary, and resilience
       summary.
-- [ ] Keep output sanitized and omit concrete base URL values.
-- [ ] Omit auth secrets, header values, proxy credentials, auth provider bean
+- [x] Keep output sanitized and omit concrete base URL values.
+- [x] Omit auth secrets, header values, proxy credentials, auth provider bean
       names, request bodies, and response bodies.
-- [ ] Keep the helper explicit; do not auto-publish an Actuator endpoint.
-- [ ] Add tests for deterministic ordering.
-- [ ] Add tests proving sensitive fields are redacted or absent.
-- [ ] Document support-bundle and custom endpoint usage.
-- [ ] Preserve source compatibility for `ReactiveHttpClientDiagnosticsProvider`.
-- [ ] Run starter tests covering diagnostics provider behavior.
-- [ ] Run documentation link checks.
+- [x] Keep the helper explicit; do not auto-publish an Actuator endpoint.
+- [x] Add tests for deterministic ordering.
+- [x] Add tests proving sensitive fields are redacted or absent.
+- [x] Document support-bundle and custom endpoint usage.
+- [x] Preserve source compatibility for `ReactiveHttpClientDiagnosticsProvider`.
+- [x] Run starter tests covering diagnostics provider behavior.
+- [x] Run documentation link checks.
+
+Evidence:
+
+- Added `ReactiveHttpClientDiagnosticsSnapshot`, a small explicit helper that
+  renders `ReactiveHttpClientDiagnosticsProvider` summaries to deterministic
+  Markdown or JSON. It does not register an Actuator endpoint, controller, log
+  line, or file writer.
+- Snapshot output includes project version, total client count, total endpoint
+  count, total inherited endpoint count, and per-client rows/objects with client
+  name, interface, base URL source, timeout source/value, resilience summary,
+  auth mode, redirect flag, endpoint count, and inherited endpoint count.
+- Snapshot rendering sorts clients by client name and interface so support
+  artifacts and approval-style tests are stable.
+- Added diagnostics tests proving rendered Markdown and JSON omit concrete base
+  URL values, auth provider bean names, sensitive headers, request bodies, and
+  response bodies.
+- Updated diagnostic context docs with Markdown/JSON snapshot examples and
+  clarified that snapshot rendering remains explicit and does not publish an
+  endpoint by default.
+- `mvn -pl reactive-http-client-starter -Dtest=ReactiveHttpClientDiagnosticsProviderTest,DocumentationReleaseArtifactTest test`
+  passed with 12 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 
