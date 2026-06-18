@@ -29,3 +29,5 @@ Planning documents for the project:
 - [v13/CHECKLIST.md](v13/CHECKLIST.md) — V13 execution checklist
 - [v14/ROADMAP.md](v14/ROADMAP.md) — V14 draft roadmap
 - [v14/CHECKLIST.md](v14/CHECKLIST.md) — V14 execution checklist
+- [v15/ROADMAP.md](v15/ROADMAP.md) — V15 draft roadmap
+- [v15/CHECKLIST.md](v15/CHECKLIST.md) — V15 execution checklist
