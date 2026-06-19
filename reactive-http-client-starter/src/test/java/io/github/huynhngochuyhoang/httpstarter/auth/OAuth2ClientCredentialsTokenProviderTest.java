@@ -185,6 +185,35 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void tokenEndpointEscapedJsonSecretValuesAreFullyRedacted() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String escapedQuote = "\\\"";
+        String quote = Character.toString((char) 34);
+        String body = "{" + quote + "client_secret" + quote + ":" + quote + "prefix" + escapedQuote + "suffix" + quote
+                + "," + quote + "access_token" + quote + ":" + quote + "opaque" + escapedQuote + "tail" + quote
+                + "," + quote + "refresh_token" + quote + ":" + quote + "rotated" + escapedQuote + "tail" + quote + "}";
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST, body))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("prefix\"suffix")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("client_secret\":\"<redacted>", "access_token\":\"<redacted>")
+                            .doesNotContain("prefix", "suffix", "opaque", "tail", "rotated");
+                })
+                .verify();
+    }
+
+    @Test
     void tokenEndpoint5xxProducesSanitizedException() {
         AtomicReference<MockClientHttpRequest> captured = captureMock();
         WebClient webClient = WebClient.builder()
@@ -230,6 +259,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getMessage())
                             .contains("malformed JSON token response")
                             .doesNotContain("leaked-access-token", "client-secret");
+                    assertThat(error.getCause()).isNotNull();
                 })
                 .verify();
     }

@@ -58,7 +58,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     private static final String DIAGNOSTIC_CLIENT_NAME = "oauth2-client-credentials";
     private static final int MAX_TOKEN_ERROR_BODY_CHARS = 1024;
     private static final Pattern JSON_SECRET_FIELD = Pattern.compile(
-            "(?i)(\\\"(?:access_token|refresh_token|id_token|client_secret)\\\"\\s*:\\s*\\\")([^\\\"]*)(\\\")");
+            "(?i)(\\\"(?:access_token|refresh_token|id_token|client_secret)\\\"\\s*:\\s*\\\")((?:\\\\.|[^\\\"\\\\])*)(\\\")");
     private static final Pattern FORM_SECRET_FIELD = Pattern.compile(
             "(?i)((?:access_token|refresh_token|id_token|client_secret)=)([^&\\s]+)");
 
@@ -78,6 +78,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     private final String audience;
     private final AuthStyle authStyle;
     private final Duration expiryLeeway;
+    private final String diagnosticClientName;
 
     private OAuth2ClientCredentialsTokenProvider(Builder b) {
         this.webClient = Objects.requireNonNull(b.webClient, "webClient");
@@ -87,6 +88,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         this.scope = b.scope;
         this.audience = b.audience;
         this.authStyle = b.authStyle != null ? b.authStyle : AuthStyle.BASIC_AUTH;
+        this.diagnosticClientName = StringUtils.hasText(b.clientName) ? b.clientName : DIAGNOSTIC_CLIENT_NAME;
         this.expiryLeeway = b.expiryLeeway != null ? b.expiryLeeway : Duration.ofSeconds(30);
         if (this.expiryLeeway.isNegative()) {
             throw new IllegalArgumentException("expiryLeeway must not be negative");
@@ -135,7 +137,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
                     .map(this::toAccessToken)
                     .onErrorMap(error -> error instanceof AuthProviderException
                             ? error
-                            : malformedTokenResponseException());
+                            : malformedTokenResponseException(error));
         });
     }
 
@@ -146,13 +148,14 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         if (StringUtils.hasText(body)) {
             message.append("; responseBody=").append(body);
         }
-        return new AuthProviderException(DIAGNOSTIC_CLIENT_NAME, message.toString());
+        return new AuthProviderException(diagnosticClientName, message.toString());
     }
 
-    private AuthProviderException malformedTokenResponseException() {
+    private AuthProviderException malformedTokenResponseException(Throwable cause) {
         return new AuthProviderException(
-                DIAGNOSTIC_CLIENT_NAME,
-                "OAuth2 token endpoint returned malformed JSON token response");
+                diagnosticClientName,
+                "OAuth2 token endpoint returned malformed JSON token response",
+                cause);
     }
 
     private String sanitizedBody(String responseBody) {
@@ -173,7 +176,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         String value = response.access_token;
         if (!StringUtils.hasText(value)) {
             throw new AuthProviderException(
-                    DIAGNOSTIC_CLIENT_NAME,
+                    diagnosticClientName,
                     "OAuth2 token endpoint returned no access_token",
                     new IllegalStateException("missing access_token"));
         }
@@ -216,6 +219,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         private String scope;
         private String audience;
         private AuthStyle authStyle;
+        private String clientName;
         private Duration expiryLeeway;
 
         private Builder(WebClient webClient) {
@@ -227,6 +231,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         public Builder clientSecret(String clientSecret) { this.clientSecret = clientSecret; return this; }
         public Builder scope(String scope) { this.scope = scope; return this; }
         public Builder audience(String audience) { this.audience = audience; return this; }
+        public Builder clientName(String clientName) { this.clientName = clientName; return this; }
         public Builder authStyle(AuthStyle authStyle) { this.authStyle = authStyle; return this; }
 
         /** How much time to subtract from the server's {@code expires_in} when setting {@link AccessToken#expiresAt()}. */
