@@ -253,6 +253,7 @@
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider*</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsSnapshot</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.RequestContext</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.RequestContextContributor</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot</include>

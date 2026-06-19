@@ -1,8 +1,11 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * Renders sanitized reactive HTTP client diagnostics for support artifacts.
@@ -13,6 +16,9 @@ import java.util.List;
  * provider bean names, request bodies, or response bodies.
  */
 public final class ReactiveHttpClientDiagnosticsSnapshot {
+
+    private static final String POM_PROPERTIES =
+            "META-INF/maven/io.github.huynhngochuyhoang/reactive-http-client-starter/pom.properties";
 
     private ReactiveHttpClientDiagnosticsSnapshot() {
     }
@@ -128,7 +134,32 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     private static String projectVersion() {
         String version = ReactiveHttpClientDiagnosticsSnapshot.class.getPackage().getImplementationVersion();
+        if (version != null && !version.isBlank()) {
+            return version;
+        }
+        version = projectVersionFromPomProperties(Thread.currentThread().getContextClassLoader());
+        if (version != null && !version.isBlank()) {
+            return version;
+        }
+        version = projectVersionFromPomProperties(ReactiveHttpClientDiagnosticsSnapshot.class.getClassLoader());
         return version != null && !version.isBlank() ? version : "unknown";
+    }
+
+    private static String projectVersionFromPomProperties(ClassLoader classLoader) {
+        if (classLoader == null) {
+            return null;
+        }
+        try (InputStream input = classLoader.getResourceAsStream(POM_PROPERTIES)) {
+            if (input == null) {
+                return null;
+            }
+            Properties properties = new Properties();
+            properties.load(input);
+            return properties.getProperty("version");
+        }
+        catch (IOException ex) {
+            return null;
+        }
     }
 
     private static StringBuilder indent(StringBuilder out, int level) {

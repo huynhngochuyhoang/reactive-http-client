@@ -4,11 +4,16 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
 import reactor.core.publisher.Mono;
 
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -60,7 +65,6 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .doesNotContain("Authorization");
     }
 
-
     @Test
     void rendersSanitizedDiagnosticsSnapshot() {
         ReactiveHttpClientDiagnosticsProvider provider = sensitiveDiagnosticsProvider();
@@ -70,7 +74,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         assertThat(markdown)
                 .startsWith("# Reactive HTTP Client Diagnostics Snapshot")
-                .contains("| Project version | `unknown` |")
+                .contains("| Project version | `")
                 .contains("| Client count | `1` |")
                 .contains("| Endpoint count | `2` |")
                 .contains("| Inherited endpoint count | `1` |")
@@ -78,7 +82,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("configured=true, retry=disabled")
                 .contains("| `provider-bean` | `true` | `2` | `1` |");
         assertThat(json)
-                .contains("\"projectVersion\": \"unknown\"")
+                .contains("\"projectVersion\":")
                 .contains("\"clientCount\": 1")
                 .contains("\"endpointCount\": 2")
                 .contains("\"inheritedEndpointCount\": 1")
@@ -108,6 +112,25 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         assertThat(markdown.indexOf("`a-client`")).isLessThan(markdown.indexOf("`z-client`"));
         assertThat(json.indexOf("\"clientName\": \"a-client\""))
                 .isLessThan(json.indexOf("\"clientName\": \"z-client\""));
+    }
+
+    @Test
+    void readsProjectVersionFromPackagedPomProperties(@TempDir Path tempDir) throws Exception {
+        Path pomProperties = tempDir.resolve(
+                "META-INF/maven/io.github.huynhngochuyhoang/reactive-http-client-starter/pom.properties");
+        Files.createDirectories(pomProperties.getParent());
+        Files.writeString(pomProperties, "version=9.8.7\n");
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{tempDir.toUri().toURL()}, previous)) {
+            Thread.currentThread().setContextClassLoader(classLoader);
+
+            String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(List.of(summary("client", "Client")));
+
+            assertThat(json).contains("\"projectVersion\": \"9.8.7\"");
+        }
+        finally {
+            Thread.currentThread().setContextClassLoader(previous);
+        }
     }
 
     private static ReactiveHttpClientDiagnosticsProvider sensitiveDiagnosticsProvider() {
