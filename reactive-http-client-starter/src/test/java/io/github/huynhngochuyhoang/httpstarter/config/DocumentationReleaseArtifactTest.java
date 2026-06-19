@@ -28,6 +28,7 @@ class DocumentationReleaseArtifactTest {
                     + "<version>([^<]+)</version>",
             Pattern.DOTALL);
     private static final String V15_CURRENT_RELEASE_VERSION = "2.10.0";
+    private static final String V15_PRE_TRANSITION_BASELINE_VERSION = "2.9.0";
     private static final String V15_TARGET_MINOR_VERSION = "2.11.0";
     private static final String V15_PATCH_FALLBACK_VERSION = "2.10.1";
 
@@ -125,7 +126,7 @@ class DocumentationReleaseArtifactTest {
                         + baselineVersion)
                 .contains("V15 is planned as a minor `" + V15_TARGET_MINOR_VERSION + "` cycle")
                 .contains("While the reactor still declares\n`" + V15_CURRENT_RELEASE_VERSION + "`, keep `api.compatibility.baseline.version` on `"
-                        + baselineVersion + "`")
+                        + V15_PRE_TRANSITION_BASELINE_VERSION + "`")
                 .contains("When the reactor is bumped to `" + V15_TARGET_MINOR_VERSION + "`, first verify the published `"
                         + V15_CURRENT_RELEASE_VERSION + "`\nbaseline artifacts resolve")
                 .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
@@ -780,28 +781,6 @@ class DocumentationReleaseArtifactTest {
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         var document = factory.newDocumentBuilder().parse(pom.toFile());
         return document.getElementsByTagName("version").item(0).getTextContent();
-    }
-
-    private static String nextMinorVersion(String version) {
-        int[] parts = semanticVersionParts(version);
-        return parts[0] + "." + (parts[1] + 1) + ".0";
-    }
-
-    private static String nextPatchVersion(String version) {
-        int[] parts = semanticVersionParts(version);
-        return parts[0] + "." + parts[1] + "." + (parts[2] + 1);
-    }
-
-    private static int[] semanticVersionParts(String version) {
-        String[] parts = version.split("\\.");
-        if (parts.length != 3) {
-            throw new IllegalArgumentException("Expected semantic version MAJOR.MINOR.PATCH but was " + version);
-        }
-        return new int[] {
-                Integer.parseInt(parts[0]),
-                Integer.parseInt(parts[1]),
-                Integer.parseInt(parts[2])
-        };
     }
 
     private static Map<String, Object> releaseEvidenceManifest(Path pom) throws Exception {
