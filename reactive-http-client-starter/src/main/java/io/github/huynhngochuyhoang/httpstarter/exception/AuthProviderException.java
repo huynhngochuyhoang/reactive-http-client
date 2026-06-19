@@ -17,6 +17,11 @@ public class AuthProviderException extends RuntimeException {
         this.clientName = clientName;
     }
 
+    public AuthProviderException(String clientName, String message, Throwable cause) {
+        super(message, cause);
+        this.clientName = clientName;
+    }
+
     public String getClientName() {
         return clientName;
     }

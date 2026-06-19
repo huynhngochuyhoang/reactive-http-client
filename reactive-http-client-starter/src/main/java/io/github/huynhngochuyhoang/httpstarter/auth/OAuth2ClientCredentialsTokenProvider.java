@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -13,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * {@link AccessTokenProvider} implementing the OAuth 2.0 Client Credentials grant
@@ -52,6 +54,13 @@ import java.util.Objects;
  * server's value to refresh slightly early (default 30 s).
  */
 public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenProvider {
+
+    private static final String DIAGNOSTIC_CLIENT_NAME = "oauth2-client-credentials";
+    private static final int MAX_TOKEN_ERROR_BODY_CHARS = 1024;
+    private static final Pattern JSON_SECRET_FIELD = Pattern.compile(
+            "(?i)(\\\"(?:access_token|refresh_token|id_token|client_secret)\\\"\\s*:\\s*\\\")([^\\\"]*)(\\\")");
+    private static final Pattern FORM_SECRET_FIELD = Pattern.compile(
+            "(?i)((?:access_token|refresh_token|id_token|client_secret)=)([^&\\s]+)");
 
     /** Where the client credentials are carried in the token request. */
     public enum AuthStyle {
@@ -115,15 +124,56 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
                     .body(BodyInserters.fromFormData(form));
         }
 
-        return spec.retrieve()
-                .bodyToMono(TokenResponse.class)
-                .map(this::toAccessToken);
+        return spec.exchangeToMono(response -> {
+            if (response.statusCode().isError()) {
+                return response.bodyToMono(String.class)
+                        .defaultIfEmpty("")
+                        .onErrorReturn("")
+                        .flatMap(body -> Mono.error(tokenEndpointException(response.statusCode(), body)));
+            }
+            return response.bodyToMono(TokenResponse.class)
+                    .map(this::toAccessToken)
+                    .onErrorMap(error -> error instanceof AuthProviderException
+                            ? error
+                            : malformedTokenResponseException());
+        });
+    }
+
+    private AuthProviderException tokenEndpointException(HttpStatusCode statusCode, String responseBody) {
+        StringBuilder message = new StringBuilder("OAuth2 token endpoint returned HTTP ")
+                .append(statusCode.value());
+        String body = sanitizedBody(responseBody);
+        if (StringUtils.hasText(body)) {
+            message.append("; responseBody=").append(body);
+        }
+        return new AuthProviderException(DIAGNOSTIC_CLIENT_NAME, message.toString());
+    }
+
+    private AuthProviderException malformedTokenResponseException() {
+        return new AuthProviderException(
+                DIAGNOSTIC_CLIENT_NAME,
+                "OAuth2 token endpoint returned malformed JSON token response");
+    }
+
+    private String sanitizedBody(String responseBody) {
+        if (!StringUtils.hasText(responseBody)) {
+            return "";
+        }
+        String sanitized = responseBody.replace(clientSecret, "<redacted>");
+        sanitized = JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
+        sanitized = FORM_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
+        sanitized = sanitized.replace("\r", " ").replace("\n", " ").strip();
+        if (sanitized.length() <= MAX_TOKEN_ERROR_BODY_CHARS) {
+            return sanitized;
+        }
+        return sanitized.substring(0, MAX_TOKEN_ERROR_BODY_CHARS) + "...(truncated)";
     }
 
     private AccessToken toAccessToken(TokenResponse response) {
         String value = response.access_token;
         if (!StringUtils.hasText(value)) {
             throw new AuthProviderException(
+                    DIAGNOSTIC_CLIENT_NAME,
                     "OAuth2 token endpoint returned no access_token",
                     new IllegalStateException("missing access_token"));
         }

@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -156,6 +157,109 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void tokenEndpoint4xxProducesBoundedSanitizedException() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String body = "{\"error\":\"invalid_client\",\"error_description\":\"client_secret=client-secret "
+                + "access_token=leaked-access-token refresh_token=leaked-refresh-token "
+                + "x".repeat(1200) + "\"}";
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST, body))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("HTTP 400", "responseBody=", "<redacted>", "...(truncated)")
+                            .doesNotContain("client-secret", "leaked-access-token", "leaked-refresh-token");
+                    assertThat(error.getMessage().length()).isLessThan(1150);
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpoint5xxProducesSanitizedException() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.SERVICE_UNAVAILABLE,
+                        "server unavailable client_secret=client-secret"))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("HTTP 503", "server unavailable", "client_secret=<redacted>")
+                            .doesNotContain("client-secret");
+                })
+                .verify();
+    }
+
+    @Test
+    void malformedTokenJsonProducesSanitizedException() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured,
+                        "not-json leaked-access-token client_secret=client-secret"))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("malformed JSON token response")
+                            .doesNotContain("leaked-access-token", "client-secret");
+                })
+                .verify();
+    }
+
+    @Test
+    void missingAccessTokenProducesSanitizedException() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured,
+                        "{\"refresh_token\":\"leaked-refresh-token\",\"expires_in\":60}"))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("no access_token")
+                            .doesNotContain("leaked-refresh-token", "client-secret");
+                })
+                .verify();
+    }
+
+    @Test
     void builderRejectsBlankRequiredFields() {
         WebClient webClient = WebClient.builder().build();
 
@@ -190,10 +294,17 @@ class OAuth2ClientCredentialsTokenProviderTest {
     private static Mono<ClientResponse> materializeAndRespond(ClientRequest request,
                                                               AtomicReference<MockClientHttpRequest> captured,
                                                               String jsonBody) {
+        return materializeAndRespond(request, captured, HttpStatus.OK, jsonBody);
+    }
+
+    private static Mono<ClientResponse> materializeAndRespond(ClientRequest request,
+                                                              AtomicReference<MockClientHttpRequest> captured,
+                                                              HttpStatus status,
+                                                              String jsonBody) {
         MockClientHttpRequest mock = new MockClientHttpRequest(request.method(), URI.create(request.url().toString()));
         return request.writeTo(mock, ExchangeStrategies.withDefaults())
                 .then(Mono.fromRunnable(() -> captured.set(mock)))
-                .thenReturn(ClientResponse.create(HttpStatus.OK)
+                .thenReturn(ClientResponse.create(status)
                         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .body(jsonBody)
                         .build());

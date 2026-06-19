@@ -142,26 +142,51 @@ Evidence:
 
 ## Priority 4 — OAuth2 Token Refresh Diagnostics
 
-### [ ] 2.1 Harden OAuth2 token refresh diagnostics
-- [ ] Review token acquisition 4xx failure messages.
-- [ ] Review token acquisition 5xx failure messages.
-- [ ] Review malformed token response failure messages.
-- [ ] Review missing `access_token` failure messages.
-- [ ] Verify token endpoint response bodies remain bounded.
-- [ ] Verify token endpoint response bodies are redacted in logs and exceptions.
-- [ ] Verify client secrets are never included in exceptions or logs.
-- [ ] Verify access tokens and refresh tokens are never included in exceptions
+### [x] 2.1 Harden OAuth2 token refresh diagnostics
+- [x] Review token acquisition 4xx failure messages.
+- [x] Review token acquisition 5xx failure messages.
+- [x] Review malformed token response failure messages.
+- [x] Review missing `access_token` failure messages.
+- [x] Verify token endpoint response bodies remain bounded.
+- [x] Verify token endpoint response bodies are redacted in logs and exceptions.
+- [x] Verify client secrets are never included in exceptions or logs.
+- [x] Verify access tokens and refresh tokens are never included in exceptions
       or logs.
-- [ ] Add tests for token endpoint 4xx.
-- [ ] Add tests for token endpoint 5xx.
-- [ ] Add tests for malformed JSON.
-- [ ] Add tests for missing access token.
-- [ ] Add tests for expiry leeway refresh behavior.
-- [ ] Document `auth-style: form-post`.
-- [ ] Document expiry leeway and cache behavior.
-- [ ] Document 401 invalidation behavior.
-- [ ] Add a complete YAML client-credentials example.
-- [ ] Preserve source compatibility for auth extension points.
+- [x] Add tests for token endpoint 4xx.
+- [x] Add tests for token endpoint 5xx.
+- [x] Add tests for malformed JSON.
+- [x] Add tests for missing access token.
+- [x] Add tests for expiry leeway refresh behavior.
+- [x] Document `auth-style: form-post`.
+- [x] Document expiry leeway and cache behavior.
+- [x] Document 401 invalidation behavior.
+- [x] Add a complete YAML client-credentials example.
+- [x] Preserve source compatibility for auth extension points.
+
+Evidence:
+
+- `OAuth2ClientCredentialsTokenProvider` now handles token endpoint responses with
+  `exchangeToMono`, mapping HTTP 4xx/5xx responses to `AuthProviderException`
+  messages that include the status and a bounded, redacted response-body snippet.
+- Token response snippets are capped at 1024 characters and redact
+  `client_secret`, `access_token`, `refresh_token`, and `id_token` style values.
+  Malformed JSON and missing `access_token` paths use fixed diagnostic messages
+  that do not include response bodies or token values.
+- Added an additive `AuthProviderException(String clientName, String message,
+  Throwable cause)` constructor; existing constructors remain unchanged.
+- Added OAuth2 tests for token endpoint 4xx, token endpoint 5xx, malformed JSON,
+  and missing access token. Existing expiry-leeway and refresh-cache tests remain
+  covered by `OAuth2ClientCredentialsTokenProviderTest` and
+  `RefreshingBearerAuthProviderTest`.
+- Updated `docs/06-auth-providers.md` with a complete YAML client-credentials
+  example, `auth-style: form-post`, expiry leeway/cache behavior, 401
+  invalidation retry behavior, and redacted token-refresh diagnostics.
+- `mvn -pl reactive-http-client-starter -Dtest=OAuth2ClientCredentialsTokenProviderTest,RefreshingBearerAuthProviderTest,OutboundAuthFilterTest,AuthProviderFactoryTest test`
+  passed with 28 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed with 9 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify`
+  passed.
 
 ---
 
