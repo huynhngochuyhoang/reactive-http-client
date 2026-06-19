@@ -101,19 +101,43 @@ reactive:
 | `errorRate <= error-rate-threshold` | `UP` |
 | `errorRate > error-rate-threshold` | `DOWN` — overall indicator is `DOWN` |
 
+Each client detail is keyed only by `client.name`. It contains bounded counters and policy context: `samples`/`sampleCount`, `errors`/`errorCount`, `minSamples`, `errorRateThreshold`, `status`, and `reason`. `errorRate` is present when the probe window has at least one sample. Reasons are `NO_SAMPLES`, `INSUFFICIENT_SAMPLES`, `ERROR_RATE_WITHIN_THRESHOLD`, or `ERROR_RATE_ABOVE_THRESHOLD`. The health indicator does not expose URLs, headers, auth configuration, proxy values, request bodies, or response bodies.
+
 ### Sample actuator response
 
 ```json
 {
   "status": "DOWN",
   "details": {
-    "user-service":    { "samples": 10, "errors": 8, "errorRate": 0.8, "status": "DOWN" },
-    "partner-service": { "samples": 20, "errors": 1, "errorRate": 0.05, "status": "UP" },
+    "user-service": {
+      "samples": 10,
+      "errors": 8,
+      "sampleCount": 10,
+      "errorCount": 8,
+      "minSamples": 10,
+      "errorRateThreshold": 0.5,
+      "errorRate": 0.8,
+      "status": "DOWN",
+      "reason": "ERROR_RATE_ABOVE_THRESHOLD"
+    },
+    "partner-service": {
+      "samples": 20,
+      "errors": 1,
+      "sampleCount": 20,
+      "errorCount": 1,
+      "minSamples": 10,
+      "errorRateThreshold": 0.5,
+      "errorRate": 0.05,
+      "status": "UP",
+      "reason": "ERROR_RATE_WITHIN_THRESHOLD"
+    },
     "errorRateThreshold": 0.5,
     "minSamples": 10
   }
 }
 ```
+
+Use the health indicator for recent error-rate status, `ReactiveHttpClientDiagnosticsProvider` or `ReactiveHttpClientDiagnosticsSnapshot` for sanitized configured-client summaries, and exchange logging for per-call request/response metadata. These surfaces intentionally expose different data.
 
 To override the indicator, register your own bean named `reactiveHttpClientHealthIndicator`.
 

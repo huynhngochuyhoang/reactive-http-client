@@ -73,17 +73,31 @@ public class HttpClientHealthIndicator implements HealthIndicator {
             Map<String, Object> perClient = new LinkedHashMap<>();
             perClient.put("samples", deltaTotal);
             perClient.put("errors", deltaErrors);
+            perClient.put("sampleCount", deltaTotal);
+            perClient.put("errorCount", deltaErrors);
+            perClient.put("minSamples", config.getMinSamples());
+            perClient.put("errorRateThreshold", config.getErrorRateThreshold());
 
-            if (deltaTotal < config.getMinSamples()) {
+            if (deltaTotal == 0) {
                 perClient.put("status", "INSUFFICIENT_SAMPLES");
-            } else {
+                perClient.put("reason", "NO_SAMPLES");
+            }
+            else if (deltaTotal < config.getMinSamples()) {
+                perClient.put("errorRate", (double) deltaErrors / (double) deltaTotal);
+                perClient.put("status", "INSUFFICIENT_SAMPLES");
+                perClient.put("reason", "INSUFFICIENT_SAMPLES");
+            }
+            else {
                 double errorRate = (double) deltaErrors / (double) deltaTotal;
                 perClient.put("errorRate", errorRate);
                 if (errorRate > config.getErrorRateThreshold()) {
                     perClient.put("status", Status.DOWN.getCode());
+                    perClient.put("reason", "ERROR_RATE_ABOVE_THRESHOLD");
                     overallDown = true;
-                } else {
+                }
+                else {
                     perClient.put("status", Status.UP.getCode());
+                    perClient.put("reason", "ERROR_RATE_WITHIN_THRESHOLD");
                 }
             }
             details.put(clientName, perClient);

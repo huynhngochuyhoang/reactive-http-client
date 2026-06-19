@@ -101,21 +101,42 @@ Evidence:
 
 ## Priority 3 — Health Indicator Troubleshooting Detail
 
-### [ ] 1.2 Improve health indicator troubleshooting detail
-- [ ] Add sanitized per-client health details for sample count.
-- [ ] Add sanitized per-client health details for error count.
-- [ ] Add sanitized per-client health details for error rate.
-- [ ] Add threshold and reason fields for evaluated clients.
-- [ ] Keep details bounded by client name.
-- [ ] Avoid URL, header, auth, proxy, request-body, and response-body values.
-- [ ] Preserve `reactive.http.observability.health.enabled=false` behavior.
-- [ ] Preserve missing-Actuator and missing-`MeterRegistry` behavior.
-- [ ] Add no-sample health tests.
-- [ ] Add below-threshold health tests.
-- [ ] Add above-threshold health tests.
-- [ ] Update observability docs with health detail semantics.
-- [ ] Clarify health indicator versus diagnostics provider versus exchange logs.
-- [ ] Run observability and health indicator tests.
+### [x] 1.2 Improve health indicator troubleshooting detail
+- [x] Add sanitized per-client health details for sample count.
+- [x] Add sanitized per-client health details for error count.
+- [x] Add sanitized per-client health details for error rate.
+- [x] Add threshold and reason fields for evaluated clients.
+- [x] Keep details bounded by client name.
+- [x] Avoid URL, header, auth, proxy, request-body, and response-body values.
+- [x] Preserve `reactive.http.observability.health.enabled=false` behavior.
+- [x] Preserve missing-Actuator and missing-`MeterRegistry` behavior.
+- [x] Add no-sample health tests.
+- [x] Add below-threshold health tests.
+- [x] Add above-threshold health tests.
+- [x] Update observability docs with health detail semantics.
+- [x] Clarify health indicator versus diagnostics provider versus exchange logs.
+- [x] Run observability and health indicator tests.
+
+Evidence:
+
+- `HttpClientHealthIndicator` now keeps existing `samples` and `errors` keys and
+  adds per-client `sampleCount`, `errorCount`, `minSamples`,
+  `errorRateThreshold`, and `reason` fields.
+- Per-client reasons are bounded enum-like strings: `NO_SAMPLES`,
+  `INSUFFICIENT_SAMPLES`, `ERROR_RATE_WITHIN_THRESHOLD`, and
+  `ERROR_RATE_ABOVE_THRESHOLD`. Details remain keyed by client name and do not
+  include URLs, headers, auth, proxy, request-body, or response-body values.
+- Added health tests for no-delta samples and extended below-threshold and
+  above-threshold assertions to cover threshold and reason fields. Existing
+  auto-configuration coverage still verifies
+  `reactive.http.observability.health.enabled=false`.
+- Updated `docs/08-observability.md` with health detail semantics and sample
+  actuator output. Updated `docs/21-diagnostic-contexts.md` to clarify health
+  indicator output versus diagnostics snapshots and exchange logs.
+- `mvn -pl reactive-http-client-starter -Dtest=HttpClientHealthIndicatorTest,ReactiveHttpClientAutoConfigurationTest,MicrometerHttpClientObserverTest test`
+  passed with 54 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed with 9 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 
