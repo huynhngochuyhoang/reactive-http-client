@@ -39,6 +39,12 @@ Lifecycle hooks receive prepared resolved request headers before later
 Custom extension points that persist header values must apply their own
 redaction policy.
 
+## Health, diagnostics, and exchange logs
+
+The Actuator health indicator is a status signal derived from Micrometer request timers. It reports bounded per-client sample counts, error counts, error rates, thresholds, and reasons for the latest health-probe window. It does not describe configured endpoints or per-call payload metadata.
+
+Use exchange logging for per-call request/response metadata, and use the diagnostics provider when support output needs configured-client summaries.
+
 ## Runtime diagnostics provider
 
 Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, timeout summary, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.

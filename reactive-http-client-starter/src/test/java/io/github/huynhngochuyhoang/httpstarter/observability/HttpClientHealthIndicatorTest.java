@@ -44,11 +44,20 @@ class HttpClientHealthIndicatorTest {
         Health health = indicator.health();
 
         assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(health.getDetails().toString())
+                .doesNotContain("/p")
+                .doesNotContain("GET")
+                .doesNotContain("boom");
         assertThat(clientDetails(health, "failing-client"))
                 .containsEntry("status", "DOWN")
                 .containsEntry("samples", 10L)
                 .containsEntry("errors", 7L)
-                .containsEntry("errorRate", 0.7d);
+                .containsEntry("sampleCount", 10L)
+                .containsEntry("errorCount", 7L)
+                .containsEntry("minSamples", 5L)
+                .containsEntry("errorRateThreshold", 0.5d)
+                .containsEntry("errorRate", 0.7d)
+                .containsEntry("reason", "ERROR_RATE_ABOVE_THRESHOLD");
     }
 
     @Test
@@ -68,7 +77,12 @@ class HttpClientHealthIndicatorTest {
                 .containsEntry("status", "UP")
                 .containsEntry("samples", 10L)
                 .containsEntry("errors", 1L)
-                .containsEntry("errorRate", 0.1d);
+                .containsEntry("sampleCount", 10L)
+                .containsEntry("errorCount", 1L)
+                .containsEntry("minSamples", 5L)
+                .containsEntry("errorRateThreshold", 0.5d)
+                .containsEntry("errorRate", 0.1d)
+                .containsEntry("reason", "ERROR_RATE_WITHIN_THRESHOLD");
     }
 
     @Test
@@ -88,6 +102,36 @@ class HttpClientHealthIndicatorTest {
                 .containsEntry("status", "INSUFFICIENT_SAMPLES")
                 .containsEntry("samples", 2L)
                 .containsEntry("errors", 2L)
+                .containsEntry("sampleCount", 2L)
+                .containsEntry("errorCount", 2L)
+                .containsEntry("minSamples", 10L)
+                .containsEntry("errorRateThreshold", 0.5d)
+                .containsEntry("errorRate", 1.0d)
+                .containsEntry("reason", "INSUFFICIENT_SAMPLES");
+    }
+
+    @Test
+    void reportsNoSamplesWhenClientHasNoDeltaSincePreviousProbe() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        config.getHealth().setMinSamples(5);
+        HttpClientHealthIndicator indicator = indicator(registry, config);
+
+        record(registry, config, "idle-client", 3, 0);
+        indicator.health();
+
+        Health health = indicator.health();
+
+        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        assertThat(clientDetails(health, "idle-client"))
+                .containsEntry("status", "INSUFFICIENT_SAMPLES")
+                .containsEntry("samples", 0L)
+                .containsEntry("errors", 0L)
+                .containsEntry("sampleCount", 0L)
+                .containsEntry("errorCount", 0L)
+                .containsEntry("minSamples", 5L)
+                .containsEntry("errorRateThreshold", 0.5d)
+                .containsEntry("reason", "NO_SAMPLES")
                 .doesNotContainKey("errorRate");
     }
 
@@ -114,7 +158,8 @@ class HttpClientHealthIndicatorTest {
         assertThat(clientDetails(second, "flaky-client"))
                 .containsEntry("samples", 10L)
                 .containsEntry("errors", 8L)
-                .containsEntry("errorRate", 0.8d);
+                .containsEntry("errorRate", 0.8d)
+                .containsEntry("reason", "ERROR_RATE_ABOVE_THRESHOLD");
     }
 
     @Test
@@ -132,9 +177,11 @@ class HttpClientHealthIndicatorTest {
 
         assertThat(health.getStatus()).isEqualTo(Status.DOWN);
         assertThat(clientDetails(health, "healthy-client"))
-                .containsEntry("status", "UP");
+                .containsEntry("status", "UP")
+                .containsEntry("reason", "ERROR_RATE_WITHIN_THRESHOLD");
         assertThat(clientDetails(health, "broken-client"))
-                .containsEntry("status", "DOWN");
+                .containsEntry("status", "DOWN")
+                .containsEntry("reason", "ERROR_RATE_ABOVE_THRESHOLD");
     }
 
     // -------------------------------------------------------------------------
