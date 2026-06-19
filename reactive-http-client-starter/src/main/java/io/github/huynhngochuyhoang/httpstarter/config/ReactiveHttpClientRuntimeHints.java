@@ -12,6 +12,9 @@ import org.springframework.aot.hint.RuntimeHintsRegistrar;
  */
 public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
 
+    static final String POM_PROPERTIES_RESOURCE =
+            "META-INF/maven/io.github.huynhngochuyhoang/reactive-http-client-starter/pom.properties";
+
     private static final Class<?>[] ANNOTATION_TYPES = {
             ReactiveHttpClient.class,
             EnableReactiveHttpClients.class,
@@ -79,5 +82,6 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
                 MemberCategory.INTROSPECT_PUBLIC_METHODS,
                 MemberCategory.INVOKE_PUBLIC_METHODS,
                 MemberCategory.DECLARED_FIELDS);
+        hints.resources().registerPattern(POM_PROPERTIES_RESOURCE);
     }
 }

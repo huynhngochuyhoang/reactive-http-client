@@ -43,6 +43,20 @@ redaction policy.
 
 Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, timeout summary, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
 
+Use `ReactiveHttpClientDiagnosticsSnapshot` when a support bundle, startup log,
+or local custom endpoint needs deterministic Markdown or JSON output from those
+same sanitized summaries:
+
+```java
+String markdown = ReactiveHttpClientDiagnosticsSnapshot.toMarkdown(diagnostics);
+String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(diagnostics);
+```
+
+The snapshot helper renders project version, total client count, total endpoint
+count, total inherited endpoint count, and one row/object per client. It sorts
+clients by name and interface for stable output. The helper is explicit: calling
+it does not register an Actuator endpoint, controller, log line, or file writer.
+
 The starter registers this provider as a normal bean and does not publish an Actuator endpoint. If an application wants one, keep endpoint exposure local to the app:
 
 ```java
