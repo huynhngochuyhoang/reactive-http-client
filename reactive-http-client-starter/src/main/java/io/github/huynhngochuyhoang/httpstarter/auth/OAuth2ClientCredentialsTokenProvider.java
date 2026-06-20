@@ -10,8 +10,10 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -55,12 +57,13 @@ import java.util.regex.Pattern;
  */
 public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenProvider {
 
-    private static final String DIAGNOSTIC_CLIENT_NAME = "oauth2-client-credentials";
     private static final int MAX_TOKEN_ERROR_BODY_CHARS = 1024;
     private static final Pattern JSON_SECRET_FIELD = Pattern.compile(
-            "(?i)(\\\"(?:access_token|refresh_token|id_token|client_secret)\\\"\\s*:\\s*\\\")((?:\\\\.|[^\\\"\\\\])*)(\\\")");
+            "(?i)(\\x22(?:access_token|refresh_token|id_token|client_secret)\\x22\\s*:\\s*\\x22)((?:\\\\.|[^\\x22\\\\])*)(\\x22)");
     private static final Pattern FORM_SECRET_FIELD = Pattern.compile(
             "(?i)((?:access_token|refresh_token|id_token|client_secret)=)([^&\\s]+)");
+    private static final Pattern BASIC_AUTHORIZATION_FIELD = Pattern.compile(
+            "(?i)(Authorization\\s*[:=]\\s*Basic\\s+)([^\\s,;<>]+)");
 
     /** Where the client credentials are carried in the token request. */
     public enum AuthStyle {
@@ -88,7 +91,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         this.scope = b.scope;
         this.audience = b.audience;
         this.authStyle = b.authStyle != null ? b.authStyle : AuthStyle.BASIC_AUTH;
-        this.diagnosticClientName = StringUtils.hasText(b.clientName) ? b.clientName : DIAGNOSTIC_CLIENT_NAME;
+        this.diagnosticClientName = StringUtils.hasText(b.clientName) ? b.clientName : null;
         this.expiryLeeway = b.expiryLeeway != null ? b.expiryLeeway : Duration.ofSeconds(30);
         if (this.expiryLeeway.isNegative()) {
             throw new IllegalArgumentException("expiryLeeway must not be negative");
@@ -141,21 +144,31 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         });
     }
 
-    private AuthProviderException tokenEndpointException(HttpStatusCode statusCode, String responseBody) {
+    private RuntimeException tokenEndpointException(HttpStatusCode statusCode, String responseBody) {
         StringBuilder message = new StringBuilder("OAuth2 token endpoint returned HTTP ")
                 .append(statusCode.value());
         String body = sanitizedBody(responseBody);
         if (StringUtils.hasText(body)) {
             message.append("; responseBody=").append(body);
         }
-        return new AuthProviderException(diagnosticClientName, message.toString());
+        return authFailure(message.toString());
     }
 
-    private AuthProviderException malformedTokenResponseException(Throwable cause) {
-        return new AuthProviderException(
-                diagnosticClientName,
-                "OAuth2 token endpoint returned malformed JSON token response",
-                cause);
+    private RuntimeException malformedTokenResponseException(Throwable cause) {
+        return authFailure("OAuth2 token endpoint returned malformed JSON token response", cause);
+    }
+
+    private RuntimeException authFailure(String message) {
+        return authFailure(message, null);
+    }
+
+    private RuntimeException authFailure(String message, Throwable cause) {
+        if (StringUtils.hasText(diagnosticClientName)) {
+            return cause == null
+                    ? new AuthProviderException(diagnosticClientName, message)
+                    : new AuthProviderException(diagnosticClientName, message, cause);
+        }
+        return cause == null ? new IllegalStateException(message) : new IllegalStateException(message, cause);
     }
 
     private String sanitizedBody(String responseBody) {
@@ -163,6 +176,10 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             return "";
         }
         String sanitized = responseBody.replace(clientSecret, "<redacted>");
+        String basicCredential = Base64.getEncoder()
+                .encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
+        sanitized = sanitized.replace(basicCredential, "<redacted>");
+        sanitized = BASIC_AUTHORIZATION_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = FORM_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = sanitized.replace("\r", " ").replace("\n", " ").strip();
@@ -175,8 +192,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     private AccessToken toAccessToken(TokenResponse response) {
         String value = response.access_token;
         if (!StringUtils.hasText(value)) {
-            throw new AuthProviderException(
-                    diagnosticClientName,
+            throw authFailure(
                     "OAuth2 token endpoint returned no access_token",
                     new IllegalStateException("missing access_token"));
         }

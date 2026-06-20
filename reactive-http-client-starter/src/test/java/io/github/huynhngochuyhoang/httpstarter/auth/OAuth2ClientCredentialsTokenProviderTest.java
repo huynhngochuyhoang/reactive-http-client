@@ -3,6 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.auth;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
@@ -17,6 +18,7 @@ import reactor.test.StepVerifier;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -171,6 +173,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
                         .tokenUri("https://auth.example.com/oauth/token")
                         .clientId("client")
                         .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
                         .build();
 
         StepVerifier.create(provider.fetchToken())
@@ -201,6 +204,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
                         .tokenUri("https://auth.example.com/oauth/token")
                         .clientId("client")
                         .clientSecret("prefix\"suffix")
+                        .clientName("diagnostic-client")
                         .build();
 
         StepVerifier.create(provider.fetchToken())
@@ -226,6 +230,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
                         .tokenUri("https://auth.example.com/oauth/token")
                         .clientId("client")
                         .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
                         .build();
 
         StepVerifier.create(provider.fetchToken())
@@ -234,6 +239,64 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getMessage())
                             .contains("HTTP 503", "server unavailable", "client_secret=<redacted>")
                             .doesNotContain("client-secret");
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointErrorRedactsEchoedBasicAuthorization() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String basicCredential = Base64.getEncoder()
+                .encodeToString("client:client-secret".getBytes(StandardCharsets.UTF_8));
+        String body = "proxy rejected Authorization: Basic " + basicCredential
+                + " and Authorization=Basic " + basicCredential;
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST, body))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("Authorization: Basic <redacted>", "Authorization=Basic <redacted>")
+                            .doesNotContain(basicCredential, "client-secret");
+                })
+                .verify();
+    }
+
+    @Test
+    void manualProviderFailureIsWrappedWithRequestClientName() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST,
+                        "{\"error\":\"invalid_client\"}"))
+                .build();
+        OAuth2ClientCredentialsTokenProvider tokenProvider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .build();
+        RefreshingBearerAuthProvider provider = new RefreshingBearerAuthProvider(tokenProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.example.com/payments"))
+                .build();
+
+        StepVerifier.create(provider.getAuth(new AuthRequest("manual-payment", request)))
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    AuthProviderException authError = (AuthProviderException) error;
+                    assertThat(authError.getClientName()).isEqualTo("manual-payment");
+                    assertThat(authError.getCause())
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessageContaining("OAuth2 token endpoint returned HTTP 400");
                 })
                 .verify();
     }
@@ -251,6 +314,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
                         .tokenUri("https://auth.example.com/oauth/token")
                         .clientId("client")
                         .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
                         .build();
 
         StepVerifier.create(provider.fetchToken())
@@ -277,6 +341,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
                         .tokenUri("https://auth.example.com/oauth/token")
                         .clientId("client")
                         .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
                         .build();
 
         StepVerifier.create(provider.fetchToken())
