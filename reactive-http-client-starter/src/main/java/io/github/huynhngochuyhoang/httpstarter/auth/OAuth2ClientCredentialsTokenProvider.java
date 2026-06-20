@@ -1,13 +1,13 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
@@ -135,10 +135,8 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
 
         return spec.exchangeToMono(response -> {
             if (response.statusCode().isError()) {
-                return response.bodyToMono(String.class)
-                        .defaultIfEmpty("")
-                        .onErrorReturn("")
-                        .flatMap(body -> Mono.error(tokenEndpointException(response.statusCode(), body)));
+                return response.createException()
+                        .flatMap(error -> Mono.error(tokenEndpointException(error)));
             }
             return response.bodyToMono(TokenResponse.class)
                     .map(this::toAccessToken)
@@ -149,15 +147,16 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         });
     }
 
-    private RuntimeException tokenEndpointException(HttpStatusCode statusCode, String responseBody) {
+    private RuntimeException tokenEndpointException(WebClientResponseException responseException) {
         StringBuilder message = new StringBuilder("OAuth2 token endpoint returned HTTP ")
-                .append(statusCode.value());
-        String body = sanitizedBody(responseBody);
+                .append(responseException.getStatusCode().value());
+        String body = sanitizedBody(responseException.getResponseBodyAsString());
         if (StringUtils.hasText(body)) {
             message.append("; responseBody=").append(body);
         }
         String diagnostic = message.toString();
-        return authFailure(diagnostic, new OAuth2TokenFailureException(diagnostic));
+        WebClientResponseException sanitizedCause = sanitizedResponseException(responseException, body);
+        return authHttpFailure(diagnostic, sanitizedCause);
     }
 
     private RuntimeException malformedTokenResponseException(Throwable cause) {
@@ -175,6 +174,27 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
                     : new AuthProviderException(diagnosticClientName, message, cause);
         }
         return cause == null ? new OAuth2TokenFailureException(message) : new OAuth2TokenFailureException(message, cause);
+    }
+
+    private RuntimeException authHttpFailure(String message, WebClientResponseException cause) {
+        if (StringUtils.hasText(diagnosticClientName)) {
+            return new AuthProviderException(diagnosticClientName, message, cause);
+        }
+        return cause;
+    }
+
+    private WebClientResponseException sanitizedResponseException(WebClientResponseException source,
+                                                                  String sanitizedBody) {
+        byte[] body = StringUtils.hasText(sanitizedBody)
+                ? sanitizedBody.getBytes(StandardCharsets.UTF_8)
+                : new byte[0];
+        return WebClientResponseException.create(
+                source.getStatusCode(),
+                source.getStatusText(),
+                source.getHeaders(),
+                body,
+                StandardCharsets.UTF_8,
+                source.getRequest());
     }
 
     private String sanitizedBody(String responseBody) {

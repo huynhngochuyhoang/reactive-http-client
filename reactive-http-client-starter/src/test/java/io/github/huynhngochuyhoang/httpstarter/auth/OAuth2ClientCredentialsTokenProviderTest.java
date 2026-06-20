@@ -7,10 +7,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
-import org.springframework.web.reactive.function.client.ClientRequest;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.ExchangeStrategies;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -182,10 +179,45 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getMessage())
                             .contains("HTTP 400", "responseBody=", "<redacted>", "...(truncated)")
                             .doesNotContain("client-secret", "leaked-access-token", "leaked-refresh-token");
-                    assertThat(error.getCause())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessageContaining("OAuth2 token endpoint returned HTTP 400");
+                    assertThat(error.getCause()).isInstanceOf(WebClientResponseException.class);
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(cause.getResponseBodyAsString())
+                            .contains("<redacted>", "...(truncated)")
+                            .doesNotContain("client-secret", "leaked-access-token", "leaked-refresh-token");
                     assertThat(error.getMessage().length()).isLessThan(1150);
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointFailureCausePreservesHttpStatusAndHeaders() {
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.TOO_MANY_REQUESTS)
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .header(HttpHeaders.RETRY_AFTER, "5")
+                        .body("{\"access_token\":\"leaked-access\"}")
+                        .build()))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getCause()).isInstanceOf(WebClientResponseException.class);
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                    assertThat(cause.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("5");
+                    assertThat(cause.getResponseBodyAsString())
+                            .contains("access_token", "<redacted>")
+                            .doesNotContain("leaked-access");
                 })
                 .verify();
     }
@@ -409,9 +441,9 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error).isInstanceOf(AuthProviderException.class);
                     AuthProviderException authError = (AuthProviderException) error;
                     assertThat(authError.getClientName()).isEqualTo("manual-payment");
-                    assertThat(authError.getCause())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessageContaining("OAuth2 token endpoint returned HTTP 400");
+                    assertThat(authError.getCause()).isInstanceOf(WebClientResponseException.class);
+                    WebClientResponseException cause = (WebClientResponseException) authError.getCause();
+                    assertThat(cause.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                 })
                 .verify();
     }
