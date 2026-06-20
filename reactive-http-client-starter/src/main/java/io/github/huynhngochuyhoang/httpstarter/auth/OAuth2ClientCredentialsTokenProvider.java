@@ -60,6 +60,8 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     private static final int MAX_TOKEN_ERROR_BODY_CHARS = 1024;
     private static final Pattern JSON_SECRET_FIELD = Pattern.compile(
             "(?i)(\\x22(?:access_token|refresh_token|id_token|client_secret)\\x22\\s*:\\s*\\x22)((?:\\\\.|[^\\x22\\\\])*)(\\x22)");
+    private static final Pattern NESTED_JSON_SECRET_FIELD = Pattern.compile(
+            "(?i)(\\\\\\x22(?:access_token|refresh_token|id_token|client_secret)\\\\\\x22\\s*:\\s*\\\\\\x22)((?:\\\\\\.|[^\\\\\\x22\\\\\\\\])*)(\\\\\\x22)");
     private static final Pattern FORM_SECRET_FIELD = Pattern.compile(
             "(?i)((?:access_token|refresh_token|id_token|client_secret)=)([^&\\s]+)");
     private static final Pattern BASIC_AUTHORIZATION_FIELD = Pattern.compile(
@@ -185,6 +187,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         sanitized = sanitized.replace(basicCredential, "<redacted>");
         sanitized = BASIC_AUTHORIZATION_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = URL_ENCODED_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
+        sanitized = NESTED_JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = FORM_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = sanitized.replaceAll("(?<![A-Za-z0-9_])" + Pattern.quote(clientSecret) + "(?![A-Za-z0-9_])", "<redacted>");

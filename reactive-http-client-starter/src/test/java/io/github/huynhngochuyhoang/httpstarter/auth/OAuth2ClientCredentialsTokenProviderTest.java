@@ -247,6 +247,37 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void tokenEndpointRedactsSensitiveFieldsInsideEscapedJsonString() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String quote = Character.toString((char) 34);
+        String escapedQuote = "\\\"";
+        String escapedPayload = escapedQuote + "access_token" + escapedQuote + ":" + escapedQuote + "leaked-access"
+                + escapedQuote + "," + escapedQuote + "refresh_token" + escapedQuote + ":" + escapedQuote
+                + "leaked-refresh" + escapedQuote;
+        String body = "{" + quote + "debug" + quote + ":" + quote + "{" + escapedPayload + "}" + quote + "}";
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST, body))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("access_token", "refresh_token", "<redacted>")
+                            .doesNotContain("leaked-access", "leaked-refresh");
+                })
+                .verify();
+    }
+
+    @Test
     void tokenEndpoint5xxProducesSanitizedException() {
         AtomicReference<MockClientHttpRequest> captured = captureMock();
         WebClient webClient = WebClient.builder()
