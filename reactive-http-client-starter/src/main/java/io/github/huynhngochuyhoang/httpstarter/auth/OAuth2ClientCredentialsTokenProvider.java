@@ -138,7 +138,8 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             }
             return response.bodyToMono(TokenResponse.class)
                     .map(this::toAccessToken)
-                    .onErrorMap(error -> error instanceof AuthProviderException
+                    .onErrorMap(error -> (error instanceof AuthProviderException
+                                    || error instanceof OAuth2TokenFailureException)
                             ? error
                             : malformedTokenResponseException(error));
         });
@@ -151,7 +152,8 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         if (StringUtils.hasText(body)) {
             message.append("; responseBody=").append(body);
         }
-        return authFailure(message.toString());
+        String diagnostic = message.toString();
+        return authFailure(diagnostic, new OAuth2TokenFailureException(diagnostic));
     }
 
     private RuntimeException malformedTokenResponseException(Throwable cause) {
@@ -168,20 +170,21 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
                     ? new AuthProviderException(diagnosticClientName, message)
                     : new AuthProviderException(diagnosticClientName, message, cause);
         }
-        return cause == null ? new IllegalStateException(message) : new IllegalStateException(message, cause);
+        return cause == null ? new OAuth2TokenFailureException(message) : new OAuth2TokenFailureException(message, cause);
     }
 
     private String sanitizedBody(String responseBody) {
         if (!StringUtils.hasText(responseBody)) {
             return "";
         }
-        String sanitized = responseBody.replace(clientSecret, "<redacted>");
+        String sanitized = responseBody;
         String basicCredential = Base64.getEncoder()
                 .encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
         sanitized = sanitized.replace(basicCredential, "<redacted>");
         sanitized = BASIC_AUTHORIZATION_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = FORM_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
+        sanitized = sanitized.replaceAll("(?<![A-Za-z0-9_])" + Pattern.quote(clientSecret) + "(?![A-Za-z0-9_])", "<redacted>");
         sanitized = sanitized.replace("\r", " ").replace("\n", " ").strip();
         if (sanitized.length() <= MAX_TOKEN_ERROR_BODY_CHARS) {
             return sanitized;
@@ -221,6 +224,17 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         public String token_type;
         public Long expires_in;
         public String scope;
+    }
+
+    private static final class OAuth2TokenFailureException extends IllegalStateException {
+
+        private OAuth2TokenFailureException(String message) {
+            super(message);
+        }
+
+        private OAuth2TokenFailureException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -182,7 +182,36 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getMessage())
                             .contains("HTTP 400", "responseBody=", "<redacted>", "...(truncated)")
                             .doesNotContain("client-secret", "leaked-access-token", "leaked-refresh-token");
+                    assertThat(error.getCause())
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessageContaining("OAuth2 token endpoint returned HTTP 400");
                     assertThat(error.getMessage().length()).isLessThan(1150);
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointRedactsSensitiveFieldsBeforeRawSecretReplacement() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST,
+                        "{\"access_token\":\"leaked-access\",\"refresh_token\":\"leaked-refresh\"}"))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("token")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("access_token\":\"<redacted>", "refresh_token\":\"<redacted>")
+                            .doesNotContain("leaked-access", "leaked-refresh");
                 })
                 .verify();
     }
@@ -350,6 +379,36 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getMessage())
                             .contains("no access_token")
                             .doesNotContain("leaked-refresh-token", "client-secret");
+                })
+                .verify();
+    }
+
+    @Test
+    void manualProviderMissingAccessTokenKeepsExplicitDiagnostic() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured,
+                        "{\"refresh_token\":\"leaked-refresh-token\",\"expires_in\":60}"))
+                .build();
+        OAuth2ClientCredentialsTokenProvider tokenProvider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .build();
+        RefreshingBearerAuthProvider provider = new RefreshingBearerAuthProvider(tokenProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.example.com/payments"))
+                .build();
+
+        StepVerifier.create(provider.getAuth(new AuthRequest("manual-payment", request)))
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    AuthProviderException authError = (AuthProviderException) error;
+                    assertThat(authError.getClientName()).isEqualTo("manual-payment");
+                    assertThat(authError.getCause())
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessageContaining("OAuth2 token endpoint returned no access_token")
+                            .hasMessageNotContaining("malformed JSON");
                 })
                 .verify();
     }
