@@ -64,6 +64,8 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             "(?i)((?:access_token|refresh_token|id_token|client_secret)=)([^&\\s]+)");
     private static final Pattern BASIC_AUTHORIZATION_FIELD = Pattern.compile(
             "(?i)(Authorization\\s*[:=]\\s*Basic\\s+)([^\\s,;<>]+)");
+    private static final Pattern URL_ENCODED_SECRET_FIELD = Pattern.compile(
+            "(?i)((?:access_token|refresh_token|id_token|client_secret)%3D)([^&\\s]+)");
 
     /** Where the client credentials are carried in the token request. */
     public enum AuthStyle {
@@ -179,9 +181,10 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         }
         String sanitized = responseBody;
         String basicCredential = Base64.getEncoder()
-                .encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
+                .encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.ISO_8859_1));
         sanitized = sanitized.replace(basicCredential, "<redacted>");
         sanitized = BASIC_AUTHORIZATION_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
+        sanitized = URL_ENCODED_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = FORM_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = sanitized.replaceAll("(?<![A-Za-z0-9_])" + Pattern.quote(clientSecret) + "(?![A-Za-z0-9_])", "<redacted>");

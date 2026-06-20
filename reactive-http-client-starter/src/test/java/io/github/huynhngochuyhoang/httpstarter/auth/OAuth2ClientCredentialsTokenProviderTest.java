@@ -276,7 +276,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
     void tokenEndpointErrorRedactsEchoedBasicAuthorization() {
         AtomicReference<MockClientHttpRequest> captured = captureMock();
         String basicCredential = Base64.getEncoder()
-                .encodeToString("client:client-secret".getBytes(StandardCharsets.UTF_8));
+                .encodeToString("client:client-secret".getBytes(StandardCharsets.ISO_8859_1));
         String body = "proxy rejected Authorization: Basic " + basicCredential
                 + " and Authorization=Basic " + basicCredential;
         WebClient webClient = WebClient.builder()
@@ -297,6 +297,61 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getMessage())
                             .contains("Authorization: Basic <redacted>", "Authorization=Basic <redacted>")
                             .doesNotContain(basicCredential, "client-secret");
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointErrorRedactsLatin1BasicCredentialEcho() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String basicCredential = Base64.getEncoder()
+                .encodeToString("client:s\u00ebcret".getBytes(StandardCharsets.ISO_8859_1));
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST,
+                        "{\"Authorization\":\"Basic " + basicCredential + "\"}"))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("s\u00ebcret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("Basic <redacted>")
+                            .doesNotContain(basicCredential);
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointErrorRedactsUrlEncodedSecretEcho() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST,
+                        "bad form: client_secret%3Ds3cr3t&client_id%3Dclient"))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("s3cr3t")
+                        .authStyle(OAuth2ClientCredentialsTokenProvider.AuthStyle.FORM_POST)
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("client_secret%3D<redacted>")
+                            .doesNotContain("s3cr3t");
                 })
                 .verify();
     }
