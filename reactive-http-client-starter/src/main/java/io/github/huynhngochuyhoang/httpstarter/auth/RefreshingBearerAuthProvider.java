@@ -156,7 +156,10 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
 
     private AuthProviderException authProviderException(String clientName, Throwable cause) {
         if (cause instanceof SanitizedAuthProviderFailure sanitizedFailure) {
-            return new AuthProviderException(clientName, sanitizedFailure.sanitizedAuthMessage(), cause);
+            return new AuthProviderException(
+                    clientName,
+                    sanitizedFailure.sanitizedAuthMessage(),
+                    sanitizedFailure.sanitizedAuthCause());
         }
         return new AuthProviderException(clientName, cause);
     }

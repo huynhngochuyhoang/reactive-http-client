@@ -164,7 +164,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             message.append("; responseBody=").append(body);
         }
         String diagnostic = message.toString();
-        WebClientResponseException sanitizedCause = sanitizedResponseException(responseException, body, diagnostic);
+        WebClientResponseException sanitizedCause = sanitizedResponseException(responseException, body);
         return authHttpFailure(diagnostic, sanitizedCause);
     }
 
@@ -198,16 +198,24 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         if (StringUtils.hasText(diagnosticClientName)) {
             return new AuthProviderException(diagnosticClientName, message, cause);
         }
-        return cause;
+        return new SanitizedOAuth2HttpFailure(message, cause);
     }
 
     private WebClientResponseException sanitizedResponseException(WebClientResponseException source,
-                                                                  String sanitizedBody,
-                                                                  String message) {
+                                                                  String sanitizedBody) {
         byte[] body = StringUtils.hasText(sanitizedBody)
                 ? sanitizedBody.getBytes(StandardCharsets.UTF_8)
                 : new byte[0];
-        return new SanitizedWebClientResponseException(source, body, message, exchangeStrategies.get());
+        WebClientResponseException sanitized = WebClientResponseException.create(
+                source.getStatusCode(),
+                source.getStatusText(),
+                source.getHeaders(),
+                body,
+                StandardCharsets.UTF_8,
+                null);
+        ExchangeStrategies strategies = exchangeStrategies.get();
+        sanitized.setBodyDecodeFunction(targetType -> decodeSanitizedBody(sanitized, targetType, strategies));
+        return sanitized;
     }
 
     private String sanitizedBody(String responseBody) {
@@ -253,46 +261,43 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         return value;
     }
 
-    private static final class SanitizedWebClientResponseException extends WebClientResponseException
+    private static Object decodeSanitizedBody(WebClientResponseException response,
+                                              ResolvableType targetType,
+                                              ExchangeStrategies exchangeStrategies) {
+        byte[] body = response.getResponseBodyAsByteArray();
+        if (body.length == 0) {
+            return null;
+        }
+        MediaType contentType = response.getHeaders().getContentType();
+        for (HttpMessageReader<?> reader : exchangeStrategies.messageReaders()) {
+            if (reader.canRead(targetType, contentType)
+                    && reader instanceof DecoderHttpMessageReader<?> decoderReader) {
+                Decoder<?> decoder = decoderReader.getDecoder();
+                return decoder.decode(
+                        DefaultDataBufferFactory.sharedInstance.wrap(body),
+                        targetType,
+                        contentType,
+                        Collections.emptyMap());
+            }
+        }
+        throw new IllegalStateException("No suitable decoder");
+    }
+
+    private static final class SanitizedOAuth2HttpFailure extends IllegalStateException
             implements SanitizedAuthProviderFailure {
 
-        private SanitizedWebClientResponseException(WebClientResponseException source,
-                                                    byte[] sanitizedBody,
-                                                    String message,
-                                                    ExchangeStrategies exchangeStrategies) {
-            super(message,
-                    source.getStatusCode(),
-                    source.getStatusText(),
-                    source.getHeaders(),
-                    sanitizedBody,
-                    StandardCharsets.UTF_8,
-                    null);
-            setBodyDecodeFunction(targetType -> decodeSanitizedBody(targetType, exchangeStrategies));
-        }
-
-        private Object decodeSanitizedBody(ResolvableType targetType, ExchangeStrategies exchangeStrategies) {
-            byte[] body = getResponseBodyAsByteArray();
-            if (body.length == 0) {
-                return null;
-            }
-            MediaType contentType = getHeaders().getContentType();
-            for (HttpMessageReader<?> reader : exchangeStrategies.messageReaders()) {
-                if (reader.canRead(targetType, contentType)
-                        && reader instanceof DecoderHttpMessageReader<?> decoderReader) {
-                    Decoder<?> decoder = decoderReader.getDecoder();
-                    return decoder.decode(
-                            DefaultDataBufferFactory.sharedInstance.wrap(body),
-                            targetType,
-                            contentType,
-                            Collections.emptyMap());
-                }
-            }
-            throw new IllegalStateException("No suitable decoder");
+        private SanitizedOAuth2HttpFailure(String message, WebClientResponseException cause) {
+            super(message, cause);
         }
 
         @Override
         public String sanitizedAuthMessage() {
             return getMessage();
+        }
+
+        @Override
+        public Throwable sanitizedAuthCause() {
+            return getCause();
         }
     }
 
@@ -370,4 +375,5 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
 }
 interface SanitizedAuthProviderFailure {
     String sanitizedAuthMessage();
+    Throwable sanitizedAuthCause();
 }

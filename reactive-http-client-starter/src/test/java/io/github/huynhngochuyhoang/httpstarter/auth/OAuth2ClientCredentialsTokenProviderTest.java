@@ -265,7 +265,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
         StepVerifier.create(provider.fetchToken())
                 .expectErrorSatisfies(error -> {
                     assertThat(error).isInstanceOf(AuthProviderException.class);
-                    assertThat(error.getCause()).isInstanceOf(WebClientResponseException.class);
+                    assertThat(error.getCause()).isInstanceOf(WebClientResponseException.TooManyRequests.class);
                     WebClientResponseException cause = (WebClientResponseException) error.getCause();
                     assertThat(cause.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
                     assertThat(basicAuthorization.get()).startsWith("Basic ");
@@ -428,6 +428,8 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getMessage())
                             .contains("HTTP 503", "server unavailable", "client_secret=<redacted>")
                             .doesNotContain("client-secret");
+                    assertThat(error.getCause())
+                            .isInstanceOf(WebClientResponseException.ServiceUnavailable.class);
                 })
                 .verify();
     }
@@ -570,7 +572,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     AuthProviderException authError = (AuthProviderException) error;
                     assertThat(authError.getClientName()).isEqualTo("manual-payment");
                     assertThat(authError.getMessage()).contains("OAuth2 token endpoint returned HTTP 400");
-                    assertThat(authError.getCause()).isInstanceOf(WebClientResponseException.class);
+                    assertThat(authError.getCause()).isInstanceOf(WebClientResponseException.BadRequest.class);
                     WebClientResponseException cause = (WebClientResponseException) authError.getCause();
                     assertThat(cause.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                 })
