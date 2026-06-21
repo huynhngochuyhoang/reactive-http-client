@@ -3,7 +3,6 @@ package io.github.huynhngochuyhoang.httpstarter.auth;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
 import java.time.Clock;
@@ -156,8 +155,8 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
     }
 
     private AuthProviderException authProviderException(String clientName, Throwable cause) {
-        if (StringUtils.hasText(cause.getMessage())) {
-            return new AuthProviderException(clientName, cause.getMessage(), cause);
+        if (cause instanceof SanitizedAuthProviderFailure sanitizedFailure) {
+            return new AuthProviderException(clientName, sanitizedFailure.sanitizedAuthMessage(), cause);
         }
         return new AuthProviderException(clientName, cause);
     }

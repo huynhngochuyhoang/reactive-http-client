@@ -68,7 +68,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     private static final Pattern NESTED_JSON_SECRET_FIELD = Pattern.compile(
             "(?i)(\\\\\\x22(?:access_token|refresh_token|id_token|client_secret)\\\\\\x22\\s*:\\s*\\\\\\x22)((?:\\\\\\.|[^\\\\\\x22\\\\\\\\])*)(\\\\\\x22)");
     private static final Pattern FORM_SECRET_FIELD = Pattern.compile(
-            "(?i)((?:access_token|refresh_token|id_token|client_secret)=)([^&\\s]+)");
+            "(?i)((?:access_token|refresh_token|id_token|client_secret)=)([^&\s]+)");
     private static final Pattern BASIC_AUTHORIZATION_FIELD = Pattern.compile(
             "(?i)(Authorization\\s*[:=]\\s*Basic\\s+)([^\\s,;<>]+)");
     private static final Pattern URL_ENCODED_SECRET_FIELD = Pattern.compile(
@@ -206,8 +206,8 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         sanitized = URL_ENCODED_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = NESTED_JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
-        sanitized = FORM_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = sanitized.replaceAll("(?<![A-Za-z0-9_])" + Pattern.quote(clientSecret) + "(?![A-Za-z0-9_])", "<redacted>");
+        sanitized = FORM_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = sanitized.replace("\r", " ").replace("\n", " ").strip();
         if (sanitized.length() <= MAX_TOKEN_ERROR_BODY_CHARS) {
             return sanitized;
@@ -237,7 +237,8 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         return value;
     }
 
-    private static final class SanitizedWebClientResponseException extends WebClientResponseException {
+    private static final class SanitizedWebClientResponseException extends WebClientResponseException
+            implements SanitizedAuthProviderFailure {
 
         private SanitizedWebClientResponseException(WebClientResponseException source, byte[] sanitizedBody, String message) {
             super(message,
@@ -269,6 +270,10 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             } catch (Exception ex) {
                 throw new IllegalStateException("Unable to decode sanitized response body", ex);
             }
+        }
+        @Override
+        public String sanitizedAuthMessage() {
+            return getMessage();
         }
     }
 
@@ -343,4 +348,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             );
         }
     }
+}
+interface SanitizedAuthProviderFailure {
+    String sanitizedAuthMessage();
 }

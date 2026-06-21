@@ -448,6 +448,37 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void tokenEndpointErrorRedactsDecodedFormSecretWithWhitespace() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST,
+                        "bad form: client_secret=top secret&client_id=client"))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("top secret")
+                        .authStyle(OAuth2ClientCredentialsTokenProvider.AuthStyle.FORM_POST)
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("client_secret=<redacted>&client_id=client")
+                            .doesNotContain("top secret", "<redacted> secret");
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getResponseBodyAsString())
+                            .contains("client_secret=<redacted>&client_id=client")
+                            .doesNotContain("top secret", "<redacted> secret");
+                })
+                .verify();
+    }
+
+    @Test
     void manualProviderFailureIsWrappedWithRequestClientName() {
         AtomicReference<MockClientHttpRequest> captured = captureMock();
         WebClient webClient = WebClient.builder()
