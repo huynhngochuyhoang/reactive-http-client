@@ -1,16 +1,18 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.codec.CodecException;
+import org.springframework.core.codec.Decoder;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.DecoderHttpMessageReader;
+import org.springframework.http.codec.HttpMessageReader;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.UnsupportedMediaTypeException;
-import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -20,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -166,7 +169,12 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     }
 
     private RuntimeException malformedTokenResponseException(Throwable cause) {
-        return authFailure("OAuth2 token endpoint returned malformed JSON token response", cause);
+        String safeCauseMessage = cause instanceof UnsupportedMediaTypeException
+                ? "Unsupported OAuth2 token response content type"
+                : "OAuth2 token response decoding failed";
+        return authFailure(
+                "OAuth2 token endpoint returned malformed JSON token response",
+                new IllegalStateException(safeCauseMessage));
     }
 
     private boolean isTokenResponseDecodeFailure(Throwable error) {
@@ -258,7 +266,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
                     source.getHeaders(),
                     sanitizedBody,
                     StandardCharsets.UTF_8,
-                    source.getRequest());
+                    null);
             setBodyDecodeFunction(targetType -> decodeSanitizedBody(targetType, exchangeStrategies));
         }
 
@@ -267,11 +275,19 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             if (body.length == 0) {
                 return null;
             }
-            ClientResponse response = ClientResponse.create(getStatusCode(), exchangeStrategies)
-                    .headers(headers -> headers.addAll(getHeaders()))
-                    .body(new String(body, StandardCharsets.UTF_8))
-                    .build();
-            return response.bodyToMono(ParameterizedTypeReference.forType(targetType.getType())).block();
+            MediaType contentType = getHeaders().getContentType();
+            for (HttpMessageReader<?> reader : exchangeStrategies.messageReaders()) {
+                if (reader.canRead(targetType, contentType)
+                        && reader instanceof DecoderHttpMessageReader<?> decoderReader) {
+                    Decoder<?> decoder = decoderReader.getDecoder();
+                    return decoder.decode(
+                            DefaultDataBufferFactory.sharedInstance.wrap(body),
+                            targetType,
+                            contentType,
+                            Collections.emptyMap());
+                }
+            }
+            throw new IllegalStateException("No suitable decoder");
         }
 
         @Override

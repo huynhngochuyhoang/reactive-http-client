@@ -4,21 +4,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.http.codec.json.Jackson2JsonDecoder;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
 import org.springframework.web.reactive.function.client.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -221,12 +220,38 @@ class OAuth2ClientCredentialsTokenProviderTest {
 
     @Test
     void tokenEndpointFailureCausePreservesHttpStatusAndHeaders() {
+        AtomicReference<String> basicAuthorization = new AtomicReference<>();
         WebClient webClient = WebClient.builder()
-                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.TOO_MANY_REQUESTS)
-                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        .header(HttpHeaders.RETRY_AFTER, "5")
-                        .body("{\"access_token\":\"leaked-access\"}")
-                        .build()))
+                .exchangeFunction(request -> {
+                    basicAuthorization.set(request.headers().getFirst(HttpHeaders.AUTHORIZATION));
+                    HttpRequest sourceRequest = new HttpRequest() {
+                        @Override
+                        public HttpMethod getMethod() {
+                            return request.method();
+                        }
+
+                        @Override
+                        public URI getURI() {
+                            return request.url();
+                        }
+
+                        @Override
+                        public HttpHeaders getHeaders() {
+                            return request.headers();
+                        }
+
+                        @Override
+                        public Map<String, Object> getAttributes() {
+                            return Map.of();
+                        }
+                    };
+                    return Mono.just(ClientResponse.create(HttpStatus.TOO_MANY_REQUESTS)
+                            .request(sourceRequest)
+                            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                            .header(HttpHeaders.RETRY_AFTER, "5")
+                            .body("{\"access_token\":\"leaked-access\"}")
+                            .build());
+                })
                 .build();
 
         OAuth2ClientCredentialsTokenProvider provider =
@@ -243,6 +268,8 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getCause()).isInstanceOf(WebClientResponseException.class);
                     WebClientResponseException cause = (WebClientResponseException) error.getCause();
                     assertThat(cause.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                    assertThat(basicAuthorization.get()).startsWith("Basic ");
+                    assertThat(cause.getRequest()).isNull();
                     assertThat(cause.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("5");
                     assertThat(cause.getResponseBodyAsString())
                             .contains("access_token", "<redacted>")
@@ -254,7 +281,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
-    void tokenEndpointFailureCauseUsesConfiguredDecodersForSanitizedBody() {
+    void tokenEndpointFailureCauseUsesConfiguredDecodersWithoutBlocking() {
         ObjectMapper mapper = new ObjectMapper()
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
         ExchangeStrategies strategies = ExchangeStrategies.builder()
@@ -277,15 +304,19 @@ class OAuth2ClientCredentialsTokenProviderTest {
                         .clientName("diagnostic-client")
                         .build();
 
-        StepVerifier.create(provider.fetchToken())
-                .expectErrorSatisfies(error -> {
+        Mono<String> decodedBody = provider.fetchToken()
+                .thenReturn("unexpected")
+                .onErrorResume(error -> {
                     assertThat(error).isInstanceOf(AuthProviderException.class);
                     WebClientResponseException cause = (WebClientResponseException) error.getCause();
-                    SnakeCaseTokenEndpointErrorBody decoded = cause.getResponseBodyAs(
-                            SnakeCaseTokenEndpointErrorBody.class);
-                    assertThat(decoded.accessToken).isEqualTo("<redacted>");
-                })
-                .verify();
+                    return Mono.fromCallable(() -> cause.getResponseBodyAs(
+                                    SnakeCaseTokenEndpointErrorBody.class).accessToken)
+                            .subscribeOn(Schedulers.parallel());
+                });
+
+        StepVerifier.create(decodedBody)
+                .expectNext("<redacted>")
+                .verifyComplete();
     }
 
     @Test
@@ -568,7 +599,12 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getMessage())
                             .contains("malformed JSON token response")
                             .doesNotContain("leaked-access-token", "client-secret");
-                    assertThat(error.getCause()).isNotNull();
+                    assertThat(error.getCause())
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessage("OAuth2 token response decoding failed")
+                            .hasMessageNotContaining("leaked-access-token")
+                            .hasMessageNotContaining("client-secret");
+                    assertThat(error.getCause().getCause()).isNull();
                 })
                 .verify();
     }
