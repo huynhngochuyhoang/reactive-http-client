@@ -156,6 +156,32 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void tokenRequestUsesBuilderDefaultStatusHandlers() {
+        WebClient webClient = WebClient.builder()
+                .defaultStatusHandler(status -> status.value() == 429,
+                        response -> Mono.error(new IllegalStateException("custom token status")))
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.TOO_MANY_REQUESTS)
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .body("{\"error\":\"rate_limited\"}")
+                        .build()))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> assertThat(error)
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessage("custom token status"))
+                .verify();
+    }
+
+    @Test
     void tokenEndpoint4xxProducesBoundedSanitizedException() {
         AtomicReference<MockClientHttpRequest> captured = captureMock();
         String body = "{\"error\":\"invalid_client\",\"error_description\":\"client_secret=client-secret "
@@ -218,6 +244,8 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(cause.getResponseBodyAsString())
                             .contains("access_token", "<redacted>")
                             .doesNotContain("leaked-access");
+                    TokenEndpointErrorBody decoded = cause.getResponseBodyAs(TokenEndpointErrorBody.class);
+                    assertThat(decoded.access_token).isEqualTo("<redacted>");
                 })
                 .verify();
     }
@@ -441,6 +469,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error).isInstanceOf(AuthProviderException.class);
                     AuthProviderException authError = (AuthProviderException) error;
                     assertThat(authError.getClientName()).isEqualTo("manual-payment");
+                    assertThat(authError.getMessage()).contains("OAuth2 token endpoint returned HTTP 400");
                     assertThat(authError.getCause()).isInstanceOf(WebClientResponseException.class);
                     WebClientResponseException cause = (WebClientResponseException) authError.getCause();
                     assertThat(cause.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -544,6 +573,11 @@ class OAuth2ClientCredentialsTokenProviderTest {
         assertThatIllegalArgumentException(() ->
                 OAuth2ClientCredentialsTokenProvider.builder(webClient)
                         .tokenUri("http://x").clientId("c").build());
+    }
+
+    @SuppressWarnings("checkstyle:MemberName")
+    static final class TokenEndpointErrorBody {
+        public String access_token;
     }
 
     // -------------------------------------------------------------------------

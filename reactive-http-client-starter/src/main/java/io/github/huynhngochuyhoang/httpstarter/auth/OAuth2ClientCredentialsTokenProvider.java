@@ -1,11 +1,15 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.codec.CodecException;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.UnsupportedMediaTypeException;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
@@ -58,6 +62,7 @@ import java.util.regex.Pattern;
 public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenProvider {
 
     private static final int MAX_TOKEN_ERROR_BODY_CHARS = 1024;
+    private static final ObjectMapper ERROR_BODY_OBJECT_MAPPER = new ObjectMapper();
     private static final Pattern JSON_SECRET_FIELD = Pattern.compile(
             "(?i)(\\x22(?:access_token|refresh_token|id_token|client_secret)\\x22\\s*:\\s*\\x22)((?:\\\\.|[^\\x22\\\\])*)(\\x22)");
     private static final Pattern NESTED_JSON_SECRET_FIELD = Pattern.compile(
@@ -133,18 +138,11 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
                     .body(BodyInserters.fromFormData(form));
         }
 
-        return spec.exchangeToMono(response -> {
-            if (response.statusCode().isError()) {
-                return response.createException()
-                        .flatMap(error -> Mono.error(tokenEndpointException(error)));
-            }
-            return response.bodyToMono(TokenResponse.class)
-                    .map(this::toAccessToken)
-                    .onErrorMap(error -> (error instanceof AuthProviderException
-                                    || error instanceof OAuth2TokenFailureException)
-                            ? error
-                            : malformedTokenResponseException(error));
-        });
+        return spec.retrieve()
+                .bodyToMono(TokenResponse.class)
+                .map(this::toAccessToken)
+                .onErrorMap(WebClientResponseException.class, this::tokenEndpointException)
+                .onErrorMap(this::isTokenResponseDecodeFailure, this::malformedTokenResponseException);
     }
 
     private RuntimeException tokenEndpointException(WebClientResponseException responseException) {
@@ -155,12 +153,16 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             message.append("; responseBody=").append(body);
         }
         String diagnostic = message.toString();
-        WebClientResponseException sanitizedCause = sanitizedResponseException(responseException, body);
+        WebClientResponseException sanitizedCause = sanitizedResponseException(responseException, body, diagnostic);
         return authHttpFailure(diagnostic, sanitizedCause);
     }
 
     private RuntimeException malformedTokenResponseException(Throwable cause) {
         return authFailure("OAuth2 token endpoint returned malformed JSON token response", cause);
+    }
+
+    private boolean isTokenResponseDecodeFailure(Throwable error) {
+        return error instanceof CodecException || error instanceof UnsupportedMediaTypeException;
     }
 
     private RuntimeException authFailure(String message) {
@@ -184,17 +186,12 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     }
 
     private WebClientResponseException sanitizedResponseException(WebClientResponseException source,
-                                                                  String sanitizedBody) {
+                                                                  String sanitizedBody,
+                                                                  String message) {
         byte[] body = StringUtils.hasText(sanitizedBody)
                 ? sanitizedBody.getBytes(StandardCharsets.UTF_8)
                 : new byte[0];
-        return WebClientResponseException.create(
-                source.getStatusCode(),
-                source.getStatusText(),
-                source.getHeaders(),
-                body,
-                StandardCharsets.UTF_8,
-                source.getRequest());
+        return new SanitizedWebClientResponseException(source, body, message);
     }
 
     private String sanitizedBody(String responseBody) {
@@ -238,6 +235,41 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             throw new IllegalArgumentException(name + " must not be blank");
         }
         return value;
+    }
+
+    private static final class SanitizedWebClientResponseException extends WebClientResponseException {
+
+        private SanitizedWebClientResponseException(WebClientResponseException source, byte[] sanitizedBody, String message) {
+            super(message,
+                    source.getStatusCode(),
+                    source.getStatusText(),
+                    source.getHeaders(),
+                    sanitizedBody,
+                    StandardCharsets.UTF_8,
+                    source.getRequest());
+        }
+
+        @Override
+        public <E> E getResponseBodyAs(Class<E> targetType) {
+            return decodeSanitizedBody(ERROR_BODY_OBJECT_MAPPER.getTypeFactory().constructType(targetType));
+        }
+
+        @Override
+        public <E> E getResponseBodyAs(ParameterizedTypeReference<E> targetType) {
+            return decodeSanitizedBody(ERROR_BODY_OBJECT_MAPPER.getTypeFactory().constructType(targetType.getType()));
+        }
+
+        private <E> E decodeSanitizedBody(com.fasterxml.jackson.databind.JavaType targetType) {
+            byte[] body = getResponseBodyAsByteArray();
+            if (body.length == 0) {
+                return null;
+            }
+            try {
+                return ERROR_BODY_OBJECT_MAPPER.readValue(body, targetType);
+            } catch (Exception ex) {
+                throw new IllegalStateException("Unable to decode sanitized response body", ex);
+            }
+        }
     }
 
     /**

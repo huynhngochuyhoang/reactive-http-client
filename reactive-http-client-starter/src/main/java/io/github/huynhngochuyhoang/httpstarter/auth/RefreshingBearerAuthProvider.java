@@ -3,6 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.auth;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
 import java.time.Clock;
@@ -127,7 +128,7 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
                     .map(token -> validateAndNormalize(clientName, token))
                     .onErrorMap(error -> error instanceof AuthProviderException
                             ? error
-                            : new AuthProviderException(clientName, error))
+                            : authProviderException(clientName, error))
                     .doOnNext(token -> {
                         synchronized (this) {
                             if (refreshEpoch == invalidationEpoch) {
@@ -152,6 +153,13 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
             inFlightRefresh = refreshMono;
             return refreshMono.map(CachedAccessToken::tokenValue);
         }
+    }
+
+    private AuthProviderException authProviderException(String clientName, Throwable cause) {
+        if (StringUtils.hasText(cause.getMessage())) {
+            return new AuthProviderException(clientName, cause.getMessage(), cause);
+        }
+        return new AuthProviderException(clientName, cause);
     }
 
     private CachedAccessToken validateAndNormalize(String clientName, AccessToken token) {
