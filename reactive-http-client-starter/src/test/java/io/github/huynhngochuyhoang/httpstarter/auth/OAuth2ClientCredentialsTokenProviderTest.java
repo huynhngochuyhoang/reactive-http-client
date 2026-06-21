@@ -1,11 +1,14 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
 import org.springframework.web.reactive.function.client.*;
 import reactor.core.publisher.Flux;
@@ -246,6 +249,41 @@ class OAuth2ClientCredentialsTokenProviderTest {
                             .doesNotContain("leaked-access");
                     TokenEndpointErrorBody decoded = cause.getResponseBodyAs(TokenEndpointErrorBody.class);
                     assertThat(decoded.access_token).isEqualTo("<redacted>");
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointFailureCauseUsesConfiguredDecodersForSanitizedBody() {
+        ObjectMapper mapper = new ObjectMapper()
+                .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(codecs -> codecs.defaultCodecs()
+                        .jackson2JsonDecoder(new Jackson2JsonDecoder(mapper)))
+                .build();
+        WebClient webClient = WebClient.builder()
+                .exchangeStrategies(strategies)
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.BAD_REQUEST, strategies)
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .body("{\"access_token\":\"leaked-access\"}")
+                        .build()))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    SnakeCaseTokenEndpointErrorBody decoded = cause.getResponseBodyAs(
+                            SnakeCaseTokenEndpointErrorBody.class);
+                    assertThat(decoded.accessToken).isEqualTo("<redacted>");
                 })
                 .verify();
     }
@@ -609,6 +647,10 @@ class OAuth2ClientCredentialsTokenProviderTest {
     @SuppressWarnings("checkstyle:MemberName")
     static final class TokenEndpointErrorBody {
         public String access_token;
+    }
+
+    static final class SnakeCaseTokenEndpointErrorBody {
+        public String accessToken;
     }
 
     // -------------------------------------------------------------------------

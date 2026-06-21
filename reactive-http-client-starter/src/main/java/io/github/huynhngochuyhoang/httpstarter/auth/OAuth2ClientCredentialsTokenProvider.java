@@ -1,8 +1,8 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.ResolvableType;
 import org.springframework.core.codec.CodecException;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
@@ -10,6 +10,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.UnsupportedMediaTypeException;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
@@ -20,6 +22,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 /**
@@ -62,7 +65,6 @@ import java.util.regex.Pattern;
 public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenProvider {
 
     private static final int MAX_TOKEN_ERROR_BODY_CHARS = 1024;
-    private static final ObjectMapper ERROR_BODY_OBJECT_MAPPER = new ObjectMapper();
     private static final Pattern JSON_SECRET_FIELD = Pattern.compile(
             "(?i)(\\x22(?:access_token|refresh_token|id_token|client_secret)\\x22\\s*:\\s*\\x22)((?:\\\\.|[^\\x22\\\\])*)(\\x22)");
     private static final Pattern NESTED_JSON_SECRET_FIELD = Pattern.compile(
@@ -83,6 +85,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     }
 
     private final WebClient webClient;
+    private final AtomicReference<ExchangeStrategies> exchangeStrategies;
     private final String tokenUri;
     private final String clientId;
     private final String clientSecret;
@@ -93,7 +96,12 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     private final String diagnosticClientName;
 
     private OAuth2ClientCredentialsTokenProvider(Builder b) {
-        this.webClient = Objects.requireNonNull(b.webClient, "webClient");
+        WebClient configuredWebClient = Objects.requireNonNull(b.webClient, "webClient");
+        this.exchangeStrategies = new AtomicReference<>(ExchangeStrategies.withDefaults());
+        this.webClient = configuredWebClient.mutate()
+                .filter((request, next) -> next.exchange(request)
+                        .doOnNext(response -> exchangeStrategies.set(response.strategies())))
+                .build();
         this.tokenUri = requireNonBlank(b.tokenUri, "tokenUri");
         this.clientId = requireNonBlank(b.clientId, "clientId");
         this.clientSecret = requireNonBlank(b.clientSecret, "clientSecret");
@@ -191,7 +199,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         byte[] body = StringUtils.hasText(sanitizedBody)
                 ? sanitizedBody.getBytes(StandardCharsets.UTF_8)
                 : new byte[0];
-        return new SanitizedWebClientResponseException(source, body, message);
+        return new SanitizedWebClientResponseException(source, body, message, exchangeStrategies.get());
     }
 
     private String sanitizedBody(String responseBody) {
@@ -240,7 +248,10 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     private static final class SanitizedWebClientResponseException extends WebClientResponseException
             implements SanitizedAuthProviderFailure {
 
-        private SanitizedWebClientResponseException(WebClientResponseException source, byte[] sanitizedBody, String message) {
+        private SanitizedWebClientResponseException(WebClientResponseException source,
+                                                    byte[] sanitizedBody,
+                                                    String message,
+                                                    ExchangeStrategies exchangeStrategies) {
             super(message,
                     source.getStatusCode(),
                     source.getStatusText(),
@@ -248,29 +259,21 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
                     sanitizedBody,
                     StandardCharsets.UTF_8,
                     source.getRequest());
+            setBodyDecodeFunction(targetType -> decodeSanitizedBody(targetType, exchangeStrategies));
         }
 
-        @Override
-        public <E> E getResponseBodyAs(Class<E> targetType) {
-            return decodeSanitizedBody(ERROR_BODY_OBJECT_MAPPER.getTypeFactory().constructType(targetType));
-        }
-
-        @Override
-        public <E> E getResponseBodyAs(ParameterizedTypeReference<E> targetType) {
-            return decodeSanitizedBody(ERROR_BODY_OBJECT_MAPPER.getTypeFactory().constructType(targetType.getType()));
-        }
-
-        private <E> E decodeSanitizedBody(com.fasterxml.jackson.databind.JavaType targetType) {
+        private Object decodeSanitizedBody(ResolvableType targetType, ExchangeStrategies exchangeStrategies) {
             byte[] body = getResponseBodyAsByteArray();
             if (body.length == 0) {
                 return null;
             }
-            try {
-                return ERROR_BODY_OBJECT_MAPPER.readValue(body, targetType);
-            } catch (Exception ex) {
-                throw new IllegalStateException("Unable to decode sanitized response body", ex);
-            }
+            ClientResponse response = ClientResponse.create(getStatusCode(), exchangeStrategies)
+                    .headers(headers -> headers.addAll(getHeaders()))
+                    .body(new String(body, StandardCharsets.UTF_8))
+                    .build();
+            return response.bodyToMono(ParameterizedTypeReference.forType(targetType.getType())).block();
         }
+
         @Override
         public String sanitizedAuthMessage() {
             return getMessage();
