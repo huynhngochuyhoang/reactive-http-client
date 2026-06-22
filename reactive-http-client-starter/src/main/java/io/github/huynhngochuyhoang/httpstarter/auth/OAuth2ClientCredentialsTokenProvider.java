@@ -152,6 +152,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         return spec.retrieve()
                 .bodyToMono(TokenResponse.class)
                 .map(this::toAccessToken)
+                .switchIfEmpty(Mono.defer(() -> Mono.error(missingAccessTokenFailure())))
                 .onErrorMap(WebClientResponseException.class, this::tokenEndpointException)
                 .onErrorMap(this::isTokenResponseDecodeFailure, this::malformedTokenResponseException);
     }
@@ -159,12 +160,13 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     private RuntimeException tokenEndpointException(WebClientResponseException responseException) {
         StringBuilder message = new StringBuilder("OAuth2 token endpoint returned HTTP ")
                 .append(responseException.getStatusCode().value());
-        String body = sanitizedBody(responseException.getResponseBodyAsString());
-        if (StringUtils.hasText(body)) {
-            message.append("; responseBody=").append(body);
+        String sanitizedBody = sanitizedBody(responseException.getResponseBodyAsString());
+        String diagnosticBody = boundedDiagnosticBody(sanitizedBody);
+        if (StringUtils.hasText(diagnosticBody)) {
+            message.append("; responseBody=").append(diagnosticBody);
         }
         String diagnostic = message.toString();
-        WebClientResponseException sanitizedCause = sanitizedResponseException(responseException, body);
+        WebClientResponseException sanitizedCause = sanitizedResponseException(responseException, sanitizedBody);
         return authHttpFailure(diagnostic, sanitizedCause);
     }
 
@@ -232,19 +234,20 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         sanitized = JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = sanitized.replaceAll("(?<![A-Za-z0-9_])" + Pattern.quote(clientSecret) + "(?![A-Za-z0-9_])", "<redacted>");
         sanitized = FORM_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
-        sanitized = sanitized.replace("\r", " ").replace("\n", " ").strip();
-        if (sanitized.length() <= MAX_TOKEN_ERROR_BODY_CHARS) {
-            return sanitized;
+        return sanitized.replace("\r", " ").replace("\n", " ").strip();
+    }
+
+    private String boundedDiagnosticBody(String sanitizedBody) {
+        if (sanitizedBody.length() <= MAX_TOKEN_ERROR_BODY_CHARS) {
+            return sanitizedBody;
         }
-        return sanitized.substring(0, MAX_TOKEN_ERROR_BODY_CHARS) + "...(truncated)";
+        return sanitizedBody.substring(0, MAX_TOKEN_ERROR_BODY_CHARS) + "...(truncated)";
     }
 
     private AccessToken toAccessToken(TokenResponse response) {
         String value = response.access_token;
         if (!StringUtils.hasText(value)) {
-            throw authFailure(
-                    "OAuth2 token endpoint returned no access_token",
-                    new IllegalStateException("missing access_token"));
+            throw missingAccessTokenFailure();
         }
         Instant expiresAt = null;
         if (response.expires_in != null && response.expires_in > 0) {
@@ -252,6 +255,12 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             expiresAt = Instant.now().plusSeconds(effectiveSeconds);
         }
         return new AccessToken(value, expiresAt);
+    }
+
+    private RuntimeException missingAccessTokenFailure() {
+        return authFailure(
+                "OAuth2 token endpoint returned no access_token",
+                new IllegalStateException("missing access_token"));
     }
 
     private static String requireNonBlank(String value, String name) {

@@ -184,7 +184,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
-    void tokenEndpoint4xxProducesBoundedSanitizedException() {
+    void tokenEndpoint4xxProducesBoundedDiagnosticAndDecodableSanitizedBody() {
         AtomicReference<MockClientHttpRequest> captured = captureMock();
         String body = "{\"error\":\"invalid_client\",\"error_description\":\"client_secret=client-secret "
                 + "access_token=leaked-access-token refresh_token=leaked-refresh-token "
@@ -211,8 +211,15 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     WebClientResponseException cause = (WebClientResponseException) error.getCause();
                     assertThat(cause.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                     assertThat(cause.getResponseBodyAsString())
-                            .contains("<redacted>", "...(truncated)")
-                            .doesNotContain("client-secret", "leaked-access-token", "leaked-refresh-token");
+                            .contains("<redacted>")
+                            .doesNotContain("...(truncated)", "client-secret",
+                                    "leaked-access-token", "leaked-refresh-token");
+                    OAuthErrorBody decoded = cause.getResponseBodyAs(OAuthErrorBody.class);
+                    assertThat(decoded.error).isEqualTo("invalid_client");
+                    assertThat(decoded.error_description)
+                            .contains("<redacted>")
+                            .doesNotContain("client-secret", "leaked-access-token", "leaked-refresh-token")
+                            .hasSizeGreaterThan(1200);
                     assertThat(error.getMessage().length()).isLessThan(1150);
                 })
                 .verify();
@@ -612,6 +619,31 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void emptySuccessfulTokenResponseProducesMissingTokenDiagnostic() {
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build()))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage()).contains("no access_token");
+                    assertThat(error.getCause())
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessage("missing access_token");
+                })
+                .verify();
+    }
+
+    @Test
     void missingAccessTokenProducesSanitizedException() {
         AtomicReference<MockClientHttpRequest> captured = captureMock();
         WebClient webClient = WebClient.builder()
@@ -685,6 +717,12 @@ class OAuth2ClientCredentialsTokenProviderTest {
     @SuppressWarnings("checkstyle:MemberName")
     static final class TokenEndpointErrorBody {
         public String access_token;
+    }
+
+    @SuppressWarnings("checkstyle:MemberName")
+    static final class OAuthErrorBody {
+        public String error;
+        public String error_description;
     }
 
     static final class SnakeCaseTokenEndpointErrorBody {
