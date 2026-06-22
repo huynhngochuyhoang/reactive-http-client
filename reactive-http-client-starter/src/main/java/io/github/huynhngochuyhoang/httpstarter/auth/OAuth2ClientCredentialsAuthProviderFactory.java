@@ -26,6 +26,7 @@ public final class OAuth2ClientCredentialsAuthProviderFactory implements AuthPro
         ReactiveHttpClientProperties.OAuth2ClientCredentialsAuthConfig oauth = config.getOauth2ClientCredentials();
         OAuth2ClientCredentialsTokenProvider.Builder builder =
                 OAuth2ClientCredentialsTokenProvider.builder(webClientBuilder.build())
+                        .clientName(clientName)
                         .tokenUri(required(oauth.getTokenUri(), clientName, "auth.oauth2-client-credentials.token-uri"))
                         .clientId(required(oauth.getClientId(), clientName, "auth.oauth2-client-credentials.client-id"))
                         .clientSecret(required(oauth.getClientSecret(), clientName, "auth.oauth2-client-credentials.client-secret"))

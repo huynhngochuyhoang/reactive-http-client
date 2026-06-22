@@ -127,7 +127,7 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
                     .map(token -> validateAndNormalize(clientName, token))
                     .onErrorMap(error -> error instanceof AuthProviderException
                             ? error
-                            : new AuthProviderException(clientName, error))
+                            : authProviderException(clientName, error))
                     .doOnNext(token -> {
                         synchronized (this) {
                             if (refreshEpoch == invalidationEpoch) {
@@ -152,6 +152,16 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
             inFlightRefresh = refreshMono;
             return refreshMono.map(CachedAccessToken::tokenValue);
         }
+    }
+
+    private AuthProviderException authProviderException(String clientName, Throwable cause) {
+        if (cause instanceof SanitizedAuthProviderFailure sanitizedFailure) {
+            return new AuthProviderException(
+                    clientName,
+                    sanitizedFailure.sanitizedAuthMessage(),
+                    sanitizedFailure.sanitizedAuthCause());
+        }
+        return new AuthProviderException(clientName, cause);
     }
 
     private CachedAccessToken validateAndNormalize(String clientName, AccessToken token) {

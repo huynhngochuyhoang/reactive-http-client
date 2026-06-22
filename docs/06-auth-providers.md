@@ -96,17 +96,37 @@ For standard OAuth 2.0 client-credentials flows, use the built-in object-style p
 reactive:
   http:
     clients:
-      user-service:
+      payment-service:
         base-url: https://api.example.com
         auth:
           type: oauth2-client-credentials
           oauth2-client-credentials:
             token-uri: https://auth.example.com/oauth/token
-            client-id: user-service
-            client-secret: ${USER_SERVICE_CLIENT_SECRET}
-            scope: read:users
-            auth-style: basic-auth   # or form-post
+            client-id: ${PAYMENT_CLIENT_ID}
+            client-secret: ${PAYMENT_CLIENT_SECRET}
+            scope: payments:read payments:write
+            audience: https://api.example.com/
+            auth-style: form-post    # basic-auth by default; use form-post when the token server requires body credentials
+            expiry-leeway-ms: 60000  # subtract 60s from expires_in before caching
 ```
+
+`auth-style: basic-auth` sends credentials in the token request `Authorization`
+header. `auth-style: form-post` sends `client_id` and `client_secret` as
+form-encoded token request fields for providers that require RFC 6749 body
+credentials.
+
+The token provider maps `expires_in` to an `AccessToken` expiry timestamp after
+subtracting `expiry-leeway-ms`. `RefreshingBearerAuthProvider` caches the token,
+deduplicates concurrent refreshes, and refreshes before the cached token enters
+its refresh window. If a downstream API returns `401` and the auth provider is
+invalidatable, the outbound auth filter invalidates the cached bearer token and
+retries the request once with a fresh token.
+
+Token endpoint failures are reported as `AuthProviderException`. HTTP 4xx/5xx
+responses include the status and a bounded, redacted response-body snippet.
+Malformed token JSON and missing `access_token` responses use fixed diagnostic
+messages. Client secrets, access tokens, and refresh tokens are not included in
+exception messages.
 
 For manual bean wiring, compose `OAuth2ClientCredentialsTokenProvider` with `RefreshingBearerAuthProvider`:
 

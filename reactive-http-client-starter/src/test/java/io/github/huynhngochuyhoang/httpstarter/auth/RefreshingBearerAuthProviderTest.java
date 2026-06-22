@@ -15,9 +15,7 @@ import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class RefreshingBearerAuthProviderTest {
 
@@ -231,6 +229,25 @@ class RefreshingBearerAuthProviderTest {
                 .assertNext(auth -> assertEquals("Bearer fresh-token", auth.getHeaders().get("Authorization")))
                 .verifyComplete();
         assertEquals(2, calls.get());
+    }
+
+    @Test
+    void shouldKeepGenericMessageForCustomProviderFailures() {
+        RefreshingBearerAuthProvider provider = new RefreshingBearerAuthProvider(
+                () -> Mono.error(new IllegalStateException("raw client_secret=leaked")),
+                Duration.ofSeconds(30),
+                Duration.ZERO,
+                Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC)
+        );
+
+        StepVerifier.create(provider.getAuth(sampleRequest()))
+                .expectErrorSatisfies(error -> {
+                    assertTrue(error instanceof io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException);
+                    assertEquals("Auth provider failed for client 'sample-client'", error.getMessage());
+                    assertTrue(error.getCause() instanceof IllegalStateException);
+                    assertEquals("raw client_secret=leaked", error.getCause().getMessage());
+                })
+                .verify();
     }
 
     private static AuthRequest sampleRequest() {
