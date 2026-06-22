@@ -471,6 +471,44 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void tokenEndpointErrorRedactsUrlEncodedBasicAuthorization() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String basicCredential = Base64.getEncoder()
+                .encodeToString("client:client-secret".getBytes(StandardCharsets.ISO_8859_1));
+        String encodedCredential = basicCredential
+                .replace("+", "%2B")
+                .replace("/", "%2F")
+                .replace("=", "%3D");
+        String encodedAuthorization = "Authorization%3A%20Basic%20" + encodedCredential;
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST,
+                        "proxy rejected " + encodedAuthorization))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(encodedCredential).contains("%3D");
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("Authorization%3A%20Basic%20<redacted>")
+                            .doesNotContain(encodedCredential, basicCredential, "client-secret");
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getResponseBodyAsString())
+                            .contains("Authorization%3A%20Basic%20<redacted>")
+                            .doesNotContain(encodedCredential, basicCredential, "client-secret");
+                })
+                .verify();
+    }
+
+    @Test
     void tokenEndpointErrorRedactsLatin1BasicCredentialEcho() {
         AtomicReference<MockClientHttpRequest> captured = captureMock();
         String basicCredential = Base64.getEncoder()

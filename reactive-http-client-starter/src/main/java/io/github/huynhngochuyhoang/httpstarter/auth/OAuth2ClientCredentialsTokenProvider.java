@@ -16,6 +16,7 @@ import org.springframework.web.reactive.function.UnsupportedMediaTypeException;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.util.UriUtils;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
@@ -228,6 +229,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         String basicCredential = Base64.getEncoder()
                 .encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.ISO_8859_1));
         sanitized = sanitized.replace(basicCredential, "<redacted>");
+        sanitized = sanitized.replace(UriUtils.encode(basicCredential, StandardCharsets.UTF_8), "<redacted>");
         sanitized = BASIC_AUTHORIZATION_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = URL_ENCODED_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = NESTED_JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
