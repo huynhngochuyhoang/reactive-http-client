@@ -476,10 +476,10 @@ class OAuth2ClientCredentialsTokenProviderTest {
         String basicCredential = Base64.getEncoder()
                 .encodeToString("client:client-secret".getBytes(StandardCharsets.ISO_8859_1));
         String encodedCredential = basicCredential
-                .replace("+", "%2B")
-                .replace("/", "%2F")
-                .replace("=", "%3D");
-        String encodedAuthorization = "Authorization%3A%20Basic%20" + encodedCredential;
+                .replace("+", "%2b")
+                .replace("/", "%2f")
+                .replace("=", "%3d");
+        String encodedAuthorization = "Authorization%3a%20Basic%20" + encodedCredential;
         WebClient webClient = WebClient.builder()
                 .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST,
                         "proxy rejected " + encodedAuthorization))
@@ -495,14 +495,14 @@ class OAuth2ClientCredentialsTokenProviderTest {
 
         StepVerifier.create(provider.fetchToken())
                 .expectErrorSatisfies(error -> {
-                    assertThat(encodedCredential).contains("%3D");
+                    assertThat(encodedCredential).contains("%3d");
                     assertThat(error).isInstanceOf(AuthProviderException.class);
                     assertThat(error.getMessage())
-                            .contains("Authorization%3A%20Basic%20<redacted>")
+                            .contains("Authorization%3a%20Basic%20<redacted>")
                             .doesNotContain(encodedCredential, basicCredential, "client-secret");
                     WebClientResponseException cause = (WebClientResponseException) error.getCause();
                     assertThat(cause.getResponseBodyAsString())
-                            .contains("Authorization%3A%20Basic%20<redacted>")
+                            .contains("Authorization%3a%20Basic%20<redacted>")
                             .doesNotContain(encodedCredential, basicCredential, "client-secret");
                 })
                 .verify();
@@ -559,6 +559,39 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getMessage())
                             .contains("client_secret%3D<redacted>")
                             .doesNotContain("s3cr3t");
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointErrorRedactsPercentEncodedJsonTokens() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String body = "%7b%22access_token%22%3a%20%22leaked-access%22%2c"
+                + "%22refresh_token%22%3a%22leaked-refresh%22%7d";
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST, body))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("%22access_token%22%3a%20%22<redacted>%22",
+                                    "%22refresh_token%22%3a%22<redacted>%22")
+                            .doesNotContain("leaked-access", "leaked-refresh");
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getResponseBodyAsString())
+                            .contains("%22access_token%22%3a%20%22<redacted>%22",
+                                    "%22refresh_token%22%3a%22<redacted>%22")
+                            .doesNotContain("leaked-access", "leaked-refresh");
                 })
                 .verify();
     }
@@ -652,6 +685,39 @@ class OAuth2ClientCredentialsTokenProviderTest {
                             .hasMessageNotContaining("leaked-access-token")
                             .hasMessageNotContaining("client-secret");
                     assertThat(error.getCause().getCause()).isNull();
+                })
+                .verify();
+    }
+
+    @Test
+    void manualProviderMalformedTokenKeepsExplicitDiagnostic() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured,
+                        "not-json leaked-access-token client_secret=client-secret"))
+                .build();
+        OAuth2ClientCredentialsTokenProvider tokenProvider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .build();
+        RefreshingBearerAuthProvider provider = new RefreshingBearerAuthProvider(tokenProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.example.com/payments"))
+                .build();
+
+        StepVerifier.create(provider.getAuth(new AuthRequest("manual-payment", request)))
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getMessage())
+                            .contains("malformed JSON token response")
+                            .doesNotContain("leaked-access-token", "client-secret");
+                    assertThat(error.getCause())
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessageContaining("malformed JSON token response");
+                    assertThat(error.getCause().getCause())
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessage("OAuth2 token response decoding failed");
                 })
                 .verify();
     }

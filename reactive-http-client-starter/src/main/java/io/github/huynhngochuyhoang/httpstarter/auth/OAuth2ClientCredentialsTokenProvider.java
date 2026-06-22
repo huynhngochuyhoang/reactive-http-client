@@ -79,6 +79,10 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             "(?i)(Authorization\\s*[:=]\\s*Basic\\s+)([^\\s,;<>]+)");
     private static final Pattern URL_ENCODED_SECRET_FIELD = Pattern.compile(
             "(?i)((?:access_token|refresh_token|id_token|client_secret)%3D)([^&\\s]+)");
+    private static final Pattern URL_ENCODED_JSON_SECRET_FIELD = Pattern.compile(
+            "(?i)(%22(?:access_token|refresh_token|id_token|client_secret)%22"
+                    + "(?:%(?:20|09|0A|0D)|\\+)*%3A(?:%(?:20|09|0A|0D)|\\+)*%22)"
+                    + "((?:(?:%5C%22)|(?!%22).)*)(%22)");
 
     /** Where the client credentials are carried in the token request. */
     public enum AuthStyle {
@@ -229,9 +233,13 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         String basicCredential = Base64.getEncoder()
                 .encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.ISO_8859_1));
         sanitized = sanitized.replace(basicCredential, "<redacted>");
-        sanitized = sanitized.replace(UriUtils.encode(basicCredential, StandardCharsets.UTF_8), "<redacted>");
+        String encodedBasicCredential = UriUtils.encode(basicCredential, StandardCharsets.UTF_8);
+        sanitized = percentEncodedLiteralPattern(encodedBasicCredential)
+                .matcher(sanitized)
+                .replaceAll("<redacted>");
         sanitized = BASIC_AUTHORIZATION_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = URL_ENCODED_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
+        sanitized = URL_ENCODED_JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = NESTED_JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = sanitized.replaceAll("(?<![A-Za-z0-9_])" + Pattern.quote(clientSecret) + "(?![A-Za-z0-9_])", "<redacted>");
@@ -244,6 +252,24 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             return sanitizedBody;
         }
         return sanitizedBody.substring(0, MAX_TOKEN_ERROR_BODY_CHARS) + "...(truncated)";
+    }
+
+    private static Pattern percentEncodedLiteralPattern(String encodedValue) {
+        StringBuilder regex = new StringBuilder(encodedValue.length() * 2);
+        for (int i = 0; i < encodedValue.length();) {
+            if (encodedValue.charAt(i) == '%' && i + 2 < encodedValue.length()
+                    && Character.digit(encodedValue.charAt(i + 1), 16) >= 0
+                    && Character.digit(encodedValue.charAt(i + 2), 16) >= 0) {
+                regex.append("%(?i:")
+                        .append(encodedValue, i + 1, i + 3)
+                        .append(')');
+                i += 3;
+            } else {
+                regex.append(Pattern.quote(String.valueOf(encodedValue.charAt(i))));
+                i++;
+            }
+        }
+        return Pattern.compile(regex.toString());
     }
 
     private AccessToken toAccessToken(TokenResponse response) {
@@ -324,7 +350,8 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         public String scope;
     }
 
-    private static final class OAuth2TokenFailureException extends IllegalStateException {
+    private static final class OAuth2TokenFailureException extends IllegalStateException
+            implements SanitizedAuthProviderFailure {
 
         private OAuth2TokenFailureException(String message) {
             super(message);
@@ -332,6 +359,16 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
 
         private OAuth2TokenFailureException(String message, Throwable cause) {
             super(message, cause);
+        }
+
+        @Override
+        public String sanitizedAuthMessage() {
+            return getMessage();
+        }
+
+        @Override
+        public Throwable sanitizedAuthCause() {
+            return this;
         }
     }
 
