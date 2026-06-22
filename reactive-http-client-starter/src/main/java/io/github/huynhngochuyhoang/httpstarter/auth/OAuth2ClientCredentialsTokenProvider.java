@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -88,9 +87,6 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             "(?i)(%22(?:access_token|refresh_token|id_token|client_secret)%22"
                     + "(?:%(?:20|09|0A|0D)|\\+)*%3A(?:%(?:20|09|0A|0D)|\\+)*%22)"
                     + "((?:(?:%5C%22)|(?!%22).)*)(%22)");
-    private static final Pattern JSON_SAFE_UNICODE_ESCAPE = Pattern.compile(
-            "(?<!\\\\)((?:\\\\\\\\)*)\\\\u([0-9a-fA-F]{4})");
-
     /** Where the client credentials are carried in the token request. */
     public enum AuthStyle {
         /** {@code Authorization: Basic base64(client_id:client_secret)}. */
@@ -109,6 +105,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     private final AuthStyle authStyle;
     private final Duration expiryLeeway;
     private final String diagnosticClientName;
+    private final Pattern clientSecretPattern;
 
     private OAuth2ClientCredentialsTokenProvider(Builder b) {
         WebClient configuredWebClient = Objects.requireNonNull(b.webClient, "webClient");
@@ -120,6 +117,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         this.tokenUri = requireNonBlank(b.tokenUri, "tokenUri");
         this.clientId = requireNonBlank(b.clientId, "clientId");
         this.clientSecret = requireNonBlank(b.clientSecret, "clientSecret");
+        this.clientSecretPattern = jsonEscapedLiteralPattern(clientSecret);
         this.scope = b.scope;
         this.audience = b.audience;
         this.authStyle = b.authStyle != null ? b.authStyle : AuthStyle.BASIC_AUTH;
@@ -259,7 +257,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         sanitized = NESTED_JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = COLON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
-        sanitized = sanitized.replaceAll("(?<![A-Za-z0-9_])" + Pattern.quote(clientSecret) + "(?![A-Za-z0-9_])", "<redacted>");
+        sanitized = clientSecretPattern.matcher(sanitized).replaceAll("<redacted>");
         sanitized = FORM_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         return sanitized.replace("\r", " ").replace("\n", " ").strip();
     }
@@ -289,6 +287,27 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         return Pattern.compile(regex.toString());
     }
 
+    private static Pattern jsonEscapedLiteralPattern(String value) {
+        StringBuilder regex = new StringBuilder(value.length() * 20);
+        regex.append("(?<![A-Za-z0-9_])");
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            regex.append("(?:")
+                    .append(Pattern.quote(String.valueOf(character)))
+                    .append("|\\\\u(?i:");
+            appendFourDigitHex(regex, character);
+            regex.append("))");
+        }
+        regex.append("(?![A-Za-z0-9_])");
+        return Pattern.compile(regex.toString());
+    }
+
+    private static void appendFourDigitHex(StringBuilder target, char character) {
+        for (int shift = 12; shift >= 0; shift -= 4) {
+            target.append(Character.forDigit(character >> shift & 0xf, 16));
+        }
+    }
+
     private static String normalizeJsonFieldNameEscapes(String value) {
         StringBuilder normalized = new StringBuilder(value.length());
         int cursor = 0;
@@ -310,12 +329,57 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
                 next++;
             }
             normalized.append(next < value.length() && value.charAt(next) == ':'
-                    ? normalizeSafeJsonUnicodeEscapes(stringValue)
+                    ? normalizeSafeJsonUnicodeEscapes(stringValue, 1)
+                    : normalizeNestedJsonFieldNameEscapes(stringValue));
+            normalized.append('"');
+            cursor = closingQuote + 1;
+        }
+        return normalized.toString();
+    }
+
+    private static String normalizeNestedJsonFieldNameEscapes(String value) {
+        StringBuilder normalized = new StringBuilder(value.length());
+        int cursor = 0;
+        while (cursor < value.length()) {
+            int openingQuote = nestedJsonQuote(value, cursor);
+            if (openingQuote < 0) {
+                normalized.append(value, cursor, value.length());
+                break;
+            }
+            normalized.append(value, cursor, openingQuote + 1);
+            int closingQuote = nestedJsonQuote(value, openingQuote + 1);
+            if (closingQuote < 0) {
+                normalized.append(value, openingQuote + 1, value.length());
+                break;
+            }
+            String stringValue = value.substring(openingQuote + 1, closingQuote);
+            int next = closingQuote + 1;
+            while (next < value.length() && Character.isWhitespace(value.charAt(next))) {
+                next++;
+            }
+            normalized.append(next < value.length() && value.charAt(next) == ':'
+                    ? normalizeSafeJsonUnicodeEscapes(stringValue, 2)
                     : stringValue);
             normalized.append('"');
             cursor = closingQuote + 1;
         }
         return normalized.toString();
+    }
+
+    private static int nestedJsonQuote(String value, int start) {
+        for (int i = start; i < value.length(); i++) {
+            if (value.charAt(i) != '"') {
+                continue;
+            }
+            int slashCount = 0;
+            for (int j = i - 1; j >= 0 && value.charAt(j) == '\\'; j--) {
+                slashCount++;
+            }
+            if (slashCount % 4 == 1) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static int jsonStringEnd(String value, int start) {
@@ -333,20 +397,46 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         return -1;
     }
 
-    private static String normalizeSafeJsonUnicodeEscapes(String value) {
-        Matcher matcher = JSON_SAFE_UNICODE_ESCAPE.matcher(value);
+    private static String normalizeSafeJsonUnicodeEscapes(String value, int slashUnit) {
         StringBuilder normalized = new StringBuilder(value.length());
-        while (matcher.find()) {
-            int decoded = Integer.parseInt(matcher.group(2), 16);
+        int cursor = 0;
+        while (cursor < value.length()) {
+            if (value.charAt(cursor) != '\\') {
+                normalized.append(value.charAt(cursor++));
+                continue;
+            }
+            int escapeStart = cursor;
+            while (cursor < value.length() && value.charAt(cursor) == '\\') {
+                cursor++;
+            }
+            // Each containing JSON string doubles the slashes that encode a nested Unicode escape.
+            int slashCount = cursor - escapeStart;
+            boolean unicodeEscape = slashCount % (slashUnit * 2) == slashUnit
+                    && cursor + 5 <= value.length()
+                    && value.charAt(cursor) == 'u';
+            int decoded = unicodeEscape ? parseFourDigitHex(value, cursor + 1) : -1;
             boolean safeFieldCharacter = decoded == '_' || decoded >= 'A' && decoded <= 'Z'
                     || decoded >= 'a' && decoded <= 'z';
-            String replacement = safeFieldCharacter
-                    ? matcher.group(1) + Character.toString(decoded)
-                    : matcher.group();
-            matcher.appendReplacement(normalized, Matcher.quoteReplacement(replacement));
+            if (safeFieldCharacter) {
+                normalized.append(value, escapeStart, cursor - slashUnit).append((char) decoded);
+                cursor += 5;
+            } else {
+                normalized.append(value, escapeStart, cursor);
+            }
         }
-        matcher.appendTail(normalized);
         return normalized.toString();
+    }
+
+    private static int parseFourDigitHex(String value, int start) {
+        int decoded = 0;
+        for (int i = start; i < start + 4; i++) {
+            int digit = Character.digit(value.charAt(i), 16);
+            if (digit < 0) {
+                return -1;
+            }
+            decoded = decoded << 4 | digit;
+        }
+        return decoded;
     }
 
     private AccessToken toAccessToken(TokenResponse response) {

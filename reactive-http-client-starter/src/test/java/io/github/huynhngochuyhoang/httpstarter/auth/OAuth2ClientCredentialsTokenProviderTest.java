@@ -453,6 +453,63 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void tokenEndpointRedactsUnicodeEscapedClientSecretInGenericJsonValue() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String escapedSecret = "s3cr" + "\\" + "u0033t";
+        String body = "{\"error_description\":\"bad secret " + escapedSecret + "\"}";
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST, body))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("s3cr3t")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error.getMessage()).contains("bad secret <redacted>").doesNotContain(escapedSecret);
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getResponseBodyAsString())
+                            .contains("bad secret <redacted>")
+                            .doesNotContain(escapedSecret);
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointRedactsUnicodeEscapedSensitiveFieldInNestedJson() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String nestedEscapedUnderscore = "\\\\" + "u005f";
+        String body = "{\"debug\":\"{\\\"access" + nestedEscapedUnderscore
+                + "token\\\":\\\"leaked-access\\\"}\"}";
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST, body))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error.getMessage())
+                            .contains("access_token\\\":\\\"<redacted>")
+                            .doesNotContain("leaked-access");
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getResponseBodyAsString()).doesNotContain("leaked-access");
+                })
+                .verify();
+    }
+
+    @Test
     void tokenEndpointRedactsColonDelimitedSensitiveFields() {
         AtomicReference<MockClientHttpRequest> captured = captureMock();
         String body = "access_token: leaked-access; refresh_token : \"leaked refresh\"; "
