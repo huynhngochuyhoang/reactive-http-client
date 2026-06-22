@@ -88,7 +88,8 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             "(?i)(%22(?:access_token|refresh_token|id_token|client_secret)%22"
                     + "(?:%(?:20|09|0A|0D)|\\+)*%3A(?:%(?:20|09|0A|0D)|\\+)*%22)"
                     + "((?:(?:%5C%22)|(?!%22).)*)(%22)");
-    private static final Pattern JSON_SAFE_UNICODE_ESCAPE = Pattern.compile("\\\\u([0-9a-fA-F]{4})");
+    private static final Pattern JSON_SAFE_UNICODE_ESCAPE = Pattern.compile(
+            "(?<!\\\\)((?:\\\\\\\\)*)\\\\u([0-9a-fA-F]{4})");
 
     /** Where the client credentials are carried in the token request. */
     public enum AuthStyle {
@@ -225,6 +226,9 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         if (contentType != null) {
             sanitizedHeaders.setContentType(new MediaType(contentType, StandardCharsets.UTF_8));
         }
+        if (sanitizedHeaders.containsKey(HttpHeaders.CONTENT_LENGTH)) {
+            sanitizedHeaders.setContentLength(body.length);
+        }
         WebClientResponseException sanitized = WebClientResponseException.create(
                 source.getStatusCode(),
                 source.getStatusText(),
@@ -241,7 +245,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         if (!StringUtils.hasText(responseBody)) {
             return "";
         }
-        String sanitized = normalizeSafeJsonUnicodeEscapes(responseBody);
+        String sanitized = normalizeJsonFieldNameEscapes(responseBody);
         String basicCredential = Base64.getEncoder()
                 .encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.ISO_8859_1));
         sanitized = sanitized.replace(basicCredential, "<redacted>");
@@ -285,14 +289,59 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         return Pattern.compile(regex.toString());
     }
 
+    private static String normalizeJsonFieldNameEscapes(String value) {
+        StringBuilder normalized = new StringBuilder(value.length());
+        int cursor = 0;
+        while (cursor < value.length()) {
+            int openingQuote = value.indexOf('"', cursor);
+            if (openingQuote < 0) {
+                normalized.append(value, cursor, value.length());
+                break;
+            }
+            normalized.append(value, cursor, openingQuote + 1);
+            int closingQuote = jsonStringEnd(value, openingQuote + 1);
+            if (closingQuote < 0) {
+                normalized.append(value, openingQuote + 1, value.length());
+                break;
+            }
+            String stringValue = value.substring(openingQuote + 1, closingQuote);
+            int next = closingQuote + 1;
+            while (next < value.length() && Character.isWhitespace(value.charAt(next))) {
+                next++;
+            }
+            normalized.append(next < value.length() && value.charAt(next) == ':'
+                    ? normalizeSafeJsonUnicodeEscapes(stringValue)
+                    : stringValue);
+            normalized.append('"');
+            cursor = closingQuote + 1;
+        }
+        return normalized.toString();
+    }
+
+    private static int jsonStringEnd(String value, int start) {
+        boolean escaped = false;
+        for (int i = start; i < value.length(); i++) {
+            char current = value.charAt(i);
+            if (escaped) {
+                escaped = false;
+            } else if (current == '\\') {
+                escaped = true;
+            } else if (current == '"') {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private static String normalizeSafeJsonUnicodeEscapes(String value) {
         Matcher matcher = JSON_SAFE_UNICODE_ESCAPE.matcher(value);
         StringBuilder normalized = new StringBuilder(value.length());
         while (matcher.find()) {
-            int decoded = Integer.parseInt(matcher.group(1), 16);
-            String replacement = decoded == '_' || decoded >= 'A' && decoded <= 'Z'
-                    || decoded >= 'a' && decoded <= 'z'
-                    ? Character.toString(decoded)
+            int decoded = Integer.parseInt(matcher.group(2), 16);
+            boolean safeFieldCharacter = decoded == '_' || decoded >= 'A' && decoded <= 'Z'
+                    || decoded >= 'a' && decoded <= 'z';
+            String replacement = safeFieldCharacter
+                    ? matcher.group(1) + Character.toString(decoded)
                     : matcher.group();
             matcher.appendReplacement(normalized, Matcher.quoteReplacement(replacement));
         }

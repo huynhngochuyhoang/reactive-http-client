@@ -297,6 +297,7 @@ class OAuth2ClientCredentialsTokenProviderTest {
                 .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.BAD_REQUEST)
                         .header(HttpHeaders.CONTENT_TYPE,
                                 new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.ISO_8859_1).toString())
+                        .header(HttpHeaders.CONTENT_LENGTH, Integer.toString(responseBytes.length))
                         .body(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(responseBytes)))
                         .build()))
                 .build();
@@ -314,6 +315,9 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     WebClientResponseException cause = (WebClientResponseException) error.getCause();
                     assertThat(cause.getHeaders().getContentType().getCharset())
                             .isEqualTo(StandardCharsets.UTF_8);
+                    assertThat(cause.getHeaders().getContentLength())
+                            .isEqualTo(cause.getResponseBodyAsByteArray().length)
+                            .isNotEqualTo(responseBytes.length);
                     assertThat(cause.getResponseBodyAsString()).contains("é", "<redacted>");
                     OAuthErrorBody decoded = cause.getResponseBodyAs(OAuthErrorBody.class);
                     assertThat(decoded.error_description).isEqualTo("é");
@@ -415,6 +419,35 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     WebClientResponseException cause = (WebClientResponseException) error.getCause();
                     assertThat(cause.getResponseBodyAsString())
                             .doesNotContain("leaked-access", "leaked-refresh", "leaked-id");
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointPreservesLiteralUnicodeEscapeInJsonValue() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String literalUnicodeEscape = "\\\\" + "u0061";
+        String expectedDescription = "literal " + "\\" + "u0061";
+        String body = "{\"error_description\":\"literal " + literalUnicodeEscape
+                + "\",\"access_token\":\"leaked-access\"}";
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST, body))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getResponseBodyAsString()).doesNotContain("leaked-access");
+                    OAuthErrorBody decoded = cause.getResponseBodyAs(OAuthErrorBody.class);
+                    assertThat(decoded.error_description).isEqualTo(expectedDescription);
                 })
                 .verify();
     }
