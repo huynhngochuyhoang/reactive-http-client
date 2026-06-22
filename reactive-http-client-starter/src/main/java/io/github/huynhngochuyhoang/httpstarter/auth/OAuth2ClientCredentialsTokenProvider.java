@@ -5,6 +5,7 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.codec.CodecException;
 import org.springframework.core.codec.Decoder;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.DecoderHttpMessageReader;
 import org.springframework.http.codec.HttpMessageReader;
@@ -27,6 +28,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -75,6 +77,9 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             "(?i)(\\\\\\x22(?:access_token|refresh_token|id_token|client_secret)\\\\\\x22\\s*:\\s*\\\\\\x22)((?:\\\\\\.|[^\\\\\\x22\\\\\\\\])*)(\\\\\\x22)");
     private static final Pattern FORM_SECRET_FIELD = Pattern.compile(
             "(?i)((?:access_token|refresh_token|id_token|client_secret)=)([^&\s]+)");
+    private static final Pattern COLON_SECRET_FIELD = Pattern.compile(
+            "(?i)((?<![A-Za-z0-9_])(?:access_token|refresh_token|id_token|client_secret)\\s*:\\s*)"
+                    + "(?:\\x22(?:\\\\.|[^\\x22\\\\])*\\x22|[^\\s,;<>]+)");
     private static final Pattern BASIC_AUTHORIZATION_FIELD = Pattern.compile(
             "(?i)(Authorization\\s*[:=]\\s*Basic\\s+)([^\\s,;<>]+)");
     private static final Pattern URL_ENCODED_SECRET_FIELD = Pattern.compile(
@@ -83,6 +88,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             "(?i)(%22(?:access_token|refresh_token|id_token|client_secret)%22"
                     + "(?:%(?:20|09|0A|0D)|\\+)*%3A(?:%(?:20|09|0A|0D)|\\+)*%22)"
                     + "((?:(?:%5C%22)|(?!%22).)*)(%22)");
+    private static final Pattern JSON_SAFE_UNICODE_ESCAPE = Pattern.compile("\\\\u([0-9a-fA-F]{4})");
 
     /** Where the client credentials are carried in the token request. */
     public enum AuthStyle {
@@ -213,10 +219,16 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         byte[] body = StringUtils.hasText(sanitizedBody)
                 ? sanitizedBody.getBytes(StandardCharsets.UTF_8)
                 : new byte[0];
+        HttpHeaders sanitizedHeaders = new HttpHeaders();
+        sanitizedHeaders.addAll(source.getHeaders());
+        MediaType contentType = sanitizedHeaders.getContentType();
+        if (contentType != null) {
+            sanitizedHeaders.setContentType(new MediaType(contentType, StandardCharsets.UTF_8));
+        }
         WebClientResponseException sanitized = WebClientResponseException.create(
                 source.getStatusCode(),
                 source.getStatusText(),
-                source.getHeaders(),
+                sanitizedHeaders,
                 body,
                 StandardCharsets.UTF_8,
                 null);
@@ -229,7 +241,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         if (!StringUtils.hasText(responseBody)) {
             return "";
         }
-        String sanitized = responseBody;
+        String sanitized = normalizeSafeJsonUnicodeEscapes(responseBody);
         String basicCredential = Base64.getEncoder()
                 .encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.ISO_8859_1));
         sanitized = sanitized.replace(basicCredential, "<redacted>");
@@ -242,6 +254,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         sanitized = URL_ENCODED_JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = NESTED_JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
         sanitized = JSON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>$3");
+        sanitized = COLON_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         sanitized = sanitized.replaceAll("(?<![A-Za-z0-9_])" + Pattern.quote(clientSecret) + "(?![A-Za-z0-9_])", "<redacted>");
         sanitized = FORM_SECRET_FIELD.matcher(sanitized).replaceAll("$1<redacted>");
         return sanitized.replace("\r", " ").replace("\n", " ").strip();
@@ -270,6 +283,21 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
             }
         }
         return Pattern.compile(regex.toString());
+    }
+
+    private static String normalizeSafeJsonUnicodeEscapes(String value) {
+        Matcher matcher = JSON_SAFE_UNICODE_ESCAPE.matcher(value);
+        StringBuilder normalized = new StringBuilder(value.length());
+        while (matcher.find()) {
+            int decoded = Integer.parseInt(matcher.group(1), 16);
+            String replacement = decoded == '_' || decoded >= 'A' && decoded <= 'Z'
+                    || decoded >= 'a' && decoded <= 'z'
+                    ? Character.toString(decoded)
+                    : matcher.group();
+            matcher.appendReplacement(normalized, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(normalized);
+        return normalized.toString();
     }
 
     private AccessToken toAccessToken(TokenResponse response) {

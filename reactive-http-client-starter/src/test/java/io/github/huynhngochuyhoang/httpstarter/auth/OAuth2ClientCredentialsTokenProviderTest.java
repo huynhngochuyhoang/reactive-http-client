@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.*;
 import org.springframework.http.codec.json.Jackson2JsonDecoder;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
@@ -288,6 +289,39 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void sanitizedFailureUpdatesResponseCharsetToUtf8() {
+        String responseBody = "{\"error\":\"invalid_client\",\"error_description\":\"é\","
+                + "\"access_token\":\"leaked-access\"}";
+        byte[] responseBytes = responseBody.getBytes(StandardCharsets.ISO_8859_1);
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.BAD_REQUEST)
+                        .header(HttpHeaders.CONTENT_TYPE,
+                                new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.ISO_8859_1).toString())
+                        .body(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(responseBytes)))
+                        .build()))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getHeaders().getContentType().getCharset())
+                            .isEqualTo(StandardCharsets.UTF_8);
+                    assertThat(cause.getResponseBodyAsString()).contains("é", "<redacted>");
+                    OAuthErrorBody decoded = cause.getResponseBodyAs(OAuthErrorBody.class);
+                    assertThat(decoded.error_description).isEqualTo("é");
+                })
+                .verify();
+    }
+
+    @Test
     void tokenEndpointFailureCauseUsesConfiguredDecodersWithoutBlocking() {
         ObjectMapper mapper = new ObjectMapper()
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
@@ -348,6 +382,69 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(error.getMessage())
                             .contains("access_token\":\"<redacted>", "refresh_token\":\"<redacted>")
                             .doesNotContain("leaked-access", "leaked-refresh");
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointRedactsUnicodeEscapedJsonFieldNames() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String escapedUnderscore = "\\" + "u005f";
+        String body = "{\"access" + escapedUnderscore + "token\":\"leaked-access\","
+                + "\"refresh" + escapedUnderscore + "token\":\"leaked-refresh\","
+                + "\"id" + escapedUnderscore + "token\":\"leaked-id\"}";
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST, body))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error.getMessage())
+                            .contains("access_token\":\"<redacted>",
+                                    "refresh_token\":\"<redacted>",
+                                    "id_token\":\"<redacted>")
+                            .doesNotContain("leaked-access", "leaked-refresh", "leaked-id");
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getResponseBodyAsString())
+                            .doesNotContain("leaked-access", "leaked-refresh", "leaked-id");
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenEndpointRedactsColonDelimitedSensitiveFields() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String body = "access_token: leaked-access; refresh_token : \"leaked refresh\"; "
+                + "id_token: leaked-id, client_secret: client-secret";
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, HttpStatus.BAD_REQUEST, body))
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error.getMessage())
+                            .contains("access_token: <redacted>", "refresh_token : <redacted>",
+                                    "id_token: <redacted>", "client_secret: <redacted>")
+                            .doesNotContain("leaked-access", "leaked refresh", "leaked-id", "client-secret");
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getResponseBodyAsString())
+                            .doesNotContain("leaked-access", "leaked refresh", "leaked-id", "client-secret");
                 })
                 .verify();
     }
