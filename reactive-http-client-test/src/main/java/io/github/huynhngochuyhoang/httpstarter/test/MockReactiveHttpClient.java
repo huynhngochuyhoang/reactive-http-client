@@ -206,6 +206,7 @@ public final class MockReactiveHttpClient<T> {
         private ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
         private ResilienceOperatorApplier resilienceOperatorApplier = new NoopResilienceOperatorApplier();
         private AuthProvider authProvider;
+        private ObjectMapper objectMapper;
         private HttpClientObserver observer;
         private final List<ReactiveHttpClientLifecycleHook> lifecycleHooks = new ArrayList<>();
 
@@ -253,6 +254,12 @@ public final class MockReactiveHttpClient<T> {
         /** Uses the supplied client configuration when constructing the mock proxy. */
         public Builder<T> clientConfig(ReactiveHttpClientProperties.ClientConfig clientConfig) {
             this.clientConfig = clientConfig != null ? clientConfig : new ReactiveHttpClientProperties.ClientConfig();
+            return this;
+        }
+
+        /** Uses the application ObjectMapper for auth-aware JSON request serialization. */
+        public Builder<T> objectMapper(ObjectMapper objectMapper) {
+            this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
             return this;
         }
 
@@ -364,12 +371,14 @@ public final class MockReactiveHttpClient<T> {
             }
             appCtx.refresh();
 
-            ObjectMapper objectMapper = null;
+            ObjectMapper effectiveObjectMapper = objectMapper;
             if (authProvider != null) {
                 if (!clientConfig.hasAuthConfigured()) {
                     clientConfig.setAuthProvider("mock-auth-provider");
                 }
-                objectMapper = new ObjectMapper();
+                if (effectiveObjectMapper == null) {
+                    effectiveObjectMapper = new ObjectMapper();
+                }
             }
 
             ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
@@ -381,7 +390,7 @@ public final class MockReactiveHttpClient<T> {
                     clientName,
                     appCtx,
                     resilienceOperatorApplier,
-                    objectMapper,
+                    effectiveObjectMapper,
                     new ReactiveHttpClientProperties.ObservabilityConfig()
             );
 

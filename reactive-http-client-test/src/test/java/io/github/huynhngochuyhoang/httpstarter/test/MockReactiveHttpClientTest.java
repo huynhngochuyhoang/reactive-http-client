@@ -1,5 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
@@ -242,7 +244,10 @@ class MockReactiveHttpClientTest {
     @Test
     void authProviderReceivesSerializedJsonBytesForDtoBodies() {
         AtomicReference<Object> capturedAuthBody = new AtomicReference<>();
+        ObjectMapper applicationObjectMapper = new ObjectMapper()
+                .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .objectMapper(applicationObjectMapper)
                 .withAuthProvider(request -> {
                     capturedAuthBody.set(request.requestBody());
                     return Mono.just(AuthContext.empty());
@@ -257,7 +262,7 @@ class MockReactiveHttpClientTest {
 
         assertThat(capturedAuthBody.get()).isInstanceOf(byte[].class);
         String serializedBody = new String((byte[]) capturedAuthBody.get(), StandardCharsets.UTF_8);
-        assertThat(serializedBody).contains("orderId", "order-1", "amount", "10");
+        assertThat(serializedBody).contains("order_id", "order-1", "amount", "10").doesNotContain("orderId");
         assertThat(mock.lastExchange().bodyAsString()).isEqualTo(serializedBody);
     }
 
