@@ -182,6 +182,8 @@ Available assertion methods:
 | `hasHeader(String, String)` | Asserts one request header value |
 | `hasHeaderValues(String, String...)` | Asserts repeated request header values in order |
 | `hasRedactedHeader(String)` | Asserts the header value is `[REDACTED]` |
+| `hasAuthorizationHeader()` | Asserts a non-blank final `Authorization` header without exposing its value |
+| `doesNotHaveAuthorizationHeader()` | Asserts the final `Authorization` header is absent; failures redact its value |
 | `hasIdempotencyKey()` | Asserts `Idempotency-Key` is present and non-blank |
 | `hasIdempotencyKey(String)` | Asserts the `Idempotency-Key` value |
 | `doesNotHaveIdempotencyKey()` | Asserts `Idempotency-Key` is absent |
@@ -197,6 +199,82 @@ Available assertion methods:
 | `hasStatusCode(int)` | Asserts the served HTTP status |
 | `RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(int)` | Asserts total recorded attempts |
 | `RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(HttpMethod, String, int)` | Asserts attempts for one method/path |
+
+---
+
+### Auth assertions and 401 invalidation
+
+Install an `AuthProvider` directly to inspect the materialized request after the
+production outbound auth filter runs:
+
+```java
+MockReactiveHttpClient<UserService> mock = MockReactiveHttpClient
+        .forClient(UserService.class)
+        .withAuthProvider(request -> Mono.just(AuthContext.builder()
+                .header("Authorization", "Bearer test-token")
+                .build()))
+        .respondTo(HttpMethod.GET, "/users/42",
+                exchange -> MockReactiveHttpClient.json(200, "{\"id\":42}"))
+        .build();
+
+mock.proxy().getUser(42).block();
+RecordedExchangeAssertions.assertThat(mock.lastExchange())
+        .hasAuthorizationHeader();
+```
+
+Installing an auth provider also enables production-style request-body preparation.
+Pass the application mapper with `objectMapper(applicationObjectMapper)` when DTOs
+depend on custom Jackson modules or naming rules; otherwise the helper uses a
+default mapper as a compatibility fallback.
+For ordinary JSON DTO bodies, the provider receives raw `byte[]` matching the
+serialized body sent by the mock, so signing providers can verify payload hashes.
+
+`hasAuthorizationHeader()` checks only for a non-blank final
+`Authorization` header. `doesNotHaveAuthorizationHeader()` checks absence.
+Neither assertion includes the credential in failure output; unexpected values
+are reported as `[REDACTED]`.
+
+Use `unauthorizedOnceThen(...)` with any `InvalidatableAuthProvider` to test one
+401 invalidation retry without starting an OAuth2 server:
+
+```java
+AtomicInteger invalidationCalls = new AtomicInteger();
+InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+    @Override
+    public Mono<AuthContext> getAuth(AuthRequest request) {
+        return Mono.just(AuthContext.builder()
+                .header("Authorization", "Bearer test-token")
+                .build());
+    }
+
+    @Override
+    public Mono<Void> invalidate() {
+        invalidationCalls.incrementAndGet();
+        return Mono.empty();
+    }
+};
+
+MockReactiveHttpClient<UserService> mock = MockReactiveHttpClient
+        .forClient(UserService.class)
+        .withAuthProvider(authProvider)
+        .respondTo(HttpMethod.GET, "/users/42",
+                MockReactiveHttpClient.unauthorizedOnceThen(
+                        exchange -> MockReactiveHttpClient.json(200, "{\"id\":42}")))
+        .build();
+
+mock.proxy().getUser(42).block();
+
+assertThat(invalidationCalls).hasValue(1);
+RecordedExchangeAssertions.assertThat(mock)
+        .hasAttemptCount(HttpMethod.GET, "/users/42", 2);
+mock.exchanges().forEach(exchange ->
+        RecordedExchangeAssertions.assertThat(exchange).hasAuthorizationHeader());
+```
+
+The supplied provider can be an in-memory test double. The helper serves one
+HTTP 401 and then delegates later requests; the production filter invalidates
+auth and sends one more request. Both outbound attempts remain in
+`exchanges()`.
 
 ---
 
