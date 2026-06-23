@@ -208,10 +208,11 @@ Evidence:
 Evidence:
 
 - `MockReactiveHttpClient.Builder.withAuthProvider(...)` installs the production `OutboundAuthFilter`, so recorded exchanges contain final auth headers after filter execution.
+- Auth-aware mock calls now serialize JSON before filters run; regression coverage proves DTO bytes exposed through AuthRequest match the recorded request body.
 - `hasAuthorizationHeader()` and `doesNotHaveAuthorizationHeader()` never include captured credentials in failure output; unexpected values are shown only as `[REDACTED]`.
 - `unauthorizedOnceThen(...)` serves one HTTP 401 before delegating to a supplied handler. Tests verify one invalidation, two auth resolutions, two recorded attempts, and statuses `401` then `200` with an in-memory `InvalidatableAuthProvider`.
 - Updated `docs/14-test-helpers.md` with Authorization assertions and a complete 401 invalidation example independent of an OAuth2 token server.
-- `mvn -pl reactive-http-client-test test` passed with 27 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-test test` passed with 28 tests, 0 failures, 0 errors, and 0 skipped.
 - Starter auth behavior tests passed with 52 tests, 0 failures, 0 errors, and 0 skipped.
 - `mvn -pl reactive-http-client-test -Papi-compatibility -DskipTests verify` passed.
 - Documentation release artifact tests passed with 9 tests, 0 failures, 0 errors, and 0 skipped.

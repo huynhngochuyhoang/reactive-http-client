@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -43,6 +44,9 @@ class MockReactiveHttpClientTest {
 
         @POST("/users")
         Mono<String> createUser(@Body String json);
+
+        @POST("/signed-requests")
+        Mono<String> createSignedRequest(@Body SignedRequest request);
 
         @GET("/search")
         Mono<String> search(@QueryParam("tag") List<String> tags,
@@ -79,6 +83,8 @@ class MockReactiveHttpClientTest {
         @GET("/bytes")
         Mono<byte[]> bytes();
     }
+
+    record SignedRequest(String orderId, int amount) {}
 
     interface SharedCatalogOperations {
         @GET("/catalog/{id}")
@@ -231,6 +237,28 @@ class MockReactiveHttpClientTest {
                 RecordedExchangeAssertions.assertThat(mock.lastExchange()).doesNotHaveAuthorizationHeader())
                 .hasMessageContaining("Authorization", "[REDACTED]")
                 .hasMessageNotContaining(token);
+    }
+
+    @Test
+    void authProviderReceivesSerializedJsonBytesForDtoBodies() {
+        AtomicReference<Object> capturedAuthBody = new AtomicReference<>();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .withAuthProvider(request -> {
+                    capturedAuthBody.set(request.requestBody());
+                    return Mono.just(AuthContext.empty());
+                })
+                .respondTo(HttpMethod.POST, "/signed-requests",
+                        exchange -> MockReactiveHttpClient.text(200, "accepted"))
+                .build();
+
+        StepVerifier.create(mock.proxy().createSignedRequest(new SignedRequest("order-1", 10)))
+                .expectNext("accepted")
+                .verifyComplete();
+
+        assertThat(capturedAuthBody.get()).isInstanceOf(byte[].class);
+        String serializedBody = new String((byte[]) capturedAuthBody.get(), StandardCharsets.UTF_8);
+        assertThat(serializedBody).contains("orderId", "order-1", "amount", "10");
+        assertThat(mock.lastExchange().bodyAsString()).isEqualTo(serializedBody);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
@@ -363,6 +364,14 @@ public final class MockReactiveHttpClient<T> {
             }
             appCtx.refresh();
 
+            ObjectMapper objectMapper = null;
+            if (authProvider != null) {
+                if (!clientConfig.hasAuthConfigured()) {
+                    clientConfig.setAuthProvider("mock-auth-provider");
+                }
+                objectMapper = new ObjectMapper();
+            }
+
             ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                     webClient,
                     new MethodMetadataCache(),
@@ -372,7 +381,7 @@ public final class MockReactiveHttpClient<T> {
                     clientName,
                     appCtx,
                     resilienceOperatorApplier,
-                    null,
+                    objectMapper,
                     new ReactiveHttpClientProperties.ObservabilityConfig()
             );
 

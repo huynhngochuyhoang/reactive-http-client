@@ -222,6 +222,10 @@ RecordedExchangeAssertions.assertThat(mock.lastExchange())
         .hasAuthorizationHeader();
 ```
 
+Installing an auth provider also enables production-style request-body preparation.
+For ordinary JSON DTO bodies, the provider receives raw `byte[]` matching the
+serialized body sent by the mock, so signing providers can verify payload hashes.
+
 `hasAuthorizationHeader()` checks only for a non-blank final
 `Authorization` header. `doesNotHaveAuthorizationHeader()` checks absence.
 Neither assertion includes the credential in failure output; unexpected values
