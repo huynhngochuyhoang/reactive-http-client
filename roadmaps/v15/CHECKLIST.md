@@ -192,18 +192,29 @@ Evidence:
 
 ## Priority 5 — Auth-Aware Mock Helper Assertions
 
-### [ ] 2.3 Add auth-aware mock helper assertions
-- [ ] Add a mock assertion for auth header presence after filters run.
-- [ ] Add a mock assertion for auth header absence after filters run.
-- [ ] Ensure assertion failure messages redact sensitive header values.
-- [ ] Add a compact 401 invalidation simulation path.
-- [ ] Verify one invalidation retry records both outbound attempts.
-- [ ] Keep helpers independent from a concrete OAuth2 server implementation.
-- [ ] Document auth header assertions in test helper docs.
-- [ ] Document 401 invalidation test usage.
-- [ ] Preserve existing mock helper source compatibility.
-- [ ] Run `reactive-http-client-test` module tests.
-- [ ] Run starter auth behavior tests.
+### [x] 2.3 Add auth-aware mock helper assertions
+- [x] Add a mock assertion for auth header presence after filters run.
+- [x] Add a mock assertion for auth header absence after filters run.
+- [x] Ensure assertion failure messages redact sensitive header values.
+- [x] Add a compact 401 invalidation simulation path.
+- [x] Verify one invalidation retry records both outbound attempts.
+- [x] Keep helpers independent from a concrete OAuth2 server implementation.
+- [x] Document auth header assertions in test helper docs.
+- [x] Document 401 invalidation test usage.
+- [x] Preserve existing mock helper source compatibility.
+- [x] Run `reactive-http-client-test` module tests.
+- [x] Run starter auth behavior tests.
+
+Evidence:
+
+- `MockReactiveHttpClient.Builder.withAuthProvider(...)` installs the production `OutboundAuthFilter`, so recorded exchanges contain final auth headers after filter execution.
+- `hasAuthorizationHeader()` and `doesNotHaveAuthorizationHeader()` never include captured credentials in failure output; unexpected values are shown only as `[REDACTED]`.
+- `unauthorizedOnceThen(...)` serves one HTTP 401 before delegating to a supplied handler. Tests verify one invalidation, two auth resolutions, two recorded attempts, and statuses `401` then `200` with an in-memory `InvalidatableAuthProvider`.
+- Updated `docs/14-test-helpers.md` with Authorization assertions and a complete 401 invalidation example independent of an OAuth2 token server.
+- `mvn -pl reactive-http-client-test test` passed with 27 tests, 0 failures, 0 errors, and 0 skipped.
+- Starter auth behavior tests passed with 52 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-test -Papi-compatibility -DskipTests verify` passed.
+- Documentation release artifact tests passed with 9 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 

@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
 import org.assertj.core.api.AbstractAssert;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -98,6 +99,25 @@ public final class RecordedExchangeAssertions {
 
         public RecordedExchangeAssert hasRedactedHeader(String name) {
             return hasHeaderValues(name, REDACTED);
+        }
+
+        /** Asserts Authorization is present without exposing its value on failure. */
+        public RecordedExchangeAssert hasAuthorizationHeader() {
+            isNotNull();
+            List<String> values = actual.headers().get(HttpHeaders.AUTHORIZATION);
+            if (values == null || values.stream().noneMatch(value -> value != null && !value.isBlank())) {
+                failWithMessage("expected Authorization header to be present but was absent");
+            }
+            return myself;
+        }
+
+        /** Asserts Authorization is absent without exposing its value on failure. */
+        public RecordedExchangeAssert doesNotHaveAuthorizationHeader() {
+            isNotNull();
+            if (actual.headers().containsKey(HttpHeaders.AUTHORIZATION)) {
+                failWithMessage("expected Authorization header to be absent but was <%s>", REDACTED);
+            }
+            return myself;
         }
 
         public RecordedExchangeAssert hasIdempotencyKey() {

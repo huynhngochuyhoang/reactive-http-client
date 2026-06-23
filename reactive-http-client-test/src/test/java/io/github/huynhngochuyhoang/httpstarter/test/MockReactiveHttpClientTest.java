@@ -1,6 +1,9 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
+import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook;
 import io.github.huynhngochuyhoang.httpstarter.core.RequestContext;
@@ -24,6 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * End-to-end sanity tests for the test-helper module: verify
@@ -201,6 +205,88 @@ class MockReactiveHttpClientTest {
                 .hasRedactedHeader("Authorization")
                 .doesNotHaveHeader("X-Missing")
                 .hasStatusCode(202);
+    }
+
+    @Test
+    void authProviderAddsAuthorizationHeaderBeforeExchangeRecording() {
+        String token = "Bearer test-secret-token";
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .withAuthProvider(request -> Mono.just(AuthContext.builder()
+                        .header("Authorization", token)
+                        .build()))
+                .respondTo(HttpMethod.GET, "/users/42",
+                        exchange -> MockReactiveHttpClient.text(200, "alice"))
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectNext("alice")
+                .verifyComplete();
+
+        RecordedExchangeAssertions.assertThat(mock)
+                .hasAttemptCount(HttpMethod.GET, "/users/42", 1);
+        mock.exchanges().forEach(exchange ->
+                RecordedExchangeAssertions.assertThat(exchange).hasAuthorizationHeader());
+
+        assertThatThrownBy(() ->
+                RecordedExchangeAssertions.assertThat(mock.lastExchange()).doesNotHaveAuthorizationHeader())
+                .hasMessageContaining("Authorization", "[REDACTED]")
+                .hasMessageNotContaining(token);
+    }
+
+    @Test
+    void authorizationHeaderAbsenceCanBeAssertedAfterFilters() {
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .respondTo(HttpMethod.GET, "/users/42",
+                        exchange -> MockReactiveHttpClient.text(200, "alice"))
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectNext("alice")
+                .verifyComplete();
+
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .doesNotHaveAuthorizationHeader();
+    }
+
+    @Test
+    void unauthorizedOnceInvalidatesAuthAndRecordsBothAttempts() {
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger invalidationCalls = new AtomicInteger();
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(AuthRequest request) {
+                return Mono.just(AuthContext.builder()
+                        .header("Authorization", "Bearer token-" + authCalls.incrementAndGet())
+                        .build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                invalidationCalls.incrementAndGet();
+                return Mono.empty();
+            }
+        };
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .withAuthProvider(authProvider)
+                .respondTo(HttpMethod.GET, "/users/42",
+                        MockReactiveHttpClient.unauthorizedOnceThen(
+                                exchange -> MockReactiveHttpClient.text(200, "alice")))
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectNext("alice")
+                .verifyComplete();
+
+        assertThat(authCalls).hasValue(2);
+        assertThat(invalidationCalls).hasValue(1);
+        RecordedExchangeAssertions.assertThat(mock)
+                .hasAttemptCount(HttpMethod.GET, "/users/42", 2);
+        RecordedExchangeAssertions.assertThat(mock.exchanges().get(0))
+                .hasAuthorizationHeader()
+                .hasStatusCode(401);
+        RecordedExchangeAssertions.assertThat(mock.exchanges().get(1))
+                .hasAuthorizationHeader()
+                .hasStatusCode(200);
     }
 
     @Test

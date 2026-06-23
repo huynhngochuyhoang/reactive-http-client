@@ -1,6 +1,8 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.*;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -163,6 +166,19 @@ public final class MockReactiveHttpClient<T> {
         return ClientResponse.create(HttpStatus.valueOf(status)).build();
     }
 
+    /**
+     * Returns a response handler that serves one HTTP 401 response, then delegates
+     * every later request to {@code afterUnauthorized}.
+     */
+    public static Function<RecordedExchange, ClientResponse> unauthorizedOnceThen(
+            Function<RecordedExchange, ClientResponse> afterUnauthorized) {
+        Objects.requireNonNull(afterUnauthorized, "afterUnauthorized");
+        AtomicBoolean unauthorizedServed = new AtomicBoolean();
+        return exchange -> unauthorizedServed.compareAndSet(false, true)
+                ? empty(HttpStatus.UNAUTHORIZED.value())
+                : afterUnauthorized.apply(exchange);
+    }
+
     private static ClientResponse.Builder responseBuilder(int status, java.util.Map<String, List<String>> headers) {
         ClientResponse.Builder builder = ClientResponse.create(HttpStatus.valueOf(status));
         if (headers != null) {
@@ -188,6 +204,7 @@ public final class MockReactiveHttpClient<T> {
                 .build();
         private ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
         private ResilienceOperatorApplier resilienceOperatorApplier = new NoopResilienceOperatorApplier();
+        private AuthProvider authProvider;
         private HttpClientObserver observer;
         private final List<ReactiveHttpClientLifecycleHook> lifecycleHooks = new ArrayList<>();
 
@@ -243,6 +260,12 @@ public final class MockReactiveHttpClient<T> {
             this.resilienceOperatorApplier = resilienceOperatorApplier != null
                     ? resilienceOperatorApplier
                     : new NoopResilienceOperatorApplier();
+            return this;
+        }
+
+        /** Installs the production outbound auth filter for requests made by this mock. */
+        public Builder<T> withAuthProvider(AuthProvider authProvider) {
+            this.authProvider = Objects.requireNonNull(authProvider, "authProvider");
             return this;
         }
 
@@ -317,9 +340,16 @@ public final class MockReactiveHttpClient<T> {
                         }));
             });
 
-            WebClient webClient = WebClient.builder()
+            ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+            String clientName = annotation != null ? annotation.name() : "mock-client";
+
+            WebClient.Builder webClientBuilder = WebClient.builder()
                     .baseUrl(baseUrl)
-                    .exchangeFunction(exchangeFunction)
+                    .exchangeFunction(exchangeFunction);
+            if (authProvider != null) {
+                webClientBuilder.filter(new OutboundAuthFilter(clientName, authProvider));
+            }
+            WebClient webClient = webClientBuilder
                     .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
                     .build();
 
@@ -332,9 +362,6 @@ public final class MockReactiveHttpClient<T> {
                 appCtx.getBeanFactory().registerSingleton("mockReactiveHttpClientLifecycleHook" + i, lifecycleHooks.get(i));
             }
             appCtx.refresh();
-
-            ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
-            String clientName = annotation != null ? annotation.name() : "mock-client";
 
             ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                     webClient,
