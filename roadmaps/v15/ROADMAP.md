@@ -195,9 +195,41 @@ boundaries are common production test cases.
 
 ---
 
-## 3. Redirect, Streaming, and Body Ownership Hardening
+## 3. Inherited Contracts, Redirect, Streaming, and Body Ownership Hardening
 
-### 3.1 Expand redirect-following contract coverage
+### 3.1 Resolve inherited generic endpoint response types
+
+**Why:** The starter supports inherited abstract endpoint methods, but generic
+parent contracts such as `ApiOperators<T extends BaseResponse>` need the
+decoder target resolved against each concrete child interface. Otherwise
+`Mono<T>` can be decoded using the parent method's erased bound instead of the
+child binding, causing runtime casts from `BaseResponse` to `BusResponse` or
+`TrainResponse`.
+
+**What:**
+
+- Resolve inherited method return types with the concrete client interface as
+  generic context.
+- Cover `Mono<T>`, `Flux<T>`, `Mono<ResponseEntity<T>>`, and nested parameterized
+  response bodies declared on shared parent interfaces.
+- Keep inherited endpoint validation, diagnostics, and snapshots aligned with
+  the concrete effective type.
+- Document the supported shared generic contract pattern and call out Java
+  generic mistakes such as binding a train client to `ApiOperators<BusResponse>`.
+
+**Acceptance:**
+
+- [ ] `BusApiOperators extends ApiOperators<BusResponse>` decodes successful
+      responses as `BusResponse`.
+- [ ] `TrainApiOperators extends ApiOperators<TrainResponse>` decodes successful
+      responses as `TrainResponse`.
+- [ ] Shared generic inherited endpoints keep per-client base URL, timeout,
+      auth, resilience, observability, and `@ApiRef` behavior.
+- [ ] Tests cover concrete decoding and avoid relying on caller-side casts.
+
+---
+
+### 3.2 Expand redirect-following contract coverage
 
 **Why:** V9 added opt-in redirect following. Production behavior depends on
 method, body repeatability, cross-authority sensitive headers, and Reactor Netty
@@ -223,7 +255,7 @@ transport behavior.
 
 ---
 
-### 3.2 Re-audit streaming response ownership
+### 3.3 Re-audit streaming response ownership
 
 **Why:** Streaming response support is easy to regress when optimizing response
 envelopes, diagnostics, or timeout reporting.
@@ -247,7 +279,7 @@ envelopes, diagnostics, or timeout reporting.
 
 ---
 
-### 3.3 Clarify bodiless and unexpected-body contracts
+### 3.4 Clarify bodiless and unexpected-body contracts
 
 **Why:** Bodiless responses were hardened in V9, but users still hit downstreams
 that send unexpected bodies on `204`, `205`, `HEAD`, or `ResponseEntity<Void>`.
@@ -404,12 +436,13 @@ predictable when enabled.
 3. Improve health indicator troubleshooting detail.
 4. Harden OAuth2 token refresh diagnostics.
 5. Add auth-aware mock helper assertions.
-6. Expand redirect-following contract coverage.
-7. Re-audit streaming response ownership.
-8. Clarify bodiless and unexpected-body contracts.
-9. Tighten configuration metadata drift checks.
-10. Add startup configuration summary logging.
-11. Add release readiness snapshot for docs, metadata, and benchmarks.
-12. Audit AWS SigV4 and raw-body signing contracts.
-13. Re-run default and optional feature benchmark audits after V14.
-14. Audit observer and lifecycle overhead with multiple observers/hooks.
+6. Resolve inherited generic endpoint response types.
+7. Expand redirect-following contract coverage.
+8. Re-audit streaming response ownership.
+9. Clarify bodiless and unexpected-body contracts.
+10. Tighten configuration metadata drift checks.
+11. Add startup configuration summary logging.
+12. Add release readiness snapshot for docs, metadata, and benchmarks.
+13. Audit AWS SigV4 and raw-body signing contracts.
+14. Re-run default and optional feature benchmark audits after V14.
+15. Audit observer and lifecycle overhead with multiple observers/hooks.
