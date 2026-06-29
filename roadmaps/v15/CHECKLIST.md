@@ -501,15 +501,15 @@ Evidence:
   empty, raw `byte[]`, and publisher rejection coverage.
 - Added invocation-handler contract coverage proving scalar JSON, `String`,
   `byte[]`, and empty requests produce `x-amz-content-sha256` values matching
-  the bytes materialized from the final outbound `ClientRequest`.
-- Added streaming-upload coverage proving a non-empty `Publisher` body is
-  rejected by built-in SigV4 before the request is sent and before the body
-  publisher is subscribed, so the starter does not sign an empty payload or
-  buffer streams only for signing convenience.
+  the bytes materialized from the final outbound `ClientRequest`; non-UTF-8
+  `String` signing now uses the declared `Content-Type` charset.
+- Added streaming-upload and multipart coverage proving non-repeatable bodies are
+  rejected by built-in SigV4 before the request is sent; publisher bodies are
+  not subscribed and multipart uploads no longer sign an empty payload.
 - Updated `docs/06-auth-providers.md` with the supported body-shape contract and
-  explicit unsupported `Publisher`/streaming behavior.
-- `mvn -pl reactive-http-client-starter -Dtest=AwsSigV4AuthProviderTest,ReactiveClientInvocationHandlerBehaviorTest test`
-  passed with 34 tests, 0 failures, 0 errors, and 0 skipped.
+  explicit unsupported `Publisher`, streaming, and multipart behavior.
+- `mvn -pl reactive-http-client-starter -Dtest=AwsSigV4AuthProviderTest,ReactiveClientInvocationHandlerBehaviorTest,MultipartRequestTest test`
+  passed with 43 tests, 0 failures, 0 errors, and 0 skipped.
 - `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
   passed with 9 tests, 0 failures, 0 errors, and 0 skipped.
 

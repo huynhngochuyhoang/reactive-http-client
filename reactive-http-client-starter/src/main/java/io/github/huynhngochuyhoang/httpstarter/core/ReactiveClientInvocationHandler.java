@@ -40,6 +40,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
@@ -480,6 +481,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         WebClient.RequestHeadersSpec<?> requestHeadersSpec;
         if (multipartBody != null) {
+            preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, multipartBody);
             requestHeadersSpec = preparedRequestSpec.body(BodyInserters.fromMultipartData(multipartBody));
         } else if (serializedRequestBody.bodyToWrite() instanceof Publisher<?> publisher) {
             requestHeadersSpec = requestFromPublisher(preparedRequestSpec, publisher, plan.bodyType(), hasContentTypeHeader);
@@ -1067,7 +1069,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return Mono.just(new SerializedRequestBody(body, bytes, bytes));
         }
         if (body instanceof String text) {
-            return Mono.just(new SerializedRequestBody(body, text, text.getBytes(StandardCharsets.UTF_8)));
+            return Mono.just(new SerializedRequestBody(body, text, text.getBytes(rawBodyCharset(contentTypeHeader))));
         }
         if (!shouldProvideJsonRawBody(contentTypeHeader) || objectMapper == null) {
             return Mono.just(new SerializedRequestBody(body, body, null));
@@ -1078,6 +1080,18 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorMap(JsonProcessingException.class, e -> new RequestSerializationException(clientName, e));
+    }
+
+    private Charset rawBodyCharset(String contentTypeHeader) {
+        if (contentTypeHeader == null || contentTypeHeader.isBlank()) {
+            return StandardCharsets.UTF_8;
+        }
+        try {
+            Charset charset = MediaType.parseMediaType(contentTypeHeader).getCharset();
+            return charset != null ? charset : StandardCharsets.UTF_8;
+        } catch (Exception ignored) {
+            return StandardCharsets.UTF_8;
+        }
     }
 
     private boolean shouldProvideJsonRawBody(String contentTypeHeader) {

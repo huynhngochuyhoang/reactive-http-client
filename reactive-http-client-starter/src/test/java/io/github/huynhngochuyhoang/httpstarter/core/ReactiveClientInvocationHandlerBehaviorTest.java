@@ -440,6 +440,20 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     }
 
     @Test
+    void shouldSignStringBodyUsingContentTypeCharset() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        WebClient webClient = sigV4WebClient(captured);
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        StepVerifier.create(invokePost(handler, "text/plain;charset=ISO-8859-1", "café"))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertEquals(sha256Hex("café".getBytes(StandardCharsets.ISO_8859_1)),
+                captured.get().headers().getFirst("x-amz-content-sha256"));
+    }
+
+    @Test
     void shouldSignByteArrayBodyUsingBytesOnWire() {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
         WebClient webClient = sigV4WebClient(captured);

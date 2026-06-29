@@ -166,11 +166,11 @@ Supported body-signing contract:
 |---|---|
 | Empty body | Signs the AWS empty SHA-256 payload hash. |
 | `byte[]` | Signs the exact byte array sent by the starter. |
-| `String` | Signs UTF-8 bytes for the string sent by the starter. |
-| JSON object body | Signs the JSON bytes serialized by the starter auth pipeline. |
-| `Publisher` or streaming upload body | Rejected before the request is sent; the starter does not buffer or subscribe to the stream only for signing. |
+| `String` | Signs bytes using the request `Content-Type` charset when one is declared; otherwise UTF-8. |
+| JSON object body | Signs the JSON bytes serialized by the starter auth pipeline with the configured `ObjectMapper`; keep WebClient codecs aligned with that mapper. |
+| `Publisher`, streaming upload body, or multipart body | Rejected before the request is sent; the starter does not buffer or subscribe to the stream only for signing. |
 
-`Publisher` request bodies are not signed by the built-in provider because the raw bytes are not materialized without consuming the stream. Use a repeatable `byte[]`, `String`, or JSON object body for built-in signing, or provide a custom auth provider that implements AWS streaming signatures.
+`Publisher`, streaming, and multipart request bodies are not signed by the built-in provider because stable raw bytes are not materialized without consuming or re-encoding the body. Use a repeatable `byte[]`, charset-declared `String`, or JSON object body with codecs aligned to the starter `ObjectMapper` for built-in signing, or provide a custom auth provider that implements AWS streaming signatures.
 
 ```yaml
 reactive:
