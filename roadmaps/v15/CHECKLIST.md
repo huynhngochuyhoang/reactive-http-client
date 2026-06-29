@@ -450,22 +450,31 @@ Evidence:
 
 ## Priority 12 — Release Readiness Snapshot
 
-### [ ] 4.3 Add release readiness snapshot for docs, metadata, and benchmarks
-- [ ] Extend release evidence manifest with a top-level readiness summary.
-- [ ] Include project version.
-- [ ] Include API compatibility baseline version.
-- [ ] Include promoted benchmark report path.
-- [ ] Include generated configuration reference status.
-- [ ] Include Markdown link validation status.
-- [ ] Include pending manual release commands.
-- [ ] Distinguish generated test evidence from manual release evidence.
-- [ ] Keep manual benchmark commands pending until explicitly run.
-- [ ] Keep manual compatibility commands pending until explicitly run.
-- [ ] Surface missing promoted benchmark reports.
-- [ ] Surface stale version links.
-- [ ] Keep release evidence under `target/release-evidence/`.
-- [ ] Verify target-only evidence is not documented as source-controlled output.
-- [ ] Run `DocumentationReleaseArtifactTest`.
+### [x] 4.3 Add release readiness snapshot for docs, metadata, and benchmarks
+- [x] Extend release evidence manifest with a top-level readiness summary.
+- [x] Include project version.
+- [x] Include API compatibility baseline version.
+- [x] Include promoted benchmark report path.
+- [x] Include generated configuration reference status.
+- [x] Include Markdown link validation status.
+- [x] Include pending manual release commands.
+- [x] Distinguish generated test evidence from manual release evidence.
+- [x] Keep manual benchmark commands pending until explicitly run.
+- [x] Keep manual compatibility commands pending until explicitly run.
+- [x] Surface missing promoted benchmark reports.
+- [x] Surface stale version links.
+- [x] Keep release evidence under `target/release-evidence/`.
+- [x] Verify target-only evidence is not documented as source-controlled output.
+- [x] Run `DocumentationReleaseArtifactTest`.
+
+Evidence:
+
+- Extended `reactive-http-client-release-evidence.json` with a top-level `readiness` object containing project version, API compatibility baseline version, promoted benchmark report path/status, generated configuration reference status, Markdown link validation status, stale benchmark-report link status, and target-only evidence metadata.
+- The readiness summary separates generated test evidence from manual release evidence. Generated docs/link checks can report `pass`, while benchmark, API compatibility, fixture, and diff-check commands remain `pending` until a maintainer runs them.
+- Manual benchmark and compatibility readiness sections list their pending commands separately; pending benchmark data is not treated as performance-claim evidence.
+- Missing promoted benchmark reports and stale benchmark-report links are surfaced with explicit `missing`/`fail` statuses when detected.
+- Updated `docs/20-native-release-compatibility.md` to describe the readiness summary and reinforce that `target/release-evidence/` output is generated target-only evidence, not source-controlled output.
+- `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed with 9 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 
