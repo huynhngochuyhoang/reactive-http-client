@@ -517,22 +517,64 @@ Evidence:
 
 ## Priority 14 — Post-V14 Benchmark Audits
 
-### [ ] 5.1 Re-run default and optional feature benchmark audits after V14
-- [ ] Run current-vs-published benchmark pair for default success path.
-- [ ] Run current-vs-published benchmark pair for optional diagnostics.
-- [ ] Run current-vs-published benchmark pair for error mapping.
-- [ ] Add and run auth-enabled benchmark rows only if V15 auth work needs them.
-- [ ] Keep current and published-baseline reports in distinct paths.
-- [ ] Apply V13 review triggers as review-only signals.
-- [ ] Rerun any review-trigger movement on the same machine before acting.
-- [ ] Record before/after evidence for every optimization.
-- [ ] Prefer removing redundant work over adding caches.
-- [ ] Verify optional feature rows are not compared to baselines without
+### [x] 5.1 Re-run default and optional feature benchmark audits after V14
+- [x] Run current-vs-published benchmark pair for default success path.
+- [x] Run current-vs-published benchmark pair for optional diagnostics.
+- [x] Run current-vs-published benchmark pair for error mapping.
+- [x] Add and run auth-enabled benchmark rows only if V15 auth work needs them.
+- [x] Keep current and published-baseline reports in distinct paths.
+- [x] Apply V13 review triggers as review-only signals.
+- [x] Rerun any review-trigger movement on the same machine before acting.
+- [x] Record before/after evidence for every optimization.
+- [x] Prefer removing redundant work over adding caches.
+- [x] Verify optional feature rows are not compared to baselines without
       equivalent work.
-- [ ] Update performance docs only with scenario-specific claims.
-- [ ] Run benchmark smoke after benchmark code changes.
-- [ ] Run release-quality benchmark when release notes include performance
+- [x] Update performance docs only with scenario-specific claims.
+- [x] Run benchmark smoke after benchmark code changes.
+- [x] Run release-quality benchmark when release notes include performance
       wording.
+
+Evidence:
+
+- Published `2.9.0` baseline artifacts were resolved before the benchmark pair:
+  `reactive-http-client-starter`, `reactive-http-client-test`, and
+  `reactive-http-client-otel`.
+- The benchmark smoke command was run manually before the release pair. Its
+  smoke artifact was intentionally not retained after the subsequent clean
+  published-baseline run.
+- Published-baseline release benchmark completed and wrote
+  `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.9.0/release-jmh.md`
+  and `release-jmh.json` with `starterVersion=2.9.0` and
+  `benchmarkCommit=2.9.0`.
+- Current-workspace release benchmark completed and wrote
+  `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
+  and `release-jmh.json` with `starterVersion=2.10.0` and
+  `benchmarkCommit=7b69b4d`.
+- The initial comparison command with `-am` failed in the manual run. The
+  comparator-only rerun succeeded with:
+  `mvn -Pbenchmarks,benchmark-compare -pl reactive-http-client-benchmarks verify -Dbenchmark.compare.current=reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.9.0/release-jmh.json -Dbenchmark.compare.output=reactive-http-client-benchmarks/target/benchmark-reports/v15-current-vs-published-2.9.0.md`.
+- Current and published-baseline reports are kept in distinct paths. The
+  comparison report was written to
+  `reactive-http-client-benchmarks/target/benchmark-reports/v15-current-vs-published-2.9.0.md`.
+- Current candidate comparison summary: `Get No Body` was `106.483 us/op`,
+  `Post Json` was `179.213 us/op`, `Response Entity` was `139.175 us/op`,
+  `Problem Detail Small Body` was `131.914 us/op`, metadata-only exchange
+  logging was `120.37 us/op`, Micrometer observer was `147.176 us/op`, and
+  retry wrapper was `140.407 us/op`.
+- The comparison report has 73 informational `review` rows. They were treated as
+  review signals, not hard gates; no optimization was made from benchmark data in
+  this priority because movement should be rerun on the same machine before
+  acting.
+- Optional feature rows remain starter-only/feature-specific evidence. Rows
+  without a published-baseline counterpart, such as diagnostics-disabled and
+  runtime diagnostics provider summaries, are reported as `missing baseline` and
+  were not compared to raw WebClient or Spring HTTP Interface.
+- No auth-enabled benchmark rows were added for Priority 14 because the V15 auth
+  work changed signing correctness/unsupported-body contracts, not a measured
+  default success-path auth feature.
+- No source performance documentation was changed; the generated benchmark
+  reports remain target-only evidence until a release note or promoted report
+  needs scenario-specific claims.
 
 ---
 
