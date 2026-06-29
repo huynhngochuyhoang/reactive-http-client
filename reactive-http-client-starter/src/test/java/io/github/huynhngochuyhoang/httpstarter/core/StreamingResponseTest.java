@@ -3,6 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.netty.buffer.PooledByteBufAllocator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -26,6 +27,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -62,6 +64,38 @@ class StreamingResponseTest {
         StepVerifier.create(totalBytes)
                 .expectNext((long) CHUNK_COUNT * CHUNK_SIZE)
                 .verifyComplete();
+    }
+
+    @Test
+    void fluxOfDataBufferKeepsRealPayloadStreamingAfterCodecLimit() {
+        DisposableServer server = HttpServer.create()
+                .port(0)
+                .route(routes -> routes.get("/large-file", (request, response) -> response
+                        .status(HttpStatus.OK.value())
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                        .sendString(Flux.range(0, CHUNK_COUNT)
+                                .map(ignored -> "x".repeat(CHUNK_SIZE)))
+                        .then()))
+                .bindNow();
+        try {
+            WebClient webClient = WebClient.builder()
+                    .baseUrl("http://127.0.0.1:" + server.port())
+                    .clientConnector(new ReactorClientHttpConnector(
+                            HttpClient.create().responseTimeout(Duration.ofSeconds(5))))
+                    .codecs(c -> c.defaultCodecs().maxInMemorySize(CODEC_LIMIT_MB * 1024 * 1024))
+                    .build();
+            ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+            Mono<Long> totalBytes = invokeStream(handler)
+                    .map(StreamingResponseTest::readableBytesAndRelease)
+                    .reduce(0L, Long::sum);
+
+            StepVerifier.create(totalBytes)
+                    .expectNext((long) CHUNK_COUNT * CHUNK_SIZE)
+                    .verifyComplete();
+        } finally {
+            server.disposeNow();
+        }
     }
 
     @Test
@@ -158,6 +192,49 @@ class StreamingResponseTest {
     }
 
     @Test
+    void responseEntityFluxDataBufferReportsEnvelopeBeforeInnerBodyIsConsumed() {
+        AtomicInteger bodySubscriptions = new AtomicInteger();
+        DefaultDataBufferFactory bufferFactory = new DefaultDataBufferFactory();
+        Flux<DataBuffer> body = Flux.defer(() -> {
+            bodySubscriptions.incrementAndGet();
+            return Flux.just(bufferFactory.wrap("chunk".getBytes(StandardCharsets.UTF_8)));
+        });
+        ClientResponse response = ClientResponse.create(HttpStatus.OK)
+                .header(HttpHeaders.CONTENT_TYPE, "application/octet-stream")
+                .body(body)
+                .build();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://stream.test")
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(req -> Mono.just(response))
+                .build();
+        RecordingLogger logger = new RecordingLogger();
+        RecordingHook hook = new RecordingHook();
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, logger, observed::add, hook);
+        AtomicReference<ResponseEntity<Flux<DataBuffer>>> entityRef = new AtomicReference<>();
+
+        StepVerifier.create(invokeStreamEntity(handler).doOnNext(entityRef::set))
+                .assertNext(entity -> assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK))
+                .verifyComplete();
+
+        assertThat(bodySubscriptions.get()).isZero();
+        assertThat(hook.successes).hasSize(1);
+        assertThat(observed).hasSize(1);
+        assertThat(logger.contexts).hasSize(1);
+        assertThat(logger.contexts.get(0).responseStatus()).isEqualTo(HttpStatus.OK.value());
+
+        StepVerifier.create(entityRef.get().getBody().map(StreamingResponseTest::readStringAndRelease))
+                .expectNext("chunk")
+                .verifyComplete();
+
+        assertThat(bodySubscriptions.get()).isEqualTo(1);
+        assertThat(hook.successes).hasSize(1);
+        assertThat(observed).hasSize(1);
+        assertThat(logger.contexts).hasSize(1);
+    }
+
+    @Test
     void fluxOfDataBufferLeavesEmittedBuffersForCallerToRelease() {
         List<PooledDataBuffer> buffers = pooledBuffers("one", "two", "three");
         WebClient webClient = WebClient.builder()
@@ -168,6 +245,27 @@ class StreamingResponseTest {
 
         StepVerifier.create(invokeStream(handler).map(StreamingResponseTest::readableBytesAndRelease))
                 .expectNext(3, 3, 5)
+                .verifyComplete();
+
+        assertReleased(buffers);
+    }
+
+    @Test
+    void fluxOfDataBufferDoesNotReleaseEmittedBufferBeforeCallerDoes() {
+        List<PooledDataBuffer> buffers = pooledBuffers("one", "two");
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://stream.test")
+                .exchangeFunction(req -> Mono.just(streamingResponse(buffers)))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        StepVerifier.create(invokeStream(handler).take(1))
+                .assertNext(buffer -> {
+                    PooledDataBuffer emitted = (PooledDataBuffer) buffer;
+                    assertThat(emitted.isAllocated()).isTrue();
+                    DataBufferUtils.release(buffer);
+                    assertThat(emitted.isAllocated()).isFalse();
+                })
                 .verifyComplete();
 
         assertReleased(buffers);
@@ -201,6 +299,28 @@ class StreamingResponseTest {
         StepVerifier.create(invokeStreamEntity(handler)
                         .flatMapMany(entity -> entity.getBody().map(StreamingResponseTest::readableBytesAndRelease)))
                 .expectNext(3, 3, 5)
+                .verifyComplete();
+
+        assertReleased(buffers);
+    }
+
+    @Test
+    void responseEntityFluxDataBufferDoesNotReleaseEmittedBufferBeforeCallerDoes() {
+        List<PooledDataBuffer> buffers = pooledBuffers("one", "two");
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://stream.test")
+                .exchangeFunction(req -> Mono.just(streamingResponse(buffers)))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient);
+
+        StepVerifier.create(invokeStreamEntity(handler)
+                        .flatMapMany(entity -> entity.getBody().take(1)))
+                .assertNext(buffer -> {
+                    PooledDataBuffer emitted = (PooledDataBuffer) buffer;
+                    assertThat(emitted.isAllocated()).isTrue();
+                    DataBufferUtils.release(buffer);
+                    assertThat(emitted.isAllocated()).isFalse();
+                })
                 .verifyComplete();
 
         assertReleased(buffers);
@@ -276,13 +396,36 @@ class StreamingResponseTest {
 
     @SuppressWarnings("unchecked")
     private static ReactiveClientInvocationHandler createHandler(WebClient webClient) {
+        return createHandler(webClient, null, null, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ReactiveClientInvocationHandler createHandler(
+            WebClient webClient,
+            RecordingLogger logger,
+            HttpClientObserver observer,
+            ReactiveHttpClientLifecycleHook hook) {
         ApplicationContext appCtx = mock(ApplicationContext.class);
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
         when(appCtx.getBeanProvider(HttpClientObserver.class)).thenReturn(observerProvider);
-        when(observerProvider.getIfAvailable()).thenReturn(null);
+        when(observerProvider.orderedStream()).thenAnswer(invocation -> observer != null
+                ? java.util.stream.Stream.of(observer)
+                : java.util.stream.Stream.empty());
+        when(observerProvider.getIfAvailable()).thenReturn(observer);
+
+        ObjectProvider<ReactiveHttpClientLifecycleHook> hookProvider = mock(ObjectProvider.class);
+        when(appCtx.getBeanProvider(ReactiveHttpClientLifecycleHook.class)).thenReturn(hookProvider);
+        when(hookProvider.orderedStream()).thenAnswer(invocation -> hook != null
+                ? java.util.stream.Stream.of(hook)
+                : java.util.stream.Stream.empty());
+
+        ObjectProvider<DefaultHttpExchangeLogger> loggerProvider = mock(ObjectProvider.class);
+        when(appCtx.getBeanProvider(DefaultHttpExchangeLogger.class)).thenReturn(loggerProvider);
+        when(loggerProvider.getIfAvailable()).thenReturn(logger);
 
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setCodecMaxInMemorySizeMb(CODEC_LIMIT_MB);
+        config.setExchangeLoggingEnabled(logger != null);
 
         return new ReactiveClientInvocationHandler(
                 webClient,
@@ -315,6 +458,24 @@ class StreamingResponseTest {
             return (Mono<ResponseEntity<Flux<DataBuffer>>>) handler.invoke(null, m, new Object[0]);
         } catch (Throwable t) {
             return Mono.error(t);
+        }
+    }
+
+    static final class RecordingLogger extends DefaultHttpExchangeLogger {
+        private final List<HttpExchangeLogContext> contexts = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void log(HttpExchangeLogContext context) {
+            contexts.add(context);
+        }
+    }
+
+    static final class RecordingHook implements ReactiveHttpClientLifecycleHook {
+        private final List<ReactiveHttpClientLifecycleContext> successes = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+            successes.add(context);
         }
     }
 
