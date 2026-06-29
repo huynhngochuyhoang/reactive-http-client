@@ -100,6 +100,29 @@ class ReactiveHttpClientConfigurationMetadataTest {
     }
 
     @Test
+    void configurationMetadataGroupSourceTypesResolve() throws IOException {
+        List<String> invalidSourceTypes = new ArrayList<>();
+        for (Path metadataFile : metadataFiles(projectRoot())) {
+            JsonNode metadata = metadata(metadataFile);
+            for (JsonNode group : metadata.path("groups")) {
+                String sourceType = group.path("sourceType").asText("");
+                if (sourceType.isBlank()) {
+                    continue;
+                }
+                try {
+                    Class.forName(sourceType);
+                }
+                catch (ReflectiveOperationException ex) {
+                    invalidSourceTypes.add(projectRoot().relativize(metadataFile) + " -> "
+                            + group.path("name").asText() + " uses " + sourceType);
+                }
+            }
+        }
+
+        assertThat(invalidSourceTypes).as("metadata group source types that cannot be resolved").isEmpty();
+    }
+
+    @Test
     void configurationMetadataGroupSourceMethodsResolve() throws IOException {
         List<String> invalidSourceMethods = new ArrayList<>();
         for (Path metadataFile : metadataFiles(projectRoot())) {
@@ -125,6 +148,38 @@ class ReactiveHttpClientConfigurationMetadataTest {
     }
 
     @Test
+    void configurationMetadataGroupSourceMethodsReturnDeclaredGroupTypes() throws IOException {
+        List<String> mismatchedSourceMethods = new ArrayList<>();
+        for (Path metadataFile : metadataFiles(projectRoot())) {
+            JsonNode metadata = metadata(metadataFile);
+            for (JsonNode group : metadata.path("groups")) {
+                String sourceType = group.path("sourceType").asText("");
+                String sourceMethod = group.path("sourceMethod").asText("");
+                String type = group.path("type").asText("");
+                if (sourceType.isBlank() || sourceMethod.isBlank() || type.isBlank()) {
+                    continue;
+                }
+                String methodName = sourceMethod.replaceFirst("\\(.*\\)$", "");
+                try {
+                    Class<?> declaredType = Class.forName(rawClassName(type));
+                    Class<?> returnType = Class.forName(sourceType).getMethod(methodName).getReturnType();
+                    if (!declaredType.isAssignableFrom(returnType)) {
+                        mismatchedSourceMethods.add(projectRoot().relativize(metadataFile) + " -> "
+                                + group.path("name").asText() + " declares " + type
+                                + " but " + sourceType + "#" + sourceMethod + " returns " + returnType.getName());
+                    }
+                }
+                catch (ReflectiveOperationException ex) {
+                    mismatchedSourceMethods.add(projectRoot().relativize(metadataFile) + " -> "
+                            + group.path("name").asText() + " uses " + sourceType + "#" + sourceMethod);
+                }
+            }
+        }
+
+        assertThat(mismatchedSourceMethods).as("metadata group source methods returning unexpected types").isEmpty();
+    }
+
+    @Test
     void documentedReactiveHttpPropertiesExistInGeneratedMetadata() throws IOException {
         Set<String> metadataNames = allMetadataNames(projectRoot());
         Map<String, Set<String>> missingByFile = new TreeMap<>();
@@ -147,6 +202,20 @@ class ReactiveHttpClientConfigurationMetadataTest {
         }
 
         assertThat(missingByFile).as("documented reactive.http.* properties missing from metadata").isEmpty();
+    }
+
+    @Test
+    void generatedConfigurationReferenceDocumentsEveryMetadataProperty() throws IOException {
+        String reference = Files.readString(projectRoot().resolve("docs/configuration-properties.md"));
+        Set<String> missing = new TreeSet<>();
+
+        for (String property : allMetadataPropertyNames(projectRoot())) {
+            if (!reference.contains("`" + property + "`")) {
+                missing.add(property);
+            }
+        }
+
+        assertThat(missing).as("metadata properties missing from generated configuration reference").isEmpty();
     }
 
     @Test
@@ -360,6 +429,11 @@ class ReactiveHttpClientConfigurationMetadataTest {
             names.add(group.path("name").asText());
         }
         return names;
+    }
+
+    private static String rawClassName(String type) {
+        int genericStart = type.indexOf("<");
+        return genericStart < 0 ? type : type.substring(0, genericStart);
     }
 
     private static String normalizeDocumentedProperty(String raw) {
