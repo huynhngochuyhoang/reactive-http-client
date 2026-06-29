@@ -480,20 +480,38 @@ Evidence:
 
 ## Priority 13 — AWS SigV4 and Raw-Body Signing Contracts
 
-### [ ] 2.2 Audit AWS SigV4 and raw-body signing contracts
-- [ ] Add SigV4 contract tests for scalar JSON bodies.
-- [ ] Add SigV4 contract tests for byte array bodies.
-- [ ] Add SigV4 contract tests for string bodies.
-- [ ] Add SigV4 contract tests for empty bodies.
-- [ ] Add SigV4 contract tests for publisher bodies.
-- [ ] Add SigV4 contract tests for streaming upload bodies.
-- [ ] Verify signed content hashes match bytes on the wire for supported shapes.
-- [ ] Verify publisher uploads do not sign an empty payload when the request body
+### [x] 2.2 Audit AWS SigV4 and raw-body signing contracts
+- [x] Add SigV4 contract tests for scalar JSON bodies.
+- [x] Add SigV4 contract tests for byte array bodies.
+- [x] Add SigV4 contract tests for string bodies.
+- [x] Add SigV4 contract tests for empty bodies.
+- [x] Add SigV4 contract tests for publisher bodies.
+- [x] Add SigV4 contract tests for streaming upload bodies.
+- [x] Verify signed content hashes match bytes on the wire for supported shapes.
+- [x] Verify publisher uploads do not sign an empty payload when the request body
       is non-empty.
-- [ ] Document unsupported non-repeatable signing behavior.
-- [ ] Avoid buffering large or streaming bodies only for signing convenience.
-- [ ] Preserve auth provider extension source compatibility.
-- [ ] Run auth and request-body tests.
+- [x] Document unsupported non-repeatable signing behavior.
+- [x] Avoid buffering large or streaming bodies only for signing convenience.
+- [x] Preserve auth provider extension source compatibility.
+- [x] Run auth and request-body tests.
+
+Evidence:
+
+- Added SigV4 provider coverage for `String` request bodies alongside existing
+  empty, raw `byte[]`, and publisher rejection coverage.
+- Added invocation-handler contract coverage proving scalar JSON, `String`,
+  `byte[]`, and empty requests produce `x-amz-content-sha256` values matching
+  the bytes materialized from the final outbound `ClientRequest`.
+- Added streaming-upload coverage proving a non-empty `Publisher` body is
+  rejected by built-in SigV4 before the request is sent and before the body
+  publisher is subscribed, so the starter does not sign an empty payload or
+  buffer streams only for signing convenience.
+- Updated `docs/06-auth-providers.md` with the supported body-shape contract and
+  explicit unsupported `Publisher`/streaming behavior.
+- `mvn -pl reactive-http-client-starter -Dtest=AwsSigV4AuthProviderTest,ReactiveClientInvocationHandlerBehaviorTest test`
+  passed with 34 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed with 9 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 

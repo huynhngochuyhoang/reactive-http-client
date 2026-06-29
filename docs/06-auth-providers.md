@@ -160,6 +160,16 @@ Supported authentication styles:
 
 Use `type: aws-sigv4` to sign requests with AWS Signature Version 4. The provider signs the HTTP method, URI, query string, headers, and raw request body bytes when the starter has serialized them for auth.
 
+Supported body-signing contract:
+
+| Body shape | Built-in SigV4 behavior |
+|---|---|
+| Empty body | Signs the AWS empty SHA-256 payload hash. |
+| `byte[]` | Signs the exact byte array sent by the starter. |
+| `String` | Signs UTF-8 bytes for the string sent by the starter. |
+| JSON object body | Signs the JSON bytes serialized by the starter auth pipeline. |
+| `Publisher` or streaming upload body | Rejected before the request is sent; the starter does not buffer or subscribe to the stream only for signing. |
+
 `Publisher` request bodies are not signed by the built-in provider because the raw bytes are not materialized without consuming the stream. Use a repeatable `byte[]`, `String`, or JSON object body for built-in signing, or provide a custom auth provider that implements AWS streaming signatures.
 
 ```yaml
