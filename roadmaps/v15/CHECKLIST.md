@@ -344,21 +344,46 @@ Evidence:
 
 ## Priority 9 — Bodiless and Unexpected-Body Contracts
 
-### [ ] 3.4 Clarify bodiless and unexpected-body contracts
-- [ ] Audit `Mono<Void>` bodiless handling with real `ClientResponse` paths.
-- [ ] Audit `Mono<ResponseEntity<Void>>` bodiless handling with real
+### [x] 3.4 Clarify bodiless and unexpected-body contracts
+- [x] Audit `Mono<Void>` bodiless handling with real `ClientResponse` paths.
+- [x] Audit `Mono<ResponseEntity<Void>>` bodiless handling with real
       `ClientResponse` paths.
-- [ ] Audit `HEAD` bodiless handling.
-- [ ] Audit `OPTIONS` bodiless handling.
-- [ ] Verify empty success bodies complete normally.
-- [ ] Verify unexpected successful bodies are drained or released as documented.
-- [ ] Verify pooled connections remain reusable when the transport permits it.
-- [ ] Verify error body capture caps remain unchanged.
-- [ ] Verify error body truncation metadata remains unchanged.
-- [ ] Document draining for connection reuse versus exposing response bodies.
-- [ ] Add tests for empty bodiless responses.
-- [ ] Add tests for unexpected-body bodiless responses.
-- [ ] Run response entity and bodiless response tests.
+- [x] Audit `HEAD` bodiless handling.
+- [x] Audit `OPTIONS` bodiless handling.
+- [x] Verify empty success bodies complete normally.
+- [x] Verify unexpected successful bodies are drained or released as documented.
+- [x] Verify pooled connections remain reusable when the transport permits it.
+- [x] Verify error body capture caps remain unchanged.
+- [x] Verify error body truncation metadata remains unchanged.
+- [x] Document draining for connection reuse versus exposing response bodies.
+- [x] Add tests for empty bodiless responses.
+- [x] Add tests for unexpected-body bodiless responses.
+- [x] Run response entity and bodiless response tests.
+
+Evidence:
+
+- Extended `ResponseEntitySupportTest` with explicit empty success-body coverage
+  for `Mono<Void>` and `Mono<ResponseEntity<Void>>`; both complete normally and
+  `ResponseEntity<Void>` still exposes status and headers.
+- Added real-transport `@HEAD` and `@OPTIONS` bodiless coverage. The tests
+  verify the proxy sends the declared method and that `Mono<Void>` /
+  `Mono<ResponseEntity<Void>>` complete without body decoding.
+- Added an OPTIONS `ResponseEntity<Void>` unexpected-body connection-reuse test,
+  complementing the existing `Mono<Void>` and `ResponseEntity<Void>` pooled
+  connection reuse tests for unexpected successful bodies.
+- Existing mock-level assertions continue to verify `Mono<Void>` uses
+  `releaseBody()` instead of `bodyToMono(Void.class)`, and
+  `Mono<ResponseEntity<Void>>` delegates to `toBodilessEntity()`.
+- Reviewed `docs/02-annotations.md` and `docs/14-test-helpers.md`; no wording
+  change was needed because they already document draining unexpected content
+  for successful bodiless calls and test-helper usage for unexpected bodies.
+- Error body cap and truncation behavior were re-verified through
+  `DefaultErrorDecoderTest` and `ProblemDetailErrorResponseMapperTest`; no
+  production error-decoder changes were made.
+- `mvn -pl reactive-http-client-starter -Dtest=ResponseEntitySupportTest test`
+  passed with 15 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-starter -Dtest=DefaultErrorDecoderTest,ProblemDetailErrorResponseMapperTest,ReactiveClientInvocationHandlerBehaviorTest test`
+  passed with 51 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 

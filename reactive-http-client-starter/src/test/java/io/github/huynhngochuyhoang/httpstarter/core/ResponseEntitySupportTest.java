@@ -2,6 +2,8 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
+import io.github.huynhngochuyhoang.httpstarter.annotation.HEAD;
+import io.github.huynhngochuyhoang.httpstarter.annotation.OPTIONS;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
@@ -97,6 +99,35 @@ class ResponseEntitySupportTest {
     }
 
     @Test
+    void monoVoidCompletesOnEmptyNoContentResponse() {
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://entity.test")
+                .exchangeFunction(req -> Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build()))
+                .build();
+
+        StepVerifier.create(invokePlainVoid(createHandler(webClient, new DefaultErrorDecoder())))
+                .verifyComplete();
+    }
+
+    @Test
+    void monoResponseEntityVoidCompletesOnEmptyNoContentResponse() {
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://entity.test")
+                .exchangeFunction(req -> Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT)
+                        .header("X-Empty", "true")
+                        .build()))
+                .build();
+
+        StepVerifier.create(invokeVoidEntity(createHandler(webClient, new DefaultErrorDecoder())))
+                .assertNext(entity -> {
+                    assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+                    assertThat(entity.getHeaders().getFirst("X-Empty")).isEqualTo("true");
+                    assertThat(entity.getBody()).isNull();
+                })
+                .verifyComplete();
+    }
+
+    @Test
     void monoResponseEntityVoidUsesBodilessEntityDecoder() {
         ClientResponse response = mockBodilessResponse();
         WebClient webClient = WebClient.builder()
@@ -163,6 +194,66 @@ class ResponseEntitySupportTest {
                     .assertNext(entity -> assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK))
                     .verifyComplete();
             StepVerifier.create(invokeVoidEntity(handler))
+                    .assertNext(entity -> assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK))
+                    .verifyComplete();
+
+            assertThat(channelIds).hasSize(2);
+            assertThat(channelIds.get(1)).isEqualTo(channelIds.get(0));
+        } finally {
+            provider.disposeLater().block(Duration.ofSeconds(5));
+            server.disposeNow();
+        }
+    }
+
+    @Test
+    void headMonoVoidCompletesAndDrainsBodilessResponse() {
+        List<String> methods = new CopyOnWriteArrayList<>();
+        DisposableServer server = methodAwareServer(null, methods);
+        try {
+            ReactiveClientInvocationHandler handler = createHandler(simpleWebClient(server), new DefaultErrorDecoder());
+
+            StepVerifier.create(invokeHead(handler))
+                    .verifyComplete();
+
+            assertThat(methods).containsExactly("HEAD head");
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    @Test
+    void optionsResponseEntityVoidCompletesAndExposesHeaders() {
+        List<String> methods = new CopyOnWriteArrayList<>();
+        DisposableServer server = methodAwareServer(null, methods);
+        try {
+            ReactiveClientInvocationHandler handler = createHandler(simpleWebClient(server), new DefaultErrorDecoder());
+
+            StepVerifier.create(invokeOptionsEntity(handler))
+                    .assertNext(entity -> {
+                        assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
+                        assertThat(entity.getHeaders().getFirst("Allow")).contains("GET");
+                        assertThat(entity.getBody()).isNull();
+                    })
+                    .verifyComplete();
+
+            assertThat(methods).containsExactly("OPTIONS options");
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    @Test
+    void pooledConnectionRemainsReusableAfterOptionsResponseEntityVoidDrainsUnexpectedBody() {
+        List<String> channelIds = new CopyOnWriteArrayList<>();
+        DisposableServer server = methodAwareServer("unexpected-body", channelIds);
+        ConnectionProvider provider = singleConnectionProvider("options-void-entity-drain");
+        try {
+            ReactiveClientInvocationHandler handler = createHandler(pooledWebClient(server, provider), new DefaultErrorDecoder());
+
+            StepVerifier.create(invokeOptionsEntity(handler))
+                    .assertNext(entity -> assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK))
+                    .verifyComplete();
+            StepVerifier.create(invokeOptionsEntity(handler))
                     .assertNext(entity -> assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK))
                     .verifyComplete();
 
@@ -263,6 +354,27 @@ class ResponseEntitySupportTest {
         return response;
     }
 
+    private static DisposableServer methodAwareServer(String responseBody, List<String> recorded) {
+        return HttpServer.create()
+                .port(0)
+                .handle((request, response) -> {
+                    if (responseBody == null) {
+                        recorded.add(request.method().name() + " " + request.path());
+                        return response.status(HttpStatus.OK.value())
+                                .header(HttpHeaders.ALLOW, "GET,HEAD,OPTIONS")
+                                .send()
+                                .then();
+                    }
+                    request.withConnection(connection -> recorded.add(connection.channel().id().asLongText()));
+                    return response.status(HttpStatus.OK.value())
+                            .header(HttpHeaders.ALLOW, "GET,HEAD,OPTIONS")
+                            .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+                            .sendString(Mono.just(responseBody))
+                            .then();
+                })
+                .bindNow();
+    }
+
     private static DisposableServer bodilessBodyServer(String path, List<String> channelIds) {
         return HttpServer.create()
                 .port(0)
@@ -282,6 +394,14 @@ class ResponseEntitySupportTest {
                 .maxConnections(1)
                 .pendingAcquireMaxCount(1)
                 .pendingAcquireTimeout(Duration.ofSeconds(2))
+                .build();
+    }
+
+    private static WebClient simpleWebClient(DisposableServer server) {
+        return WebClient.builder()
+                .baseUrl("http://127.0.0.1:" + server.port())
+                .clientConnector(new ReactorClientHttpConnector(
+                        HttpClient.create().responseTimeout(Duration.ofSeconds(5))))
                 .build();
     }
 
@@ -323,6 +443,26 @@ class ResponseEntitySupportTest {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private static Mono<Void> invokeHead(ReactiveClientInvocationHandler handler) {
+        try {
+            Method method = EntityClient.class.getMethod("head");
+            return (Mono<Void>) handler.invoke(null, method, new Object[0]);
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Mono<ResponseEntity<Void>> invokeOptionsEntity(ReactiveClientInvocationHandler handler) {
+        try {
+            Method method = EntityClient.class.getMethod("optionsEntity");
+            return (Mono<ResponseEntity<Void>>) handler.invoke(null, method, new Object[0]);
+        } catch (Throwable t) {
+            return Mono.error(t);
+        }
+    }
+
     interface EntityClient {
         @GET("/string")
         Mono<ResponseEntity<String>> getStringEntity();
@@ -332,5 +472,11 @@ class ResponseEntitySupportTest {
 
         @GET("/void-entity")
         Mono<ResponseEntity<Void>> getVoidEntity();
+
+        @HEAD("/head")
+        Mono<Void> head();
+
+        @OPTIONS("/options")
+        Mono<ResponseEntity<Void>> optionsEntity();
     }
 }
