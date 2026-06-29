@@ -34,37 +34,7 @@ class DocumentationReleaseArtifactTest {
 
     @Test
     void localMarkdownLinksResolve() throws IOException {
-        Path root = projectRoot();
-        List<String> brokenLinks = new ArrayList<>();
-
-        try (Stream<Path> files = markdownFiles(root)) {
-            for (Path markdown : files.toList()) {
-                Matcher matcher = MARKDOWN_LINK.matcher(markdownWithoutFencedCode(Files.readString(markdown)));
-                while (matcher.find()) {
-                    String target = matcher.group(1);
-                    if (isExternal(target)) {
-                        continue;
-                    }
-                    String[] parts = target.split("#", 2);
-                    String pathOnly = parts[0];
-                    String anchor = parts.length == 2 ? URLDecoder.decode(parts[1], StandardCharsets.UTF_8) : "";
-                    Path resolved = pathOnly.isBlank()
-                            ? markdown
-                            : markdown.getParent()
-                                    .resolve(URLDecoder.decode(pathOnly, StandardCharsets.UTF_8))
-                                    .normalize();
-                    if (!Files.exists(resolved)) {
-                        brokenLinks.add(root.relativize(markdown) + " -> " + target);
-                        continue;
-                    }
-                    if (!anchor.isBlank() && !markdownAnchors(resolved).contains(anchor)) {
-                        brokenLinks.add(root.relativize(markdown) + " -> " + target + " (missing anchor)");
-                    }
-                }
-            }
-        }
-
-        assertThat(brokenLinks).as("broken local Markdown links").isEmpty();
+        assertThat(brokenLocalMarkdownLinks(projectRoot())).as("broken local Markdown links").isEmpty();
     }
 
     @Test
@@ -478,6 +448,41 @@ class DocumentationReleaseArtifactTest {
         assertThat(generated.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(pomProperty(pomXml, "api.compatibility.baseline.version"));
         assertThat(generated.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
+        JsonNode readiness = generated.path("readiness");
+        assertThat(readiness.path("projectVersion").asText()).isEqualTo(generated.path("projectVersion").asText());
+        assertThat(readiness.path("apiCompatibilityBaselineVersion").asText())
+                .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
+        assertThat(readiness.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
+        assertThat(readiness.path("generatedTestEvidence").path("status").asText()).isEqualTo("pass");
+        assertThat(readiness.path("manualReleaseEvidence").path("status").asText()).isEqualTo("pending");
+        List<String> pendingReleaseCommands = streamText(readiness.path("manualReleaseEvidence").path("pendingCommands"));
+        assertThat(pendingReleaseCommands).contains("mvn -Papi-compatibility -DskipTests verify");
+        assertThat(pendingReleaseCommands)
+                .anySatisfy(command -> assertThat(command)
+                        .contains("benchmark-release")
+                        .contains("benchmark.commit=$(git rev-parse --short HEAD)"));
+        assertThat(readiness.path("manualBenchmarkEvidence").path("status").asText()).isEqualTo("pending");
+        List<String> pendingBenchmarkCommands = streamText(readiness.path("manualBenchmarkEvidence").path("pendingCommands"));
+        assertThat(pendingBenchmarkCommands)
+                .contains("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify");
+        assertThat(pendingBenchmarkCommands)
+                .anySatisfy(command -> assertThat(command)
+                        .contains("benchmark-release")
+                        .contains("benchmark.commit=$(git rev-parse --short HEAD)"));
+        assertThat(readiness.path("manualCompatibilityEvidence").path("status").asText()).isEqualTo("pending");
+        assertThat(readiness.path("manualCompatibilityEvidence").path("pendingCommands"))
+                .extracting(JsonNode::asText)
+                .containsExactly("mvn -Papi-compatibility -DskipTests verify",
+                        "bash scripts/verify-api-compatibility-fixtures.sh");
+        assertThat(readiness.path("promotedBenchmarkReport").path("path").asText())
+                .isEqualTo("docs/benchmark-report-" + generated.path("projectVersion").asText() + ".md");
+        assertThat(readiness.path("promotedBenchmarkReport").path("status").asText()).isEqualTo("present");
+        assertThat(readiness.path("configurationReference").path("status").asText()).isEqualTo("current");
+        assertThat(readiness.path("markdownLinks").path("status").asText()).isEqualTo("pass");
+        assertThat(readiness.path("staleBenchmarkReportLinks").path("status").asText()).isEqualTo("pass");
+        assertThat(readiness.path("releaseEvidenceDirectory").asText()).isEqualTo("target/release-evidence/");
+        assertThat(readiness.path("targetOnlyEvidence").path("sourceControlled").asBoolean()).isFalse();
+        assertThat(readiness.path("targetOnlyEvidence").path("commitGeneratedEvidence").asBoolean()).isFalse();
         assertThat(generated.path("benchmarkDependencyManagement").path("springBootVersion").asText())
                 .isEqualTo(pomProperty(pomXml, "spring-boot.version"));
         assertThat(generated.path("benchmarkDependencyManagement").path("reactorNettyVersionSource").asText())
@@ -602,6 +607,12 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("smokeReport");
     }
 
+    private static List<String> streamText(JsonNode array) {
+        List<String> values = new ArrayList<>();
+        array.forEach(value -> values.add(value.asText()));
+        return values;
+    }
+
     private static String releaseNoteBenchmarkEvidenceMarkdown(JsonNode manifest) {
         JsonNode evidence = manifest.path("benchmarkEvidence");
         String projectVersion = manifest.path("projectVersion").asText();
@@ -662,6 +673,26 @@ class DocumentationReleaseArtifactTest {
         return versions;
     }
 
+    private static List<String> staleBenchmarkReportReferences(Path root, String projectVersion) throws IOException {
+        List<Path> releaseDocs = List.of(
+                root.resolve("README.md"),
+                root.resolve("CHANGELOG.md"),
+                root.resolve("docs/22-benchmarks.md"),
+                root.resolve("docs/23-performance-summary.md"),
+                root.resolve("docs/24-benchmark-consumer-examples.md"));
+        Pattern pattern = Pattern.compile("benchmark-report-(\\d+\\.\\d+\\.\\d+)\\.md");
+        List<String> stale = new ArrayList<>();
+        for (Path releaseDoc : releaseDocs) {
+            Matcher matcher = pattern.matcher(Files.readString(releaseDoc));
+            while (matcher.find()) {
+                if (!projectVersion.equals(matcher.group(1))) {
+                    stale.add(root.relativize(releaseDoc) + " -> " + matcher.group());
+                }
+            }
+        }
+        return stale;
+    }
+
     private static String changelogSection(String changelog, String version) {
         String heading = "## [" + version + "]";
         int start = changelog.indexOf(heading);
@@ -670,6 +701,37 @@ class DocumentationReleaseArtifactTest {
         }
         int end = changelog.indexOf("\n## [", start + heading.length());
         return end < 0 ? changelog.substring(start) : changelog.substring(start, end);
+    }
+
+    private static List<String> brokenLocalMarkdownLinks(Path root) throws IOException {
+        List<String> brokenLinks = new ArrayList<>();
+        try (Stream<Path> files = markdownFiles(root)) {
+            for (Path markdown : files.toList()) {
+                Matcher matcher = MARKDOWN_LINK.matcher(markdownWithoutFencedCode(Files.readString(markdown)));
+                while (matcher.find()) {
+                    String target = matcher.group(1);
+                    if (isExternal(target)) {
+                        continue;
+                    }
+                    String[] parts = target.split("#", 2);
+                    String pathOnly = parts[0];
+                    String anchor = parts.length == 2 ? URLDecoder.decode(parts[1], StandardCharsets.UTF_8) : "";
+                    Path resolved = pathOnly.isBlank()
+                            ? markdown
+                            : markdown.getParent()
+                                    .resolve(URLDecoder.decode(pathOnly, StandardCharsets.UTF_8))
+                                    .normalize();
+                    if (!Files.exists(resolved)) {
+                        brokenLinks.add(root.relativize(markdown) + " -> " + target);
+                        continue;
+                    }
+                    if (!anchor.isBlank() && !markdownAnchors(resolved).contains(anchor)) {
+                        brokenLinks.add(root.relativize(markdown) + " -> " + target + " (missing anchor)");
+                    }
+                }
+            }
+        }
+        return brokenLinks;
     }
 
     private static Stream<Path> markdownFiles(Path root) throws IOException {
@@ -794,10 +856,8 @@ class DocumentationReleaseArtifactTest {
         manifest.put("javaVersion", System.getProperty("java.version"));
         manifest.put("javaBaseline", pomProperty(pomXml, "java.version"));
         manifest.put("springBootBaseline", pomProperty(pomXml, "spring-boot.version"));
-        manifest.put("benchmarkDependencyManagement", benchmarkDependencyManagement(pomXml));
-        manifest.put("publishedBaselineArtifacts", publishedBaselineArtifacts(baselineVersion));
-        manifest.put("benchmarkEvidence", benchmarkEvidence(projectVersion, baselineVersion));
-        manifest.put("checks", List.of(
+        Map<String, Object> benchmarkEvidence = benchmarkEvidence(projectVersion, baselineVersion);
+        List<Map<String, String>> checks = List.of(
                 check("mvn test", "pass", "Generated by DocumentationReleaseArtifactTest during the current test run."),
                 check("mvn -Papi-compatibility -DskipTests verify", "pending", "Run before release."),
                 check("bash scripts/verify-api-compatibility-fixtures.sh", "pending", "Run before release."),
@@ -807,8 +867,87 @@ class DocumentationReleaseArtifactTest {
                 check("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify", "pending",
                         "Harness smoke only; do not publish these numbers."),
                 check("mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)", "pending",
-                        "Run when request-path behavior changed or release notes make performance claims.")));
+                        "Run when request-path behavior changed or release notes make performance claims."));
+        manifest.put("readiness", releaseReadiness(pom.getParent(), projectVersion, baselineVersion, benchmarkEvidence, checks));
+        manifest.put("benchmarkDependencyManagement", benchmarkDependencyManagement(pomXml));
+        manifest.put("publishedBaselineArtifacts", publishedBaselineArtifacts(baselineVersion));
+        manifest.put("benchmarkEvidence", benchmarkEvidence);
+        manifest.put("checks", checks);
         return manifest;
+    }
+
+    private static Map<String, Object> releaseReadiness(Path root,
+                                                        String projectVersion,
+                                                        String baselineVersion,
+                                                        Map<String, Object> benchmarkEvidence,
+                                                        List<Map<String, String>> checks) throws IOException {
+        String promotedReport = (String) benchmarkEvidence.get("promotedReport");
+        List<String> pendingManualCommands = checks.stream()
+                .filter(check -> "pending".equals(check.get("status")))
+                .map(check -> check.get("command"))
+                .toList();
+        List<String> pendingBenchmarkCommands = pendingManualCommands.stream()
+                .filter(command -> command.contains("benchmark"))
+                .toList();
+        List<String> pendingCompatibilityCommands = pendingManualCommands.stream()
+                .filter(command -> command.contains("api-compatibility")
+                        || command.contains("verify-api-compatibility-fixtures"))
+                .toList();
+        boolean configurationReferenceCurrent = Files.readString(root.resolve("docs/configuration-properties.md"))
+                .equals(configurationReferenceMarkdown(configurationMetadata(root)));
+        List<String> brokenLinks = brokenLocalMarkdownLinks(root);
+        List<String> staleBenchmarkLinks = staleBenchmarkReportReferences(root, projectVersion);
+
+        LinkedHashMap<String, Object> readiness = new LinkedHashMap<>();
+        readiness.put("projectVersion", projectVersion);
+        readiness.put("apiCompatibilityBaselineVersion", baselineVersion);
+        readiness.put("apiCompatibilityBaselineMatchesProjectVersion", projectVersion.equals(baselineVersion));
+        readiness.put("generatedTestEvidence", readinessStatus("pass",
+                "Generated by DocumentationReleaseArtifactTest in target/release-evidence/."));
+        readiness.put("manualReleaseEvidence", readinessManualStatus(pendingManualCommands));
+        readiness.put("manualBenchmarkEvidence", readinessManualStatus(pendingBenchmarkCommands));
+        readiness.put("manualCompatibilityEvidence", readinessManualStatus(pendingCompatibilityCommands));
+        readiness.put("promotedBenchmarkReport", readinessPathStatus(promotedReport,
+                Files.exists(root.resolve(promotedReport)) ? "present" : "missing"));
+        readiness.put("configurationReference", readinessPathStatus("docs/configuration-properties.md",
+                configurationReferenceCurrent ? "current" : "stale"));
+        readiness.put("markdownLinks", readinessListStatus(brokenLinks.isEmpty() ? "pass" : "fail", "brokenLinks", brokenLinks));
+        readiness.put("staleBenchmarkReportLinks", readinessListStatus(
+                staleBenchmarkLinks.isEmpty() ? "pass" : "fail", "references", staleBenchmarkLinks));
+        readiness.put("releaseEvidenceDirectory", "target/release-evidence/");
+        readiness.put("targetOnlyEvidence", Map.of(
+                "directory", "target/release-evidence/",
+                "sourceControlled", false,
+                "commitGeneratedEvidence", false));
+        return readiness;
+    }
+
+    private static Map<String, Object> readinessStatus(String status, String note) {
+        LinkedHashMap<String, Object> value = new LinkedHashMap<>();
+        value.put("status", status);
+        value.put("note", note);
+        return value;
+    }
+
+    private static Map<String, Object> readinessManualStatus(List<String> pendingCommands) {
+        LinkedHashMap<String, Object> value = new LinkedHashMap<>();
+        value.put("status", pendingCommands.isEmpty() ? "complete" : "pending");
+        value.put("pendingCommands", pendingCommands);
+        return value;
+    }
+
+    private static Map<String, Object> readinessPathStatus(String path, String status) {
+        LinkedHashMap<String, Object> value = new LinkedHashMap<>();
+        value.put("path", path);
+        value.put("status", status);
+        return value;
+    }
+
+    private static Map<String, Object> readinessListStatus(String status, String field, List<String> values) {
+        LinkedHashMap<String, Object> value = new LinkedHashMap<>();
+        value.put("status", status);
+        value.put(field, values);
+        return value;
     }
 
     private static Map<String, Object> benchmarkEvidence(String projectVersion, String baselineVersion) {
