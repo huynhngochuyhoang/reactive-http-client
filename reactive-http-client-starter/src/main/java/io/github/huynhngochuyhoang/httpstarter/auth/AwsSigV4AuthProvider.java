@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
 import org.reactivestreams.Publisher;
+import org.springframework.util.MultiValueMap;
 import reactor.core.publisher.Mono;
 
 import javax.crypto.Mac;
@@ -179,6 +180,10 @@ public final class AwsSigV4AuthProvider implements AuthProvider {
         }
         if (requestBody instanceof Publisher<?>) {
             throw new IllegalArgumentException("AWS SigV4 auth cannot sign Publisher request bodies because raw bytes are not materialized. "
+                    + "Use a repeatable byte[], String, or JSON object body, or provide a custom AuthProvider that supports AWS streaming signatures.");
+        }
+        if (requestBody instanceof MultiValueMap<?, ?>) {
+            throw new IllegalArgumentException("AWS SigV4 auth cannot sign multipart request bodies because stable raw bytes are not materialized. "
                     + "Use a repeatable byte[], String, or JSON object body, or provide a custom AuthProvider that supports AWS streaming signatures.");
         }
         throw new IllegalArgumentException("AWS SigV4 auth cannot sign request body type "

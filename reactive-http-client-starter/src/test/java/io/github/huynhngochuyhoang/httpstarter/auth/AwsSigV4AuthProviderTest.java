@@ -8,6 +8,7 @@ import reactor.test.StepVerifier;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -74,6 +75,28 @@ class AwsSigV4AuthProviderTest {
     }
 
     @Test
+    void signsStringRequestBodyBytes() {
+        AwsSigV4AuthProvider provider = AwsSigV4AuthProvider.builder()
+                .accessKeyId("AKIAIOSFODNN7EXAMPLE")
+                .secretAccessKey("wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY")
+                .region("us-east-1")
+                .service("execute-api")
+                .clock(Clock.fixed(Instant.parse("2026-05-13T12:00:00Z"), ZoneOffset.UTC))
+                .build();
+
+        String body = "{\"message\":\"hello\"}";
+        ClientRequest request = ClientRequest.create(
+                        HttpMethod.POST,
+                        URI.create("https://abc123.execute-api.us-east-1.amazonaws.com/prod/messages"))
+                .build();
+
+        StepVerifier.create(provider.getAuth(new AuthRequest("api-client", request, body)))
+                .assertNext(auth -> assertThat(auth.getHeaders().get("x-amz-content-sha256"))
+                        .isEqualTo(sha256Hex(body.getBytes(StandardCharsets.UTF_8))))
+                .verifyComplete();
+    }
+
+    @Test
     void rejectsPublisherBodiesInsteadOfSigningEmptyPayload() {
         AwsSigV4AuthProvider provider = AwsSigV4AuthProvider.builder()
                 .accessKeyId("AKIAIOSFODNN7EXAMPLE")
@@ -130,6 +153,19 @@ class AwsSigV4AuthProviderTest {
                 .accessKeyId("key").secretAccessKey("secret").service("s3").build());
         assertThatIllegalArgumentException(() -> AwsSigV4AuthProvider.builder()
                 .accessKeyId("key").secretAccessKey("secret").region("us-east-1").build());
+    }
+
+    private static String sha256Hex(byte[] bytes) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to calculate SHA-256", e);
+        }
     }
 
     private static void assertThatIllegalArgumentException(Runnable action) {

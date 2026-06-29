@@ -3,7 +3,10 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
+import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -25,8 +28,13 @@ import reactor.test.StepVerifier;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -406,6 +414,94 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     }
 
     @Test
+    void shouldSignJsonBodyUsingSerializedBytesOnWire() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        WebClient webClient = sigV4WebClient(captured);
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        StepVerifier.create(invokePostJson(handler, "application/json", Map.of("id", 1)))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertSignedHashMatchesBody(captured.get());
+    }
+
+    @Test
+    void shouldSignStringBodyUsingBytesOnWire() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        WebClient webClient = sigV4WebClient(captured);
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        StepVerifier.create(invokePost(handler, "text/plain", "payload"))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertSignedHashMatchesBody(captured.get());
+    }
+
+    @Test
+    void shouldSignStringBodyUsingContentTypeCharset() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        WebClient webClient = sigV4WebClient(captured);
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        StepVerifier.create(invokePost(handler, "text/plain;charset=ISO-8859-1", "café"))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertEquals(sha256Hex("café".getBytes(StandardCharsets.ISO_8859_1)),
+                captured.get().headers().getFirst("x-amz-content-sha256"));
+    }
+
+    @Test
+    void shouldSignByteArrayBodyUsingBytesOnWire() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        WebClient webClient = sigV4WebClient(captured);
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        StepVerifier.create(invokePostBytes(handler, "application/octet-stream", "binary-data".getBytes(StandardCharsets.UTF_8)))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertSignedHashMatchesBody(captured.get());
+    }
+
+    @Test
+    void shouldSignEmptyBodyUsingEmptyPayloadHash() {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        WebClient webClient = sigV4WebClient(captured);
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        StepVerifier.create(invokeGet(handler, null))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertEquals(sha256Hex(new byte[0]), captured.get().headers().getFirst("x-amz-content-sha256"));
+    }
+
+    @Test
+    void shouldRejectSigV4PublisherBodyBeforeStreamingUploadIsSubscribed() {
+        AtomicInteger subscriptions = new AtomicInteger();
+        Flux<String> body = Flux.just("payload").doOnSubscribe(subscription -> subscriptions.incrementAndGet());
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(new OutboundAuthFilter("test-client", sigV4Provider()))
+                .exchangeFunction(request -> Mono.error(new AssertionError("request must not be sent")))
+                .build();
+
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+
+        StepVerifier.create(invokePublisherBody(handler, body))
+                .expectErrorSatisfies(error -> {
+                    AuthProviderException authError = assertInstanceOf(AuthProviderException.class, error);
+                    assertInstanceOf(IllegalArgumentException.class, authError.getCause());
+                    assertTrue(authError.getCause().getMessage().contains("cannot sign Publisher request bodies"));
+                })
+                .verify();
+        assertEquals(0, subscriptions.get());
+    }
+
+    @Test
     void shouldProvideRawBodyForCustomJsonContentType() {
         AtomicReference<byte[]> capturedRawBody = new AtomicReference<>();
         WebClient webClient = WebClient.builder()
@@ -539,6 +635,54 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         MockClientHttpRequest mock = new MockClientHttpRequest(request.method(), URI.create(request.url().toString()));
         request.writeTo(mock, ExchangeStrategies.withDefaults()).block();
         return mock;
+    }
+
+    private static void assertSignedHashMatchesBody(ClientRequest request) {
+        assertNotNull(request);
+        assertNotNull(request.headers().getFirst("Authorization"));
+        assertEquals(sha256Hex(materializedBody(request)), request.headers().getFirst("x-amz-content-sha256"));
+    }
+
+    private static byte[] materializedBody(ClientRequest request) {
+        String body = materialize(request).getBodyAsString().block();
+        return body == null ? new byte[0] : body.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static WebClient sigV4WebClient(AtomicReference<ClientRequest> captured) {
+        return WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(new OutboundAuthFilter("test-client", sigV4Provider()))
+                .exchangeFunction(request -> {
+                    captured.set(request);
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build());
+                })
+                .build();
+    }
+
+    private static AwsSigV4AuthProvider sigV4Provider() {
+        return AwsSigV4AuthProvider.builder()
+                .accessKeyId("AKIAIOSFODNN7EXAMPLE")
+                .secretAccessKey("wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY")
+                .region("us-east-1")
+                .service("execute-api")
+                .clock(Clock.fixed(Instant.parse("2026-05-13T12:00:00Z"), ZoneOffset.UTC))
+                .build();
+    }
+
+    private static String sha256Hex(byte[] bytes) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to calculate SHA-256", e);
+        }
     }
 
     @SuppressWarnings("unchecked")

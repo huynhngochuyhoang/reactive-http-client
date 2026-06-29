@@ -1,11 +1,10 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import io.github.huynhngochuyhoang.httpstarter.annotation.FormField;
-import io.github.huynhngochuyhoang.httpstarter.annotation.FormFile;
-import io.github.huynhngochuyhoang.httpstarter.annotation.MultipartBody;
-import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
-import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
+import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -24,6 +23,9 @@ import reactor.test.StepVerifier;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,6 +96,28 @@ class MultipartRequestTest {
     }
 
     @Test
+    void sigV4MultipartUploadFailsBeforeSigningEmptyPayload() {
+        AtomicReference<ClientRequest> captured = captureExchange();
+        ReactiveClientInvocationHandler handler = createSigV4Handler(captured);
+        ByteArrayResource avatar = new ByteArrayResource("binary-data".getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() { return "avatar.png"; }
+        };
+
+        StepVerifier.create(invokeUploadAvatar(handler, 42L, "profile pic", avatar))
+                .expectErrorSatisfies(error -> {
+                    AuthProviderException authError = org.junit.jupiter.api.Assertions.assertInstanceOf(
+                            AuthProviderException.class, error);
+                    assertThat(authError.getCause())
+                            .isInstanceOf(IllegalArgumentException.class)
+                            .hasMessageContaining("cannot sign multipart request bodies")
+                            .hasMessageContaining("stable raw bytes are not materialized");
+                })
+                .verify();
+        assertThat(captured.get()).isNull();
+    }
+
+    @Test
     void combiningMultipartBodyWithBodyFailsAtMetadataParse() {
         MethodMetadataCache cache = new MethodMetadataCache();
 
@@ -149,6 +173,26 @@ class MultipartRequestTest {
                 })
                 .build();
 
+        return createHandler(webClient, new ReactiveHttpClientProperties.ClientConfig());
+    }
+
+    private static ReactiveClientInvocationHandler createSigV4Handler(AtomicReference<ClientRequest> captured) {
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://multipart.test")
+                .filter(new OutboundAuthFilter("multipart-client", sigV4Provider()))
+                .exchangeFunction(request -> {
+                    captured.set(request);
+                    return Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build());
+                })
+                .build();
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setAuthProvider("awsSigV4");
+        return createHandler(webClient, config);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ReactiveClientInvocationHandler createHandler(
+            WebClient webClient, ReactiveHttpClientProperties.ClientConfig config) {
         ApplicationContext appCtx = mock(ApplicationContext.class);
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
         when(appCtx.getBeanProvider(HttpClientObserver.class)).thenReturn(observerProvider);
@@ -159,13 +203,23 @@ class MultipartRequestTest {
                 new MethodMetadataCache(),
                 new RequestArgumentResolver(),
                 new DefaultErrorDecoder(),
-                new ReactiveHttpClientProperties.ClientConfig(),
+                config,
                 "multipart-client",
                 appCtx,
                 new NoopResilienceOperatorApplier(),
                 null,
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );
+    }
+
+    private static AwsSigV4AuthProvider sigV4Provider() {
+        return AwsSigV4AuthProvider.builder()
+                .accessKeyId("AKIAIOSFODNN7EXAMPLE")
+                .secretAccessKey("wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY")
+                .region("us-east-1")
+                .service("execute-api")
+                .clock(Clock.fixed(Instant.parse("2026-05-13T12:00:00Z"), ZoneOffset.UTC))
+                .build();
     }
 
     private static AtomicReference<ClientRequest> captureExchange() {
