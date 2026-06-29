@@ -468,6 +468,8 @@ class DocumentationReleaseArtifactTest {
                 .anySatisfy(command -> assertThat(command)
                         .contains("benchmark-release")
                         .contains("benchmark.commit=$(git rev-parse --short HEAD)"));
+        assertThat(pendingReleaseCommands)
+                .contains(generated.path("benchmarkEvidence").path("publishedStarterCommand").asText());
         assertThat(readiness.path("manualBenchmarkEvidence").path("status").asText()).isEqualTo("pending");
         List<String> pendingBenchmarkCommands = streamText(readiness.path("manualBenchmarkEvidence").path("pendingCommands"));
         assertThat(pendingBenchmarkCommands)
@@ -911,10 +913,10 @@ class DocumentationReleaseArtifactTest {
                 .filter(artifact -> "pending".equals(artifact.get("status")))
                 .map(artifact -> artifact.get("resolutionCommand"))
                 .forEach(pendingManualCommands::add);
+        pendingManualCommands.add((String) benchmarkEvidence.get("publishedStarterCommand"));
         List<String> pendingBenchmarkCommands = new ArrayList<>(pendingManualCommands.stream()
                 .filter(command -> command.contains("benchmark"))
                 .toList());
-        pendingBenchmarkCommands.add((String) benchmarkEvidence.get("publishedStarterCommand"));
         List<String> pendingCompatibilityCommands = pendingManualCommands.stream()
                 .filter(command -> command.contains("api-compatibility")
                         || command.contains("verify-api-compatibility-fixtures"))
