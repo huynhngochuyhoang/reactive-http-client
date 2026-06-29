@@ -63,6 +63,15 @@ count, total inherited endpoint count, and one row/object per client. It sorts
 clients by name and interface for stable output. The helper is explicit: calling
 it does not register an Actuator endpoint, controller, log line, or file writer.
 
+When DEBUG logging is enabled for `ReactiveHttpClientFactoryBean`, startup logs
+include one sanitized `startup summary` line per client using the same summary
+fields: client name, interface, endpoint count, inherited endpoint count, base
+URL source, timeout summary, resilience summary, auth mode, redirect policy, and
+observability state. The summary line does not include concrete base URL values,
+header values, auth-provider bean names, proxy credentials, request bodies, or
+response bodies. It is DEBUG-only; normal INFO startup logs do not include this
+support summary.
+
 The starter registers this provider as a normal bean and does not publish an Actuator endpoint. If an application wants one, keep endpoint exposure local to the app:
 
 ```java

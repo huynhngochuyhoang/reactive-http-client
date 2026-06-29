@@ -126,6 +126,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         Object rateLimiterRegistry = resolveSafely("io.github.resilience4j.ratelimiter.RateLimiterRegistry");
         ResilienceOperatorApplier resilienceOperatorApplier = resolveResilienceOperatorApplier(
                 circuitBreakerRegistry, retryRegistry, bulkheadRegistry, rateLimiterRegistry);
+        logStartupSummary(type, clientName, config, metadataCache, resilienceOperatorApplier, properties.getObservability());
         ObjectMapper objectMapper = applicationContext.getBeanProvider(ObjectMapper.class).getIfAvailable();
 
         if (config.getResilience() != null && config.getResilience().isEnabled()) {
@@ -504,6 +505,45 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 observabilityEnabled ? "enabled" : "disabled",
                 config.isExchangeLoggingEnabled() ? "enabled" : "disabled",
                 config.getLogPreset().name().toLowerCase(Locale.ROOT).replace('_', '-'));
+    }
+
+    private void logStartupSummary(Class<?> clientInterface,
+                                   String clientName,
+                                   ReactiveHttpClientProperties.ClientConfig config,
+                                   MethodMetadataCache metadataCache,
+                                   ResilienceOperatorApplier resilienceOperatorApplier,
+                                   ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        ReactiveHttpClientDiagnosticsProvider.ClientSummary summary = ReactiveHttpClientDiagnosticsProvider.clientSummary(
+                clientInterface, clientName, config, metadataCache, resilienceOperatorApplier);
+        boolean observabilityEnabled = observabilityConfig == null || observabilityConfig.isEnabled();
+
+        log.debug("Reactive HTTP client [{}] startup summary: interface={}, endpoints={}, inheritedEndpoints={}, "
+                        + "baseUrlSource={}, timeout={}, resilience={}, auth={}, redirects={}, observability={}",
+                summary.clientName(),
+                summary.clientInterface(),
+                summary.endpointCount(),
+                summary.inheritedEndpointCount(),
+                summary.baseUrlSource(),
+                diagnosticsTimeoutSummary(summary.timeout()),
+                diagnosticsResilienceSummary(summary.resilience()),
+                summary.authMode(),
+                summary.followRedirects() ? "follow" : "manual",
+                observabilityEnabled ? "enabled" : "disabled");
+    }
+
+    private static String diagnosticsTimeoutSummary(ReactiveHttpClientDiagnosticsProvider.TimeoutSummary timeout) {
+        return timeout.source() + ":" + timeout.timeoutMs() + "ms";
+    }
+
+    private static String diagnosticsResilienceSummary(ReactiveHttpClientDiagnosticsProvider.ResilienceSummary resilience) {
+        return "configured=" + resilience.configured()
+                + ",retry=" + resilience.retry()
+                + ",rateLimiter=" + resilience.rateLimiter()
+                + ",circuitBreaker=" + resilience.circuitBreaker()
+                + ",bulkhead=" + resilience.bulkhead();
     }
 
     private void logMethodPolicyDiagnostics(Class<?> clientInterface,
