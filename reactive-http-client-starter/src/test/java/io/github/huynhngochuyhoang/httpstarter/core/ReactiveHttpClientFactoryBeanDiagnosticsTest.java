@@ -10,8 +10,11 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationContext;
@@ -77,6 +80,53 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .contains("exchangeLogging=enabled")
                     .contains("logPreset=metadata-only")
                     .doesNotContain("proxy-secret");
+        } finally {
+            logger.setLevel(previousLevel);
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void debugStartupSummaryUsesDiagnosticsProviderFieldsAndSanitizedValues(CapturedOutput output) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("https://secret-base.example.com");
+        config.setAuthProvider("namedAuthProvider");
+        config.setDefaultHeaders(Map.of("Authorization", "Bearer secret-token"));
+        config.setFollowRedirects(true);
+        config.setRequestTimeoutMs(1000);
+        config.getResilience().setEnabled(true);
+        properties.getObservability().setEnabled(false);
+        properties.getClients().put("internal-policy-client", config);
+
+        ReactiveHttpClientFactoryBean<InternalPolicyClient> factoryBean =
+                buildFactoryBean(properties, InternalPolicyClient.class);
+        try {
+            factoryBean.getObject();
+
+            ReactiveHttpClientDiagnosticsProvider.ClientSummary expected = diagnosticsSummary(
+                    properties, InternalPolicyClient.class, "internal-policy-client");
+            assertThat(output.getOut().lines()
+                    .filter(line -> line.contains("Reactive HTTP client [internal-policy-client] startup summary"))
+                    .findFirst())
+                    .hasValueSatisfying(line -> assertThat(line)
+                            .contains("interface=" + expected.clientInterface())
+                            .contains("endpoints=" + expected.endpointCount())
+                            .contains("inheritedEndpoints=" + expected.inheritedEndpointCount())
+                            .contains("baseUrlSource=" + expected.baseUrlSource())
+                            .contains("timeout=" + expected.timeout().source() + ":" + expected.timeout().timeoutMs() + "ms")
+                            .contains("resilience=configured=" + expected.resilience().configured())
+                            .contains("retry=" + expected.resilience().retry())
+                            .contains("auth=" + expected.authMode())
+                            .contains("redirects=follow")
+                            .contains("observability=disabled")
+                            .doesNotContain("https://secret-base.example.com")
+                            .doesNotContain("namedAuthProvider")
+                            .doesNotContain("secret-token")
+                            .doesNotContain("Authorization"));
         } finally {
             logger.setLevel(previousLevel);
             factoryBean.destroy();
@@ -303,7 +353,9 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         try {
             factoryBean.getObject();
 
-            assertThat(output.getOut()).doesNotContain("method policy");
+            assertThat(output.getOut())
+                    .doesNotContain("method policy")
+                    .doesNotContain("startup summary");
         } finally {
             logger.setLevel(previousLevel);
             factoryBean.destroy();
@@ -940,6 +992,19 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         } finally {
             factoryBean.destroy();
         }
+    }
+
+    private ReactiveHttpClientDiagnosticsProvider.ClientSummary diagnosticsSummary(
+            ReactiveHttpClientProperties properties, Class<?> clientInterface, String clientName) {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, clientInterface);
+        beanFactory.registerBeanDefinition(clientName, definition);
+
+        return new ReactiveHttpClientDiagnosticsProvider(beanFactory, properties, new MethodMetadataCache())
+                .clientSummaries()
+                .get(0);
     }
 
     @SuppressWarnings("unchecked")

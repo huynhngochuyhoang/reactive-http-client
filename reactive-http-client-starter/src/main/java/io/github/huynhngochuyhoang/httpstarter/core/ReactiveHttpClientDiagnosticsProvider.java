@@ -52,8 +52,20 @@ public class ReactiveHttpClientDiagnosticsProvider {
         String clientName = annotation != null ? annotation.name() : "";
         ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
+        return clientSummary(clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
+    }
+
+    static ClientSummary clientSummary(Class<?> clientInterface,
+                                       String clientName,
+                                       ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                       MethodMetadataCache metadataCache,
+                                       ResilienceOperatorApplier resilienceOperatorApplier) {
+        ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+        ReactiveHttpClientProperties.ClientConfig resolvedConfig = clientConfig != null
+                ? clientConfig
+                : new ReactiveHttpClientProperties.ClientConfig();
         List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
-                clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
+                clientInterface, clientName, resolvedConfig, metadataCache, resilienceOperatorApplier);
         long inherited = contracts.stream()
                 .filter(EffectiveHttpClientContract::inherited)
                 .count();
@@ -63,16 +75,16 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return new ClientSummary(
                 clientName,
                 clientInterface.getName(),
-                baseUrlSource(annotation, clientConfig),
+                baseUrlSource(annotation, resolvedConfig),
                 new TimeoutSummary(timeout.source(), timeout.timeoutMs()),
                 new ResilienceSummary(
-                        clientConfig.getResilience() != null && clientConfig.getResilience().isEnabled(),
+                        resolvedConfig.getResilience() != null && resolvedConfig.getResilience().isEnabled(),
                         resilience.retry(),
                         resilience.rateLimiter(),
                         resilience.circuitBreaker(),
                         resilience.bulkhead()),
-                authMode(clientConfig),
-                clientConfig.isFollowRedirects(),
+                authMode(resolvedConfig),
+                resolvedConfig.isFollowRedirects(),
                 contracts.size(),
                 Math.toIntExact(inherited));
     }
@@ -97,7 +109,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return null;
     }
 
-    private EffectiveHttpClientContract.TimeoutPolicy representativeTimeout(List<EffectiveHttpClientContract> contracts) {
+    private static EffectiveHttpClientContract.TimeoutPolicy representativeTimeout(List<EffectiveHttpClientContract> contracts) {
         return contracts.stream()
                 .map(EffectiveHttpClientContract::timeout)
                 .filter(timeout -> !"disabled".equals(timeout.source()))
@@ -105,7 +117,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 .orElse(new EffectiveHttpClientContract.TimeoutPolicy("disabled", 0));
     }
 
-    private EffectiveHttpClientContract.ResiliencePolicy representativeResilience(List<EffectiveHttpClientContract> contracts) {
+    private static EffectiveHttpClientContract.ResiliencePolicy representativeResilience(List<EffectiveHttpClientContract> contracts) {
         return contracts.stream()
                 .map(EffectiveHttpClientContract::resilience)
                 .filter(resilience -> !"disabled".equals(resilience.retry())
@@ -117,7 +129,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                         "disabled", "disabled", "disabled", "disabled"));
     }
 
-    private String baseUrlSource(ReactiveHttpClient annotation,
+    private static String baseUrlSource(ReactiveHttpClient annotation,
                                  ReactiveHttpClientProperties.ClientConfig clientConfig) {
         if (annotation != null && StringUtils.hasText(annotation.baseUrl())) {
             return "annotation";
@@ -128,7 +140,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return "missing";
     }
 
-    private String authMode(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+    private static String authMode(ReactiveHttpClientProperties.ClientConfig clientConfig) {
         if (StringUtils.hasText(clientConfig.getAuthProvider())) {
             return "provider-bean";
         }

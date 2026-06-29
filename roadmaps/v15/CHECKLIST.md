@@ -419,22 +419,32 @@ Evidence:
 
 ## Priority 11 — Startup Configuration Summary Logging
 
-### [ ] 1.3 Add startup configuration summary logging
-- [ ] Decide whether startup summary is opt-in property based or DEBUG-only.
-- [ ] Add sanitized one-line summary per client.
-- [ ] Include client name and interface.
-- [ ] Include endpoint count and inherited endpoint count.
-- [ ] Include auth mode.
-- [ ] Include timeout source summary.
-- [ ] Include resilience enabled/disabled summary.
-- [ ] Include redirect-following flag.
-- [ ] Include observability enabled/disabled summary.
-- [ ] Reuse diagnostics snapshot sanitization rules.
-- [ ] Verify summary output agrees with `ReactiveHttpClientDiagnosticsProvider`.
-- [ ] Verify default configuration does not add INFO log noise.
-- [ ] Add logging tests for enabled summary output.
-- [ ] Add logging tests for sanitized output.
-- [ ] Document startup summary usage.
+### [x] 1.3 Add startup configuration summary logging
+- [x] Decide whether startup summary is opt-in property based or DEBUG-only.
+- [x] Add sanitized one-line summary per client.
+- [x] Include client name and interface.
+- [x] Include endpoint count and inherited endpoint count.
+- [x] Include auth mode.
+- [x] Include timeout source summary.
+- [x] Include resilience enabled/disabled summary.
+- [x] Include redirect-following flag.
+- [x] Include observability enabled/disabled summary.
+- [x] Reuse diagnostics snapshot sanitization rules.
+- [x] Verify summary output agrees with `ReactiveHttpClientDiagnosticsProvider`.
+- [x] Verify default configuration does not add INFO log noise.
+- [x] Add logging tests for enabled summary output.
+- [x] Add logging tests for sanitized output.
+- [x] Document startup summary usage.
+
+Evidence:
+
+- Added a DEBUG-only `Reactive HTTP client [...] startup summary` line emitted during proxy construction after resilience operator availability is resolved.
+- The summary line uses the same `ReactiveHttpClientDiagnosticsProvider.ClientSummary` construction path as the runtime diagnostics provider for client name, interface, base URL source, timeout, resilience, auth mode, redirect policy, endpoint count, and inherited endpoint count.
+- The line adds observability state from `ReactiveHttpClientProperties` and omits concrete base URL values, header values, auth-provider bean names, proxy credentials, request bodies, and response bodies.
+- Added logging coverage that compares summary fields against `ReactiveHttpClientDiagnosticsProvider`, verifies sanitized output, and verifies INFO logs do not contain the startup summary.
+- Updated `docs/21-diagnostic-contexts.md` with the DEBUG startup summary contract and sanitization boundary.
+- `mvn -pl reactive-http-client-starter -Dtest=ReactiveHttpClientFactoryBeanDiagnosticsTest,ReactiveHttpClientDiagnosticsProviderTest test` passed with 51 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed with 9 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 
