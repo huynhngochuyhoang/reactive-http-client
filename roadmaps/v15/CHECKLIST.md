@@ -219,9 +219,38 @@ Evidence:
 
 ---
 
-## Priority 6 — Redirect-Following Contract Coverage
+## Priority 6 — Inherited Generic Endpoint Type Resolution
 
-### [ ] 3.1 Expand redirect-following contract coverage
+### [x] 3.1 Resolve inherited generic endpoint response types
+- [x] Add a regression test for `BusApiOperators extends ApiOperators<BusResponse>`.
+- [x] Add a regression test for `TrainApiOperators extends ApiOperators<TrainResponse>`.
+- [x] Verify inherited `Mono<T>` methods decode using the concrete child binding.
+- [x] Verify inherited `Flux<T>` methods decode using the concrete child binding.
+- [x] Verify inherited `Mono<ResponseEntity<T>>` methods decode using the concrete child binding.
+- [x] Verify nested parameterized bodies from inherited methods keep their concrete type arguments.
+- [x] Resolve request-body generic parameter types with the concrete child binding when auth serialization or repeatability checks need the body type.
+- [x] Keep shared `MethodMetadataCache` behavior safe for two child clients binding the same parent method differently.
+- [x] Verify inherited endpoint validation still reports the concrete `@ReactiveHttpClient` child name.
+- [x] Verify diagnostics, contract snapshots, and startup method policy output describe inherited generic endpoints consistently.
+- [x] Document the supported generic shared-contract pattern in annotation docs.
+- [x] Document that each child interface must bind the correct concrete type, e.g. train clients must extend `ApiOperators<TrainResponse>`.
+- [x] Run inherited endpoint, mock helper, and contract snapshot tests.
+
+Evidence:
+
+- Added concrete-client request-plan resolution for inherited generic methods. Runtime proxy construction now passes the concrete `@ReactiveHttpClient` interface into `ReactiveClientInvocationHandler`, and mock clients do the same.
+- `RequestPlan.from(meta, concreteClientInterface)` resolves inherited `Mono<T>`, `Flux<T>`, `Mono<ResponseEntity<T>>`, nested parameterized response bodies, and generic `@Body T` types without mutating shared `MethodMetadataCache` entries.
+- Added starter regression coverage proving bus and train clients sharing `ApiOperators<T extends BaseResponse>` decode to `BusResponse` and `TrainResponse`, while the shared metadata entry remains reused safely.
+- Added mock-helper regression coverage proving `MockReactiveHttpClient` decodes inherited generic child clients with the concrete response type.
+- Updated annotation and test-helper docs with the supported generic shared-contract pattern and the requirement that each child bind the correct concrete DTO type.
+- `mvn -pl reactive-http-client-starter -Dtest=MethodMetadataValidationTest,ReactiveClientInvocationHandlerBehaviorTest test` passed with 44 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-test -am test` passed with 652 tests, 0 failures, 0 errors, and 0 skipped across the root, starter, and test modules.
+
+---
+
+## Priority 7 — Redirect-Following Contract Coverage
+
+### [ ] 3.2 Expand redirect-following contract coverage
 - [ ] Add default visible-3xx coverage for `301`.
 - [ ] Add default visible-3xx coverage for `302`.
 - [ ] Add default visible-3xx coverage for `303`.
@@ -246,9 +275,9 @@ Evidence:
 
 ---
 
-## Priority 7 — Streaming Response Ownership Re-Audit
+## Priority 8 — Streaming Response Ownership Re-Audit
 
-### [ ] 3.2 Re-audit streaming response ownership
+### [ ] 3.3 Re-audit streaming response ownership
 - [ ] Re-run real `WebClient` ownership coverage for `Flux<DataBuffer>`.
 - [ ] Re-run real `WebClient` ownership coverage for
       `Mono<ResponseEntity<Flux<DataBuffer>>>`.
@@ -266,9 +295,9 @@ Evidence:
 
 ---
 
-## Priority 8 — Bodiless and Unexpected-Body Contracts
+## Priority 9 — Bodiless and Unexpected-Body Contracts
 
-### [ ] 3.3 Clarify bodiless and unexpected-body contracts
+### [ ] 3.4 Clarify bodiless and unexpected-body contracts
 - [ ] Audit `Mono<Void>` bodiless handling with real `ClientResponse` paths.
 - [ ] Audit `Mono<ResponseEntity<Void>>` bodiless handling with real
       `ClientResponse` paths.
@@ -286,7 +315,7 @@ Evidence:
 
 ---
 
-## Priority 9 — Configuration Metadata Drift Checks
+## Priority 10 — Configuration Metadata Drift Checks
 
 ### [ ] 4.2 Tighten configuration metadata drift checks
 - [ ] Verify starter metadata group `sourceType` values resolve on starter tests.
@@ -307,7 +336,7 @@ Evidence:
 
 ---
 
-## Priority 10 — Startup Configuration Summary Logging
+## Priority 11 — Startup Configuration Summary Logging
 
 ### [ ] 1.3 Add startup configuration summary logging
 - [ ] Decide whether startup summary is opt-in property based or DEBUG-only.
@@ -328,7 +357,7 @@ Evidence:
 
 ---
 
-## Priority 11 — Release Readiness Snapshot
+## Priority 12 — Release Readiness Snapshot
 
 ### [ ] 4.3 Add release readiness snapshot for docs, metadata, and benchmarks
 - [ ] Extend release evidence manifest with a top-level readiness summary.
@@ -349,7 +378,7 @@ Evidence:
 
 ---
 
-## Priority 12 — AWS SigV4 and Raw-Body Signing Contracts
+## Priority 13 — AWS SigV4 and Raw-Body Signing Contracts
 
 ### [ ] 2.2 Audit AWS SigV4 and raw-body signing contracts
 - [ ] Add SigV4 contract tests for scalar JSON bodies.
@@ -368,7 +397,7 @@ Evidence:
 
 ---
 
-## Priority 13 — Post-V14 Benchmark Audits
+## Priority 14 — Post-V14 Benchmark Audits
 
 ### [ ] 5.1 Re-run default and optional feature benchmark audits after V14
 - [ ] Run current-vs-published benchmark pair for default success path.
@@ -389,7 +418,7 @@ Evidence:
 
 ---
 
-## Priority 14 — Observer and Lifecycle Overhead Audit
+## Priority 15 — Observer and Lifecycle Overhead Audit
 
 ### [ ] 5.2 Audit observer and lifecycle overhead with multiple observers/hooks
 - [ ] Add optional diagnostics benchmark row for one observer.

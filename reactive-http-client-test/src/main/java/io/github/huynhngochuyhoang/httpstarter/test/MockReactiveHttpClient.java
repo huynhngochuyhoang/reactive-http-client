@@ -388,6 +388,7 @@ public final class MockReactiveHttpClient<T> {
                     new DefaultErrorDecoder(),
                     clientConfig,
                     clientName,
+                    clientInterface,
                     appCtx,
                     resilienceOperatorApplier,
                     effectiveObjectMapper,

@@ -140,6 +140,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 errorDecoder,
                 config,
                 clientName,
+                type,
                 applicationContext,
                 resilienceOperatorApplier,
                 objectMapper,
@@ -517,7 +518,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         for (Method method : clientInterface.getMethods()) {
             if (!isDeclarativeClientMethod(method)) continue;
             MethodMetadata meta = metadataCache.get(method);
-            RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
+            RequestPlan plan = RequestPlan.from(meta, clientInterface);
             EffectiveApi effectiveApi = diagnosticEffectiveApi(plan, clientConfig);
             boolean inherited = method.getDeclaringClass() != clientInterface;
             log.debug("Reactive HTTP client [{}] method policy: method=[{}#{}], declaredBy={}, "
@@ -788,7 +789,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         for (Method method : clientInterface.getMethods()) {
             if (!isDeclarativeClientMethod(method)) continue;
             MethodMetadata meta = metadataCache.get(method);
-            RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
+            RequestPlan plan = RequestPlan.from(meta, clientInterface);
             String httpMethod = diagnosticHttpMethod(meta, clientConfig);
             boolean retryEnabled = isRetryMethodEnabled(resilience, httpMethod)
                     && resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY);

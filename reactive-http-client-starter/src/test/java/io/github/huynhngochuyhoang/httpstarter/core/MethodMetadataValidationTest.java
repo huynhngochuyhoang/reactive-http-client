@@ -2,9 +2,13 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.ResponseEntity;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -232,6 +236,50 @@ class MethodMetadataValidationTest {
         assertEquals("/child/{id}", overloadedMetadata.getPathTemplate());
     }
 
+    @Test
+    void shouldResolveInheritedGenericEndpointTypesForConcreteClient() throws Exception {
+        MethodMetadataCache cache = new MethodMetadataCache();
+        Method busGet = BusApiOperators.class.getMethod("getOrder", String.class);
+        Method trainGet = TrainApiOperators.class.getMethod("getOrder", String.class);
+
+        MethodMetadata busMetadata = cache.get(busGet);
+        MethodMetadata trainMetadata = cache.get(trainGet);
+
+        assertSame(busMetadata, trainMetadata);
+        assertEquals(BusResponse.class, RequestPlan.from(busMetadata, BusApiOperators.class).responseType());
+        assertEquals(TrainResponse.class, RequestPlan.from(trainMetadata, TrainApiOperators.class).responseType());
+    }
+
+    @Test
+    void shouldResolveInheritedGenericEnvelopeAndBodyTypesForConcreteClient() throws Exception {
+        MethodMetadataCache cache = new MethodMetadataCache();
+
+        RequestPlan busFlux = RequestPlan.from(
+                cache.get(BusApiOperators.class.getMethod("listOrders")),
+                BusApiOperators.class);
+        assertEquals(BusResponse.class, busFlux.responseType());
+
+        RequestPlan busEntity = RequestPlan.from(
+                cache.get(BusApiOperators.class.getMethod("getOrderEntity")),
+                BusApiOperators.class);
+        ParameterizedType entityType = assertInstanceOf(ParameterizedType.class, busEntity.responseType());
+        assertEquals(ResponseEntity.class, entityType.getRawType());
+        assertEquals(BusResponse.class, entityType.getActualTypeArguments()[0]);
+
+        RequestPlan trainNested = RequestPlan.from(
+                cache.get(TrainApiOperators.class.getMethod("listOrderEnvelope")),
+                TrainApiOperators.class);
+        ParameterizedType listType = assertInstanceOf(ParameterizedType.class, trainNested.responseType());
+        assertEquals(List.class, listType.getRawType());
+        assertEquals(TrainResponse.class, listType.getActualTypeArguments()[0]);
+
+        RequestPlan busSubmit = RequestPlan.from(
+                cache.get(BusApiOperators.class.getMethod("submit", BaseResponse.class)),
+                BusApiOperators.class);
+        assertEquals(BusResponse.class, busSubmit.bodyType());
+        assertEquals(RequestBodyRepeatability.REPEATABLE, busSubmit.bodyRepeatability());
+    }
+
     interface InvalidReturnTypeClient {
         @GET("/items")
         String call();
@@ -347,6 +395,41 @@ class MethodMetadataValidationTest {
     interface ChildOverloadedClient extends ParentOverloadedClient {
         @GET("/child/{id}")
         Mono<String> get(@PathVar("id") Long id);
+    }
+
+    interface ApiOperators<T extends BaseResponse> {
+        @GET("/api/order")
+        Mono<T> getOrder(@QueryParam("orderId") String orderId);
+
+        @GET("/api/orders")
+        Flux<T> listOrders();
+
+        @GET("/api/order/entity")
+        Mono<ResponseEntity<T>> getOrderEntity();
+
+        @GET("/api/order/envelope")
+        Mono<List<T>> listOrderEnvelope();
+
+        @POST("/api/order")
+        Mono<T> submit(@Body T body);
+    }
+
+    interface BusApiOperators extends ApiOperators<BusResponse> {
+    }
+
+    interface TrainApiOperators extends ApiOperators<TrainResponse> {
+    }
+
+    static class BaseResponse {
+        String code;
+    }
+
+    static class BusResponse extends BaseResponse {
+        String message;
+    }
+
+    static class TrainResponse extends BaseResponse {
+        String bookingCode;
     }
 
     static final class OverrideTestExchangeLogger implements HttpExchangeLogger {
