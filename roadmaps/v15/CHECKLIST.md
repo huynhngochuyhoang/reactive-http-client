@@ -250,28 +250,51 @@ Evidence:
 
 ## Priority 7 — Redirect-Following Contract Coverage
 
-### [ ] 3.2 Expand redirect-following contract coverage
-- [ ] Add default visible-3xx coverage for `301`.
-- [ ] Add default visible-3xx coverage for `302`.
-- [ ] Add default visible-3xx coverage for `303`.
-- [ ] Add default visible-3xx coverage for `307`.
-- [ ] Add default visible-3xx coverage for `308`.
-- [ ] Add opt-in follow-redirects coverage for `301`.
-- [ ] Add opt-in follow-redirects coverage for `302`.
-- [ ] Add opt-in follow-redirects coverage for `303`.
-- [ ] Add opt-in follow-redirects coverage for `307`.
-- [ ] Add opt-in follow-redirects coverage for `308`.
-- [ ] Verify default behavior still returns visible redirects to proxy callers.
-- [ ] Verify safe redirect cases work when `follow-redirects=true`.
-- [ ] Verify docs do not promise sensitive headers across cross-authority
+### [x] 3.2 Expand redirect-following contract coverage
+- [x] Add default visible-3xx coverage for `301`.
+- [x] Add default visible-3xx coverage for `302`.
+- [x] Add default visible-3xx coverage for `303`.
+- [x] Add default visible-3xx coverage for `307`.
+- [x] Add default visible-3xx coverage for `308`.
+- [x] Add opt-in follow-redirects coverage for `301`.
+- [x] Add opt-in follow-redirects coverage for `302`.
+- [x] Add opt-in follow-redirects coverage for `303`.
+- [x] Add opt-in follow-redirects coverage for `307`.
+- [x] Add opt-in follow-redirects coverage for `308`.
+- [x] Verify default behavior still returns visible redirects to proxy callers.
+- [x] Verify safe redirect cases work when `follow-redirects=true`.
+- [x] Verify docs do not promise sensitive headers across cross-authority
       redirects.
-- [ ] Verify observer final request fields match the documented redirect
+- [x] Verify observer final request fields match the documented redirect
       semantics.
-- [ ] Verify exchange-log final request fields match the documented redirect
+- [x] Verify exchange-log final request fields match the documented redirect
       semantics.
-- [ ] Document method and body replay limits for POST, PATCH, and streaming
+- [x] Document method and body replay limits for POST, PATCH, and streaming
       uploads.
-- [ ] Run redirect and error-handling tests.
+- [x] Run redirect and error-handling tests.
+
+Evidence:
+
+- Extended `RedirectHandlingContractTest` so default `follow-redirects=false`
+  behavior is covered for `301`, `302`, `303`, `307`, and `308`; each remains a
+  visible `ResponseEntity` redirect with the `Location` header available to the
+  proxy caller.
+- Existing opt-in coverage continues to verify `follow-redirects=true` for
+  `301`, `302`, `303`, `307`, and `308` GET calls, final 4xx/5xx decoding after
+  a redirect, excessive-chain fallback to a visible 3xx, repeatable POST body
+  replay for `301`, `302`, `307`, and `308`, and `303` switching POST to a
+  bodiless GET.
+- Added real-transport observer and exchange-log coverage proving final request
+  URL/server fields describe the original declarative `/start` request after a
+  followed redirect, matching the documented diagnostics contract.
+- Existing cross-authority redirect coverage proves `Authorization`, `Cookie`,
+  and `Proxy-Authorization` are not forwarded by the delegated Reactor Netty
+  redirect policy.
+- Updated redirect docs to clarify that automatic redirect body replay is only
+  safe when the body can be sent again, with explicit caution for `POST`,
+  `PATCH`, and streaming uploads.
+- `mvn -pl reactive-http-client-starter -Dtest=RedirectHandlingContractTest,DefaultErrorDecoderTest,ProblemDetailErrorResponseMapperTest test`
+  passed with 50 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 

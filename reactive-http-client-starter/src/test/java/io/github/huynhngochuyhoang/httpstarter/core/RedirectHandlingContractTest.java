@@ -65,15 +65,16 @@ class RedirectHandlingContractTest {
         assertThat(observed.get().getStatusCode()).isEqualTo(HttpStatus.FOUND.value());
     }
 
-    @Test
-    void starterTransportLeavesRedirectVisibleWhenFollowRedirectsDisabled() {
-        DisposableServer server = redirectToFinalServer(HttpStatus.FOUND.value(), HttpStatus.OK.value(), "followed");
+    @ParameterizedTest
+    @ValueSource(ints = {301, 302, 303, 307, 308})
+    void starterTransportLeavesRedirectVisibleWhenFollowRedirectsDisabled(int status) {
+        DisposableServer server = redirectToFinalServer(status, HttpStatus.OK.value(), "followed");
         try {
             RedirectClient client = createFactoryClient(serverBaseUrl(server), config -> { });
 
             StepVerifier.create(client.get())
                     .assertNext(response -> {
-                        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+                        assertThat(response.getStatusCode().value()).isEqualTo(status);
                         assertThat(response.getHeaders().getFirst(HttpHeaders.LOCATION)).isEqualTo("/final");
                     })
                     .verifyComplete();
@@ -111,6 +112,39 @@ class RedirectHandlingContractTest {
                     .verifyComplete();
 
             assertThat(requests).hasValue(2);
+        } finally {
+            server.disposeNow(Duration.ofSeconds(5));
+        }
+    }
+
+    @Test
+    void followedRedirectReportsOriginalDeclarativeRequestToObserverAndExchangeLogger() {
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        RecordingExchangeLogger logger = new RecordingExchangeLogger();
+        DisposableServer server = redirectToFinalServer(HttpStatus.FOUND.value(), HttpStatus.OK.value(), "followed");
+        try {
+            String baseUrl = serverBaseUrl(server);
+            RedirectClient client = createFactoryClient(
+                    baseUrl,
+                    config -> {
+                        config.setFollowRedirects(true);
+                        config.setExchangeLoggingEnabled(true);
+                    },
+                    observed::set,
+                    logger);
+
+            StepVerifier.create(client.get())
+                    .assertNext(response -> {
+                        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+                        assertThat(response.getBody()).isEqualTo("followed");
+                    })
+                    .verifyComplete();
+
+            assertThat(observed.get().getRequestUrl()).isEqualTo(baseUrl + "/start");
+            assertThat(observed.get().getServerAddress()).isEqualTo("127.0.0.1");
+            assertThat(observed.get().getServerPort()).isEqualTo(server.port());
+            assertThat(logger.context.get().requestUrl()).hasToString(baseUrl + "/start");
+            assertThat(logger.context.get().responseStatus()).isEqualTo(HttpStatus.OK.value());
         } finally {
             server.disposeNow(Duration.ofSeconds(5));
         }
@@ -330,6 +364,14 @@ class RedirectHandlingContractTest {
     private static RedirectClient createFactoryClient(
             String baseUrl,
             Consumer<ReactiveHttpClientProperties.ClientConfig> configurer) {
+        return createFactoryClient(baseUrl, configurer, null, null);
+    }
+
+    private static RedirectClient createFactoryClient(
+            String baseUrl,
+            Consumer<ReactiveHttpClientProperties.ClientConfig> configurer,
+            HttpClientObserver observer,
+            DefaultHttpExchangeLogger exchangeLogger) {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setBaseUrl(baseUrl);
@@ -338,12 +380,15 @@ class RedirectHandlingContractTest {
 
         ReactiveHttpClientFactoryBean<RedirectClient> factoryBean = new ReactiveHttpClientFactoryBean<>();
         factoryBean.setType(RedirectClient.class);
-        factoryBean.setApplicationContext(factoryContext(properties));
+        factoryBean.setApplicationContext(factoryContext(properties, observer, exchangeLogger));
         return factoryBean.getObject();
     }
 
     @SuppressWarnings("unchecked")
-    private static ApplicationContext factoryContext(ReactiveHttpClientProperties properties) {
+    private static ApplicationContext factoryContext(
+            ReactiveHttpClientProperties properties,
+            HttpClientObserver observer,
+            DefaultHttpExchangeLogger exchangeLogger) {
         ApplicationContext context = mock(ApplicationContext.class);
 
         ObjectProvider<Object> defaultProvider = mock(ObjectProvider.class);
@@ -375,7 +420,12 @@ class RedirectHandlingContractTest {
 
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
         when(observerProvider.orderedStream()).thenReturn(Stream.empty());
+        when(observerProvider.getIfAvailable()).thenReturn(observer);
         when(context.getBeanProvider(HttpClientObserver.class)).thenReturn(observerProvider);
+
+        ObjectProvider<DefaultHttpExchangeLogger> exchangeLoggerProvider = mock(ObjectProvider.class);
+        when(exchangeLoggerProvider.getIfAvailable()).thenReturn(exchangeLogger);
+        when(context.getBeanProvider(DefaultHttpExchangeLogger.class)).thenReturn(exchangeLoggerProvider);
 
         ObjectProvider<ReactiveHttpClientLifecycleHook> lifecycleProvider = mock(ObjectProvider.class);
         when(lifecycleProvider.orderedStream()).thenReturn(Stream.empty());
@@ -415,6 +465,15 @@ class RedirectHandlingContractTest {
 
     private static String serverBaseUrl(DisposableServer server) {
         return "http://127.0.0.1:" + server.port();
+    }
+
+    static final class RecordingExchangeLogger extends DefaultHttpExchangeLogger {
+        private final AtomicReference<HttpExchangeLogContext> context = new AtomicReference<>();
+
+        @Override
+        public void log(HttpExchangeLogContext context) {
+            this.context.set(context);
+        }
     }
 
     @ReactiveHttpClient(name = "redirect-client")
