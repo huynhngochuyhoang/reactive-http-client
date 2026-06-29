@@ -389,22 +389,31 @@ Evidence:
 
 ## Priority 10 — Configuration Metadata Drift Checks
 
-### [ ] 4.2 Tighten configuration metadata drift checks
-- [ ] Verify starter metadata group `sourceType` values resolve on starter tests.
-- [ ] Verify OTel metadata group `sourceType` values resolve on OTel tests.
-- [ ] Keep nested group metadata pointed at declaring configuration classes.
-- [ ] Validate scalar `.properties` examples against property metadata only.
-- [ ] Validate scalar YAML leaves against property metadata only.
-- [ ] Reject scalar assignments that match only metadata groups.
-- [ ] Avoid masking malformed API-map examples.
-- [ ] Preserve block-list YAML validation for list-valued properties.
-- [ ] Verify every documented property has metadata.
-- [ ] Verify every metadata property appears in generated configuration docs.
-- [ ] Require descriptions for new metadata properties.
-- [ ] Require defaults where defaults are meaningful.
-- [ ] Run starter configuration metadata tests.
-- [ ] Run OTel configuration metadata tests.
-- [ ] Regenerate `docs/configuration-properties.md` if metadata changes.
+### [x] 4.2 Tighten configuration metadata drift checks
+- [x] Verify starter metadata group `sourceType` values resolve on starter tests.
+- [x] Verify OTel metadata group `sourceType` values resolve on OTel tests.
+- [x] Keep nested group metadata pointed at declaring configuration classes.
+- [x] Validate scalar `.properties` examples against property metadata only.
+- [x] Validate scalar YAML leaves against property metadata only.
+- [x] Reject scalar assignments that match only metadata groups.
+- [x] Avoid masking malformed API-map examples.
+- [x] Preserve block-list YAML validation for list-valued properties.
+- [x] Verify every documented property has metadata.
+- [x] Verify every metadata property appears in generated configuration docs.
+- [x] Require descriptions for new metadata properties.
+- [x] Require defaults where defaults are meaningful.
+- [x] Run starter configuration metadata tests.
+- [x] Run OTel configuration metadata tests.
+- [x] Regenerate `docs/configuration-properties.md` if metadata changes.
+
+Evidence:
+
+- Added starter metadata drift checks for group `sourceType` resolution and source-method return-type alignment, so nested groups stay pointed at the declaring configuration class.
+- Added an explicit guard that every metadata property from starter and OTel metadata appears in `docs/configuration-properties.md`; the existing generated-reference equality test remains the stronger full-file drift check.
+- Existing example extraction tests continue to validate scalar `.properties` entries and YAML leaves against property metadata only, reject scalar group assignments, preserve malformed API-map leaves, and include block-list YAML properties.
+- Existing metadata tests continue to require descriptions and high-value defaults, while OTel metadata source types are validated on the OTel module classpath. No metadata files changed, so `docs/configuration-properties.md` did not need regeneration.
+- `mvn -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest,DocumentationReleaseArtifactTest test` passed with 22 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-otel -Dtest=OpenTelemetryConfigurationMetadataTest test` passed with 4 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 
