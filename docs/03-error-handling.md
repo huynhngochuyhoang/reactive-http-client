@@ -38,12 +38,13 @@ Redirect following is delegated to Reactor Netty. On cross-domain redirects,
 Reactor Netty removes sensitive redirect headers such as `Authorization`,
 `Cookie`, `Proxy-Authorization`, and `Expect` unless you provide a custom
 transport policy. Request bodies can be replayed by the transport for redirect
-requests; be careful with non-repeatable bodies. Reactor Netty preserves the
-method and body for `301`, `302`, `307`, and `308`; `303` switches to a
-bodiless `GET`. When the transport stops after an excessive redirect chain,
-the remaining 3xx response is surfaced to the proxy. Starter observer and
-exchange-log request
-URL fields describe the original declarative request, not every redirect hop.
+requests only when the body can be sent again. Use extra care with `POST`,
+`PATCH`, and streaming uploads: non-repeatable bodies may not be safe to follow
+automatically. Reactor Netty preserves the method and body for repeatable `301`,
+`302`, `307`, and `308` requests; `303` switches to a bodiless `GET`. When the
+transport stops after an excessive redirect chain, the remaining 3xx response is
+surfaced to the proxy. Starter observer and exchange-log request URL fields
+describe the original declarative request, not every redirect hop.
 
 ## Error body retention policy
 
