@@ -469,6 +469,8 @@ class DocumentationReleaseArtifactTest {
                 .anySatisfy(command -> assertThat(command)
                         .contains("benchmark-release")
                         .contains("benchmark.commit=$(git rev-parse --short HEAD)"));
+        assertThat(pendingBenchmarkCommands)
+                .contains(generated.path("benchmarkEvidence").path("publishedStarterCommand").asText());
         assertThat(readiness.path("manualCompatibilityEvidence").path("status").asText()).isEqualTo("pending");
         assertThat(readiness.path("manualCompatibilityEvidence").path("pendingCommands"))
                 .extracting(JsonNode::asText)
@@ -683,7 +685,11 @@ class DocumentationReleaseArtifactTest {
         Pattern pattern = Pattern.compile("benchmark-report-(\\d+\\.\\d+\\.\\d+)\\.md");
         List<String> stale = new ArrayList<>();
         for (Path releaseDoc : releaseDocs) {
-            Matcher matcher = pattern.matcher(Files.readString(releaseDoc));
+            String contents = Files.readString(releaseDoc);
+            if ("CHANGELOG.md".equals(root.relativize(releaseDoc).toString())) {
+                contents = changelogSection(contents, projectVersion);
+            }
+            Matcher matcher = pattern.matcher(contents);
             while (matcher.find()) {
                 if (!projectVersion.equals(matcher.group(1))) {
                     stale.add(root.relativize(releaseDoc) + " -> " + matcher.group());
@@ -886,9 +892,10 @@ class DocumentationReleaseArtifactTest {
                 .filter(check -> "pending".equals(check.get("status")))
                 .map(check -> check.get("command"))
                 .toList();
-        List<String> pendingBenchmarkCommands = pendingManualCommands.stream()
+        List<String> pendingBenchmarkCommands = new ArrayList<>(pendingManualCommands.stream()
                 .filter(command -> command.contains("benchmark"))
-                .toList();
+                .toList());
+        pendingBenchmarkCommands.add((String) benchmarkEvidence.get("publishedStarterCommand"));
         List<String> pendingCompatibilityCommands = pendingManualCommands.stream()
                 .filter(command -> command.contains("api-compatibility")
                         || command.contains("verify-api-compatibility-fixtures"))
