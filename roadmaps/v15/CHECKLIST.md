@@ -300,21 +300,45 @@ Evidence:
 
 ## Priority 8 — Streaming Response Ownership Re-Audit
 
-### [ ] 3.3 Re-audit streaming response ownership
-- [ ] Re-run real `WebClient` ownership coverage for `Flux<DataBuffer>`.
-- [ ] Re-run real `WebClient` ownership coverage for
+### [x] 3.3 Re-audit streaming response ownership
+- [x] Re-run real `WebClient` ownership coverage for `Flux<DataBuffer>`.
+- [x] Re-run real `WebClient` ownership coverage for
       `Mono<ResponseEntity<Flux<DataBuffer>>>`.
-- [ ] Add cancellation coverage for starter-owned discarded buffers.
-- [ ] Add cancellation coverage for subscriber-owned emitted buffers.
-- [ ] Verify streaming bodies remain consumable after envelope emission.
-- [ ] Verify diagnostics complete at the documented envelope boundary.
-- [ ] Verify lifecycle hooks do not imply inner stream consumption.
-- [ ] Verify observer events do not imply inner stream consumption.
-- [ ] Verify exchange logs do not imply inner stream consumption.
-- [ ] Avoid body buffering for streaming diagnostics.
-- [ ] Update streaming docs if any wording is ambiguous.
-- [ ] Run streaming response tests.
-- [ ] Run timeout tests that cover streaming behavior.
+- [x] Add cancellation coverage for starter-owned discarded buffers.
+- [x] Add cancellation coverage for subscriber-owned emitted buffers.
+- [x] Verify streaming bodies remain consumable after envelope emission.
+- [x] Verify diagnostics complete at the documented envelope boundary.
+- [x] Verify lifecycle hooks do not imply inner stream consumption.
+- [x] Verify observer events do not imply inner stream consumption.
+- [x] Verify exchange logs do not imply inner stream consumption.
+- [x] Avoid body buffering for streaming diagnostics.
+- [x] Update streaming docs if any wording is ambiguous.
+- [x] Run streaming response tests.
+- [x] Run timeout tests that cover streaming behavior.
+
+Evidence:
+
+- Extended `StreamingResponseTest` with real Reactor Netty direct
+  `Flux<DataBuffer>` coverage over the configured codec limit, complementing
+  the existing real `Mono<ResponseEntity<Flux<DataBuffer>>>` envelope test.
+- Added consumer-ownership assertions for direct and envelope streaming paths:
+  emitted pooled buffers remain allocated until the subscriber releases them,
+  while existing cancellation tests continue to prove discarded buffers are
+  released by the starter.
+- Added envelope-bound diagnostics coverage proving lifecycle success, observer
+  events, and exchange logs are emitted when the response envelope is available,
+  before the inner `Flux<DataBuffer>` is subscribed or consumed. Consuming the
+  inner body does not emit additional terminal diagnostics.
+- Re-ran subscription-local reporting coverage for streaming envelopes, which
+  verifies concurrent streaming subscriptions keep independent terminal state.
+- Reviewed `docs/11-streaming.md` and `docs/21-diagnostic-contexts.md`; no
+  wording change was needed because they already document consumer-owned
+  `DataBuffer` chunks and envelope-bound diagnostics for
+  `Mono<ResponseEntity<Flux<DataBuffer>>>`.
+- `mvn -pl reactive-http-client-starter -Dtest=StreamingResponseTest test`
+  passed with 12 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-starter -Dtest=ApiLevelTimeoutReadTimeoutPrecedenceTest,SubscriptionLocalReportingStateTest test`
+  passed with 11 tests, 0 failures, 0 errors, and 0 skipped.
 
 ---
 
