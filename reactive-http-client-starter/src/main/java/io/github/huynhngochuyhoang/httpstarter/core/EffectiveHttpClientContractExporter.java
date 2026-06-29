@@ -58,7 +58,7 @@ final class EffectiveHttpClientContractExporter {
                                                         ResilienceOperatorApplier resilienceOperatorApplier,
                                                         Method method) {
         MethodMetadata meta = metadataCache.get(method);
-        RequestPlan plan = meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
+        RequestPlan plan = RequestPlan.from(meta, clientInterface);
         EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);
         BaseUrl effectiveBaseUrl = effectiveBaseUrl(clientInterface, clientConfig);
         ReactiveHttpClientFactoryBean.validatePathTemplate(

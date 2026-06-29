@@ -84,6 +84,30 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     }
 
     @Test
+    void shouldDecodeInheritedGenericEndpointAsConcreteChildResponseType() {
+        BusApiOperators busClient = createProxy(BusApiOperators.class, jsonResponseWebClient(
+                "{\"code\":\"0\",\"message\":\"boarding\"}"));
+        TrainApiOperators trainClient = createProxy(TrainApiOperators.class, jsonResponseWebClient(
+                "{\"code\":\"0\",\"bookingCode\":\"TR-9\"}"));
+
+        StepVerifier.create(busClient.getOrder("bus-1"))
+                .assertNext(response -> {
+                    assertInstanceOf(BusResponse.class, response);
+                    assertEquals("0", response.code);
+                    assertEquals("boarding", response.message);
+                })
+                .verifyComplete();
+
+        StepVerifier.create(trainClient.getOrder("train-1"))
+                .assertNext(response -> {
+                    assertInstanceOf(TrainResponse.class, response);
+                    assertEquals("0", response.code);
+                    assertEquals("TR-9", response.bookingCode);
+                })
+                .verifyComplete();
+    }
+
+    @Test
     void shouldLetHeaderParamOverrideDefaultHeaderIgnoringCase() {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
         WebClient webClient = WebClient.builder()
@@ -640,6 +664,29 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         }
     }
 
+    private static WebClient jsonResponseWebClient(String body) {
+        return WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .body(body)
+                        .build()))
+                .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T createProxy(Class<T> clientInterface, WebClient webClient) {
+        ReactiveClientInvocationHandler handler = createHandler(
+                webClient,
+                new ReactiveHttpClientProperties.ClientConfig(),
+                new ObjectMapper(),
+                clientInterface);
+        return (T) Proxy.newProxyInstance(
+                clientInterface.getClassLoader(),
+                new Class<?>[]{clientInterface},
+                handler);
+    }
+
     private static WebClient captureRequestWebClient(AtomicReference<ClientRequest> captured) {
         return WebClient.builder()
                 .baseUrl("http://test.local")
@@ -679,6 +726,15 @@ class ReactiveClientInvocationHandlerBehaviorTest {
             WebClient webClient,
             ReactiveHttpClientProperties.ClientConfig config,
             ObjectMapper objectMapper) {
+        return createHandler(webClient, config, objectMapper, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ReactiveClientInvocationHandler createHandler(
+            WebClient webClient,
+            ReactiveHttpClientProperties.ClientConfig config,
+            ObjectMapper objectMapper,
+            Class<?> clientInterface) {
         ApplicationContext appCtx = mock(ApplicationContext.class);
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
         when(appCtx.getBeanProvider(HttpClientObserver.class)).thenReturn(observerProvider);
@@ -691,6 +747,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 new DefaultErrorDecoder(),
                 config,
                 "test-client",
+                clientInterface,
                 appCtx,
                 new NoopResilienceOperatorApplier(),
                 objectMapper,
@@ -772,6 +829,29 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     interface ClientWithApiRefPathQuery {
         @ApiRef("lookup")
         Mono<String> lookup(@PathVar("id") String id, @QueryParam("lang") String lang);
+    }
+
+    interface ApiOperators<T extends BaseResponse> {
+        @GET("/api/order")
+        Mono<T> getOrder(@QueryParam("orderId") String orderId);
+    }
+
+    interface BusApiOperators extends ApiOperators<BusResponse> {
+    }
+
+    interface TrainApiOperators extends ApiOperators<TrainResponse> {
+    }
+
+    static class BaseResponse {
+        public String code;
+    }
+
+    static class BusResponse extends BaseResponse {
+        public String message;
+    }
+
+    static class TrainResponse extends BaseResponse {
+        public String bookingCode;
     }
 
     interface ClientWithDefaultMethod {

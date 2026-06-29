@@ -63,8 +63,28 @@ reactive:
 ```
 
 The starter validates inherited abstract endpoint methods when the proxy is
-created. Java default methods can still be used as local helper methods without
-HTTP annotations.
+created. Inherited generic endpoint methods are resolved against each concrete
+child interface, so a shared parent can still decode different downstream DTOs:
+
+```java
+public interface ApiOperators<T extends BaseResponse> {
+    @GET("/api/order")
+    Mono<T> getOrder(@QueryParam("orderId") String orderId);
+}
+
+@ReactiveHttpClient(name = "bus-api")
+public interface BusApiOperators extends ApiOperators<BusResponse> {
+}
+
+@ReactiveHttpClient(name = "train-api")
+public interface TrainApiOperators extends ApiOperators<TrainResponse> {
+}
+```
+
+Each child must bind the type it really returns. For example, a train client
+that extends `ApiOperators<BusResponse>` will still have a Java contract that
+returns `BusResponse`, not `TrainResponse`. Java default methods can still be
+used as local helper methods without HTTP annotations.
 
 ---
 

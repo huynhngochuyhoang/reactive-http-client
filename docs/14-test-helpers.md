@@ -79,6 +79,13 @@ RecordedExchangeAssertions.assertThat(mock.lastExchange())
         .hasStatusCode(200);
 ```
 
+Generic shared contracts are also resolved through the concrete child client. For
+example, build `MockReactiveHttpClient<BusApiOperators>` from
+`BusApiOperators.class` when `BusApiOperators extends ApiOperators<BusResponse>`;
+that lets `Mono<T>` decode as `BusResponse`. A child declared as
+`ApiOperators<BusResponse>` still has a bus response contract, so bind each child
+to the DTO it actually returns.
+
 ### Unmatched requests
 
 Requests that do not match any registered matcher fall through to a configurable fallback response (HTTP 404 by default), so tests fail loudly instead of hanging on a missing matcher.

@@ -97,6 +97,31 @@ class MockReactiveHttpClientTest {
     interface InheritedNamedClient extends SharedCatalogOperations {
     }
 
+    interface ApiOperators<T extends BaseResponse> {
+        @GET("/api/order")
+        Mono<T> getOrder(@QueryParam("orderId") String orderId);
+    }
+
+    @ReactiveHttpClient(name = "bus-api")
+    interface BusApiOperators extends ApiOperators<BusResponse> {
+    }
+
+    @ReactiveHttpClient(name = "train-api")
+    interface TrainApiOperators extends ApiOperators<TrainResponse> {
+    }
+
+    static class BaseResponse {
+        public String code;
+    }
+
+    static class BusResponse extends BaseResponse {
+        public String message;
+    }
+
+    static class TrainResponse extends BaseResponse {
+        public String bookingCode;
+    }
+
     @ReactiveHttpClient(name = "named-client")
     interface NamedClient {
         @GET("/items/{id}")
@@ -580,6 +605,35 @@ class MockReactiveHttpClientTest {
             assertThat(context.pathTemplate()).isEqualTo("/catalog/{id}");
             assertThat(context.requestUrl()).isEqualTo(URI.create("http://inherited.mock.local:8082/catalog/42"));
         });
+    }
+
+    @Test
+    void inheritedGenericAnnotatedClientDecodesConcreteResponseType() {
+        MockReactiveHttpClient<BusApiOperators> busMock = MockReactiveHttpClient
+                .forClient(BusApiOperators.class)
+                .respondTo(HttpMethod.GET, "/api/order",
+                        ex -> MockReactiveHttpClient.json(200, "{\"code\":\"0\",\"message\":\"boarding\"}"))
+                .build();
+        MockReactiveHttpClient<TrainApiOperators> trainMock = MockReactiveHttpClient
+                .forClient(TrainApiOperators.class)
+                .respondTo(HttpMethod.GET, "/api/order",
+                        ex -> MockReactiveHttpClient.json(200, "{\"code\":\"0\",\"bookingCode\":\"TR-9\"}"))
+                .build();
+
+        StepVerifier.create(busMock.proxy().getOrder("bus-1"))
+                .assertNext(response -> {
+                    assertThat(response).isInstanceOf(BusResponse.class);
+                    assertThat(response.code).isEqualTo("0");
+                    assertThat(response.message).isEqualTo("boarding");
+                })
+                .verifyComplete();
+        StepVerifier.create(trainMock.proxy().getOrder("train-1"))
+                .assertNext(response -> {
+                    assertThat(response).isInstanceOf(TrainResponse.class);
+                    assertThat(response.code).isEqualTo("0");
+                    assertThat(response.bookingCode).isEqualTo("TR-9");
+                })
+                .verifyComplete();
     }
 
     @Test

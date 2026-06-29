@@ -84,6 +84,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final DefaultErrorDecoder errorDecoder;
     private final ReactiveHttpClientProperties.ClientConfig clientConfig;
     private final String clientName;
+    private final Class<?> clientInterface;
+    private final Map<Method, RequestPlan> requestPlanCache = new ConcurrentHashMap<>();
     private final ApplicationContext applicationContext;
     private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> loggerCache = new ConcurrentHashMap<>();
     private final AtomicBoolean loggerCacheLimitWarningLogged = new AtomicBoolean(false);
@@ -112,12 +114,29 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             ResilienceOperatorApplier resilienceOperatorApplier,
             ObjectMapper objectMapper,
             ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
+        this(webClient, metadataCache, argumentResolver, errorDecoder, clientConfig, clientName, null,
+                applicationContext, resilienceOperatorApplier, objectMapper, observabilityConfig);
+    }
+
+    public ReactiveClientInvocationHandler(
+            WebClient webClient,
+            MethodMetadataCache metadataCache,
+            RequestArgumentResolver argumentResolver,
+            DefaultErrorDecoder errorDecoder,
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            String clientName,
+            Class<?> clientInterface,
+            ApplicationContext applicationContext,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            ObjectMapper objectMapper,
+            ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
         this.webClient = webClient;
         this.metadataCache = metadataCache;
         this.argumentResolver = argumentResolver;
         this.errorDecoder = errorDecoder;
         this.clientConfig = Objects.requireNonNull(clientConfig, "clientConfig must not be null");
         this.clientName = clientName;
+        this.clientInterface = clientInterface;
         this.applicationContext = applicationContext;
         this.resilienceOperatorApplier = resilienceOperatorApplier != null
                 ? resilienceOperatorApplier
@@ -204,7 +223,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
 
         MethodMetadata meta = metadataCache.get(method);
-        RequestPlan plan = meta.getRequestPlan();
+        RequestPlan plan = requestPlan(method, meta);
         EffectiveApi effectiveApi = resolveEffectiveApi(plan);
 
         if (effectiveApi.httpMethod() == null) {
@@ -333,6 +352,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    private RequestPlan requestPlan(Method method, MethodMetadata meta) {
+        if (clientInterface == null) {
+            return meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
+        }
+        return requestPlanCache.computeIfAbsent(method, ignored -> RequestPlan.from(meta, clientInterface));
+    }
 
     private boolean usesSubscriptionState(RequestPlan plan,
                                           HttpExchangeLogger exchangeLogger,
@@ -867,7 +893,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private EffectiveApi resolveEffectiveApi(Method method, MethodMetadata meta) {
-        return resolveEffectiveApi(meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta));
+        return resolveEffectiveApi(requestPlan(method, meta));
     }
 
     private EffectiveApi resolveEffectiveApi(RequestPlan plan) {

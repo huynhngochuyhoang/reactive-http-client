@@ -221,20 +221,30 @@ Evidence:
 
 ## Priority 6 — Inherited Generic Endpoint Type Resolution
 
-### [ ] 3.1 Resolve inherited generic endpoint response types
-- [ ] Add a regression test for `BusApiOperators extends ApiOperators<BusResponse>`.
-- [ ] Add a regression test for `TrainApiOperators extends ApiOperators<TrainResponse>`.
-- [ ] Verify inherited `Mono<T>` methods decode using the concrete child binding.
-- [ ] Verify inherited `Flux<T>` methods decode using the concrete child binding.
-- [ ] Verify inherited `Mono<ResponseEntity<T>>` methods decode using the concrete child binding.
-- [ ] Verify nested parameterized bodies from inherited methods keep their concrete type arguments.
-- [ ] Resolve request-body generic parameter types with the concrete child binding when auth serialization or repeatability checks need the body type.
-- [ ] Keep shared `MethodMetadataCache` behavior safe for two child clients binding the same parent method differently.
-- [ ] Verify inherited endpoint validation still reports the concrete `@ReactiveHttpClient` child name.
-- [ ] Verify diagnostics, contract snapshots, and startup method policy output describe inherited generic endpoints consistently.
-- [ ] Document the supported generic shared-contract pattern in annotation docs.
-- [ ] Document that each child interface must bind the correct concrete type, e.g. train clients must extend `ApiOperators<TrainResponse>`.
-- [ ] Run inherited endpoint, mock helper, and contract snapshot tests.
+### [x] 3.1 Resolve inherited generic endpoint response types
+- [x] Add a regression test for `BusApiOperators extends ApiOperators<BusResponse>`.
+- [x] Add a regression test for `TrainApiOperators extends ApiOperators<TrainResponse>`.
+- [x] Verify inherited `Mono<T>` methods decode using the concrete child binding.
+- [x] Verify inherited `Flux<T>` methods decode using the concrete child binding.
+- [x] Verify inherited `Mono<ResponseEntity<T>>` methods decode using the concrete child binding.
+- [x] Verify nested parameterized bodies from inherited methods keep their concrete type arguments.
+- [x] Resolve request-body generic parameter types with the concrete child binding when auth serialization or repeatability checks need the body type.
+- [x] Keep shared `MethodMetadataCache` behavior safe for two child clients binding the same parent method differently.
+- [x] Verify inherited endpoint validation still reports the concrete `@ReactiveHttpClient` child name.
+- [x] Verify diagnostics, contract snapshots, and startup method policy output describe inherited generic endpoints consistently.
+- [x] Document the supported generic shared-contract pattern in annotation docs.
+- [x] Document that each child interface must bind the correct concrete type, e.g. train clients must extend `ApiOperators<TrainResponse>`.
+- [x] Run inherited endpoint, mock helper, and contract snapshot tests.
+
+Evidence:
+
+- Added concrete-client request-plan resolution for inherited generic methods. Runtime proxy construction now passes the concrete `@ReactiveHttpClient` interface into `ReactiveClientInvocationHandler`, and mock clients do the same.
+- `RequestPlan.from(meta, concreteClientInterface)` resolves inherited `Mono<T>`, `Flux<T>`, `Mono<ResponseEntity<T>>`, nested parameterized response bodies, and generic `@Body T` types without mutating shared `MethodMetadataCache` entries.
+- Added starter regression coverage proving bus and train clients sharing `ApiOperators<T extends BaseResponse>` decode to `BusResponse` and `TrainResponse`, while the shared metadata entry remains reused safely.
+- Added mock-helper regression coverage proving `MockReactiveHttpClient` decodes inherited generic child clients with the concrete response type.
+- Updated annotation and test-helper docs with the supported generic shared-contract pattern and the requirement that each child bind the correct concrete DTO type.
+- `mvn -pl reactive-http-client-starter -Dtest=MethodMetadataValidationTest,ReactiveClientInvocationHandlerBehaviorTest test` passed with 44 tests, 0 failures, 0 errors, and 0 skipped.
+- `mvn -pl reactive-http-client-test -am test` passed with 652 tests, 0 failures, 0 errors, and 0 skipped across the root, starter, and test modules.
 
 ---
 
