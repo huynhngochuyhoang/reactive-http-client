@@ -90,12 +90,12 @@ class DocumentationReleaseArtifactTest {
                         + baselineVersion)
                 .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
                         + baselineVersion)
-                .contains("### V15 baseline transition")
-                .contains("The V15 minor release moved the reactor to `" + projectVersion + "`")
-                .contains("published\n`" + baselineVersion + "` starter, test, and OTel artifacts resolved")
-                .contains("baseline and benchmark published-baseline paths now use `" + baselineVersion + "`")
-                .contains("release\nevidence compares the `" + projectVersion + "` candidate")
-                .contains("keep the API compatibility baseline on `" + baselineVersion + "`");
+                .contains("### V16 baseline transition")
+                .contains("The V16 post-release transition moved the reactor to `" + projectVersion + "`")
+                .contains("published `" + baselineVersion + "` starter, test, and OTel artifacts resolved")
+                .contains("compatibility baseline and benchmark published-baseline paths now use `" + baselineVersion + "`")
+                .contains("release evidence compares the `" + projectVersion + "` candidate")
+                .contains("baseline on `" + baselineVersion + "`");
 
         assertThat(benchmarkDocs)
                 .contains("The example version must match the root `api.compatibility.baseline.version`")
@@ -103,11 +103,11 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Dbenchmark.starter.version=" + baselineVersion)
                 .contains("-Dbenchmark.commit=" + baselineVersion)
                 .contains("published-starter-" + baselineVersion + "/release-jmh.md")
-                .contains("For the V15 minor transition")
+                .contains("For the V16 post-release transition")
                 .contains("this example now uses `" + baselineVersion + "`")
-                .contains("reactor\nhas been bumped to `" + projectVersion + "`")
-                .contains("published `" + baselineVersion + "` artifacts resolve")
-                .contains("Move\nboth `benchmark.starter.version` and `published-starter-<version>` paths together");
+                .contains("the reactor has been bumped to `" + projectVersion + "`")
+                .contains("published `" + baselineVersion + "`\nartifacts resolve")
+                .contains("Move both `benchmark.starter.version` and `published-starter-<version>` paths together");
 
         assertThat(manifest.path("publishedBaselineArtifacts"))
                 .extracting(artifact -> artifact.path("resolutionCommand").asText())
@@ -146,7 +146,8 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String projectVersion = projectVersion(root.resolve("pom.xml"));
         String baselineVersion = pomProperty(Files.readString(root.resolve("pom.xml")), "api.compatibility.baseline.version");
-        Path promotedReport = root.resolve("docs/benchmark-report-" + projectVersion + ".md");
+        String promotedReportVersion = latestPromotedBenchmarkReportVersion(root, projectVersion);
+        Path promotedReport = root.resolve("docs/benchmark-report-" + promotedReportVersion + ".md");
         String readmeDocs = Files.readString(root.resolve("README.md"));
         String changelogDocs = Files.readString(root.resolve("CHANGELOG.md"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
@@ -158,12 +159,12 @@ class DocumentationReleaseArtifactTest {
 
         assertThat(readmeDocs)
                 .contains("[Benchmarks](docs/22-benchmarks.md)")
-                .contains("[Benchmark Report " + projectVersion + "](docs/benchmark-report-" + projectVersion + ".md)")
+                .contains("[Benchmark Report " + promotedReportVersion + "](docs/benchmark-report-" + promotedReportVersion + ".md)")
                 .contains("[Performance Summary](docs/23-performance-summary.md)");
 
         assertThat(changelogDocs)
-                .contains("[Benchmark Report " + projectVersion + "](docs/benchmark-report-" + projectVersion + ".md)")
-                .contains("release-quality evidence for starter `" + projectVersion + "` benchmark scenarios")
+                .contains("[Benchmark Report " + promotedReportVersion + "](docs/benchmark-report-" + promotedReportVersion + ".md)")
+                .contains("release-quality evidence for starter `" + promotedReportVersion + "` benchmark scenarios")
                 .contains("scenario names, and release-quality report links")
                 .contains("smoke-only reports from being")
                 .doesNotContain("near zero overhead")
@@ -181,13 +182,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("exact JMH scenario name")
                 .contains("Avoid broad wording such as")
                 .contains("smoke-only report links")
-                .contains("Benchmark Report " + projectVersion)
+                .contains("Benchmark Report " + promotedReportVersion)
                 .contains("Performance Summary")
                 .contains("Benchmark Consumer Examples")
                 .contains("24-benchmark-consumer-examples.md")
                 .contains("## Release-Note Benchmark Evidence")
                 .contains("Benchmark evidence:")
-                .contains("Promoted report: [Benchmark Report " + projectVersion + "](docs/benchmark-report-" + projectVersion + ".md)")
+                .contains("Promoted report: [Benchmark Report " + promotedReportVersion + "](docs/benchmark-report-" + promotedReportVersion + ".md)")
                 .contains("paths relative\nto the repository root")
                 .contains("Current candidate command")
                 .contains("Published baseline command")
@@ -237,20 +238,19 @@ class DocumentationReleaseArtifactTest {
                 .contains("## Starter-Only and Optional Feature Rows")
                 .contains("## Raw Results")
                 .contains("## Promotion Notes")
-                .contains("Report version: `" + projectVersion + "`")
-                .contains("Starter version under test: `" + projectVersion + "`")
+                .contains("Report version: `" + promotedReportVersion + "`")
+                .contains("Starter version under test: `" + promotedReportVersion + "`")
                 .contains("Evidence level: **Release-quality**, not smoke evidence.")
-                .contains("| `starterVersion` | " + projectVersion + " |")
+                .contains("| `starterVersion` | " + promotedReportVersion + " |")
                 .contains("| `benchmarkCommit` |")
                 .contains("| `javaVersion` |")
                 .contains("| `springBootVersion` |")
                 .contains("| `availableProcessors` |")
                 .contains("## Comparison Summary")
                 .contains("## Report Pairing")
-                .contains("Current candidate: this promoted report measures starter `" + projectVersion + "`")
-                .contains("Published baseline: the paired baseline report path is `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
-                        + baselineVersion + "/release-jmh.md`")
-                .contains("Numeric rows in this promoted report are current-candidate `" + projectVersion + "` rows")
+                .contains("Current candidate: this promoted report measures starter `" + promotedReportVersion + "`")
+                .contains("Published baseline: the paired baseline report path is `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-")
+                .contains("Numeric rows in this promoted report are current-candidate `" + promotedReportVersion + "` rows")
                 .doesNotContain("/home/");
 
         assertThat(performanceSummaryDocs)
@@ -270,7 +270,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("Resilience wrapper selection")
                 .contains("Response envelope handling")
                 .contains("starter-only error-mapping overhead")
-                .contains("starter `" + projectVersion + "`")
+                .contains("starter `" + promotedReportVersion + "`")
                 .contains("Current-vs-baseline comparisons should use the paired report paths")
                 .contains("published-starter-" + baselineVersion + "/release-jmh.md")
                 .contains("Resolve the published baseline artifacts before promoting a comparison")
@@ -283,7 +283,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkConsumerDocs)
                 .startsWith("# Benchmark Consumer Examples")
                 .contains("[benchmark methodology](22-benchmarks.md#methodology-and-limits)")
-                .contains("[" + projectVersion + " promoted report](benchmark-report-" + projectVersion + ".md)")
+                .contains("[" + promotedReportVersion + " promoted report](benchmark-report-" + promotedReportVersion + ".md)")
                 .contains("## Equivalent Success Path")
                 .contains("## Raw WebClient")
                 .contains("webClient.get()")
@@ -370,28 +370,29 @@ class DocumentationReleaseArtifactTest {
                 .isEmpty();
         assertThat(promotedReportLinks)
                 .as("public docs should link the promoted current-version benchmark report")
-                .contains("docs/benchmark-report-" + projectVersion + ".md",
-                        "benchmark-report-" + projectVersion + ".md");
+                .contains("docs/benchmark-report-" + promotedReportVersion + ".md",
+                        "benchmark-report-" + promotedReportVersion + ".md");
     }
 
     @Test
     void promotedBenchmarkReportVersionsMatchReleaseDocumentation() throws Exception {
         Path root = projectRoot();
         String projectVersion = projectVersion(root.resolve("pom.xml"));
-        Path currentReport = root.resolve("docs/benchmark-report-" + projectVersion + ".md");
+        String promotedReportVersion = latestPromotedBenchmarkReportVersion(root, projectVersion);
+        Path promotedReport = root.resolve("docs/benchmark-report-" + promotedReportVersion + ".md");
 
-        assertPromotedReportMetadata(currentReport, projectVersion);
+        assertPromotedReportMetadata(promotedReport, promotedReportVersion);
 
-        assertCurrentBenchmarkReportReferences(root.resolve("README.md"), projectVersion);
-        assertCurrentBenchmarkReportReferences(root.resolve("docs/22-benchmarks.md"), projectVersion);
-        assertCurrentBenchmarkReportReferences(root.resolve("docs/23-performance-summary.md"), projectVersion);
-        assertCurrentBenchmarkReportReferences(root.resolve("docs/24-benchmark-consumer-examples.md"), projectVersion);
+        assertCurrentBenchmarkReportReferences(root.resolve("README.md"), promotedReportVersion);
+        assertCurrentBenchmarkReportReferences(root.resolve("docs/22-benchmarks.md"), promotedReportVersion);
+        assertCurrentBenchmarkReportReferences(root.resolve("docs/23-performance-summary.md"), promotedReportVersion);
+        assertCurrentBenchmarkReportReferences(root.resolve("docs/24-benchmark-consumer-examples.md"), promotedReportVersion);
 
         String changelog = Files.readString(root.resolve("CHANGELOG.md"));
-        String releaseSection = changelogSection(changelog, projectVersion);
+        String releaseSection = changelogSection(changelog, promotedReportVersion);
         assertThat(releaseSection)
-                .contains("[Benchmark Report " + projectVersion + "](docs/benchmark-report-" + projectVersion + ".md)");
-        assertBenchmarkReportReferences("CHANGELOG.md release " + projectVersion, releaseSection, projectVersion);
+                .contains("[Benchmark Report " + promotedReportVersion + "](docs/benchmark-report-" + promotedReportVersion + ".md)");
+        assertBenchmarkReportReferences("CHANGELOG.md release " + promotedReportVersion, releaseSection, promotedReportVersion);
 
         try (Stream<Path> reports = Files.list(root.resolve("docs"))) {
             for (Path report : reports
@@ -471,9 +472,11 @@ class DocumentationReleaseArtifactTest {
                 .containsExactly("mvn -Papi-compatibility -DskipTests verify",
                         "mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify",
                         "bash scripts/verify-api-compatibility-fixtures.sh");
+        String expectedPromotedReport = "docs/benchmark-report-" + generated.path("projectVersion").asText() + ".md";
         assertThat(readiness.path("promotedBenchmarkReport").path("path").asText())
-                .isEqualTo("docs/benchmark-report-" + generated.path("projectVersion").asText() + ".md");
-        assertThat(readiness.path("promotedBenchmarkReport").path("status").asText()).isEqualTo("present");
+                .isEqualTo(expectedPromotedReport);
+        assertThat(readiness.path("promotedBenchmarkReport").path("status").asText())
+                .isEqualTo(Files.exists(root.resolve(expectedPromotedReport)) ? "present" : "missing");
         assertThat(readiness.path("configurationReference").path("status").asText()).isEqualTo("current");
         assertThat(readiness.path("markdownLinks").path("status").asText()).isEqualTo("pass");
         assertThat(readiness.path("staleBenchmarkReportLinks").path("status").asText()).isEqualTo("pass");
@@ -669,6 +672,37 @@ class DocumentationReleaseArtifactTest {
             versions.add(matcher.group(1));
         }
         return versions;
+    }
+
+    private static String latestPromotedBenchmarkReportVersion(Path root, String projectVersion) throws IOException {
+        if (Files.exists(root.resolve("docs/benchmark-report-" + projectVersion + ".md"))) {
+            return projectVersion;
+        }
+        try (Stream<Path> reports = Files.list(root.resolve("docs"))) {
+            return reports
+                    .map(path -> path.getFileName().toString())
+                    .filter(name -> name.matches("benchmark-report-\\d+\\.\\d+\\.\\d+\\.md"))
+                    .map(name -> name.substring("benchmark-report-".length(), name.length() - ".md".length()))
+                    .max(DocumentationReleaseArtifactTest::compareVersions)
+                    .orElseThrow(() -> new IllegalStateException("Missing promoted benchmark report"));
+        }
+    }
+
+    private static int compareVersions(String left, String right) {
+        int[] leftParts = versionParts(left);
+        int[] rightParts = versionParts(right);
+        for (int i = 0; i < leftParts.length; i++) {
+            int compared = Integer.compare(leftParts[i], rightParts[i]);
+            if (compared != 0) {
+                return compared;
+            }
+        }
+        return 0;
+    }
+
+    private static int[] versionParts(String version) {
+        String[] parts = version.split("\\.");
+        return new int[]{Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2])};
     }
 
     private static List<String> staleBenchmarkReportReferences(Path root, String projectVersion) throws IOException {
@@ -890,6 +924,7 @@ class DocumentationReleaseArtifactTest {
                                                         List<Map<String, String>> publishedBaselineArtifacts,
                                                         List<Map<String, String>> checks) throws IOException {
         String promotedReport = (String) benchmarkEvidence.get("promotedReport");
+        String promotedReportVersion = latestPromotedBenchmarkReportVersion(root, projectVersion);
         List<String> pendingManualCommands = new ArrayList<>(checks.stream()
                 .filter(check -> "pending".equals(check.get("status")))
                 .map(check -> check.get("command"))
@@ -909,7 +944,7 @@ class DocumentationReleaseArtifactTest {
         boolean configurationReferenceCurrent = Files.readString(root.resolve("docs/configuration-properties.md"))
                 .equals(configurationReferenceMarkdown(configurationMetadata(root)));
         List<String> brokenLinks = brokenLocalMarkdownLinks(root);
-        List<String> staleBenchmarkLinks = staleBenchmarkReportReferences(root, projectVersion);
+        List<String> staleBenchmarkLinks = staleBenchmarkReportReferences(root, promotedReportVersion);
 
         LinkedHashMap<String, Object> readiness = new LinkedHashMap<>();
         readiness.put("projectVersion", projectVersion);

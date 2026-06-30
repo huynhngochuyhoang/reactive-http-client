@@ -7,30 +7,40 @@ release blocker requires reordering.
 
 ## Priority 1 — Post-`2.11.0` Baseline Transition
 
-### [ ] 1.1 Move the compatibility baseline after `2.11.0` is published
-- [ ] Confirm `2.11.0` is published and resolvable before changing the baseline.
-- [ ] Resolve `io.github.huynhngochuyhoang:reactive-http-client-starter:2.11.0`.
-- [ ] Resolve `io.github.huynhngochuyhoang:reactive-http-client-test:2.11.0`.
-- [ ] Resolve `io.github.huynhngochuyhoang:reactive-http-client-otel:2.11.0`.
-- [ ] Move `api.compatibility.baseline.version` to `2.11.0`.
-- [ ] Update benchmark published-baseline commands to
+### [x] 1.1 Move the compatibility baseline after `2.11.0` is published
+- [x] Confirm `2.11.0` is published and resolvable before changing the baseline.
+- [x] Resolve `io.github.huynhngochuyhoang:reactive-http-client-starter:2.11.0`.
+- [x] Resolve `io.github.huynhngochuyhoang:reactive-http-client-test:2.11.0`.
+- [x] Resolve `io.github.huynhngochuyhoang:reactive-http-client-otel:2.11.0`.
+- [x] Bump the reactor to `2.12.0` so the `2.11.0` baseline is not a self-comparison.
+- [x] Move `api.compatibility.baseline.version` to `2.11.0`.
+- [x] Update benchmark published-baseline commands to
       `-Dbenchmark.starter.version=2.11.0`.
-- [ ] Update benchmark published-baseline report paths to
+- [x] Update benchmark published-baseline report paths to
       `published-starter-2.11.0`.
-- [ ] Update release compatibility docs with the transition commands.
-- [ ] Verify root API compatibility passes against published `2.11.0`.
-- [ ] Verify module-scoped starter API compatibility passes against published
+- [x] Update release compatibility docs with the transition commands.
+- [x] Verify root API compatibility passes against published `2.11.0`.
+- [x] Verify module-scoped starter API compatibility passes against published
       `2.11.0`.
-- [ ] Verify root API compatibility rejects self-comparison with the current
+- [x] Verify root API compatibility rejects self-comparison with the current
       reactor version.
-- [ ] Verify module-scoped API compatibility rejects self-comparison with the
+- [x] Verify module-scoped API compatibility rejects self-comparison with the
       current reactor version.
-- [ ] Run focused release documentation tests.
-- [ ] Run `git diff --check`.
+- [x] Run focused release documentation tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Published `2.11.0` artifacts resolved with `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.11.0`, `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.11.0`, and `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.11.0`.
+- Root and module parent versions now target `2.12.0`; `api.compatibility.baseline.version` now points at published `2.11.0`.
+- Benchmark published-baseline commands and paths now use `-Dbenchmark.starter.version=2.11.0` and `published-starter-2.11.0`.
+- Release docs now include the V16 post-release baseline transition and keep the latest promoted benchmark report on `2.11.0` until a future `2.12.0` release-quality report exists.
+- `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `mvn -Papi-compatibility -DskipTests verify` passed against the published `2.11.0` baseline.
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify` passed against the published `2.11.0` baseline.
+- `mvn -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.12.0 validate` failed as expected with the self-comparison guard.
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.12.0 validate` failed as expected with the self-comparison guard.
+- `git diff --check` passed.
 
 ---
 
