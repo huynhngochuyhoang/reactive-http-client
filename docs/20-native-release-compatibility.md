@@ -12,8 +12,8 @@ is documented as supported.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. While the project version remains `2.10.0`,
-the baseline stays on `2.9.0`:
+from the current reactor version. While the project version remains `2.11.0`,
+the baseline stays on `2.10.0`:
 
 ```bash
 mvn -Papi-compatibility -DskipTests verify
@@ -38,41 +38,16 @@ The profile also fails during `validate` when
 `api.compatibility.baseline.version` equals the current reactor
 `project.version`. Keep the baseline pointed at the last published release so
 Maven cannot satisfy the old artifact from the current reactor or local build.
-For the `2.10.0` reactor, the guard must reject
-`-Dapi.compatibility.baseline.version=2.10.0`; that self-comparison is never
+For the `2.11.0` reactor, the guard must reject
+`-Dapi.compatibility.baseline.version=2.11.0`; that self-comparison is never
 valid release evidence.
 
 ### Release baseline sequence
 
-While cutting `2.10.0`, keep `api.compatibility.baseline.version` on `2.9.0`
-until the `2.10.0` artifacts are published and resolve. Before publishing,
-resolve every published `2.9.0` baseline artifact that the release evidence
+While cutting `2.11.0`, keep `api.compatibility.baseline.version` on `2.10.0`
+until the `2.11.0` artifacts are published and resolve. Before publishing,
+resolve every published `2.10.0` baseline artifact that the release evidence
 manifest lists:
-
-```bash
-mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.9.0
-mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.9.0
-mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.9.0
-```
-
-Run the root API compatibility command and at least one module-scoped
-compatibility command before release so the inherited guard is exercised outside
-the full reactor. After `2.10.0` is published and resolves, the next development
-cycle may bump the reactor to the next version and update
-`api.compatibility.baseline.version` to `2.10.0`. Update benchmark
-published-baseline commands, release evidence docs, and promoted-report pairing
-wording in the same change whenever that baseline property changes.
-
-### V15 baseline transition
-
-V15 is planned as a minor `2.11.0` cycle if the drafted public diagnostics,
-auth, health, and test-helper work ships. While the reactor still declares
-`2.10.0`, keep `api.compatibility.baseline.version` on `2.9.0`; setting it to
-`2.10.0` before the reactor version changes would compare the current build to
-itself once the local artifact is present.
-
-When the reactor is bumped to `2.11.0`, first verify the published `2.10.0`
-baseline artifacts resolve:
 
 ```bash
 mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.10.0
@@ -80,11 +55,23 @@ mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-t
 mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.10.0
 ```
 
-Only after those artifacts resolve should `api.compatibility.baseline.version`
-move to `2.10.0`. Move the benchmark published-baseline command and
-`published-starter-2.10.0` report paths in the same change. If V15 is reduced to
-a patch-only `2.10.1` scope, keep the API compatibility baseline on `2.9.0`
-unless the release policy explicitly changes patch-line baselines.
+Run the root API compatibility command and at least one module-scoped
+compatibility command before release so the inherited guard is exercised outside
+the full reactor. After `2.11.0` is published and resolves, the next development
+cycle may bump the reactor to the next version and update
+`api.compatibility.baseline.version` to `2.11.0`. Update benchmark
+published-baseline commands, release evidence docs, and promoted-report pairing
+wording in the same change whenever that baseline property changes.
+
+### V15 baseline transition
+
+The V15 minor release moved the reactor to `2.11.0` only after the published
+`2.10.0` starter, test, and OTel artifacts resolved. The API compatibility
+baseline and benchmark published-baseline paths now use `2.10.0`, so release
+evidence compares the `2.11.0` candidate against the last published release.
+If a future patch-only `2.11.x` scope is cut before `2.11.0` is published and
+resolvable, keep the API compatibility baseline on `2.10.0` unless the release
+policy explicitly changes patch-line baselines.
 
 For an intentional breaking change, target a future major release. Review the
 japicmp report, document the migration in `CHANGELOG.md`, update

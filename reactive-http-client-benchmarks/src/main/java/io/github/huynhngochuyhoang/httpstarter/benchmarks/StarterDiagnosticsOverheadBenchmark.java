@@ -11,8 +11,11 @@ import io.github.huynhngochuyhoang.httpstarter.core.NoopResilienceOperatorApplie
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveClientInvocationHandler;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook;
 import io.github.huynhngochuyhoang.httpstarter.core.RequestArgumentResolver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -23,6 +26,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.support.GenericApplicationContext;
+import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -46,6 +50,10 @@ public class StarterDiagnosticsOverheadBenchmark {
     private StarterBenchmarkClient diagnosticsDisabledClient;
     private StarterBenchmarkClient exchangeLoggingClient;
     private StarterBenchmarkClient micrometerClient;
+    private StarterBenchmarkClient oneObserverClient;
+    private StarterBenchmarkClient multipleObserversClient;
+    private StarterBenchmarkClient oneLifecycleHookClient;
+    private StarterBenchmarkClient multipleLifecycleHooksClient;
     private ReactiveHttpClientDiagnosticsProvider diagnosticsProvider;
 
     @Setup
@@ -57,6 +65,20 @@ public class StarterDiagnosticsOverheadBenchmark {
         }, context -> context.registerBean(DefaultHttpExchangeLogger.class, DefaultHttpExchangeLogger::new));
         micrometerClient = createClient(config -> {}, context -> context.registerBean(HttpClientObserver.class, () ->
                 new MicrometerHttpClientObserver(new SimpleMeterRegistry(), new ReactiveHttpClientProperties.ObservabilityConfig())));
+        oneObserverClient = createClient(config -> {}, context ->
+                context.registerBean("noopObserver", HttpClientObserver.class, NoopObserver::new));
+        multipleObserversClient = createClient(config -> {}, context -> {
+            context.registerBean("noopObserverOne", HttpClientObserver.class, NoopObserver::new);
+            context.registerBean("noopObserverTwo", HttpClientObserver.class, NoopObserver::new);
+            context.registerBean("noopObserverThree", HttpClientObserver.class, NoopObserver::new);
+        });
+        oneLifecycleHookClient = createClient(config -> {}, context ->
+                context.registerBean("noopLifecycleHook", ReactiveHttpClientLifecycleHook.class, () -> new NoopLifecycleHook(0)));
+        multipleLifecycleHooksClient = createClient(config -> {}, context -> {
+            context.registerBean("noopLifecycleHookOne", ReactiveHttpClientLifecycleHook.class, () -> new NoopLifecycleHook(0));
+            context.registerBean("noopLifecycleHookTwo", ReactiveHttpClientLifecycleHook.class, () -> new NoopLifecycleHook(1));
+            context.registerBean("noopLifecycleHookThree", ReactiveHttpClientLifecycleHook.class, () -> new NoopLifecycleHook(2));
+        });
         diagnosticsProvider = createDiagnosticsProvider();
     }
 
@@ -81,6 +103,26 @@ public class StarterDiagnosticsOverheadBenchmark {
     @Benchmark
     public BenchmarkUser micrometerObserverGetNoBody() {
         return validateUser(micrometerClient.currentUser().block());
+    }
+
+    @Benchmark
+    public BenchmarkUser starterFeatureOneObserverGetNoBody() {
+        return validateUser(oneObserverClient.currentUser().block());
+    }
+
+    @Benchmark
+    public BenchmarkUser starterFeatureMultipleObserversGetNoBody() {
+        return validateUser(multipleObserversClient.currentUser().block());
+    }
+
+    @Benchmark
+    public BenchmarkUser starterFeatureOneLifecycleHookGetNoBody() {
+        return validateUser(oneLifecycleHookClient.currentUser().block());
+    }
+
+    @Benchmark
+    public BenchmarkUser starterFeatureMultipleLifecycleHooksGetNoBody() {
+        return validateUser(multipleLifecycleHooksClient.currentUser().block());
     }
 
     @Benchmark
@@ -152,6 +194,34 @@ public class StarterDiagnosticsOverheadBenchmark {
             throw new IllegalStateException("Expected " + CURRENT_USER + " but got " + user);
         }
         return user;
+    }
+
+    private static final class NoopObserver implements HttpClientObserver {
+        @Override
+        public void record(HttpClientObserverEvent event) {
+        }
+    }
+
+    private static final class NoopLifecycleHook implements ReactiveHttpClientLifecycleHook, Ordered {
+
+        private final int order;
+
+        private NoopLifecycleHook(int order) {
+            this.order = order;
+        }
+
+        @Override
+        public int getOrder() {
+            return order;
+        }
+
+        @Override
+        public void onStart(ReactiveHttpClientLifecycleContext context) {
+        }
+
+        @Override
+        public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+        }
     }
 
     @FunctionalInterface
