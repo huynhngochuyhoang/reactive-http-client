@@ -27,10 +27,6 @@ class DocumentationReleaseArtifactTest {
                     + "<artifactId>reactive-http-client-[^<]+</artifactId>\\s*"
                     + "<version>([^<]+)</version>",
             Pattern.DOTALL);
-    private static final String V15_CURRENT_RELEASE_VERSION = "2.10.0";
-    private static final String V15_PRE_TRANSITION_BASELINE_VERSION = "2.9.0";
-    private static final String V15_TARGET_MINOR_VERSION = "2.11.0";
-    private static final String V15_PATCH_FALLBACK_VERSION = "2.10.1";
 
     @Test
     void localMarkdownLinksResolve() throws IOException {
@@ -94,21 +90,11 @@ class DocumentationReleaseArtifactTest {
                         + baselineVersion)
                 .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
                         + baselineVersion)
-                .contains("V15 is planned as a minor `" + V15_TARGET_MINOR_VERSION + "` cycle")
-                .contains("While the reactor still declares\n`" + V15_CURRENT_RELEASE_VERSION + "`, keep `api.compatibility.baseline.version` on `"
-                        + V15_PRE_TRANSITION_BASELINE_VERSION + "`")
-                .contains("When the reactor is bumped to `" + V15_TARGET_MINOR_VERSION + "`, first verify the published `"
-                        + V15_CURRENT_RELEASE_VERSION + "`\nbaseline artifacts resolve")
-                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
-                        + V15_CURRENT_RELEASE_VERSION)
-                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:"
-                        + V15_CURRENT_RELEASE_VERSION)
-                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
-                        + V15_CURRENT_RELEASE_VERSION)
-                .contains("Only after those artifacts resolve should `api.compatibility.baseline.version`\nmove to `"
-                        + V15_CURRENT_RELEASE_VERSION + "`")
-                .contains("`published-starter-" + V15_CURRENT_RELEASE_VERSION + "` report paths")
-                .contains("patch-only `" + V15_PATCH_FALLBACK_VERSION + "` scope")
+                .contains("### V15 baseline transition")
+                .contains("The V15 minor release moved the reactor to `" + projectVersion + "`")
+                .contains("published\n`" + baselineVersion + "` starter, test, and OTel artifacts resolved")
+                .contains("baseline and benchmark published-baseline paths now use `" + baselineVersion + "`")
+                .contains("release\nevidence compares the `" + projectVersion + "` candidate")
                 .contains("keep the API compatibility baseline on `" + baselineVersion + "`");
 
         assertThat(benchmarkDocs)
@@ -118,11 +104,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Dbenchmark.commit=" + baselineVersion)
                 .contains("published-starter-" + baselineVersion + "/release-jmh.md")
                 .contains("For the V15 minor transition")
-                .contains("reactor\nremains `" + V15_CURRENT_RELEASE_VERSION + "`")
-                .contains("bumped to `" + V15_TARGET_MINOR_VERSION + "`")
-                .contains("published\n`" + V15_CURRENT_RELEASE_VERSION + "` artifacts resolve")
-                .contains("move both `benchmark.starter.version` and\n`published-starter-<version>` paths to `"
-                        + V15_CURRENT_RELEASE_VERSION + "`");
+                .contains("this example now uses `" + baselineVersion + "`")
+                .contains("reactor\nhas been bumped to `" + projectVersion + "`")
+                .contains("published `" + baselineVersion + "` artifacts resolve")
+                .contains("Move\nboth `benchmark.starter.version` and `published-starter-<version>` paths together");
 
         assertThat(manifest.path("publishedBaselineArtifacts"))
                 .extracting(artifact -> artifact.path("resolutionCommand").asText())
@@ -298,7 +283,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkConsumerDocs)
                 .startsWith("# Benchmark Consumer Examples")
                 .contains("[benchmark methodology](22-benchmarks.md#methodology-and-limits)")
-                .contains("[2.10.0 promoted report](benchmark-report-" + projectVersion + ".md)")
+                .contains("[" + projectVersion + " promoted report](benchmark-report-" + projectVersion + ".md)")
                 .contains("## Equivalent Success Path")
                 .contains("## Raw WebClient")
                 .contains("webClient.get()")

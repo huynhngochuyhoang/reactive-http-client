@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-06-30
+
+### Added
+
+- **Diagnostics snapshot export.** Added a public sanitized diagnostics snapshot helper for support artifacts, with project version metadata, native resource hints, and compatibility coverage for the documented API.
+- **Runtime diagnostics and health details.** Health troubleshooting output and opt-in startup configuration summaries now explain effective client policy without exposing secrets, request bodies, response bodies, or raw header values.
+- **Auth and test-helper diagnostics.** OAuth2 client-credentials failures now surface sanitized token-endpoint status/body context, and mock clients can assert Authorization headers and compact 401 invalidation flows without leaking credentials.
+- **Benchmark audit rows.** Added observer and lifecycle-hook overhead rows to the benchmark harness so optional diagnostics cost can be audited with one or multiple observers/hooks.
+- **Release readiness summary.** Release evidence now includes a one-place readiness view for promoted benchmark reports, stale performance links, generated docs, baseline artifact resolution, compatibility commands, and manual benchmark commands.
+
+### Changed
+
+- **Inherited generic endpoints.** Inherited generic endpoint methods now resolve response and request-body types through each concrete child client, so shared interfaces like `ApiOperators<T>` decode `Mono<T>`, `Flux<T>`, and `ResponseEntity<T>` using the child binding.
+- **Release baseline.** The reactor now targets `2.11.0` and compares public API compatibility plus benchmark baseline evidence against published `2.10.0` artifacts.
+- **Performance evidence.** Current performance documentation and release notes now require the source-controlled [Benchmark Report 2.11.0](docs/benchmark-report-2.11.0.md) as release-quality evidence for starter `2.11.0` benchmark scenarios.
+
+### Fixed
+
+- **AWS SigV4 signing contracts.** Raw-body signing coverage now documents and tests supported body shapes, avoids silently signing empty multipart uploads, and keeps unsupported streaming/body cases explicit.
+- **Redirect, streaming, and bodiless contracts.** Redirect-following, streaming response ownership, and unexpected bodiless-response handling were re-audited with contract coverage so diagnostics and pooling behavior stay consistent.
+- **Configuration metadata drift.** Metadata and example-validation checks now keep starter and OTel configuration docs aligned with generated metadata and reject malformed scalar/group examples.
+
 ## [2.10.0] - 2026-06-11
 
 ### Added
@@ -1186,7 +1208,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.10.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.7.0...v2.8.0

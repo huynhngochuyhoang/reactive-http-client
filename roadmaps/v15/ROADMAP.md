@@ -1,9 +1,8 @@
 # Reactive HTTP Client — Roadmap V15
 
-> **Status:** draft after V14 release-awareness work. V15 assumes `2.10.0`
-> shipped with the benchmark module, promoted performance docs, and release
-> evidence guardrails. The next cycle should favor production hardening and
-> operator feedback over broad new API surface.
+> **Status:** completed and prepared for release as `2.11.0` after V15
+> production-hardening, diagnostics, auth, benchmark-audit, and release-readiness
+> work.
 
 V15 uses the benchmark and release-evidence system from V12 through V14 as a
 decision tool. It should not become another performance-only roadmap. The

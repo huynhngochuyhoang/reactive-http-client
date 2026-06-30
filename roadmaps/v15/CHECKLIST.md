@@ -27,31 +27,43 @@ release blocker requires reordering.
 
 Evidence:
 
-- V15 is documented as a planned minor `2.11.0` cycle if the drafted public
-  diagnostics, auth, health, and test-helper work ships. The current reactor
-  remains `2.10.0`, so `api.compatibility.baseline.version` remains `2.9.0`
-  until the reactor version moves off `2.10.0`.
+- V15 is released as the minor `2.11.0` line. The reactor now declares `2.11.0`
+  and `api.compatibility.baseline.version` now points at published `2.10.0`
+  artifacts.
 - Release compatibility docs now document the exact transition: resolve
   published `2.10.0` artifacts first, then move the API baseline and benchmark
   published-baseline paths to `2.10.0` in the same change after the reactor is
   bumped to `2.11.0`.
-- Benchmark docs now state that the V15 published-baseline command stays on
-  `2.9.0` while the reactor remains `2.10.0`, then moves to `2.10.0` with the
-  baseline property after the `2.11.0` reactor bump.
+- Benchmark docs now use `2.10.0` for the V15 published-baseline command and
+  `published-starter-2.10.0` report paths after the `2.11.0` reactor bump.
 - Published `2.10.0` artifacts resolved successfully:
   `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.10.0`,
   `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.10.0`,
   and `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.10.0`.
 - `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
   passed with 9 tests, 0 failures, 0 errors, and 0 skipped.
-- `mvn -Papi-compatibility -DskipTests validate` passed with the configured
-  `2.9.0` baseline and executed the guard in the root, starter, test, and OTel
+- `mvn -q test` passed for the full reactor test suite.
+- `bash scripts/verify-api-compatibility-fixtures.sh` passed: additive API
+  changes were accepted and constructor removal was rejected.
+- `mvn -Papi-compatibility -DskipTests verify` passed with the configured
+  `2.10.0` baseline and executed the guard in the root, starter, test, and OTel
   modules.
-- `mvn -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.10.0 validate`
-  failed as expected with the guard rejecting current-reactor self-comparison.
-- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.10.0 validate`
-  failed as expected with the module-scoped guard rejecting current-reactor
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify`
+  passed with the configured `2.10.0` baseline and exercised the module-scoped
+  guard path.
+- `mvn -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.11.0 validate`
+  fails as expected with the guard rejecting current-reactor self-comparison.
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.11.0 validate`
+  fails as expected with the module-scoped guard rejecting current-reactor
   self-comparison.
+- Promoted release-quality benchmark evidence was regenerated from clean commit
+  `4ec8c6a` and added at `docs/benchmark-report-2.11.0.md` from the completed
+  manual release benchmark run. Performance docs/changelog now cite that
+  source-controlled report.
+- The regenerated report labels `diagnosticsNoNetwork*` rows as
+  `No-network starter invocation`; only loopback `starterFeature*` rows remain
+  in the optional-feature evidence bucket.
+- `git diff --check` passed after the release-prep edits.
 
 ---
 
@@ -580,21 +592,56 @@ Evidence:
 
 ## Priority 15 — Observer and Lifecycle Overhead Audit
 
-### [ ] 5.2 Audit observer and lifecycle overhead with multiple observers/hooks
-- [ ] Add optional diagnostics benchmark row for one observer.
-- [ ] Add optional diagnostics benchmark row for multiple observers.
-- [ ] Add optional diagnostics benchmark row for one lifecycle hook.
-- [ ] Add optional diagnostics benchmark row for multiple ordered lifecycle
+### [x] 5.2 Audit observer and lifecycle overhead with multiple observers/hooks
+- [x] Add optional diagnostics benchmark row for one observer.
+- [x] Add optional diagnostics benchmark row for multiple observers.
+- [x] Add optional diagnostics benchmark row for one lifecycle hook.
+- [x] Add optional diagnostics benchmark row for multiple ordered lifecycle
       hooks.
-- [ ] Inspect per-call allocation in observer lookup.
-- [ ] Inspect per-call allocation in lifecycle hook lookup.
-- [ ] Inspect composite observer construction overhead.
-- [ ] Reuse immutable observer snapshots only when Spring semantics allow it.
-- [ ] Reuse immutable lifecycle hook snapshots only when Spring semantics allow
+- [x] Inspect per-call allocation in observer lookup.
+- [x] Inspect per-call allocation in lifecycle hook lookup.
+- [x] Inspect composite observer construction overhead.
+- [x] Reuse immutable observer snapshots only when Spring semantics allow it.
+- [x] Reuse immutable lifecycle hook snapshots only when Spring semantics allow
       it.
-- [ ] Preserve observer ordering.
-- [ ] Preserve lifecycle hook ordering.
-- [ ] Preserve observer failure isolation.
-- [ ] Add tests for dynamic bean behavior if caching is introduced.
-- [ ] Run observer and lifecycle tests.
-- [ ] Record benchmark evidence before and after any optimization.
+- [x] Preserve observer ordering.
+- [x] Preserve lifecycle hook ordering.
+- [x] Preserve observer failure isolation.
+- [x] Add tests for dynamic bean behavior if caching is introduced.
+- [x] Run observer and lifecycle tests.
+- [x] Record benchmark evidence before and after any optimization.
+
+Evidence:
+
+- Added four smokeable JMH rows in `StarterDiagnosticsOverheadBenchmark`:
+  `diagnosticsNoNetworkOneObserverGetNoBody`,
+  `diagnosticsNoNetworkMultipleObserversGetNoBody`,
+  `diagnosticsNoNetworkOneLifecycleHookGetNoBody`, and
+  `diagnosticsNoNetworkMultipleLifecycleHooksGetNoBody`.
+- Observer lookup still queries `ObjectProvider.orderedStream()` per proxy
+  invocation, builds a list when observers are present, and constructs a
+  `CompositeHttpClientObserver` only when more than one observer is present.
+- Lifecycle lookup still queries `ObjectProvider.orderedStream()` per proxy
+  invocation, filters by `supports(clientName)`, and materializes the ordered
+  hook list for the call.
+- No immutable observer or lifecycle snapshot cache was introduced. The current
+  handler contract intentionally re-queries Spring providers per invocation so
+  late-registered or scoped beans remain visible, and lifecycle `supports(...)`
+  filtering continues to use the current client name. Because no caching was
+  introduced, no dynamic-bean caching regression test was needed.
+- Existing behavior preserves observer ordering through Spring provider order,
+  lifecycle hook ordering through Spring provider order plus `Ordered` hooks, and
+  observer failure isolation through `CompositeHttpClientObserver`.
+- Clean release benchmark command passed:
+  `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am clean verify -DskipTests -Dbenchmark.commit=4ec8c6a`.
+  The release run executed all four renamed no-network diagnostics rows and wrote
+  `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json`
+  plus `release-jmh.md`.
+- Compile/package verification passed:
+  `mvn -q -Pbenchmarks -pl reactive-http-client-benchmarks -am -DskipTests package`.
+- Focused observer/lifecycle tests passed with 57 tests, 0 failures, 0 errors,
+  and 0 skipped:
+  `mvn -pl reactive-http-client-starter -Dtest=ReactiveHttpClientLifecycleHookTest,CompositeHttpClientObserverTest,MicrometerHttpClientObserverTest,ReactiveClientInvocationHandlerObservabilityErrorCategoryTest test`.
+- No before/after optimization numbers were recorded because this priority added
+  audit coverage only; runtime optimization was deliberately deferred until a
+  future benchmark-backed change can preserve Spring dynamic lookup semantics.
