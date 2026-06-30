@@ -610,10 +610,10 @@ Evidence:
 Evidence:
 
 - Added four smokeable JMH rows in `StarterDiagnosticsOverheadBenchmark`:
-  `starterFeatureOneObserverGetNoBody`,
-  `starterFeatureMultipleObserversGetNoBody`,
-  `starterFeatureOneLifecycleHookGetNoBody`, and
-  `starterFeatureMultipleLifecycleHooksGetNoBody`.
+  `diagnosticsNoNetworkOneObserverGetNoBody`,
+  `diagnosticsNoNetworkMultipleObserversGetNoBody`,
+  `diagnosticsNoNetworkOneLifecycleHookGetNoBody`, and
+  `diagnosticsNoNetworkMultipleLifecycleHooksGetNoBody`.
 - Observer lookup still queries `ObjectProvider.orderedStream()` per proxy
   invocation, builds a list when observers are present, and constructs a
   `CompositeHttpClientObserver` only when more than one observer is present.
@@ -629,7 +629,7 @@ Evidence:
   lifecycle hook ordering through Spring provider order plus `Ordered` hooks, and
   observer failure isolation through `CompositeHttpClientObserver`.
 - Smoke benchmark command passed:
-  `mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify -Dbenchmark.include=.*StarterDiagnosticsOverheadBenchmark.starterFeature.*`.
+  `mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify -Dbenchmark.include=.*StarterDiagnosticsOverheadBenchmark.diagnosticsNoNetwork.*`.
   The smoke run executed all four new rows and wrote
   `reactive-http-client-benchmarks/target/benchmark-reports/smoke-only-jmh.json`.
 - Compile/package verification passed:

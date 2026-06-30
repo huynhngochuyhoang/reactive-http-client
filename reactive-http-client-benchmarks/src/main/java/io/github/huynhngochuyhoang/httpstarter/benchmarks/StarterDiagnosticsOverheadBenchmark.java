@@ -106,22 +106,22 @@ public class StarterDiagnosticsOverheadBenchmark {
     }
 
     @Benchmark
-    public BenchmarkUser starterFeatureOneObserverGetNoBody() {
+    public BenchmarkUser diagnosticsNoNetworkOneObserverGetNoBody() {
         return validateUser(oneObserverClient.currentUser().block());
     }
 
     @Benchmark
-    public BenchmarkUser starterFeatureMultipleObserversGetNoBody() {
+    public BenchmarkUser diagnosticsNoNetworkMultipleObserversGetNoBody() {
         return validateUser(multipleObserversClient.currentUser().block());
     }
 
     @Benchmark
-    public BenchmarkUser starterFeatureOneLifecycleHookGetNoBody() {
+    public BenchmarkUser diagnosticsNoNetworkOneLifecycleHookGetNoBody() {
         return validateUser(oneLifecycleHookClient.currentUser().block());
     }
 
     @Benchmark
-    public BenchmarkUser starterFeatureMultipleLifecycleHooksGetNoBody() {
+    public BenchmarkUser diagnosticsNoNetworkMultipleLifecycleHooksGetNoBody() {
         return validateUser(multipleLifecycleHooksClient.currentUser().block());
     }
 
