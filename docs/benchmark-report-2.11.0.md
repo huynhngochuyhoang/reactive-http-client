@@ -4,12 +4,12 @@
 
 - Report version: `2.11.0`.
 - Starter version under test: `2.11.0`.
-- Benchmark input commit: `e08876b-dirty` (release input tree; generated before release-prep edits were committed).
+- Benchmark input commit: `4ec8c6a` (clean committed release input tree).
 - Evidence level: **Release-quality**, not smoke evidence.
 - Machine limits: local loopback run on Linux/amd64 with `8` available processors; JVM warmup, CPU scheduling, and Netty event-loop scheduling affect the numbers.
 - Generated source artifacts are retained during release evidence collection but are not committed: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json` and its adjacent environment properties file.
 
-- Generated at: `2026-06-30T00:06:55.607238195Z`
+- Generated at: `2026-06-30T02:28:13.009668068Z`
 - Result file: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json`
 - Run label: **Release-quality candidate**
 
@@ -32,11 +32,11 @@
 
 | Key | Value |
 | --- | --- |
-| `generatedAt` | 2026-06-30T00:06:55.607238195Z |
+| `generatedAt` | 2026-06-30T02:28:13.009668068Z |
 | `projectVersion` | 2.11.0 |
 | `starterVersion` | 2.11.0 |
 | `apiCompatibilityBaselineVersion` | 2.10.0 |
-| `benchmarkCommit` | e08876b-dirty |
+| `benchmarkCommit` | 4ec8c6a |
 | `springBootVersion` | 3.5.0 |
 | `springWebFluxVersion` | 6.2.7 |
 | `reactorNettyVersion` | 1.2.6 |
@@ -55,111 +55,111 @@
 
 | Scenario | Starter avg | vs raw WebClient | vs Spring HTTP Interface |
 | --- | ---: | ---: | ---: |
-| Client Error Small Body | 49.755 us/op | 29.012% faster | 32.735% faster |
-| Get No Body | 47.073 us/op | 14.786% slower | 8.676% slower |
-| Get Path Query Header | 51.915 us/op | 14.245% slower | 6.99% faster |
-| Post Json | 73.924 us/op | 35.712% slower | 33.093% slower |
-| Response Entity | 56.956 us/op | 19.644% slower | 0.881% faster |
-| Server Error Small Body | 49.72 us/op | 27.652% faster | 33.739% faster |
+| Client Error Small Body | 56.609 us/op | 31.631% faster | 28.328% faster |
+| Get No Body | 51.295 us/op | 37.544% faster | 87.828% faster |
+| Get Path Query Header | 56.514 us/op | 16.318% slower | 13.465% faster |
+| Post Json | 74.904 us/op | 27.658% slower | 14.617% slower |
+| Response Entity | 68.008 us/op | 36.843% slower | 9.038% slower |
+| Server Error Small Body | 54.536 us/op | 22.915% faster | 28.233% faster |
 
 ## Starter-Only and Optional Feature Rows
 
 | Scenario | Label | Average |
 | --- | --- | ---: |
-| Circuit Breaker Wrapper Get No Body | Optional starter feature | 53.119 us/op |
-| Exchange Logging Metadata Only Get No Body | Optional starter feature | 49.468 us/op |
-| Micrometer Observer Get No Body | Optional starter feature | 58.648 us/op |
-| Retry Wrapper Get No Body | Optional starter feature | 54.85 us/op |
-| Problem Detail Small Body | Starter-only error-mapping overhead | 63.297 us/op |
+| Circuit Breaker Wrapper Get No Body | Optional starter feature | 53.615 us/op |
+| Exchange Logging Metadata Only Get No Body | Optional starter feature | 52.84 us/op |
+| Micrometer Observer Get No Body | Optional starter feature | 68.336 us/op |
+| Retry Wrapper Get No Body | Optional starter feature | 52.675 us/op |
+| Problem Detail Small Body | Starter-only error-mapping overhead | 66.603 us/op |
 
 ## Raw Results
 
 | Benchmark | Label | Mode | Score | p50 | p95 | p99 | Allocation rate | Allocation/op |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| clientSideOverheadRawWebClientClientErrorSmallBody | Client-side overhead | `thrpt` | 0.009 ops/us | 0.008 ops/us | 0.012 ops/us | 0.012 ops/us | 300.257 MB/sec | 36474.83 B/op |
-| clientSideOverheadRawWebClientClientErrorSmallBody | Client-side overhead | `avgt` | 70.089 us/op | 68.915 us/op | 78.191 us/op | 78.191 us/op | 499.307 MB/sec | 36646.638 B/op |
-| clientSideOverheadRawWebClientClientErrorSmallBody | Client-side overhead | `sample` | 70.168 us/op | 64.768 us/op | 97.408 us/op | 121.486 us/op | 495.008 MB/sec | 36570.64 B/op |
-| clientSideOverheadSpringHttpExchangeClientErrorSmallBody | Client-side overhead | `thrpt` | 0.01 ops/us | 0.011 ops/us | 0.012 ops/us | 0.012 ops/us | 348.779 MB/sec | 37183.975 B/op |
-| clientSideOverheadSpringHttpExchangeClientErrorSmallBody | Client-side overhead | `avgt` | 73.968 us/op | 72.738 us/op | 79.586 us/op | 79.586 us/op | 474.857 MB/sec | 36850.545 B/op |
-| clientSideOverheadSpringHttpExchangeClientErrorSmallBody | Client-side overhead | `sample` | 74.948 us/op | 69.76 us/op | 102.784 us/op | 140.032 us/op | 470.993 MB/sec | 37174.473 B/op |
-| clientSideOverheadStarterClientErrorSmallBody | Client-side overhead | `thrpt` | 0.014 ops/us | 0.015 ops/us | 0.016 ops/us | 0.016 ops/us | 380.958 MB/sec | 28906.253 B/op |
-| clientSideOverheadStarterClientErrorSmallBody | Client-side overhead | `avgt` | 49.755 us/op | 49.888 us/op | 52.699 us/op | 52.699 us/op | 547.927 MB/sec | 28605.755 B/op |
-| clientSideOverheadStarterClientErrorSmallBody | Client-side overhead | `sample` | 52.206 us/op | 49.024 us/op | 70.656 us/op | 90.752 us/op | 526.738 MB/sec | 28709.018 B/op |
-| clientSideOverheadRawWebClientGetNoBody | Client-side overhead | `thrpt` | 0.015 ops/us | 0.016 ops/us | 0.02 ops/us | 0.02 ops/us | 317.295 MB/sec | 21814.571 B/op |
-| clientSideOverheadRawWebClientGetNoBody | Client-side overhead | `avgt` | 41.009 us/op | 40.85 us/op | 42.574 us/op | 42.574 us/op | 506.403 MB/sec | 21812.462 B/op |
-| clientSideOverheadRawWebClientGetNoBody | Client-side overhead | `sample` | 42.078 us/op | 38.976 us/op | 56.32 us/op | 80.128 us/op | 495.593 MB/sec | 21728.775 B/op |
-| clientSideOverheadSpringHttpExchangeGetNoBody | Client-side overhead | `thrpt` | 0.015 ops/us | 0.018 ops/us | 0.019 ops/us | 0.019 ops/us | 323.027 MB/sec | 22124.047 B/op |
-| clientSideOverheadSpringHttpExchangeGetNoBody | Client-side overhead | `avgt` | 43.315 us/op | 43.316 us/op | 45.942 us/op | 45.942 us/op | 494.975 MB/sec | 22513.599 B/op |
-| clientSideOverheadSpringHttpExchangeGetNoBody | Client-side overhead | `sample` | 44.013 us/op | 40.96 us/op | 58.176 us/op | 81.792 us/op | 487.91 MB/sec | 22388.846 B/op |
-| clientSideOverheadStarterGetNoBody | Client-side overhead | `thrpt` | 0.015 ops/us | 0.016 ops/us | 0.017 ops/us | 0.017 ops/us | 315.989 MB/sec | 22577.004 B/op |
-| clientSideOverheadStarterGetNoBody | Client-side overhead | `avgt` | 47.073 us/op | 47.052 us/op | 48.6 us/op | 48.6 us/op | 453.02 MB/sec | 22395.444 B/op |
-| clientSideOverheadStarterGetNoBody | Client-side overhead | `sample` | 48.727 us/op | 45.44 us/op | 65.216 us/op | 89.344 us/op | 443.345 MB/sec | 22312.987 B/op |
-| clientSideOverheadRawWebClientGetPathQueryHeader | Client-side overhead | `thrpt` | 0.016 ops/us | 0.017 ops/us | 0.019 ops/us | 0.019 ops/us | 373.17 MB/sec | 24260.199 B/op |
-| clientSideOverheadRawWebClientGetPathQueryHeader | Client-side overhead | `avgt` | 45.442 us/op | 44.659 us/op | 48.587 us/op | 48.587 us/op | 509.792 MB/sec | 24307.674 B/op |
-| clientSideOverheadRawWebClientGetPathQueryHeader | Client-side overhead | `sample` | 46.336 us/op | 43.072 us/op | 60.992 us/op | 90.112 us/op | 504.768 MB/sec | 24307.445 B/op |
-| clientSideOverheadSpringHttpExchangeGetPathQueryHeader | Client-side overhead | `thrpt` | 0.012 ops/us | 0.014 ops/us | 0.015 ops/us | 0.015 ops/us | 390.993 MB/sec | 33009.163 B/op |
-| clientSideOverheadSpringHttpExchangeGetPathQueryHeader | Client-side overhead | `avgt` | 55.817 us/op | 55.965 us/op | 57.36 us/op | 57.36 us/op | 556.391 MB/sec | 32617.764 B/op |
-| clientSideOverheadSpringHttpExchangeGetPathQueryHeader | Client-side overhead | `sample` | 57.516 us/op | 53.952 us/op | 79.232 us/op | 100.608 us/op | 542.885 MB/sec | 32887.271 B/op |
-| clientSideOverheadStarterGetPathQueryHeader | Client-side overhead | `thrpt` | 0.012 ops/us | 0.014 ops/us | 0.016 ops/us | 0.016 ops/us | 326.433 MB/sec | 27548.065 B/op |
-| clientSideOverheadStarterGetPathQueryHeader | Client-side overhead | `avgt` | 51.915 us/op | 52.233 us/op | 55.355 us/op | 55.355 us/op | 498.831 MB/sec | 27184.908 B/op |
-| clientSideOverheadStarterGetPathQueryHeader | Client-side overhead | `sample` | 54.498 us/op | 50.944 us/op | 75.136 us/op | 102.4 us/op | 475.775 MB/sec | 27317.646 B/op |
-| clientSideOverheadRawWebClientPostJson | Client-side overhead | `thrpt` | 0.011 ops/us | 0.01 ops/us | 0.016 ops/us | 0.016 ops/us | 286.976 MB/sec | 26969.727 B/op |
-| clientSideOverheadRawWebClientPostJson | Client-side overhead | `avgt` | 54.472 us/op | 51.742 us/op | 70.417 us/op | 70.417 us/op | 478.357 MB/sec | 27075.35 B/op |
-| clientSideOverheadRawWebClientPostJson | Client-side overhead | `sample` | 52.458 us/op | 48.064 us/op | 72.832 us/op | 108.544 us/op | 495.489 MB/sec | 27279.07 B/op |
-| clientSideOverheadSpringHttpExchangePostJson | Client-side overhead | `thrpt` | 0.013 ops/us | 0.015 ops/us | 0.015 ops/us | 0.015 ops/us | 322.133 MB/sec | 26818.636 B/op |
-| clientSideOverheadSpringHttpExchangePostJson | Client-side overhead | `avgt` | 55.543 us/op | 53.593 us/op | 75.791 us/op | 75.791 us/op | 464.91 MB/sec | 26804.757 B/op |
-| clientSideOverheadSpringHttpExchangePostJson | Client-side overhead | `sample` | 56.031 us/op | 50.816 us/op | 82.176 us/op | 132.096 us/op | 453.641 MB/sec | 26781.968 B/op |
-| clientSideOverheadStarterPostJson | Client-side overhead | `thrpt` | 0.01 ops/us | 0.01 ops/us | 0.013 ops/us | 0.013 ops/us | 261.144 MB/sec | 27707.168 B/op |
-| clientSideOverheadStarterPostJson | Client-side overhead | `avgt` | 73.924 us/op | 60.008 us/op | 139.9 us/op | 139.9 us/op | 393.961 MB/sec | 27678.176 B/op |
-| clientSideOverheadStarterPostJson | Client-side overhead | `sample` | 63.505 us/op | 55.808 us/op | 114.688 us/op | 166.656 us/op | 408.851 MB/sec | 27374.974 B/op |
-| clientSideOverheadRawWebClientResponseEntity | Client-side overhead | `thrpt` | 0.016 ops/us | 0.017 ops/us | 0.018 ops/us | 0.018 ops/us | 364.949 MB/sec | 24611.962 B/op |
-| clientSideOverheadRawWebClientResponseEntity | Client-side overhead | `avgt` | 47.605 us/op | 47.315 us/op | 50.014 us/op | 50.014 us/op | 494.247 MB/sec | 24691.624 B/op |
-| clientSideOverheadRawWebClientResponseEntity | Client-side overhead | `sample` | 47.788 us/op | 44.288 us/op | 64.896 us/op | 96.067 us/op | 496.652 MB/sec | 24693.825 B/op |
-| clientSideOverheadSpringHttpExchangeResponseEntity | Client-side overhead | `thrpt` | 0.013 ops/us | 0.014 ops/us | 0.015 ops/us | 0.015 ops/us | 417.648 MB/sec | 33098.228 B/op |
-| clientSideOverheadSpringHttpExchangeResponseEntity | Client-side overhead | `avgt` | 57.462 us/op | 57.223 us/op | 63.24 us/op | 63.24 us/op | 546.324 MB/sec | 32865.502 B/op |
-| clientSideOverheadSpringHttpExchangeResponseEntity | Client-side overhead | `sample` | 56.118 us/op | 52.608 us/op | 75.392 us/op | 105.6 us/op | 561.304 MB/sec | 33178.952 B/op |
-| clientSideOverheadStarterResponseEntity | Client-side overhead | `thrpt` | 0.01 ops/us | 0.01 ops/us | 0.015 ops/us | 0.015 ops/us | 269.772 MB/sec | 27665.583 B/op |
-| clientSideOverheadStarterResponseEntity | Client-side overhead | `avgt` | 56.956 us/op | 56.636 us/op | 62.816 us/op | 62.816 us/op | 462.822 MB/sec | 27641.344 B/op |
-| clientSideOverheadStarterResponseEntity | Client-side overhead | `sample` | 55.208 us/op | 51.776 us/op | 75.264 us/op | 97.152 us/op | 472.313 MB/sec | 27470.19 B/op |
-| clientSideOverheadRawWebClientServerErrorSmallBody | Client-side overhead | `thrpt` | 0.011 ops/us | 0.012 ops/us | 0.012 ops/us | 0.012 ops/us | 387.893 MB/sec | 36492.225 B/op |
-| clientSideOverheadRawWebClientServerErrorSmallBody | Client-side overhead | `avgt` | 68.723 us/op | 69.22 us/op | 72.005 us/op | 72.005 us/op | 509.456 MB/sec | 36737.258 B/op |
-| clientSideOverheadRawWebClientServerErrorSmallBody | Client-side overhead | `sample` | 71.364 us/op | 64.704 us/op | 96.896 us/op | 131.328 us/op | 491.547 MB/sec | 36950.958 B/op |
-| clientSideOverheadSpringHttpExchangeServerErrorSmallBody | Client-side overhead | `thrpt` | 0.01 ops/us | 0.01 ops/us | 0.011 ops/us | 0.011 ops/us | 352.484 MB/sec | 37122.541 B/op |
-| clientSideOverheadSpringHttpExchangeServerErrorSmallBody | Client-side overhead | `avgt` | 75.036 us/op | 74.334 us/op | 77.873 us/op | 77.873 us/op | 473.09 MB/sec | 37291.341 B/op |
-| clientSideOverheadSpringHttpExchangeServerErrorSmallBody | Client-side overhead | `sample` | 74.486 us/op | 70.144 us/op | 98.432 us/op | 125.568 us/op | 474.846 MB/sec | 37251.942 B/op |
-| clientSideOverheadStarterServerErrorSmallBody | Client-side overhead | `thrpt` | 0.014 ops/us | 0.015 ops/us | 0.016 ops/us | 0.016 ops/us | 388.388 MB/sec | 29001.189 B/op |
-| clientSideOverheadStarterServerErrorSmallBody | Client-side overhead | `avgt` | 49.72 us/op | 49.936 us/op | 53.595 us/op | 53.595 us/op | 556.277 MB/sec | 29021.401 B/op |
-| clientSideOverheadStarterServerErrorSmallBody | Client-side overhead | `sample` | 51.894 us/op | 48.64 us/op | 70.144 us/op | 88.576 us/op | 532.007 MB/sec | 28988.803 B/op |
-| starterFeatureCircuitBreakerWrapperGetNoBody | Optional starter feature | `thrpt` | 0.013 ops/us | 0.014 ops/us | 0.015 ops/us | 0.015 ops/us | 316.149 MB/sec | 26632.858 B/op |
-| starterFeatureCircuitBreakerWrapperGetNoBody | Optional starter feature | `avgt` | 53.119 us/op | 50.967 us/op | 62.609 us/op | 62.609 us/op | 479.468 MB/sec | 26552.208 B/op |
-| starterFeatureCircuitBreakerWrapperGetNoBody | Optional starter feature | `sample` | 52.348 us/op | 48.832 us/op | 71.552 us/op | 104.32 us/op | 486.908 MB/sec | 26596.563 B/op |
-| starterFeatureExchangeLoggingMetadataOnlyGetNoBody | Optional starter feature | `thrpt` | 0.012 ops/us | 0.014 ops/us | 0.016 ops/us | 0.016 ops/us | 317.89 MB/sec | 27273.947 B/op |
-| starterFeatureExchangeLoggingMetadataOnlyGetNoBody | Optional starter feature | `avgt` | 49.468 us/op | 49.999 us/op | 50.991 us/op | 50.991 us/op | 524.15 MB/sec | 27235.992 B/op |
-| starterFeatureExchangeLoggingMetadataOnlyGetNoBody | Optional starter feature | `sample` | 52.596 us/op | 47.36 us/op | 79.232 us/op | 117.951 us/op | 506.264 MB/sec | 27274.138 B/op |
-| starterFeatureMicrometerObserverGetNoBody | Optional starter feature | `thrpt` | 0.011 ops/us | 0.013 ops/us | 0.014 ops/us | 0.014 ops/us | 312.584 MB/sec | 29740.917 B/op |
-| starterFeatureMicrometerObserverGetNoBody | Optional starter feature | `avgt` | 58.648 us/op | 55.546 us/op | 67.309 us/op | 67.309 us/op | 482.666 MB/sec | 29517.734 B/op |
-| starterFeatureMicrometerObserverGetNoBody | Optional starter feature | `sample` | 59.003 us/op | 53.568 us/op | 86.656 us/op | 137.728 us/op | 478.456 MB/sec | 29759.096 B/op |
-| starterFeatureMultipleLifecycleHooksGetNoBody | Optional starter feature | `thrpt` | 128823.049 ops/s | 129334.515 ops/s | 132786.769 ops/s | 132786.769 ops/s | 1819.523 MB/sec | 14812.011 B/op |
-| starterFeatureMultipleObserversGetNoBody | Optional starter feature | `thrpt` | 124026.844 ops/s | 123714.16 ops/s | 127593.795 ops/s | 127593.795 ops/s | 1793.968 MB/sec | 15168.011 B/op |
-| starterFeatureOneLifecycleHookGetNoBody | Optional starter feature | `thrpt` | 139076.627 ops/s | 138964.468 ops/s | 143492.037 ops/s | 143492.037 ops/s | 1955.895 MB/sec | 14748.01 B/op |
-| starterFeatureOneObserverGetNoBody | Optional starter feature | `thrpt` | 136899.277 ops/s | 136769.237 ops/s | 141017.38 ops/s | 141017.38 ops/s | 1939.463 MB/sec | 14856.01 B/op |
-| starterFeatureRetryWrapperGetNoBody | Optional starter feature | `thrpt` | 0.013 ops/us | 0.014 ops/us | 0.015 ops/us | 0.015 ops/us | 346.791 MB/sec | 27930.959 B/op |
-| starterFeatureRetryWrapperGetNoBody | Optional starter feature | `avgt` | 54.85 us/op | 54.135 us/op | 62.545 us/op | 62.545 us/op | 486.747 MB/sec | 27928.898 B/op |
-| starterFeatureRetryWrapperGetNoBody | Optional starter feature | `sample` | 55.214 us/op | 50.944 us/op | 76.8 us/op | 108.032 us/op | 480.82 MB/sec | 27973.383 B/op |
-| argumentResolutionPathQueryHeaderFromMetadata | No-network starter invocation | `thrpt` | 5111166.16 ops/s | 5122361.074 ops/s | 5199532.855 ops/s | 5199532.855 ops/s | 4796.297 MB/sec | 984 B/op |
-| argumentResolutionPathQueryHeaderFromPlan | No-network starter invocation | `thrpt` | 5128294.924 ops/s | 5121302.134 ops/s | 5185257.16 ops/s | 5185257.16 ops/s | 4812.367 MB/sec | 984 B/op |
-| cachedMethodMetadataLookup | No-network starter invocation | `thrpt` | 118385912.564 ops/s | 118045298.295 ops/s | 121483085.747 ops/s | 121483085.747 ops/s | 1806.39 MB/sec | 16 B/op |
-| cachedRequestPlanLookup | No-network starter invocation | `thrpt` | 113872423.002 ops/s | 114669407.817 ops/s | 116560394.841 ops/s | 116560394.841 ops/s | 1737.522 MB/sec | 16 B/op |
-| diagnosticsDisabledGetNoBody | No-network starter invocation | `thrpt` | 151424.337 ops/s | 151538.642 ops/s | 169680.599 ops/s | 169680.599 ops/s | 1566.292 MB/sec | 10848.009 B/op |
-| metadataLookup | No-network starter invocation | `thrpt` | 122605793.884 ops/s | 123101506.219 ops/s | 124976372.741 ops/s | 124976372.741 ops/s | 1870.714 MB/sec | 16 B/op |
-| metadataOnlyExchangeLoggingGetNoBody | No-network starter invocation | `thrpt` | 66009.006 ops/s | 65495.821 ops/s | 70197.227 ops/s | 70197.227 ops/s | 1064.031 MB/sec | 16904.024 B/op |
-| micrometerObserverGetNoBody | No-network starter invocation | `thrpt` | 114368.532 ops/s | 114407.418 ops/s | 120072.333 ops/s | 120072.333 ops/s | 1777.346 MB/sec | 16297.064 B/op |
-| proxyInvocationCreatesPublisher | No-network starter invocation | `thrpt` | 2652442.315 ops/s | 2657914.802 ops/s | 2741260.434 ops/s | 2741260.434 ops/s | 4047.108 MB/sec | 1600.001 B/op |
-| proxyInvocationWithMockExchange | No-network starter invocation | `thrpt` | 142826.799 ops/s | 143058.524 ops/s | 147087.041 ops/s | 147087.041 ops/s | 1895.956 MB/sec | 13920.007 B/op |
-| runtimeDiagnosticsProviderClientSummaries | No-network starter invocation | `thrpt` | 29238.188 ops/s | 29078.897 ops/s | 30242.729 ops/s | 30242.729 ops/s | 1889.625 MB/sec | 67772.076 B/op |
-| starterErrorMappingProblemDetailSmallBody | Starter-only error-mapping overhead | `thrpt` | 0.011 ops/us | 0.012 ops/us | 0.014 ops/us | 0.014 ops/us | 984.171 MB/sec | 92366.551 B/op |
-| starterErrorMappingProblemDetailSmallBody | Starter-only error-mapping overhead | `avgt` | 63.297 us/op | 63.624 us/op | 71.321 us/op | 71.321 us/op | 1394.118 MB/sec | 92437.17 B/op |
-| starterErrorMappingProblemDetailSmallBody | Starter-only error-mapping overhead | `sample` | 61.538 us/op | 57.728 us/op | 81.92 us/op | 120.064 us/op | 1420.936 MB/sec | 92096.465 B/op |
+| clientSideOverheadRawWebClientClientErrorSmallBody | Client-side overhead | `thrpt` | 0.009 ops/us | 0.01 ops/us | 0.011 ops/us | 0.011 ops/us | 312.185 MB/sec | 36459.181 B/op |
+| clientSideOverheadRawWebClientClientErrorSmallBody | Client-side overhead | `avgt` | 82.8 us/op | 72.49 us/op | 163.431 us/op | 163.431 us/op | 448.555 MB/sec | 36588.16 B/op |
+| clientSideOverheadRawWebClientClientErrorSmallBody | Client-side overhead | `sample` | 70.401 us/op | 64.256 us/op | 95.872 us/op | 143.616 us/op | 492.026 MB/sec | 36476.213 B/op |
+| clientSideOverheadSpringHttpExchangeClientErrorSmallBody | Client-side overhead | `thrpt` | 0.009 ops/us | 0.01 ops/us | 0.011 ops/us | 0.011 ops/us | 320.928 MB/sec | 37164.087 B/op |
+| clientSideOverheadSpringHttpExchangeClientErrorSmallBody | Client-side overhead | `avgt` | 78.984 us/op | 78.278 us/op | 88.8 us/op | 88.8 us/op | 445.934 MB/sec | 36939.975 B/op |
+| clientSideOverheadSpringHttpExchangeClientErrorSmallBody | Client-side overhead | `sample` | 408.781 us/op | 240.384 us/op | 1277.952 us/op | 3248.128 us/op | 87.483 MB/sec | 38310.23 B/op |
+| clientSideOverheadStarterClientErrorSmallBody | Client-side overhead | `thrpt` | 0.014 ops/us | 0.014 ops/us | 0.015 ops/us | 0.015 ops/us | 375.801 MB/sec | 28772.352 B/op |
+| clientSideOverheadStarterClientErrorSmallBody | Client-side overhead | `avgt` | 56.609 us/op | 56.089 us/op | 62.228 us/op | 62.228 us/op | 485.978 MB/sec | 28838.157 B/op |
+| clientSideOverheadStarterClientErrorSmallBody | Client-side overhead | `sample` | 72.668 us/op | 58.816 us/op | 125.696 us/op | 208.64 us/op | 373.548 MB/sec | 28637.86 B/op |
+| clientSideOverheadRawWebClientGetNoBody | Client-side overhead | `thrpt` | 0.017 ops/us | 0.018 ops/us | 0.02 ops/us | 0.02 ops/us | 355.346 MB/sec | 21590.848 B/op |
+| clientSideOverheadRawWebClientGetNoBody | Client-side overhead | `avgt` | 82.131 us/op | 60.025 us/op | 185.188 us/op | 185.188 us/op | 324.404 MB/sec | 21901.199 B/op |
+| clientSideOverheadRawWebClientGetNoBody | Client-side overhead | `sample` | 50.645 us/op | 39.872 us/op | 84.608 us/op | 153.856 us/op | 437.809 MB/sec | 21987.208 B/op |
+| clientSideOverheadSpringHttpExchangeGetNoBody | Client-side overhead | `thrpt` | 0.016 ops/us | 0.017 ops/us | 0.018 ops/us | 0.018 ops/us | 341.17 MB/sec | 22400.515 B/op |
+| clientSideOverheadSpringHttpExchangeGetNoBody | Client-side overhead | `avgt` | 421.409 us/op | 235.035 us/op | 1633.048 us/op | 1633.048 us/op | 205.891 MB/sec | 22982.844 B/op |
+| clientSideOverheadSpringHttpExchangeGetNoBody | Client-side overhead | `sample` | 68.829 us/op | 54.272 us/op | 116.992 us/op | 251.392 us/op | 321.206 MB/sec | 22233.626 B/op |
+| clientSideOverheadStarterGetNoBody | Client-side overhead | `thrpt` | 0.015 ops/us | 0.015 ops/us | 0.016 ops/us | 0.016 ops/us | 322.558 MB/sec | 22647.89 B/op |
+| clientSideOverheadStarterGetNoBody | Client-side overhead | `avgt` | 51.295 us/op | 49.885 us/op | 61.431 us/op | 61.431 us/op | 419.862 MB/sec | 22414.114 B/op |
+| clientSideOverheadStarterGetNoBody | Client-side overhead | `sample` | 83.529 us/op | 51.648 us/op | 153.856 us/op | 366.019 us/op | 263.951 MB/sec | 22565.46 B/op |
+| clientSideOverheadRawWebClientGetPathQueryHeader | Client-side overhead | `thrpt` | 0.013 ops/us | 0.015 ops/us | 0.017 ops/us | 0.017 ops/us | 308.094 MB/sec | 24816.686 B/op |
+| clientSideOverheadRawWebClientGetPathQueryHeader | Client-side overhead | `avgt` | 48.586 us/op | 48.173 us/op | 54.742 us/op | 54.742 us/op | 479.944 MB/sec | 24409.785 B/op |
+| clientSideOverheadRawWebClientGetPathQueryHeader | Client-side overhead | `sample` | 95.427 us/op | 73.984 us/op | 158.208 us/op | 476.611 us/op | 252.15 MB/sec | 24258.127 B/op |
+| clientSideOverheadSpringHttpExchangeGetPathQueryHeader | Client-side overhead | `thrpt` | 0.012 ops/us | 0.013 ops/us | 0.015 ops/us | 0.015 ops/us | 360.552 MB/sec | 32784.299 B/op |
+| clientSideOverheadSpringHttpExchangeGetPathQueryHeader | Client-side overhead | `avgt` | 65.308 us/op | 61.992 us/op | 81.534 us/op | 81.534 us/op | 482.548 MB/sec | 32617.854 B/op |
+| clientSideOverheadSpringHttpExchangeGetPathQueryHeader | Client-side overhead | `sample` | 84.343 us/op | 63.936 us/op | 154.88 us/op | 328.192 us/op | 367.134 MB/sec | 32725.871 B/op |
+| clientSideOverheadStarterGetPathQueryHeader | Client-side overhead | `thrpt` | 0.012 ops/us | 0.012 ops/us | 0.014 ops/us | 0.014 ops/us | 303.244 MB/sec | 27434.146 B/op |
+| clientSideOverheadStarterGetPathQueryHeader | Client-side overhead | `avgt` | 56.514 us/op | 56.501 us/op | 60.887 us/op | 60.887 us/op | 459.451 MB/sec | 27234.299 B/op |
+| clientSideOverheadStarterGetPathQueryHeader | Client-side overhead | `sample` | 84.517 us/op | 61.952 us/op | 156.416 us/op | 311.875 us/op | 307.873 MB/sec | 27514.887 B/op |
+| clientSideOverheadRawWebClientPostJson | Client-side overhead | `thrpt` | 0.011 ops/us | 0.011 ops/us | 0.014 ops/us | 0.014 ops/us | 275.91 MB/sec | 27477.102 B/op |
+| clientSideOverheadRawWebClientPostJson | Client-side overhead | `avgt` | 58.675 us/op | 54.142 us/op | 87.588 us/op | 87.588 us/op | 451.477 MB/sec | 27047.762 B/op |
+| clientSideOverheadRawWebClientPostJson | Client-side overhead | `sample` | 56.541 us/op | 48.32 us/op | 96 us/op | 147.062 us/op | 458.721 MB/sec | 27130.557 B/op |
+| clientSideOverheadSpringHttpExchangePostJson | Client-side overhead | `thrpt` | 0.011 ops/us | 0.013 ops/us | 0.014 ops/us | 0.014 ops/us | 288.205 MB/sec | 27018.501 B/op |
+| clientSideOverheadSpringHttpExchangePostJson | Client-side overhead | `avgt` | 65.352 us/op | 60.846 us/op | 88.551 us/op | 88.551 us/op | 399.241 MB/sec | 26834.509 B/op |
+| clientSideOverheadSpringHttpExchangePostJson | Client-side overhead | `sample` | 100.935 us/op | 70.144 us/op | 218.88 us/op | 469.284 us/op | 252.995 MB/sec | 27109.213 B/op |
+| clientSideOverheadStarterPostJson | Client-side overhead | `thrpt` | 0.01 ops/us | 0.011 ops/us | 0.013 ops/us | 0.013 ops/us | 272.814 MB/sec | 27689.502 B/op |
+| clientSideOverheadStarterPostJson | Client-side overhead | `avgt` | 74.904 us/op | 66.684 us/op | 118.483 us/op | 118.483 us/op | 369.985 MB/sec | 27625.608 B/op |
+| clientSideOverheadStarterPostJson | Client-side overhead | `sample` | 116.175 us/op | 73.344 us/op | 250.637 us/op | 559.524 us/op | 224.637 MB/sec | 27842.745 B/op |
+| clientSideOverheadRawWebClientResponseEntity | Client-side overhead | `thrpt` | 0.012 ops/us | 0.012 ops/us | 0.016 ops/us | 0.016 ops/us | 285.499 MB/sec | 24989.216 B/op |
+| clientSideOverheadRawWebClientResponseEntity | Client-side overhead | `avgt` | 49.698 us/op | 49.215 us/op | 52.427 us/op | 52.427 us/op | 471.836 MB/sec | 24615.874 B/op |
+| clientSideOverheadRawWebClientResponseEntity | Client-side overhead | `sample` | 49.473 us/op | 44.416 us/op | 68.224 us/op | 110.464 us/op | 483.524 MB/sec | 24569.19 B/op |
+| clientSideOverheadSpringHttpExchangeResponseEntity | Client-side overhead | `thrpt` | 0.012 ops/us | 0.013 ops/us | 0.015 ops/us | 0.015 ops/us | 380.647 MB/sec | 32845.907 B/op |
+| clientSideOverheadSpringHttpExchangeResponseEntity | Client-side overhead | `avgt` | 62.371 us/op | 61.568 us/op | 68.518 us/op | 68.518 us/op | 502.247 MB/sec | 32849.478 B/op |
+| clientSideOverheadSpringHttpExchangeResponseEntity | Client-side overhead | `sample` | 104.097 us/op | 77.056 us/op | 203.52 us/op | 479.744 us/op | 299.808 MB/sec | 33089.046 B/op |
+| clientSideOverheadStarterResponseEntity | Client-side overhead | `thrpt` | 0.012 ops/us | 0.012 ops/us | 0.014 ops/us | 0.014 ops/us | 306.612 MB/sec | 27770.343 B/op |
+| clientSideOverheadStarterResponseEntity | Client-side overhead | `avgt` | 68.008 us/op | 61.025 us/op | 131.139 us/op | 131.139 us/op | 405.444 MB/sec | 27359.733 B/op |
+| clientSideOverheadStarterResponseEntity | Client-side overhead | `sample` | 64.9 us/op | 56.32 us/op | 110.592 us/op | 168.96 us/op | 401.711 MB/sec | 27500.378 B/op |
+| clientSideOverheadRawWebClientServerErrorSmallBody | Client-side overhead | `thrpt` | 0.01 ops/us | 0.01 ops/us | 0.011 ops/us | 0.011 ops/us | 338.483 MB/sec | 36392.821 B/op |
+| clientSideOverheadRawWebClientServerErrorSmallBody | Client-side overhead | `avgt` | 70.748 us/op | 70.091 us/op | 76.196 us/op | 76.196 us/op | 495.802 MB/sec | 36804.988 B/op |
+| clientSideOverheadRawWebClientServerErrorSmallBody | Client-side overhead | `sample` | 73.67 us/op | 64.256 us/op | 107.008 us/op | 163.584 us/op | 475.209 MB/sec | 36863.475 B/op |
+| clientSideOverheadSpringHttpExchangeServerErrorSmallBody | Client-side overhead | `thrpt` | 0.009 ops/us | 0.01 ops/us | 0.011 ops/us | 0.011 ops/us | 324.273 MB/sec | 37419.756 B/op |
+| clientSideOverheadSpringHttpExchangeServerErrorSmallBody | Client-side overhead | `avgt` | 75.99 us/op | 75.961 us/op | 78.629 us/op | 78.629 us/op | 469.435 MB/sec | 37465.595 B/op |
+| clientSideOverheadSpringHttpExchangeServerErrorSmallBody | Client-side overhead | `sample` | 87.56 us/op | 76.416 us/op | 146.944 us/op | 214.528 us/op | 402.171 MB/sec | 37128.075 B/op |
+| clientSideOverheadStarterServerErrorSmallBody | Client-side overhead | `thrpt` | 0.015 ops/us | 0.014 ops/us | 0.016 ops/us | 0.016 ops/us | 403.153 MB/sec | 29051.783 B/op |
+| clientSideOverheadStarterServerErrorSmallBody | Client-side overhead | `avgt` | 54.536 us/op | 54.068 us/op | 63.607 us/op | 63.607 us/op | 507.467 MB/sec | 28964.23 B/op |
+| clientSideOverheadStarterServerErrorSmallBody | Client-side overhead | `sample` | 67.893 us/op | 55.936 us/op | 112.512 us/op | 184.832 us/op | 406.012 MB/sec | 29083.258 B/op |
+| starterFeatureCircuitBreakerWrapperGetNoBody | Optional starter feature | `thrpt` | 0.013 ops/us | 0.014 ops/us | 0.015 ops/us | 0.015 ops/us | 327.509 MB/sec | 26693.637 B/op |
+| starterFeatureCircuitBreakerWrapperGetNoBody | Optional starter feature | `avgt` | 53.615 us/op | 51.924 us/op | 63.149 us/op | 63.149 us/op | 472.53 MB/sec | 26509.128 B/op |
+| starterFeatureCircuitBreakerWrapperGetNoBody | Optional starter feature | `sample` | 56.991 us/op | 50.496 us/op | 90.112 us/op | 140.032 us/op | 442.349 MB/sec | 26581.461 B/op |
+| starterFeatureExchangeLoggingMetadataOnlyGetNoBody | Optional starter feature | `thrpt` | 0.014 ops/us | 0.015 ops/us | 0.016 ops/us | 0.016 ops/us | 375.698 MB/sec | 27356.71 B/op |
+| starterFeatureExchangeLoggingMetadataOnlyGetNoBody | Optional starter feature | `avgt` | 52.84 us/op | 53.161 us/op | 55.367 us/op | 55.367 us/op | 490.446 MB/sec | 27201.805 B/op |
+| starterFeatureExchangeLoggingMetadataOnlyGetNoBody | Optional starter feature | `sample` | 78.112 us/op | 52.672 us/op | 135.936 us/op | 378.757 us/op | 329.234 MB/sec | 27256.823 B/op |
+| starterFeatureMicrometerObserverGetNoBody | Optional starter feature | `thrpt` | 0.01 ops/us | 0.012 ops/us | 0.013 ops/us | 0.013 ops/us | 295.306 MB/sec | 29834.379 B/op |
+| starterFeatureMicrometerObserverGetNoBody | Optional starter feature | `avgt` | 68.336 us/op | 60.068 us/op | 117.677 us/op | 117.677 us/op | 436.597 MB/sec | 29655.529 B/op |
+| starterFeatureMicrometerObserverGetNoBody | Optional starter feature | `sample` | 63.113 us/op | 54.4 us/op | 103.936 us/op | 163.835 us/op | 446.487 MB/sec | 29712.849 B/op |
+| starterFeatureRetryWrapperGetNoBody | Optional starter feature | `thrpt` | 0.011 ops/us | 0.012 ops/us | 0.014 ops/us | 0.014 ops/us | 288.859 MB/sec | 27690.805 B/op |
+| starterFeatureRetryWrapperGetNoBody | Optional starter feature | `avgt` | 52.675 us/op | 52.35 us/op | 56.542 us/op | 56.542 us/op | 503.118 MB/sec | 27828.198 B/op |
+| starterFeatureRetryWrapperGetNoBody | Optional starter feature | `sample` | 86.688 us/op | 53.248 us/op | 203.008 us/op | 464.896 us/op | 303.176 MB/sec | 28087.837 B/op |
+| argumentResolutionPathQueryHeaderFromMetadata | No-network starter invocation | `thrpt` | 4423457.923 ops/s | 4372542.957 ops/s | 5038400.583 ops/s | 5038400.583 ops/s | 4150.951 MB/sec | 984 B/op |
+| argumentResolutionPathQueryHeaderFromPlan | No-network starter invocation | `thrpt` | 4557443.416 ops/s | 4655764.997 ops/s | 5103105.541 ops/s | 5103105.541 ops/s | 4276.676 MB/sec | 984 B/op |
+| cachedMethodMetadataLookup | No-network starter invocation | `thrpt` | 120057721.842 ops/s | 121841758.4 ops/s | 129261842.343 ops/s | 129261842.343 ops/s | 1831.864 MB/sec | 16 B/op |
+| cachedRequestPlanLookup | No-network starter invocation | `thrpt` | 114437486.316 ops/s | 115599030.12 ops/s | 119426675.146 ops/s | 119426675.146 ops/s | 1746.14 MB/sec | 16 B/op |
+| diagnosticsDisabledGetNoBody | No-network starter invocation | `thrpt` | 179749.965 ops/s | 180082.975 ops/s | 183391.32 ops/s | 183391.32 ops/s | 1862.202 MB/sec | 10864.007 B/op |
+| diagnosticsNoNetworkMultipleLifecycleHooksGetNoBody | No-network starter invocation | `thrpt` | 97328.552 ops/s | 107132.536 ops/s | 120553.278 ops/s | 120553.278 ops/s | 1374.329 MB/sec | 14808.014 B/op |
+| diagnosticsNoNetworkMultipleObserversGetNoBody | No-network starter invocation | `thrpt` | 106599.861 ops/s | 105953.468 ops/s | 117061.301 ops/s | 117061.301 ops/s | 1549.594 MB/sec | 15244.014 B/op |
+| diagnosticsNoNetworkOneLifecycleHookGetNoBody | No-network starter invocation | `thrpt` | 114264.472 ops/s | 123379.671 ops/s | 128780.378 ops/s | 128780.378 ops/s | 1607.914 MB/sec | 14752.017 B/op |
+| diagnosticsNoNetworkOneObserverGetNoBody | No-network starter invocation | `thrpt` | 113883.426 ops/s | 113697.439 ops/s | 128407.925 ops/s | 128407.925 ops/s | 1599.44 MB/sec | 14732.013 B/op |
+| metadataLookup | No-network starter invocation | `thrpt` | 116855173.259 ops/s | 117012193.273 ops/s | 118350898.833 ops/s | 118350898.833 ops/s | 1782.967 MB/sec | 16 B/op |
+| metadataOnlyExchangeLoggingGetNoBody | No-network starter invocation | `thrpt` | 73258.23 ops/s | 75266.477 ops/s | 79286.286 ops/s | 79286.286 ops/s | 1180.832 MB/sec | 16904.021 B/op |
+| micrometerObserverGetNoBody | No-network starter invocation | `thrpt` | 95351.748 ops/s | 95824.616 ops/s | 99453.155 ops/s | 99453.155 ops/s | 1489.74 MB/sec | 16384.015 B/op |
+| proxyInvocationCreatesPublisher | No-network starter invocation | `thrpt` | 2553874.559 ops/s | 2554711.003 ops/s | 2597078.337 ops/s | 2597078.337 ops/s | 3896.689 MB/sec | 1600.001 B/op |
+| proxyInvocationWithMockExchange | No-network starter invocation | `thrpt` | 132229.45 ops/s | 132187.409 ops/s | 138851.09 ops/s | 138851.09 ops/s | 1749.861 MB/sec | 13876.009 B/op |
+| runtimeDiagnosticsProviderClientSummaries | No-network starter invocation | `thrpt` | 26780.943 ops/s | 26970.279 ops/s | 27589.092 ops/s | 27589.092 ops/s | 1727.069 MB/sec | 67628.082 B/op |
+| starterErrorMappingProblemDetailSmallBody | Starter-only error-mapping overhead | `thrpt` | 0.01 ops/us | 0.011 ops/us | 0.012 ops/us | 0.012 ops/us | 916.91 MB/sec | 92466.821 B/op |
+| starterErrorMappingProblemDetailSmallBody | Starter-only error-mapping overhead | `avgt` | 66.603 us/op | 65.548 us/op | 72.778 us/op | 72.778 us/op | 1323.607 MB/sec | 92345.608 B/op |
+| starterErrorMappingProblemDetailSmallBody | Starter-only error-mapping overhead | `sample` | 76.01 us/op | 67.328 us/op | 119.424 us/op | 186.368 us/op | 1148.174 MB/sec | 92029.109 B/op |
 
 ## Promotion Notes
 

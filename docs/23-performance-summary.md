@@ -36,19 +36,18 @@ The promoted `2.11.0` report contains these average-time loopback rows:
 
 | Scenario | Starter avg | Scope |
 |---|---:|---|
-| `Get No Body` | 47.073 us/op | Default success path with no request body. |
-| `Get Path Query Header` | 51.915 us/op | Default success path with path, query, and header argument resolution. |
-| `Post Json` | 73.924 us/op | Default JSON request/response path. |
-| `Response Entity` | 56.956 us/op | Default `Mono<ResponseEntity<T>>` envelope path. |
-| `Client Error Small Body` | 49.755 us/op | Default bounded 4xx error path. |
-| `Server Error Small Body` | 49.72 us/op | Default bounded 5xx error path. |
+| `Get No Body` | 51.295 us/op | Default success path with no request body. |
+| `Get Path Query Header` | 56.514 us/op | Default success path with path, query, and header argument resolution. |
+| `Post Json` | 74.904 us/op | Default JSON request/response path. |
+| `Response Entity` | 68.008 us/op | Default `Mono<ResponseEntity<T>>` envelope path. |
+| `Client Error Small Body` | 56.609 us/op | Default bounded 4xx error path. |
+| `Server Error Small Body` | 54.536 us/op | Default bounded 5xx error path. |
 
-In this run, the starter default path is close to Spring HTTP Interface for
-`Get No Body` and `Response Entity`, slower than raw `WebClient` on success-path
-rows that do additional declarative work, faster than Spring HTTP Interface for
-`Get Path Query Header` in this run, and faster than both baselines on the
-small bounded error rows. Treat those as scenario-specific observations from the
-named report, not as universal ordering.
+In this run, the starter default path is faster than both baselines for
+`Get No Body` and the small bounded error rows, faster than Spring HTTP Interface
+but slower than raw `WebClient` for `Get Path Query Header`, and slower than both
+baselines for `Post Json` and `Response Entity`. Treat those as
+scenario-specific observations from the named report, not as universal ordering.
 
 ## Expected Overhead Sources
 
@@ -72,10 +71,10 @@ Optional feature rows enable one starter feature at a time:
 
 | Scenario | Average | Meaning |
 |---|---:|---|
-| `Exchange Logging Metadata Only Get No Body` | 49.468 us/op | Metadata-only exchange logging enabled. |
-| `Micrometer Observer Get No Body` | 58.648 us/op | Micrometer observer enabled. |
-| `Retry Wrapper Get No Body` | 54.85 us/op | Retry wrapper enabled for the request. |
-| `Circuit Breaker Wrapper Get No Body` | 53.119 us/op | Circuit-breaker wrapper enabled for the request. |
+| `Exchange Logging Metadata Only Get No Body` | 52.84 us/op | Metadata-only exchange logging enabled. |
+| `Micrometer Observer Get No Body` | 68.336 us/op | Micrometer observer enabled. |
+| `Retry Wrapper Get No Body` | 52.675 us/op | Retry wrapper enabled for the request. |
+| `Circuit Breaker Wrapper Get No Body` | 53.615 us/op | Circuit-breaker wrapper enabled for the request. |
 
 These are starter optional-feature overhead rows. Do not compare them to raw
 `WebClient` unless the raw baseline performs equivalent logging, observation, or
@@ -84,7 +83,7 @@ resilience work.
 ## Starter Error Mapping
 
 `Problem Detail Small Body` is labeled starter-only error-mapping overhead in the
-promoted report. Its average-time row is 63.297 us/op for a small
+promoted report. Its average-time row is 66.603 us/op for a small
 `application/problem+json` response. Raw `WebClient` and Spring HTTP Interface
 do not provide the same Problem Detail mapper in this harness, so this row is
 not a raw-client parity comparison.

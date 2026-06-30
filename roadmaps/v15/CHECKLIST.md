@@ -56,9 +56,13 @@ Evidence:
 - `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.11.0 validate`
   fails as expected with the module-scoped guard rejecting current-reactor
   self-comparison.
-- Promoted release-quality benchmark evidence was added at
-  `docs/benchmark-report-2.11.0.md` from the completed manual release benchmark
-  run, and performance docs/changelog now cite that source-controlled report.
+- Promoted release-quality benchmark evidence was regenerated from clean commit
+  `4ec8c6a` and added at `docs/benchmark-report-2.11.0.md` from the completed
+  manual release benchmark run. Performance docs/changelog now cite that
+  source-controlled report.
+- The regenerated report labels `diagnosticsNoNetwork*` rows as
+  `No-network starter invocation`; only loopback `starterFeature*` rows remain
+  in the optional-feature evidence bucket.
 - `git diff --check` passed after the release-prep edits.
 
 ---
@@ -628,10 +632,11 @@ Evidence:
 - Existing behavior preserves observer ordering through Spring provider order,
   lifecycle hook ordering through Spring provider order plus `Ordered` hooks, and
   observer failure isolation through `CompositeHttpClientObserver`.
-- Smoke benchmark command passed:
-  `mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify -Dbenchmark.include=.*StarterDiagnosticsOverheadBenchmark.diagnosticsNoNetwork.*`.
-  The smoke run executed all four new rows and wrote
-  `reactive-http-client-benchmarks/target/benchmark-reports/smoke-only-jmh.json`.
+- Clean release benchmark command passed:
+  `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am clean verify -DskipTests -Dbenchmark.commit=4ec8c6a`.
+  The release run executed all four renamed no-network diagnostics rows and wrote
+  `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json`
+  plus `release-jmh.md`.
 - Compile/package verification passed:
   `mvn -q -Pbenchmarks -pl reactive-http-client-benchmarks -am -DskipTests package`.
 - Focused observer/lifecycle tests passed with 57 tests, 0 failures, 0 errors,
