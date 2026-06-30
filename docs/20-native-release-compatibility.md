@@ -12,8 +12,8 @@ is documented as supported.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. While the project version remains `2.11.0`,
-the baseline stays on `2.10.0`:
+from the current reactor version. While the project version remains `2.12.0`,
+the baseline stays on `2.11.0`:
 
 ```bash
 mvn -Papi-compatibility -DskipTests verify
@@ -38,30 +38,40 @@ The profile also fails during `validate` when
 `api.compatibility.baseline.version` equals the current reactor
 `project.version`. Keep the baseline pointed at the last published release so
 Maven cannot satisfy the old artifact from the current reactor or local build.
-For the `2.11.0` reactor, the guard must reject
-`-Dapi.compatibility.baseline.version=2.11.0`; that self-comparison is never
+For the `2.12.0` reactor, the guard must reject
+`-Dapi.compatibility.baseline.version=2.12.0`; that self-comparison is never
 valid release evidence.
 
 ### Release baseline sequence
 
-While cutting `2.11.0`, keep `api.compatibility.baseline.version` on `2.10.0`
-until the `2.11.0` artifacts are published and resolve. Before publishing,
-resolve every published `2.10.0` baseline artifact that the release evidence
+While cutting `2.12.0`, keep `api.compatibility.baseline.version` on `2.11.0`
+until the `2.12.0` artifacts are published and resolve. Before publishing,
+resolve every published `2.11.0` baseline artifact that the release evidence
 manifest lists:
 
 ```bash
-mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.10.0
-mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.10.0
-mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.10.0
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.11.0
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.11.0
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.11.0
 ```
 
 Run the root API compatibility command and at least one module-scoped
 compatibility command before release so the inherited guard is exercised outside
-the full reactor. After `2.11.0` is published and resolves, the next development
+the full reactor. After `2.12.0` is published and resolves, the next development
 cycle may bump the reactor to the next version and update
-`api.compatibility.baseline.version` to `2.11.0`. Update benchmark
+`api.compatibility.baseline.version` to `2.12.0`. Update benchmark
 published-baseline commands, release evidence docs, and promoted-report pairing
 wording in the same change whenever that baseline property changes.
+
+### V16 baseline transition
+
+The V16 post-release transition moved the reactor to `2.12.0` only after the
+published `2.11.0` starter, test, and OTel artifacts resolved. The API
+compatibility baseline and benchmark published-baseline paths now use `2.11.0`,
+so release evidence compares the `2.12.0` candidate against the last published
+release. Until `2.12.0` is published and resolvable, keep the API compatibility
+baseline on `2.11.0` unless the release policy explicitly changes patch-line
+baselines.
 
 ### V15 baseline transition
 

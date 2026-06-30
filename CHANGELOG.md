@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Post-release baseline transition.** The reactor now targets `2.12.0` while API compatibility and published-baseline benchmark evidence compare against the published `2.11.0` artifacts.
+
+
 ## [2.11.0] - 2026-06-30
 
 ### Added
