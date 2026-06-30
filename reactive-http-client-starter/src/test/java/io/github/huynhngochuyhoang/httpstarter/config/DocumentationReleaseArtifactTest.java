@@ -151,6 +151,7 @@ class DocumentationReleaseArtifactTest {
         String readmeDocs = Files.readString(root.resolve("README.md"));
         String changelogDocs = Files.readString(root.resolve("CHANGELOG.md"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
+        String releaseNoteBenchmarkBlock = releaseNoteBenchmarkBlock(benchmarkDocs);
         String benchmarkConsumerDocs = Files.readString(root.resolve("docs/24-benchmark-consumer-examples.md"));
         String promotedReportDocs = Files.readString(promotedReport);
         String performanceSummaryDocs = Files.readString(root.resolve("docs/23-performance-summary.md"));
@@ -188,7 +189,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("24-benchmark-consumer-examples.md")
                 .contains("## Release-Note Benchmark Evidence")
                 .contains("Benchmark evidence:")
-                .contains("Promoted report: [Benchmark Report " + promotedReportVersion + "](docs/benchmark-report-" + promotedReportVersion + ".md)")
+                .contains("Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted")
                 .contains("paths relative\nto the repository root")
                 .contains("Current candidate command")
                 .contains("Published baseline command")
@@ -228,6 +229,11 @@ class DocumentationReleaseArtifactTest {
                 .contains("Broad claims such as");
 
         assertThat(promotedReport).exists();
+        assertThat(releaseNoteBenchmarkBlock)
+                .contains("Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted")
+                .doesNotContain("docs/benchmark-report-" + promotedReportVersion + ".md")
+                .doesNotContain("[Benchmark Report " + promotedReportVersion + "]");
+
         assertThat(promotedReportDocs)
                 .startsWith("# Reactive HTTP Client Benchmark Report")
                 .contains("## Promotion Metadata")
@@ -826,6 +832,23 @@ class DocumentationReleaseArtifactTest {
             anchor.setLength(anchor.length() - 1);
         }
         return anchor.toString();
+    }
+
+    private static String releaseNoteBenchmarkBlock(String markdown) {
+        int heading = markdown.indexOf("## Release-Note Benchmark Evidence");
+        if (heading < 0) {
+            throw new IllegalStateException("Missing release-note benchmark evidence section");
+        }
+        int fenceStart = markdown.indexOf("```markdown", heading);
+        if (fenceStart < 0) {
+            throw new IllegalStateException("Missing release-note benchmark evidence block");
+        }
+        int blockStart = markdown.indexOf('\n', fenceStart) + 1;
+        int fenceEnd = markdown.indexOf("```", blockStart);
+        if (fenceEnd < 0) {
+            throw new IllegalStateException("Unclosed release-note benchmark evidence block");
+        }
+        return markdown.substring(blockStart, fenceEnd);
     }
 
     private static String markdownWithoutFencedCode(String markdown) {

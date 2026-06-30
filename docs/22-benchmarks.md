@@ -149,7 +149,7 @@ release notes:
 
 ```markdown
 Benchmark evidence:
-- Promoted report: [Benchmark Report 2.11.0](docs/benchmark-report-2.11.0.md)
+- Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted
 - Current candidate command: `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`
 - Published baseline command: `mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.11.0 -Dbenchmark.commit=2.11.0`
 - Current candidate report: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
