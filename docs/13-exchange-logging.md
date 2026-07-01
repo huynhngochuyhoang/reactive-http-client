@@ -110,7 +110,12 @@ The built-in logger logs at `INFO` on success and `WARN` on error. Request/respo
 
 Sensitive headers (`Authorization`, `Cookie`, `Set-Cookie`, `Proxy-Authorization`, `X-Api-Key`) are automatically replaced with `[REDACTED]` in both request and response header maps.
 
-When the starter-managed `WebClient` is used, `requestHeaders` reflects the final outbound headers visible after built-in filters and per-client `ReactiveHttpClientCustomizer` filters. This lets header logging show customizer-added values such as `X-Request-ID` without buffering or inspecting the request body.
+When the starter-managed `WebClient` is used, `requestHeaders` reflects the final
+outbound headers visible after built-in filters and per-client
+`ReactiveHttpClientCustomizer` filters. This lets header logging show
+customizer-added values such as `X-Request-ID` without buffering or inspecting
+the request body. See [Production Support Bundles](26-support-bundles.md) for
+safe logging bundles.
 
 ### Default log format (success)
 

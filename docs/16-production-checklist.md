@@ -76,6 +76,7 @@ reactive:
 
 ## Logging and testing
 
+- Use [Production Support Bundles](26-support-bundles.md) when collecting safe incident evidence.
 - Keep exchange body logging disabled unless a production incident requires it.
 - Keep `log-preset: metadata-only` by default; use `headers` or `bodies` only for targeted investigations.
 - Redact sensitive headers in inbound snapshots and exchange logs.

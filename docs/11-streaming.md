@@ -53,7 +53,11 @@ The upstream status code and headers are forwarded to the caller without bufferi
 - Emitted `DataBuffer` chunks are consumer-owned. Release them after manual reads, or pass them to a component that documents ownership transfer.
 - Buffers discarded before consumer handoff are released by the starter, including queued chunks discarded by cancellation.
 - For direct `Flux<DataBuffer>` methods, lifecycle hooks, observers, and exchange logs finish when the stream completes, errors, or is cancelled.
-- For `Mono<ResponseEntity<Flux<DataBuffer>>>`, lifecycle hooks, observers, and exchange logs finish when the response envelope is emitted. They do not prove that the inner body was subscribed, fully consumed, or released. Response-size diagnostics still use `Content-Length` when available.
+- For `Mono<ResponseEntity<Flux<DataBuffer>>>`, lifecycle hooks, observers, and
+  exchange logs finish when the response envelope is emitted. They do not prove
+  that the inner body was subscribed, fully consumed, or released. Response-size
+  diagnostics still use `Content-Length` when available. See [Production Support Bundles](26-support-bundles.md)
+  for safe streaming incident evidence.
 
 ---
 

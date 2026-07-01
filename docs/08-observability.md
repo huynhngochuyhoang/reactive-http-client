@@ -137,7 +137,11 @@ Each client detail is keyed only by `client.name`. It contains bounded counters 
 }
 ```
 
-Use the health indicator for recent error-rate status, `ReactiveHttpClientDiagnosticsProvider` or `ReactiveHttpClientDiagnosticsSnapshot` for sanitized configured-client summaries, and exchange logging for per-call request/response metadata. These surfaces intentionally expose different data.
+Use the health indicator for recent error-rate status, `ReactiveHttpClientDiagnosticsProvider` or
+`ReactiveHttpClientDiagnosticsSnapshot` for sanitized configured-client summaries,
+and exchange logging for per-call request/response metadata. These surfaces
+intentionally expose different data. See [Production Support Bundles](26-support-bundles.md)
+for safe incident evidence examples.
 
 To override the indicator, register your own bean named `reactiveHttpClientHealthIndicator`.
 

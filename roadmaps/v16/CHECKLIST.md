@@ -113,27 +113,30 @@ Evidence:
 
 ## Priority 4 — Production Support Bundle Examples
 
-### [ ] 2.2 Add production support bundle examples
-- [ ] Add a support-bundle documentation page.
-- [ ] Document a minimal safe support bundle for configuration issues.
-- [ ] Document a minimal safe support bundle for OAuth2/auth failures.
-- [ ] Document a minimal safe support bundle for retry/idempotency behavior.
-- [ ] Document a minimal safe support bundle for timeout incidents.
-- [ ] Document a minimal safe support bundle for streaming ownership issues.
-- [ ] Document a minimal safe support bundle for performance investigations.
-- [ ] Include diagnostics snapshot export examples.
-- [ ] Include health detail examples.
-- [ ] Include log-category examples for startup summaries and exchange logs.
-- [ ] Include benchmark evidence links and explain promoted report scope.
-- [ ] Avoid instructing users to collect raw request or response bodies by
+### [x] 2.2 Add production support bundle examples
+- [x] Add a support-bundle documentation page.
+- [x] Document a minimal safe support bundle for configuration issues.
+- [x] Document a minimal safe support bundle for OAuth2/auth failures.
+- [x] Document a minimal safe support bundle for retry/idempotency behavior.
+- [x] Document a minimal safe support bundle for timeout incidents.
+- [x] Document a minimal safe support bundle for streaming ownership issues.
+- [x] Document a minimal safe support bundle for performance investigations.
+- [x] Include diagnostics snapshot export examples.
+- [x] Include health detail examples.
+- [x] Include log-category examples for startup summaries and exchange logs.
+- [x] Include benchmark evidence links and explain promoted report scope.
+- [x] Avoid instructing users to collect raw request or response bodies by
       default.
-- [ ] Link the page from relevant diagnostics, observability, benchmark, auth,
+- [x] Link the page from relevant diagnostics, observability, benchmark, auth,
       timeout, and streaming docs.
-- [ ] Run documentation link checks.
+- [x] Run documentation link checks.
 
 Evidence:
 
-- Pending.
+- Added `docs/26-support-bundles.md` with safe baseline support-bundle contents, diagnostics snapshot export examples, Actuator `rhttpclients` capture, health detail examples, startup and exchange log category examples, and incident-specific bundles for configuration, OAuth2/auth, retry/idempotency, timeout, streaming ownership, and performance investigations.
+- The support-bundle guidance avoids raw request bodies, raw response bodies, tokens, secrets, cookies, proxy credentials, concrete base URLs, and idempotency-key values by default.
+- Linked the page from `README.md`, diagnostics, observability, benchmarks, auth, timeout, streaming, exchange logging, production checklist, and performance troubleshooting docs.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
 
 ---
 

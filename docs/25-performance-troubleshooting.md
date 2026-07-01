@@ -8,6 +8,7 @@ Related docs:
 
 - [Benchmarks](22-benchmarks.md)
 - [Performance Summary](23-performance-summary.md)
+- [Production Support Bundles](26-support-bundles.md)
 - [Observability](08-observability.md)
 - [Exchange Logging](13-exchange-logging.md)
 - [Lifecycle Hooks](19-lifecycle-hooks.md)
