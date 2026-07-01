@@ -47,6 +47,8 @@ class ReactiveHttpClientAotSmokeTest {
                 .contains(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS, MemberCategory.INVOKE_PUBLIC_METHODS);
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.ClientConfig.class).getMemberCategories())
                 .contains(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS, MemberCategory.INVOKE_PUBLIC_METHODS);
+        assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.DiagnosticsEndpointConfig.class).getMemberCategories())
+                .contains(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS, MemberCategory.INVOKE_PUBLIC_METHODS);
         assertThat(RuntimeHintsPredicates.resource().forResource(ReactiveHttpClientRuntimeHints.POM_PROPERTIES_RESOURCE))
                 .accepts(hints);
     }

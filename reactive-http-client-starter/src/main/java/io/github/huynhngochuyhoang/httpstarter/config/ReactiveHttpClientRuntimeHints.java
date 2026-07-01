@@ -59,6 +59,7 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
             ReactiveHttpClientProperties.ObservabilityConfig.class,
             ReactiveHttpClientProperties.HistogramConfig.class,
             ReactiveHttpClientProperties.HealthConfig.class,
+            ReactiveHttpClientProperties.DiagnosticsEndpointConfig.class,
             ReactiveHttpClientProperties.CorrelationIdConfig.class,
             ReactiveHttpClientProperties.InboundHeadersConfig.class
     };
