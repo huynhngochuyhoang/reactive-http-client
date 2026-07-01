@@ -91,7 +91,7 @@ Generated target-only reports and adjacent JMH environment files may include
 machine-local absolute paths from Maven, the JVM, or the operating system while
 they remain under `target/`. Before copying a release-quality report into
 `docs/`, sanitize those paths; source-controlled promoted reports must not
-contain machine-local paths such as `/home/` or `/Users/`.
+contain machine-local absolute paths such as `/home/`, `/workspace/`, `/tmp/`, or `C:\Users\...`.
 
 Run the same benchmark harness against the last published starter artifact by
 setting `benchmark.starter.version`, enabling `benchmark-published-baseline`, and

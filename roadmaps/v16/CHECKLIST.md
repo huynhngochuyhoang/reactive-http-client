@@ -70,7 +70,7 @@ Evidence:
 
 - `docs/22-benchmarks.md` now documents the clean committed-tree benchmark sequence: check `git status --short`, capture `git rev-parse --short HEAD`, and pass that value through `-Dbenchmark.commit=$(git rev-parse --short HEAD)`.
 - The benchmark guide now states that promoted source-controlled reports must not use missing, `unknown`, or `dirty` benchmark commits and must not contain machine-local absolute paths. Generated target-only reports may retain local paths while they stay under `target/`.
-- `DocumentationReleaseArtifactTest` now validates the currently promoted benchmark report provenance and includes synthetic coverage for missing, `unknown`, `dirty`, malformed non-SHA, clean, and local-path report snippets. Historical promoted reports remain covered by metadata validation without being treated as current release evidence.
+- `DocumentationReleaseArtifactTest` now validates the currently promoted benchmark report provenance and includes synthetic coverage for missing, `unknown`, `dirty`, malformed non-SHA, clean, and local-path report snippets, including Linux home/workspace/tmp and Windows drive paths. Historical promoted reports remain covered by metadata validation without being treated as current release evidence.
 - `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
 
 ---

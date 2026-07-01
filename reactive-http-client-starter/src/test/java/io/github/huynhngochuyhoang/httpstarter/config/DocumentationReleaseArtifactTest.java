@@ -23,6 +23,8 @@ class DocumentationReleaseArtifactTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final Pattern MARKDOWN_LINK = Pattern.compile("!?\\[[^]]*]\\(([^)\\s]+)(?:\\s+\"[^\"]*\")?\\)");
+    private static final Pattern UNIX_ABSOLUTE_PATH = Pattern.compile("(^|[\\s`\\\"=:(])(/(?!/)[^\\s`|)]+)");
+    private static final Pattern WINDOWS_ABSOLUTE_PATH = Pattern.compile("(^|[\\s`\\\"=:(])([A-Za-z]:[\\\\\\/][^\\s`|)]+)");
     private static final Pattern PROJECT_VERSION_SNIPPET = Pattern.compile(
             "<groupId>io\\.github\\.huynhngochuyhoang</groupId>\\s*"
                     + "<artifactId>reactive-http-client-[^<]+</artifactId>\\s*"
@@ -267,8 +269,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("## Report Pairing")
                 .contains("Current candidate: this promoted report measures starter `" + promotedReportVersion + "`")
                 .contains("Published baseline: the paired baseline report path is `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-")
-                .contains("Numeric rows in this promoted report are current-candidate `" + promotedReportVersion + "` rows")
-                .doesNotContain("/home/");
+                .contains("Numeric rows in this promoted report are current-candidate `" + promotedReportVersion + "` rows");
 
         assertThat(performanceSummaryDocs)
                 .contains("## Methodology First")
@@ -394,6 +395,9 @@ class DocumentationReleaseArtifactTest {
     @Test
     void promotedBenchmarkProvenanceRejectsMissingUnknownDirtyMalformedAndLocalPathReports() {
         assertPromotedBenchmarkProvenance("clean", benchmarkReportWithCommit("4ec8c6a"));
+        assertPromotedBenchmarkProvenance("relative-path-and-url", benchmarkReportWithCommit("4ec8c6a")
+                + "Result file: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json`\n"
+                + "Problem URL: https://example.com/problems/benchmark\n");
 
         assertThatThrownBy(() -> assertPromotedBenchmarkProvenance("missing", "# Report\n"))
                 .hasMessageContaining("benchmarkCommit");
@@ -405,6 +409,15 @@ class DocumentationReleaseArtifactTest {
                 .hasMessageContaining("short Git SHA");
         assertThatThrownBy(() -> assertPromotedBenchmarkProvenance("local-path", benchmarkReportWithCommit("4ec8c6a")
                 + "Generated from /home/runner/reactive-http-client\n"))
+                .hasMessageContaining("machine-local absolute paths");
+        assertThatThrownBy(() -> assertPromotedBenchmarkProvenance("workspace-path", benchmarkReportWithCommit("4ec8c6a")
+                + "Generated from /workspace/reactive-http-client/target/benchmark-reports/release-jmh.md\n"))
+                .hasMessageContaining("machine-local absolute paths");
+        assertThatThrownBy(() -> assertPromotedBenchmarkProvenance("tmp-path", benchmarkReportWithCommit("4ec8c6a")
+                + "Generated from /tmp/reactive-http-client/target/benchmark-reports/release-jmh.md\n"))
+                .hasMessageContaining("machine-local absolute paths");
+        assertThatThrownBy(() -> assertPromotedBenchmarkProvenance("windows-path", benchmarkReportWithCommit("4ec8c6a")
+                + "Generated from C:\\Users\\runner\\reactive-http-client\\target\\benchmark-reports\\release-jmh.md\n"))
                 .hasMessageContaining("machine-local absolute paths");
     }
 
@@ -673,8 +686,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     private static void assertPromotedBenchmarkProvenance(String source, String reportDocs) {
-        List<String> localPaths = List.of("/home/", "/Users/");
-        assertThat(localPaths.stream().filter(reportDocs::contains).toList())
+        assertThat(machineLocalAbsolutePaths(reportDocs))
                 .as(source + " machine-local absolute paths")
                 .isEmpty();
 
@@ -699,6 +711,20 @@ class DocumentationReleaseArtifactTest {
         assertThat(firstToken(commit))
                 .as(source + " benchmarkCommit short Git SHA")
                 .matches("[0-9a-fA-F]{7,40}");
+    }
+
+    private static List<String> machineLocalAbsolutePaths(String text) {
+        List<String> paths = new ArrayList<>();
+        appendMatches(UNIX_ABSOLUTE_PATH, text, paths);
+        appendMatches(WINDOWS_ABSOLUTE_PATH, text, paths);
+        return paths;
+    }
+
+    private static void appendMatches(Pattern pattern, String text, List<String> paths) {
+        Matcher matcher = pattern.matcher(text);
+        while (matcher.find()) {
+            paths.add(matcher.group(2));
+        }
     }
 
     private static String firstToken(String value) {
