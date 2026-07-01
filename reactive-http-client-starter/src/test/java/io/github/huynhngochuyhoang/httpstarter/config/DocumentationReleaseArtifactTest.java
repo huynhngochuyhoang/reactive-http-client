@@ -17,6 +17,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DocumentationReleaseArtifactTest {
 
@@ -192,6 +193,15 @@ class DocumentationReleaseArtifactTest {
                 .contains("Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted")
                 .contains("paths relative\nto the repository root")
                 .contains("Current candidate command")
+                .contains("clean committed tree")
+                .contains("git status --short")
+                .contains("missing `benchmarkCommit`")
+                .contains("benchmarkCommit=unknown")
+                .contains("commit value containing `dirty`")
+                .contains("short Git SHA")
+                .contains("Generated target-only reports")
+                .contains("machine-local absolute paths")
+                .contains("source-controlled promoted reports must not")
                 .contains("Published baseline command")
                 .contains("Current candidate report")
                 .contains("Published baseline report")
@@ -229,6 +239,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("Broad claims such as");
 
         assertThat(promotedReport).exists();
+        assertPromotedBenchmarkProvenance(promotedReport.toString(), promotedReportDocs);
         assertThat(releaseNoteBenchmarkBlock)
                 .contains("Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted")
                 .doesNotContain("docs/benchmark-report-" + promotedReportVersion + ".md")
@@ -378,6 +389,23 @@ class DocumentationReleaseArtifactTest {
                 .as("public docs should link the promoted current-version benchmark report")
                 .contains("docs/benchmark-report-" + promotedReportVersion + ".md",
                         "benchmark-report-" + promotedReportVersion + ".md");
+    }
+
+    @Test
+    void promotedBenchmarkProvenanceRejectsMissingUnknownDirtyMalformedAndLocalPathReports() {
+        assertPromotedBenchmarkProvenance("clean", benchmarkReportWithCommit("4ec8c6a"));
+
+        assertThatThrownBy(() -> assertPromotedBenchmarkProvenance("missing", "# Report\n"))
+                .hasMessageContaining("benchmarkCommit");
+        assertThatThrownBy(() -> assertPromotedBenchmarkProvenance("unknown", benchmarkReportWithCommit("unknown")))
+                .hasMessageContaining("unknown");
+        assertThatThrownBy(() -> assertPromotedBenchmarkProvenance("dirty", benchmarkReportWithCommit("4ec8c6a-dirty")))
+                .hasMessageContaining("dirty");
+        assertThatThrownBy(() -> assertPromotedBenchmarkProvenance("malformed", benchmarkReportWithCommit("release-candidate")))
+                .hasMessageContaining("short Git SHA");
+        assertThatThrownBy(() -> assertPromotedBenchmarkProvenance("local-path", benchmarkReportWithCommit("4ec8c6a")
+                + "Generated from /home/runner/reactive-http-client\n"))
+                .hasMessageContaining("machine-local absolute paths");
     }
 
     @Test
@@ -642,6 +670,51 @@ class DocumentationReleaseArtifactTest {
         List<String> rendered = new ArrayList<>();
         values.forEach(value -> rendered.add("`" + value.asText() + "`"));
         return String.join(", ", rendered);
+    }
+
+    private static void assertPromotedBenchmarkProvenance(String source, String reportDocs) {
+        List<String> localPaths = List.of("/home/", "/Users/");
+        assertThat(localPaths.stream().filter(reportDocs::contains).toList())
+                .as(source + " machine-local absolute paths")
+                .isEmpty();
+
+        String prefix = "| `benchmarkCommit` |";
+        String commitLine = reportDocs.lines()
+                .filter(line -> line.startsWith(prefix))
+                .findFirst()
+                .orElse("");
+        assertThat(commitLine)
+                .as(source + " benchmarkCommit metadata")
+                .isNotBlank();
+
+        String commit = commitLine.substring(prefix.length()).trim();
+        if (commit.endsWith("|")) {
+            commit = commit.substring(0, commit.length() - 1).trim();
+        }
+        String normalized = commit.toLowerCase(Locale.ROOT);
+        assertThat(normalized)
+                .as(source + " benchmarkCommit")
+                .doesNotContain("unknown")
+                .doesNotContain("dirty");
+        assertThat(firstToken(commit))
+                .as(source + " benchmarkCommit short Git SHA")
+                .matches("[0-9a-fA-F]{7,40}");
+    }
+
+    private static String firstToken(String value) {
+        int end = 0;
+        while (end < value.length() && !Character.isWhitespace(value.charAt(end))) {
+            end++;
+        }
+        return value.substring(0, end);
+    }
+
+    private static String benchmarkReportWithCommit(String commit) {
+        return "# Reactive HTTP Client Benchmark Report\n"
+                + "## Environment\n"
+                + "| Key | Value |\n"
+                + "| --- | --- |\n"
+                + "| `benchmarkCommit` | " + commit + " |\n";
     }
 
     private static void assertPromotedReportMetadata(Path report, String expectedVersion) throws IOException {

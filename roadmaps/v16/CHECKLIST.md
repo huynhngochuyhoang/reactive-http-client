@@ -46,29 +46,32 @@ Evidence:
 
 ## Priority 2 — Clean Benchmark Provenance Guard
 
-### [ ] 1.2 Preserve clean benchmark provenance for promoted reports
-- [ ] Add release-doc validation that rejects current promoted reports with
+### [x] 1.2 Preserve clean benchmark provenance for promoted reports
+- [x] Add release-doc validation that rejects current promoted reports with
       `benchmarkCommit` missing.
-- [ ] Add release-doc validation that rejects current promoted reports with
+- [x] Add release-doc validation that rejects current promoted reports with
       `benchmarkCommit=unknown`.
-- [ ] Add release-doc validation that rejects current promoted reports whose
+- [x] Add release-doc validation that rejects current promoted reports whose
       benchmark commit contains `dirty`.
-- [ ] Validate that the current promoted report commit looks like a short Git
+- [x] Validate that the current promoted report commit looks like a short Git
       SHA.
-- [ ] Validate current promoted reports do not contain machine-local absolute
+- [x] Validate current promoted reports do not contain machine-local absolute
       paths.
-- [ ] Keep historical promoted reports valid unless they are current-release
+- [x] Keep historical promoted reports valid unless they are current-release
       evidence.
-- [ ] Document the clean-commit release benchmark sequence in
+- [x] Document the clean-commit release benchmark sequence in
       `docs/22-benchmarks.md`.
-- [ ] Document when generated target-only reports may still contain local paths.
-- [ ] Add or extend tests covering dirty, unknown, missing, and clean commit
+- [x] Document when generated target-only reports may still contain local paths.
+- [x] Add or extend tests covering dirty, unknown, missing, and clean commit
       cases.
-- [ ] Run `DocumentationReleaseArtifactTest`.
+- [x] Run `DocumentationReleaseArtifactTest`.
 
 Evidence:
 
-- Pending.
+- `docs/22-benchmarks.md` now documents the clean committed-tree benchmark sequence: check `git status --short`, capture `git rev-parse --short HEAD`, and pass that value through `-Dbenchmark.commit=$(git rev-parse --short HEAD)`.
+- The benchmark guide now states that promoted source-controlled reports must not use missing, `unknown`, or `dirty` benchmark commits and must not contain machine-local absolute paths. Generated target-only reports may retain local paths while they stay under `target/`.
+- `DocumentationReleaseArtifactTest` now validates the currently promoted benchmark report provenance and includes synthetic coverage for missing, `unknown`, `dirty`, malformed non-SHA, clean, and local-path report snippets. Historical promoted reports remain covered by metadata validation without being treated as current release evidence.
+- `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
 
 ---
 

@@ -72,6 +72,27 @@ intentionally builds the reactor starter under test:
 mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)
 ```
 
+For a report that will be promoted into `docs/benchmark-report-<version>.md`,
+run the release benchmark from a clean committed tree:
+
+```bash
+git status --short
+git rev-parse --short HEAD
+mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)
+```
+
+`git status --short` must print nothing before the benchmark starts. Do not
+promote reports whose environment table has a missing `benchmarkCommit`,
+`benchmarkCommit=unknown`, or a commit value containing `dirty`. The promoted
+`benchmarkCommit` must begin with a short Git SHA so future release comparisons
+can check out the benchmarked input tree.
+
+Generated target-only reports and adjacent JMH environment files may include
+machine-local absolute paths from Maven, the JVM, or the operating system while
+they remain under `target/`. Before copying a release-quality report into
+`docs/`, sanitize those paths; source-controlled promoted reports must not
+contain machine-local paths such as `/home/` or `/Users/`.
+
 Run the same benchmark harness against the last published starter artifact by
 setting `benchmark.starter.version`, enabling `benchmark-published-baseline`, and
 omitting `-am` so Maven resolves the published dependency instead of the current
