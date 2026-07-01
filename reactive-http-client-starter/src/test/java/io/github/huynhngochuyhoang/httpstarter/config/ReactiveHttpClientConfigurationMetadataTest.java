@@ -62,6 +62,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "reactive.http.observability.metric-name",
                 "reactive.http.observability.health.enabled",
                 "reactive.http.observability.histogram.enabled",
+                "reactive.http.observability.diagnostics-endpoint.enabled",
                 "reactive.http.correlation-id.max-length",
                 "reactive.http.inbound-headers.allow-list"
         );
@@ -359,6 +360,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.observability.log-request-body", false);
         assertDefaultValue(metadata, "reactive.http.observability.log-response-body", false);
         assertDefaultValue(metadata, "reactive.http.observability.health.enabled", true);
+        assertDefaultValue(metadata, "reactive.http.observability.diagnostics-endpoint.enabled", false);
         assertDefaultValue(metadata, "reactive.http.observability.health.error-rate-threshold", 0.5);
         assertDefaultValue(metadata, "reactive.http.observability.health.min-samples", 10);
         assertDefaultValue(metadata, "reactive.http.observability.histogram.enabled", false);

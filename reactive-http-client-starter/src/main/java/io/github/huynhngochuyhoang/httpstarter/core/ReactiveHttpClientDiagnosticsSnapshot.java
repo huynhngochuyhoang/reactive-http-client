@@ -2,10 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * Renders sanitized reactive HTTP client diagnostics for support artifacts.
@@ -55,6 +52,40 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     public static String toJson(ReactiveHttpClientDiagnosticsProvider provider) {
         return toJson(provider.clientSummaries());
+    }
+
+    public static Map<String, Object> toMap(ReactiveHttpClientDiagnosticsProvider provider) {
+        return toMap(provider.clientSummaries());
+    }
+
+    public static Map<String, Object> toMap(Collection<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries) {
+        List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> clients = sorted(summaries);
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("projectVersion", projectVersion());
+        snapshot.put("clientCount", clients.size());
+        snapshot.put("endpointCount", endpointCount(clients));
+        snapshot.put("inheritedEndpointCount", inheritedEndpointCount(clients));
+        List<Map<String, Object>> clientMaps = new ArrayList<>(clients.size());
+        for (ReactiveHttpClientDiagnosticsProvider.ClientSummary client : clients) {
+            Map<String, Object> clientMap = new LinkedHashMap<>();
+            clientMap.put("clientName", client.clientName());
+            clientMap.put("clientInterface", client.clientInterface());
+            clientMap.put("baseUrlSource", client.baseUrlSource());
+            clientMap.put("timeoutSource", client.timeout().source());
+            clientMap.put("timeoutMs", client.timeout().timeoutMs());
+            clientMap.put("resilienceConfigured", client.resilience().configured());
+            clientMap.put("retry", client.resilience().retry());
+            clientMap.put("rateLimiter", client.resilience().rateLimiter());
+            clientMap.put("circuitBreaker", client.resilience().circuitBreaker());
+            clientMap.put("bulkhead", client.resilience().bulkhead());
+            clientMap.put("authMode", client.authMode());
+            clientMap.put("followRedirects", client.followRedirects());
+            clientMap.put("endpointCount", client.endpointCount());
+            clientMap.put("inheritedEndpointCount", client.inheritedEndpointCount());
+            clientMaps.add(clientMap);
+        }
+        snapshot.put("clients", clientMaps);
+        return snapshot;
     }
 
     public static String toJson(Collection<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries) {

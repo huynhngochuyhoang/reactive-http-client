@@ -12,6 +12,7 @@ import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientHealthIndicator;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
+import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.micrometer.tagged.TaggedBulkheadMetrics;
@@ -198,6 +199,26 @@ public class ReactiveHttpClientAutoConfiguration {
         @ConditionalOnMissingBean(name = "reactiveHttpRateLimiterMeterBinder")
         public MeterBinder reactiveHttpRateLimiterMeterBinder(RateLimiterRegistry registry) {
             return TaggedRateLimiterMetrics.ofRateLimiterRegistry(registry);
+        }
+    }
+
+    /**
+     * Registers the sanitized diagnostics Actuator endpoint only when Actuator
+     * endpoint infrastructure is present and the endpoint is explicitly enabled.
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = "org.springframework.boot.actuate.endpoint.annotation.Endpoint")
+    @ConditionalOnProperty(
+            prefix = "reactive.http.observability",
+            name = "diagnostics-endpoint.enabled",
+            havingValue = "true")
+    static class HttpClientDiagnosticsEndpointAutoConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean(name = "reactiveHttpClientDiagnosticsEndpoint")
+        public ReactiveHttpClientDiagnosticsEndpoint reactiveHttpClientDiagnosticsEndpoint(
+                ReactiveHttpClientDiagnosticsProvider diagnosticsProvider) {
+            return new ReactiveHttpClientDiagnosticsEndpoint(diagnosticsProvider);
         }
     }
 

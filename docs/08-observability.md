@@ -143,6 +143,26 @@ To override the indicator, register your own bean named `reactiveHttpClientHealt
 
 ---
 
+## Actuator diagnostics endpoint
+
+When `spring-boot-starter-actuator` is on the classpath, a sanitized configured-client diagnostics endpoint is available as an explicit opt-in. It is disabled by default and uses the endpoint id `rhttpclients`.
+
+```yaml
+reactive:
+  http:
+    observability:
+      diagnostics-endpoint:
+        enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: rhttpclients
+```
+
+The endpoint returns the same JSON-safe fields as `ReactiveHttpClientDiagnosticsSnapshot`: project version, client count, endpoint count, inherited endpoint count, and per-client policy summaries. It does not expose concrete base URLs, auth secrets, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
+
 ## Connection-pool metrics
 
 Enable Reactor Netty pool gauges per client or globally:

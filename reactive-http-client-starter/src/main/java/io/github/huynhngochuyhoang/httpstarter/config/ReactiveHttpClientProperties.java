@@ -736,6 +736,7 @@ public class ReactiveHttpClientProperties {
 
         private HealthConfig health = new HealthConfig();
         private HistogramConfig histogram = new HistogramConfig();
+        private DiagnosticsEndpointConfig diagnosticsEndpoint = new DiagnosticsEndpointConfig();
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -764,6 +765,24 @@ public class ReactiveHttpClientProperties {
         public void setHistogram(HistogramConfig histogram) {
             this.histogram = histogram != null ? histogram : new HistogramConfig();
         }
+
+        public DiagnosticsEndpointConfig getDiagnosticsEndpoint() { return diagnosticsEndpoint; }
+        public void setDiagnosticsEndpoint(DiagnosticsEndpointConfig diagnosticsEndpoint) {
+            this.diagnosticsEndpoint = diagnosticsEndpoint != null
+                    ? diagnosticsEndpoint
+                    : new DiagnosticsEndpointConfig();
+        }
+    }
+
+    /**
+     * Opt-in Actuator endpoint for sanitized configured-client diagnostics.
+     */
+    public static class DiagnosticsEndpointConfig {
+        /** Enable the rhttpclients Actuator endpoint. Default: false. */
+        private boolean enabled = false;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
     }
 
     /**

@@ -63,6 +63,40 @@ count, total inherited endpoint count, and one row/object per client. It sorts
 clients by name and interface for stable output. The helper is explicit: calling
 it does not register an Actuator endpoint, controller, log line, or file writer.
 
+## Opt-in Actuator diagnostics endpoint
+
+When `spring-boot-starter-actuator` is on the classpath, the starter can expose
+the same sanitized JSON snapshot through a disabled-by-default Actuator endpoint.
+Enable the bean with the starter property and expose the Actuator endpoint through
+normal Spring Boot management endpoint configuration:
+
+```yaml
+reactive:
+  http:
+    observability:
+      diagnostics-endpoint:
+        enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: rhttpclients
+```
+
+The endpoint id is `rhttpclients`. A read operation returns JSON with
+`projectVersion`, `clientCount`, `endpointCount`, `inheritedEndpointCount`, and
+one `clients` entry per registered client. Each client entry includes client
+name, interface, base URL source, timeout source/value, resilience summary, auth
+mode, redirect-following flag, endpoint count, and inherited endpoint count.
+
+This endpoint is for support-safe configured-client diagnostics. It uses the
+same sanitized fields as `ReactiveHttpClientDiagnosticsSnapshot`; it does not
+include concrete base URL values, header values, auth-provider bean names, proxy
+credentials, request bodies, or response bodies. It differs from health details,
+which report recent Micrometer error-rate status, and from exchange logs, which
+report per-call request/response metadata.
+
 When DEBUG logging is enabled for `ReactiveHttpClientFactoryBean`, startup logs
 include one sanitized `startup summary` line per client using the same summary
 fields: client name, interface, endpoint count, inherited endpoint count, base
@@ -71,25 +105,6 @@ observability state. The summary line does not include concrete base URL values,
 header values, auth-provider bean names, proxy credentials, request bodies, or
 response bodies. It is DEBUG-only; normal INFO startup logs do not include this
 support summary.
-
-The starter registers this provider as a normal bean and does not publish an Actuator endpoint. If an application wants one, keep endpoint exposure local to the app:
-
-```java
-@Endpoint(id = "reactive-http-clients")
-class ReactiveHttpClientsEndpoint {
-
-    private final ReactiveHttpClientDiagnosticsProvider diagnostics;
-
-    ReactiveHttpClientsEndpoint(ReactiveHttpClientDiagnosticsProvider diagnostics) {
-        this.diagnostics = diagnostics;
-    }
-
-    @ReadOperation
-    List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> clients() {
-        return diagnostics.clientSummaries();
-    }
-}
-```
 
 See [Exchange Logging](13-exchange-logging.md), [Lifecycle Hooks](19-lifecycle-hooks.md),
 and [Error Handling](03-error-handling.md) for extension-point-specific guidance.
