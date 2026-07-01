@@ -128,6 +128,9 @@ class ReactiveHttpClientAutoConfigurationTest {
                         "reactive.http.clients.diagnostic-client.resilience.enabled=true")
                 .run(context -> {
                     assertThat(context).hasSingleBean(ReactiveHttpClientDiagnosticsEndpoint.class);
+                    assertThat(ReactiveHttpClientDiagnosticsEndpoint.class
+                            .getAnnotation(org.springframework.boot.actuate.endpoint.annotation.Endpoint.class).id())
+                            .isEqualTo("rhttpclients");
 
                     Map<String, Object> snapshot = context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class)
                             .diagnostics();
