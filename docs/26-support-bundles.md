@@ -64,6 +64,9 @@ reactive:
         enabled: true
 
 management:
+  endpoint:
+    health:
+      show-details: always
   endpoints:
     web:
       exposure:
@@ -110,7 +113,7 @@ summaries and metadata-only exchange logs:
 logging:
   level:
     io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean: DEBUG
-    io.github.huynhngochuyhoang.httpstarter.observability.DefaultHttpExchangeLogger: INFO
+    io.github.huynhngochuyhoang.httpstarter.core.DefaultHttpExchangeLogger: INFO
 
 reactive:
   http:
