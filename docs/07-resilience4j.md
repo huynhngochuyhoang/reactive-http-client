@@ -84,10 +84,12 @@ reactive:
 ```
 
 Strict mode fails proxy construction only when the Retry operator is actually
-available and a method is both retryable and unsafe. `GET`, `HEAD`, `PUT`,
-`DELETE`, `OPTIONS`, and `TRACE` are treated as safe. Unsafe methods are allowed
-when startup can prove an idempotency key will be sent, either from a configured
-default `Idempotency-Key` header or method-level `@IdempotencyKey` generation.
+available, the resolved Retry instance can make more than one attempt, and a
+method is both retryable and unsafe. `GET`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`,
+and `TRACE` are treated as safe. Unsafe methods are allowed when startup can
+prove an idempotency key will be sent, either from a configured default
+`Idempotency-Key` header that the method cannot override dynamically or
+method-level `@IdempotencyKey` generation.
 
 Runtime-provided idempotency keys from `@HeaderParam`, `@IdempotencyKey`
 parameters, header maps, or Reactor context can still be null or absent for a

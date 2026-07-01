@@ -148,7 +148,7 @@ Evidence:
 - [x] Reuse the existing retry-safety classifier where possible.
 - [x] Gate strict failures on actual retry operator availability.
 - [x] Treat idempotent HTTP methods as safe.
-- [x] Treat effective default `Idempotency-Key` headers as safe.
+- [x] Treat non-overrideable default `Idempotency-Key` headers as safe.
 - [x] Treat runtime-provided idempotency keys from supported contexts as safe
       only when startup can prove the contract, or document why warning mode is
       retained.
@@ -163,10 +163,10 @@ Evidence:
 Evidence:
 
 - Added per-client `reactive.http.clients.<name>.resilience.strict-unsafe-retry-validation`, default `false`, so existing unsafe retry behavior remains warning-only unless explicitly enabled.
-- Strict validation runs at proxy startup only when resilience is enabled, the retry method is configured for the resolved HTTP method, and the Retry operator is actually available. No-op resilience wiring is skipped.
-- Strict validation allows safe HTTP retry methods, configured default `Idempotency-Key` headers, and method-level generated idempotency keys; runtime-supplied parameter, header-map, and Reactor-context keys remain documented as dynamic contracts that should use warning mode.
+- Strict validation runs at proxy startup only when resilience is enabled, the retry method is configured for the resolved HTTP method, the Retry operator is actually available, and the resolved Retry instance can make more than one attempt. No-op resilience wiring and max-attempts-one Retry instances are skipped.
+- Strict validation allows safe HTTP retry methods, non-overrideable configured default `Idempotency-Key` headers, and method-level generated idempotency keys; runtime-supplied parameter, header-map, and Reactor-context keys remain documented as dynamic contracts that should use warning mode.
 - Startup failure diagnostics include the concrete client interface, fully qualified declaring method signature, HTTP method, retry instance/source, and retry methods, including inherited overloaded methods.
-- Added metadata, generated configuration reference, resilience documentation, and focused startup tests for unsafe POST failure, no-op retry availability, default/generated idempotency keys, idempotent methods, and inherited overload diagnostics.
+- Added metadata, generated configuration reference, resilience documentation, and focused startup tests for unsafe POST failure, no-op retry availability, default/generated idempotency keys, overrideable default headers, max-attempts-one Retry instances, idempotent methods, and inherited overload diagnostics.
 - `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientFactoryBeanDiagnosticsTest,ReactiveHttpClientConfigurationMetadataTest,ReactiveClientInvocationHandlerRetrySafetyTest,ReactiveClientInvocationHandlerRetryMethodsTest,IdempotencyKeySupportTest,DocumentationReleaseArtifactTest test` passed.
 
 ---

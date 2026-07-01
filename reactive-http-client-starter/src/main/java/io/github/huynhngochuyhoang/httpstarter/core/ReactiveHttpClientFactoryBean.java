@@ -837,10 +837,13 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             if (!isRetryMethodEnabled(resilience, httpMethod)) {
                 continue;
             }
+            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
+            if (!resilienceOperatorApplier.canRetryMoreThanOnce(retryInstance)) {
+                continue;
+            }
             if (startupRetrySafety(plan, httpMethod, clientConfig) != RetrySafetyClassification.UNSAFE_RETRY) {
                 continue;
             }
-            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
             unsafeMethods.add("clientInterface=" + clientInterface.getName()
                     + ", method=" + methodSignature(method)
                     + ", httpMethod=" + httpMethod
@@ -870,10 +873,26 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             return RetrySafetyClassification.SAFE_METHOD;
         }
         if (StringUtils.hasText(plan.generatedIdempotencyKeyHeader())
-                || hasDefaultIdempotencyKeyHeaderValue(clientConfig)) {
+                || hasStartupProvableDefaultIdempotencyKeyHeader(plan, clientConfig)) {
             return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
         }
         return RetrySafetyClassification.UNSAFE_RETRY;
+    }
+
+    private static boolean hasStartupProvableDefaultIdempotencyKeyHeader(RequestPlan plan,
+                                                                        ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        return hasDefaultIdempotencyKeyHeaderValue(clientConfig)
+                && !canOverrideDefaultIdempotencyKeyHeader(plan);
+    }
+
+    private static boolean canOverrideDefaultIdempotencyKeyHeader(RequestPlan plan) {
+        return !plan.headerMapParams().isEmpty()
+                || plan.headerParams().stream()
+                .map(RequestPlan.NamedArgumentBinding::name)
+                .anyMatch(name -> "Idempotency-Key".equalsIgnoreCase(name))
+                || plan.idempotencyKeyParams().stream()
+                .map(RequestPlan.NamedArgumentBinding::name)
+                .anyMatch(name -> "Idempotency-Key".equalsIgnoreCase(name));
     }
 
     private static String methodSignature(Method method) {
@@ -959,7 +978,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 || plan.retrySafety() == RetrySafetyClassification.SAFE_METHOD) {
             return RetrySafetyClassification.SAFE_METHOD;
         }
-        if (hasDefaultIdempotencyKeyHeaderValue(clientConfig)) {
+        if (hasStartupProvableDefaultIdempotencyKeyHeader(plan, clientConfig)) {
             return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
         }
         return plan.retrySafety();

@@ -47,4 +47,11 @@ public interface ResilienceOperatorApplier {
     default boolean isInstanceConfigured(InstanceType type, String instanceName) {
         return true;
     }
+
+    /**
+     * true if the named Retry instance can make a duplicate attempt.
+     */
+    default boolean canRetryMoreThanOnce(String instanceName) {
+        return isOperatorAvailable(InstanceType.RETRY);
+    }
 }
