@@ -352,6 +352,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.bulkhead", "default");
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.rate-limiter", "default");
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.retry-methods", List.of("GET", "HEAD"));
+        assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.strict-unsafe-retry-validation", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.timeout-ms", 0);
         assertDefaultValue(metadata, "reactive.http.observability.enabled", true);
         assertDefaultValue(metadata, "reactive.http.observability.metric-name", "reactive.http.client.requests");

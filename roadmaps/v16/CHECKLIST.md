@@ -142,27 +142,32 @@ Evidence:
 
 ## Priority 5 — Strict Unsafe-Retry Contracts
 
-### [ ] 3.1 Add opt-in strict mode for unsafe retry contracts
-- [ ] Choose the strict retry validation property name and default.
-- [ ] Preserve warning-only default behavior.
-- [ ] Reuse the existing retry-safety classifier where possible.
-- [ ] Gate strict failures on actual retry operator availability.
-- [ ] Treat idempotent HTTP methods as safe.
-- [ ] Treat effective default `Idempotency-Key` headers as safe.
-- [ ] Treat runtime-provided idempotency keys from supported contexts as safe
+### [x] 3.1 Add opt-in strict mode for unsafe retry contracts
+- [x] Choose the strict retry validation property name and default.
+- [x] Preserve warning-only default behavior.
+- [x] Reuse the existing retry-safety classifier where possible.
+- [x] Gate strict failures on actual retry operator availability.
+- [x] Treat idempotent HTTP methods as safe.
+- [x] Treat effective default `Idempotency-Key` headers as safe.
+- [x] Treat runtime-provided idempotency keys from supported contexts as safe
       only when startup can prove the contract, or document why warning mode is
       retained.
-- [ ] Include overloaded method signatures in strict failure diagnostics.
-- [ ] Include inherited endpoint context in strict failure diagnostics.
-- [ ] Add startup failure tests for unsafe retryable methods.
-- [ ] Add tests proving no-op retry wiring does not fail strict mode.
-- [ ] Add tests proving effective idempotency keys do not fail strict mode.
+- [x] Include overloaded method signatures in strict failure diagnostics.
+- [x] Include inherited endpoint context in strict failure diagnostics.
+- [x] Add startup failure tests for unsafe retryable methods.
+- [x] Add tests proving no-op retry wiring does not fail strict mode.
+- [x] Add tests proving effective idempotency keys do not fail strict mode.
 - [x] Add configuration metadata and docs for strict retry validation.
-- [ ] Run resilience, idempotency, and startup validation tests.
+- [x] Run resilience, idempotency, and startup validation tests.
 
 Evidence:
 
-- Pending.
+- Added per-client `reactive.http.clients.<name>.resilience.strict-unsafe-retry-validation`, default `false`, so existing unsafe retry behavior remains warning-only unless explicitly enabled.
+- Strict validation runs at proxy startup only when resilience is enabled, the retry method is configured for the resolved HTTP method, and the Retry operator is actually available. No-op resilience wiring is skipped.
+- Strict validation allows safe HTTP retry methods, configured default `Idempotency-Key` headers, and method-level generated idempotency keys; runtime-supplied parameter, header-map, and Reactor-context keys remain documented as dynamic contracts that should use warning mode.
+- Startup failure diagnostics include the concrete client interface, fully qualified declaring method signature, HTTP method, retry instance/source, and retry methods, including inherited overloaded methods.
+- Added metadata, generated configuration reference, resilience documentation, and focused startup tests for unsafe POST failure, no-op retry availability, default/generated idempotency keys, idempotent methods, and inherited overload diagnostics.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientFactoryBeanDiagnosticsTest,ReactiveHttpClientConfigurationMetadataTest,ReactiveClientInvocationHandlerRetrySafetyTest,ReactiveClientInvocationHandlerRetryMethodsTest,IdempotencyKeySupportTest,DocumentationReleaseArtifactTest test` passed.
 
 ---
 

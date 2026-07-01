@@ -65,6 +65,36 @@ A retry-enabled method is classified as:
 
 `@IdempotencyKey` can be used on a parameter to pass the key explicitly, or on a method to generate one key per invocation. `RequestContext.withIdempotencyKey(ctx, value)` can supply the key through Reactor context for one subscribed call. The starter does not provide downstream idempotency storage. The header is only a signal that your downstream service can use to make duplicate attempts safe.
 
+### Strict unsafe-retry validation
+
+The default behavior is warning-only: retry-enabled unsafe methods still run, and
+the starter logs when a subscribed call has no `Idempotency-Key` on the wire. For
+teams that prefer startup failure, enable strict validation per client:
+
+```yaml
+reactive:
+  http:
+    clients:
+      payment-service:
+        resilience:
+          enabled: true
+          retry: payment-service
+          retry-methods: [GET, HEAD, POST]
+          strict-unsafe-retry-validation: true
+```
+
+Strict mode fails proxy construction only when the Retry operator is actually
+available and a method is both retryable and unsafe. `GET`, `HEAD`, `PUT`,
+`DELETE`, `OPTIONS`, and `TRACE` are treated as safe. Unsafe methods are allowed
+when startup can prove an idempotency key will be sent, either from a configured
+default `Idempotency-Key` header or method-level `@IdempotencyKey` generation.
+
+Runtime-provided idempotency keys from `@HeaderParam`, `@IdempotencyKey`
+parameters, header maps, or Reactor context can still be null or absent for a
+given call, so strict startup validation does not treat them as proven-safe
+contracts. Keep strict validation disabled for those dynamic contracts and rely
+on the runtime unsafe-retry warning instead.
+
 ### Request body repeatability
 
 Retries re-subscribe to the outbound request. The starter does not buffer large

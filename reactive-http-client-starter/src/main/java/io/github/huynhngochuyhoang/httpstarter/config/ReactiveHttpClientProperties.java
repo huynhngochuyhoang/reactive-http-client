@@ -630,6 +630,8 @@ public class ReactiveHttpClientProperties {
          * Defaults to idempotent-safe methods.
          */
         private Set<String> retryMethods = new LinkedHashSet<>(Set.of("GET", "HEAD"));
+        /** Fail startup when a retryable unsafe method has no startup-provable idempotency key. */
+        private boolean strictUnsafeRetryValidation = false;
         /** Name of the Resilience4j Bulkhead instance. */
         private String bulkhead = "default";
         /** Name of the Resilience4j RateLimiter instance. */
@@ -648,6 +650,12 @@ public class ReactiveHttpClientProperties {
         public void setRetry(String retry) { this.retry = retry; }
 
         public Set<String> getRetryMethods() { return retryMethods; }
+
+        public boolean isStrictUnsafeRetryValidation() { return strictUnsafeRetryValidation; }
+        public void setStrictUnsafeRetryValidation(boolean strictUnsafeRetryValidation) {
+            this.strictUnsafeRetryValidation = strictUnsafeRetryValidation;
+        }
+
         public void setRetryMethods(Set<String> retryMethods) {
             if (retryMethods == null || retryMethods.isEmpty()) {
                 this.retryMethods = new LinkedHashSet<>();
