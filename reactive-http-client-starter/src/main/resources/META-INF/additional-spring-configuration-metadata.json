@@ -720,7 +720,7 @@
     {
       "name": "reactive.http.observability.diagnostics-endpoint.enabled",
       "type": "java.lang.Boolean",
-      "description": "Enable the opt-in reactive-http-clients Actuator endpoint that returns sanitized configured-client diagnostics. Requires Actuator endpoint infrastructure and management endpoint exposure. Default: false.",
+      "description": "Enable the opt-in rhttpclients Actuator endpoint that returns sanitized configured-client diagnostics. Requires Actuator endpoint infrastructure and management endpoint exposure. Default: false.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$DiagnosticsEndpointConfig",
       "defaultValue": false
     },

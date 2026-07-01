@@ -94,7 +94,7 @@
 | `reactive.http.network.tls.trust-store-password` | `java.lang.String` |  | Password for the truststore. |  |
 | `reactive.http.network.tls.trust-store-type` | `java.lang.String` | `"PKCS12"` | Truststore format. Default: PKCS12. |  |
 | `reactive.http.network.write-timeout-ms` | `java.lang.Integer` |  | Deprecated alias for network-write-timeout-ms. Use network-write-timeout-ms instead. | warning; replacement: `reactive.http.network.network-write-timeout-ms` |
-| `reactive.http.observability.diagnostics-endpoint.enabled` | `java.lang.Boolean` | `false` | Enable the opt-in reactive-http-clients Actuator endpoint that returns sanitized configured-client diagnostics. Requires Actuator endpoint infrastructure and management endpoint exposure. Default: false. |  |
+| `reactive.http.observability.diagnostics-endpoint.enabled` | `java.lang.Boolean` | `false` | Enable the opt-in rhttpclients Actuator endpoint that returns sanitized configured-client diagnostics. Requires Actuator endpoint infrastructure and management endpoint exposure. Default: false. |  |
 | `reactive.http.observability.enabled` | `java.lang.Boolean` | `true` | Master switch for all metrics and tracing. Default: true. |  |
 | `reactive.http.observability.health.enabled` | `java.lang.Boolean` | `true` | Enable the Actuator health indicator for reactive HTTP clients. Default: true. |  |
 | `reactive.http.observability.health.error-rate-threshold` | `java.lang.Double` | `0.5` | Error ratio threshold [0, 1] above which a client is reported DOWN. Default: 0.5. |  |

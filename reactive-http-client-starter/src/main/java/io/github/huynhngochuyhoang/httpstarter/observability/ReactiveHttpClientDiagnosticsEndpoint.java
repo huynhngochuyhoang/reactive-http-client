@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  * Opt-in Actuator endpoint for sanitized reactive HTTP client diagnostics.
  */
-@Endpoint(id = "reactive-http-clients")
+@Endpoint(id = "rhttpclients")
 public class ReactiveHttpClientDiagnosticsEndpoint {
 
     private final ReactiveHttpClientDiagnosticsProvider diagnosticsProvider;

@@ -100,7 +100,7 @@ Evidence:
 
 Evidence:
 
-- Added `ReactiveHttpClientDiagnosticsEndpoint`, an opt-in `reactive-http-clients` Actuator endpoint enabled by `reactive.http.observability.diagnostics-endpoint.enabled=false` by default.
+- Added `ReactiveHttpClientDiagnosticsEndpoint`, an opt-in `rhttpclients` Actuator endpoint enabled by `reactive.http.observability.diagnostics-endpoint.enabled=false` by default.
 - The endpoint returns JSON-compatible output from `ReactiveHttpClientDiagnosticsSnapshot.toMap(...)`, backed by `ReactiveHttpClientDiagnosticsProvider` summaries.
 - Auto-configuration is gated on Actuator endpoint classes and the opt-in property; tests cover default-disabled behavior, enabled output, and missing Actuator endpoint classes.
 - Endpoint tests verify project version, client count, endpoint count, inherited endpoint count, auth mode, redirect flag, timeout source, and resilience fields while omitting concrete base URLs, auth secrets, header values, auth-provider bean names, request bodies, and response bodies.

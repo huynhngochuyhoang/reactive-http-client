@@ -81,10 +81,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: reactive-http-clients
+        include: rhttpclients
 ```
 
-The endpoint id is `reactive-http-clients`. A read operation returns JSON with
+The endpoint id is `rhttpclients`. A read operation returns JSON with
 `projectVersion`, `clientCount`, `endpointCount`, `inheritedEndpointCount`, and
 one `clients` entry per registered client. Each client entry includes client
 name, interface, base URL source, timeout source/value, resilience summary, auth

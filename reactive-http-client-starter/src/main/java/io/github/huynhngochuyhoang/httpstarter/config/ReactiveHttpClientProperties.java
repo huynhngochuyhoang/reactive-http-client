@@ -778,7 +778,7 @@ public class ReactiveHttpClientProperties {
      * Opt-in Actuator endpoint for sanitized configured-client diagnostics.
      */
     public static class DiagnosticsEndpointConfig {
-        /** Enable the reactive-http-clients Actuator endpoint. Default: false. */
+        /** Enable the rhttpclients Actuator endpoint. Default: false. */
         private boolean enabled = false;
 
         public boolean isEnabled() { return enabled; }
