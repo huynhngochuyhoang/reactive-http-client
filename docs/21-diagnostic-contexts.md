@@ -107,4 +107,5 @@ response bodies. It is DEBUG-only; normal INFO startup logs do not include this
 support summary.
 
 See [Exchange Logging](13-exchange-logging.md), [Lifecycle Hooks](19-lifecycle-hooks.md),
-and [Error Handling](03-error-handling.md) for extension-point-specific guidance.
+[Error Handling](03-error-handling.md), and [Production Support Bundles](26-support-bundles.md)
+for extension-point-specific guidance.

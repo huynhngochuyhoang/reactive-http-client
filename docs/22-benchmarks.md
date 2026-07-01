@@ -35,6 +35,8 @@ Current promoted report:
   profile. Use it only for the named scenarios and environment it records.
 - [Performance Summary](23-performance-summary.md) explains how to read the
   promoted report without turning scenario-specific data into broad claims.
+- [Production Support Bundles](26-support-bundles.md) explains which benchmark
+  evidence belongs in performance incident bundles.
 - [Benchmark Consumer Examples](24-benchmark-consumer-examples.md) shows the raw
   `WebClient`, Spring HTTP Interface, and starter client shapes used by one
   comparable success-path scenario.

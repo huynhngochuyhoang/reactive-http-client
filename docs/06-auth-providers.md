@@ -126,7 +126,8 @@ Token endpoint failures are reported as `AuthProviderException`. HTTP 4xx/5xx
 responses include the status and a bounded, redacted response-body snippet.
 Malformed token JSON and missing `access_token` responses use fixed diagnostic
 messages. Client secrets, access tokens, and refresh tokens are not included in
-exception messages.
+exception messages. See [Production Support Bundles](26-support-bundles.md) for
+safe OAuth2/auth incident evidence.
 
 For manual bean wiring, compose `OAuth2ClientCredentialsTokenProvider` with `RefreshingBearerAuthProvider`:
 

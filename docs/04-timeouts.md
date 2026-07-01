@@ -37,7 +37,8 @@ exchange logs, and observer events. Response headers are retained for exchange
 logging, but lifecycle hooks and observer events do not expose response-header
 maps. Streaming responses are not buffered to enforce or report timeout state;
 already emitted items stay visible to the subscriber before the timeout error is
-propagated.
+propagated. See [Production Support Bundles](26-support-bundles.md) for a safe
+timeout incident bundle.
 
 ---
 

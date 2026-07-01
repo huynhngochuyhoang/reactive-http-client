@@ -1,0 +1,237 @@
+# Production Support Bundles
+
+Use this page when opening an internal support ticket, handing an incident to an
+on-call teammate, or asking maintainers to help diagnose starter behavior. The
+goal is a small, support-safe bundle that explains the client configuration and
+runtime symptoms without collecting raw request bodies, response bodies, tokens,
+secrets, or customer data by default.
+
+## Baseline Bundle
+
+Start every bundle with these artifacts:
+
+| Artifact | How to capture | Why it helps |
+|---|---|---|
+| Starter version | `mvn dependency:tree -Dincludes=io.github.huynhngochuyhoang` or the application build file | Confirms the runtime contract and known fixes. |
+| Client names and interfaces | `ReactiveHttpClientDiagnosticsSnapshot` or the `rhttpclients` Actuator endpoint | Shows registered clients, inherited endpoint counts, timeout source, auth mode, resilience, and redirect policy without exposing URLs or secrets. |
+| Health detail | `/actuator/health` when the starter health indicator is enabled | Shows recent error-rate status and sample thresholds per client. |
+| Metadata-only exchange logs | `log-exchange: true` with `log-preset: metadata-only` for the affected client | Shows method, path template, status, duration, error, and subscription-attempt count while omitting headers and bodies. |
+| Relevant exception type and message | Application logs with stack traces, after normal log redaction | Identifies error category, timeout type, auth failure, or response mapping path. |
+| Configuration snippets | Only the affected `reactive.http.clients.<name>` block with secret values replaced | Confirms timeout, auth, resilience, proxy, TLS, redirect, and logging settings. |
+
+Do not collect raw request bodies, raw response bodies, bearer tokens, client
+secrets, cookies, proxy credentials, or full concrete base URLs unless your
+incident process explicitly approves that data. When headers are required, prefer
+redacted header names and presence/absence evidence over raw values.
+
+## Diagnostics Snapshot
+
+For a one-off JSON or Markdown snapshot, inject
+`ReactiveHttpClientDiagnosticsProvider` and use the public helper:
+
+```java
+@Component
+class SupportBundleExporter {
+    private final ReactiveHttpClientDiagnosticsProvider diagnostics;
+
+    SupportBundleExporter(ReactiveHttpClientDiagnosticsProvider diagnostics) {
+        this.diagnostics = diagnostics;
+    }
+
+    String diagnosticsJson() {
+        return ReactiveHttpClientDiagnosticsSnapshot.toJson(diagnostics);
+    }
+
+    String diagnosticsMarkdown() {
+        return ReactiveHttpClientDiagnosticsSnapshot.toMarkdown(diagnostics);
+    }
+}
+```
+
+The snapshot includes project version, total client count, total endpoint count,
+total inherited endpoint count, and per-client policy summaries. It does not
+include concrete base URLs, header values, proxy credentials, auth-provider bean
+names, request bodies, or response bodies.
+
+If Actuator is available and the endpoint is explicitly enabled, the same
+sanitized data can be read from the `rhttpclients` endpoint:
+
+```yaml
+reactive:
+  http:
+    observability:
+      diagnostics-endpoint:
+        enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,rhttpclients
+```
+
+```bash
+curl -s http://localhost:8080/actuator/rhttpclients
+```
+
+## Health Details
+
+For error-rate incidents, include the affected client entry from
+`/actuator/health`. A useful detail block contains `samples`, `errors`,
+`minSamples`, `errorRateThreshold`, `errorRate`, `status`, and `reason`.
+
+```json
+{
+  "status": "DOWN",
+  "details": {
+    "user-service": {
+      "samples": 10,
+      "errors": 8,
+      "minSamples": 10,
+      "errorRateThreshold": 0.5,
+      "errorRate": 0.8,
+      "status": "DOWN",
+      "reason": "ERROR_RATE_ABOVE_THRESHOLD"
+    }
+  }
+}
+```
+
+Health details are recent Micrometer error-rate signals. They do not describe the
+configured endpoint contract, final request headers, response headers, request
+bodies, or response bodies.
+
+## Log Categories
+
+Use targeted logging for the affected client and time window. Start with startup
+summaries and metadata-only exchange logs:
+
+```yaml
+logging:
+  level:
+    io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean: DEBUG
+    io.github.huynhngochuyhoang.httpstarter.observability.DefaultHttpExchangeLogger: INFO
+
+reactive:
+  http:
+    clients:
+      user-service:
+        log-exchange: true
+        log-preset: metadata-only
+```
+
+The startup summary is DEBUG-only and sanitized. Metadata-only exchange logs omit
+headers and bodies while still reporting status, duration, error, and
+subscription-attempt count. Move to `log-preset: headers` only when header
+presence is required and redaction is acceptable. Use `log-preset: bodies` only
+under an approved incident procedure.
+
+## Configuration Issues
+
+Minimal safe bundle:
+
+- Diagnostics snapshot for the affected client.
+- The sanitized `reactive.http.clients.<name>` YAML block.
+- Startup summary logs from `ReactiveHttpClientFactoryBean` at DEBUG.
+- The startup exception and stack trace, if the proxy fails to build.
+- The annotation or `@ApiRef` method signature for the affected endpoint.
+
+This bundle is usually enough to diagnose client-name mismatches, missing API-map
+entries, invalid path variables, inherited endpoint behavior, timeout precedence,
+redirect policy, and auth/resilience precedence.
+
+## OAuth2 and Auth Failures
+
+Minimal safe bundle:
+
+- Diagnostics snapshot showing `authMode` for the affected client.
+- Sanitized auth configuration with `client-id`, `client-secret`, tokens, and
+  authorization headers replaced.
+- `AuthProviderException` class name, message, client name, and cause type.
+- Token endpoint HTTP status and sanitized response-body snippet when present.
+- Metadata-only exchange logs for the downstream API call that failed after auth.
+
+Do not include raw token endpoint request bodies, raw token responses, bearer
+tokens, Basic credentials, refresh tokens, client secrets, cookies, or signed
+Authorization headers. For AWS SigV4, include the body shape (`byte[]`, `String`,
+JSON object, publisher, multipart, or empty) and whether the request uses a
+custom `WebClient` codec configuration; do not include the signature or payload.
+
+## Retry and Idempotency Behavior
+
+Minimal safe bundle:
+
+- Diagnostics snapshot showing resilience configuration for the client.
+- The sanitized client resilience YAML and relevant Resilience4j instance config.
+- Metadata-only exchange log lines for one logical call, including
+  `subscriptionAttemptCount`.
+- The Java method signature, HTTP method, and whether an `Idempotency-Key` is
+  provided by annotation, header parameter, default header, or request context.
+- Lifecycle hook or observer output if your application already records it.
+
+Attempt counts are subscription attempts, not proof that each attempt reached the
+network. Do not collect idempotency-key values by default; record only whether a
+key was present and which source provided it.
+
+## Timeout Incidents
+
+Minimal safe bundle:
+
+- Diagnostics snapshot showing timeout source and value for the affected client.
+- The method annotation or API-map entry when it overrides client timeout.
+- Network timeout settings: connect, read safety net, and write safety net.
+- Metadata-only exchange log or observer event with duration, status when
+  available, exception type, and subscription-attempt count.
+- Health details for the affected client and the same time window.
+
+For timeout after response headers, exchange logs can retain response headers;
+lifecycle hooks and observer events do not expose response-header maps. Redact
+headers before sharing them.
+
+## Streaming Ownership Issues
+
+Minimal safe bundle:
+
+- Method return type: `Flux<DataBuffer>` or `Mono<ResponseEntity<Flux<DataBuffer>>>`.
+- Consumer code path that subscribes, forwards, cancels, or releases buffers.
+- Whether the stream is proxied to WebFlux, manually consumed, or discarded.
+- Metadata-only exchange logs for stream start/error/cancellation.
+- Any `DataBufferLimitException`, leak detector, cancellation, or timeout log.
+
+Do not capture streaming payload bytes by default. For
+`Mono<ResponseEntity<Flux<DataBuffer>>>`, remember that terminal observer,
+lifecycle, and exchange-log records describe response-envelope completion, not
+full consumption of the inner body.
+
+## Performance Investigations
+
+Minimal safe bundle:
+
+- Diagnostics snapshot for the affected client.
+- Metadata-only exchange logs or metrics for the affected API name, method,
+  status, duration, error category, and attempt count.
+- Connection-pool metrics for active, idle, total, and pending connections.
+- Payload shape and approximate size range, without payload contents.
+- Enabled optional features: exchange logging preset, Micrometer, OpenTelemetry,
+  retry, circuit breaker, rate limiter, bulkhead, auth signing, proxy, TLS, and
+  custom filters.
+- Promoted benchmark report link when making a benchmark-based claim.
+
+Current promoted report: [Benchmark Report 2.11.0](benchmark-report-2.11.0.md).
+That report is release-quality evidence only for the named local-loopback
+scenarios, dependency versions, and environment it records. For production
+incidents, use it as orientation and measure the real downstream path directly.
+Do not cite smoke-only benchmark reports or generated `target/benchmark-reports`
+files as public evidence.
+
+## Related Docs
+
+- [Diagnostic Context Contracts](21-diagnostic-contexts.md)
+- [Observability](08-observability.md)
+- [Exchange Logging](13-exchange-logging.md)
+- [Outbound Auth Providers](06-auth-providers.md)
+- [Resilience4j Integration](07-resilience4j.md)
+- [Timeouts](04-timeouts.md)
+- [Streaming Responses](11-streaming.md)
+- [Benchmarks](22-benchmarks.md)
+- [Performance Troubleshooting](25-performance-troubleshooting.md)
