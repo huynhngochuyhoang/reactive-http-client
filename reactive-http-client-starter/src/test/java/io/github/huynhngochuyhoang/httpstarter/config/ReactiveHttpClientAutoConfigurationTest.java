@@ -2,12 +2,16 @@ package io.github.huynhngochuyhoang.httpstarter.config;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
+import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.auth.OAuth2ClientCredentialsAuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientHealthIndicator;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
+import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.micrometer.tagged.TaggedBulkheadMetrics;
@@ -22,16 +26,21 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.FactoryBean;
+import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -107,6 +116,65 @@ class ReactiveHttpClientAutoConfigurationTest {
     }
 
     @Test
+    void diagnosticsEndpointRegisteredWhenExplicitlyEnabledAndReturnsSanitizedSnapshot() {
+        runner.withInitializer(ReactiveHttpClientAutoConfigurationTest::registerDiagnosticEndpointClient)
+                .withPropertyValues(
+                        "reactive.http.observability.diagnostics-endpoint.enabled=true",
+                        "reactive.http.clients.diagnostic-client.base-url=https://user:token@example.com",
+                        "reactive.http.clients.diagnostic-client.auth-provider=secretAuthProviderBean",
+                        "reactive.http.clients.diagnostic-client.default-headers.Authorization=Bearer secret-token",
+                        "reactive.http.clients.diagnostic-client.follow-redirects=true",
+                        "reactive.http.clients.diagnostic-client.request-timeout-ms=500",
+                        "reactive.http.clients.diagnostic-client.resilience.enabled=true")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ReactiveHttpClientDiagnosticsEndpoint.class);
+
+                    Map<String, Object> snapshot = context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class)
+                            .diagnostics();
+
+                    assertThat(snapshot)
+                            .containsEntry("clientCount", 1)
+                            .containsEntry("endpointCount", 2)
+                            .containsEntry("inheritedEndpointCount", 1)
+                            .containsKey("projectVersion");
+                    assertThat(snapshot.get("clients")).isInstanceOf(List.class);
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> clients = (List<Map<String, Object>>) snapshot.get("clients");
+                    assertThat(clients).hasSize(1);
+                    assertThat(clients.get(0))
+                            .containsEntry("clientName", "diagnostic-client")
+                            .containsEntry("clientInterface", DiagnosticEndpointClient.class.getName())
+                            .containsEntry("baseUrlSource", "property")
+                            .containsEntry("timeoutSource", "client")
+                            .containsEntry("timeoutMs", 500L)
+                            .containsEntry("resilienceConfigured", true)
+                            .containsEntry("authMode", "provider-bean")
+                            .containsEntry("followRedirects", true)
+                            .containsEntry("endpointCount", 2)
+                            .containsEntry("inheritedEndpointCount", 1);
+                    assertThat(snapshot.toString())
+                            .doesNotContain("https://user:token@example.com")
+                            .doesNotContain("user:token")
+                            .doesNotContain("secretAuthProviderBean")
+                            .doesNotContain("secret-token")
+                            .doesNotContain("Authorization")
+                            .doesNotContain("requestBody")
+                            .doesNotContain("responseBody");
+                });
+    }
+
+    @Test
+    void diagnosticsEndpointSkippedWhenActuatorEndpointClassesMissing() {
+        runner.withClassLoader(new FilteredClassLoader("org.springframework.boot.actuate.endpoint.annotation"))
+                .withPropertyValues("reactive.http.observability.diagnostics-endpoint.enabled=true")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean("reactiveHttpClientDiagnosticsEndpoint");
+                });
+    }
+
+
+    @Test
     void userSuppliedWebClientBuilderOverridesStarterPrototypeBuilder() {
         runner.withUserConfiguration(UserWebClientBuilderConfig.class, CountingCustomizerConfig.class)
                 .run(context -> {
@@ -149,6 +217,27 @@ class ReactiveHttpClientAutoConfigurationTest {
         } finally {
             logger.setLevel(previousLevel);
         }
+    }
+
+    private static void registerDiagnosticEndpointClient(ConfigurableApplicationContext context) {
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticEndpointClient.class);
+        ((BeanDefinitionRegistry) context.getBeanFactory())
+                .registerBeanDefinition("diagnosticEndpointClient", definition);
+    }
+
+    interface DiagnosticEndpointSharedOperations {
+
+        @GET("/shared")
+        Mono<String> shared();
+    }
+
+    @ReactiveHttpClient(name = "diagnostic-client")
+    interface DiagnosticEndpointClient extends DiagnosticEndpointSharedOperations {
+
+        @GET("/direct")
+        Mono<String> direct();
     }
 
     // -------------------------------------------------------------------------

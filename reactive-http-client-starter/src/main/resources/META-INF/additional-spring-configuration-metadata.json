@@ -100,6 +100,12 @@
       "sourceMethod": "getHealth()"
     },
     {
+      "name": "reactive.http.observability.diagnostics-endpoint",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$DiagnosticsEndpointConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
+      "sourceMethod": "getDiagnosticsEndpoint()"
+    },
+    {
       "name": "reactive.http.observability.histogram",
       "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$HistogramConfig",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
@@ -710,6 +716,13 @@
       "description": "Enable the Actuator health indicator for reactive HTTP clients. Default: true.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$HealthConfig",
       "defaultValue": true
+    },
+    {
+      "name": "reactive.http.observability.diagnostics-endpoint.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable the opt-in reactive-http-clients Actuator endpoint that returns sanitized configured-client diagnostics. Requires Actuator endpoint infrastructure and management endpoint exposure. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$DiagnosticsEndpointConfig",
+      "defaultValue": false
     },
     {
       "name": "reactive.http.observability.health.error-rate-threshold",

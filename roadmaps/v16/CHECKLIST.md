@@ -77,30 +77,37 @@ Evidence:
 
 ## Priority 3 — Opt-In Actuator Diagnostics Endpoint
 
-### [ ] 2.1 Add an opt-in Actuator diagnostics endpoint
-- [ ] Choose the smallest endpoint surface and property name.
-- [ ] Keep the endpoint disabled by default.
-- [ ] Register the endpoint only when Actuator endpoint dependencies are present.
-- [ ] Reuse `ReactiveHttpClientDiagnosticsProvider` for source data.
-- [ ] Reuse `ReactiveHttpClientDiagnosticsSnapshot` sanitization rules.
-- [ ] Prefer JSON output first; leave Markdown as helper-only unless needed.
-- [ ] Verify endpoint output includes project version, client count, endpoint
+### [x] 2.1 Add an opt-in Actuator diagnostics endpoint
+- [x] Choose the smallest endpoint surface and property name.
+- [x] Keep the endpoint disabled by default.
+- [x] Register the endpoint only when Actuator endpoint dependencies are present.
+- [x] Reuse `ReactiveHttpClientDiagnosticsProvider` for source data.
+- [x] Reuse `ReactiveHttpClientDiagnosticsSnapshot` sanitization rules.
+- [x] Prefer JSON output first; leave Markdown as helper-only unless needed.
+- [x] Verify endpoint output includes project version, client count, endpoint
       count, inherited endpoint count, auth mode, redirect flag, timeout source,
       and resilience summary.
-- [ ] Verify endpoint output omits concrete base URLs.
-- [ ] Verify endpoint output omits auth secrets, header values, proxy
+- [x] Verify endpoint output omits concrete base URLs.
+- [x] Verify endpoint output omits auth secrets, header values, proxy
       credentials, auth provider bean names, request bodies, and response
       bodies.
-- [ ] Verify missing Actuator dependencies keep existing starter behavior.
-- [ ] Add configuration metadata for the endpoint property.
-- [ ] Document endpoint usage and how it differs from health details, exchange
+- [x] Verify missing Actuator dependencies keep existing starter behavior.
+- [x] Add configuration metadata for the endpoint property.
+- [x] Document endpoint usage and how it differs from health details, exchange
       logs, startup summaries, and helper snapshots.
-- [ ] Run diagnostics provider and Actuator endpoint tests.
-- [ ] Run documentation metadata/link tests.
+- [x] Run diagnostics provider and Actuator endpoint tests.
+- [x] Run documentation metadata/link tests.
 
 Evidence:
 
-- Pending.
+- Added `ReactiveHttpClientDiagnosticsEndpoint`, an opt-in `reactive-http-clients` Actuator endpoint enabled by `reactive.http.observability.diagnostics-endpoint.enabled=false` by default.
+- The endpoint returns JSON-compatible output from `ReactiveHttpClientDiagnosticsSnapshot.toMap(...)`, backed by `ReactiveHttpClientDiagnosticsProvider` summaries.
+- Auto-configuration is gated on Actuator endpoint classes and the opt-in property; tests cover default-disabled behavior, enabled output, and missing Actuator endpoint classes.
+- Endpoint tests verify project version, client count, endpoint count, inherited endpoint count, auth mode, redirect flag, timeout source, and resilience fields while omitting concrete base URLs, auth secrets, header values, auth-provider bean names, request bodies, and response bodies.
+- Added configuration metadata and regenerated `docs/configuration-properties.md` for `reactive.http.observability.diagnostics-endpoint.enabled`.
+- Documented endpoint usage and scope in `docs/21-diagnostic-contexts.md` and `docs/08-observability.md`.
+- `mvn -pl reactive-http-client-starter -Dtest=ReactiveHttpClientAutoConfigurationTest,ReactiveHttpClientDiagnosticsProviderTest,ReactiveHttpClientConfigurationMetadataTest test` passed.
+- `mvn -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
 
 ---
 
@@ -147,7 +154,7 @@ Evidence:
 - [ ] Add startup failure tests for unsafe retryable methods.
 - [ ] Add tests proving no-op retry wiring does not fail strict mode.
 - [ ] Add tests proving effective idempotency keys do not fail strict mode.
-- [ ] Add configuration metadata and docs for strict retry validation.
+- [x] Add configuration metadata and docs for strict retry validation.
 - [ ] Run resilience, idempotency, and startup validation tests.
 
 Evidence:
