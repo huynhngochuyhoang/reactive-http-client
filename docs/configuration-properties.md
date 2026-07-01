@@ -54,6 +54,7 @@
 | `reactive.http.clients.[name].resilience.rate-limiter` | `java.lang.String` | `"default"` | Name of the Resilience4j RateLimiter instance from application config. Default: default. |  |
 | `reactive.http.clients.[name].resilience.retry` | `java.lang.String` | `"default"` | Name of the Resilience4j Retry instance from application config. Default: default. |  |
 | `reactive.http.clients.[name].resilience.retry-methods` | `java.util.Set<java.lang.String>` | `["GET","HEAD"]` | HTTP methods eligible for retry. Values are upper-cased. Default: [GET, HEAD]. |  |
+| `reactive.http.clients.[name].resilience.strict-unsafe-retry-validation` | `java.lang.Boolean` | `false` | Fail startup when strict retry validation is enabled and an actually retryable unsafe HTTP method has no startup-provable Idempotency-Key contract. Default: false. |  |
 | `reactive.http.clients.[name].resilience.timeout-ms` | `java.lang.Long` | `0` | Deprecated alias for request-timeout-ms. 0 disables the per-request timeout. request-timeout-ms wins when both are configured. | warning; replacement: `reactive.http.clients.[name].request-timeout-ms` |
 | `reactive.http.clients.[name].tls.ciphers` | `java.util.List<java.lang.String>` |  | Per-client allowed TLS cipher suites override. |  |
 | `reactive.http.clients.[name].tls.insecure-trust-all` | `java.lang.Boolean` |  | Per-client certificate verification disable override — NEVER use in production. |  |

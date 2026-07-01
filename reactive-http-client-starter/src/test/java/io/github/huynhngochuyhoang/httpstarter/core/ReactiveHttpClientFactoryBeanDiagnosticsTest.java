@@ -7,6 +7,8 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
@@ -442,6 +444,197 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                             + "retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled");
         } finally {
             logger.setLevel(previousLevel);
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationFailsStartupForRetryablePostWithoutStartupProvableIdempotencyKey() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictUnsafeRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictUnsafeRetryClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("strict unsafe retry validation")
+                    .hasMessageContaining("reactive.http.clients.strict-retry-client.resilience.strict-unsafe-retry-validation=true")
+                    .hasMessageContaining("clientInterface=" + StrictUnsafeRetryClient.class.getName())
+                    .hasMessageContaining("method=" + StrictUnsafeRetryClient.class.getName() + "#create()")
+                    .hasMessageContaining("httpMethod=POST")
+                    .hasMessageContaining("retry=default")
+                    .hasMessageContaining("retryMethods=[POST]")
+                    .hasMessageContaining("Idempotency-Key")
+                    .hasMessageContaining("Runtime-provided idempotency keys");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationDoesNotFailWhenRetryOperatorUnavailable() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictUnsafeRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictUnsafeRetryClient.class);
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationAllowsRetryInstanceWithSingleAttempt() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("single-attempt");
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-retry-client", config);
+        RetryRegistry retryRegistry = RetryRegistry.of(RetryConfig.custom().maxAttempts(1).build());
+
+        ReactiveHttpClientFactoryBean<StrictUnsafeRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictUnsafeRetryClient.class, retryRegistry);
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationRejectsDefaultIdempotencyKeyWhenHeaderParamCanOverrideIt() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.setDefaultHeaders(Map.of("Idempotency-Key", "configured-key"));
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictHeaderOverrideRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictHeaderOverrideRetryClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("strict unsafe retry validation")
+                    .hasMessageContaining("method=" + StrictHeaderOverrideRetryClient.class.getName()
+                            + "#create(java.lang.String)")
+                    .hasMessageContaining("Runtime-provided idempotency keys");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationRejectsDefaultIdempotencyKeyWhenHeaderMapCanOverrideIt() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.setDefaultHeaders(Map.of("Idempotency-Key", "configured-key"));
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictHeaderMapOverrideRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictHeaderMapOverrideRetryClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("strict unsafe retry validation")
+                    .hasMessageContaining("method=" + StrictHeaderMapOverrideRetryClient.class.getName()
+                            + "#create(java.util.Map)")
+                    .hasMessageContaining("Runtime-provided idempotency keys");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationAllowsDefaultIdempotencyKey() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.setDefaultHeaders(Map.of("Idempotency-Key", "configured-key"));
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictUnsafeRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictUnsafeRetryClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationAllowsGeneratedIdempotencyKey() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictGeneratedIdempotencyClient> factoryBean =
+                buildFactoryBean(properties, StrictGeneratedIdempotencyClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationAllowsIdempotentHttpMethods() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("PUT"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictIdempotentMethodClient> factoryBean =
+                buildFactoryBean(properties, StrictIdempotentMethodClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationReportsInheritedOverloadedMethodSignatures() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-inherited-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictInheritedUnsafeRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictInheritedUnsafeRetryClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("clientInterface=" + StrictInheritedUnsafeRetryClient.class.getName())
+                    .hasMessageContaining("method=" + StrictInheritedUnsafeOperations.class.getName() + "#create(java.lang.String)")
+                    .hasMessageContaining("method=" + StrictInheritedUnsafeOperations.class.getName() + "#create(java.lang.Long)");
+        } finally {
             factoryBean.destroy();
         }
     }
@@ -1014,6 +1207,12 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
     @SuppressWarnings("unchecked")
     private <T> ReactiveHttpClientFactoryBean<T> buildFactoryBean(ReactiveHttpClientProperties properties, Class<T> type) {
+        return buildFactoryBean(properties, type, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> ReactiveHttpClientFactoryBean<T> buildFactoryBean(
+            ReactiveHttpClientProperties properties, Class<T> type, RetryRegistry retryRegistry) {
         ApplicationContext ctx = mock(ApplicationContext.class);
 
         ObjectProvider<Object> defaultProvider = mock(ObjectProvider.class);
@@ -1022,6 +1221,12 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                 .thenAnswer(inv -> inv.getArgument(0, Supplier.class).get());
         lenient().when(defaultProvider.orderedStream()).thenReturn(Stream.empty());
         when(ctx.getBeanProvider(any(Class.class))).thenReturn((ObjectProvider) defaultProvider);
+
+        if (retryRegistry != null) {
+            ObjectProvider<RetryRegistry> retryRegistryProvider = mock(ObjectProvider.class);
+            when(retryRegistryProvider.getIfAvailable()).thenReturn(retryRegistry);
+            when(ctx.getBeanProvider(RetryRegistry.class)).thenReturn(retryRegistryProvider);
+        }
 
         ObjectProvider<ReactiveHttpClientProperties> propsProvider = mock(ObjectProvider.class);
         when(propsProvider.getIfAvailable(any(Supplier.class))).thenReturn(properties);
@@ -1088,6 +1293,49 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         Mono<String> create();
     }
 
+
+    @ReactiveHttpClient(name = "strict-retry-client")
+    interface StrictUnsafeRetryClient {
+        @POST("/create")
+        Mono<String> create();
+    }
+
+    @ReactiveHttpClient(name = "strict-retry-client")
+    interface StrictHeaderOverrideRetryClient {
+        @POST("/create")
+        Mono<String> create(@HeaderParam("Idempotency-Key") String idempotencyKey);
+    }
+
+    @ReactiveHttpClient(name = "strict-retry-client")
+    interface StrictHeaderMapOverrideRetryClient {
+        @POST("/create")
+        Mono<String> create(@HeaderParam Map<String, String> headers);
+    }
+
+    @ReactiveHttpClient(name = "strict-retry-client")
+    interface StrictGeneratedIdempotencyClient {
+        @POST("/create")
+        @IdempotencyKey
+        Mono<String> create();
+    }
+
+    @ReactiveHttpClient(name = "strict-retry-client")
+    interface StrictIdempotentMethodClient {
+        @PUT("/replace")
+        Mono<String> replace();
+    }
+
+    interface StrictInheritedUnsafeOperations {
+        @POST("/create/string")
+        Mono<String> create(String id);
+
+        @POST("/create/long")
+        Mono<String> create(Long id);
+    }
+
+    @ReactiveHttpClient(name = "strict-inherited-retry-client")
+    interface StrictInheritedUnsafeRetryClient extends StrictInheritedUnsafeOperations {
+    }
 
     @ReactiveHttpClient(name = "annotation-url-malformed-client", baseUrl = "http://bad host")
     interface MalformedAnnotationBaseUrlClient {

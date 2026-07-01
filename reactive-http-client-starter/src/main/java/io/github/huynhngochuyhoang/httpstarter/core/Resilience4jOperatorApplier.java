@@ -128,6 +128,12 @@ public class Resilience4jOperatorApplier implements ResilienceOperatorApplier {
     }
 
     @Override
+    public boolean canRetryMoreThanOnce(String instanceName) {
+        return retryRegistry != null
+                && retryRegistry.retry(instanceName).getRetryConfig().getMaxAttempts() > 1;
+    }
+
+    @Override
     public boolean isInstanceConfigured(InstanceType type, String instanceName) {
         if (instanceName == null || instanceName.isBlank()) return true;
         return switch (type) {

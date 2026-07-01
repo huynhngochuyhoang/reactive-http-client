@@ -518,6 +518,13 @@
       ]
     },
     {
+      "name": "reactive.http.clients.[name].resilience.strict-unsafe-retry-validation",
+      "type": "java.lang.Boolean",
+      "description": "Fail startup when strict retry validation is enabled and an actually retryable unsafe HTTP method has no startup-provable Idempotency-Key contract. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
+      "defaultValue": false
+    },
+    {
       "name": "reactive.http.clients.[name].resilience.bulkhead",
       "type": "java.lang.String",
       "description": "Name of the Resilience4j Bulkhead instance from application config. Default: default.",

@@ -131,6 +131,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
 
         if (config.getResilience() != null && config.getResilience().isEnabled()) {
             validatePerMethodResilienceInstances(type, metadataCache, resilienceOperatorApplier, clientName);
+            validateStrictUnsafeRetryContracts(type, metadataCache, config, resilienceOperatorApplier, clientName);
             logMethodResilienceDiagnostics(type, metadataCache, config, resilienceOperatorApplier, clientName);
         }
 
@@ -814,6 +815,93 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         }
     }
 
+    private void validateStrictUnsafeRetryContracts(Class<?> clientInterface,
+                                                    MethodMetadataCache metadataCache,
+                                                    ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                    ResilienceOperatorApplier resilienceOperatorApplier,
+                                                    String clientName) {
+        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
+        if (resilience == null
+                || !resilience.isEnabled()
+                || !resilience.isStrictUnsafeRetryValidation()
+                || !resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)) {
+            return;
+        }
+
+        List<String> unsafeMethods = new ArrayList<>();
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method)) continue;
+            MethodMetadata meta = metadataCache.get(method);
+            RequestPlan plan = RequestPlan.from(meta, clientInterface);
+            String httpMethod = diagnosticHttpMethod(meta, clientConfig);
+            if (!isRetryMethodEnabled(resilience, httpMethod)) {
+                continue;
+            }
+            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
+            if (!resilienceOperatorApplier.canRetryMoreThanOnce(retryInstance)) {
+                continue;
+            }
+            if (startupRetrySafety(plan, httpMethod, clientConfig) != RetrySafetyClassification.UNSAFE_RETRY) {
+                continue;
+            }
+            unsafeMethods.add("clientInterface=" + clientInterface.getName()
+                    + ", method=" + methodSignature(method)
+                    + ", httpMethod=" + httpMethod
+                    + ", retry=" + retryInstance
+                    + ", retrySource=" + (StringUtils.hasText(plan.retryInstanceName())
+                    ? "method-level @Retry" : "client resilience.retry")
+                    + ", retryMethods=" + resilience.getRetryMethods());
+        }
+
+        if (!unsafeMethods.isEmpty()) {
+            throw new IllegalStateException("Reactive HTTP client [" + clientName + "] failed strict unsafe retry validation "
+                    + "(reactive.http.clients." + clientName
+                    + ".resilience.strict-unsafe-retry-validation=true). "
+                    + "Retryable unsafe methods must use an idempotent HTTP method, a configured default "
+                    + "Idempotency-Key header, or method-level @IdempotencyKey generation. "
+                    + "Runtime-provided idempotency keys from parameters, header maps, or Reactor context "
+                    + "cannot be proven at startup; keep strict validation disabled for those dynamic contracts.\n  - "
+                    + String.join("\n  - ", unsafeMethods));
+        }
+    }
+
+    private static RetrySafetyClassification startupRetrySafety(RequestPlan plan,
+                                                                String httpMethod,
+                                                                ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (ReactiveClientInvocationHandler.isSafeRetryMethod(httpMethod)
+                || plan.retrySafety() == RetrySafetyClassification.SAFE_METHOD) {
+            return RetrySafetyClassification.SAFE_METHOD;
+        }
+        if (StringUtils.hasText(plan.generatedIdempotencyKeyHeader())
+                || hasStartupProvableDefaultIdempotencyKeyHeader(plan, clientConfig)) {
+            return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
+        }
+        return RetrySafetyClassification.UNSAFE_RETRY;
+    }
+
+    private static boolean hasStartupProvableDefaultIdempotencyKeyHeader(RequestPlan plan,
+                                                                        ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        return hasDefaultIdempotencyKeyHeaderValue(clientConfig)
+                && !canOverrideDefaultIdempotencyKeyHeader(plan);
+    }
+
+    private static boolean canOverrideDefaultIdempotencyKeyHeader(RequestPlan plan) {
+        return !plan.headerMapParams().isEmpty()
+                || plan.headerParams().stream()
+                .map(RequestPlan.NamedArgumentBinding::name)
+                .anyMatch(name -> "Idempotency-Key".equalsIgnoreCase(name))
+                || plan.idempotencyKeyParams().stream()
+                .map(RequestPlan.NamedArgumentBinding::name)
+                .anyMatch(name -> "Idempotency-Key".equalsIgnoreCase(name));
+    }
+
+    private static String methodSignature(Method method) {
+        String parameters = Arrays.stream(method.getParameterTypes())
+                .map(type -> type.getCanonicalName() != null ? type.getCanonicalName() : type.getName())
+                .collect(java.util.stream.Collectors.joining(","));
+        return method.getDeclaringClass().getName() + "#" + method.getName() + "(" + parameters + ")";
+    }
+
     private void logMethodResilienceDiagnostics(Class<?> clientInterface,
                                                 MethodMetadataCache metadataCache,
                                                 ReactiveHttpClientProperties.ClientConfig clientConfig,
@@ -890,7 +978,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 || plan.retrySafety() == RetrySafetyClassification.SAFE_METHOD) {
             return RetrySafetyClassification.SAFE_METHOD;
         }
-        if (hasDefaultIdempotencyKeyHeaderValue(clientConfig)) {
+        if (hasStartupProvableDefaultIdempotencyKeyHeader(plan, clientConfig)) {
             return RetrySafetyClassification.EXPLICIT_IDEMPOTENCY_KEY;
         }
         return plan.retrySafety();
