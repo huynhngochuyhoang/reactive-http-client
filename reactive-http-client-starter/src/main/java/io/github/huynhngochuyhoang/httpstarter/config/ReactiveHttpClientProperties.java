@@ -569,6 +569,7 @@ public class ReactiveHttpClientProperties {
         private String sessionToken;
         private String region;
         private String service;
+        private boolean strictBodySigningValidation = false;
 
         public String getAccessKeyId() { return accessKeyId; }
         public void setAccessKeyId(String accessKeyId) { this.accessKeyId = accessKeyId; }
@@ -584,6 +585,11 @@ public class ReactiveHttpClientProperties {
 
         public String getService() { return service; }
         public void setService(String service) { this.service = service; }
+
+        public boolean isStrictBodySigningValidation() { return strictBodySigningValidation; }
+        public void setStrictBodySigningValidation(boolean strictBodySigningValidation) {
+            this.strictBodySigningValidation = strictBodySigningValidation;
+        }
     }
 
     public static class ApiConfig {

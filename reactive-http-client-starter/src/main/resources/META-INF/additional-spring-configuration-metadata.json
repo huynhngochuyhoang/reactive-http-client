@@ -462,6 +462,13 @@
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$AwsSigV4AuthConfig"
     },
     {
+      "name": "reactive.http.clients.[name].auth.aws-sig-v4.strict-body-signing-validation",
+      "type": "java.lang.Boolean",
+      "description": "Fail startup for built-in AWS SigV4 clients when a declarative method uses a body shape whose stable raw bytes cannot be materialized for signing. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$AwsSigV4AuthConfig",
+      "defaultValue": false
+    },
+    {
       "name": "reactive.http.clients.[name].apis",
       "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties.ApiConfig>",
       "description": "Optional named API definitions for @ApiRef methods. Keys are logical API names.",

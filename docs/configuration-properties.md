@@ -18,6 +18,7 @@
 | `reactive.http.clients.[name].auth.aws-sig-v4.secret-access-key` | `java.lang.String` |  | AWS secret access key for type aws-sigv4. |  |
 | `reactive.http.clients.[name].auth.aws-sig-v4.service` | `java.lang.String` |  | AWS SigV4 service signing name, for example s3 or execute-api. |  |
 | `reactive.http.clients.[name].auth.aws-sig-v4.session-token` | `java.lang.String` |  | Optional AWS session token for temporary credentials. |  |
+| `reactive.http.clients.[name].auth.aws-sig-v4.strict-body-signing-validation` | `java.lang.Boolean` | `false` | Fail startup for built-in AWS SigV4 clients when a declarative method uses a body shape whose stable raw bytes cannot be materialized for signing. Default: false. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.audience` | `java.lang.String` |  | Optional OAuth2 audience sent to the token endpoint. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.auth-style` | `java.lang.String` | `"basic-auth"` | OAuth2 client authentication style. Values: basic-auth, form-post. Default: basic-auth. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.client-id` | `java.lang.String` |  | OAuth2 client ID for type oauth2-client-credentials. |  |

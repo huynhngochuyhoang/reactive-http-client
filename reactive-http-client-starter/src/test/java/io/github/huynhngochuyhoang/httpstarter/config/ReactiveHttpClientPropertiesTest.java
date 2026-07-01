@@ -62,6 +62,7 @@ class ReactiveHttpClientPropertiesTest {
         yaml.put("reactive.http.clients.payments.auth.aws-sig-v4.secret-access-key", "secret");
         yaml.put("reactive.http.clients.payments.auth.aws-sig-v4.region", "us-east-1");
         yaml.put("reactive.http.clients.payments.auth.aws-sig-v4.service", "execute-api");
+        yaml.put("reactive.http.clients.payments.auth.aws-sig-v4.strict-body-signing-validation", true);
 
         ReactiveHttpClientProperties bound = bind(yaml);
 
@@ -71,6 +72,7 @@ class ReactiveHttpClientPropertiesTest {
         assertEquals("aws-sigv4", config.getAuth().getType());
         assertEquals("key", config.getAuth().getAwsSigV4().getAccessKeyId());
         assertEquals("execute-api", config.getAuth().getAwsSigV4().getService());
+        assertTrue(config.getAuth().getAwsSigV4().isStrictBodySigningValidation());
     }
 
     @Test

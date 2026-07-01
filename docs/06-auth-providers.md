@@ -163,13 +163,17 @@ Use `type: aws-sigv4` to sign requests with AWS Signature Version 4. The provide
 
 Supported body-signing contract:
 
+Enable `strict-body-signing-validation` when you want proxy construction to fail
+for methods whose body bytes cannot be proven safe for built-in SigV4 signing.
+The default remains runtime validation so existing clients keep starting.
+
 | Body shape | Built-in SigV4 behavior |
 |---|---|
 | Empty body | Signs the AWS empty SHA-256 payload hash. |
 | `byte[]` | Signs the exact byte array sent by the starter. |
 | `String` | Signs bytes using the request `Content-Type` charset when one is declared; otherwise UTF-8. |
 | JSON object body | Signs the JSON bytes serialized by the starter auth pipeline with the configured `ObjectMapper`; keep WebClient codecs aligned with that mapper. |
-| `Publisher`, streaming upload body, or multipart body | Rejected before the request is sent; the starter does not buffer or subscribe to the stream only for signing. |
+| `Publisher`, streaming upload body, or multipart body | Rejected at startup when strict body-signing validation is enabled; otherwise rejected before the request is sent. The starter does not buffer or subscribe to the stream only for signing. |
 
 `Publisher`, streaming, and multipart request bodies are not signed by the built-in provider because stable raw bytes are not materialized without consuming or re-encoding the body. Use a repeatable `byte[]`, charset-declared `String`, or JSON object body with codecs aligned to the starter `ObjectMapper` for built-in signing, or provide a custom auth provider that implements AWS streaming signatures.
 
@@ -187,6 +191,7 @@ reactive:
             session-token: ${AWS_SESSION_TOKEN:}
             region: us-east-1
             service: execute-api
+            strict-body-signing-validation: true
 ```
 
 Out of scope: SigV4a, STS assume-role flow, and pre-signed URLs.

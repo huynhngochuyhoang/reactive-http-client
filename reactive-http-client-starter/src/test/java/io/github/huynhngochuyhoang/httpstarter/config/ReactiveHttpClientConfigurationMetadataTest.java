@@ -346,6 +346,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.clients.[name].apis.[api-name].timeout-ms", -1);
         assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.auth-style", "basic-auth");
         assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.expiry-leeway-ms", 30000);
+        assertDefaultValue(metadata, "reactive.http.clients.[name].auth.aws-sig-v4.strict-body-signing-validation", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.enabled", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.retry", "default");
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.circuit-breaker", "default");

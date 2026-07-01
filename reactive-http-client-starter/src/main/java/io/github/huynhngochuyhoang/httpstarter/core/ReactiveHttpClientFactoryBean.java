@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
+import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
@@ -17,6 +19,8 @@ import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.lang.NonNull;
 import org.springframework.util.StringUtils;
@@ -26,9 +30,7 @@ import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.Proxy;
+import java.lang.reflect.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
@@ -128,6 +130,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 circuitBreakerRegistry, retryRegistry, bulkheadRegistry, rateLimiterRegistry);
         logStartupSummary(type, clientName, config, metadataCache, resilienceOperatorApplier, properties.getObservability());
         ObjectMapper objectMapper = applicationContext.getBeanProvider(ObjectMapper.class).getIfAvailable();
+        validateStrictBodySigningContracts(type, metadataCache, config, objectMapper, clientName);
 
         if (config.getResilience() != null && config.getResilience().isEnabled()) {
             validatePerMethodResilienceInstances(type, metadataCache, resilienceOperatorApplier, clientName);
@@ -812,6 +815,116 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     "Reactive HTTP client '" + clientName + "' references undefined Resilience4j instances:\n  - "
                             + String.join("\n  - ", missing)
                             + "\nDefine them under resilience4j.<retry|circuitbreaker|bulkhead|ratelimiter>.instances.* in application config.");
+        }
+    }
+
+    private void validateStrictBodySigningContracts(Class<?> clientInterface,
+                                                    MethodMetadataCache metadataCache,
+                                                    ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                    ObjectMapper objectMapper,
+                                                    String clientName) {
+        if (!usesStrictBuiltInAwsSigV4(clientConfig)) {
+            return;
+        }
+
+        List<String> unsupportedMethods = new ArrayList<>();
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method)) continue;
+            MethodMetadata meta = metadataCache.get(method);
+            RequestPlan plan = RequestPlan.from(meta, clientInterface);
+            BodySigningContract contract = bodySigningContract(plan, objectMapper);
+            if (contract.supported()) {
+                continue;
+            }
+            unsupportedMethods.add("clientInterface=" + clientInterface.getName()
+                    + ", method=" + methodSignature(method)
+                    + ", httpMethod=" + diagnosticHttpMethod(meta, clientConfig)
+                    + ", pathTemplate=" + plan.pathTemplate()
+                    + ", bodyShape=" + contract.bodyShape()
+                    + ", auth=aws-sigv4"
+                    + ", reason=" + contract.reason());
+        }
+
+        if (!unsupportedMethods.isEmpty()) {
+            throw new IllegalStateException("Reactive HTTP client [" + clientName + "] failed strict body-signing validation "
+                    + "(reactive.http.clients." + clientName
+                    + ".auth.aws-sig-v4.strict-body-signing-validation=true). "
+                    + "Built-in AWS SigV4 body signing supports empty, byte[], String, and JSON object bodies "
+                    + "only when stable raw bytes can be materialized. Publisher, streaming or resource, multipart, "
+                    + "and unknown generic bodies require a custom AuthProvider or strict validation disabled.\n  - "
+                    + String.join("\n  - ", unsupportedMethods));
+        }
+    }
+
+    private static boolean usesStrictBuiltInAwsSigV4(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (clientConfig == null || StringUtils.hasText(clientConfig.getAuthProvider())) {
+            return false;
+        }
+        ReactiveHttpClientProperties.AuthConfig auth = clientConfig.getAuth();
+        return auth != null
+                && AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(auth.getType())
+                && auth.getAwsSigV4() != null
+                && auth.getAwsSigV4().isStrictBodySigningValidation();
+    }
+
+    private static BodySigningContract bodySigningContract(RequestPlan plan, ObjectMapper objectMapper) {
+        if (plan.multipart()) {
+            return BodySigningContract.unsupported("multipart",
+                    "multipart bodies do not expose stable raw bytes for built-in SigV4 signing");
+        }
+        Type bodyType = plan.bodyType();
+        if (bodyType == null) {
+            return BodySigningContract.supported("empty");
+        }
+        Class<?> rawType = rawClass(bodyType);
+        if (rawType == null) {
+            return BodySigningContract.unsupported("unknown(" + bodyType.getTypeName() + ")",
+                    "generic body type cannot be proven to materialize stable raw bytes");
+        }
+        String typeName = rawType.getTypeName();
+        if (Publisher.class.isAssignableFrom(rawType)) {
+            return BodySigningContract.unsupported("publisher(" + typeName + ")",
+                    "Publisher bodies are non-repeatable and are not consumed for built-in SigV4 signing");
+        }
+        if (DataBuffer.class.isAssignableFrom(rawType)) {
+            return BodySigningContract.unsupported("data-buffer(" + typeName + ")",
+                    "DataBuffer bodies are streaming buffers and are not consumed for built-in SigV4 signing");
+        }
+        if (Resource.class.isAssignableFrom(rawType)) {
+            return BodySigningContract.unsupported("resource(" + typeName + ")",
+                    "Resource bodies are application-owned streams and do not expose stable raw bytes");
+        }
+        if (byte[].class.equals(rawType)) {
+            return BodySigningContract.supported("byte[]");
+        }
+        if (String.class.equals(rawType)) {
+            return BodySigningContract.supported("String");
+        }
+        if (objectMapper == null) {
+            return BodySigningContract.unsupported("json(" + typeName + ")",
+                    "JSON body signing requires an ObjectMapper bean to materialize raw bytes");
+        }
+        return BodySigningContract.supported("json(" + typeName + ")");
+    }
+
+    private static Class<?> rawClass(Type type) {
+        if (type instanceof Class<?> clazz) {
+            return clazz;
+        }
+        if (type instanceof ParameterizedType parameterizedType
+                && parameterizedType.getRawType() instanceof Class<?> clazz) {
+            return clazz;
+        }
+        return null;
+    }
+
+    private record BodySigningContract(boolean supported, String bodyShape, String reason) {
+        static BodySigningContract supported(String bodyShape) {
+            return new BodySigningContract(true, bodyShape, null);
+        }
+
+        static BodySigningContract unsupported(String bodyShape, String reason) {
+            return new BodySigningContract(false, bodyShape, reason);
         }
     }
 
