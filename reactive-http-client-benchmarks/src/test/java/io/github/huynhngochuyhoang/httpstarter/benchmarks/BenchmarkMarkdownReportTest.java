@@ -14,22 +14,69 @@ class BenchmarkMarkdownReportTest {
     Path tempDir;
 
     @Test
-    void labelsDiagnosticsNoNetworkRowsSeparatelyFromLoopbackFeatureRows() throws Exception {
-        Path result = tempDir.resolve("release-jmh.json");
-        Files.writeString(result, "[" + String.join(",",
-                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.LoopbackClientComparisonBenchmark.starterFeatureMicrometerObserverGetNoBody",
-                        "avgt", 58.0, "us/op"),
-                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.StarterDiagnosticsOverheadBenchmark.diagnosticsNoNetworkOneObserverGetNoBody",
-                        "thrpt", 123000.0, "ops/s")) + "]");
+    void classifiesClientSideOverheadRowsIntoComparisonSummary() throws Exception {
+        String report = renderReport(
+                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.LoopbackClientComparisonBenchmark.clientSideOverheadRawWebClientPostJson",
+                        "avgt", 10.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.LoopbackClientComparisonBenchmark.clientSideOverheadSpringHttpExchangePostJson",
+                        "avgt", 12.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.LoopbackClientComparisonBenchmark.clientSideOverheadStarterPostJson",
+                        "avgt", 15.0, "us/op"));
 
-        BenchmarkMarkdownReport.writeIfResultFilePresent(new String[]{"-rff", result.toString()});
+        assertThat(report)
+                .contains("| Post Json | 15 us/op | 50% slower | 25% slower |")
+                .contains("| clientSideOverheadRawWebClientPostJson | Client-side overhead | `avgt` | 10 us/op |")
+                .contains("| clientSideOverheadSpringHttpExchangePostJson | Client-side overhead | `avgt` | 12 us/op |")
+                .contains("| clientSideOverheadStarterPostJson | Client-side overhead | `avgt` | 15 us/op |");
+    }
 
-        String report = Files.readString(tempDir.resolve("release-jmh.md"));
+    @Test
+    void classifiesLoopbackStarterFeatureRowsAsOptionalStarterFeatures() throws Exception {
+        String report = renderReport(result(
+                "io.github.huynhngochuyhoang.httpstarter.benchmarks.LoopbackClientComparisonBenchmark.starterFeatureMicrometerObserverGetNoBody",
+                "avgt", 58.0, "us/op"));
+
         assertThat(report)
                 .contains("| Micrometer Observer Get No Body | Optional starter feature | 58 us/op |")
-                .contains("| starterFeatureMicrometerObserverGetNoBody | Optional starter feature | `avgt` | 58 us/op |")
+                .contains("| starterFeatureMicrometerObserverGetNoBody | Optional starter feature | `avgt` | 58 us/op |");
+    }
+
+    @Test
+    void classifiesStarterErrorMappingRowsAsStarterOnlyErrorMapping() throws Exception {
+        String report = renderReport(result(
+                "io.github.huynhngochuyhoang.httpstarter.benchmarks.LoopbackClientComparisonBenchmark.starterErrorMappingProblemDetailSmallBody",
+                "avgt", 77.0, "us/op"));
+
+        assertThat(report)
+                .contains("| Problem Detail Small Body | Starter-only error-mapping overhead | 77 us/op |")
+                .contains("| starterErrorMappingProblemDetailSmallBody | Starter-only error-mapping overhead | `avgt` | 77 us/op |");
+    }
+
+    @Test
+    void classifiesNoNetworkRowsWithoutOptionalFeatureSummary() throws Exception {
+        String report = renderReport(
+                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.StarterDiagnosticsOverheadBenchmark.metadataOnlyExchangeLoggingGetNoBody",
+                        "avgt", 42.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.StarterDiagnosticsOverheadBenchmark.diagnosticsNoNetworkOneObserverGetNoBody",
+                        "thrpt", 123000.0, "ops/s"),
+                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.StarterDiagnosticsOverheadBenchmark.runtimeDiagnosticsProviderClientSummaries",
+                        "avgt", 5.0, "us/op"));
+
+        assertThat(report)
+                .doesNotContain("## Starter-Only and Optional Feature Rows")
+                .contains("| metadataOnlyExchangeLoggingGetNoBody | No-network starter invocation | `avgt` | 42 us/op |")
                 .contains("| diagnosticsNoNetworkOneObserverGetNoBody | No-network starter invocation | `thrpt` | 123000 ops/s |")
-                .doesNotContain("| diagnosticsNoNetworkOneObserverGetNoBody | Optional starter feature |");
+                .contains("| runtimeDiagnosticsProviderClientSummaries | No-network starter invocation | `avgt` | 5 us/op |")
+                .doesNotContain("| metadataOnlyExchangeLoggingGetNoBody | Optional starter feature |")
+                .doesNotContain("| diagnosticsNoNetworkOneObserverGetNoBody | Optional starter feature |")
+                .doesNotContain("| runtimeDiagnosticsProviderClientSummaries | Optional starter feature |");
+    }
+
+    private String renderReport(String... results) throws Exception {
+        Path result = tempDir.resolve("release-jmh.json");
+        Files.writeString(result, "[" + String.join(",", results) + "]");
+        BenchmarkMarkdownReport.writeIfResultFilePresent(new String[]{"-rff", result.toString()});
+        return Files.readString(tempDir.resolve("release-jmh.md"));
     }
 
     private static String result(String benchmarkName, String mode, double score, String unit) {

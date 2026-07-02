@@ -273,44 +273,87 @@ Evidence:
 
 ## Priority 9 — ResponseEntity and JSON Benchmark Re-Audit
 
-### [ ] 5.1 Re-audit ResponseEntity and JSON rows after `2.11.0`
-- [ ] Confirm published `2.11.0` artifacts resolve before comparing against
+### [x] 5.1 Re-audit ResponseEntity and JSON rows after `2.11.0`
+- [x] Confirm published `2.11.0` artifacts resolve before comparing against
       them.
-- [ ] Run the published-baseline benchmark for `2.11.0`.
-- [ ] Run the current-workspace benchmark on the same machine.
-- [ ] Compare `Post Json` current versus published baseline.
-- [ ] Compare `Response Entity` current versus published baseline.
-- [ ] Repeat rows enough to distinguish noise from persistent movement.
-- [ ] Inspect allocation deltas for repeated movement.
-- [ ] Use profiler output only if repeated movement justifies it.
-- [ ] Document whether optimization is required.
-- [ ] If optimizing, record named before/after benchmark rows.
-- [ ] If not optimizing, record why no code change was made.
-- [ ] Keep public docs scenario-specific and avoid broad performance claims.
+- [x] Run the published-baseline benchmark for `2.11.0`.
+- [x] Run the current-workspace benchmark on the same machine.
+- [x] Compare `Post Json` current versus published baseline.
+- [x] Compare `Response Entity` current versus published baseline.
+- [x] Repeat rows enough to distinguish noise from persistent movement.
+- [x] Inspect allocation deltas for repeated movement.
+- [x] Use profiler output only if repeated movement justifies it.
+- [x] Document whether optimization is required.
+- [x] If optimizing, record named before/after benchmark rows.
+- [x] If not optimizing, record why no code change was made.
+- [x] Keep public docs scenario-specific and avoid broad performance claims.
 
 Evidence:
 
-- Pending.
+- User completed the first three steps with published-baseline and current-workspace
+  release reports at
+  `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.11.0/release-jmh.md`
+  and `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`.
+- Generated the paired comparison with
+  `mvn -Pbenchmarks,benchmark-compare -pl reactive-http-client-benchmarks -am verify -Dbenchmark.compare.current=reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.11.0/release-jmh.json`,
+  writing `reactive-http-client-benchmarks/target/benchmark-reports/benchmark-comparison.md`.
+- `clientSideOverheadStarterPostJson` current versus published `2.11.0`:
+  average time `61.057 us/op` versus `207.553 us/op` (`70.583%` faster),
+  p50 `59.093 us/op` versus `195.45 us/op`, p95/p99 `71.193 us/op`
+  versus `459.507 us/op`; average-time allocation moved from
+  `28040.906 B/op` to `27558.631 B/op` (`1.72%` lower).
+- `clientSideOverheadStarterResponseEntity` current versus published `2.11.0`:
+  average time `59.448 us/op` versus `58.661 us/op` (`1.342%` slower),
+  p50 `58.23 us/op` versus `56.279 us/op`, p95/p99 `69.954 us/op`
+  versus `68.212 us/op`; average-time allocation moved from `27373.44 B/op`
+  to `27405.011 B/op` (`0.115%` higher).
+- Release benchmark profile uses `5` warmup iterations, `5` measurement
+  iterations, `2` forks, throughput/average-time/sample-time modes, and the GC
+  profiler, which was enough for this audit to distinguish the large Post Json
+  movement from the small ResponseEntity noise-level movement.
+- No additional profiler run or optimization was required: the only large named
+  movement is an improvement in `clientSideOverheadStarterPostJson`;
+  `clientSideOverheadStarterResponseEntity` is effectively flat and allocations
+  are stable.
+- No public performance docs were broadened; the audit evidence stays tied to
+  the named benchmark rows and target-only comparison report.
 
 ---
 
 ## Priority 10 — Benchmark Prefix Classification Contract
 
-### [ ] 5.2 Separate no-network diagnostics audit output from release feature claims
-- [ ] Add report-generation tests for `clientSideOverhead*` rows.
-- [ ] Add report-generation tests for `starterFeature*` rows.
-- [ ] Add report-generation tests for `starterErrorMapping*` rows.
-- [ ] Add report-generation tests for no-network invocation rows.
-- [ ] Verify no-network rows do not appear in the optional-feature summary table.
-- [ ] Verify loopback `starterFeature*` rows remain in the optional-feature
+### [x] 5.2 Separate no-network diagnostics audit output from release feature claims
+- [x] Add report-generation tests for `clientSideOverhead*` rows.
+- [x] Add report-generation tests for `starterFeature*` rows.
+- [x] Add report-generation tests for `starterErrorMapping*` rows.
+- [x] Add report-generation tests for no-network invocation rows.
+- [x] Verify no-network rows do not appear in the optional-feature summary table.
+- [x] Verify loopback `starterFeature*` rows remain in the optional-feature
       summary table.
-- [ ] Document benchmark naming conventions for loopback feature rows.
-- [ ] Document benchmark naming conventions for no-network audit rows.
-- [ ] Run benchmark module tests.
+- [x] Document benchmark naming conventions for loopback feature rows.
+- [x] Document benchmark naming conventions for no-network audit rows.
+- [x] Run benchmark module tests.
 
 Evidence:
 
-- Pending.
+- Expanded `BenchmarkMarkdownReportTest` into focused report-generation coverage
+  for `clientSideOverhead*`, `starterFeature*`, `starterErrorMapping*`, and
+  no-network diagnostics/invocation rows.
+- Verified `clientSideOverhead*` rows feed the comparison summary and raw results
+  with the `Client-side overhead` label.
+- Verified loopback `starterFeature*` rows remain in the starter-only optional
+  feature summary and raw results with the `Optional starter feature` label.
+- Verified `starterErrorMapping*` rows remain in the starter-only summary with
+  the `Starter-only error-mapping overhead` label.
+- Verified no-network rows such as `metadataOnlyExchangeLoggingGetNoBody`,
+  `diagnosticsNoNetworkOneObserverGetNoBody`, and
+  `runtimeDiagnosticsProviderClientSummaries` stay out of the optional-feature
+  summary and render only as `No-network starter invocation` raw rows.
+- Added a benchmark naming contract to `docs/22-benchmarks.md` that reserves
+  `starterFeature*` for loopback feature rows and directs no-network diagnostics
+  audits to descriptive non-feature names.
+- Verified: `mvn -q -Pbenchmarks -pl reactive-http-client-benchmarks -am test`.
+- Verified: `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`.
 
 ---
 

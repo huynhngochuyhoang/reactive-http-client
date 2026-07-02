@@ -328,6 +328,29 @@ a release-quality report into `docs/` with a versioned filename. Only link a
 promoted report from release notes when the release makes performance claims
 backed by that report.
 
+## Benchmark Naming Contract
+
+The generated Markdown report classifies rows by benchmark method prefix. Keep
+new benchmark names in one of these buckets so release reports do not mix
+different scenario shapes:
+
+- `clientSideOverhead<RawWebClient|SpringHttpExchange|Starter><Scenario>` is
+  reserved for loopback scenarios where all compared clients perform the same
+  HTTP request and validation work. These rows feed the comparison summary.
+- `starterFeature<Scenario>` is reserved for loopback starter scenarios that
+  enable exactly one optional starter feature while still sending a request to
+  the shared loopback server. These rows appear in the starter-only optional
+  feature summary.
+- `starterErrorMapping<Scenario>` is reserved for loopback starter-specific
+  error-mapping work, such as Problem Detail mapping, where baseline clients do
+  not install equivalent behavior. These rows appear as starter-only
+  error-mapping overhead.
+- No-network invocation or diagnostics audits must not use the `starterFeature`
+  prefix. Use descriptive names such as `diagnosticsNoNetwork...`,
+  `metadataOnly...`, or `runtimeDiagnosticsProvider...`; these rows remain in raw
+  results as `No-network starter invocation` and are excluded from optional
+  feature summary tables.
+
 ## Metrics
 
 Loopback benchmarks use stable JMH benchmark names for release-to-release diffs
