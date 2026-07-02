@@ -83,8 +83,10 @@ public interface TrainApiOperators extends ApiOperators<TrainResponse> {
 
 Each child must bind the type it really returns. For example, a train client
 that extends `ApiOperators<BusResponse>` will still have a Java contract that
-returns `BusResponse`, not `TrainResponse`. Java default methods can still be
-used as local helper methods without HTTP annotations.
+returns `BusResponse`, not `TrainResponse`. Startup DEBUG method-policy logs and
+`ReactiveHttpClientContractSnapshot` include `genericBindings`, `responseType`,
+and `bodyType` fields so this mismatch is visible without making a request.
+Java default methods can still be used as local helper methods without HTTP annotations.
 
 ---
 

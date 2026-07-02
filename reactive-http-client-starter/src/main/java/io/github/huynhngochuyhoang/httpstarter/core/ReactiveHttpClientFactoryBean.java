@@ -568,9 +568,9 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             EffectiveApi effectiveApi = diagnosticEffectiveApi(plan, clientConfig);
             boolean inherited = method.getDeclaringClass() != clientInterface;
             log.debug("Reactive HTTP client [{}] method policy: method=[{}#{}], declaredBy={}, "
-                            + "concreteClient={}, inherited={}, apiRef={}, httpMethod={}, pathTemplate={}, "
-                            + "baseUrl={} (source={}), requestTimeout={}, redirectPolicy={}, retrySafety={}, "
-                            + "bodyRepeatability={}",
+                            + "concreteClient={}, inherited={}, apiRef={}, genericBindings={}, responseType={}, "
+                            + "bodyType={}, httpMethod={}, pathTemplate={}, baseUrl={} (source={}), "
+                            + "requestTimeout={}, redirectPolicy={}, retrySafety={}, bodyRepeatability={}",
                     clientName,
                     method.getDeclaringClass().getSimpleName(),
                     method.getName(),
@@ -578,6 +578,9 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     clientInterface.getName(),
                     inherited,
                     StringUtils.hasText(plan.apiRefName()) ? plan.apiRefName() : "none",
+                    EffectiveHttpClientContractExporter.genericBindings(clientInterface, method),
+                    EffectiveHttpClientContractExporter.typeName(plan.responseType()),
+                    EffectiveHttpClientContractExporter.typeName(plan.bodyType()),
                     effectiveApi.httpMethod(),
                     effectiveApi.pathTemplate(),
                     baseUrl,

@@ -234,26 +234,40 @@ Evidence:
 
 ## Priority 8 — Generic Inherited Contract Diagnostics
 
-### [ ] 4.2 Improve startup validation messages for generic inherited contracts
-- [ ] Identify current startup diagnostics for inherited generic endpoint
+### [x] 4.2 Improve startup validation messages for generic inherited contracts
+- [x] Identify current startup diagnostics for inherited generic endpoint
       bindings.
-- [ ] Include parent interface in relevant diagnostics.
-- [ ] Include concrete client interface in relevant diagnostics.
-- [ ] Include type variable and resolved concrete type where useful.
-- [ ] Include endpoint method and declaring interface where useful.
-- [ ] Improve snapshot or diagnostics provider output only if it remains
+- [x] Include parent interface in relevant diagnostics.
+- [x] Include concrete client interface in relevant diagnostics.
+- [x] Include type variable and resolved concrete type where useful.
+- [x] Include endpoint method and declaring interface where useful.
+- [x] Improve snapshot or diagnostics provider output only if it remains
       sanitized and bounded.
-- [ ] Add docs for correct `ApiOperators<T>` style declarations.
-- [ ] Add docs for incorrect generic declarations such as binding a train client
+- [x] Add docs for correct `ApiOperators<T>` style declarations.
+- [x] Add docs for incorrect generic declarations such as binding a train client
       to the bus response type.
-- [ ] Add tests for successful generic inherited diagnostics.
-- [ ] Add tests for incorrect generic inherited declarations or actionable
+- [x] Add tests for successful generic inherited diagnostics.
+- [x] Add tests for incorrect generic inherited declarations or actionable
       failure messages.
-- [ ] Preserve existing inherited endpoint behavior.
+- [x] Preserve existing inherited endpoint behavior.
 
 Evidence:
 
-- Pending.
+- Added `genericBindings`, `responseType`, and `bodyType` to effective contract
+  export and contract snapshots so inherited generic endpoint bindings are
+  visible before runtime invocation.
+- Startup DEBUG method-policy diagnostics now include the declaring parent
+  interface, concrete client interface, inherited flag, generic binding, and
+  resolved request/response body types.
+- Documented correct and incorrect inherited generic client declarations in
+  `docs/02-annotations.md` and `docs/14-test-helpers.md`.
+- Added coverage for successful `ApiOperators<T>` resolution and a misbound
+  train client that still resolves to the bus response type.
+- Verified:
+  `mvn -q -pl reactive-http-client-starter -Dtest=MethodMetadataValidationTest,ReactiveClientInvocationHandlerBehaviorTest,ReactiveHttpClientFactoryBeanDiagnosticsTest,EffectiveHttpClientContractExporterTest,ReactiveHttpClientContractSnapshotTest test`
+- Verified:
+  `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+- Verified: `git diff --check`
 
 ---
 

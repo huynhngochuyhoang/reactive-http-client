@@ -570,4 +570,4 @@ private static ApiConfig api(String method, String path) {
 }
 ```
 
-Rows are sorted by client name, declaring interface, and Java method signature. Use `filterClient("client-name")` and `filterMethod("methodName")` to keep snapshots focused. The output is sanitized: it includes contract metadata such as base URL, timeout source, resilience operator names, and body repeatability, but not auth secrets, default header values, proxy credentials, or request bodies.
+Rows are sorted by client name, declaring interface, and Java method signature. Use `filterClient("client-name")` and `filterMethod("methodName")` to keep snapshots focused. For inherited generic endpoints, the table includes the parent type-variable binding plus resolved response and request-body types, which makes an accidental declaration such as `TrainClient extends ApiOperators<BusResponse>` visible as `T=BusResponse`. The output is sanitized: it includes contract metadata such as base URL, timeout source, resilience operator names, resolved type names, and body repeatability, but not auth secrets, default header values, proxy credentials, or request bodies.

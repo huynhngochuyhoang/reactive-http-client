@@ -2,11 +2,13 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import org.springframework.core.ResolvableType;
 import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
@@ -71,6 +73,9 @@ final class EffectiveHttpClientContractExporter {
                 method.getDeclaringClass().getName(),
                 method.getDeclaringClass() != clientInterface,
                 methodSignature(method),
+                genericBindings(clientInterface, method),
+                typeName(plan.responseType()),
+                typeName(plan.bodyType()),
                 effectiveApi.httpMethod(),
                 effectiveApi.pathTemplate(),
                 redactedBaseUrl(effectiveBaseUrl.value()),
@@ -201,6 +206,30 @@ final class EffectiveHttpClientContractExporter {
         return StringUtils.hasText(methodLevel) ? methodLevel : clientLevel;
     }
 
+    static String genericBindings(Class<?> clientInterface, Method method) {
+        if (method.getDeclaringClass() == clientInterface) {
+            return "none";
+        }
+        TypeVariable<?>[] variables = method.getDeclaringClass().getTypeParameters();
+        if (variables.length == 0) {
+            return "none";
+        }
+        ResolvableType declaringType = ResolvableType.forClass(clientInterface).as(method.getDeclaringClass());
+        if (declaringType == ResolvableType.NONE) {
+            return "unresolved";
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < variables.length; i++) {
+            if (i > 0) {
+                out.append(", ");
+            }
+            ResolvableType resolved = declaringType.getGeneric(i);
+            Type type = resolved != ResolvableType.NONE ? resolved.getType() : variables[i];
+            out.append(variables[i].getName()).append("=").append(typeName(type));
+        }
+        return out.toString();
+    }
+
     private static String methodSignature(Method method) {
         return method.getName() + "("
                 + Arrays.stream(method.getGenericParameterTypes())
@@ -210,8 +239,8 @@ final class EffectiveHttpClientContractExporter {
                 + ")";
     }
 
-    private static String typeName(Type type) {
-        return type.getTypeName();
+    static String typeName(Type type) {
+        return type != null ? type.getTypeName() : "none";
     }
 
     private record BaseUrl(String value, String source) {

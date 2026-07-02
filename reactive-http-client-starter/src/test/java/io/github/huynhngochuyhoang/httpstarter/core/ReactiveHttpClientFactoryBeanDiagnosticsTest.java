@@ -269,6 +269,60 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         }
     }
 
+
+    @Test
+    void methodPolicyDiagnosticsReportGenericInheritedTypeBindings(CapturedOutput output) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("generic-bus-policy-client", clientConfig("http://generic-bus.example"));
+        properties.getClients().put("generic-train-policy-client", clientConfig("http://generic-train.example"));
+
+        ReactiveHttpClientFactoryBean<GenericBusPolicyClient> busFactory =
+                buildFactoryBean(properties, GenericBusPolicyClient.class);
+        ReactiveHttpClientFactoryBean<GenericTrainMisboundPolicyClient> trainFactory =
+                buildFactoryBean(properties, GenericTrainMisboundPolicyClient.class);
+        try {
+            busFactory.getObject();
+            trainFactory.getObject();
+
+            assertThat(output.getOut().lines()
+                    .filter(line -> line.contains("Reactive HTTP client [generic-bus-policy-client] method policy")
+                            && line.contains("method=[GenericPolicyOperations#getOrder]"))
+                    .findFirst())
+                    .hasValueSatisfying(line -> assertThat(line)
+                            .contains("declaredBy=" + GenericPolicyOperations.class.getName())
+                            .contains("concreteClient=" + GenericBusPolicyClient.class.getName())
+                            .contains("inherited=true")
+                            .contains("genericBindings=T=" + GenericBusPolicyResponse.class.getName())
+                            .contains("responseType=" + GenericBusPolicyResponse.class.getName())
+                            .contains("bodyType=none"));
+            assertThat(output.getOut().lines()
+                    .filter(line -> line.contains("Reactive HTTP client [generic-bus-policy-client] method policy")
+                            && line.contains("method=[GenericPolicyOperations#submit]"))
+                    .findFirst())
+                    .hasValueSatisfying(line -> assertThat(line)
+                            .contains("genericBindings=T=" + GenericBusPolicyResponse.class.getName())
+                            .contains("responseType=" + GenericBusPolicyResponse.class.getName())
+                            .contains("bodyType=" + GenericBusPolicyResponse.class.getName()));
+            assertThat(output.getOut().lines()
+                    .filter(line -> line.contains("Reactive HTTP client [generic-train-policy-client] method policy")
+                            && line.contains("method=[GenericPolicyOperations#getOrder]"))
+                    .findFirst())
+                    .hasValueSatisfying(line -> assertThat(line)
+                            .contains("concreteClient=" + GenericTrainMisboundPolicyClient.class.getName())
+                            .contains("genericBindings=T=" + GenericBusPolicyResponse.class.getName())
+                            .contains("responseType=" + GenericBusPolicyResponse.class.getName())
+                            .doesNotContain(GenericTrainPolicyResponse.class.getName()));
+        } finally {
+            logger.setLevel(previousLevel);
+            busFactory.destroy();
+            trainFactory.destroy();
+        }
+    }
+
     @Test
     void debugStartupDiagnosticsReportMethodTimeoutAsWinningSource(CapturedOutput output) throws Exception {
         Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
@@ -1758,6 +1812,34 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
     @ReactiveHttpClient(name = "method-timeout-policy-client", baseUrl = "http://method-timeout.annotation")
     interface MethodTimeoutPolicyClient extends MethodTimeoutPolicyOperations {
+    }
+
+    interface GenericPolicyOperations<T extends GenericBasePolicyResponse> {
+        @GET("/api/order")
+        Mono<T> getOrder();
+
+        @POST("/api/order")
+        Mono<T> submit(@Body T body);
+    }
+
+    @ReactiveHttpClient(name = "generic-bus-policy-client")
+    interface GenericBusPolicyClient extends GenericPolicyOperations<GenericBusPolicyResponse> {
+    }
+
+    @ReactiveHttpClient(name = "generic-train-policy-client")
+    interface GenericTrainMisboundPolicyClient extends GenericPolicyOperations<GenericBusPolicyResponse> {
+    }
+
+    static class GenericBasePolicyResponse {
+        String code;
+    }
+
+    static class GenericBusPolicyResponse extends GenericBasePolicyResponse {
+        String message;
+    }
+
+    static class GenericTrainPolicyResponse extends GenericBasePolicyResponse {
+        String bookingCode;
     }
 
     @ReactiveHttpClient(name = "api-ref-policy-client")
