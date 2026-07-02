@@ -62,32 +62,46 @@ Evidence:
 
 ## Priority 2 — Post-`2.12.0` Baseline Transition
 
-### [ ] 1.1 Move the baseline only after `2.12.0` is published
-- [ ] Confirm published `2.12.0` artifacts resolve before changing the baseline.
-- [ ] Resolve `io.github.huynhngochuyhoang:reactive-http-client-starter:2.12.0`.
-- [ ] Resolve `io.github.huynhngochuyhoang:reactive-http-client-test:2.12.0`.
-- [ ] Resolve `io.github.huynhngochuyhoang:reactive-http-client-otel:2.12.0`.
-- [ ] Bump the next development reactor version so it does not equal the
+### [x] 1.1 Move the baseline only after `2.12.0` is published
+- [x] Confirm published `2.12.0` artifacts resolve before changing the baseline.
+- [x] Resolve `io.github.huynhngochuyhoang:reactive-http-client-starter:2.12.0`.
+- [x] Resolve `io.github.huynhngochuyhoang:reactive-http-client-test:2.12.0`.
+- [x] Resolve `io.github.huynhngochuyhoang:reactive-http-client-otel:2.12.0`.
+- [x] Bump the next development reactor version so it does not equal the
       `2.12.0` baseline.
-- [ ] Move `api.compatibility.baseline.version` to `2.12.0` only after artifact
+- [x] Move `api.compatibility.baseline.version` to `2.12.0` only after artifact
       resolution succeeds.
-- [ ] Update benchmark published-baseline commands to
+- [x] Update benchmark published-baseline commands to
       `-Dbenchmark.starter.version=2.12.0`.
-- [ ] Update benchmark published-baseline report paths to
+- [x] Update benchmark published-baseline report paths to
       `published-starter-2.12.0`.
-- [ ] Update release compatibility docs with the transition commands.
-- [ ] Verify root API compatibility passes against published `2.12.0`.
-- [ ] Verify module-scoped starter API compatibility passes against published
+- [x] Update release compatibility docs with the transition commands.
+- [x] Verify root API compatibility passes against published `2.12.0`.
+- [x] Verify module-scoped starter API compatibility passes against published
       `2.12.0`.
-- [ ] Verify root self-comparison guard rejects the current reactor version.
-- [ ] Verify module-scoped self-comparison guard rejects the current reactor
+- [x] Verify root self-comparison guard rejects the current reactor version.
+- [x] Verify module-scoped self-comparison guard rejects the current reactor
       version.
-- [ ] Run focused release documentation tests.
-- [ ] Run `git diff --check`.
+- [x] Run focused release documentation tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.12.0` passed.
+- `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.12.0` passed.
+- `mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.12.0` passed.
+- Bumped the reactor and module parent versions to `2.13.0`, keeping the next development version distinct from the published `2.12.0` API baseline.
+- Moved `api.compatibility.baseline.version` to `2.12.0` only after published artifact resolution succeeded.
+- Updated README and quick-start dependency snippets to `2.13.0`.
+- Updated release compatibility docs, benchmark published-baseline commands, and benchmark comparison paths to use `2.12.0` and `published-starter-2.12.0`.
+- Kept public promoted benchmark-report links tied to the latest promoted historical `2.11.0` report; no `2.12.0` or `2.13.0` performance claim was introduced here.
+- Added the `Unreleased` changelog entry for the post-`2.12.0` baseline transition and updated changelog comparison links.
+- `mvn -Papi-compatibility -DskipTests verify` passed against the published `2.12.0` baseline.
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify` passed against the published `2.12.0` baseline.
+- `mvn -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.13.0 validate` failed as expected with the self-comparison guard message.
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.13.0 validate` failed as expected with the self-comparison guard message.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `git diff --check` passed.
 
 ---
 
