@@ -224,10 +224,29 @@ final class EffectiveHttpClientContractExporter {
                 out.append(", ");
             }
             ResolvableType resolved = declaringType.getGeneric(i);
-            Type type = resolved != ResolvableType.NONE ? resolved.getType() : variables[i];
-            out.append(variables[i].getName()).append("=").append(typeName(type));
+            out.append(variables[i].getName()).append("=").append(typeName(resolved, variables[i]));
         }
         return out.toString();
+    }
+
+    private static String typeName(ResolvableType resolvableType, Type fallback) {
+        if (resolvableType == ResolvableType.NONE) {
+            return typeName(fallback);
+        }
+        Class<?> rawClass = resolvableType.resolve();
+        if (resolvableType.hasGenerics() && rawClass != null) {
+            return rawClass.getTypeName() + "<"
+                    + Arrays.stream(resolvableType.getGenerics())
+                    .map(generic -> typeName(generic, generic.getType()))
+                    .reduce((left, right) -> left + ", " + right)
+                    .orElse("")
+                    + ">";
+        }
+        Type type = resolvableType.getType();
+        if (type instanceof TypeVariable<?>) {
+            return rawClass != null ? rawClass.getTypeName() : typeName(fallback);
+        }
+        return typeName(type);
     }
 
     private static String methodSignature(Method method) {

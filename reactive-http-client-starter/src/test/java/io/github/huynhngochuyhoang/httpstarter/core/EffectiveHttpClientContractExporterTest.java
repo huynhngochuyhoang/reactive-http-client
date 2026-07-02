@@ -108,6 +108,18 @@ class EffectiveHttpClientContractExporterTest {
     }
 
     @Test
+    void exportsNestedResolvedGenericBindingsForInheritedContracts() {
+        EffectiveHttpClientContract contract = onlyContract(ConcreteWrappedClient.class,
+                new ReactiveHttpClientProperties.ClientConfig());
+
+        assertThat(contract.declaringInterface()).isEqualTo(WrappedOperations.class.getName());
+        assertThat(contract.concreteClientInterface()).isEqualTo(ConcreteWrappedClient.class.getName());
+        assertThat(contract.genericBindings()).isEqualTo("T=java.util.List<java.lang.String>");
+        assertThat(contract.responseType()).isEqualTo("java.util.List<java.lang.String>");
+        assertThat(contract.bodyType()).isEqualTo("none");
+    }
+
+    @Test
     void exportsMisboundGenericClientAsDeclaredJavaContract() {
         EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
                         GenericTrainMisboundClient.class, "generic-train",
@@ -260,6 +272,18 @@ class EffectiveHttpClientContractExporterTest {
     }
 
     interface ChildClient extends ParentClient {
+    }
+
+    interface WrappedOperations<T> {
+
+        @GET("/wrapped")
+        Mono<T> getWrapped();
+    }
+
+    interface StringListOperations<R> extends WrappedOperations<List<R>> {
+    }
+
+    interface ConcreteWrappedClient extends StringListOperations<String> {
     }
 
     interface GenericOperations<T extends GenericBaseResponse> {
