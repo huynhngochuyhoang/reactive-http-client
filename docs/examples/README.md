@@ -4,6 +4,10 @@ These examples are documentation snippets, not a compiled sample module. They ar
 kept small so each block can be copied into an application and adapted to local
 package names, credentials, and upstream URLs.
 
+## Effective Configuration
+
+See [Effective Configuration Examples](effective-configuration.md) for metadata-validated starter configuration snippets covering inherited clients, auth, proxy/TLS, redirects, strict retry, strict body signing, and diagnostics.
+
 ## OAuth2 Client Credentials
 
 ```yaml
