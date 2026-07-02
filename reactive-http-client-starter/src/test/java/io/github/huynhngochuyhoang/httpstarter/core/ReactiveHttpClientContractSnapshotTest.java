@@ -1,9 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import io.github.huynhngochuyhoang.httpstarter.annotation.ApiRef;
-import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
-import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
-import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
@@ -28,13 +25,39 @@ class ReactiveHttpClientContractSnapshotTest {
                 .render();
 
         assertThat(snapshot).isEqualTo("""
-                | Client | Interface | Declared By | Inherited | Method | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Timeout | Resilience | Redirect | Body |
-                |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-                | internal-users | %s | %s | true | getUser(java.lang.String) | GET | /internal-users/{id} | http://internal.example | property | users.get | users.get | client:1000ms | retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled | manual | NONE |
-                | partner-users | %s | %s | true | getUser(java.lang.String) | GET | /partner-users/{id} | http://partner.example | property | users.get | users.get | client:2000ms | retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled | manual | NONE |
+                | Client | Interface | Declared By | Inherited | Method | Generic Bindings | Response Type | Body Type | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Timeout | Resilience | Redirect | Body |
+                |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+                | internal-users | %s | %s | true | getUser(java.lang.String) | none | java.lang.String | none | GET | /internal-users/{id} | http://internal.example | property | users.get | users.get | client:1000ms | retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled | manual | NONE |
+                | partner-users | %s | %s | true | getUser(java.lang.String) | none | java.lang.String | none | GET | /partner-users/{id} | http://partner.example | property | users.get | users.get | client:2000ms | retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled | manual | NONE |
                 """.formatted(
                 InternalUserClient.class.getName(), SharedUserOperations.class.getName(),
                 PartnerUserClient.class.getName(), SharedUserOperations.class.getName()));
+    }
+
+    @Test
+    void rendersResolvedGenericBindingsAndTypesForInheritedContracts() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setBaseUrl("https://generic.example");
+
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(GenericBusClient.class, config)
+                .client(GenericTrainMisboundClient.class, config)
+                .render();
+
+        assertThat(snapshot)
+                .contains("| generic-bus | " + GenericBusClient.class.getName()
+                        + " | " + ApiOperators.class.getName() + " | true | getOrder() | T="
+                        + BusResponse.class.getName() + " | " + BusResponse.class.getName()
+                        + " | none | GET | /api/order |")
+                .contains("| generic-bus | " + GenericBusClient.class.getName()
+                        + " | " + ApiOperators.class.getName() + " | true | submit(T) | T="
+                        + BusResponse.class.getName() + " | " + BusResponse.class.getName()
+                        + " | " + BusResponse.class.getName() + " | POST | /api/order |")
+                .contains("| generic-train | " + GenericTrainMisboundClient.class.getName()
+                        + " | " + ApiOperators.class.getName() + " | true | getOrder() | T="
+                        + BusResponse.class.getName() + " | " + BusResponse.class.getName()
+                        + " | none | GET | /api/order |")
+                .doesNotContain(TrainResponse.class.getName());
     }
 
     @Test
@@ -69,7 +92,7 @@ class ReactiveHttpClientContractSnapshotTest {
 
         assertThat(snapshot)
                 .contains("| direct-client |")
-                .contains("| ping() | GET | /ping | http://direct.example | property |");
+                .contains("| ping() | none | java.lang.String | none | GET | /ping | http://direct.example | property |");
     }
 
     @Test
@@ -80,7 +103,7 @@ class ReactiveHttpClientContractSnapshotTest {
 
         assertThat(snapshot)
                 .contains("|  | " + UrlOnlyClient.class.getName())
-                .contains("| ping() | GET | /ping | https://url-only.example | annotation |");
+                .contains("| ping() | none | java.lang.String | none | GET | /ping | https://url-only.example | annotation |");
     }
 
     @Test
@@ -91,7 +114,7 @@ class ReactiveHttpClientContractSnapshotTest {
                 .render();
 
         assertThat(snapshot)
-                .contains("| good() | GET | /good |")
+                .contains("| good() | none | java.lang.String | none | GET | /good |")
                 .doesNotContain("bad()");
     }
 
@@ -138,6 +161,35 @@ class ReactiveHttpClientContractSnapshotTest {
 
     @ReactiveHttpClient(name = "partner-users")
     interface PartnerUserClient extends SharedUserOperations {
+    }
+
+    interface ApiOperators<T extends BaseResponse> {
+
+        @GET("/api/order")
+        Mono<T> getOrder();
+
+        @POST("/api/order")
+        Mono<T> submit(@Body T body);
+    }
+
+    @ReactiveHttpClient(name = "generic-bus")
+    interface GenericBusClient extends ApiOperators<BusResponse> {
+    }
+
+    @ReactiveHttpClient(name = "generic-train")
+    interface GenericTrainMisboundClient extends ApiOperators<BusResponse> {
+    }
+
+    static class BaseResponse {
+        String code;
+    }
+
+    static class BusResponse extends BaseResponse {
+        String message;
+    }
+
+    static class TrainResponse extends BaseResponse {
+        String bookingCode;
     }
 
     @ReactiveHttpClient(name = "direct-client")

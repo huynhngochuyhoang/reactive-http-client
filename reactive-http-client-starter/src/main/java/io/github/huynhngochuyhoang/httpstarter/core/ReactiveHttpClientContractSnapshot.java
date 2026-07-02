@@ -128,8 +128,8 @@ public final class ReactiveHttpClientContractSnapshot {
                     .toList();
 
             StringBuilder markdown = new StringBuilder();
-            markdown.append("| Client | Interface | Declared By | Inherited | Method | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Timeout | Resilience | Redirect | Body |\n");
-            markdown.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+            markdown.append("| Client | Interface | Declared By | Inherited | Method | Generic Bindings | Response Type | Body Type | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Timeout | Resilience | Redirect | Body |\n");
+            markdown.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
             for (EffectiveHttpClientContract contract : contracts) {
                 markdown.append("| ")
                         .append(cell(contract.clientName())).append(" | ")
@@ -137,6 +137,9 @@ public final class ReactiveHttpClientContractSnapshot {
                         .append(cell(contract.declaringInterface())).append(" | ")
                         .append(contract.inherited()).append(" | ")
                         .append(cell(contract.javaMethodSignature())).append(" | ")
+                        .append(cell(contract.genericBindings())).append(" | ")
+                        .append(cell(contract.responseType())).append(" | ")
+                        .append(cell(contract.bodyType())).append(" | ")
                         .append(cell(contract.httpMethod())).append(" | ")
                         .append(cell(contract.pathTemplate())).append(" | ")
                         .append(cell(redactedBaseUrl(contract.baseUrl()))).append(" | ")

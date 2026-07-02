@@ -56,6 +56,9 @@ class EffectiveHttpClientContractExporterTest {
         assertThat(contract.concreteClientInterface()).isEqualTo(ChildClient.class.getName());
         assertThat(contract.declaringInterface()).isEqualTo(ParentClient.class.getName());
         assertThat(contract.inherited()).isTrue();
+        assertThat(contract.genericBindings()).isEqualTo("none");
+        assertThat(contract.responseType()).isEqualTo(String.class.getName());
+        assertThat(contract.bodyType()).isEqualTo("none");
         assertThat(contract.httpMethod()).isEqualTo("GET");
         assertThat(contract.pathTemplate()).isEqualTo("/shared/{id}");
         assertThat(contract.timeout()).isEqualTo(new EffectiveHttpClientContract.TimeoutPolicy("client", 500));
@@ -77,6 +80,59 @@ class EffectiveHttpClientContractExporterTest {
         assertThat(contract.apiName()).isEqualTo("item.update");
         assertThat(contract.apiRef()).isEqualTo("item.update");
         assertThat(contract.timeout()).isEqualTo(new EffectiveHttpClientContract.TimeoutPolicy("api-ref", 700));
+    }
+
+    @Test
+    void exportsResolvedGenericTypesForInheritedContracts() {
+        List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
+                GenericBusClient.class, "generic-bus", new ReactiveHttpClientProperties.ClientConfig(), metadataCache);
+
+        EffectiveHttpClientContract get = contracts.stream()
+                .filter(contract -> contract.javaMethodSignature().startsWith("getOrder"))
+                .findFirst()
+                .orElseThrow();
+        EffectiveHttpClientContract submit = contracts.stream()
+                .filter(contract -> contract.javaMethodSignature().startsWith("submit"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(get.declaringInterface()).isEqualTo(GenericOperations.class.getName());
+        assertThat(get.concreteClientInterface()).isEqualTo(GenericBusClient.class.getName());
+        assertThat(get.inherited()).isTrue();
+        assertThat(get.genericBindings()).isEqualTo("T=" + GenericBusResponse.class.getName());
+        assertThat(get.responseType()).isEqualTo(GenericBusResponse.class.getName());
+        assertThat(get.bodyType()).isEqualTo("none");
+        assertThat(submit.genericBindings()).isEqualTo("T=" + GenericBusResponse.class.getName());
+        assertThat(submit.responseType()).isEqualTo(GenericBusResponse.class.getName());
+        assertThat(submit.bodyType()).isEqualTo(GenericBusResponse.class.getName());
+    }
+
+    @Test
+    void exportsNestedResolvedGenericBindingsForInheritedContracts() {
+        EffectiveHttpClientContract contract = onlyContract(ConcreteWrappedClient.class,
+                new ReactiveHttpClientProperties.ClientConfig());
+
+        assertThat(contract.declaringInterface()).isEqualTo(WrappedOperations.class.getName());
+        assertThat(contract.concreteClientInterface()).isEqualTo(ConcreteWrappedClient.class.getName());
+        assertThat(contract.genericBindings()).isEqualTo("T=java.util.List<java.lang.String>");
+        assertThat(contract.responseType()).isEqualTo("java.util.List<java.lang.String>");
+        assertThat(contract.bodyType()).isEqualTo("none");
+    }
+
+    @Test
+    void exportsMisboundGenericClientAsDeclaredJavaContract() {
+        EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
+                        GenericTrainMisboundClient.class, "generic-train",
+                        new ReactiveHttpClientProperties.ClientConfig(), metadataCache)
+                .stream()
+                .filter(candidate -> candidate.javaMethodSignature().startsWith("getOrder"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(contract.concreteClientInterface()).isEqualTo(GenericTrainMisboundClient.class.getName());
+        assertThat(contract.declaringInterface()).isEqualTo(GenericOperations.class.getName());
+        assertThat(contract.genericBindings()).isEqualTo("T=" + GenericBusResponse.class.getName());
+        assertThat(contract.responseType()).isEqualTo(GenericBusResponse.class.getName());
     }
 
     @Test
@@ -216,6 +272,41 @@ class EffectiveHttpClientContractExporterTest {
     }
 
     interface ChildClient extends ParentClient {
+    }
+
+    interface WrappedOperations<T> {
+
+        @GET("/wrapped")
+        Mono<T> getWrapped();
+    }
+
+    interface StringListOperations<R> extends WrappedOperations<List<R>> {
+    }
+
+    interface ConcreteWrappedClient extends StringListOperations<String> {
+    }
+
+    interface GenericOperations<T extends GenericBaseResponse> {
+
+        @GET("/api/order")
+        Mono<T> getOrder();
+
+        @POST("/api/order")
+        Mono<T> submit(@Body T body);
+    }
+
+    interface GenericBusClient extends GenericOperations<GenericBusResponse> {
+    }
+
+    interface GenericTrainMisboundClient extends GenericOperations<GenericBusResponse> {
+    }
+
+    static class GenericBaseResponse {
+        String code;
+    }
+
+    static class GenericBusResponse extends GenericBaseResponse {
+        String message;
     }
 
     interface NoTimeoutClient {
