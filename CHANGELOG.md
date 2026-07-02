@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-07-02
+
 ### Added
 
 - **Opt-in diagnostics endpoint and support bundles.** Added an opt-in Actuator diagnostics endpoint plus production support-bundle guidance for collecting sanitized diagnostics snapshots, health details, startup summaries, exchange logs, and benchmark evidence.
