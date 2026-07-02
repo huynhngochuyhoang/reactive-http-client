@@ -204,26 +204,31 @@ Evidence:
 
 ## Priority 7 — Generated Effective Configuration Examples
 
-### [ ] 4.1 Add generated effective-configuration examples
-- [ ] Decide whether examples are generated artifacts, validated snippets, or
+### [x] 4.1 Add generated effective-configuration examples
+- [x] Decide whether examples are generated artifacts, validated snippets, or
       both.
-- [ ] Add or validate an inherited shared-interface configuration example.
-- [ ] Add or validate an OAuth2 client-credentials configuration example.
-- [ ] Add or validate an AWS SigV4 configuration example.
-- [ ] Add or validate proxy/TLS configuration examples.
-- [ ] Add or validate redirect-following configuration examples.
-- [ ] Add or validate strict retry configuration examples.
-- [ ] Add or validate strict body-signing configuration examples.
-- [ ] Add or validate diagnostics endpoint configuration examples.
-- [ ] Ensure examples bind against current configuration metadata.
-- [ ] Reject scalar assignments to metadata groups.
-- [ ] Reject stale or unknown property names.
-- [ ] Keep starter, OTel, and benchmark module properties separated.
-- [ ] Run configuration metadata and documentation release tests.
+- [x] Add or validate an inherited shared-interface configuration example.
+- [x] Add or validate an OAuth2 client-credentials configuration example.
+- [x] Add or validate an AWS SigV4 configuration example.
+- [x] Add or validate proxy/TLS configuration examples.
+- [x] Add or validate redirect-following configuration examples.
+- [x] Add or validate strict retry configuration examples.
+- [x] Add or validate strict body-signing configuration examples.
+- [x] Add or validate diagnostics endpoint configuration examples.
+- [x] Ensure examples bind against current configuration metadata.
+- [x] Reject scalar assignments to metadata groups.
+- [x] Reject stale or unknown property names.
+- [x] Keep starter, OTel, and benchmark module properties separated.
+- [x] Run configuration metadata and documentation release tests.
 
 Evidence:
 
-- Pending.
+- Added `docs/examples/effective-configuration.md` as the validated effective-configuration examples artifact. The page covers shared inherited-client API maps, OAuth2 client credentials, AWS SigV4 strict body signing, proxy/TLS overrides, redirect following, strict retry, and the opt-in diagnostics endpoint.
+- Linked the new examples page from `docs/examples/README.md`.
+- Added `effectiveConfigurationExamplesCoverV16ScenariosAndUseStarterMetadata()` to require the V16 scenario properties, validate the snippets against generated configuration metadata, and keep OTel properties out of the starter examples page.
+- Existing metadata tests continue to reject scalar assignments to metadata groups and malformed API-map leaves, and the new page is included in the stale/unknown property scan.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
 
 ---
 

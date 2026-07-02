@@ -258,6 +258,60 @@ class ReactiveHttpClientConfigurationMetadataTest {
         );
     }
 
+
+    @Test
+    void effectiveConfigurationExamplesCoverV16ScenariosAndUseStarterMetadata() throws IOException {
+        Path examples = projectRoot().resolve("docs/examples/effective-configuration.md");
+        Set<String> exampleProperties = configurationExampleProperties(Files.readAllLines(examples));
+        Set<String> missing = new TreeSet<>(exampleProperties);
+        missing.removeAll(allMetadataPropertyNames(projectRoot()));
+
+        assertThat(missing).as("effective configuration examples missing from metadata").isEmpty();
+        assertThat(exampleProperties).contains(
+                "reactive.http.clients.[name].base-url",
+                "reactive.http.clients.[name].request-timeout-ms",
+                "reactive.http.clients.[name].follow-redirects",
+                "reactive.http.clients.[name].apis.[api-name].method",
+                "reactive.http.clients.[name].apis.[api-name].path",
+                "reactive.http.clients.[name].apis.[api-name].timeout-ms",
+                "reactive.http.clients.[name].auth.type",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.token-uri",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.client-id",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.client-secret",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.auth-style",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.expiry-leeway-ms",
+                "reactive.http.clients.[name].auth.aws-sig-v4.access-key-id",
+                "reactive.http.clients.[name].auth.aws-sig-v4.secret-access-key",
+                "reactive.http.clients.[name].auth.aws-sig-v4.session-token",
+                "reactive.http.clients.[name].auth.aws-sig-v4.region",
+                "reactive.http.clients.[name].auth.aws-sig-v4.service",
+                "reactive.http.clients.[name].auth.aws-sig-v4.strict-body-signing-validation",
+                "reactive.http.clients.[name].default-headers",
+                "reactive.http.clients.[name].proxy.type",
+                "reactive.http.clients.[name].tls.trust-store",
+                "reactive.http.clients.[name].tls.trust-store-password",
+                "reactive.http.clients.[name].tls.key-store",
+                "reactive.http.clients.[name].tls.key-store-password",
+                "reactive.http.clients.[name].tls.protocols",
+                "reactive.http.clients.[name].tls.ciphers",
+                "reactive.http.clients.[name].resilience.enabled",
+                "reactive.http.clients.[name].resilience.retry",
+                "reactive.http.clients.[name].resilience.retry-methods",
+                "reactive.http.clients.[name].resilience.strict-unsafe-retry-validation",
+                "reactive.http.network.proxy.type",
+                "reactive.http.network.proxy.host",
+                "reactive.http.network.proxy.port",
+                "reactive.http.network.proxy.username",
+                "reactive.http.network.proxy.password",
+                "reactive.http.network.proxy.non-proxy-hosts",
+                "reactive.http.network.tls.trust-store",
+                "reactive.http.network.tls.trust-store-password",
+                "reactive.http.network.tls.trust-store-type",
+                "reactive.http.observability.diagnostics-endpoint.enabled"
+        );
+        assertThat(exampleProperties).noneMatch(property -> property.startsWith("reactive.http.observability.otel"));
+    }
+
     @Test
     void documentedConfigurationExampleExtractionRejectsGroupsAndMalformedApiMapLeaves() throws IOException {
         Set<String> metadataNames = allMetadataPropertyNames(projectRoot());
