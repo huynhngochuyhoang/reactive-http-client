@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Benchmark and public API readiness audits.** Re-audited JSON/`ResponseEntity` benchmark rows without adding a speculative optimization, separated no-network benchmark diagnostics from loopback feature claims, and expanded public API compatibility coverage for documented diagnostics and contract snapshot helpers.
+- **Benchmark and public API readiness audits.** Re-audited JSON/`ResponseEntity` benchmark rows without adding a speculative optimization, separated no-network benchmark diagnostics from loopback feature claims, and expanded public API compatibility coverage for documented header-redaction, method-metadata cache, diagnostics, and contract snapshot helpers.
 
 
 ## [2.11.0] - 2026-06-30

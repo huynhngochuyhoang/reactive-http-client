@@ -33,12 +33,13 @@ The Maven profile produces japicmp reports under each module's
 fixture script verifies that additive APIs pass while removal of a public
 constructor fails. The filtered comparison covers the documented extension
 points, annotations, exceptions, observability types, configuration properties,
-test-helper package, OpenTelemetry companion package, and public diagnostics
-helpers such as `ReactiveHttpClientDiagnosticsProvider`,
+test-helper package, OpenTelemetry companion package, documented cache and
+redaction helpers such as `MethodMetadataCache` and `SensitiveHeaders`, and
+public diagnostics helpers such as `ReactiveHttpClientDiagnosticsProvider`,
 `ReactiveHttpClientDiagnosticsSnapshot`, and
 `ReactiveHttpClientContractSnapshot`. Internal implementation classes remain
 excluded unless they are explicitly listed in the POM include set; examples
-include proxy invocation internals, metadata caches, URI argument resolution,
+include proxy invocation internals, URI argument resolution internals,
 transport/TLS applicators, and generated release-test fixtures.
 
 The profile also fails during `validate` when

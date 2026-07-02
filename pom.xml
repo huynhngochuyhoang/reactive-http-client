@@ -248,16 +248,18 @@
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.FileAttachment</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogContext</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogger</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider*</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsSnapshot</include>
-                                    <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientContractSnapshot</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientContractSnapshot*</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.RequestContext</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.RequestContextContributor</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.SensitiveHeaders</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.test</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.otel</include>
                                 </includes>

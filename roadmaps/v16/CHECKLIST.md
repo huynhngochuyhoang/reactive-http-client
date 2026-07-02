@@ -383,9 +383,10 @@ Evidence:
   `ReactiveHttpClientDiagnosticsProvider*`,
   `ReactiveHttpClientDiagnosticsSnapshot`, `AuthProviderException`,
   annotations, exceptions, observability types, configuration properties, and
-  extension-point packages were already covered;
-  `ReactiveHttpClientContractSnapshot` was documented but missing from the
-  explicit core helper includes, so it is now included in `pom.xml`.
+  extension-point packages were already covered. `SensitiveHeaders`,
+  `MethodMetadataCache`, and nested `ReactiveHttpClientContractSnapshot` fluent
+  API types were documented but missing from the explicit core helper includes,
+  so they are now included in `pom.xml`.
 - Audited public test helper and OTel surfaces. The existing include set covers
   `io.github.huynhngochuyhoang.httpstarter.test` and
   `io.github.huynhngochuyhoang.httpstarter.otel`, and generated japicmp reports
