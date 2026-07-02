@@ -179,9 +179,9 @@ their body-signing contract remains application-owned.
 | `String` | Signs bytes using the request `Content-Type` charset when one is declared; otherwise UTF-8. |
 | Concrete JSON object body | Signs the JSON bytes serialized by the starter auth pipeline with the configured `ObjectMapper`; strict mode requires an absent or startup-provable JSON-compatible `Content-Type`, and WebClient codecs must stay aligned with that mapper. |
 | `@Body Object` or erased generic body | Rejected at startup when strict body-signing validation is enabled because the runtime value could be a stream, resource, map, DTO, or another unsupported shape. |
-| `Publisher`, streaming upload body, or multipart body | Rejected at startup when strict body-signing validation is enabled; otherwise rejected before the request is sent. The starter does not buffer or subscribe to the stream only for signing. |
+| `Publisher`, `InputStream`, `Reader`, `ReadableByteChannel`, streaming upload body, or multipart body | Rejected at startup when strict body-signing validation is enabled; otherwise rejected before the request is sent. The starter does not buffer or subscribe to the stream only for signing. |
 
-`Publisher`, streaming, multipart, `@Body Object`, and erased-generic request bodies are not signed by the built-in provider because stable raw bytes are not materialized without consuming or re-encoding the body. Use a repeatable `byte[]`, charset-declared `String`, or concrete JSON object body with an absent or JSON-compatible `Content-Type` and codecs aligned to the starter `ObjectMapper` for built-in signing, or provide a custom auth provider that implements AWS streaming signatures.
+`Publisher`, Java stream types, multipart, `@Body Object`, and erased-generic request bodies are not signed by the built-in provider because stable raw bytes are not materialized without consuming or re-encoding the body. Use a repeatable `byte[]`, charset-declared `String`, or concrete JSON object body with an absent or JSON-compatible `Content-Type` and codecs aligned to the starter `ObjectMapper` for built-in signing, or provide a custom auth provider that implements AWS streaming signatures.
 
 ```yaml
 reactive:

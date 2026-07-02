@@ -29,9 +29,12 @@ import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 
+import java.io.InputStream;
+import java.io.Reader;
 import java.lang.reflect.*;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.channels.ReadableByteChannel;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -851,7 +854,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     + ".auth.aws-sig-v4.strict-body-signing-validation=true). "
                     + "Built-in AWS SigV4 body signing supports empty, byte[], String, and concrete JSON object bodies "
                     + "only when stable raw bytes and a JSON-compatible Content-Type can be proven at startup. "
-                    + "Publisher, streaming or resource, multipart, Object or erased generic bodies, and dynamic "
+                    + "Publisher, Java stream, resource, multipart, Object or erased generic bodies, and dynamic "
                     + "Content-Type values require a custom AuthProvider or strict validation disabled.\n  - "
                     + String.join("\n  - ", unsupportedMethods));
         }
@@ -899,6 +902,10 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             return BodySigningContract.unsupported("resource(" + typeName + ")",
                     "Resource bodies are application-owned streams and do not expose stable raw bytes");
         }
+        if (isApplicationOwnedStreamBody(rawType)) {
+            return BodySigningContract.unsupported("stream(" + typeName + ")",
+                    "Stream body types are application-owned and do not expose stable raw bytes");
+        }
         if (Object.class.equals(rawType)) {
             return BodySigningContract.unsupported("unknown(" + typeName + ")",
                     "Object or erased generic bodies cannot prove stable raw bytes at startup");
@@ -933,6 +940,12 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         }
         return BodySigningContract.unsupported("json(" + typeName + ")",
                 "configured default Content-Type [" + defaultContentType + "] is not JSON-compatible");
+    }
+
+    private static boolean isApplicationOwnedStreamBody(Class<?> rawType) {
+        return InputStream.class.isAssignableFrom(rawType)
+                || Reader.class.isAssignableFrom(rawType)
+                || ReadableByteChannel.class.isAssignableFrom(rawType);
     }
 
     private static boolean hasDynamicContentTypeHeader(RequestPlan plan) {

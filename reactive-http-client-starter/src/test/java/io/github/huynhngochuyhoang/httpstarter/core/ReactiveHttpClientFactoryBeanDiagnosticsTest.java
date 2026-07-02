@@ -27,6 +27,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.InputStream;
+import java.io.Reader;
+import java.nio.channels.ReadableByteChannel;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -677,6 +680,32 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                             + "#uploadDataBuffer(org.springframework.core.io.buffer.DataBuffer)")
                     .hasMessageContaining("bodyShape=data-buffer")
                     .hasMessageContaining("auth=aws-sigv4");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsJavaStreamBodies() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+
+        ReactiveHttpClientFactoryBean<StrictSigV4JavaStreamBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4JavaStreamBodyClient.class, null, new ObjectMapper());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("method=" + StrictSigV4JavaStreamBodyClient.class.getName()
+                            + "#uploadInputStream(java.io.InputStream)")
+                    .hasMessageContaining("bodyShape=stream(java.io.InputStream)")
+                    .hasMessageContaining("method=" + StrictSigV4JavaStreamBodyClient.class.getName()
+                            + "#uploadReader(java.io.Reader)")
+                    .hasMessageContaining("bodyShape=stream(java.io.Reader)")
+                    .hasMessageContaining("method=" + StrictSigV4JavaStreamBodyClient.class.getName()
+                            + "#uploadChannel(java.nio.channels.ReadableByteChannel)")
+                    .hasMessageContaining("bodyShape=stream(java.nio.channels.ReadableByteChannel)")
+                    .hasMessageContaining("Stream body types are application-owned");
         } finally {
             factoryBean.destroy();
         }
@@ -1566,6 +1595,18 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
         @POST("/data-buffer")
         Mono<String> uploadDataBuffer(@Body DataBuffer body);
+    }
+
+    @ReactiveHttpClient(name = "strict-body-signing-client")
+    interface StrictSigV4JavaStreamBodyClient {
+        @POST("/input-stream")
+        Mono<String> uploadInputStream(@Body InputStream body);
+
+        @POST("/reader")
+        Mono<String> uploadReader(@Body Reader body);
+
+        @POST("/channel")
+        Mono<String> uploadChannel(@Body ReadableByteChannel body);
     }
 
     @ReactiveHttpClient(name = "strict-body-signing-client")
