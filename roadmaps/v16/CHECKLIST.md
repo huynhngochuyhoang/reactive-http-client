@@ -359,52 +359,106 @@ Evidence:
 
 ## Priority 11 — Public API Compatibility Coverage Audit
 
-### [ ] 6.1 Expand public API baseline coverage for new V15/V16 helpers
-- [ ] Audit documented public starter types against japicmp includes.
-- [ ] Audit documented public test-helper types against japicmp includes.
-- [ ] Audit documented public OTel types against japicmp includes.
-- [ ] Include `ReactiveHttpClientDiagnosticsProvider` public surface where
+### [x] 6.1 Expand public API baseline coverage for new V15/V16 helpers
+- [x] Audit documented public starter types against japicmp includes.
+- [x] Audit documented public test-helper types against japicmp includes.
+- [x] Audit documented public OTel types against japicmp includes.
+- [x] Include `ReactiveHttpClientDiagnosticsProvider` public surface where
       appropriate.
-- [ ] Include `ReactiveHttpClientDiagnosticsSnapshot` public surface where
+- [x] Include `ReactiveHttpClientDiagnosticsSnapshot` public surface where
       appropriate.
-- [ ] Include `AuthProviderException` public constructors and accessors where
+- [x] Include `AuthProviderException` public constructors and accessors where
       appropriate.
-- [ ] Include mock helper public APIs where appropriate.
-- [ ] Keep internal implementation classes out of the documented compatibility
+- [x] Include mock helper public APIs where appropriate.
+- [x] Keep internal implementation classes out of the documented compatibility
       promise.
-- [ ] Document any explicit exclusions.
-- [ ] Run root API compatibility.
-- [ ] Run module-scoped API compatibility for starter and test modules.
-- [ ] Run API compatibility fixture script.
+- [x] Document any explicit exclusions.
+- [x] Run root API compatibility.
+- [x] Run module-scoped API compatibility for starter and test modules.
+- [x] Run API compatibility fixture script.
 
 Evidence:
 
-- Pending.
+- Audited documented public starter surfaces against the japicmp include set.
+  `ReactiveHttpClientDiagnosticsProvider*`,
+  `ReactiveHttpClientDiagnosticsSnapshot`, `AuthProviderException`,
+  annotations, exceptions, observability types, configuration properties, and
+  extension-point packages were already covered. `SensitiveHeaders`,
+  `MethodMetadataCache`, its public `MethodMetadata` return model, nested
+  `ReactiveHttpClientContractSnapshot` fluent API types, and the public
+  `ResilienceOperatorApplier` hook accepted by that builder were documented but
+  missing from the explicit core helper includes, so they are now included in
+  `pom.xml`.
+- Audited public test helper and OTel surfaces. The existing include set covers
+  `io.github.huynhngochuyhoang.httpstarter.test` and
+  `io.github.huynhngochuyhoang.httpstarter.otel`, and generated japicmp reports
+  list those filters for starter, test, and OTel module compatibility runs.
+- Clarified the compatibility guide so documented public helpers are part of the
+  compatibility promise while internal proxy, URI-resolution, transport/TLS,
+  metadata-cache, and release-test fixture internals stay excluded unless
+  explicitly listed in the POM include set.
+- Verified root API compatibility with
+  `mvn -Papi-compatibility -DskipTests verify`.
+- Verified module-scoped starter compatibility with
+  `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify`.
+- Verified module-scoped test-helper compatibility with
+  `mvn -pl reactive-http-client-test -am -Papi-compatibility -DskipTests verify`.
+  Running the test module without `-am` attempted to resolve the unpublished
+  current starter `2.12.0` remotely and failed DNS resolution, so the
+  reactor-backed module check is the reproducible local validation path.
+- Verified compatibility guard fixtures with
+  `bash scripts/verify-api-compatibility-fixtures.sh`.
 
 ---
 
 ## Priority 12 — Release Readiness for Next Patch or Minor
 
-### [ ] 6.2 Prepare release readiness for the next minor or patch
-- [ ] Decide patch versus minor after V16 scope is finalized.
-- [ ] Keep changelog entries under `Unreleased` until release prep starts.
-- [ ] Ensure release evidence commands name the selected next version.
-- [ ] Ensure release evidence commands name the selected API baseline.
-- [ ] Verify promoted benchmark links are current if performance claims are
+### [x] 6.2 Prepare release readiness for the next minor or patch
+- [x] Decide patch versus minor after V16 scope is finalized.
+- [x] Keep changelog entries under `Unreleased` until release prep starts.
+- [x] Ensure release evidence commands name the selected next version.
+- [x] Ensure release evidence commands name the selected API baseline.
+- [x] Verify promoted benchmark links are current if performance claims are
       included.
-- [ ] Verify generated configuration docs are current.
-- [ ] Verify Markdown links pass.
-- [ ] Verify baseline artifact resolution commands are listed.
-- [ ] Verify API compatibility commands are listed.
-- [ ] Verify manual benchmark commands are listed when performance claims are
+- [x] Verify generated configuration docs are current.
+- [x] Verify Markdown links pass.
+- [x] Verify baseline artifact resolution commands are listed.
+- [x] Verify API compatibility commands are listed.
+- [x] Verify manual benchmark commands are listed when performance claims are
       included.
-- [ ] Run focused release documentation tests.
-- [ ] Run the full reactor test suite.
-- [ ] Run `git diff --check`.
-- [ ] Mark `ROADMAP.md` completed only after implementation and evidence are
+- [x] Run focused release documentation tests.
+- [x] Run the full reactor test suite.
+- [x] Run `git diff --check`.
+- [x] Mark `ROADMAP.md` completed only after implementation and evidence are
       complete.
 
 Evidence:
 
-- Pending.
+- Selected the next release line as the minor `2.12.0` candidate because V16
+  adds opt-in Actuator diagnostics, strict validation modes, public diagnostics
+  examples, and release-readiness behavior. The API and published benchmark
+  baseline remains the published `2.11.0` line.
+- Updated `CHANGELOG.md` under `Unreleased` with V16 Added, Changed, and Fixed
+  entries. No `2.12.0` dated release section was created.
+- Generated readiness evidence reports `projectVersion=2.12.0`,
+  `apiCompatibilityBaselineVersion=2.11.0`, generated configuration docs as
+  `current`, Markdown links as `pass`, and stale benchmark-report links as
+  `pass`.
+- Generated readiness evidence lists baseline artifact resolution commands for
+  starter, test-helper, and OTel `2.11.0` artifacts; root compatibility,
+  module-scoped starter compatibility, and compatibility fixture commands; and
+  benchmark package, smoke, current-candidate release, and published-baseline
+  commands.
+- The readiness manifest points the future promoted report to
+  `docs/benchmark-report-2.12.0.md` and currently marks it `missing`. This is
+  expected until a release-quality `2.12.0` benchmark is run and promoted for
+  public performance claims; current public performance docs continue to cite
+  the historical `2.11.0` promoted report.
+- Marked `roadmaps/v16/ROADMAP.md` completed and checked all acceptance criteria
+  after the execution checklist reached completion.
+- Verified focused release documentation with
+  `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`.
+- Verified the full reactor test suite with `mvn test`; result: 741 tests, 0
+  failures, 0 errors, 0 skipped.
+- Verified formatting with `git diff --check`.
 

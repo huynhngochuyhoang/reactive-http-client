@@ -31,8 +31,18 @@ mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify
 The Maven profile produces japicmp reports under each module's
 `target/japicmp/` directory and fails for binary-incompatible changes. The
 fixture script verifies that additive APIs pass while removal of a public
-constructor fails. Internal implementation classes and test fixtures are not
-part of the filtered public API comparison.
+constructor fails. The filtered comparison covers the documented extension
+points, annotations, exceptions, observability types, configuration properties,
+test-helper package, OpenTelemetry companion package, documented cache and
+redaction helpers such as `MethodMetadataCache`, `MethodMetadata`, and
+`SensitiveHeaders`, the contract snapshot resilience hook
+`ResilienceOperatorApplier`, and public diagnostics helpers such as
+`ReactiveHttpClientDiagnosticsProvider`,
+`ReactiveHttpClientDiagnosticsSnapshot`, and
+`ReactiveHttpClientContractSnapshot`. Internal implementation classes remain
+excluded unless they are explicitly listed in the POM include set; examples
+include proxy invocation internals, URI argument resolution internals,
+transport/TLS applicators, and generated release-test fixtures.
 
 The profile also fails during `validate` when
 `api.compatibility.baseline.version` equals the current reactor

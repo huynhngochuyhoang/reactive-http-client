@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V16
 
-> **Status:** draft after V15 completion and the `2.11.0` release-prep line.
+> **Status:** completed for the `2.12.0` candidate line.
 
 V15 finished the production-hardening cycle around diagnostics, auth refresh
 failure handling, inherited generic endpoint types, streaming ownership,
@@ -50,10 +50,10 @@ against `2.11.0` instead of the older baseline.
 
 **Acceptance:**
 
-- [ ] Published `2.11.0` starter, test, and OTel artifacts resolve.
-- [ ] API compatibility compares the next reactor version against `2.11.0`.
-- [ ] Root and module-scoped self-comparison guard checks still fail as expected.
-- [ ] Benchmark docs and release evidence point at the same baseline version.
+- [x] Published `2.11.0` starter, test, and OTel artifacts resolve.
+- [x] API compatibility compares the next reactor version against `2.11.0`.
+- [x] Root and module-scoped self-comparison guard checks still fail as expected.
+- [x] Benchmark docs and release evidence point at the same baseline version.
 
 ---
 
@@ -74,10 +74,10 @@ without relying on manual review.
 
 **Acceptance:**
 
-- [ ] Promoted reports with dirty or unknown benchmark commits fail tests.
-- [ ] Promoted reports with machine-local paths fail tests.
-- [ ] Release benchmark docs show the clean-commit command sequence.
-- [ ] Existing historical reports remain valid unless they are current-release
+- [x] Promoted reports with dirty or unknown benchmark commits fail tests.
+- [x] Promoted reports with machine-local paths fail tests.
+- [x] Release benchmark docs show the clean-commit command sequence.
+- [x] Existing historical reports remain valid unless they are current-release
       evidence.
 
 ---
@@ -103,11 +103,11 @@ to support teams.
 
 **Acceptance:**
 
-- [ ] No Actuator endpoint is registered unless explicitly enabled.
-- [ ] Output matches the existing sanitized diagnostics snapshot contract.
-- [ ] Endpoint tests prove secrets, header values, body values, auth provider
+- [x] No Actuator endpoint is registered unless explicitly enabled.
+- [x] Output matches the existing sanitized diagnostics snapshot contract.
+- [x] Endpoint tests prove secrets, header values, body values, auth provider
       bean names, and concrete base URLs are absent.
-- [ ] Missing Actuator dependencies keep the starter behavior unchanged.
+- [x] Missing Actuator dependencies keep the starter behavior unchanged.
 
 ---
 
@@ -129,9 +129,9 @@ the right evidence during incidents.
 
 **Acceptance:**
 
-- [ ] Docs describe a minimal safe support bundle for common incident categories.
-- [ ] Examples use existing public APIs and configuration keys.
-- [ ] Documentation link validation covers the new page.
+- [x] Docs describe a minimal safe support bundle for common incident categories.
+- [x] Examples use existing public APIs and configuration keys.
+- [x] Documentation link validation covers the new page.
 
 ---
 
@@ -156,10 +156,10 @@ logs for these contracts.
 
 **Acceptance:**
 
-- [ ] Default behavior remains warning-only.
-- [ ] Strict mode fails startup only for retry paths that can actually retry.
-- [ ] Idempotent methods and effective idempotency keys do not fail strict mode.
-- [ ] Tests cover overloaded methods and inherited endpoints.
+- [x] Default behavior remains warning-only.
+- [x] Strict mode fails startup only for retry paths that can actually retry.
+- [x] Idempotent methods and effective idempotency keys do not fail strict mode.
+- [x] Tests cover overloaded methods and inherited endpoints.
 
 ---
 
@@ -180,12 +180,12 @@ charset-sensitive signing combinations instead of runtime failures.
 
 **Acceptance:**
 
-- [ ] Default behavior remains source and behavior compatible.
-- [ ] Strict mode rejects known unsupported built-in signing shapes before the
+- [x] Default behavior remains source and behavior compatible.
+- [x] Strict mode rejects known unsupported built-in signing shapes before the
       first request.
-- [ ] Tests cover JSON, byte array, String with charset, publisher, multipart,
+- [x] Tests cover JSON, byte array, String with charset, publisher, multipart,
       and empty-body paths.
-- [ ] Documentation does not promise signing parity when codecs are customized
+- [x] Documentation does not promise signing parity when codecs are customized
       beyond the signer bytes.
 
 ---
@@ -209,9 +209,9 @@ metadata.
 
 **Acceptance:**
 
-- [ ] Examples bind against current configuration metadata.
-- [ ] Strict-mode examples include both valid and invalid snippets.
-- [ ] Docs clearly separate starter, OTel, and benchmark module properties.
+- [x] Examples bind against current configuration metadata.
+- [x] Strict-mode examples include both valid and invalid snippets.
+- [x] Docs clearly separate starter, OTel, and benchmark module properties.
 
 ---
 
@@ -233,9 +233,9 @@ mapping instead of only showing a decoded type mismatch later.
 
 **Acceptance:**
 
-- [ ] Diagnostics explain `ApiOperators<T>` to `BusResponse` style bindings.
-- [ ] Incorrect generic declarations fail or report with actionable context.
-- [ ] Existing inherited endpoint behavior remains compatible.
+- [x] Diagnostics explain `ApiOperators<T>` to `BusResponse` style bindings.
+- [x] Incorrect generic declarations fail or report with actionable context.
+- [x] Existing inherited endpoint behavior remains compatible.
 
 ---
 
@@ -258,9 +258,9 @@ before any optimization work.
 
 **Acceptance:**
 
-- [ ] Any optimization proposal cites named before/after benchmark rows.
-- [ ] No public claim is made from smoke output or one noisy release run.
-- [ ] If no repeatable issue appears, document that no optimization was made.
+- [x] Any optimization proposal cites named before/after benchmark rows.
+- [x] No public claim is made from smoke output or one noisy release run.
+- [x] If no repeatable issue appears, document that no optimization was made.
 
 ---
 
@@ -279,9 +279,9 @@ make this contract harder to regress in future benchmark additions.
 
 **Acceptance:**
 
-- [ ] New benchmark prefixes must have an explicit label contract.
-- [ ] No-network rows cannot appear in the optional-feature summary table.
-- [ ] Documentation explains how to interpret no-network diagnostics rows.
+- [x] New benchmark prefixes must have an explicit label contract.
+- [x] No-network rows cannot appear in the optional-feature summary table.
+- [x] Documentation explains how to interpret no-network diagnostics rows.
 
 ---
 
@@ -302,10 +302,10 @@ set.
 
 **Acceptance:**
 
-- [ ] Every documented public class or method has compatibility coverage or an
+- [x] Every documented public class or method has compatibility coverage or an
       explicit reason for exclusion.
-- [ ] Compatibility tests pass against the current published baseline.
-- [ ] Release docs describe any intentionally unsupported internal types.
+- [x] Compatibility tests pass against the current published baseline.
+- [x] Release docs describe any intentionally unsupported internal types.
 
 ---
 
@@ -324,7 +324,7 @@ that evidence current without adding brittle automation.
 
 **Acceptance:**
 
-- [ ] Release readiness evidence names the selected version and baseline.
-- [ ] Changelog entries stay under `Unreleased` until release prep starts.
-- [ ] Release tests pass before marking V16 complete.
+- [x] Release readiness evidence names the selected version and baseline.
+- [x] Changelog entries stay under `Unreleased` until release prep starts.
+- [x] Release tests pass before marking V16 complete.
 
