@@ -173,27 +173,32 @@ Evidence:
 
 ## Priority 6 — Strict Built-In Body-Signing Contracts
 
-### [ ] 3.2 Add opt-in strict mode for ambiguous outbound body signing
-- [ ] Choose the strict body-signing validation property name and default.
-- [ ] Preserve default source and behavior compatibility.
-- [ ] Scope strict validation to built-in body-signing auth providers.
-- [ ] Avoid guessing body-signing behavior for custom auth providers.
-- [ ] Reject unsupported multipart signing shapes in strict mode.
-- [ ] Reject unsupported non-repeatable streaming signing shapes in strict mode.
-- [ ] Validate byte-array body signing as supported.
-- [ ] Validate empty-body signing as supported.
-- [ ] Validate scalar JSON body signing under the documented codec contract.
-- [ ] Validate `String` body signing under the documented charset contract.
-- [ ] Validate publisher body signing under the documented repeatability/raw-byte
+### [x] 3.2 Add opt-in strict mode for ambiguous outbound body signing
+- [x] Choose the strict body-signing validation property name and default.
+- [x] Preserve default source and behavior compatibility.
+- [x] Scope strict validation to built-in body-signing auth providers.
+- [x] Avoid guessing body-signing behavior for custom auth providers.
+- [x] Reject unsupported multipart signing shapes in strict mode.
+- [x] Reject unsupported non-repeatable streaming signing shapes in strict mode.
+- [x] Validate byte-array body signing as supported.
+- [x] Validate empty-body signing as supported.
+- [x] Validate scalar JSON body signing under the documented codec contract.
+- [x] Validate `String` body signing under the documented charset contract.
+- [x] Validate publisher body signing under the documented repeatability/raw-byte
       contract.
-- [ ] Add clear startup diagnostics naming client, method, body shape, and auth
+- [x] Add clear startup diagnostics naming client, method, body shape, and auth
       mode.
-- [ ] Update auth provider docs with strict-mode examples.
-- [ ] Run SigV4, auth, request-body, and documentation tests.
+- [x] Update auth provider docs with strict-mode examples.
+- [x] Run SigV4, auth, request-body, and documentation tests.
 
 Evidence:
 
-- Pending.
+- Added `reactive.http.clients.<name>.auth.aws-sig-v4.strict-body-signing-validation`, default `false`, under the built-in AWS SigV4 auth config. Existing runtime behavior remains unchanged unless the property is enabled.
+- Strict startup validation runs only when object-style `auth.type: aws-sigv4` resolves to the starter built-in `AwsSigV4AuthProvider`; named `auth-provider` beans and custom `AuthProviderFactory` selections are treated as custom and skipped.
+- Strict mode allows empty bodies, `byte[]`, `String`, and concrete JSON object bodies when an `ObjectMapper` is available and the startup-visible `Content-Type` is absent or JSON-compatible.
+- Strict mode rejects multipart bodies, `Publisher` bodies, Java stream bodies, `DataBuffer` streaming bodies, `Resource` bodies, `@Body Object` or erased generic bodies, JSON object bodies when no `ObjectMapper` is available, JSON bodies with configured non-JSON `Content-Type`, and JSON bodies with runtime-supplied `Content-Type`. Diagnostics include client interface, method signature, HTTP method, path template, body shape, auth mode, and reason.
+- Updated Spring configuration metadata, generated configuration reference, property binding coverage, and AWS SigV4 docs with a strict-mode YAML example.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientFactoryBeanDiagnosticsTest,ReactiveHttpClientPropertiesTest,ReactiveHttpClientConfigurationMetadataTest,AuthProviderFactoryTest,AwsSigV4AuthProviderTest,OutboundAuthFilterTest,ReactiveClientInvocationHandlerBehaviorTest,MultipartRequestTest,DocumentationReleaseArtifactTest test` passed.
 
 ---
 

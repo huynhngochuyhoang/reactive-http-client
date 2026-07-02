@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
+import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
@@ -20,9 +22,15 @@ import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.InputStream;
+import java.io.Reader;
+import java.nio.channels.ReadableByteChannel;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -640,6 +648,213 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
+    void strictBodySigningValidationAllowsSupportedSigV4BodyShapes() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+
+        ReactiveHttpClientFactoryBean<StrictSigV4SupportedBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4SupportedBodyClient.class, null, new ObjectMapper());
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsSigV4PublisherAndStreamingBodies() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+
+        ReactiveHttpClientFactoryBean<StrictSigV4StreamingBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4StreamingBodyClient.class, null, new ObjectMapper());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("reactive.http.clients.strict-body-signing-client.auth.aws-sig-v4.strict-body-signing-validation=true")
+                    .hasMessageContaining("method=" + StrictSigV4StreamingBodyClient.class.getName()
+                            + "#uploadPublisher(reactor.core.publisher.Flux)")
+                    .hasMessageContaining("bodyShape=publisher")
+                    .hasMessageContaining("method=" + StrictSigV4StreamingBodyClient.class.getName()
+                            + "#uploadDataBuffer(org.springframework.core.io.buffer.DataBuffer)")
+                    .hasMessageContaining("bodyShape=data-buffer")
+                    .hasMessageContaining("auth=aws-sigv4");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsJavaStreamBodies() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+
+        ReactiveHttpClientFactoryBean<StrictSigV4JavaStreamBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4JavaStreamBodyClient.class, null, new ObjectMapper());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("method=" + StrictSigV4JavaStreamBodyClient.class.getName()
+                            + "#uploadInputStream(java.io.InputStream)")
+                    .hasMessageContaining("bodyShape=stream(java.io.InputStream)")
+                    .hasMessageContaining("method=" + StrictSigV4JavaStreamBodyClient.class.getName()
+                            + "#uploadReader(java.io.Reader)")
+                    .hasMessageContaining("bodyShape=stream(java.io.Reader)")
+                    .hasMessageContaining("method=" + StrictSigV4JavaStreamBodyClient.class.getName()
+                            + "#uploadChannel(java.nio.channels.ReadableByteChannel)")
+                    .hasMessageContaining("bodyShape=stream(java.nio.channels.ReadableByteChannel)")
+                    .hasMessageContaining("Stream body types are application-owned");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsSigV4MultipartBody() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+
+        ReactiveHttpClientFactoryBean<StrictSigV4MultipartBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4MultipartBodyClient.class, null, new ObjectMapper());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("method=" + StrictSigV4MultipartBodyClient.class.getName()
+                            + "#upload(byte[])")
+                    .hasMessageContaining("bodyShape=multipart")
+                    .hasMessageContaining("multipart bodies do not expose stable raw bytes");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsJsonBodyWhenObjectMapperUnavailable() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+
+        ReactiveHttpClientFactoryBean<StrictSigV4JsonBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4JsonBodyClient.class);
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("bodyShape=json(java.util.Map)")
+                    .hasMessageContaining("JSON body signing requires an ObjectMapper bean");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationIgnoresNamedCustomAuthProvider() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = awsSigV4ClientConfig(true);
+        config.setAuthProvider("namedAuthProvider");
+        properties.getClients().put("strict-body-signing-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictSigV4StreamingBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4StreamingBodyClient.class);
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationIgnoresCustomFactorySelectedForAwsSigV4() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+        AuthProviderFactory customFactory = new AuthProviderFactory() {
+            @Override
+            public boolean supports(String type) {
+                return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+            }
+
+            @Override
+            public AuthProvider create(String clientName,
+                                       ReactiveHttpClientProperties.AuthConfig authConfig,
+                                       WebClient.Builder webClientBuilder) {
+                return request -> Mono.just(AuthContext.empty());
+            }
+        };
+
+        ReactiveHttpClientFactoryBean<StrictSigV4StreamingBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4StreamingBodyClient.class, null,
+                        new ObjectMapper(), customFactory);
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsErasedObjectBody() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+
+        ReactiveHttpClientFactoryBean<StrictSigV4ObjectBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4ObjectBodyClient.class, null, new ObjectMapper());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("method=" + StrictSigV4ObjectBodyClient.class.getName()
+                            + "#post(java.lang.Object)")
+                    .hasMessageContaining("bodyShape=unknown(java.lang.Object)")
+                    .hasMessageContaining("Object or erased generic bodies cannot prove stable raw bytes");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsJsonBodyWithStaticNonJsonContentType() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = awsSigV4ClientConfig(true);
+        config.setDefaultHeaders(Map.of("Content-Type", "text/plain"));
+        properties.getClients().put("strict-body-signing-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictSigV4JsonBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4JsonBodyClient.class, null, new ObjectMapper());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("bodyShape=json(java.util.Map)")
+                    .hasMessageContaining("configured default Content-Type [text/plain] is not JSON-compatible");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsJsonBodyWithDynamicContentType() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+
+        ReactiveHttpClientFactoryBean<StrictSigV4DynamicContentTypeJsonBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4DynamicContentTypeJsonBodyClient.class, null,
+                        new ObjectMapper());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("method=" + StrictSigV4DynamicContentTypeJsonBodyClient.class.getName()
+                            + "#json(java.lang.String,java.util.Map)")
+                    .hasMessageContaining("bodyShape=json(java.util.Map)")
+                    .hasMessageContaining("Content-Type is supplied dynamically");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
     void failsFastWhenProxyPortIsSetWithoutHost() {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
@@ -1213,6 +1428,13 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     @SuppressWarnings("unchecked")
     private <T> ReactiveHttpClientFactoryBean<T> buildFactoryBean(
             ReactiveHttpClientProperties properties, Class<T> type, RetryRegistry retryRegistry) {
+        return buildFactoryBean(properties, type, retryRegistry, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> ReactiveHttpClientFactoryBean<T> buildFactoryBean(
+            ReactiveHttpClientProperties properties, Class<T> type, RetryRegistry retryRegistry, ObjectMapper objectMapper,
+            AuthProviderFactory... authProviderFactories) {
         ApplicationContext ctx = mock(ApplicationContext.class);
 
         ObjectProvider<Object> defaultProvider = mock(ObjectProvider.class);
@@ -1221,6 +1443,13 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                 .thenAnswer(inv -> inv.getArgument(0, Supplier.class).get());
         lenient().when(defaultProvider.orderedStream()).thenReturn(Stream.empty());
         when(ctx.getBeanProvider(any(Class.class))).thenReturn((ObjectProvider) defaultProvider);
+
+        ObjectProvider<AuthProviderFactory> authFactoryProvider = mock(ObjectProvider.class);
+        AuthProviderFactory[] factories = authProviderFactories != null && authProviderFactories.length > 0
+                ? authProviderFactories
+                : new AuthProviderFactory[]{new AwsSigV4AuthProviderFactory()};
+        when(authFactoryProvider.orderedStream()).thenAnswer(inv -> Arrays.stream(factories));
+        when(ctx.getBeanProvider(AuthProviderFactory.class)).thenReturn(authFactoryProvider);
 
         if (retryRegistry != null) {
             ObjectProvider<RetryRegistry> retryRegistryProvider = mock(ObjectProvider.class);
@@ -1254,7 +1483,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         when(ctx.getBean("namedAuthProvider", AuthProvider.class)).thenReturn(namedAuthProvider);
 
         ObjectProvider<ObjectMapper> objectMapperProvider = mock(ObjectProvider.class);
-        when(objectMapperProvider.getIfAvailable()).thenReturn(null);
+        when(objectMapperProvider.getIfAvailable()).thenReturn(objectMapper);
         when(ctx.getBeanProvider(ObjectMapper.class)).thenReturn(objectMapperProvider);
 
         ReactiveHttpClientFactoryBean<T> factoryBean = new ReactiveHttpClientFactoryBean<>();
@@ -1266,6 +1495,19 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     private ReactiveHttpClientProperties.ClientConfig clientConfig(String baseUrl) {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setBaseUrl(baseUrl);
+        return config;
+    }
+
+    private ReactiveHttpClientProperties.ClientConfig awsSigV4ClientConfig(boolean strictBodySigningValidation) {
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setAccessKeyId("test-key");
+        auth.getAwsSigV4().setSecretAccessKey("test-secret");
+        auth.getAwsSigV4().setRegion("us-east-1");
+        auth.getAwsSigV4().setService("execute-api");
+        auth.getAwsSigV4().setStrictBodySigningValidation(strictBodySigningValidation);
+        config.setAuth(auth);
         return config;
     }
 
@@ -1310,6 +1552,68 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     interface StrictHeaderMapOverrideRetryClient {
         @POST("/create")
         Mono<String> create(@HeaderParam Map<String, String> headers);
+    }
+
+    @ReactiveHttpClient(name = "strict-body-signing-client")
+    interface StrictSigV4SupportedBodyClient {
+        @POST("/empty")
+        Mono<String> empty();
+
+        @POST("/bytes")
+        Mono<String> bytes(@Body byte[] body);
+
+        @POST("/text")
+        Mono<String> text(@Body String body);
+
+        @POST("/json")
+        Mono<String> json(@Body Map<String, Object> body);
+    }
+
+    @ReactiveHttpClient(name = "strict-body-signing-client")
+    interface StrictSigV4JsonBodyClient {
+        @POST("/json")
+        Mono<String> json(@Body Map<String, Object> body);
+    }
+
+    @ReactiveHttpClient(name = "strict-body-signing-client")
+    interface StrictSigV4ObjectBodyClient {
+        @POST("/object")
+        Mono<String> post(@Body Object body);
+    }
+
+    @ReactiveHttpClient(name = "strict-body-signing-client")
+    interface StrictSigV4DynamicContentTypeJsonBodyClient {
+        @POST("/json")
+        Mono<String> json(@HeaderParam("Content-Type") String contentType,
+                          @Body Map<String, Object> body);
+    }
+
+    @ReactiveHttpClient(name = "strict-body-signing-client")
+    interface StrictSigV4StreamingBodyClient {
+        @POST("/publisher")
+        Mono<String> uploadPublisher(@Body Flux<String> body);
+
+        @POST("/data-buffer")
+        Mono<String> uploadDataBuffer(@Body DataBuffer body);
+    }
+
+    @ReactiveHttpClient(name = "strict-body-signing-client")
+    interface StrictSigV4JavaStreamBodyClient {
+        @POST("/input-stream")
+        Mono<String> uploadInputStream(@Body InputStream body);
+
+        @POST("/reader")
+        Mono<String> uploadReader(@Body Reader body);
+
+        @POST("/channel")
+        Mono<String> uploadChannel(@Body ReadableByteChannel body);
+    }
+
+    @ReactiveHttpClient(name = "strict-body-signing-client")
+    interface StrictSigV4MultipartBodyClient {
+        @POST("/multipart")
+        @MultipartBody
+        Mono<String> upload(@FormFile("file") byte[] file);
     }
 
     @ReactiveHttpClient(name = "strict-retry-client")
