@@ -165,7 +165,7 @@ management:
         include: rhttpclients
 ```
 
-The endpoint returns the same JSON-safe fields as `ReactiveHttpClientDiagnosticsSnapshot`: project version, client count, endpoint count, inherited endpoint count, and per-client policy summaries. It does not expose concrete base URLs, auth secrets, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
+The endpoint returns the same JSON-safe fields as `ReactiveHttpClientDiagnosticsSnapshot`: project version, client count, endpoint count, inherited endpoint count, per-client policy summaries, and strict validation flags. It does not expose concrete base URLs, auth secrets, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
 
 ## Connection-pool metrics
 

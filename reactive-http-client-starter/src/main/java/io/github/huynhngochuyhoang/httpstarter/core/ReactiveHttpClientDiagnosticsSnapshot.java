@@ -21,27 +21,38 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     }
 
     public static String toMarkdown(ReactiveHttpClientDiagnosticsProvider provider) {
-        return toMarkdown(provider.clientSummaries());
+        return toMarkdownEntries(provider.clientSnapshotEntries().stream()
+                .map(ReactiveHttpClientDiagnosticsSnapshot::snapshotClient)
+                .toList());
     }
 
     public static String toMarkdown(Collection<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries) {
-        List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> clients = sorted(summaries);
-        StringBuilder out = new StringBuilder(512 + clients.size() * 192);
+        return toMarkdownEntries(summaries.stream()
+                .map(ReactiveHttpClientDiagnosticsSnapshot::snapshotClient)
+                .toList());
+    }
+
+    private static String toMarkdownEntries(Collection<SnapshotClient> entries) {
+        List<SnapshotClient> clients = sortedEntries(entries);
+        StringBuilder out = new StringBuilder(512 + clients.size() * 224);
         out.append("# Reactive HTTP Client Diagnostics Snapshot\n\n");
         out.append("| Field | Value |\n");
         out.append("|---|---|\n");
         out.append("| Project version | `").append(markdown(projectVersion())).append("` |\n");
         out.append("| Client count | `").append(clients.size()).append("` |\n");
-        out.append("| Endpoint count | `").append(endpointCount(clients)).append("` |\n");
-        out.append("| Inherited endpoint count | `").append(inheritedEndpointCount(clients)).append("` |\n\n");
-        out.append("| Client | Interface | Base URL source | Timeout | Resilience | Auth mode | Redirects | Endpoints | Inherited endpoints |\n");
-        out.append("|---|---|---|---|---|---|---|---|---|\n");
-        for (ReactiveHttpClientDiagnosticsProvider.ClientSummary client : clients) {
+        out.append("| Endpoint count | `").append(endpointCountEntries(clients)).append("` |\n");
+        out.append("| Inherited endpoint count | `").append(inheritedEndpointCountEntries(clients)).append("` |\n\n");
+        out.append("| Client | Interface | Base URL source | Timeout | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |\n");
+        out.append("|---|---|---|---|---|---|---|---|---|---|---|\n");
+        for (SnapshotClient entry : clients) {
+            ReactiveHttpClientDiagnosticsProvider.ClientSummary client = entry.summary();
             out.append("| `").append(markdown(client.clientName())).append("` ");
             out.append("| `").append(markdown(client.clientInterface())).append("` ");
             out.append("| `").append(markdown(client.baseUrlSource())).append("` ");
             out.append("| `").append(markdown(timeout(client.timeout()))).append("` ");
             out.append("| `").append(markdown(resilience(client.resilience()))).append("` ");
+            out.append("| `").append(entry.strictUnsafeRetryValidation()).append("` ");
+            out.append("| `").append(entry.strictBodySigningValidation()).append("` ");
             out.append("| `").append(markdown(client.authMode())).append("` ");
             out.append("| `").append(client.followRedirects()).append("` ");
             out.append("| `").append(client.endpointCount()).append("` ");
@@ -51,22 +62,33 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     }
 
     public static String toJson(ReactiveHttpClientDiagnosticsProvider provider) {
-        return toJson(provider.clientSummaries());
+        return toJsonEntries(provider.clientSnapshotEntries().stream()
+                .map(ReactiveHttpClientDiagnosticsSnapshot::snapshotClient)
+                .toList());
     }
 
     public static Map<String, Object> toMap(ReactiveHttpClientDiagnosticsProvider provider) {
-        return toMap(provider.clientSummaries());
+        return toMapEntries(provider.clientSnapshotEntries().stream()
+                .map(ReactiveHttpClientDiagnosticsSnapshot::snapshotClient)
+                .toList());
     }
 
     public static Map<String, Object> toMap(Collection<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries) {
-        List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> clients = sorted(summaries);
+        return toMapEntries(summaries.stream()
+                .map(ReactiveHttpClientDiagnosticsSnapshot::snapshotClient)
+                .toList());
+    }
+
+    private static Map<String, Object> toMapEntries(Collection<SnapshotClient> entries) {
+        List<SnapshotClient> clients = sortedEntries(entries);
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("projectVersion", projectVersion());
         snapshot.put("clientCount", clients.size());
-        snapshot.put("endpointCount", endpointCount(clients));
-        snapshot.put("inheritedEndpointCount", inheritedEndpointCount(clients));
+        snapshot.put("endpointCount", endpointCountEntries(clients));
+        snapshot.put("inheritedEndpointCount", inheritedEndpointCountEntries(clients));
         List<Map<String, Object>> clientMaps = new ArrayList<>(clients.size());
-        for (ReactiveHttpClientDiagnosticsProvider.ClientSummary client : clients) {
+        for (SnapshotClient entry : clients) {
+            ReactiveHttpClientDiagnosticsProvider.ClientSummary client = entry.summary();
             Map<String, Object> clientMap = new LinkedHashMap<>();
             clientMap.put("clientName", client.clientName());
             clientMap.put("clientInterface", client.clientInterface());
@@ -78,6 +100,8 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             clientMap.put("rateLimiter", client.resilience().rateLimiter());
             clientMap.put("circuitBreaker", client.resilience().circuitBreaker());
             clientMap.put("bulkhead", client.resilience().bulkhead());
+            clientMap.put("strictUnsafeRetryValidation", entry.strictUnsafeRetryValidation());
+            clientMap.put("strictBodySigningValidation", entry.strictBodySigningValidation());
             clientMap.put("authMode", client.authMode());
             clientMap.put("followRedirects", client.followRedirects());
             clientMap.put("endpointCount", client.endpointCount());
@@ -89,19 +113,26 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     }
 
     public static String toJson(Collection<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries) {
-        List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> clients = sorted(summaries);
-        StringBuilder out = new StringBuilder(512 + clients.size() * 256);
+        return toJsonEntries(summaries.stream()
+                .map(ReactiveHttpClientDiagnosticsSnapshot::snapshotClient)
+                .toList());
+    }
+
+    private static String toJsonEntries(Collection<SnapshotClient> entries) {
+        List<SnapshotClient> clients = sortedEntries(entries);
+        StringBuilder out = new StringBuilder(512 + clients.size() * 288);
         out.append("{\n");
         field(out, 1, "projectVersion", projectVersion(), true);
         field(out, 1, "clientCount", clients.size(), true);
-        field(out, 1, "endpointCount", endpointCount(clients), true);
-        field(out, 1, "inheritedEndpointCount", inheritedEndpointCount(clients), true);
+        field(out, 1, "endpointCount", endpointCountEntries(clients), true);
+        field(out, 1, "inheritedEndpointCount", inheritedEndpointCountEntries(clients), true);
         indent(out, 1).append("\"clients\": [");
         if (!clients.isEmpty()) {
             out.append('\n');
         }
         for (int i = 0; i < clients.size(); i++) {
-            ReactiveHttpClientDiagnosticsProvider.ClientSummary client = clients.get(i);
+            SnapshotClient entry = clients.get(i);
+            ReactiveHttpClientDiagnosticsProvider.ClientSummary client = entry.summary();
             indent(out, 2).append("{\n");
             field(out, 3, "clientName", client.clientName(), true);
             field(out, 3, "clientInterface", client.clientInterface(), true);
@@ -113,6 +144,8 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             field(out, 3, "rateLimiter", client.resilience().rateLimiter(), true);
             field(out, 3, "circuitBreaker", client.resilience().circuitBreaker(), true);
             field(out, 3, "bulkhead", client.resilience().bulkhead(), true);
+            field(out, 3, "strictUnsafeRetryValidation", entry.strictUnsafeRetryValidation(), true);
+            field(out, 3, "strictBodySigningValidation", entry.strictBodySigningValidation(), true);
             field(out, 3, "authMode", client.authMode(), true);
             field(out, 3, "followRedirects", client.followRedirects(), true);
             field(out, 3, "endpointCount", client.endpointCount(), true);
@@ -131,22 +164,41 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
         return out.toString();
     }
 
-    private static List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> sorted(
-            Collection<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries) {
-        return summaries.stream()
-                .sorted(Comparator.comparing(ReactiveHttpClientDiagnosticsProvider.ClientSummary::clientName)
-                        .thenComparing(ReactiveHttpClientDiagnosticsProvider.ClientSummary::clientInterface))
+    private static SnapshotClient snapshotClient(ReactiveHttpClientDiagnosticsProvider.ClientSummary summary) {
+        return new SnapshotClient(summary, false, false);
+    }
+
+    private static SnapshotClient snapshotClient(ReactiveHttpClientDiagnosticsProvider.ClientSnapshotEntry entry) {
+        return new SnapshotClient(
+                entry.summary(),
+                entry.strictUnsafeRetryValidation(),
+                entry.strictBodySigningValidation());
+    }
+
+    private static List<SnapshotClient> sortedEntries(Collection<SnapshotClient> entries) {
+        return entries.stream()
+                .sorted(Comparator.comparing((SnapshotClient entry) -> entry.summary().clientName())
+                        .thenComparing(entry -> entry.summary().clientInterface()))
                 .toList();
     }
 
-    private static int endpointCount(List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries) {
-        return summaries.stream()
+    private record SnapshotClient(
+            ReactiveHttpClientDiagnosticsProvider.ClientSummary summary,
+            boolean strictUnsafeRetryValidation,
+            boolean strictBodySigningValidation
+    ) {
+    }
+
+    private static int endpointCountEntries(List<SnapshotClient> entries) {
+        return entries.stream()
+                .map(SnapshotClient::summary)
                 .mapToInt(ReactiveHttpClientDiagnosticsProvider.ClientSummary::endpointCount)
                 .sum();
     }
 
-    private static int inheritedEndpointCount(List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries) {
-        return summaries.stream()
+    private static int inheritedEndpointCountEntries(List<SnapshotClient> entries) {
+        return entries.stream()
+                .map(SnapshotClient::summary)
                 .mapToInt(ReactiveHttpClientDiagnosticsProvider.ClientSummary::inheritedEndpointCount)
                 .sum();
     }

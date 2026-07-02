@@ -49,8 +49,8 @@ class SupportBundleExporter {
 ```
 
 The snapshot includes project version, total client count, total endpoint count,
-total inherited endpoint count, and per-client policy summaries. It does not
-include concrete base URLs, header values, proxy credentials, auth-provider bean
+total inherited endpoint count, per-client policy summaries, and strict validation
+flags. It does not include concrete base URLs, header values, proxy credentials, auth-provider bean
 names, request bodies, or response bodies.
 
 If Actuator is available and the endpoint is explicitly enabled, the same

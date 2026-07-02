@@ -78,6 +78,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("| Client count | `1` |")
                 .contains("| Endpoint count | `2` |")
                 .contains("| Inherited endpoint count | `1` |")
+                .contains("Strict retry validation")
+                .contains("Strict body-signing validation")
                 .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName() + "` | `property` | `client:500` |")
                 .contains("configured=true, retry=disabled")
                 .contains("| `provider-bean` | `true` | `2` | `1` |");
@@ -91,6 +93,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("\"baseUrlSource\": \"property\"")
                 .contains("\"timeoutSource\": \"client\"")
                 .contains("\"timeoutMs\": 500")
+                .contains("\"strictUnsafeRetryValidation\": false")
+                .contains("\"strictBodySigningValidation\": false")
                 .contains("\"authMode\": \"provider-bean\"")
                 .contains("\"followRedirects\": true");
         assertThat(markdown + json)

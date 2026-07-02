@@ -107,27 +107,38 @@ Evidence:
 
 ## Priority 3 — Diagnostics Endpoint Contract Stabilization
 
-### [ ] 2.1 Stabilize the opt-in diagnostics endpoint contract
-- [ ] Re-audit endpoint enablement property and default-disabled behavior.
-- [ ] Re-audit the Actuator endpoint id and exposure examples.
-- [ ] Verify the endpoint is absent when Actuator endpoint dependencies are not
+### [x] 2.1 Stabilize the opt-in diagnostics endpoint contract
+- [x] Re-audit endpoint enablement property and default-disabled behavior.
+- [x] Re-audit the Actuator endpoint id and exposure examples.
+- [x] Verify the endpoint is absent when Actuator endpoint dependencies are not
       available.
-- [ ] Verify endpoint output is generated from
+- [x] Verify endpoint output is generated from
       `ReactiveHttpClientDiagnosticsSnapshot` or equivalent sanitized data.
-- [ ] Verify endpoint output omits concrete base URLs, secrets, sensitive header
+- [x] Verify endpoint output omits concrete base URLs, secrets, sensitive header
       values, request bodies, response bodies, and auth provider bean names.
-- [ ] Add or extend tests for multiple configured clients.
-- [ ] Add or extend tests for inherited generic endpoint summaries.
-- [ ] Add or extend tests for strict validation mode summaries.
-- [ ] Add or extend tests for disabled and missing optional dependency paths.
-- [ ] Update docs that explain endpoint output versus health details, logs,
+- [x] Add or extend tests for multiple configured clients.
+- [x] Add or extend tests for inherited generic endpoint summaries.
+- [x] Add or extend tests for strict validation mode summaries.
+- [x] Add or extend tests for disabled and missing optional dependency paths.
+- [x] Update docs that explain endpoint output versus health details, logs,
       observers, exchange logging, and helper snapshots.
-- [ ] Run diagnostics provider, auto-configuration, and endpoint tests.
-- [ ] Run documentation metadata/link tests.
+- [x] Run diagnostics provider, auto-configuration, and endpoint tests.
+- [x] Run documentation metadata/link tests.
 
 Evidence:
 
-- Pending.
+- Endpoint enablement remains opt-in through `reactive.http.observability.diagnostics-endpoint.enabled=true`; the default auto-configuration path still registers only `ReactiveHttpClientDiagnosticsProvider` and no endpoint bean.
+- Confirmed the Actuator endpoint id remains the alphanumeric `rhttpclients` id used by the docs and exposure examples.
+- Existing missing-Actuator coverage still verifies the endpoint bean is skipped without failing startup when Actuator endpoint annotation classes are unavailable.
+- `ReactiveHttpClientDiagnosticsEndpoint.diagnostics()` still delegates to `ReactiveHttpClientDiagnosticsSnapshot.toMap(provider)`; the new multi-client endpoint test asserts endpoint output equals the snapshot helper output.
+- Provider-backed snapshot output now includes sanitized `strictUnsafeRetryValidation` and `strictBodySigningValidation` booleans without changing the public `ClientSummary` record constructor.
+- Added endpoint coverage for multiple clients, inherited generic endpoints, strict unsafe-retry config, strict AWS SigV4 body-signing config, deterministic client ordering, and sanitized output that omits concrete base URLs, auth secrets, sensitive header material, request bodies, and response bodies.
+- Updated observability, diagnostic-context, and support-bundle docs to describe endpoint output versus health details, exchange logs, and helper snapshots.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientAutoConfigurationTest,ReactiveHttpClientDiagnosticsProviderTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest test` passed.
+- `git diff --check` passed.
+
 
 ---
 

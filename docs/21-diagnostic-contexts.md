@@ -59,8 +59,8 @@ String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(diagnostics);
 ```
 
 The snapshot helper renders project version, total client count, total endpoint
-count, total inherited endpoint count, and one row/object per client. It sorts
-clients by name and interface for stable output. The helper is explicit: calling
+count, total inherited endpoint count, strict validation flags, and one row/object
+per client. It sorts clients by name and interface for stable output. The helper is explicit: calling
 it does not register an Actuator endpoint, controller, log line, or file writer.
 
 ## Opt-in Actuator diagnostics endpoint
@@ -88,7 +88,8 @@ The endpoint id is `rhttpclients`. A read operation returns JSON with
 `projectVersion`, `clientCount`, `endpointCount`, `inheritedEndpointCount`, and
 one `clients` entry per registered client. Each client entry includes client
 name, interface, base URL source, timeout source/value, resilience summary, auth
-mode, redirect-following flag, endpoint count, and inherited endpoint count.
+mode, redirect-following flag, strict unsafe-retry and strict body-signing
+validation flags, endpoint count, and inherited endpoint count.
 
 This endpoint is for support-safe configured-client diagnostics. It uses the
 same sanitized fields as `ReactiveHttpClientDiagnosticsSnapshot`; it does not

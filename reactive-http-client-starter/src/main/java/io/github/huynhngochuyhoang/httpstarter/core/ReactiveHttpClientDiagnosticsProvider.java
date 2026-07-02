@@ -35,24 +35,35 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     public List<ClientSummary> clientSummaries() {
+        return clientSnapshotEntries().stream()
+                .map(ClientSnapshotEntry::summary)
+                .toList();
+    }
+
+    List<ClientSnapshotEntry> clientSnapshotEntries() {
         ResilienceOperatorApplier resilienceOperatorApplier = resilienceOperatorApplier();
         return List.of(beanFactory.getBeanDefinitionNames()).stream()
                 .map(this::clientInterface)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(clientInterface -> clientSummary(clientInterface, resilienceOperatorApplier))
-                .sorted(Comparator.comparing(ClientSummary::clientName)
-                        .thenComparing(ClientSummary::clientInterface))
+                .map(clientInterface -> clientSnapshotEntry(clientInterface, resilienceOperatorApplier))
+                .sorted(Comparator.comparing((ClientSnapshotEntry entry) -> entry.summary().clientName())
+                        .thenComparing(entry -> entry.summary().clientInterface()))
                 .toList();
     }
 
-    private ClientSummary clientSummary(Class<?> clientInterface,
-                                        ResilienceOperatorApplier resilienceOperatorApplier) {
+    private ClientSnapshotEntry clientSnapshotEntry(Class<?> clientInterface,
+                                                    ResilienceOperatorApplier resilienceOperatorApplier) {
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         String clientName = annotation != null ? annotation.name() : "";
         ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
-        return clientSummary(clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
+        ClientSummary summary = clientSummary(
+                clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
+        return new ClientSnapshotEntry(
+                summary,
+                strictUnsafeRetryValidation(clientConfig),
+                strictBodySigningValidation(clientConfig));
     }
 
     static ClientSummary clientSummary(Class<?> clientInterface,
@@ -150,6 +161,18 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return "none";
     }
 
+    private static boolean strictUnsafeRetryValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        return clientConfig.getResilience() != null
+                && clientConfig.getResilience().isStrictUnsafeRetryValidation();
+    }
+
+    private static boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        return clientConfig.getAuth() != null
+                && clientConfig.getAuth().getAwsSigV4() != null
+                && "aws-sigv4".equalsIgnoreCase(clientConfig.getAuth().getType())
+                && clientConfig.getAuth().getAwsSigV4().isStrictBodySigningValidation();
+    }
+
     private ResilienceOperatorApplier resilienceOperatorApplier() {
         Object circuitBreakerRegistry = bean("io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry");
         Object retryRegistry = bean("io.github.resilience4j.retry.RetryRegistry");
@@ -170,6 +193,13 @@ public class ReactiveHttpClientDiagnosticsProvider {
         } catch (ClassNotFoundException | LinkageError ex) {
             return null;
         }
+    }
+
+    record ClientSnapshotEntry(
+            ClientSummary summary,
+            boolean strictUnsafeRetryValidation,
+            boolean strictBodySigningValidation
+    ) {
     }
 
     public record ClientSummary(
