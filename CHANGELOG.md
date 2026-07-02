@@ -9,9 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Opt-in diagnostics endpoint and support bundles.** Added an opt-in Actuator diagnostics endpoint plus production support-bundle guidance for collecting sanitized diagnostics snapshots, health details, startup summaries, exchange logs, and benchmark evidence.
+- **Strict production guardrails.** Added opt-in startup validation for unsafe retry contracts and built-in body-signing contracts so teams can fail fast on risky retry/idempotency or SigV4 body shapes while preserving warning-only defaults.
+- **Effective configuration and generic-contract diagnostics.** Added metadata-backed effective-configuration examples and improved inherited generic endpoint diagnostics for shared interfaces such as `ApiOperators<T>`.
+
 ### Changed
 
 - **Post-release baseline transition.** The reactor now targets `2.12.0` while API compatibility and published-baseline benchmark evidence compare against the published `2.11.0` artifacts.
+- **Release readiness evidence.** V16 keeps generated release evidence aligned with the `2.12.0` candidate and `2.11.0` API/benchmark baseline, including manual benchmark, compatibility, baseline-resolution, generated-doc, Markdown-link, and promoted-report checks.
+
+### Fixed
+
+- **Benchmark and public API readiness audits.** Re-audited JSON/`ResponseEntity` benchmark rows without adding a speculative optimization, separated no-network benchmark diagnostics from loopback feature claims, and expanded public API compatibility coverage for documented diagnostics and contract snapshot helpers.
 
 
 ## [2.11.0] - 2026-06-30
