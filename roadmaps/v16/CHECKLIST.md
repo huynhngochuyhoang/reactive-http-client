@@ -194,9 +194,9 @@ Evidence:
 Evidence:
 
 - Added `reactive.http.clients.<name>.auth.aws-sig-v4.strict-body-signing-validation`, default `false`, under the built-in AWS SigV4 auth config. Existing runtime behavior remains unchanged unless the property is enabled.
-- Strict startup validation runs only for object-style `auth.type: aws-sigv4`; named `auth-provider` beans are treated as custom and skipped.
-- Strict mode allows empty bodies, `byte[]`, `String`, and JSON object bodies when an `ObjectMapper` is available to materialize raw signing bytes.
-- Strict mode rejects multipart bodies, `Publisher` bodies, `DataBuffer` streaming bodies, `Resource` bodies, unknown generic bodies, and JSON object bodies when no `ObjectMapper` is available. Diagnostics include client interface, method signature, HTTP method, path template, body shape, auth mode, and reason.
+- Strict startup validation runs only when object-style `auth.type: aws-sigv4` resolves to the starter built-in `AwsSigV4AuthProvider`; named `auth-provider` beans and custom `AuthProviderFactory` selections are treated as custom and skipped.
+- Strict mode allows empty bodies, `byte[]`, `String`, and concrete JSON object bodies when an `ObjectMapper` is available and the startup-visible `Content-Type` is absent or JSON-compatible.
+- Strict mode rejects multipart bodies, `Publisher` bodies, `DataBuffer` streaming bodies, `Resource` bodies, `@Body Object` or erased generic bodies, JSON object bodies when no `ObjectMapper` is available, JSON bodies with configured non-JSON `Content-Type`, and JSON bodies with runtime-supplied `Content-Type`. Diagnostics include client interface, method signature, HTTP method, path template, body shape, auth mode, and reason.
 - Updated Spring configuration metadata, generated configuration reference, property binding coverage, and AWS SigV4 docs with a strict-mode YAML example.
 - `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientFactoryBeanDiagnosticsTest,ReactiveHttpClientPropertiesTest,ReactiveHttpClientConfigurationMetadataTest,AuthProviderFactoryTest,AwsSigV4AuthProviderTest,OutboundAuthFilterTest,ReactiveClientInvocationHandlerBehaviorTest,MultipartRequestTest,DocumentationReleaseArtifactTest test` passed.
 

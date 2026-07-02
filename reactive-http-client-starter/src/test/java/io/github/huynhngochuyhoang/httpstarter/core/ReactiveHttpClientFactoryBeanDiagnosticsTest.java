@@ -27,6 +27,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -736,6 +737,95 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
+    void strictBodySigningValidationIgnoresCustomFactorySelectedForAwsSigV4() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+        AuthProviderFactory customFactory = new AuthProviderFactory() {
+            @Override
+            public boolean supports(String type) {
+                return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+            }
+
+            @Override
+            public AuthProvider create(String clientName,
+                                       ReactiveHttpClientProperties.AuthConfig authConfig,
+                                       WebClient.Builder webClientBuilder) {
+                return request -> Mono.just(AuthContext.empty());
+            }
+        };
+
+        ReactiveHttpClientFactoryBean<StrictSigV4StreamingBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4StreamingBodyClient.class, null,
+                        new ObjectMapper(), customFactory);
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsErasedObjectBody() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+
+        ReactiveHttpClientFactoryBean<StrictSigV4ObjectBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4ObjectBodyClient.class, null, new ObjectMapper());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("method=" + StrictSigV4ObjectBodyClient.class.getName()
+                            + "#post(java.lang.Object)")
+                    .hasMessageContaining("bodyShape=unknown(java.lang.Object)")
+                    .hasMessageContaining("Object or erased generic bodies cannot prove stable raw bytes");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsJsonBodyWithStaticNonJsonContentType() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = awsSigV4ClientConfig(true);
+        config.setDefaultHeaders(Map.of("Content-Type", "text/plain"));
+        properties.getClients().put("strict-body-signing-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictSigV4JsonBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4JsonBodyClient.class, null, new ObjectMapper());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("bodyShape=json(java.util.Map)")
+                    .hasMessageContaining("configured default Content-Type [text/plain] is not JSON-compatible");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictBodySigningValidationRejectsJsonBodyWithDynamicContentType() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
+
+        ReactiveHttpClientFactoryBean<StrictSigV4DynamicContentTypeJsonBodyClient> factoryBean =
+                buildFactoryBean(properties, StrictSigV4DynamicContentTypeJsonBodyClient.class, null,
+                        new ObjectMapper());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation")
+                    .hasMessageContaining("method=" + StrictSigV4DynamicContentTypeJsonBodyClient.class.getName()
+                            + "#json(java.lang.String,java.util.Map)")
+                    .hasMessageContaining("bodyShape=json(java.util.Map)")
+                    .hasMessageContaining("Content-Type is supplied dynamically");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
     void failsFastWhenProxyPortIsSetWithoutHost() {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
@@ -1314,7 +1404,8 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
     @SuppressWarnings("unchecked")
     private <T> ReactiveHttpClientFactoryBean<T> buildFactoryBean(
-            ReactiveHttpClientProperties properties, Class<T> type, RetryRegistry retryRegistry, ObjectMapper objectMapper) {
+            ReactiveHttpClientProperties properties, Class<T> type, RetryRegistry retryRegistry, ObjectMapper objectMapper,
+            AuthProviderFactory... authProviderFactories) {
         ApplicationContext ctx = mock(ApplicationContext.class);
 
         ObjectProvider<Object> defaultProvider = mock(ObjectProvider.class);
@@ -1325,7 +1416,10 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         when(ctx.getBeanProvider(any(Class.class))).thenReturn((ObjectProvider) defaultProvider);
 
         ObjectProvider<AuthProviderFactory> authFactoryProvider = mock(ObjectProvider.class);
-        when(authFactoryProvider.orderedStream()).thenReturn(Stream.of(new AwsSigV4AuthProviderFactory()));
+        AuthProviderFactory[] factories = authProviderFactories != null && authProviderFactories.length > 0
+                ? authProviderFactories
+                : new AuthProviderFactory[]{new AwsSigV4AuthProviderFactory()};
+        when(authFactoryProvider.orderedStream()).thenAnswer(inv -> Arrays.stream(factories));
         when(ctx.getBeanProvider(AuthProviderFactory.class)).thenReturn(authFactoryProvider);
 
         if (retryRegistry != null) {
@@ -1450,6 +1544,19 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     interface StrictSigV4JsonBodyClient {
         @POST("/json")
         Mono<String> json(@Body Map<String, Object> body);
+    }
+
+    @ReactiveHttpClient(name = "strict-body-signing-client")
+    interface StrictSigV4ObjectBodyClient {
+        @POST("/object")
+        Mono<String> post(@Body Object body);
+    }
+
+    @ReactiveHttpClient(name = "strict-body-signing-client")
+    interface StrictSigV4DynamicContentTypeJsonBodyClient {
+        @POST("/json")
+        Mono<String> json(@HeaderParam("Content-Type") String contentType,
+                          @Body Map<String, Object> body);
     }
 
     @ReactiveHttpClient(name = "strict-body-signing-client")

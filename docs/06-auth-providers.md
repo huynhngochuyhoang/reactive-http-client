@@ -167,15 +167,21 @@ Enable `strict-body-signing-validation` when you want proxy construction to fail
 for methods whose body bytes cannot be proven safe for built-in SigV4 signing.
 The default remains runtime validation so existing clients keep starting.
 
+Strict validation is enforced only when object-style `type: aws-sigv4` resolves
+to the starter built-in `AwsSigV4AuthProvider`. Named `auth-provider` beans and
+custom `AuthProviderFactory` selections are treated as custom providers, so
+their body-signing contract remains application-owned.
+
 | Body shape | Built-in SigV4 behavior |
 |---|---|
 | Empty body | Signs the AWS empty SHA-256 payload hash. |
 | `byte[]` | Signs the exact byte array sent by the starter. |
 | `String` | Signs bytes using the request `Content-Type` charset when one is declared; otherwise UTF-8. |
-| JSON object body | Signs the JSON bytes serialized by the starter auth pipeline with the configured `ObjectMapper`; keep WebClient codecs aligned with that mapper. |
+| Concrete JSON object body | Signs the JSON bytes serialized by the starter auth pipeline with the configured `ObjectMapper`; strict mode requires an absent or startup-provable JSON-compatible `Content-Type`, and WebClient codecs must stay aligned with that mapper. |
+| `@Body Object` or erased generic body | Rejected at startup when strict body-signing validation is enabled because the runtime value could be a stream, resource, map, DTO, or another unsupported shape. |
 | `Publisher`, streaming upload body, or multipart body | Rejected at startup when strict body-signing validation is enabled; otherwise rejected before the request is sent. The starter does not buffer or subscribe to the stream only for signing. |
 
-`Publisher`, streaming, and multipart request bodies are not signed by the built-in provider because stable raw bytes are not materialized without consuming or re-encoding the body. Use a repeatable `byte[]`, charset-declared `String`, or JSON object body with codecs aligned to the starter `ObjectMapper` for built-in signing, or provide a custom auth provider that implements AWS streaming signatures.
+`Publisher`, streaming, multipart, `@Body Object`, and erased-generic request bodies are not signed by the built-in provider because stable raw bytes are not materialized without consuming or re-encoding the body. Use a repeatable `byte[]`, charset-declared `String`, or concrete JSON object body with an absent or JSON-compatible `Content-Type` and codecs aligned to the starter `ObjectMapper` for built-in signing, or provide a custom auth provider that implements AWS streaming signatures.
 
 ```yaml
 reactive:
