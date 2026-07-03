@@ -2,12 +2,23 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.annotation.Retry;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
+import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.FactoryBean;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
+import org.springframework.cglib.proxy.Enhancer;
+import org.springframework.cglib.proxy.MethodInterceptor;
+import org.springframework.core.Ordered;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.net.URL;
@@ -66,6 +77,62 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void clientSummariesDoNotResolveStrictAuthProviders() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+        beanFactory.registerSingleton("throwingAuthProviderFactory", new ThrowingAwsSigV4Factory());
+
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider(null);
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        config.setAuth(auth);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries = provider.clientSummaries();
+
+        assertThat(summaries).hasSize(1);
+        assertThat(summaries.get(0).authMode()).isEqualTo("aws-sigv4");
+    }
+
+    @Test
+    void providerSnapshotsDoNotResolveStrictAuthProviders() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+        beanFactory.registerSingleton("throwingAuthProviderFactory", new ThrowingAwsSigV4Factory());
+
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider(null);
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        config.setAuth(auth);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(provider);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>) snapshot.get("clients");
+        assertThat(clients).hasSize(1);
+        assertThat(clients.get(0))
+                .containsEntry("authMode", "aws-sigv4")
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
     void rendersSanitizedDiagnosticsSnapshot() {
         ReactiveHttpClientDiagnosticsProvider provider = sensitiveDiagnosticsProvider();
 
@@ -78,6 +145,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("| Client count | `1` |")
                 .contains("| Endpoint count | `2` |")
                 .contains("| Inherited endpoint count | `1` |")
+                .contains("Strict retry validation")
+                .contains("Strict body-signing validation")
                 .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName() + "` | `property` | `client:500` |")
                 .contains("configured=true, retry=disabled")
                 .contains("| `provider-bean` | `true` | `2` | `1` |");
@@ -91,6 +160,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("\"baseUrlSource\": \"property\"")
                 .contains("\"timeoutSource\": \"client\"")
                 .contains("\"timeoutMs\": 500")
+                .contains("\"strictUnsafeRetryValidation\": false")
+                .contains("\"strictBodySigningValidation\": false")
                 .contains("\"authMode\": \"provider-bean\"")
                 .contains("\"followRedirects\": true");
         assertThat(markdown + json)
@@ -99,6 +170,191 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .doesNotContain("secretAuthProviderBean")
                 .doesNotContain("secret-token")
                 .doesNotContain("Authorization");
+    }
+
+    @Test
+    void reportsStrictRetryValidationOnlyWhenRetryOperatorIsAvailable() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setStrictUnsafeRetryValidation(true);
+        config.setResilience(resilience);
+
+        Map<String, Object> dormantClient = snapshotClient(config);
+
+        assertThat(dormantClient)
+                .containsEntry("resilienceConfigured", false)
+                .containsEntry("strictUnsafeRetryValidation", false);
+
+        resilience.setEnabled(true);
+        Map<String, Object> noRetryOperatorClient = snapshotClient(config);
+
+        assertThat(noRetryOperatorClient)
+                .containsEntry("resilienceConfigured", true)
+                .containsEntry("strictUnsafeRetryValidation", false);
+
+        RetryRegistry singleAttemptRetryRegistry = RetryRegistry.of(
+                RetryConfig.custom().maxAttempts(1).build());
+        Map<String, Object> singleAttemptClient = snapshotClient(config, singleAttemptRetryRegistry);
+
+        assertThat(singleAttemptClient)
+                .containsEntry("resilienceConfigured", true)
+                .containsEntry("strictUnsafeRetryValidation", false);
+
+        Map<String, Object> retryOperatorClient = snapshotClient(config, RetryRegistry.ofDefaults());
+
+        assertThat(retryOperatorClient)
+                .containsEntry("resilienceConfigured", true)
+                .containsEntry("strictUnsafeRetryValidation", true);
+    }
+
+    @Test
+    void strictRetryDiagnosticsDoNotCreateMissingRetryInstances() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setStrictUnsafeRetryValidation(true);
+        config.setResilience(resilience);
+        RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
+
+        Map<String, Object> client = snapshotClient(
+                "diagnostic-missing-retry", DiagnosticMissingRetryClient.class, config, retryRegistry);
+
+        assertThat(client)
+                .containsEntry("clientName", "diagnostic-missing-retry")
+                .containsEntry("strictUnsafeRetryValidation", false);
+        assertThat(retryRegistry.find("ghost-retry")).isEmpty();
+    }
+
+    @Test
+    void ignoresObjectAuthStrictBodySigningWhenNamedProviderIsSelected() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider("customSigner");
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType("aws-sigv4");
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        auth.getAwsSigV4().setAccessKeyId("access-key");
+        auth.getAwsSigV4().setSecretAccessKey("secret-key");
+        auth.getAwsSigV4().setRegion("us-east-1");
+        auth.getAwsSigV4().setService("execute-api");
+        config.setAuth(auth);
+
+        Map<String, Object> client = snapshotClient(config);
+
+        assertThat(client)
+                .containsEntry("authMode", "provider-bean")
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
+    void reportsStrictBodySigningOnlyForSelectedBuiltInAwsSigV4Factory() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider(null);
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        auth.getAwsSigV4().setAccessKeyId("access-key");
+        auth.getAwsSigV4().setSecretAccessKey("secret-key");
+        auth.getAwsSigV4().setRegion("us-east-1");
+        auth.getAwsSigV4().setService("execute-api");
+        config.setAuth(auth);
+
+        Map<String, Object> customFactoryClient = snapshotClient(
+                config, null, new OrderedCustomAwsSigV4Factory(), new AwsSigV4AuthProviderFactory());
+
+        assertThat(customFactoryClient)
+                .containsEntry("authMode", "aws-sigv4")
+                .containsEntry("strictBodySigningValidation", false);
+
+        Map<String, Object> delegatingFactoryClient = snapshotClient(
+                config, null, new OrderedDelegatingAwsSigV4Factory(), new AwsSigV4AuthProviderFactory());
+
+        assertThat(delegatingFactoryClient)
+                .containsEntry("authMode", "aws-sigv4")
+                .containsEntry("strictBodySigningValidation", false);
+
+        Map<String, Object> builtInFactoryClient = snapshotClient(config, null, new AwsSigV4AuthProviderFactory());
+
+        assertThat(builtInFactoryClient)
+                .containsEntry("authMode", "aws-sigv4")
+                .containsEntry("strictBodySigningValidation", true);
+    }
+
+    @Test
+    void providerSnapshotsKeepStrictFlagsForClassBasedProviderProxies() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+        beanFactory.registerSingleton("retryRegistry", RetryRegistry.ofDefaults());
+
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setStrictUnsafeRetryValidation(true);
+        config.setResilience(resilience);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider target = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+        ReactiveHttpClientDiagnosticsProvider proxy = classBasedProxy(target);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>) ReactiveHttpClientDiagnosticsSnapshot
+                .toMap(proxy)
+                .get("clients");
+
+        assertThat(clients).hasSize(1);
+        assertThat(clients.get(0))
+                .containsEntry("strictUnsafeRetryValidation", true)
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
+    void rendersUnknownStrictValidationFlagsForSummaryOnlySnapshots() {
+        ReactiveHttpClientDiagnosticsProvider.ClientSummary summary = summary("summary-client", "com.example.SummaryClient");
+
+        String markdown = ReactiveHttpClientDiagnosticsSnapshot.toMarkdown(List.of(summary));
+        String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(List.of(summary));
+        Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(List.of(summary));
+
+        assertThat(markdown).contains("| `summary-client` | `com.example.SummaryClient` | `property` | `disabled:0` | `configured=false, retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled` | `unknown` | `unknown` |");
+        assertThat(json)
+                .contains("\"strictUnsafeRetryValidation\": null")
+                .contains("\"strictBodySigningValidation\": null")
+                .doesNotContain("\"strictUnsafeRetryValidation\": false")
+                .doesNotContain("\"strictBodySigningValidation\": false");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>) snapshot.get("clients");
+        assertThat(clients.get(0).get("strictUnsafeRetryValidation")).isNull();
+        assertThat(clients.get(0).get("strictBodySigningValidation")).isNull();
+    }
+
+    @Test
+    void providerSnapshotsRespectOverriddenClientSummaries() {
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                new DefaultListableBeanFactory(), new ReactiveHttpClientProperties(), new MethodMetadataCache()) {
+            @Override
+            public List<ClientSummary> clientSummaries() {
+                return List.of(summary("custom-client", "com.example.CustomClient"));
+            }
+        };
+
+        Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(provider);
+        String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(provider);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>) snapshot.get("clients");
+        assertThat(clients).hasSize(1);
+        assertThat(clients.get(0))
+                .containsEntry("clientName", "custom-client")
+                .containsEntry("clientInterface", "com.example.CustomClient")
+                .containsEntry("strictUnsafeRetryValidation", null)
+                .containsEntry("strictBodySigningValidation", null);
+        assertThat(json)
+                .contains("\"clientName\": \"custom-client\"")
+                .contains("\"strictUnsafeRetryValidation\": null")
+                .doesNotContain("diagnostic-client");
     }
 
     @Test
@@ -131,6 +387,61 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         finally {
             Thread.currentThread().setContextClassLoader(previous);
         }
+    }
+
+    private static ReactiveHttpClientDiagnosticsProvider classBasedProxy(ReactiveHttpClientDiagnosticsProvider target) {
+        Enhancer enhancer = new Enhancer();
+        enhancer.setSuperclass(ReactiveHttpClientDiagnosticsProvider.class);
+        enhancer.setCallback((MethodInterceptor) (object, method, args, methodProxy) ->
+                method.invoke(target, args != null ? args : new Object[0]));
+        return (ReactiveHttpClientDiagnosticsProvider) enhancer.create(
+                new Class<?>[]{
+                        ConfigurableListableBeanFactory.class,
+                        ReactiveHttpClientProperties.class,
+                        MethodMetadataCache.class},
+                new Object[]{
+                        new DefaultListableBeanFactory(),
+                        new ReactiveHttpClientProperties(),
+                        new MethodMetadataCache()});
+    }
+
+    private static Map<String, Object> snapshotClient(ReactiveHttpClientProperties.ClientConfig config) {
+        return snapshotClient(config, null);
+    }
+
+    private static Map<String, Object> snapshotClient(ReactiveHttpClientProperties.ClientConfig config,
+                                                      RetryRegistry retryRegistry,
+                                                      AuthProviderFactory... authProviderFactories) {
+        return snapshotClient("diagnostic-client", DiagnosticClient.class, config, retryRegistry, authProviderFactories);
+    }
+
+    private static Map<String, Object> snapshotClient(String clientName,
+                                                      Class<?> clientInterface,
+                                                      ReactiveHttpClientProperties.ClientConfig config,
+                                                      RetryRegistry retryRegistry,
+                                                      AuthProviderFactory... authProviderFactories) {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, clientInterface);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+        if (retryRegistry != null) {
+            beanFactory.registerSingleton("retryRegistry", retryRegistry);
+        }
+        for (int i = 0; i < authProviderFactories.length; i++) {
+            beanFactory.registerSingleton("authProviderFactory" + i, authProviderFactories[i]);
+        }
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of(clientName, config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>) ReactiveHttpClientDiagnosticsSnapshot
+                .toMap(provider)
+                .get("clients");
+        return clients.get(0);
     }
 
     private static ReactiveHttpClientDiagnosticsProvider sensitiveDiagnosticsProvider() {
@@ -175,10 +486,75 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 0);
     }
 
+    static class ThrowingAwsSigV4Factory implements AuthProviderFactory {
+
+        @Override
+        public boolean supports(String type) {
+            return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+        }
+
+        @Override
+        public AuthProvider create(String clientName,
+                                   ReactiveHttpClientProperties.AuthConfig config,
+                                   WebClient.Builder webClientBuilder) {
+            throw new IllegalStateException("Auth provider should not be resolved for client summaries");
+        }
+    }
+
+    static class OrderedCustomAwsSigV4Factory implements AuthProviderFactory, Ordered {
+
+        @Override
+        public int getOrder() {
+            return Ordered.HIGHEST_PRECEDENCE;
+        }
+
+        @Override
+        public boolean supports(String type) {
+            return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+        }
+
+        @Override
+        public AuthProvider create(String clientName,
+                                   ReactiveHttpClientProperties.AuthConfig config,
+                                   WebClient.Builder webClientBuilder) {
+            return request -> Mono.empty();
+        }
+    }
+
+    static class OrderedDelegatingAwsSigV4Factory implements AuthProviderFactory, Ordered {
+
+        private final AwsSigV4AuthProviderFactory delegate = new AwsSigV4AuthProviderFactory();
+
+        @Override
+        public int getOrder() {
+            return Ordered.HIGHEST_PRECEDENCE;
+        }
+
+        @Override
+        public boolean supports(String type) {
+            return delegate.supports(type);
+        }
+
+        @Override
+        public AuthProvider create(String clientName,
+                                   ReactiveHttpClientProperties.AuthConfig config,
+                                   WebClient.Builder webClientBuilder) {
+            return delegate.create(clientName, config, webClientBuilder);
+        }
+    }
+
     interface SharedOperations {
 
         @GET("/shared")
         Mono<String> shared();
+    }
+
+    @ReactiveHttpClient(name = "diagnostic-missing-retry")
+    interface DiagnosticMissingRetryClient {
+
+        @Retry("ghost-retry")
+        @GET("/missing-retry")
+        Mono<String> missingRetry();
     }
 
     @ReactiveHttpClient(name = "diagnostic-client")

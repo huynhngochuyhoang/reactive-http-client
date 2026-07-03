@@ -1,6 +1,8 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
+import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -8,8 +10,11 @@ import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -40,19 +45,45 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 .map(this::clientInterface)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(clientInterface -> clientSummary(clientInterface, resilienceOperatorApplier))
+                .map(clientInterface -> clientSummaryEntry(clientInterface, resilienceOperatorApplier))
                 .sorted(Comparator.comparing(ClientSummary::clientName)
                         .thenComparing(ClientSummary::clientInterface))
                 .toList();
     }
 
-    private ClientSummary clientSummary(Class<?> clientInterface,
-                                        ResilienceOperatorApplier resilienceOperatorApplier) {
+    List<ClientSnapshotEntry> clientSnapshotEntries() {
+        ResilienceOperatorApplier resilienceOperatorApplier = resilienceOperatorApplier();
+        return List.of(beanFactory.getBeanDefinitionNames()).stream()
+                .map(this::clientInterface)
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(clientInterface -> clientSnapshotEntry(clientInterface, resilienceOperatorApplier))
+                .sorted(Comparator.comparing((ClientSnapshotEntry entry) -> entry.summary().clientName())
+                        .thenComparing(entry -> entry.summary().clientInterface()))
+                .toList();
+    }
+
+    private ClientSummary clientSummaryEntry(Class<?> clientInterface,
+                                             ResilienceOperatorApplier resilienceOperatorApplier) {
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         String clientName = annotation != null ? annotation.name() : "";
         ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
         return clientSummary(clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
+    }
+
+    private ClientSnapshotEntry clientSnapshotEntry(Class<?> clientInterface,
+                                                    ResilienceOperatorApplier resilienceOperatorApplier) {
+        ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+        String clientName = annotation != null ? annotation.name() : "";
+        ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
+                .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
+        ClientSummary summary = clientSummary(
+                clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
+        return new ClientSnapshotEntry(
+                summary,
+                strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceOperatorApplier),
+                strictBodySigningValidation(clientConfig));
     }
 
     static ClientSummary clientSummary(Class<?> clientInterface,
@@ -150,6 +181,89 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return "none";
     }
 
+    private boolean strictUnsafeRetryValidation(Class<?> clientInterface,
+                                                ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                ResilienceOperatorApplier resilienceOperatorApplier) {
+        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
+        if (resilience == null
+                || !resilience.isEnabled()
+                || !resilience.isStrictUnsafeRetryValidation()
+                || !resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)) {
+            return false;
+        }
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method)) {
+                continue;
+            }
+            MethodMetadata meta = metadataCache.get(method);
+            String httpMethod = diagnosticHttpMethod(meta, clientConfig);
+            if (!isRetryMethodEnabled(resilience, httpMethod)) {
+                continue;
+            }
+            RequestPlan plan = RequestPlan.from(meta, clientInterface);
+            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
+            if (StringUtils.hasText(plan.retryInstanceName())
+                    && !resilienceOperatorApplier.isInstanceConfigured(ResilienceOperatorApplier.InstanceType.RETRY, retryInstance)) {
+                continue;
+            }
+            if (resilienceOperatorApplier.canRetryMoreThanOnce(retryInstance)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (StringUtils.hasText(clientConfig.getAuthProvider())
+                || clientConfig.getAuth() == null
+                || clientConfig.getAuth().getAwsSigV4() == null
+                || !AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(clientConfig.getAuth().getType())
+                || !clientConfig.getAuth().getAwsSigV4().isStrictBodySigningValidation()) {
+            return false;
+        }
+        return beanFactory.getBeanProvider(AuthProviderFactory.class)
+                .orderedStream()
+                .filter(factory -> factory.supports(clientConfig.getAuth().getType()))
+                .findFirst()
+                .filter(AwsSigV4AuthProviderFactory.class::isInstance)
+                .isPresent();
+    }
+
+    private static String diagnosticHttpMethod(MethodMetadata meta,
+                                               ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (StringUtils.hasText(meta.getHttpMethod())) {
+            return meta.getHttpMethod();
+        }
+        if (StringUtils.hasText(meta.getApiRefName()) && clientConfig.getApis() != null) {
+            ReactiveHttpClientProperties.ApiConfig apiConfig = clientConfig.getApis().get(meta.getApiRefName());
+            if (apiConfig != null && StringUtils.hasText(apiConfig.getMethod())) {
+                return apiConfig.getMethod().trim().toUpperCase(Locale.ROOT);
+            }
+        }
+        return null;
+    }
+
+    private static boolean isRetryMethodEnabled(ReactiveHttpClientProperties.ResilienceConfig resilience,
+                                                String httpMethod) {
+        return httpMethod != null
+                && resilience.getRetryMethods() != null
+                && resilience.getRetryMethods().contains(httpMethod.toUpperCase(Locale.ROOT));
+    }
+
+    private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {
+        return StringUtils.hasText(methodLevel) ? methodLevel : clientLevel;
+    }
+
+    private static boolean isDeclarativeClientMethod(Method method) {
+        int modifiers = method.getModifiers();
+        return method.getDeclaringClass() != Object.class
+                && Modifier.isAbstract(modifiers)
+                && !Modifier.isStatic(modifiers)
+                && !method.isSynthetic()
+                && !method.isDefault()
+                && !method.isBridge();
+    }
+
     private ResilienceOperatorApplier resilienceOperatorApplier() {
         Object circuitBreakerRegistry = bean("io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry");
         Object retryRegistry = bean("io.github.resilience4j.retry.RetryRegistry");
@@ -170,6 +284,13 @@ public class ReactiveHttpClientDiagnosticsProvider {
         } catch (ClassNotFoundException | LinkageError ex) {
             return null;
         }
+    }
+
+    record ClientSnapshotEntry(
+            ClientSummary summary,
+            boolean strictUnsafeRetryValidation,
+            boolean strictBodySigningValidation
+    ) {
     }
 
     public record ClientSummary(

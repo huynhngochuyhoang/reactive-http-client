@@ -7,6 +7,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.auth.OAuth2ClientCredentialsAuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsSnapshot;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientHealthIndicator;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
@@ -167,6 +168,86 @@ class ReactiveHttpClientAutoConfigurationTest {
     }
 
     @Test
+    void diagnosticsEndpointSummarizesMultipleInheritedGenericAndStrictClients() {
+        runner.withInitializer(context -> {
+                    registerDiagnosticEndpointClient(
+                            context, "diagnosticBusEndpointClient", DiagnosticEndpointBusClient.class);
+                    registerDiagnosticEndpointClient(
+                            context, "diagnosticTrainEndpointClient", DiagnosticEndpointTrainClient.class);
+                    registerDiagnosticEndpointClient(
+                            context, "diagnosticStrictEndpointClient", DiagnosticEndpointStrictClient.class);
+                })
+                .withUserConfiguration(Resilience4jRegistriesConfig.class)
+                .withPropertyValues(
+                        "reactive.http.observability.diagnostics-endpoint.enabled=true",
+                        "reactive.http.clients.diagnostic-bus.base-url=https://bus.internal.example",
+                        "reactive.http.clients.diagnostic-bus.request-timeout-ms=150",
+                        "reactive.http.clients.diagnostic-bus.follow-redirects=true",
+                        "reactive.http.clients.diagnostic-train.base-url=https://train.internal.example",
+                        "reactive.http.clients.strict-diagnostic-client.base-url=https://strict.internal.example",
+                        "reactive.http.clients.strict-diagnostic-client.resilience.enabled=true",
+                        "reactive.http.clients.strict-diagnostic-client.resilience.retry=strict-retry",
+                        "reactive.http.clients.strict-diagnostic-client.resilience.retry-methods[0]=GET",
+                        "reactive.http.clients.strict-diagnostic-client.resilience.strict-unsafe-retry-validation=true",
+                        "reactive.http.clients.strict-diagnostic-client.auth.type=aws-sigv4",
+                        "reactive.http.clients.strict-diagnostic-client.auth.aws-sig-v4.access-key-id=AKIA_TEST",
+                        "reactive.http.clients.strict-diagnostic-client.auth.aws-sig-v4.secret-access-key=super-secret",
+                        "reactive.http.clients.strict-diagnostic-client.auth.aws-sig-v4.region=us-east-1",
+                        "reactive.http.clients.strict-diagnostic-client.auth.aws-sig-v4.service=execute-api",
+                        "reactive.http.clients.strict-diagnostic-client.auth.aws-sig-v4.strict-body-signing-validation=true")
+                .run(context -> {
+                    ReactiveHttpClientDiagnosticsProvider provider =
+                            context.getBean(ReactiveHttpClientDiagnosticsProvider.class);
+                    Map<String, Object> snapshot = context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class)
+                            .diagnostics();
+
+                    assertThat(snapshot).isEqualTo(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider));
+                    assertThat(snapshot)
+                            .containsEntry("clientCount", 3)
+                            .containsEntry("endpointCount", 3)
+                            .containsEntry("inheritedEndpointCount", 2);
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> clients = (List<Map<String, Object>>) snapshot.get("clients");
+                    assertThat(clients)
+                            .extracting(client -> client.get("clientName"))
+                            .containsExactly("diagnostic-bus", "diagnostic-train", "strict-diagnostic-client");
+
+                    assertThat(diagnosticClient(clients, "diagnostic-bus"))
+                            .containsEntry("clientInterface", DiagnosticEndpointBusClient.class.getName())
+                            .containsEntry("baseUrlSource", "property")
+                            .containsEntry("timeoutSource", "client")
+                            .containsEntry("timeoutMs", 150L)
+                            .containsEntry("followRedirects", true)
+                            .containsEntry("endpointCount", 1)
+                            .containsEntry("inheritedEndpointCount", 1)
+                            .containsEntry("strictUnsafeRetryValidation", false)
+                            .containsEntry("strictBodySigningValidation", false);
+                    assertThat(diagnosticClient(clients, "diagnostic-train"))
+                            .containsEntry("clientInterface", DiagnosticEndpointTrainClient.class.getName())
+                            .containsEntry("endpointCount", 1)
+                            .containsEntry("inheritedEndpointCount", 1);
+                    assertThat(diagnosticClient(clients, "strict-diagnostic-client"))
+                            .containsEntry("clientInterface", DiagnosticEndpointStrictClient.class.getName())
+                            .containsEntry("resilienceConfigured", true)
+                            .containsEntry("retry", "strict-retry")
+                            .containsEntry("authMode", "aws-sigv4")
+                            .containsEntry("strictUnsafeRetryValidation", true)
+                            .containsEntry("strictBodySigningValidation", true)
+                            .containsEntry("endpointCount", 1)
+                            .containsEntry("inheritedEndpointCount", 0);
+
+                    assertThat(snapshot.toString())
+                            .doesNotContain("bus.internal.example")
+                            .doesNotContain("train.internal.example")
+                            .doesNotContain("strict.internal.example")
+                            .doesNotContain("AKIA_TEST")
+                            .doesNotContain("super-secret")
+                            .doesNotContain("requestBody")
+                            .doesNotContain("responseBody");
+                });
+    }
+
+    @Test
     void diagnosticsEndpointSkippedWhenActuatorEndpointClassesMissing() {
         runner.withClassLoader(new FilteredClassLoader("org.springframework.boot.actuate.endpoint.annotation"))
                 .withPropertyValues("reactive.http.observability.diagnostics-endpoint.enabled=true")
@@ -223,11 +304,23 @@ class ReactiveHttpClientAutoConfigurationTest {
     }
 
     private static void registerDiagnosticEndpointClient(ConfigurableApplicationContext context) {
+        registerDiagnosticEndpointClient(context, "diagnosticEndpointClient", DiagnosticEndpointClient.class);
+    }
+
+    private static void registerDiagnosticEndpointClient(
+            ConfigurableApplicationContext context, String beanName, Class<?> clientInterface) {
         GenericBeanDefinition definition = new GenericBeanDefinition();
         definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
-        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticEndpointClient.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, clientInterface);
         ((BeanDefinitionRegistry) context.getBeanFactory())
-                .registerBeanDefinition("diagnosticEndpointClient", definition);
+                .registerBeanDefinition(beanName, definition);
+    }
+
+    private static Map<String, Object> diagnosticClient(List<Map<String, Object>> clients, String clientName) {
+        return clients.stream()
+                .filter(client -> clientName.equals(client.get("clientName")))
+                .findFirst()
+                .orElseThrow();
     }
 
     interface DiagnosticEndpointSharedOperations {
@@ -241,6 +334,33 @@ class ReactiveHttpClientAutoConfigurationTest {
 
         @GET("/direct")
         Mono<String> direct();
+    }
+
+    interface DiagnosticEndpointGenericOperations<T> {
+
+        @GET("/generic-order")
+        Mono<T> getOrder();
+    }
+
+    @ReactiveHttpClient(name = "diagnostic-bus")
+    interface DiagnosticEndpointBusClient extends DiagnosticEndpointGenericOperations<DiagnosticEndpointBusResponse> {
+    }
+
+    @ReactiveHttpClient(name = "diagnostic-train")
+    interface DiagnosticEndpointTrainClient extends DiagnosticEndpointGenericOperations<DiagnosticEndpointTrainResponse> {
+    }
+
+    @ReactiveHttpClient(name = "strict-diagnostic-client")
+    interface DiagnosticEndpointStrictClient {
+
+        @GET("/strict")
+        Mono<String> strict();
+    }
+
+    static class DiagnosticEndpointBusResponse {
+    }
+
+    static class DiagnosticEndpointTrainResponse {
     }
 
     // -------------------------------------------------------------------------
