@@ -150,24 +150,30 @@ Evidence:
 
 ## Priority 4 — Support-Bundle Regression Fixtures
 
-### [ ] 2.2 Add production support-bundle regression fixtures
-- [ ] Add approval-style or deterministic fixtures for sanitized diagnostics
+### [x] 2.2 Add production support-bundle regression fixtures
+- [x] Add approval-style or deterministic fixtures for sanitized diagnostics
       snapshot output.
-- [ ] Add or validate support-bundle examples that combine diagnostics JSON,
+- [x] Add or validate support-bundle examples that combine diagnostics JSON,
       health details, startup summaries, exchange-log category settings, and
       benchmark report links.
-- [ ] Ensure support-bundle examples use fake hostnames and placeholder values.
-- [ ] Ensure examples never include tokens, secrets, request bodies, response
+- [x] Ensure support-bundle examples use fake hostnames and placeholder values.
+- [x] Ensure examples never include tokens, secrets, request bodies, response
       bodies, concrete base URLs, or raw sensitive header values.
-- [ ] Keep fixtures small enough for normal code review.
-- [ ] Validate support-bundle configuration snippets against metadata.
-- [ ] Validate support-bundle links through documentation tests.
-- [ ] Run focused support-bundle documentation tests.
-- [ ] Run `git diff --check`.
+- [x] Keep fixtures small enough for normal code review.
+- [x] Validate support-bundle configuration snippets against metadata.
+- [x] Validate support-bundle links through documentation tests.
+- [x] Run focused support-bundle documentation tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added a deterministic diagnostics JSON fixture in `ReactiveHttpClientDiagnosticsProviderTest` that renders `ReactiveHttpClientDiagnosticsSnapshot.toJson(provider)`, normalizes only `projectVersion`, and verifies client count, inherited endpoint count, timeout source, auth mode, redirect policy, strict validation flags, and sanitized omission of base URL, auth-provider bean name, Authorization, Cookie, and raw header values.
+- Added a reviewable support-bundle fixture section to `docs/26-support-bundles.md` that combines diagnostics JSON, health JSON, startup summary logs, metadata-only exchange logs, sanitized client config, and a promoted benchmark report link placeholder.
+- Added support-bundle-specific metadata and safety coverage in `ReactiveHttpClientConfigurationMetadataTest`; it validates the support-bundle YAML against generated starter metadata and asserts the fixture uses `.example.invalid` plus placeholder paths without raw Authorization, bearer, cookie, body, localhost, or common public-domain examples.
+- Existing Markdown link validation in `DocumentationReleaseArtifactTest` covers the support-bundle related-doc links and benchmark report link.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientDiagnosticsProviderTest,ReactiveHttpClientConfigurationMetadataTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `git diff --check` passed.
 
 ---
 

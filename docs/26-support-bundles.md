@@ -24,6 +24,66 @@ secrets, cookies, proxy credentials, or full concrete base URLs unless your
 incident process explicitly approves that data. When headers are required, prefer
 redacted header names and presence/absence evidence over raw values.
 
+## Reviewable Bundle Fixture
+
+A small reviewable support bundle should keep each artifact separate and use
+fake hostnames plus placeholders before it leaves the incident system:
+
+```text
+support-bundle/
+  diagnostics/rhttpclients.json
+  health/health.json
+  logs/startup-summary.log
+  logs/exchange-metadata.log
+  config/reactive-http-client.yml
+  performance/benchmark-report-link.txt
+```
+
+```yaml
+reactive:
+  http:
+    observability:
+      diagnostics-endpoint:
+        enabled: true
+    clients:
+      inventory-api:
+        base-url: https://inventory-api.example.invalid
+        request-timeout-ms: 750
+        follow-redirects: false
+        log-exchange: true
+        log-preset: metadata-only
+        resilience:
+          enabled: true
+          retry: inventoryReadRetry
+          retry-methods:
+            - GET
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: health,rhttpclients
+
+logging:
+  level:
+    io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean: DEBUG
+    io.github.huynhngochuyhoang.httpstarter.core.DefaultHttpExchangeLogger: INFO
+```
+
+```text
+performance/benchmark-report-link.txt
+docs/benchmark-report-<version>.md
+```
+
+The diagnostics JSON, health JSON, startup summary, metadata-only exchange log,
+sanitized client configuration, and promoted benchmark report link together form
+the reviewable bundle. The example intentionally uses `.example.invalid`,
+placeholder instance names, and metadata-only logging. Replace any production
+header values with presence/absence notes before sharing.
+
 ## Diagnostics Snapshot
 
 For a one-off JSON or Markdown snapshot, inject

@@ -313,6 +313,51 @@ class ReactiveHttpClientConfigurationMetadataTest {
     }
 
     @Test
+    void supportBundleExamplesUseSafePlaceholdersAndStarterMetadata() throws IOException {
+        Path supportBundleDocs = projectRoot().resolve("docs/26-support-bundles.md");
+        String markdown = Files.readString(supportBundleDocs);
+        String fixture = markdownSection(markdown, "## Reviewable Bundle Fixture", "## Diagnostics Snapshot");
+        Set<String> exampleProperties = configurationExampleProperties(Arrays.asList(fixture.split("\\R")));
+        Set<String> missing = new TreeSet<>(exampleProperties);
+        missing.removeAll(allMetadataPropertyNames(projectRoot()));
+
+        assertThat(missing).as("support-bundle example properties missing from metadata").isEmpty();
+        assertThat(exampleProperties).contains(
+                "reactive.http.observability.diagnostics-endpoint.enabled",
+                "reactive.http.clients.[name].base-url",
+                "reactive.http.clients.[name].request-timeout-ms",
+                "reactive.http.clients.[name].follow-redirects",
+                "reactive.http.clients.[name].log-exchange",
+                "reactive.http.clients.[name].log-preset",
+                "reactive.http.clients.[name].resilience.enabled",
+                "reactive.http.clients.[name].resilience.retry",
+                "reactive.http.clients.[name].resilience.retry-methods");
+        assertThat(fixture)
+                .contains("diagnostics/rhttpclients.json")
+                .contains("health/health.json")
+                .contains("logs/startup-summary.log")
+                .contains("logs/exchange-metadata.log")
+                .contains("config/reactive-http-client.yml")
+                .contains("performance/benchmark-report-link.txt")
+                .contains("inventory-api.example.invalid")
+                .contains("docs/benchmark-report-<version>.md")
+                .contains("ReactiveHttpClientFactoryBean")
+                .contains("DefaultHttpExchangeLogger");
+        assertThat(fixture)
+                .doesNotContain("Authorization")
+                .doesNotContain("Bearer ")
+                .doesNotContain("Cookie")
+                .doesNotContain("client-secret")
+                .doesNotContain("access-token")
+                .doesNotContain("requestBody")
+                .doesNotContain("responseBody")
+                .doesNotContain("localhost")
+                .doesNotContain(".com")
+                .doesNotContain(".net")
+                .doesNotContain(".org");
+    }
+
+    @Test
     void documentedConfigurationExampleExtractionRejectsGroupsAndMalformedApiMapLeaves() throws IOException {
         Set<String> metadataNames = allMetadataPropertyNames(projectRoot());
         Set<String> exampleProperties = configurationExampleProperties(List.of(
@@ -423,6 +468,22 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.observability.histogram.slo-boundaries-ms", List.of(50, 100, 200, 500, 1000, 2000, 5000));
         assertDefaultValue(metadata, "reactive.http.correlation-id.max-length", 128);
         assertDefaultValue(metadata, "reactive.http.correlation-id.mdc-keys", List.of("correlationId", "X-Correlation-Id", "traceId"));
+    }
+
+    private static String markdownSection(String markdown, String heading, String nextHeading) {
+        int start = markdown.indexOf(heading);
+        if (start < 0) {
+            throw new IllegalStateException("Missing Markdown section " + heading);
+        }
+        int bodyStart = markdown.indexOf('\n', start);
+        if (bodyStart < 0) {
+            throw new IllegalStateException("Markdown section has no body " + heading);
+        }
+        int end = markdown.indexOf(nextHeading, bodyStart);
+        if (end < 0) {
+            throw new IllegalStateException("Missing next Markdown section " + nextHeading);
+        }
+        return markdown.substring(bodyStart + 1, end);
     }
 
     private static JsonNode starterMetadata() throws IOException {
