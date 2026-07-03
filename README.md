@@ -224,6 +224,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Benchmark Report 2.11.0](docs/benchmark-report-2.11.0.md) | Promoted release-quality benchmark report |
 | [Performance Summary](docs/23-performance-summary.md) | Interpreting benchmark data |
 | [Production Support Bundles](docs/26-support-bundles.md) | Safe incident evidence examples |
+| [V16 to V17 Adoption Guide](docs/27-v16-to-v17-adoption.md) | Diagnostics-first strict validation rollout |
 | [Configuration Properties](docs/configuration-properties.md) | Generated property reference |
 | [Examples](docs/examples/README.md) | Copy-paste snippets |
 

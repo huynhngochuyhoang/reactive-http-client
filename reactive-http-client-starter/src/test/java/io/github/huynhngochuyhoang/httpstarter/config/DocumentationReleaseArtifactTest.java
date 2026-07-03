@@ -180,6 +180,39 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v16ToV17AdoptionGuideDocumentsDiagnosticsFirstStrictValidationRollout() throws IOException {
+        Path root = projectRoot();
+        String readme = Files.readString(root.resolve("README.md"));
+        String guide = Files.readString(root.resolve("docs/27-v16-to-v17-adoption.md"));
+
+        assertThat(readme)
+                .contains("[V16 to V17 Adoption Guide](docs/27-v16-to-v17-adoption.md)");
+        assertThat(guide)
+                .startsWith("# V16 to V17 Adoption Guide")
+                .contains("Capture a diagnostics snapshot or `rhttpclients` endpoint response before")
+                .contains("Production Support Bundle")
+                .contains("Health details show recent Micrometer error-rate status")
+                .contains("Startup summaries show sanitized client configuration at DEBUG")
+                .contains("The `rhttpclients` endpoint shows sanitized configured-client diagnostics")
+                .contains("strict-unsafe-retry-validation: true")
+                .contains("one client")
+                .contains("Reactor context")
+                .contains("@HeaderParam")
+                .contains("@IdempotencyKey` parameters")
+                .contains("runtime contracts rather than startup-provable contracts")
+                .contains("strict-body-signing-validation: true")
+                .contains("Do not enable it for clients\nthat send publisher, multipart, resource, Java stream, erased `Object`, or\ndynamic non-JSON body shapes")
+                .contains("Named `auth-provider` beans and custom `AuthProviderFactory` selections own\ntheir own signing contract")
+                .contains("[Quick Start](01-quick-start.md)")
+                .contains("[Outbound Auth Providers](06-auth-providers.md)")
+                .contains("[Resilience4j Integration](07-resilience4j.md)")
+                .contains("[Observability](08-observability.md)")
+                .contains("[Production Support Bundles](26-support-bundles.md)")
+                .contains("[Benchmarks](22-benchmarks.md)")
+                .contains("[Native Image and Release Compatibility](20-native-release-compatibility.md)");
+    }
+
+    @Test
     void benchmarkModuleUsesStarterDependencyManagement() throws IOException {
         String benchmarkPom = Files.readString(projectRoot().resolve("reactive-http-client-benchmarks/pom.xml"));
 
