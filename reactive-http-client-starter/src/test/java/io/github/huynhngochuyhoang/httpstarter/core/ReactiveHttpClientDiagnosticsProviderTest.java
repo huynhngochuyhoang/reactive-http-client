@@ -2,12 +2,18 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
+import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
+import org.springframework.core.Ordered;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.net.URL;
@@ -106,7 +112,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
-    void reportsStrictRetryValidationOnlyWhenResilienceIsEnabled() {
+    void reportsStrictRetryValidationOnlyWhenRetryOperatorIsAvailable() {
         ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setStrictUnsafeRetryValidation(true);
@@ -119,9 +125,15 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("strictUnsafeRetryValidation", false);
 
         resilience.setEnabled(true);
-        Map<String, Object> enabledClient = snapshotClient(config);
+        Map<String, Object> noRetryOperatorClient = snapshotClient(config);
 
-        assertThat(enabledClient)
+        assertThat(noRetryOperatorClient)
+                .containsEntry("resilienceConfigured", true)
+                .containsEntry("strictUnsafeRetryValidation", false);
+
+        Map<String, Object> retryOperatorClient = snapshotClient(config, RetryRegistry.ofDefaults());
+
+        assertThat(retryOperatorClient)
                 .containsEntry("resilienceConfigured", true)
                 .containsEntry("strictUnsafeRetryValidation", true);
     }
@@ -140,6 +152,29 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         assertThat(client)
                 .containsEntry("authMode", "provider-bean")
                 .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
+    void reportsStrictBodySigningOnlyForBuiltInAwsSigV4Factory() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider(null);
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        config.setAuth(auth);
+
+        Map<String, Object> customFactoryClient = snapshotClient(
+                config, null, new OrderedCustomAwsSigV4Factory(), new AwsSigV4AuthProviderFactory());
+
+        assertThat(customFactoryClient)
+                .containsEntry("authMode", "aws-sigv4")
+                .containsEntry("strictBodySigningValidation", false);
+
+        Map<String, Object> builtInFactoryClient = snapshotClient(config, null, new AwsSigV4AuthProviderFactory());
+
+        assertThat(builtInFactoryClient)
+                .containsEntry("authMode", "aws-sigv4")
+                .containsEntry("strictBodySigningValidation", true);
     }
 
     @Test
@@ -195,11 +230,23 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     private static Map<String, Object> snapshotClient(ReactiveHttpClientProperties.ClientConfig config) {
+        return snapshotClient(config, null);
+    }
+
+    private static Map<String, Object> snapshotClient(ReactiveHttpClientProperties.ClientConfig config,
+                                                      RetryRegistry retryRegistry,
+                                                      AuthProviderFactory... authProviderFactories) {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         GenericBeanDefinition definition = new GenericBeanDefinition();
         definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
         definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
         beanFactory.registerBeanDefinition("diagnosticClient", definition);
+        if (retryRegistry != null) {
+            beanFactory.registerSingleton("retryRegistry", retryRegistry);
+        }
+        for (int i = 0; i < authProviderFactories.length; i++) {
+            beanFactory.registerSingleton("authProviderFactory" + i, authProviderFactories[i]);
+        }
 
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         properties.setClients(Map.of("diagnostic-client", config));
@@ -253,6 +300,26 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 false,
                 1,
                 0);
+    }
+
+    static class OrderedCustomAwsSigV4Factory implements AuthProviderFactory, Ordered {
+
+        @Override
+        public int getOrder() {
+            return Ordered.HIGHEST_PRECEDENCE;
+        }
+
+        @Override
+        public boolean supports(String type) {
+            return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+        }
+
+        @Override
+        public AuthProvider create(String clientName,
+                                   ReactiveHttpClientProperties.AuthConfig config,
+                                   WebClient.Builder webClientBuilder) {
+            return request -> Mono.empty();
+        }
     }
 
     interface SharedOperations {

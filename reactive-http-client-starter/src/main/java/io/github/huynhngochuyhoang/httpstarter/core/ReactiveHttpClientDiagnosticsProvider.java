@@ -1,6 +1,8 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
+import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -62,7 +64,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
         return new ClientSnapshotEntry(
                 summary,
-                strictUnsafeRetryValidation(clientConfig),
+                strictUnsafeRetryValidation(clientConfig, resilienceOperatorApplier),
                 strictBodySigningValidation(clientConfig));
     }
 
@@ -161,18 +163,28 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return "none";
     }
 
-    private static boolean strictUnsafeRetryValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+    private static boolean strictUnsafeRetryValidation(ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                        ResilienceOperatorApplier resilienceOperatorApplier) {
         return clientConfig.getResilience() != null
                 && clientConfig.getResilience().isEnabled()
-                && clientConfig.getResilience().isStrictUnsafeRetryValidation();
+                && clientConfig.getResilience().isStrictUnsafeRetryValidation()
+                && resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY);
     }
 
-    private static boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
-        return !StringUtils.hasText(clientConfig.getAuthProvider())
-                && clientConfig.getAuth() != null
-                && clientConfig.getAuth().getAwsSigV4() != null
-                && "aws-sigv4".equalsIgnoreCase(clientConfig.getAuth().getType())
-                && clientConfig.getAuth().getAwsSigV4().isStrictBodySigningValidation();
+    private boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (StringUtils.hasText(clientConfig.getAuthProvider())
+                || clientConfig.getAuth() == null
+                || clientConfig.getAuth().getAwsSigV4() == null
+                || !AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(clientConfig.getAuth().getType())
+                || !clientConfig.getAuth().getAwsSigV4().isStrictBodySigningValidation()) {
+            return false;
+        }
+        return beanFactory.getBeanProvider(AuthProviderFactory.class)
+                .orderedStream()
+                .filter(factory -> factory.supports(clientConfig.getAuth().getType()))
+                .findFirst()
+                .filter(AwsSigV4AuthProviderFactory.class::isInstance)
+                .isPresent();
     }
 
     private ResilienceOperatorApplier resilienceOperatorApplier() {
