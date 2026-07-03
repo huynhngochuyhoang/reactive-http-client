@@ -127,6 +127,45 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void documentedPublicSurfaceMapMatchesApiCompatibilityIncludes() throws IOException {
+        Path root = projectRoot();
+        String pomXml = Files.readString(root.resolve("pom.xml"));
+        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        List<String> documentedIncludes = documentedPublicSurfaceIncludes(releaseDocs);
+        List<String> apiIncludes = apiCompatibilityIncludes(pomXml);
+
+        assertThat(documentedIncludes)
+                .as("documented public API compatibility map")
+                .isNotEmpty()
+                .doesNotHaveDuplicates()
+                .contains(
+                        "io.github.huynhngochuyhoang.httpstarter.annotation",
+                        "io.github.huynhngochuyhoang.httpstarter.auth",
+                        "io.github.huynhngochuyhoang.httpstarter.exception",
+                        "io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogger",
+                        "io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook",
+                        "io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider*",
+                        "io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsSnapshot",
+                        "io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientContractSnapshot*",
+                        "io.github.huynhngochuyhoang.httpstarter.core.SensitiveHeaders",
+                        "io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache",
+                        "io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata*",
+                        "io.github.huynhngochuyhoang.httpstarter.core.ResilienceOperatorApplier*",
+                        "io.github.huynhngochuyhoang.httpstarter.test",
+                        "io.github.huynhngochuyhoang.httpstarter.otel");
+        assertThat(apiIncludes)
+                .as("api-compatibility japicmp includes")
+                .containsExactlyInAnyOrderElementsOf(documentedIncludes);
+        assertThat(releaseDocs)
+                .contains("When documenting a new public helper")
+                .contains("Prefer the narrowest include\npattern")
+                .contains("Keep implementation\ninternals excluded")
+                .contains("mvn -Papi-compatibility -DskipTests verify")
+                .contains("mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify")
+                .contains("bash scripts/verify-api-compatibility-fixtures.sh");
+    }
+
+    @Test
     void benchmarkModuleUsesStarterDependencyManagement() throws IOException {
         String benchmarkPom = Files.readString(projectRoot().resolve("reactive-http-client-benchmarks/pom.xml"));
 
@@ -1234,6 +1273,48 @@ class DocumentationReleaseArtifactTest {
         check.put("status", status);
         check.put("note", note);
         return check;
+    }
+
+    private static List<String> apiCompatibilityIncludes(String pomXml) {
+        int profileStart = pomXml.indexOf("<id>api-compatibility</id>");
+        if (profileStart < 0) {
+            throw new IllegalStateException("Missing api-compatibility profile");
+        }
+        int includesStart = pomXml.indexOf("<includes>", profileStart);
+        int includesEnd = pomXml.indexOf("</includes>", includesStart);
+        if (includesStart < 0 || includesEnd < includesStart) {
+            throw new IllegalStateException("Missing api-compatibility includes");
+        }
+        Matcher matcher = Pattern.compile("<include>([^<]+)</include>")
+                .matcher(pomXml.substring(includesStart, includesEnd));
+        List<String> includes = new ArrayList<>();
+        while (matcher.find()) {
+            includes.add(matcher.group(1));
+        }
+        return includes;
+    }
+
+    private static List<String> documentedPublicSurfaceIncludes(String markdown) {
+        String section = markdownSection(markdown, "### Documented public surface map",
+                "### Compatibility include workflow");
+        Matcher matcher = Pattern.compile("(?m)^\\| `([^`]+)` \\|").matcher(section);
+        List<String> includes = new ArrayList<>();
+        while (matcher.find()) {
+            includes.add(matcher.group(1));
+        }
+        return includes;
+    }
+
+    private static String markdownSection(String markdown, String heading, String nextHeading) {
+        int start = markdown.indexOf(heading);
+        if (start < 0) {
+            throw new IllegalStateException("Missing Markdown heading: " + heading);
+        }
+        int end = markdown.indexOf(nextHeading, start + heading.length());
+        if (end < 0) {
+            throw new IllegalStateException("Missing Markdown heading: " + nextHeading);
+        }
+        return markdown.substring(start, end);
     }
 
     private static String pomProperty(String pomXml, String property) {
