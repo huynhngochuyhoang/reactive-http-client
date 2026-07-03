@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
+import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.annotation.Retry;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
@@ -170,6 +171,66 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .doesNotContain("secretAuthProviderBean")
                 .doesNotContain("secret-token")
                 .doesNotContain("Authorization");
+    }
+
+    @Test
+    void rendersDeterministicSupportBundleDiagnosticsFixture() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, SupportBundleClient.class);
+        beanFactory.registerBeanDefinition("supportBundleClient", definition);
+
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setBaseUrl("https://inventory-api.example.invalid");
+        config.setRequestTimeoutMs(750);
+        config.setAuthProvider("internalSupportAuthProvider");
+        config.setDefaultHeaders(Map.of(
+                "Authorization", "Bearer raw-token",
+                "Cookie", "session=raw-cookie"));
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("support-inventory", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(provider)
+                .replaceFirst("\"projectVersion\": \"[^\"]+\"", "\"projectVersion\": \"<project-version>\"");
+
+        assertThat(json).isEqualTo("""
+                {
+                  "projectVersion": "<project-version>",
+                  "clientCount": 1,
+                  "endpointCount": 2,
+                  "inheritedEndpointCount": 1,
+                  "clients": [
+                    {
+                      "clientName": "support-inventory",
+                      "clientInterface": "%s",
+                      "baseUrlSource": "property",
+                      "timeoutSource": "client",
+                      "timeoutMs": 750,
+                      "resilienceConfigured": false,
+                      "retry": "disabled",
+                      "rateLimiter": "disabled",
+                      "circuitBreaker": "disabled",
+                      "bulkhead": "disabled",
+                      "strictUnsafeRetryValidation": false,
+                      "strictBodySigningValidation": false,
+                      "authMode": "provider-bean",
+                      "followRedirects": false,
+                      "endpointCount": 2,
+                      "inheritedEndpointCount": 1
+                    }
+                  ]
+                }
+                """.formatted(SupportBundleClient.class.getName()));
+        assertThat(json)
+                .doesNotContain("inventory-api.example.invalid")
+                .doesNotContain("internalSupportAuthProvider")
+                .doesNotContain("raw-token")
+                .doesNotContain("raw-cookie")
+                .doesNotContain("Authorization")
+                .doesNotContain("Cookie");
     }
 
     @Test
@@ -541,6 +602,19 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                                    WebClient.Builder webClientBuilder) {
             return delegate.create(clientName, config, webClientBuilder);
         }
+    }
+
+    interface SupportBundleSharedOperations {
+
+        @GET("/health")
+        Mono<String> health();
+    }
+
+    @ReactiveHttpClient(name = "support-inventory")
+    interface SupportBundleClient extends SupportBundleSharedOperations {
+
+        @GET("/orders/{orderId}")
+        Mono<String> order(@PathVar("orderId") String orderId);
     }
 
     interface SharedOperations {
