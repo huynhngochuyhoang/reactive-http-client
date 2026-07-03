@@ -22,6 +22,7 @@ import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
@@ -539,6 +540,23 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
+    void strictUnsafeRetryValidationDisabledKeepsWarningOnlyCompatibility() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        properties.getClients().put("strict-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictUnsafeRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictUnsafeRetryClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
     void strictUnsafeRetryValidationDoesNotFailWhenRetryOperatorUnavailable() throws Exception {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
@@ -619,6 +637,56 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .hasMessageContaining("method=" + StrictHeaderMapOverrideRetryClient.class.getName()
                             + "#create(java.util.Map)")
                     .hasMessageContaining("Runtime-provided idempotency keys");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationRejectsApiRefUnsafePostWithoutStartupIdempotency() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("POST");
+        api.setPath("/orders");
+        config.setApis(Map.of("orders.create", api));
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-api-ref-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictApiRefUnsafeRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictApiRefUnsafeRetryClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("strict unsafe retry validation")
+                    .hasMessageContaining("clientInterface=" + StrictApiRefUnsafeRetryClient.class.getName())
+                    .hasMessageContaining("method=" + StrictApiRefUnsafeRetryClient.class.getName() + "#create()")
+                    .hasMessageContaining("httpMethod=POST")
+                    .hasMessageContaining("Runtime-provided idempotency keys");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationAllowsApiRefGeneratedIdempotencyKey() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("POST");
+        api.setPath("/orders");
+        config.setApis(Map.of("orders.create", api));
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-api-ref-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictApiRefGeneratedIdempotencyClient> factoryBean =
+                buildFactoryBean(properties, StrictApiRefGeneratedIdempotencyClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
         } finally {
             factoryBean.destroy();
         }
@@ -733,6 +801,9 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .hasMessageContaining("method=" + StrictSigV4StreamingBodyClient.class.getName()
                             + "#uploadDataBuffer(org.springframework.core.io.buffer.DataBuffer)")
                     .hasMessageContaining("bodyShape=data-buffer")
+                    .hasMessageContaining("method=" + StrictSigV4StreamingBodyClient.class.getName()
+                            + "#uploadResource(org.springframework.core.io.Resource)")
+                    .hasMessageContaining("bodyShape=resource")
                     .hasMessageContaining("auth=aws-sigv4");
         } finally {
             factoryBean.destroy();
@@ -1608,6 +1679,19 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         Mono<String> create(@HeaderParam Map<String, String> headers);
     }
 
+    @ReactiveHttpClient(name = "strict-api-ref-retry-client")
+    interface StrictApiRefUnsafeRetryClient {
+        @ApiRef("orders.create")
+        Mono<String> create();
+    }
+
+    @ReactiveHttpClient(name = "strict-api-ref-retry-client")
+    interface StrictApiRefGeneratedIdempotencyClient {
+        @ApiRef("orders.create")
+        @IdempotencyKey
+        Mono<String> create();
+    }
+
     @ReactiveHttpClient(name = "strict-body-signing-client")
     interface StrictSigV4SupportedBodyClient {
         @POST("/empty")
@@ -1621,6 +1705,12 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
         @POST("/json")
         Mono<String> json(@Body Map<String, Object> body);
+
+        @POST("/dto")
+        Mono<String> dto(@Body StrictSigV4JsonPayload body);
+    }
+
+    record StrictSigV4JsonPayload(String value) {
     }
 
     @ReactiveHttpClient(name = "strict-body-signing-client")
@@ -1649,6 +1739,9 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
         @POST("/data-buffer")
         Mono<String> uploadDataBuffer(@Body DataBuffer body);
+
+        @POST("/resource")
+        Mono<String> uploadResource(@Body Resource body);
     }
 
     @ReactiveHttpClient(name = "strict-body-signing-client")

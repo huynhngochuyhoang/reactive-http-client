@@ -97,6 +97,21 @@ given call, so strict startup validation does not treat them as proven-safe
 contracts. Keep strict validation disabled for those dynamic contracts and rely
 on the runtime unsafe-retry warning instead.
 
+Incremental rollout pattern:
+
+1. Enable resilience with the intended `retry-methods`, but leave
+   `strict-unsafe-retry-validation` disabled.
+2. Review startup resilience diagnostics, diagnostics snapshots, and runtime
+   unsafe-retry warnings for one client at a time.
+3. Convert retryable unsafe methods to idempotent HTTP methods, method-level
+   `@IdempotencyKey` generation, or a configured default `Idempotency-Key`
+   header that the method cannot override dynamically.
+4. Leave strict validation disabled for methods that intentionally rely on
+   Reactor context, header parameters, or header maps for idempotency keys; those
+   are runtime contracts, not startup-provable contracts.
+5. Enable `strict-unsafe-retry-validation: true` for the audited client, then
+   repeat the same process for the next client.
+
 ### Request body repeatability
 
 Retries re-subscribe to the outbound request. The starter does not buffer large
