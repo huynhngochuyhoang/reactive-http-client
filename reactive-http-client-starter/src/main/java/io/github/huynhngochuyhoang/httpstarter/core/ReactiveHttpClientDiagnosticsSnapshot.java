@@ -23,9 +23,28 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     }
 
     public static String toMarkdown(ReactiveHttpClientDiagnosticsProvider provider) {
-        return toMarkdownEntries(provider.clientSnapshotEntries().stream()
+        return toMarkdownEntries(snapshotClients(provider));
+    }
+
+    private static List<SnapshotClient> snapshotClients(ReactiveHttpClientDiagnosticsProvider provider) {
+        if (usesInternalSnapshotEntries(provider)) {
+            return provider.clientSnapshotEntries().stream()
+                    .map(ReactiveHttpClientDiagnosticsSnapshot::snapshotClient)
+                    .toList();
+        }
+        return provider.clientSummaries().stream()
                 .map(ReactiveHttpClientDiagnosticsSnapshot::snapshotClient)
-                .toList());
+                .toList();
+    }
+
+    private static boolean usesInternalSnapshotEntries(ReactiveHttpClientDiagnosticsProvider provider) {
+        try {
+            java.lang.reflect.Method method = provider.getClass().getMethod("clientSummaries");
+            return method.getDeclaringClass() == ReactiveHttpClientDiagnosticsProvider.class;
+        }
+        catch (NoSuchMethodException ex) {
+            return false;
+        }
     }
 
     public static String toMarkdown(Collection<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries) {
@@ -64,15 +83,11 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     }
 
     public static String toJson(ReactiveHttpClientDiagnosticsProvider provider) {
-        return toJsonEntries(provider.clientSnapshotEntries().stream()
-                .map(ReactiveHttpClientDiagnosticsSnapshot::snapshotClient)
-                .toList());
+        return toJsonEntries(snapshotClients(provider));
     }
 
     public static Map<String, Object> toMap(ReactiveHttpClientDiagnosticsProvider provider) {
-        return toMapEntries(provider.clientSnapshotEntries().stream()
-                .map(ReactiveHttpClientDiagnosticsSnapshot::snapshotClient)
-                .toList());
+        return toMapEntries(snapshotClients(provider));
     }
 
     public static Map<String, Object> toMap(Collection<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries) {

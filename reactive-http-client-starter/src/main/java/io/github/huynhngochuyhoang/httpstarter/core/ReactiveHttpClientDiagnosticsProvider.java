@@ -1,7 +1,9 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
+import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.springframework.beans.factory.FactoryBean;
@@ -9,9 +11,13 @@ import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.reactive.function.client.WebClient;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -64,8 +70,8 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
         return new ClientSnapshotEntry(
                 summary,
-                strictUnsafeRetryValidation(clientConfig, resilienceOperatorApplier),
-                strictBodySigningValidation(clientConfig));
+                strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceOperatorApplier),
+                strictBodySigningValidation(clientName, clientConfig));
     }
 
     static ClientSummary clientSummary(Class<?> clientInterface,
@@ -163,15 +169,36 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return "none";
     }
 
-    private static boolean strictUnsafeRetryValidation(ReactiveHttpClientProperties.ClientConfig clientConfig,
-                                                        ResilienceOperatorApplier resilienceOperatorApplier) {
-        return clientConfig.getResilience() != null
-                && clientConfig.getResilience().isEnabled()
-                && clientConfig.getResilience().isStrictUnsafeRetryValidation()
-                && resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY);
+    private boolean strictUnsafeRetryValidation(Class<?> clientInterface,
+                                                ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                ResilienceOperatorApplier resilienceOperatorApplier) {
+        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
+        if (resilience == null
+                || !resilience.isEnabled()
+                || !resilience.isStrictUnsafeRetryValidation()
+                || !resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)) {
+            return false;
+        }
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method)) {
+                continue;
+            }
+            MethodMetadata meta = metadataCache.get(method);
+            String httpMethod = diagnosticHttpMethod(meta, clientConfig);
+            if (!isRetryMethodEnabled(resilience, httpMethod)) {
+                continue;
+            }
+            RequestPlan plan = RequestPlan.from(meta, clientInterface);
+            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
+            if (resilienceOperatorApplier.canRetryMoreThanOnce(retryInstance)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+    private boolean strictBodySigningValidation(String clientName,
+                                                ReactiveHttpClientProperties.ClientConfig clientConfig) {
         if (StringUtils.hasText(clientConfig.getAuthProvider())
                 || clientConfig.getAuth() == null
                 || clientConfig.getAuth().getAwsSigV4() == null
@@ -179,12 +206,57 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 || !clientConfig.getAuth().getAwsSigV4().isStrictBodySigningValidation()) {
             return false;
         }
+        AuthProvider provider = resolveObjectAuthProvider(clientName, clientConfig.getAuth());
+        return provider instanceof AwsSigV4AuthProvider;
+    }
+
+    private AuthProvider resolveObjectAuthProvider(String clientName, ReactiveHttpClientProperties.AuthConfig auth) {
         return beanFactory.getBeanProvider(AuthProviderFactory.class)
                 .orderedStream()
-                .filter(factory -> factory.supports(clientConfig.getAuth().getType()))
+                .filter(factory -> factory.supports(auth.getType()))
                 .findFirst()
-                .filter(AwsSigV4AuthProviderFactory.class::isInstance)
-                .isPresent();
+                .map(factory -> factory.create(clientName, auth, webClientBuilder()))
+                .orElse(null);
+    }
+
+    private WebClient.Builder webClientBuilder() {
+        return beanFactory.getBeanProvider(WebClient.Builder.class)
+                .getIfAvailable(WebClient::builder);
+    }
+
+    private static String diagnosticHttpMethod(MethodMetadata meta,
+                                               ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (StringUtils.hasText(meta.getHttpMethod())) {
+            return meta.getHttpMethod();
+        }
+        if (StringUtils.hasText(meta.getApiRefName()) && clientConfig.getApis() != null) {
+            ReactiveHttpClientProperties.ApiConfig apiConfig = clientConfig.getApis().get(meta.getApiRefName());
+            if (apiConfig != null && StringUtils.hasText(apiConfig.getMethod())) {
+                return apiConfig.getMethod().trim().toUpperCase(Locale.ROOT);
+            }
+        }
+        return null;
+    }
+
+    private static boolean isRetryMethodEnabled(ReactiveHttpClientProperties.ResilienceConfig resilience,
+                                                String httpMethod) {
+        return httpMethod != null
+                && resilience.getRetryMethods() != null
+                && resilience.getRetryMethods().contains(httpMethod.toUpperCase(Locale.ROOT));
+    }
+
+    private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {
+        return StringUtils.hasText(methodLevel) ? methodLevel : clientLevel;
+    }
+
+    private static boolean isDeclarativeClientMethod(Method method) {
+        int modifiers = method.getModifiers();
+        return method.getDeclaringClass() != Object.class
+                && Modifier.isAbstract(modifiers)
+                && !Modifier.isStatic(modifiers)
+                && !method.isSynthetic()
+                && !method.isDefault()
+                && !method.isBridge();
     }
 
     private ResilienceOperatorApplier resilienceOperatorApplier() {
