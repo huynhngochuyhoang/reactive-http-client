@@ -313,6 +313,58 @@ class ReactiveHttpClientConfigurationMetadataTest {
     }
 
     @Test
+    void productionPolicyExampleUsesSafePlaceholdersAndStarterMetadata() throws IOException {
+        Path examples = projectRoot().resolve("docs/examples/production-policy.md");
+        String markdown = Files.readString(examples);
+        Set<String> exampleProperties = configurationExampleProperties(Files.readAllLines(examples));
+        Set<String> missing = new TreeSet<>(exampleProperties);
+        missing.removeAll(allMetadataPropertyNames(projectRoot()));
+
+        assertThat(missing).as("production policy example properties missing from metadata").isEmpty();
+        assertThat(exampleProperties).contains(
+                "reactive.http.observability.diagnostics-endpoint.enabled",
+                "reactive.http.clients.[name].base-url",
+                "reactive.http.clients.[name].request-timeout-ms",
+                "reactive.http.clients.[name].apis.[api-name].method",
+                "reactive.http.clients.[name].apis.[api-name].path",
+                "reactive.http.clients.[name].apis.[api-name].timeout-ms",
+                "reactive.http.clients.[name].log-exchange",
+                "reactive.http.clients.[name].log-preset",
+                "reactive.http.clients.[name].auth.type",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.token-uri",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.client-id",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.client-secret",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.auth-style",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.expiry-leeway-ms",
+                "reactive.http.clients.[name].resilience.enabled",
+                "reactive.http.clients.[name].resilience.retry",
+                "reactive.http.clients.[name].resilience.retry-methods",
+                "reactive.http.clients.[name].resilience.strict-unsafe-retry-validation",
+                "reactive.http.clients.[name].default-headers",
+                "reactive.http.clients.[name].auth.aws-sig-v4.access-key-id",
+                "reactive.http.clients.[name].auth.aws-sig-v4.secret-access-key",
+                "reactive.http.clients.[name].auth.aws-sig-v4.session-token",
+                "reactive.http.clients.[name].auth.aws-sig-v4.region",
+                "reactive.http.clients.[name].auth.aws-sig-v4.service",
+                "reactive.http.clients.[name].auth.aws-sig-v4.strict-body-signing-validation");
+        assertThat(markdown)
+                .contains("@ReactiveHttpClient(name = \"bus-orders\")")
+                .contains("@ReactiveHttpClient(name = \"train-orders\")")
+                .contains("@ApiRef(\"orders-get\")")
+                .contains("@IdempotencyKey")
+                .contains("strict-unsafe-retry-validation: true")
+                .contains("strict-body-signing-validation: true")
+                .contains("diagnostics/rhttpclients.json")
+                .contains("health/health.json")
+                .contains("${EXAMPLE_PAYMENT_CLIENT_SECRET}")
+                .contains("${EXAMPLE_AWS_SECRET_ACCESS_KEY}")
+                .contains(".example.invalid")
+                .doesNotContain("api.example.com")
+                .doesNotContain("localhost")
+                .doesNotContain("Bearer ");
+    }
+
+    @Test
     void supportBundleExamplesUseSafePlaceholdersAndStarterMetadata() throws IOException {
         Path supportBundleDocs = projectRoot().resolve("docs/26-support-bundles.md");
         String markdown = Files.readString(supportBundleDocs);

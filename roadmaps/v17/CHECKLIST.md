@@ -365,23 +365,38 @@ Evidence:
 
 ## Priority 10 — Production Policy Example Coverage
 
-### [ ] 5.2 Improve example app coverage without creating a new framework
-- [ ] Add one compact example page or package for common production policy.
-- [ ] Include inherited clients with per-client timeout policy.
-- [ ] Include OAuth2 client credentials with placeholder values.
-- [ ] Include retry with a startup-provable idempotency-key contract.
-- [ ] Include strict unsafe-retry validation.
-- [ ] Include strict built-in SigV4 body-signing validation only where the body
+### [x] 5.2 Improve example app coverage without creating a new framework
+- [x] Add one compact example page or package for common production policy.
+- [x] Include inherited clients with per-client timeout policy.
+- [x] Include OAuth2 client credentials with placeholder values.
+- [x] Include retry with a startup-provable idempotency-key contract.
+- [x] Include strict unsafe-retry validation.
+- [x] Include strict built-in SigV4 body-signing validation only where the body
       shape is supported.
-- [ ] Include diagnostics endpoint and support-bundle capture snippets.
-- [ ] Keep values fake and obviously non-production.
-- [ ] Avoid adding a runnable sample service unless tests require it.
-- [ ] Validate configuration snippets against metadata.
-- [ ] Run documentation link tests.
+- [x] Include diagnostics endpoint and support-bundle capture snippets.
+- [x] Keep values fake and obviously non-production.
+- [x] Avoid adding a runnable sample service unless tests require it.
+- [x] Validate configuration snippets against metadata.
+- [x] Run documentation link tests.
 
 Evidence:
 
-- Pending.
+- Added `docs/examples/production-policy.md` as a compact documentation-only
+  policy example rather than a runnable sample service.
+- The example covers inherited read clients with separate `@ApiRef` mappings and
+  per-client timeout policy, an OAuth2 payment command client, method-level
+  generated `@IdempotencyKey` for startup-provable POST retry safety, strict
+  unsafe-retry validation, and built-in AWS SigV4 strict body signing for a
+  concrete JSON DTO body with a static JSON `Content-Type`.
+- Added diagnostics endpoint, health details, startup-summary logging,
+  metadata-only exchange logging, and support-bundle capture snippets using
+  `.example.invalid` hosts and `${EXAMPLE_*}` placeholders.
+- Linked the page from `docs/examples/README.md`.
+- Added `ReactiveHttpClientConfigurationMetadataTest` coverage that validates
+  the production-policy YAML against starter metadata and checks safe
+  placeholder conventions.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
 
 ---
 

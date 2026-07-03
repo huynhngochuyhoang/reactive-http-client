@@ -8,6 +8,10 @@ package names, credentials, and upstream URLs.
 
 See [Effective Configuration Examples](effective-configuration.md) for metadata-validated starter configuration snippets covering inherited clients, auth, proxy/TLS, redirects, strict retry, strict body signing, and diagnostics.
 
+## Production Policy
+
+See [Production Policy Example](production-policy.md) for a compact metadata-validated policy example covering inherited clients, per-client timeouts, OAuth2, strict retry, strict SigV4 body signing, diagnostics, and support-bundle capture.
+
 ## OAuth2 Client Credentials
 
 ```yaml
