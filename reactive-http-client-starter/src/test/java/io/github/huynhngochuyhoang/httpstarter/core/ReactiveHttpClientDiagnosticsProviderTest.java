@@ -12,8 +12,11 @@ import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.FactoryBean;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
+import org.springframework.cglib.proxy.Enhancer;
+import org.springframework.cglib.proxy.MethodInterceptor;
 import org.springframework.core.Ordered;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -277,6 +280,37 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsKeepStrictFlagsForClassBasedProviderProxies() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+        beanFactory.registerSingleton("retryRegistry", RetryRegistry.ofDefaults());
+
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setStrictUnsafeRetryValidation(true);
+        config.setResilience(resilience);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider target = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+        ReactiveHttpClientDiagnosticsProvider proxy = classBasedProxy(target);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>) ReactiveHttpClientDiagnosticsSnapshot
+                .toMap(proxy)
+                .get("clients");
+
+        assertThat(clients).hasSize(1);
+        assertThat(clients.get(0))
+                .containsEntry("strictUnsafeRetryValidation", true)
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
     void rendersUnknownStrictValidationFlagsForSummaryOnlySnapshots() {
         ReactiveHttpClientDiagnosticsProvider.ClientSummary summary = summary("summary-client", "com.example.SummaryClient");
 
@@ -353,6 +387,22 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         finally {
             Thread.currentThread().setContextClassLoader(previous);
         }
+    }
+
+    private static ReactiveHttpClientDiagnosticsProvider classBasedProxy(ReactiveHttpClientDiagnosticsProvider target) {
+        Enhancer enhancer = new Enhancer();
+        enhancer.setSuperclass(ReactiveHttpClientDiagnosticsProvider.class);
+        enhancer.setCallback((MethodInterceptor) (object, method, args, methodProxy) ->
+                method.invoke(target, args != null ? args : new Object[0]));
+        return (ReactiveHttpClientDiagnosticsProvider) enhancer.create(
+                new Class<?>[]{
+                        ConfigurableListableBeanFactory.class,
+                        ReactiveHttpClientProperties.class,
+                        MethodMetadataCache.class},
+                new Object[]{
+                        new DefaultListableBeanFactory(),
+                        new ReactiveHttpClientProperties(),
+                        new MethodMetadataCache()});
     }
 
     private static Map<String, Object> snapshotClient(ReactiveHttpClientProperties.ClientConfig config) {

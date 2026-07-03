@@ -1,5 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import org.springframework.util.ClassUtils;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
@@ -39,7 +41,8 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     private static boolean usesInternalSnapshotEntries(ReactiveHttpClientDiagnosticsProvider provider) {
         try {
-            java.lang.reflect.Method method = provider.getClass().getMethod("clientSummaries");
+            Class<?> providerClass = ClassUtils.getUserClass(provider);
+            java.lang.reflect.Method method = providerClass.getMethod("clientSummaries");
             return method.getDeclaringClass() == ReactiveHttpClientDiagnosticsProvider.class;
         }
         catch (NoSuchMethodException ex) {

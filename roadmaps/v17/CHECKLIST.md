@@ -137,6 +137,7 @@ Evidence:
 - Strict retry diagnostics now report true only when resilience is enabled, the strict flag is active, the Retry operator is available, and at least one resolved retry instance can make duplicate attempts; method-level missing `@Retry` names are not materialized during diagnostics.
 - Strict body-signing diagnostics now report true only when object-style AWS SigV4 selects the starter built-in factory; named auth-provider beans and custom factories report false without provider construction.
 - Summary-only snapshot overloads now render provider-only strict validation values as unknown/null instead of silently reporting false, and provider snapshot overloads respect custom `clientSummaries()` overrides.
+- Provider snapshot overloads now classify class-based Spring/CGLIB proxies by the user class so the default provider keeps strict validation booleans instead of falling back to summary-only unknown values.
 - Added endpoint coverage for multiple clients, inherited generic endpoints, strict unsafe-retry config, strict AWS SigV4 body-signing config, deterministic client ordering, and sanitized output that omits concrete base URLs, auth secrets, sensitive header material, request bodies, and response bodies.
 - Updated observability, diagnostic-context, and support-bundle docs to describe endpoint output versus health details, exchange logs, and helper snapshots.
 - `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientAutoConfigurationTest,ReactiveHttpClientDiagnosticsProviderTest test` passed.
