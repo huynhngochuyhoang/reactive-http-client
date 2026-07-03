@@ -290,25 +290,41 @@ Evidence:
 
 ## Priority 8 — Public Constructor and Mutable Model Review
 
-### [ ] 4.2 Review public constructors and mutable models for long-term support
-- [ ] Review public constructors and setters on `MethodMetadata*`.
-- [ ] Review diagnostics provider and diagnostics snapshot public models.
-- [ ] Review contract snapshot builder, client model, nested classes, and return
+### [x] 4.2 Review public constructors and mutable models for long-term support
+- [x] Review public constructors and setters on `MethodMetadata*`.
+- [x] Review diagnostics provider and diagnostics snapshot public models.
+- [x] Review contract snapshot builder, client model, nested classes, and return
       models.
-- [ ] Review test-helper public records and assertion helper methods.
-- [ ] Review public enums and nested types exposed through compatibility-covered
+- [x] Review test-helper public records and assertion helper methods.
+- [x] Review public enums and nested types exposed through compatibility-covered
       helpers.
-- [ ] Document every compatibility-covered type as supported, deprecated, or
+- [x] Document every compatibility-covered type as supported, deprecated, or
       reserved for a future major release.
-- [ ] Avoid removals or narrowing changes in the current minor line.
-- [ ] Add javadocs only where a public type is intended for user implementation
+- [x] Avoid removals or narrowing changes in the current minor line.
+- [x] Add javadocs only where a public type is intended for user implementation
       or direct instantiation.
-- [ ] Run API compatibility fixtures.
-- [ ] Run root and module-scoped API compatibility.
+- [x] Run API compatibility fixtures.
+- [x] Run root and module-scoped API compatibility.
 
 Evidence:
 
-- Pending.
+- Added support-status coverage to the documented public surface map in
+  `docs/20-native-release-compatibility.md`; every compatibility-covered
+  include pattern is currently marked `Supported`, and the doc now states that
+  future reserved or deprecated surfaces must be marked in the same table.
+- Added a constructor and mutable model policy covering `MethodMetadata`,
+  `MethodMetadataCache`, diagnostics summary records, diagnostics snapshot
+  overloads, contract snapshot `Client` and `Builder`, test-helper APIs,
+  `ResilienceOperatorApplier.InstanceType`, and OTel public constructors/static
+  factories.
+- Added focused Javadocs for user-facing mutable/constructible surfaces:
+  `MethodMetadata`, `MethodMetadataCache`, diagnostics summary records,
+  contract snapshot `Client`/`Builder`, and `ResilienceOperatorApplier`.
+- Extended `DocumentationReleaseArtifactTest.documentedPublicSurfaceMapMatchesApiCompatibilityIncludes` to require support statuses and the constructor/mutability policy.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `bash scripts/verify-api-compatibility-fixtures.sh` passed.
+- `mvn -q -Papi-compatibility -DskipTests verify` passed.
+- `mvn -q -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify` passed.
 
 ---
 

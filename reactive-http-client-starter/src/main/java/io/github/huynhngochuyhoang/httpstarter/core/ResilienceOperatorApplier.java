@@ -5,6 +5,11 @@ import reactor.core.publisher.Mono;
 
 /**
  * Applies resilience operators to Reactor publishers.
+ *
+ * <p>This interface is public for diagnostics, contract snapshots, and test
+ * helpers that need to model operator availability without depending directly
+ * on Resilience4j registries. Implementations should preserve the default
+ * validation methods unless they can answer from a real registry.
  */
 public interface ResilienceOperatorApplier {
 

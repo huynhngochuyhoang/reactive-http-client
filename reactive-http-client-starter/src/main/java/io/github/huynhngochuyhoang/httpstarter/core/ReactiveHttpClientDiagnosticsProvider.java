@@ -293,6 +293,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
     ) {
     }
 
+    /** Sanitized immutable summary for one registered reactive HTTP client. */
     public record ClientSummary(
             String clientName,
             String clientInterface,
@@ -306,9 +307,11 @@ public class ReactiveHttpClientDiagnosticsProvider {
     ) {
     }
 
+    /** Effective timeout source and value exposed in diagnostics snapshots. */
     public record TimeoutSummary(String source, long timeoutMs) {
     }
 
+    /** Effective resilience operator names exposed in diagnostics snapshots. */
     public record ResilienceSummary(
             boolean configured,
             String retry,

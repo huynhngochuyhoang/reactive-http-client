@@ -48,6 +48,7 @@ public final class ReactiveHttpClientContractSnapshot {
         return builder.render();
     }
 
+    /** Client input used by the Markdown contract snapshot builder. */
     public record Client(Class<?> clientInterface,
                          String clientName,
                          ReactiveHttpClientProperties.ClientConfig clientConfig) {
@@ -64,6 +65,7 @@ public final class ReactiveHttpClientContractSnapshot {
         }
     }
 
+    /** Builder for deterministic Markdown contract snapshots. */
     public static final class Builder {
         private final List<Client> clients = new ArrayList<>();
         private final Set<String> clientNameFilters = new LinkedHashSet<>();

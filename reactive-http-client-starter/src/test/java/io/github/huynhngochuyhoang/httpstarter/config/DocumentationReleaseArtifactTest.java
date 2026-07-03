@@ -131,7 +131,10 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
-        List<String> documentedIncludes = documentedPublicSurfaceIncludes(releaseDocs);
+        List<PublicSurfaceRow> documentedRows = documentedPublicSurfaceRows(releaseDocs);
+        List<String> documentedIncludes = documentedRows.stream()
+                .map(PublicSurfaceRow::includePattern)
+                .toList();
         List<String> apiIncludes = apiCompatibilityIncludes(pomXml);
 
         assertThat(documentedIncludes)
@@ -153,10 +156,21 @@ class DocumentationReleaseArtifactTest {
                         "io.github.huynhngochuyhoang.httpstarter.core.ResilienceOperatorApplier*",
                         "io.github.huynhngochuyhoang.httpstarter.test",
                         "io.github.huynhngochuyhoang.httpstarter.otel");
+        assertThat(documentedRows)
+                .extracting(PublicSurfaceRow::supportStatus)
+                .containsOnly("Supported");
         assertThat(apiIncludes)
                 .as("api-compatibility japicmp includes")
                 .containsExactlyInAnyOrderElementsOf(documentedIncludes);
         assertThat(releaseDocs)
+                .contains("No compatibility-covered type is currently deprecated")
+                .contains("### Constructor and mutable model policy")
+                .contains("The `MethodMetadata` no-arg constructor")
+                .contains("canonical\n  record constructors")
+                .contains("Provider overloads may include provider-only fields")
+                .contains("builder methods, and\n  rendered table columns")
+                .contains("Package-private\n  constructors remain internal")
+                .contains("public nested enum")
                 .contains("When documenting a new public helper")
                 .contains("Prefer the narrowest include\npattern")
                 .contains("Keep implementation\ninternals excluded")
@@ -1294,15 +1308,31 @@ class DocumentationReleaseArtifactTest {
         return includes;
     }
 
-    private static List<String> documentedPublicSurfaceIncludes(String markdown) {
+    private record PublicSurfaceRow(String includePattern, String supportStatus) {
+    }
+
+    private static List<PublicSurfaceRow> documentedPublicSurfaceRows(String markdown) {
         String section = markdownSection(markdown, "### Documented public surface map",
-                "### Compatibility include workflow");
-        Matcher matcher = Pattern.compile("(?m)^\\| `([^`]+)` \\|").matcher(section);
-        List<String> includes = new ArrayList<>();
-        while (matcher.find()) {
-            includes.add(matcher.group(1));
+                "### Constructor and mutable model policy");
+        List<PublicSurfaceRow> rows = new ArrayList<>();
+        for (String line : section.split("\\R")) {
+            if (!line.startsWith("| `")) {
+                continue;
+            }
+            String[] columns = line.split("\\|", -1);
+            if (columns.length < 6) {
+                throw new IllegalStateException("Malformed public surface row: " + line);
+            }
+            rows.add(new PublicSurfaceRow(stripBackticks(columns[1].trim()), columns[4].trim()));
         }
-        return includes;
+        return rows;
+    }
+
+    private static String stripBackticks(String value) {
+        if (value.startsWith("`") && value.endsWith("`")) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
     }
 
     private static String markdownSection(String markdown, String heading, String nextHeading) {
