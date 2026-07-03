@@ -179,55 +179,71 @@ Evidence:
 
 ## Priority 5 — Strict Unsafe-Retry Adoption Audit
 
-### [ ] 3.1 Audit strict unsafe-retry validation against real configuration shapes
-- [ ] Re-test strict retry validation with inherited endpoints.
-- [ ] Re-test strict retry validation with `@ApiRef` endpoint mappings.
-- [ ] Re-test strict retry validation with method-level generated idempotency
+### [x] 3.1 Audit strict unsafe-retry validation against real configuration shapes
+- [x] Re-test strict retry validation with inherited endpoints.
+- [x] Re-test strict retry validation with `@ApiRef` endpoint mappings.
+- [x] Re-test strict retry validation with method-level generated idempotency
       keys.
-- [ ] Re-test strict retry validation with Reactor-context idempotency keys and
+- [x] Re-test strict retry validation with Reactor-context idempotency keys and
       document why they are dynamic rather than startup-provable.
-- [ ] Re-test strict retry validation with configured default headers.
-- [ ] Re-test strict retry validation with dynamic header maps and header params
+- [x] Re-test strict retry validation with configured default headers.
+- [x] Re-test strict retry validation with dynamic header maps and header params
       that can remove or override `Idempotency-Key`.
-- [ ] Re-test strict retry validation with overloaded methods.
-- [ ] Re-test strict retry validation with disabled retry instances and no-op
+- [x] Re-test strict retry validation with overloaded methods.
+- [x] Re-test strict retry validation with disabled retry instances and no-op
       retry operators.
-- [ ] Improve startup error messages only where adoption evidence shows they are
+- [x] Improve startup error messages only where adoption evidence shows they are
       ambiguous.
-- [ ] Keep warning-only behavior unchanged when strict mode is disabled.
-- [ ] Add incremental rollout guidance for enabling strict mode one client at a
+- [x] Keep warning-only behavior unchanged when strict mode is disabled.
+- [x] Add incremental rollout guidance for enabling strict mode one client at a
       time.
-- [ ] Run retry, idempotency, diagnostics, and documentation tests.
+- [x] Run retry, idempotency, diagnostics, and documentation tests.
 
 Evidence:
 
-- Pending.
+- Existing strict retry tests continue to cover inherited overloaded endpoints, method-level generated `@IdempotencyKey`, idempotent HTTP methods, configured default `Idempotency-Key` headers, dynamic `@HeaderParam` and header-map overrides, unavailable Retry operators, and single-attempt Retry instances.
+- Added startup coverage for warning-only compatibility when resilience retry is enabled for POST but `strict-unsafe-retry-validation` remains disabled.
+- Added `@ApiRef` strict retry coverage: a configured POST API ref without startup-provable idempotency fails startup, while the same API ref with method-level generated `@IdempotencyKey` succeeds.
+- Re-audited Reactor-context idempotency as intentionally dynamic; docs now keep it outside startup-provable contracts and add an incremental one-client-at-a-time strict-mode rollout pattern.
+- Existing startup error text already names the client, method signature, HTTP method, retry instance, retry methods, and explains that runtime-provided keys from parameters, header maps, or Reactor context are not startup-provable, so no message change was needed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientFactoryBeanDiagnosticsTest,ReactiveClientInvocationHandlerRetrySafetyTest,IdempotencyKeySupportTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientDiagnosticsProviderTest,ReactiveHttpClientConfigurationMetadataTest,DocumentationReleaseArtifactTest test` passed.
+- `git diff --check` passed.
 
 ---
 
 ## Priority 6 — Strict AWS SigV4 Body-Signing Audit
 
-### [ ] 3.2 Audit strict body-signing validation for built-in AWS SigV4
-- [ ] Re-test strict validation for byte-array bodies.
-- [ ] Re-test strict validation for UTF-8 string bodies.
-- [ ] Re-test strict validation for JSON DTO bodies.
-- [ ] Re-test strict validation for absent body paths.
-- [ ] Re-test strict validation for static non-JSON `Content-Type` values.
-- [ ] Re-test strict validation for dynamic `Content-Type` header parameters.
-- [ ] Re-test strict validation for erased `Object` bodies.
-- [ ] Re-test strict validation for publisher bodies.
-- [ ] Re-test strict validation for resource and multipart bodies.
-- [ ] Re-test strict validation for Java stream body types.
-- [ ] Verify custom `AuthProviderFactory` selection is not rejected by built-in
+### [x] 3.2 Audit strict body-signing validation for built-in AWS SigV4
+- [x] Re-test strict validation for byte-array bodies.
+- [x] Re-test strict validation for UTF-8 string bodies.
+- [x] Re-test strict validation for JSON DTO bodies.
+- [x] Re-test strict validation for absent body paths.
+- [x] Re-test strict validation for static non-JSON `Content-Type` values.
+- [x] Re-test strict validation for dynamic `Content-Type` header parameters.
+- [x] Re-test strict validation for erased `Object` bodies.
+- [x] Re-test strict validation for publisher bodies.
+- [x] Re-test strict validation for resource and multipart bodies.
+- [x] Re-test strict validation for Java stream body types.
+- [x] Verify custom `AuthProviderFactory` selection is not rejected by built-in
       SigV4 assumptions.
-- [ ] Verify named custom auth providers are not rejected by built-in SigV4
+- [x] Verify named custom auth providers are not rejected by built-in SigV4
       assumptions.
-- [ ] Document JSON signing codec-alignment requirements.
-- [ ] Run SigV4, auth provider, strict body-signing, and documentation tests.
+- [x] Document JSON signing codec-alignment requirements.
+- [x] Run SigV4, auth provider, strict body-signing, and documentation tests.
 
 Evidence:
 
-- Pending.
+- Added strict SigV4 audit coverage for concrete DTO JSON bodies and direct
+  `Resource` body rejection in `ReactiveHttpClientFactoryBeanDiagnosticsTest`.
+- Existing strict validation coverage re-confirmed `byte[]`, default UTF-8
+  `String`, absent bodies, static and dynamic `Content-Type` rejection, erased
+  `Object`, `Publisher`, `DataBuffer`, multipart, Java stream bodies, named
+  auth providers, and custom `AuthProviderFactory` selection.
+- Documented the JSON DTO/object codec-alignment requirement in
+  `docs/06-auth-providers.md`.
+- `mvn -q -pl reactive-http-client-starter -Dtest=AwsSigV4AuthProviderTest,AuthProviderFactoryTest,RefreshingBearerAuthProviderTest,ReactiveHttpClientFactoryBeanDiagnosticsTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest,DocumentationReleaseArtifactTest test` passed.
 
 ---
 
