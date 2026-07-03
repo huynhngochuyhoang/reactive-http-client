@@ -43,8 +43,14 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     public List<ClientSummary> clientSummaries() {
-        return clientSnapshotEntries().stream()
-                .map(ClientSnapshotEntry::summary)
+        ResilienceOperatorApplier resilienceOperatorApplier = resilienceOperatorApplier();
+        return List.of(beanFactory.getBeanDefinitionNames()).stream()
+                .map(this::clientInterface)
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(clientInterface -> clientSummaryEntry(clientInterface, resilienceOperatorApplier))
+                .sorted(Comparator.comparing(ClientSummary::clientName)
+                        .thenComparing(ClientSummary::clientInterface))
                 .toList();
     }
 
@@ -58,6 +64,15 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 .sorted(Comparator.comparing((ClientSnapshotEntry entry) -> entry.summary().clientName())
                         .thenComparing(entry -> entry.summary().clientInterface()))
                 .toList();
+    }
+
+    private ClientSummary clientSummaryEntry(Class<?> clientInterface,
+                                             ResilienceOperatorApplier resilienceOperatorApplier) {
+        ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+        String clientName = annotation != null ? annotation.name() : "";
+        ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
+                .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
+        return clientSummary(clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
     }
 
     private ClientSnapshotEntry clientSnapshotEntry(Class<?> clientInterface,
@@ -190,6 +205,10 @@ public class ReactiveHttpClientDiagnosticsProvider {
             }
             RequestPlan plan = RequestPlan.from(meta, clientInterface);
             String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
+            if (StringUtils.hasText(plan.retryInstanceName())
+                    && !resilienceOperatorApplier.isInstanceConfigured(ResilienceOperatorApplier.InstanceType.RETRY, retryInstance)) {
+                continue;
+            }
             if (resilienceOperatorApplier.canRetryMoreThanOnce(retryInstance)) {
                 return true;
             }

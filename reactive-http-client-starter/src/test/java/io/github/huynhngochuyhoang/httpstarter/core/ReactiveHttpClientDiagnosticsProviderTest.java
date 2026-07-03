@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.annotation.Retry;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
@@ -70,6 +71,32 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .doesNotContain("secretAuthProviderBean")
                 .doesNotContain("secret-token")
                 .doesNotContain("Authorization");
+    }
+
+    @Test
+    void clientSummariesDoNotResolveStrictAuthProviders() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+        beanFactory.registerSingleton("throwingAuthProviderFactory", new ThrowingAwsSigV4Factory());
+
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider(null);
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        config.setAuth(auth);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        List<ReactiveHttpClientDiagnosticsProvider.ClientSummary> summaries = provider.clientSummaries();
+
+        assertThat(summaries).hasSize(1);
+        assertThat(summaries.get(0).authMode()).isEqualTo("aws-sigv4");
     }
 
     @Test
@@ -145,6 +172,24 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         assertThat(retryOperatorClient)
                 .containsEntry("resilienceConfigured", true)
                 .containsEntry("strictUnsafeRetryValidation", true);
+    }
+
+    @Test
+    void strictRetryDiagnosticsDoNotCreateMissingRetryInstances() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setStrictUnsafeRetryValidation(true);
+        config.setResilience(resilience);
+        RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
+
+        Map<String, Object> client = snapshotClient(
+                "diagnostic-missing-retry", DiagnosticMissingRetryClient.class, config, retryRegistry);
+
+        assertThat(client)
+                .containsEntry("clientName", "diagnostic-missing-retry")
+                .containsEntry("strictUnsafeRetryValidation", false);
+        assertThat(retryRegistry.find("ghost-retry")).isEmpty();
     }
 
     @Test
@@ -287,10 +332,18 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     private static Map<String, Object> snapshotClient(ReactiveHttpClientProperties.ClientConfig config,
                                                       RetryRegistry retryRegistry,
                                                       AuthProviderFactory... authProviderFactories) {
+        return snapshotClient("diagnostic-client", DiagnosticClient.class, config, retryRegistry, authProviderFactories);
+    }
+
+    private static Map<String, Object> snapshotClient(String clientName,
+                                                      Class<?> clientInterface,
+                                                      ReactiveHttpClientProperties.ClientConfig config,
+                                                      RetryRegistry retryRegistry,
+                                                      AuthProviderFactory... authProviderFactories) {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         GenericBeanDefinition definition = new GenericBeanDefinition();
         definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
-        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, clientInterface);
         beanFactory.registerBeanDefinition("diagnosticClient", definition);
         if (retryRegistry != null) {
             beanFactory.registerSingleton("retryRegistry", retryRegistry);
@@ -300,7 +353,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         }
 
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
-        properties.setClients(Map.of("diagnostic-client", config));
+        properties.setClients(Map.of(clientName, config));
         ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
                 beanFactory, properties, new MethodMetadataCache());
 
@@ -353,6 +406,21 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 0);
     }
 
+    static class ThrowingAwsSigV4Factory implements AuthProviderFactory {
+
+        @Override
+        public boolean supports(String type) {
+            return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+        }
+
+        @Override
+        public AuthProvider create(String clientName,
+                                   ReactiveHttpClientProperties.AuthConfig config,
+                                   WebClient.Builder webClientBuilder) {
+            throw new IllegalStateException("Auth provider should not be resolved for client summaries");
+        }
+    }
+
     static class OrderedCustomAwsSigV4Factory implements AuthProviderFactory, Ordered {
 
         @Override
@@ -399,6 +467,14 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         @GET("/shared")
         Mono<String> shared();
+    }
+
+    @ReactiveHttpClient(name = "diagnostic-missing-retry")
+    interface DiagnosticMissingRetryClient {
+
+        @Retry("ghost-retry")
+        @GET("/missing-retry")
+        Mono<String> missingRetry();
     }
 
     @ReactiveHttpClient(name = "diagnostic-client")
