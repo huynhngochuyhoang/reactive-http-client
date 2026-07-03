@@ -1,9 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
-import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
-import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.springframework.beans.factory.FactoryBean;
@@ -11,7 +9,6 @@ import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -86,7 +83,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return new ClientSnapshotEntry(
                 summary,
                 strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceOperatorApplier),
-                strictBodySigningValidation(clientName, clientConfig));
+                strictBodySigningValidation(clientConfig));
     }
 
     static ClientSummary clientSummary(Class<?> clientInterface,
@@ -216,8 +213,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return false;
     }
 
-    private boolean strictBodySigningValidation(String clientName,
-                                                ReactiveHttpClientProperties.ClientConfig clientConfig) {
+    private boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
         if (StringUtils.hasText(clientConfig.getAuthProvider())
                 || clientConfig.getAuth() == null
                 || clientConfig.getAuth().getAwsSigV4() == null
@@ -225,22 +221,12 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 || !clientConfig.getAuth().getAwsSigV4().isStrictBodySigningValidation()) {
             return false;
         }
-        AuthProvider provider = resolveObjectAuthProvider(clientName, clientConfig.getAuth());
-        return provider instanceof AwsSigV4AuthProvider;
-    }
-
-    private AuthProvider resolveObjectAuthProvider(String clientName, ReactiveHttpClientProperties.AuthConfig auth) {
         return beanFactory.getBeanProvider(AuthProviderFactory.class)
                 .orderedStream()
-                .filter(factory -> factory.supports(auth.getType()))
+                .filter(factory -> factory.supports(clientConfig.getAuth().getType()))
                 .findFirst()
-                .map(factory -> factory.create(clientName, auth, webClientBuilder()))
-                .orElse(null);
-    }
-
-    private WebClient.Builder webClientBuilder() {
-        return beanFactory.getBeanProvider(WebClient.Builder.class)
-                .getIfAvailable(WebClient::builder);
+                .filter(AwsSigV4AuthProviderFactory.class::isInstance)
+                .isPresent();
     }
 
     private static String diagnosticHttpMethod(MethodMetadata meta,

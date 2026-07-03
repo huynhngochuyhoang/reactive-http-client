@@ -133,8 +133,9 @@ Evidence:
 - `ReactiveHttpClientDiagnosticsEndpoint.diagnostics()` still delegates to `ReactiveHttpClientDiagnosticsSnapshot.toMap(provider)`; the new multi-client endpoint test asserts endpoint output equals the snapshot helper output.
 - Provider-backed snapshot output now includes sanitized `strictUnsafeRetryValidation` and `strictBodySigningValidation` booleans without changing the public `ClientSummary` record constructor.
 - Public `clientSummaries()` remains summary-only and does not resolve strict auth providers before discarding snapshot-only flags.
+- Provider-backed snapshots do not construct auth providers while reporting strict body-signing diagnostics.
 - Strict retry diagnostics now report true only when resilience is enabled, the strict flag is active, the Retry operator is available, and at least one resolved retry instance can make duplicate attempts; method-level missing `@Retry` names are not materialized during diagnostics.
-- Strict body-signing diagnostics now report true only when object-style AWS SigV4 resolves to the built-in provider instance, including ordered custom factories that delegate to the built-in provider; named auth-provider beans and custom non-built-in providers report false.
+- Strict body-signing diagnostics now report true only when object-style AWS SigV4 selects the starter built-in factory; named auth-provider beans and custom factories report false without provider construction.
 - Summary-only snapshot overloads now render provider-only strict validation values as unknown/null instead of silently reporting false, and provider snapshot overloads respect custom `clientSummaries()` overrides.
 - Added endpoint coverage for multiple clients, inherited generic endpoints, strict unsafe-retry config, strict AWS SigV4 body-signing config, deterministic client ordering, and sanitized output that omits concrete base URLs, auth secrets, sensitive header material, request bodies, and response bodies.
 - Updated observability, diagnostic-context, and support-bundle docs to describe endpoint output versus health details, exchange logs, and helper snapshots.

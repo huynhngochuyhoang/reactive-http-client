@@ -100,6 +100,36 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsDoNotResolveStrictAuthProviders() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+        beanFactory.registerSingleton("throwingAuthProviderFactory", new ThrowingAwsSigV4Factory());
+
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider(null);
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        config.setAuth(auth);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(provider);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>) snapshot.get("clients");
+        assertThat(clients).hasSize(1);
+        assertThat(clients.get(0))
+                .containsEntry("authMode", "aws-sigv4")
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
     void rendersSanitizedDiagnosticsSnapshot() {
         ReactiveHttpClientDiagnosticsProvider provider = sensitiveDiagnosticsProvider();
 
@@ -213,7 +243,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
-    void reportsStrictBodySigningOnlyForBuiltInAwsSigV4Factory() {
+    void reportsStrictBodySigningOnlyForSelectedBuiltInAwsSigV4Factory() {
         ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
         config.setAuthProvider(null);
         ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
@@ -237,7 +267,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         assertThat(delegatingFactoryClient)
                 .containsEntry("authMode", "aws-sigv4")
-                .containsEntry("strictBodySigningValidation", true);
+                .containsEntry("strictBodySigningValidation", false);
 
         Map<String, Object> builtInFactoryClient = snapshotClient(config, null, new AwsSigV4AuthProviderFactory());
 
