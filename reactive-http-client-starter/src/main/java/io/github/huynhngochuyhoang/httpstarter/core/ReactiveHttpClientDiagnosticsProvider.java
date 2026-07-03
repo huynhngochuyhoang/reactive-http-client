@@ -163,11 +163,13 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     private static boolean strictUnsafeRetryValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
         return clientConfig.getResilience() != null
+                && clientConfig.getResilience().isEnabled()
                 && clientConfig.getResilience().isStrictUnsafeRetryValidation();
     }
 
     private static boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
-        return clientConfig.getAuth() != null
+        return !StringUtils.hasText(clientConfig.getAuthProvider())
+                && clientConfig.getAuth() != null
                 && clientConfig.getAuth().getAwsSigV4() != null
                 && "aws-sigv4".equalsIgnoreCase(clientConfig.getAuth().getType())
                 && clientConfig.getAuth().getAwsSigV4().isStrictBodySigningValidation();

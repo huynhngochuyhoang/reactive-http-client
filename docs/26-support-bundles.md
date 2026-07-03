@@ -48,9 +48,10 @@ class SupportBundleExporter {
 }
 ```
 
-The snapshot includes project version, total client count, total endpoint count,
+Provider-backed snapshots include project version, total client count, total endpoint count,
 total inherited endpoint count, per-client policy summaries, and strict validation
-flags. It does not include concrete base URLs, header values, proxy credentials, auth-provider bean
+flags. Summary-only collection snapshots mark strict validation flags as unknown.
+They do not include concrete base URLs, header values, proxy credentials, auth-provider bean
 names, request bodies, or response bodies.
 
 If Actuator is available and the endpoint is explicitly enabled, the same

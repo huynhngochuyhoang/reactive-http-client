@@ -106,6 +106,63 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void reportsStrictRetryValidationOnlyWhenResilienceIsEnabled() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setStrictUnsafeRetryValidation(true);
+        config.setResilience(resilience);
+
+        Map<String, Object> dormantClient = snapshotClient(config);
+
+        assertThat(dormantClient)
+                .containsEntry("resilienceConfigured", false)
+                .containsEntry("strictUnsafeRetryValidation", false);
+
+        resilience.setEnabled(true);
+        Map<String, Object> enabledClient = snapshotClient(config);
+
+        assertThat(enabledClient)
+                .containsEntry("resilienceConfigured", true)
+                .containsEntry("strictUnsafeRetryValidation", true);
+    }
+
+    @Test
+    void ignoresObjectAuthStrictBodySigningWhenNamedProviderIsSelected() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider("customSigner");
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType("aws-sigv4");
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        config.setAuth(auth);
+
+        Map<String, Object> client = snapshotClient(config);
+
+        assertThat(client)
+                .containsEntry("authMode", "provider-bean")
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
+    void rendersUnknownStrictValidationFlagsForSummaryOnlySnapshots() {
+        ReactiveHttpClientDiagnosticsProvider.ClientSummary summary = summary("summary-client", "com.example.SummaryClient");
+
+        String markdown = ReactiveHttpClientDiagnosticsSnapshot.toMarkdown(List.of(summary));
+        String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(List.of(summary));
+        Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(List.of(summary));
+
+        assertThat(markdown).contains("| `summary-client` | `com.example.SummaryClient` | `property` | `disabled:0` | `configured=false, retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled` | `unknown` | `unknown` |");
+        assertThat(json)
+                .contains("\"strictUnsafeRetryValidation\": null")
+                .contains("\"strictBodySigningValidation\": null")
+                .doesNotContain("\"strictUnsafeRetryValidation\": false")
+                .doesNotContain("\"strictBodySigningValidation\": false");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>) snapshot.get("clients");
+        assertThat(clients.get(0).get("strictUnsafeRetryValidation")).isNull();
+        assertThat(clients.get(0).get("strictBodySigningValidation")).isNull();
+    }
+
+    @Test
     void rendersDiagnosticsSnapshotInDeterministicOrder() {
         ReactiveHttpClientDiagnosticsProvider.ClientSummary zClient = summary("z-client", "com.example.ZClient");
         ReactiveHttpClientDiagnosticsProvider.ClientSummary aClient = summary("a-client", "com.example.AClient");
@@ -135,6 +192,25 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         finally {
             Thread.currentThread().setContextClassLoader(previous);
         }
+    }
+
+    private static Map<String, Object> snapshotClient(ReactiveHttpClientProperties.ClientConfig config) {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>) ReactiveHttpClientDiagnosticsSnapshot
+                .toMap(provider)
+                .get("clients");
+        return clients.get(0);
     }
 
     private static ReactiveHttpClientDiagnosticsProvider sensitiveDiagnosticsProvider() {

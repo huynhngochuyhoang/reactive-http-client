@@ -7,8 +7,10 @@ import java.util.*;
 /**
  * Renders sanitized reactive HTTP client diagnostics for support artifacts.
  *
- * <p>The snapshot only renders fields already exposed by
- * {@link ReactiveHttpClientDiagnosticsProvider.ClientSummary}. It intentionally
+ * <p>The collection overloads mark provider-only strict validation flags as unknown
+ * because {@link ReactiveHttpClientDiagnosticsProvider.ClientSummary} does not
+ * carry those values; provider overloads render them from internal sanitized
+ * entries. It intentionally
  * does not include base URL values, header values, proxy credentials, auth
  * provider bean names, request bodies, or response bodies.
  */
@@ -51,8 +53,8 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             out.append("| `").append(markdown(client.baseUrlSource())).append("` ");
             out.append("| `").append(markdown(timeout(client.timeout()))).append("` ");
             out.append("| `").append(markdown(resilience(client.resilience()))).append("` ");
-            out.append("| `").append(entry.strictUnsafeRetryValidation()).append("` ");
-            out.append("| `").append(entry.strictBodySigningValidation()).append("` ");
+            out.append("| `").append(strictFlag(entry.strictUnsafeRetryValidation())).append("` ");
+            out.append("| `").append(strictFlag(entry.strictBodySigningValidation())).append("` ");
             out.append("| `").append(markdown(client.authMode())).append("` ");
             out.append("| `").append(client.followRedirects()).append("` ");
             out.append("| `").append(client.endpointCount()).append("` ");
@@ -165,7 +167,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     }
 
     private static SnapshotClient snapshotClient(ReactiveHttpClientDiagnosticsProvider.ClientSummary summary) {
-        return new SnapshotClient(summary, false, false);
+        return new SnapshotClient(summary, null, null);
     }
 
     private static SnapshotClient snapshotClient(ReactiveHttpClientDiagnosticsProvider.ClientSnapshotEntry entry) {
@@ -184,8 +186,8 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     private record SnapshotClient(
             ReactiveHttpClientDiagnosticsProvider.ClientSummary summary,
-            boolean strictUnsafeRetryValidation,
-            boolean strictBodySigningValidation
+            Boolean strictUnsafeRetryValidation,
+            Boolean strictBodySigningValidation
     ) {
     }
 
@@ -213,6 +215,10 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
                 + ", rateLimiter=" + resilience.rateLimiter()
                 + ", circuitBreaker=" + resilience.circuitBreaker()
                 + ", bulkhead=" + resilience.bulkhead();
+    }
+
+    private static String strictFlag(Boolean strictFlag) {
+        return strictFlag != null ? strictFlag.toString() : "unknown";
     }
 
     private static String projectVersion() {
@@ -268,6 +274,15 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     private static void field(StringBuilder out, int indent, String name, long value, boolean comma) {
         indent(out, indent).append('"').append(json(name)).append("\": ").append(value);
+        if (comma) {
+            out.append(',');
+        }
+        out.append('\n');
+    }
+
+    private static void field(StringBuilder out, int indent, String name, Boolean value, boolean comma) {
+        indent(out, indent).append('"').append(json(name)).append("\": ");
+        out.append(value != null ? value.toString() : "null");
         if (comma) {
             out.append(',');
         }
