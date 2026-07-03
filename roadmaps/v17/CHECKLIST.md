@@ -249,29 +249,42 @@ Evidence:
 
 ## Priority 7 — Documented Public Surface Audit Guard
 
-### [ ] 4.1 Add a documented-public-surface audit guard
-- [ ] Define a source-controlled map of documented public helper types to japicmp
+### [x] 4.1 Add a documented-public-surface audit guard
+- [x] Define a source-controlled map of documented public helper types to japicmp
       include patterns.
-- [ ] Cover annotation packages and declarative method annotations.
-- [ ] Cover exception and auth extension points.
-- [ ] Cover exchange logging and lifecycle hook public contracts.
-- [ ] Cover diagnostics provider, diagnostics snapshot, and contract snapshot
+- [x] Cover annotation packages and declarative method annotations.
+- [x] Cover exception and auth extension points.
+- [x] Cover exchange logging and lifecycle hook public contracts.
+- [x] Cover diagnostics provider, diagnostics snapshot, and contract snapshot
       public contracts.
-- [ ] Cover `SensitiveHeaders`, `MethodMetadataCache`, `MethodMetadata*`, and
+- [x] Cover `SensitiveHeaders`, `MethodMetadataCache`, `MethodMetadata*`, and
       `ResilienceOperatorApplier*`.
-- [ ] Cover test-helper package public contracts.
-- [ ] Cover OTel companion public contracts.
-- [ ] Add a release-doc test that fails when a documented helper is missing from
+- [x] Cover test-helper package public contracts.
+- [x] Cover OTel companion public contracts.
+- [x] Add a release-doc test that fails when a documented helper is missing from
       the compatibility include map.
-- [ ] Document the workflow for adding new public helpers with compatibility
+- [x] Document the workflow for adding new public helpers with compatibility
       coverage in the same change.
-- [ ] Keep implementation internals excluded unless they are documented as
+- [x] Keep implementation internals excluded unless they are documented as
       replacement or extension surfaces.
-- [ ] Run API compatibility and release documentation tests.
+- [x] Run API compatibility and release documentation tests.
 
 Evidence:
 
-- Pending.
+- Added a documented public surface map to
+  `docs/20-native-release-compatibility.md`, with one row per japicmp include
+  pattern for annotation, auth, exception, exchange logging, lifecycle,
+  diagnostics, contract snapshot, metadata cache, redaction, test-helper, and
+  OTel public surfaces.
+- Added a compatibility include workflow requiring future documented public
+  helpers to update the map and POM include set together, while keeping
+  implementation internals excluded unless documented as extension surfaces.
+- Added `DocumentationReleaseArtifactTest.documentedPublicSurfaceMapMatchesApiCompatibilityIncludes`, which fails when the documented map and POM
+  `api-compatibility` include set diverge.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `mvn -q -Papi-compatibility -DskipTests verify` passed.
+- `mvn -q -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify` passed.
+- `bash scripts/verify-api-compatibility-fixtures.sh` passed.
 
 ---
 
