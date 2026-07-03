@@ -330,23 +330,36 @@ Evidence:
 
 ## Priority 9 — V16-to-V17 Adoption Guide
 
-### [ ] 5.1 Add a V16-to-V17 adoption guide
-- [ ] Add a guide for adopting V16 features after upgrade.
-- [ ] Put diagnostics snapshot and support-bundle capture before strict startup
+### [x] 5.1 Add a V16-to-V17 adoption guide
+- [x] Add a guide for adopting V16 features after upgrade.
+- [x] Put diagnostics snapshot and support-bundle capture before strict startup
       validation.
-- [ ] Explain health details, startup summaries, and diagnostics endpoint scope.
-- [ ] Explain strict retry rollout one client at a time.
-- [ ] Explain strict body-signing rollout and when not to enable it.
-- [ ] Explain dynamic idempotency-key limitations.
-- [ ] Explain custom body-signing provider limitations.
-- [ ] Link to quick start, auth, resilience, observability, support bundle,
+- [x] Explain health details, startup summaries, and diagnostics endpoint scope.
+- [x] Explain strict retry rollout one client at a time.
+- [x] Explain strict body-signing rollout and when not to enable it.
+- [x] Explain dynamic idempotency-key limitations.
+- [x] Explain custom body-signing provider limitations.
+- [x] Link to quick start, auth, resilience, observability, support bundle,
       benchmarks, and native compatibility docs.
-- [ ] Use metadata-backed configuration keys in examples.
-- [ ] Run documentation link and metadata tests.
+- [x] Use metadata-backed configuration keys in examples.
+- [x] Run documentation link and metadata tests.
 
 Evidence:
 
-- Pending.
+- Added `docs/27-v16-to-v17-adoption.md` with a diagnostics-first upgrade
+  sequence: capture provider-backed diagnostics snapshots or the opt-in
+  `rhttpclients` endpoint, collect a safe support bundle, then enable strict
+  startup validation one client at a time.
+- The guide explains health details, DEBUG startup summaries, diagnostics
+  endpoint scope, strict unsafe-retry rollout, dynamic idempotency-key limits,
+  strict built-in SigV4 body-signing rollout, and custom provider limitations.
+- Linked the guide from the README guide table and back to quick start, auth,
+  resilience, observability, support bundles, benchmarks, and native/release
+  compatibility docs.
+- Added release-doc coverage that asserts the adoption guide keeps the
+  diagnostics-first strict-validation sequence and related links.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest test` passed.
 
 ---
 
