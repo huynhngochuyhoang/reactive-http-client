@@ -10,7 +10,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Parsed metadata for a single method on a {@code @ReactiveHttpClient} interface.
+ * Parsed metadata for a single method on a {@code ReactiveHttpClient} interface.
+ *
+ * <p>This type is public because applications can replace {@link MethodMetadataCache}.
+ * Instances are mutable while metadata is parsed; cached instances may expose immutable
+ * maps and sets after parsing is complete. Treat the no-arg constructor, accessors,
+ * {@link #TIMEOUT_NOT_SET}, and mutability phase as compatibility-covered.
  */
 public class MethodMetadata {
 

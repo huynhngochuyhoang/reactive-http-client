@@ -14,7 +14,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Thread-safe cache that parses and stores {@link MethodMetadata} for each interface method.
+ * Thread-safe cache that parses and stores {@link MethodMetadata} for each
+ * interface method.
+ *
+ * <p>Applications may replace the starter bean named {@code methodMetadataCache}.
+ * The public constructor and {@link #get(Method)} return contract are therefore
+ * compatibility-covered for custom cache implementations and wrappers.
  */
 public class MethodMetadataCache {
 

@@ -49,40 +49,83 @@ transport/TLS applicators, and generated release-test fixtures.
 This source-controlled map is the release contract between the public docs and
 the `api-compatibility` japicmp include filter.
 `DocumentationReleaseArtifactTest` fails when a mapped pattern is missing from
-the POM include set.
+the POM include set or lacks an explicit support status.
 
-| Japicmp include pattern | Documented public surface | Examples |
-|---|---|---|
-| `io.github.huynhngochuyhoang.httpstarter.annotation` | Declarative client annotations | Client, HTTP verb, argument binding, `ApiRef`, idempotency, timeout, and logging annotations |
-| `io.github.huynhngochuyhoang.httpstarter.auth` | Auth extension points and built-in provider helpers | `AuthProvider`, `AuthProviderFactory`, `InvalidatableAuthProvider`, token providers, OAuth2, AWS SigV4 |
-| `io.github.huynhngochuyhoang.httpstarter.enable` | Enablement annotation package | Starter enablement annotations |
-| `io.github.huynhngochuyhoang.httpstarter.exception` | Public exception hierarchy | Client, remote-service, problem-detail, and auth exceptions |
-| `io.github.huynhngochuyhoang.httpstarter.filter` | Public filter contracts | Inbound header filtering support |
-| `io.github.huynhngochuyhoang.httpstarter.observability` | Observer contracts and events | Observer APIs and event models |
-| `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties*` | Configuration model used by tests and diagnostics | Root, client, auth, resilience, observability, proxy, TLS, and pool config models |
-| `io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder` | Error decoding extension surface | Default decoder customization and replacement |
-| `io.github.huynhngochuyhoang.httpstarter.core.DefaultHttpExchangeLogger` | Default exchange logger | Built-in metadata/headers/body logging implementation |
-| `io.github.huynhngochuyhoang.httpstarter.core.ErrorResponseContext` | Error mapper context | Error status, headers, body, and truncation metadata |
-| `io.github.huynhngochuyhoang.httpstarter.core.ErrorResponseMapper` | Error mapper SPI | Custom status/body-to-exception mapping |
-| `io.github.huynhngochuyhoang.httpstarter.core.FileAttachment` | Multipart helper model | File upload metadata used by multipart tests and docs |
-| `io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogContext` | Exchange logger context | Final outbound request and response metadata |
-| `io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogger` | Exchange logger SPI | Custom logger implementations |
-| `io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache` | Replaceable metadata cache | `methodMetadataCache` bean replacement |
-| `io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata*` | Metadata cache model | Public metadata returned by cache implementations |
-| `io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper` | Problem Detail mapper | Built-in RFC 9457 mapper |
-| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer` | WebClient builder customizer SPI | Per-client builder filters and codecs |
-| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext` | Lifecycle hook context | Attempt/subscription metadata |
-| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook` | Lifecycle hook SPI | Audit and side-effect callbacks |
-| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider*` | Diagnostics provider and nested models | Runtime support summaries |
-| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsSnapshot` | Diagnostics snapshot helper | JSON and Markdown support-bundle rendering |
-| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientContractSnapshot*` | Contract snapshot helper and nested builder/client APIs | Approval-style effective contract snapshots |
-| `io.github.huynhngochuyhoang.httpstarter.core.RequestContext` | Request context model | Context values shared with contributors |
-| `io.github.huynhngochuyhoang.httpstarter.core.RequestContextContributor` | Request context contributor SPI | Context enrichment hooks |
-| `io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot` | Request context snapshot model | Immutable context snapshot exports |
-| `io.github.huynhngochuyhoang.httpstarter.core.ResilienceOperatorApplier*` | Contract snapshot resilience hook | Operator availability and instance-type hook |
-| `io.github.huynhngochuyhoang.httpstarter.core.SensitiveHeaders` | Header redaction helper | Custom exchange logger redaction checks |
-| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | Mock client builder, assertions, retry and auth test helpers |
-| `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | OTel auto-configuration and extension-facing types |
+| Japicmp include pattern | Documented public surface | Examples | Support status |
+|---|---|---|---|
+| `io.github.huynhngochuyhoang.httpstarter.annotation` | Declarative client annotations | Client, HTTP verb, argument binding, ApiRef, idempotency, timeout, and logging annotations | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.auth` | Auth extension points and built-in provider helpers | `AuthProvider`, `AuthProviderFactory`, `InvalidatableAuthProvider`, token providers, OAuth2, AWS SigV4 | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.enable` | Enablement annotation package | Starter enablement annotations | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.exception` | Public exception hierarchy | Client, remote-service, problem-detail, and auth exceptions | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.filter` | Public filter contracts | Inbound header filtering support | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.observability` | Observer contracts and events | Observer APIs and event models | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties*` | Configuration model used by tests and diagnostics | Root, client, auth, resilience, observability, proxy, TLS, and pool config models | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder` | Error decoding extension surface | Default decoder customization and replacement | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.DefaultHttpExchangeLogger` | Default exchange logger | Built-in metadata, headers, and body logging implementation | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ErrorResponseContext` | Error mapper context | Error status, headers, body, and truncation metadata | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ErrorResponseMapper` | Error mapper SPI | Custom status/body-to-exception mapping | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.FileAttachment` | Multipart helper model | File upload metadata used by multipart tests and docs | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogContext` | Exchange logger context | Final outbound request and response metadata | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogger` | Exchange logger SPI | Custom logger implementations | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache` | Replaceable metadata cache | `methodMetadataCache` bean replacement | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata*` | Metadata cache model | Public metadata returned by cache implementations | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper` | Problem Detail mapper | Built-in RFC 9457 mapper | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer` | WebClient builder customizer SPI | Per-client builder filters and codecs | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext` | Lifecycle hook context | Attempt/subscription metadata | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook` | Lifecycle hook SPI | Audit and side-effect callbacks | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider*` | Diagnostics provider and nested models | Runtime support summaries | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsSnapshot` | Diagnostics snapshot helper | JSON and Markdown support-bundle rendering | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientContractSnapshot*` | Contract snapshot helper and nested builder/client APIs | Approval-style effective contract snapshots | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.RequestContext` | Request context model | Context values shared with contributors | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.RequestContextContributor` | Request context contributor SPI | Context enrichment hooks | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot` | Request context snapshot model | Immutable context snapshot exports | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ResilienceOperatorApplier*` | Contract snapshot resilience hook | Operator availability and instance-type hook | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.SensitiveHeaders` | Header redaction helper | Custom exchange logger redaction checks | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | Mock client builder, assertions, retry and auth test helpers | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | OTel auto-configuration and extension-facing types | Supported |
+
+No compatibility-covered type is currently deprecated. If a future public type is
+reserved for removal or replacement in a future major release, mark its row as
+`Reserved` or `Deprecated` and link to the migration note in the same change.
+
+### Constructor and mutable model policy
+
+The V17 review treats these compatibility-covered constructors, records,
+builder stages, public nested types, and mutable models as supported for the
+current minor line:
+
+- `MethodMetadata` and `MethodMetadataCache` are the replacement-cache surface.
+  The `MethodMetadata` no-arg constructor, `TIMEOUT_NOT_SET`, getters, setters,
+  mutable maps and sets returned during parsing, and immutable cached maps and
+  sets returned after parsing are compatibility-covered. Do not remove, rename,
+  narrow, or change the mutability phase of those members in a minor release.
+- `ReactiveHttpClientDiagnosticsProvider.ClientSummary`, `TimeoutSummary`, and
+  `ResilienceSummary` are immutable diagnostics read models. Their canonical
+  record constructors and component names are compatibility-covered; add new
+  diagnostics through additive snapshot map fields before changing record
+  components.
+- `ReactiveHttpClientDiagnosticsSnapshot` static rendering methods are supported
+  support-bundle helpers. Provider overloads may include provider-only fields;
+  collection overloads must keep unknown provider-only fields explicit rather
+  than rendering false values.
+- `ReactiveHttpClientContractSnapshot.Client`, `Builder`, builder methods, and
+  rendered table columns are supported approval-test helpers. Additive builder
+  methods are allowed; removing builder stages, changing existing record
+  components, or narrowing the render contract requires a future major release.
+- Test helper classes under `io.github.huynhngochuyhoang.httpstarter.test`,
+  including `MockReactiveHttpClient`, `RecordedExchange`,
+  `RecordedExchangeAssertions`, `ErrorCategoryAssertions`, and
+  `MockHttpServerExtension`, are supported test APIs. Package-private
+  constructors remain internal; public factory, builder, accessor, response,
+  retry, auth, observer, lifecycle, and assertion methods should remain
+  additive in the current minor line.
+- `ResilienceOperatorApplier.InstanceType` is a public nested enum used by
+  diagnostics and contract snapshots. Do not remove or rename enum constants in
+  the current minor line; add new constants only with corresponding docs and
+  compatibility-fixture review.
+- OTel companion constructors and static factories documented through the
+  `io.github.huynhngochuyhoang.httpstarter.otel` package are supported. Avoid
+  constructor removal or signature narrowing in the current minor line.
 
 ### Compatibility include workflow
 
