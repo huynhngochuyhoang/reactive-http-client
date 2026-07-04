@@ -25,6 +25,8 @@ import org.springframework.context.aot.ApplicationContextAotGenerator;
 import org.springframework.javapoet.ClassName;
 import reactor.core.publisher.Mono;
 
+import java.lang.reflect.Modifier;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ReactiveHttpClientAotSmokeTest {
@@ -49,6 +51,11 @@ class ReactiveHttpClientAotSmokeTest {
                 .contains(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS, MemberCategory.INVOKE_PUBLIC_METHODS);
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.DiagnosticsEndpointConfig.class).getMemberCategories())
                 .contains(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS, MemberCategory.INVOKE_PUBLIC_METHODS);
+        assertThat(ReactiveHttpClientProperties.class.getDeclaredClasses())
+                .filteredOn(type -> Modifier.isPublic(type.getModifiers()))
+                .allSatisfy(type -> assertThat(hints.reflection().getTypeHint(type))
+                        .as(type.getName())
+                        .isNotNull());
         assertThat(RuntimeHintsPredicates.resource().forResource(ReactiveHttpClientRuntimeHints.POM_PROPERTIES_RESOURCE))
                 .accepts(hints);
     }

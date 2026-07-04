@@ -219,6 +219,8 @@ Supported native-image path:
   interfaces.
 - Starter configuration properties under `reactive.http.*`.
 - Micrometer-backed client metrics when Micrometer is present.
+- Diagnostics snapshot version metadata from the packaged Maven
+  `pom.properties` resource.
 
 Limits:
 
@@ -228,6 +230,10 @@ Limits:
 - Optional libraries still require native support and runtime hints from their
   owners, including Resilience4j, alternate TLS providers, and OpenTelemetry
   exporters.
+- The `rhttpclients` Actuator endpoint remains optional in native images: the
+  starter contributes property-binding hints for
+  `reactive.http.observability.diagnostics-endpoint.*`, but Actuator endpoint
+  infrastructure and management exposure still come from the application.
 - Client interfaces must be visible during Spring AOT processing. Dynamically
   generating or registering new client interfaces after AOT processing is not
   supported.

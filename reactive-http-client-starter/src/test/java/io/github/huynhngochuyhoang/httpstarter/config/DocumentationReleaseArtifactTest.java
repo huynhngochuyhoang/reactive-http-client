@@ -98,7 +98,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("published `" + baselineVersion + "` starter, test, and OTel artifacts resolved")
                 .contains("compatibility baseline and benchmark published-baseline paths now use `" + baselineVersion + "`")
                 .contains("release evidence compares the `" + projectVersion + "` candidate")
-                .contains("baseline on `" + baselineVersion + "`");
+                .contains("baseline on `" + baselineVersion + "`")
+                .contains("Diagnostics snapshot version metadata from the packaged Maven\n  `pom.properties` resource")
+                .contains("The `rhttpclients` Actuator endpoint remains optional in native images")
+                .contains("reactive.http.observability.diagnostics-endpoint.*");
 
         assertThat(benchmarkDocs)
                 .contains("The example version must match the root `api.compatibility.baseline.version`")

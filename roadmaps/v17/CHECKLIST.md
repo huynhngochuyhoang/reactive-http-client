@@ -482,24 +482,48 @@ Evidence:
 
 ## Priority 13 — Native Hint Re-Audit
 
-### [ ] 7.1 Re-audit native hints for V16 public and configuration surfaces
-- [ ] Verify runtime hints cover diagnostics endpoint configuration binding.
-- [ ] Verify runtime hints cover diagnostics snapshot version metadata resources.
-- [ ] Verify inherited client proxy hints still cover inherited endpoint methods.
-- [ ] Verify public annotations and configuration property types needed at
+### [x] 7.1 Re-audit native hints for V16 public and configuration surfaces
+- [x] Verify runtime hints cover diagnostics endpoint configuration binding.
+- [x] Verify runtime hints cover diagnostics snapshot version metadata resources.
+- [x] Verify inherited client proxy hints still cover inherited endpoint methods.
+- [x] Verify public annotations and configuration property types needed at
       runtime are covered.
-- [ ] Verify optional Actuator behavior remains conditional in JVM and native
+- [x] Verify optional Actuator behavior remains conditional in JVM and native
       builds.
-- [ ] Verify optional OTel behavior remains conditional in JVM and native builds.
-- [ ] Add native smoke coverage only when a V16 surface requires new reflection
+- [x] Verify optional OTel behavior remains conditional in JVM and native builds.
+- [x] Add native smoke coverage only when a V16 surface requires new reflection
       or resource hints.
-- [ ] Document native limitations explicitly.
-- [ ] Run AOT smoke tests.
-- [ ] Run focused release documentation tests.
+- [x] Document native limitations explicitly.
+- [x] Run AOT smoke tests.
+- [x] Run focused release documentation tests.
 
 Evidence:
 
-- Pending.
+- Re-audited `ReactiveHttpClientRuntimeHints` against the public nested
+  `ReactiveHttpClientProperties` configuration model. `DiagnosticsEndpointConfig`
+  and the diagnostics snapshot `pom.properties` resource were already covered;
+  the audit found one missing configuration-property enum hint,
+  `ReactiveHttpClientProperties.LogPreset`, and added it.
+- Strengthened `ReactiveHttpClientAotSmokeTest` so every public nested
+  `ReactiveHttpClientProperties` type must have an explicit reflection hint,
+  preventing future native configuration-property drift. Existing AOT coverage
+  still verifies inherited client proxy/public-method hints and the diagnostics
+  snapshot version metadata resource.
+- Verified optional Actuator behavior remains conditional through existing
+  `ReactiveHttpClientAutoConfigurationTest` coverage: the diagnostics provider is
+  registered without the endpoint, the `rhttpclients` endpoint is explicit
+  opt-in, and the endpoint is skipped when Actuator endpoint classes are absent.
+- Verified optional OTel behavior remains conditional through existing
+  `OpenTelemetryHttpClientAutoConfigurationTest` coverage: the master switch
+  disables all OTel beans, and span/propagation switches remain independently
+  conditional.
+- Updated `docs/20-native-release-compatibility.md` to document native support
+  for diagnostics snapshot version metadata and the optional native-image limits
+  for the `rhttpclients` Actuator endpoint. Added release-doc assertions for the
+  new native wording.
+- Focused verification passed:
+  `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientAotSmokeTest,ReactiveHttpClientAutoConfigurationTest,DocumentationReleaseArtifactTest test`
+  and `mvn -q -pl reactive-http-client-otel -am -Dtest=OpenTelemetryHttpClientAutoConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false test`. The OTel run uses `-am` because the reactor is on unreleased `2.13.0`, so resolving the starter from a remote repository is not valid release evidence before publication.
 
 ---
 
