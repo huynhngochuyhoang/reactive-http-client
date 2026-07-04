@@ -2,7 +2,7 @@
 
 This page shows the client shapes behind the benchmark comparisons. Use it with
 the [benchmark methodology](22-benchmarks.md#methodology-and-limits) and the
-[2.11.0 promoted report](benchmark-report-2.11.0.md).
+[2.12.0 promoted report](benchmark-report-2.12.0.md).
 
 The examples below model the `Get Path Query Header` success-path scenario. Each
 client sends `GET /users/{id}?expand=summary`, includes `X-Tenant`, decodes the

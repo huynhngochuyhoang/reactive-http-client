@@ -402,27 +402,40 @@ Evidence:
 
 ## Priority 11 — `2.12.0` Benchmark Report Promotion or Deferral
 
-### [ ] 6.1 Promote or explicitly defer the `2.12.0` benchmark report
-- [ ] Decide whether `2.12.0` release notes include public performance claims.
-- [ ] If performance claims are included, run the clean current-candidate release
+### [x] 6.1 Promote or explicitly defer the `2.12.0` benchmark report
+- [x] Decide whether `2.12.0` release notes include public performance claims.
+- [x] If performance claims are included, run the clean current-candidate release
       benchmark with `-Dbenchmark.commit=$(git rev-parse --short HEAD)`.
-- [ ] If performance claims are included, run the published-baseline benchmark
+- [x] If performance claims are included, run the published-baseline benchmark
       against `2.11.0`.
-- [ ] If performance claims are included, promote
+- [x] If performance claims are included, promote
       `docs/benchmark-report-2.12.0.md` from clean release-quality evidence.
-- [ ] If performance claims are included, ensure changelog wording cites the
+- [x] If performance claims are included, ensure changelog wording cites the
       promoted `2.12.0` report.
-- [ ] If performance claims are not included, document the report as intentionally
+- [x] If performance claims are not included, document the report as intentionally
       deferred and keep public performance docs tied to the latest promoted
       historical report.
-- [ ] Keep current and published-baseline report paths distinct.
-- [ ] Ensure target-only reports are not cited as release evidence.
-- [ ] Run benchmark report validation tests.
-- [ ] Run focused release documentation tests.
+- [x] Keep current and published-baseline report paths distinct.
+- [x] Ensure target-only reports are not cited as release evidence.
+- [x] Run benchmark report validation tests.
+- [x] Run focused release documentation tests.
 
 Evidence:
 
-- Pending.
+- Corrected the release interpretation: although the reactor now declares
+  `2.13.0` after the post-`2.12.0` baseline transition, this priority promotes
+  the already-run benchmark as `2.12.0` release evidence.
+- Promoted `docs/benchmark-report-2.12.0.md` from
+  `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`,
+  adding source-controlled promotion metadata, sanitized target paths, `2.12.0`
+  report/starter metadata, and `2.11.0` published-baseline pairing.
+- Updated README, changelog, benchmark docs, performance summary, benchmark
+  consumer examples, and support-bundle docs to cite `Benchmark Report 2.12.0` for public performance
+  evidence while preserving the historical `2.11.0` changelog entry.
+- Kept generated target reports out of public links; public docs cite only the
+  promoted source-controlled report.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `git diff --check` passed.
 
 ---
 
