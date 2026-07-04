@@ -232,7 +232,7 @@ Limits:
   exporters.
 - The `rhttpclients` Actuator endpoint remains optional in native images: the
   starter contributes property-binding hints for
-  `reactive.http.observability.diagnostics-endpoint.*`, but Actuator endpoint
+  `reactive.http.observability.diagnostics-endpoint.enabled`, but Actuator endpoint
   infrastructure and management exposure still come from the application.
 - Client interfaces must be visible during Spring AOT processing. Dynamically
   generating or registering new client interfaces after AOT processing is not

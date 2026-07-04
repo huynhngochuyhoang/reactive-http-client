@@ -101,7 +101,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("baseline on `" + baselineVersion + "`")
                 .contains("Diagnostics snapshot version metadata from the packaged Maven\n  `pom.properties` resource")
                 .contains("The `rhttpclients` Actuator endpoint remains optional in native images")
-                .contains("reactive.http.observability.diagnostics-endpoint.*");
+                .contains("reactive.http.observability.diagnostics-endpoint.enabled");
 
         assertThat(benchmarkDocs)
                 .contains("The example version must match the root `api.compatibility.baseline.version`")
