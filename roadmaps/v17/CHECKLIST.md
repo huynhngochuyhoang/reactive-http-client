@@ -529,22 +529,44 @@ Evidence:
 
 ## Priority 14 — Dependency Baseline Readiness
 
-### [ ] 7.2 Prepare dependency-baseline review for the next Spring Boot line
-- [ ] Audit the current Java support policy.
-- [ ] Audit the current Spring Boot baseline.
-- [ ] Audit Reactor Netty, Micrometer, Resilience4j, OpenTelemetry, and test
+### [x] 7.2 Prepare dependency-baseline review for the next Spring Boot line
+- [x] Audit the current Java support policy.
+- [x] Audit the current Spring Boot baseline.
+- [x] Audit Reactor Netty, Micrometer, Resilience4j, OpenTelemetry, and test
       dependency versions from dependency management.
-- [ ] Document which dependency upgrades are compatibility-neutral.
-- [ ] Document which dependency upgrades require a minor release.
-- [ ] Keep benchmark dependency metadata recording resolved versions and source.
-- [ ] Avoid upgrading baselines as part of unrelated feature work.
-- [ ] Ensure generated metadata and release evidence tests catch dependency drift.
-- [ ] Run benchmark metadata tests if dependency metadata changes.
-- [ ] Run release documentation tests.
+- [x] Document which dependency upgrades are compatibility-neutral.
+- [x] Document which dependency upgrades require a minor release.
+- [x] Keep benchmark dependency metadata recording resolved versions and source.
+- [x] Avoid upgrading baselines as part of unrelated feature work.
+- [x] Ensure generated metadata and release evidence tests catch dependency drift.
+- [x] Run benchmark metadata tests if dependency metadata changes.
+- [x] Run release documentation tests.
 
 Evidence:
 
-- Pending.
+- Audited the current dependency-baseline inputs from the root POM: Java `21`,
+  Spring Boot `3.5.0`, Resilience4j `2.2.0`, JMH `1.37`, and the Spring Boot
+  dependency-management source for Spring WebFlux, Reactor Netty, Micrometer,
+  OpenTelemetry, and most test dependencies. No dependency version was changed
+  for this priority.
+- Added `docs/20-native-release-compatibility.md` dependency-baseline readiness
+  guidance that classifies compatibility-neutral maintenance versus changes that
+  require a minor release, and records that baseline upgrades must not be mixed
+  with unrelated feature work.
+- Extended `DocumentationReleaseArtifactTest` release evidence generation with a
+  `dependencyBaselineReview` block covering Java, Spring Boot, WebFlux, Reactor
+  Netty, Micrometer, OpenTelemetry, Resilience4j, test-dependency source, JMH,
+  compatibility-neutral updates, minor-release updates, and the baseline-upgrade
+  policy. The test now keeps those docs and generated evidence aligned with POM
+  properties.
+- Strengthened benchmark dependency-management assertions so the benchmark module
+  remains versionless for Spring WebFlux, Reactor Netty, Micrometer, and
+  Resilience4j dependencies while recording managed version sources in release
+  evidence.
+- Focused verification passed:
+  `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`,
+  `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest#documentedReactiveHttpPropertiesExistInGeneratedMetadata test`,
+  and `mvn -q -Pbenchmarks -pl reactive-http-client-benchmarks -am -Dtest=BenchmarkMarkdownReportTest,BenchmarkReportComparatorTest -Dsurefire.failIfNoSpecifiedTests=false test`.
 
 ---
 

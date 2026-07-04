@@ -69,6 +69,9 @@ class DocumentationReleaseArtifactTest {
         String pomXml = Files.readString(root.resolve("pom.xml"));
         String projectVersion = projectVersion(root.resolve("pom.xml"));
         String baselineVersion = pomProperty(pomXml, "api.compatibility.baseline.version");
+        String javaVersion = pomProperty(pomXml, "java.version");
+        String springBootVersion = pomProperty(pomXml, "spring-boot.version");
+        String resilience4jVersion = pomProperty(pomXml, "resilience4j.version");
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
@@ -101,7 +104,17 @@ class DocumentationReleaseArtifactTest {
                 .contains("baseline on `" + baselineVersion + "`")
                 .contains("Diagnostics snapshot version metadata from the packaged Maven\n  `pom.properties` resource")
                 .contains("The `rhttpclients` Actuator endpoint remains optional in native images")
-                .contains("reactive.http.observability.diagnostics-endpoint.enabled");
+                .contains("reactive.http.observability.diagnostics-endpoint.enabled")
+                .contains("## Dependency baseline readiness")
+                .contains("| Java runtime/compiler | Root `java.version`, `maven.compiler.source`, and `maven.compiler.target` | `"
+                        + javaVersion + "` is the supported baseline")
+                .contains("| Spring Boot baseline | Root `spring-boot.version` | `" + springBootVersion
+                        + "` is the minimum tested baseline")
+                .contains("| Resilience4j | Root `resilience4j.version` plus `resilience4j-bom` | `"
+                        + resilience4jVersion + "` remains the optional resilience baseline")
+                .contains("Compatibility-neutral dependency maintenance includes")
+                .contains("Requires a minor release: raising the Java baseline")
+                .contains("Do not mix a baseline\nupgrade with unrelated feature work");
 
         assertThat(benchmarkDocs)
                 .contains("The example version must match the root `api.compatibility.baseline.version`")
@@ -231,6 +244,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("benchmark.reactor-netty.artifact");
         assertThat(dependencyBlock(benchmarkPom, "spring-webflux")).doesNotContain("<version>");
         assertThat(dependencyBlock(benchmarkPom, "reactor-netty-http")).doesNotContain("<version>");
+        assertThat(dependencyBlock(benchmarkPom, "micrometer-core")).doesNotContain("<version>");
+        assertThat(dependencyBlock(benchmarkPom, "resilience4j-reactor")).doesNotContain("<version>");
+        assertThat(dependencyBlock(benchmarkPom, "resilience4j-circuitbreaker")).doesNotContain("<version>");
+        assertThat(dependencyBlock(benchmarkPom, "resilience4j-retry")).doesNotContain("<version>");
     }
 
     @Test
@@ -634,10 +651,45 @@ class DocumentationReleaseArtifactTest {
         assertThat(readiness.path("releaseEvidenceDirectory").asText()).isEqualTo("target/release-evidence/");
         assertThat(readiness.path("targetOnlyEvidence").path("sourceControlled").asBoolean()).isFalse();
         assertThat(readiness.path("targetOnlyEvidence").path("commitGeneratedEvidence").asBoolean()).isFalse();
+        JsonNode dependencyBaselineReview = generated.path("dependencyBaselineReview");
+        assertThat(dependencyBaselineReview.path("javaBaseline").asText())
+                .isEqualTo(pomProperty(pomXml, "java.version"));
+        assertThat(dependencyBaselineReview.path("springBootBaseline").asText())
+                .isEqualTo(pomProperty(pomXml, "spring-boot.version"));
+        assertThat(dependencyBaselineReview.path("resilience4jVersion").asText())
+                .isEqualTo(pomProperty(pomXml, "resilience4j.version"));
+        assertThat(dependencyBaselineReview.path("jmhVersion").asText())
+                .isEqualTo(pomProperty(pomXml, "jmh.version"));
+        assertThat(dependencyBaselineReview.path("springWebFluxVersionSource").asText())
+                .contains("spring-boot-dependencies:" + pomProperty(pomXml, "spring-boot.version"));
+        assertThat(dependencyBaselineReview.path("micrometerVersionSource").asText())
+                .contains("spring-boot-dependencies:" + pomProperty(pomXml, "spring-boot.version"));
+        assertThat(dependencyBaselineReview.path("openTelemetryVersionSource").asText())
+                .contains("spring-boot-dependencies:" + pomProperty(pomXml, "spring-boot.version"));
+        assertThat(dependencyBaselineReview.path("testDependencyVersionSource").asText())
+                .contains("spring-boot-dependencies:" + pomProperty(pomXml, "spring-boot.version"))
+                .contains("explicit test-only pins");
+        assertThat(dependencyBaselineReview.path("compatibilityNeutralUpgrades"))
+                .extracting(JsonNode::asText)
+                .contains("Spring Boot patch upgrades within the documented baseline line",
+                        "benchmark harness updates that keep metadata recording intact");
+        assertThat(dependencyBaselineReview.path("minorReleaseUpgrades"))
+                .extracting(JsonNode::asText)
+                .contains("raising the Java baseline", "adding a new Spring Boot minor line");
+        assertThat(dependencyBaselineReview.path("baselineUpgradePolicy").asText())
+                .contains("Do not mix dependency-baseline upgrades with unrelated feature work");
         assertThat(generated.path("benchmarkDependencyManagement").path("springBootVersion").asText())
                 .isEqualTo(pomProperty(pomXml, "spring-boot.version"));
         assertThat(generated.path("benchmarkDependencyManagement").path("reactorNettyVersionSource").asText())
                 .contains("spring-boot-dependencies");
+        assertThat(generated.path("benchmarkDependencyManagement").path("springWebFluxVersionSource").asText())
+                .contains("spring-boot-dependencies");
+        assertThat(generated.path("benchmarkDependencyManagement").path("micrometerVersionSource").asText())
+                .contains("spring-boot-dependencies");
+        assertThat(generated.path("benchmarkDependencyManagement").path("resilience4jVersion").asText())
+                .isEqualTo(pomProperty(pomXml, "resilience4j.version"));
+        assertThat(generated.path("benchmarkDependencyManagement").path("jmhVersion").asText())
+                .isEqualTo(pomProperty(pomXml, "jmh.version"));
         assertThat(generated.path("publishedBaselineArtifacts"))
                 .extracting(artifact -> artifact.path("artifact").asText())
                 .containsExactly(
@@ -1119,6 +1171,7 @@ class DocumentationReleaseArtifactTest {
         manifest.put("javaVersion", System.getProperty("java.version"));
         manifest.put("javaBaseline", pomProperty(pomXml, "java.version"));
         manifest.put("springBootBaseline", pomProperty(pomXml, "spring-boot.version"));
+        manifest.put("dependencyBaselineReview", dependencyBaselineReview(pomXml));
         Map<String, Object> benchmarkEvidence = benchmarkEvidence(projectVersion, baselineVersion);
         List<Map<String, String>> publishedBaselineArtifacts = publishedBaselineArtifacts(baselineVersion);
         List<Map<String, String>> checks = List.of(
@@ -1306,11 +1359,48 @@ class DocumentationReleaseArtifactTest {
         return pair;
     }
 
+    private static Map<String, Object> dependencyBaselineReview(String pomXml) {
+        String springBootVersion = pomProperty(pomXml, "spring-boot.version");
+        String resilience4jVersion = pomProperty(pomXml, "resilience4j.version");
+        LinkedHashMap<String, Object> review = new LinkedHashMap<>();
+        review.put("javaBaseline", pomProperty(pomXml, "java.version"));
+        review.put("springBootBaseline", springBootVersion);
+        review.put("springWebFluxVersionSource", "spring-boot-dependencies:" + springBootVersion);
+        review.put("reactorNettyVersionSource", "spring-boot-dependencies:" + springBootVersion);
+        review.put("micrometerVersionSource", "spring-boot-dependencies:" + springBootVersion);
+        review.put("openTelemetryVersionSource", "spring-boot-dependencies:" + springBootVersion);
+        review.put("resilience4jVersion", resilience4jVersion);
+        review.put("resilience4jVersionSource", "resilience4j-bom:" + resilience4jVersion);
+        review.put("testDependencyVersionSource", "spring-boot-dependencies:" + springBootVersion
+                + "; explicit test-only pins stay local to module POMs");
+        review.put("jmhVersion", pomProperty(pomXml, "jmh.version"));
+        review.put("compatibilityNeutralUpgrades", List.of(
+                "Spring Boot patch upgrades within the documented baseline line",
+                "managed WebFlux, Reactor Netty, Micrometer, and OpenTelemetry patch movement from that Boot line",
+                "Resilience4j patch-compatible updates with operator tests",
+                "test-only dependency updates that do not change published helper APIs",
+                "benchmark harness updates that keep metadata recording intact"));
+        review.put("minorReleaseUpgrades", List.of(
+                "raising the Java baseline",
+                "adding a new Spring Boot minor line",
+                "making optional integrations required runtime dependencies",
+                "behavior-changing Resilience4j baseline updates",
+                "runtime Reactor Netty, Micrometer, or OpenTelemetry upgrades outside the managed Spring Boot baseline"));
+        review.put("baselineUpgradePolicy",
+                "Do not mix dependency-baseline upgrades with unrelated feature work; update release docs, generated evidence, configuration metadata, and benchmark metadata together.");
+        return review;
+    }
+
     private static Map<String, Object> benchmarkDependencyManagement(String pomXml) {
         LinkedHashMap<String, Object> dependencyManagement = new LinkedHashMap<>();
         dependencyManagement.put("source", "root spring-boot-dependencies BOM");
         dependencyManagement.put("springBootVersion", pomProperty(pomXml, "spring-boot.version"));
+        dependencyManagement.put("springWebFluxVersionSource", "resolved from spring-boot-dependencies");
         dependencyManagement.put("reactorNettyVersionSource", "resolved from spring-boot-dependencies");
+        dependencyManagement.put("micrometerVersionSource", "resolved from spring-boot-dependencies");
+        dependencyManagement.put("resilience4jVersion", pomProperty(pomXml, "resilience4j.version"));
+        dependencyManagement.put("resilience4jVersionSource", "resolved from resilience4j-bom");
+        dependencyManagement.put("jmhVersion", pomProperty(pomXml, "jmh.version"));
         dependencyManagement.put("benchmarkModuleUsesStarterParent", true);
         return dependencyManagement;
     }

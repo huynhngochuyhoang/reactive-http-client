@@ -8,6 +8,34 @@ Spring Boot `3.5.x` line are expected to remain compatible, but adding another
 Spring Boot minor line requires an explicit release-smoke matrix entry before it
 is documented as supported.
 
+## Dependency baseline readiness
+
+Current release-line dependency inputs:
+
+| Area | Source | Current policy |
+|---|---|---|
+| Java runtime/compiler | Root `java.version`, `maven.compiler.source`, and `maven.compiler.target` | `21` is the supported baseline. Raising it requires a minor release, release-smoke review, and native-smoke review. |
+| Spring Boot baseline | Root `spring-boot.version` | `3.5.0` is the minimum tested baseline. Patch upgrades within `3.5.x` are compatibility-neutral when release smoke, AOT smoke, and generated documentation tests pass. A new Spring Boot minor line requires a minor release and an expanded release-smoke matrix. |
+| Spring WebFlux, Reactor Netty, Micrometer, and OpenTelemetry API | Spring Boot dependency management | Keep module POMs versionless for these artifacts. Review exact resolved versions from the effective POM or release evidence when `spring-boot.version` changes. |
+| Resilience4j | Root `resilience4j.version` plus `resilience4j-bom` | `2.2.0` remains the optional resilience baseline. Patch-compatible updates are acceptable with operator and diagnostics tests; a major or behavior-changing baseline update requires a minor release. |
+| Test dependencies | Spring Boot dependency management plus explicit test-only pins | Test-only updates are compatibility-neutral when they do not change published test-helper APIs or release fixtures. Explicit pins such as the TLS fixture dependency stay local to tests. |
+| Benchmark harness | Root `jmh.version` and benchmark Maven profiles | Benchmark-only updates do not change runtime compatibility, but release-quality reports must record the project version, starter version, Spring Boot baseline, resolved WebFlux/Reactor Netty versions, dependency-management source, and benchmark commit. |
+
+Compatibility-neutral dependency maintenance includes Spring Boot `3.5.x` patch
+updates, managed Spring WebFlux/Reactor Netty/Micrometer/OpenTelemetry patch
+movement inherited from that Boot line, Resilience4j patch-compatible updates,
+test-only dependency updates, and benchmark harness updates that keep report
+metadata intact.
+
+Requires a minor release: raising the Java baseline, adding a new Spring Boot
+minor line, changing optional integrations into required runtime dependencies,
+changing the Resilience4j baseline in a way that affects operator behavior or
+public diagnostics, or upgrading Reactor Netty/Micrometer/OpenTelemetry outside
+the managed Spring Boot baseline for runtime behavior. Do not mix a baseline
+upgrade with unrelated feature work; make the baseline change visible in release
+evidence, generated configuration metadata, and benchmark metadata in the same
+change.
+
 ## Public API compatibility
 
 The `api-compatibility` profile compares the supported public surfaces of all
