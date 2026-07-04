@@ -51,6 +51,7 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
             ReactiveHttpClientProperties.ProxyConfig.Type.class,
             ReactiveHttpClientProperties.TlsConfig.class,
             ReactiveHttpClientProperties.ClientConfig.class,
+            ReactiveHttpClientProperties.LogPreset.class,
             ReactiveHttpClientProperties.AuthConfig.class,
             ReactiveHttpClientProperties.OAuth2ClientCredentialsAuthConfig.class,
             ReactiveHttpClientProperties.AwsSigV4AuthConfig.class,
