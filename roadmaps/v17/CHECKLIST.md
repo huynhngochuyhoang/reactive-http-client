@@ -441,24 +441,42 @@ Evidence:
 
 ## Priority 12 — Diagnostics and Strict-Mode Overhead Audit
 
-### [ ] 6.2 Re-audit diagnostics and strict-mode overhead only if adoption needs it
-- [ ] Confirm whether user feedback or release evidence requires a new overhead
+### [x] 6.2 Re-audit diagnostics and strict-mode overhead only if adoption needs it
+- [x] Confirm whether user feedback or release evidence requires a new overhead
       audit.
-- [ ] Keep benchmark smoke and release commands available.
-- [ ] Add or refresh no-network audit rows only when they isolate a real
+- [x] Keep benchmark smoke and release commands available.
+- [x] Add or refresh no-network audit rows only when they isolate a real
       diagnostics or strict-mode question.
-- [ ] Separate startup validation cost from request-path cost and endpoint
+- [x] Separate startup validation cost from request-path cost and endpoint
       rendering cost.
-- [ ] Keep optional diagnostics rows out of raw-client comparison tables.
-- [ ] Preserve benchmark prefix classification for any new rows.
-- [ ] Avoid optimization without repeatable named-row evidence.
-- [ ] Keep performance documentation scoped to measured scenarios.
-- [ ] Run benchmark module tests when benchmark code changes.
-- [ ] Run documentation tests when performance docs change.
+- [x] Keep optional diagnostics rows out of raw-client comparison tables.
+- [x] Preserve benchmark prefix classification for any new rows.
+- [x] Avoid optimization without repeatable named-row evidence.
+- [x] Keep performance documentation scoped to measured scenarios.
+- [x] Run benchmark module tests when benchmark code changes.
+- [x] Run documentation tests when performance docs change.
 
 Evidence:
 
-- Pending.
+- Re-audited the promoted `docs/benchmark-report-2.12.0.md` evidence and found
+  existing named no-network rows for disabled diagnostics, metadata-only
+  exchange logging, Micrometer observation, one/multiple observers,
+  one/multiple lifecycle hooks, and `runtimeDiagnosticsProviderClientSummaries`.
+- Did not add new benchmark methods because no new adoption feedback or release
+  evidence identified a diagnostics or strict-mode overhead question that was
+  not already isolated by those named rows.
+- Documented the audit boundary in `docs/22-benchmarks.md`: request-path
+  diagnostics, on-demand diagnostics-provider inspection, support-path Actuator
+  endpoint rendering, and startup/proxy-construction strict validation must be
+  measured separately.
+- Updated `docs/23-performance-summary.md` with a V17 diagnostics and
+  strict-mode audit section, keeping optional diagnostics rows out of raw-client
+  comparison claims and avoiding optimization without a dedicated named row.
+- No benchmark code changed, so benchmark module tests were not required for
+  this priority; existing benchmark report classification keeps no-network rows
+  out of optional feature summary tables.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `git diff --check` passed.
 
 ---
 
