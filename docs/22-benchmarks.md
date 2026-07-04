@@ -371,7 +371,16 @@ diagnostics benchmarks exercise proxy calls with no network I/O, so disabled
 exchange logging and observer paths can be compared with metadata-only exchange
 logging and Micrometer recording. Runtime diagnostics provider calls are measured
 separately because `ReactiveHttpClientDiagnosticsProvider.clientSummaries()` is an
-on-demand inspection API, not part of proxy invocation.
+on-demand inspection API, not part of proxy invocation. Actuator diagnostics
+endpoint rendering is also support-path work, not request-path work; add a
+dedicated endpoint-rendering row only if support-bundle adoption shows that JSON
+serialization is a real bottleneck.
+
+Strict unsafe-retry validation and strict built-in SigV4 body-signing validation
+are startup/proxy-construction checks. Do not measure them with request-path
+loopback rows. Add a dedicated startup-construction benchmark only if adoption
+evidence shows strict validation affects application startup materially; avoid
+optimizing strict-mode code without a repeatable named row.
 
 Recommended production defaults are to keep exchange logging disabled unless an
 app needs request auditing, use `METADATA_ONLY` before enabling body capture, and

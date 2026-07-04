@@ -81,6 +81,27 @@ These are starter optional-feature overhead rows. Do not compare them to raw
 `WebClient` unless the raw baseline performs equivalent logging, observation, or
 resilience work.
 
+## Diagnostics and Strict-Mode Audit
+
+The V17 audit did not add new benchmark methods. The promoted `2.12.0` report
+already contains named no-network rows for disabled diagnostics, metadata-only
+exchange logging, Micrometer observation, one or multiple observers, one or
+multiple lifecycle hooks, and `runtimeDiagnosticsProviderClientSummaries`. Those
+rows are labeled `No-network starter invocation` in raw results and stay out of
+raw `WebClient` or Spring HTTP Interface comparison tables.
+
+Interpret diagnostics costs in separate buckets:
+
+- Request-path diagnostics rows isolate proxy invocation with no network I/O.
+- Runtime diagnostics provider rows isolate on-demand support inspection.
+- Actuator diagnostics endpoint JSON rendering is support-path work and would
+  need a separate endpoint-rendering benchmark if adoption feedback shows it is a
+  bottleneck.
+- Strict unsafe-retry validation and strict built-in SigV4 body-signing
+  validation run during startup/proxy construction. They do not add per-request
+  strict-validation work after startup, so no request-path optimization was
+  attempted without a dedicated startup benchmark row.
+
 ## Starter Error Mapping
 
 `Problem Detail Small Body` is labeled starter-only error-mapping overhead in the
