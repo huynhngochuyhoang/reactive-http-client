@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Post-release baseline transition.** The reactor now targets `2.12.0` while API compatibility and published-baseline benchmark evidence compare against the published `2.11.0` artifacts.
 - **Release readiness evidence.** V16 keeps generated release evidence aligned with the `2.12.0` candidate and `2.11.0` API/benchmark baseline, including manual benchmark, compatibility, baseline-resolution, generated-doc, Markdown-link, and promoted-report checks.
+- **Performance evidence.** Current performance documentation and release notes now require the source-controlled [Benchmark Report 2.12.0](docs/benchmark-report-2.12.0.md) as release-quality evidence for starter `2.12.0` benchmark scenarios.
 
 ### Fixed
 

@@ -221,7 +221,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Native Image and Release Compatibility](docs/20-native-release-compatibility.md) | AOT support and smoke matrix |
 | [Diagnostic Context Contracts](docs/21-diagnostic-contexts.md) | Extension-point capability matrix |
 | [Benchmarks](docs/22-benchmarks.md) | Benchmark harness and commands |
-| [Benchmark Report 2.11.0](docs/benchmark-report-2.11.0.md) | Promoted release-quality benchmark report |
+| [Benchmark Report 2.12.0](docs/benchmark-report-2.12.0.md) | Promoted release-quality benchmark report |
 | [Performance Summary](docs/23-performance-summary.md) | Interpreting benchmark data |
 | [Production Support Bundles](docs/26-support-bundles.md) | Safe incident evidence examples |
 | [V16 to V17 Adoption Guide](docs/27-v16-to-v17-adoption.md) | Diagnostics-first strict validation rollout |

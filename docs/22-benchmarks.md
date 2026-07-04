@@ -30,8 +30,8 @@ Known limits:
 
 Current promoted report:
 
-- [Benchmark Report 2.11.0](benchmark-report-2.11.0.md) is release-quality
-  evidence for starter `2.11.0`, generated from the `2.11.0` release benchmark
+- [Benchmark Report 2.12.0](benchmark-report-2.12.0.md) is release-quality
+  evidence for starter `2.12.0`, generated from the `2.12.0` release benchmark
   profile. Use it only for the named scenarios and environment it records.
 - [Performance Summary](23-performance-summary.md) explains how to read the
   promoted report without turning scenario-specific data into broad claims.

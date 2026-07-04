@@ -281,7 +281,7 @@ Minimal safe bundle:
   custom filters.
 - Promoted benchmark report link when making a benchmark-based claim.
 
-Current promoted report: [Benchmark Report 2.11.0](benchmark-report-2.11.0.md).
+Current promoted report: [Benchmark Report 2.12.0](benchmark-report-2.12.0.md).
 That report is release-quality evidence only for the named local-loopback
 scenarios, dependency versions, and environment it records. For production
 incidents, use it as orientation and measure the real downstream path directly.
