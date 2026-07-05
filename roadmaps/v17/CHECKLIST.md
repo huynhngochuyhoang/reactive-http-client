@@ -572,25 +572,43 @@ Evidence:
 
 ## Priority 15 — V17 Release Readiness
 
-### [ ] 8.1 Keep V17 release evidence source-controlled and current
-- [ ] Decide patch versus minor after V17 scope is finalized.
-- [ ] Keep changelog entries under `Unreleased` while V17 work is active.
-- [ ] Ensure release evidence commands name the selected next version.
-- [ ] Ensure release evidence commands name the selected API baseline.
-- [ ] Verify generated configuration docs are current.
-- [ ] Verify Markdown links pass across docs and roadmaps.
-- [ ] Verify baseline artifact resolution commands are listed.
-- [ ] Verify root and module-scoped API compatibility commands are listed.
-- [ ] Verify API compatibility fixture command is listed.
-- [ ] Verify benchmark smoke, release, and published-baseline commands are listed
+### [x] 8.1 Keep V17 release evidence source-controlled and current
+- [x] Decide patch versus minor after V17 scope is finalized.
+- [x] Keep changelog entries under `Unreleased` while V17 work is active.
+- [x] Ensure release evidence commands name the selected next version.
+- [x] Ensure release evidence commands name the selected API baseline.
+- [x] Verify generated configuration docs are current.
+- [x] Verify Markdown links pass across docs and roadmaps.
+- [x] Verify baseline artifact resolution commands are listed.
+- [x] Verify root and module-scoped API compatibility commands are listed.
+- [x] Verify API compatibility fixture command is listed.
+- [x] Verify benchmark smoke, release, and published-baseline commands are listed
       when performance evidence is needed.
-- [ ] Run focused release documentation tests.
-- [ ] Run full reactor tests.
-- [ ] Run API compatibility.
-- [ ] Run `git diff --check`.
-- [ ] Mark `ROADMAP.md` completed only after implementation and evidence are
+- [x] Run focused release documentation tests.
+- [x] Run full reactor tests.
+- [x] Run API compatibility.
+- [x] Run `git diff --check`.
+- [x] Mark `ROADMAP.md` completed only after implementation and evidence are
       complete.
 
 Evidence:
 
-- Pending.
+- Selected the next release line as `2.13.0` with API compatibility and
+  published-baseline benchmark evidence against `2.12.0`. `CHANGELOG.md` now
+  has `## [2.13.0] - 2026-07-05` and `Unreleased` points at
+  `v2.13.0...HEAD`; release tagging remains a separate release-prep action.
+- Verified generated release evidence names project version `2.13.0`, API
+  baseline `2.12.0`, published baseline artifact-resolution commands for
+  starter/test/OTel `2.12.0`, root and module-scoped API compatibility commands,
+  the compatibility fixture script, and benchmark smoke/release/published-baseline
+  commands. No new performance claim was introduced in this priority, so no new
+  benchmark run was required here.
+- Marked `roadmaps/v17/ROADMAP.md` completed on 2026-07-04 and checked roadmap
+  acceptance boxes only after full tests and compatibility evidence passed.
+- Verification passed:
+  `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`,
+  `mvn test`,
+  `mvn -q -Papi-compatibility -DskipTests verify`,
+  `mvn -q -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify`,
+  `bash scripts/verify-api-compatibility-fixtures.sh`,
+  and `git diff --check`.
