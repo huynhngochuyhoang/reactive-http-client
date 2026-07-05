@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-07-05
+
 ### Changed
 
 - **Post-2.12 baseline transition.** The reactor now targets `2.13.0` while API compatibility and published-baseline benchmark evidence compare against the published `2.12.0` artifacts.
@@ -1231,7 +1233,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.12.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.9.0...v2.10.0

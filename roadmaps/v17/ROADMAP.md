@@ -1,9 +1,9 @@
 # Reactive HTTP Client — Roadmap V17
 
-> **Status:** draft after V16 completion. V16 prepared the `2.12.0` candidate
-> line with opt-in diagnostics, strict validation, generated examples,
-> compatibility coverage, and release readiness. V17 should start only after the
-> V16 release evidence decision is clear.
+> **Status:** completed on 2026-07-04 and release-dated on 2026-07-05.
+> V17 cut the `2.13.0` changelog section while keeping API compatibility and
+> published-baseline benchmark evidence against `2.12.0`. This roadmap is
+> complete; post-release baseline movement belongs to V18.
 
 V16 closed a long production-hardening loop. The starter now has diagnostics,
 strict validation, benchmark evidence, inherited generic contracts, support
@@ -70,13 +70,13 @@ default behavior, this is more than a patch-only correction.
 
 **Acceptance:**
 
-- [ ] Release decision is recorded as minor or patch before tagging.
-- [ ] Changelog, README, quick start, Maven versions, and release evidence agree
+- [x] Release decision is recorded as minor or patch before tagging.
+- [x] Changelog, README, quick start, Maven versions, and release evidence agree
       on the selected version.
-- [ ] API compatibility compares `2.12.0` against published `2.11.0`.
-- [ ] Performance claims, if any, cite a clean promoted `2.12.0` benchmark
+- [x] API compatibility compares `2.12.0` against published `2.11.0`.
+- [x] Performance claims, if any, cite a clean promoted `2.12.0` benchmark
       report.
-- [ ] No target-only release evidence is committed as source-controlled proof.
+- [x] No target-only release evidence is committed as source-controlled proof.
 
 ---
 
@@ -103,11 +103,11 @@ older baseline.
 
 **Acceptance:**
 
-- [ ] Published `2.12.0` starter, test-helper, and OTel artifacts resolve.
-- [ ] The next development reactor version does not equal the API baseline.
-- [ ] Root and module-scoped self-comparison guard checks still reject the
+- [x] Published `2.12.0` starter, test-helper, and OTel artifacts resolve.
+- [x] The next development reactor version does not equal the API baseline.
+- [x] Root and module-scoped self-comparison guard checks still reject the
       current reactor version.
-- [ ] Benchmark docs, release evidence, and performance summary name the same
+- [x] Benchmark docs, release evidence, and performance summary name the same
       published baseline version.
 
 ---
@@ -133,10 +133,10 @@ bundles.
 
 **Acceptance:**
 
-- [ ] The endpoint is absent unless explicitly enabled and exposed.
-- [ ] Endpoint output is sanitized identically to diagnostics snapshots.
-- [ ] Missing Actuator classes do not affect normal starter startup.
-- [ ] Support-bundle docs explain endpoint output versus health, logs, observers,
+- [x] The endpoint is absent unless explicitly enabled and exposed.
+- [x] Endpoint output is sanitized identically to diagnostics snapshots.
+- [x] Missing Actuator classes do not affect normal starter startup.
+- [x] Support-bundle docs explain endpoint output versus health, logs, observers,
       and exchange logging.
 
 ---
@@ -157,11 +157,11 @@ or accidentally collect unsafe data.
 
 **Acceptance:**
 
-- [ ] Support-bundle examples are generated or tested against current public
+- [x] Support-bundle examples are generated or tested against current public
       APIs and configuration metadata.
-- [ ] Snapshot fixtures are deterministic across runs.
-- [ ] Sensitive fields are redacted or absent in every example.
-- [ ] Documentation tests fail when support-bundle links or property names drift.
+- [x] Snapshot fixtures are deterministic across runs.
+- [x] Sensitive fields are redacted or absent in every example.
+- [x] Documentation tests fail when support-bundle links or property names drift.
 
 ---
 
@@ -184,13 +184,13 @@ contracts still fail before traffic is sent.
 
 **Acceptance:**
 
-- [ ] Strict retry validation fails only when a retry can actually duplicate an
+- [x] Strict retry validation fails only when a retry can actually duplicate an
       unsafe request without a startup-provable idempotency key.
-- [ ] Idempotent methods, generated keys, and non-retrying configurations do not
+- [x] Idempotent methods, generated keys, and non-retrying configurations do not
       fail strict mode.
-- [ ] Dynamic headers that can remove or override `Idempotency-Key` remain
+- [x] Dynamic headers that can remove or override `Idempotency-Key` remain
       treated as not startup-provable.
-- [ ] Docs show a safe incremental rollout pattern.
+- [x] Docs show a safe incremental rollout pattern.
 
 ---
 
@@ -213,11 +213,11 @@ that intentionally support more body shapes.
 
 **Acceptance:**
 
-- [ ] Strict SigV4 validation accepts only startup-provable built-in signing
+- [x] Strict SigV4 validation accepts only startup-provable built-in signing
       shapes.
-- [ ] Runtime behavior remains compatible when strict mode is disabled.
-- [ ] Custom auth providers are not rejected by built-in SigV4 rules.
-- [ ] Docs make codec-alignment requirements explicit for JSON signing.
+- [x] Runtime behavior remains compatible when strict mode is disabled.
+- [x] Custom auth providers are not rejected by built-in SigV4 rules.
+- [x] Docs make codec-alignment requirements explicit for JSON signing.
 
 ---
 
@@ -242,13 +242,13 @@ was marked complete. V17 should make that kind of drift harder to repeat.
 
 **Acceptance:**
 
-- [ ] Each documented public helper has a matching japicmp include pattern or a
+- [x] Each documented public helper has a matching japicmp include pattern or a
       documented exclusion reason.
-- [ ] The release-doc test fails when a documented helper is missing from the
+- [x] The release-doc test fails when a documented helper is missing from the
       compatibility include map.
-- [ ] Internal classes are not accidentally promoted because they appear in docs
+- [x] Internal classes are not accidentally promoted because they appear in docs
       as implementation detail examples.
-- [ ] The compatibility guide explains the include-map maintenance workflow.
+- [x] The compatibility guide explains the include-map maintenance workflow.
 
 ---
 
@@ -271,11 +271,11 @@ constructors become harder to change.
 
 **Acceptance:**
 
-- [ ] Every compatibility-covered type has an intentional support story.
-- [ ] No public type is removed or narrowed in V17.
-- [ ] Any questionable public surface is documented as supported, deprecated, or
+- [x] Every compatibility-covered type has an intentional support story.
+- [x] No public type is removed or narrowed in V17.
+- [x] Any questionable public surface is documented as supported, deprecated, or
       reserved for a future major release.
-- [ ] API compatibility fixtures still catch representative removals.
+- [x] API compatibility fixtures still catch representative removals.
 
 ---
 
@@ -299,10 +299,10 @@ order for enabling them without turning every diagnostic feature on at once.
 
 **Acceptance:**
 
-- [ ] The guide gives an ordered rollout path for existing applications.
-- [ ] The guide separates diagnostics collection from strict startup validation.
-- [ ] Examples use metadata-backed configuration keys.
-- [ ] Documentation link validation covers the guide.
+- [x] The guide gives an ordered rollout path for existing applications.
+- [x] The guide separates diagnostics collection from strict startup validation.
+- [x] Examples use metadata-backed configuration keys.
+- [x] Documentation link validation covers the guide.
 
 ---
 
@@ -322,10 +322,10 @@ copyable configuration that demonstrates common production policy together.
 
 **Acceptance:**
 
-- [ ] The example uses fake hostnames and placeholder credentials only.
-- [ ] The example composes existing features without introducing new public API.
-- [ ] Configuration snippets pass metadata validation.
-- [ ] Docs explain which pieces are optional.
+- [x] The example uses fake hostnames and placeholder credentials only.
+- [x] The example composes existing features without introducing new public API.
+- [x] Configuration snippets pass metadata validation.
+- [x] Docs explain which pieces are optional.
 
 ---
 
@@ -348,12 +348,12 @@ state before adding new performance wording.
 
 **Acceptance:**
 
-- [ ] The release-readiness state for `docs/benchmark-report-2.12.0.md` is either
+- [x] The release-readiness state for `docs/benchmark-report-2.12.0.md` is either
       present with clean provenance or intentionally deferred with no public
       performance claims.
-- [ ] Current and published-baseline report paths remain distinct.
-- [ ] Benchmark docs do not cite target-only reports as release evidence.
-- [ ] Changelog performance wording, if any, cites the promoted report.
+- [x] Current and published-baseline report paths remain distinct.
+- [x] Benchmark docs do not cite target-only reports as release evidence.
+- [x] Changelog performance wording, if any, cites the promoted report.
 
 ---
 
@@ -373,10 +373,10 @@ focused evidence if users report overhead or startup delays.
 
 **Acceptance:**
 
-- [ ] Any new benchmark row has an explicit prefix classification.
-- [ ] Optional diagnostics rows are not mixed into raw-client comparison tables.
-- [ ] No optimization is made without repeatable named-row evidence.
-- [ ] Performance docs keep claims scoped to measured scenarios.
+- [x] Any new benchmark row has an explicit prefix classification.
+- [x] Optional diagnostics rows are not mixed into raw-client comparison tables.
+- [x] No optimization is made without repeatable named-row evidence.
+- [x] Performance docs keep claims scoped to measured scenarios.
 
 ---
 
@@ -400,11 +400,11 @@ AOT builds.
 
 **Acceptance:**
 
-- [ ] AOT smoke tests cover the V16 public/configuration additions that need
+- [x] AOT smoke tests cover the V16 public/configuration additions that need
       hints.
-- [ ] Optional dependencies remain optional in native and JVM builds.
-- [ ] Native docs do not promise unsupported Actuator or OTel behavior.
-- [ ] Runtime hints stay scoped to real runtime needs.
+- [x] Optional dependencies remain optional in native and JVM builds.
+- [x] Native docs do not promise unsupported Actuator or OTel behavior.
+- [x] Runtime hints stay scoped to real runtime needs.
 
 ---
 
@@ -424,11 +424,11 @@ compatibility expectations explicit before a future dependency baseline change.
 
 **Acceptance:**
 
-- [ ] Dependency baseline docs name the current Spring Boot and Java support
+- [x] Dependency baseline docs name the current Spring Boot and Java support
       policy.
-- [ ] Benchmark reports continue to record dependency-management source.
-- [ ] Any baseline upgrade has a dedicated release note and compatibility check.
-- [ ] No dependency drift bypasses generated metadata or release evidence tests.
+- [x] Benchmark reports continue to record dependency-management source.
+- [x] Any baseline upgrade has a dedicated release note and compatibility check.
+- [x] No dependency drift bypasses generated metadata or release evidence tests.
 
 ---
 
@@ -450,8 +450,8 @@ that discipline without turning every manual benchmark into a normal CI gate.
 
 **Acceptance:**
 
-- [ ] Release evidence names the selected next version and API baseline.
-- [ ] Changelog entries stay under `Unreleased` until release prep starts.
-- [ ] Generated docs and Markdown links pass before marking V17 complete.
-- [ ] Full tests, API compatibility, and `git diff --check` pass before release
+- [x] Release evidence names the selected next version and API baseline.
+- [x] Changelog entries stay under `Unreleased` until release prep starts.
+- [x] Generated docs and Markdown links pass before marking V17 complete.
+- [x] Full tests, API compatibility, and `git diff --check` pass before release
       prep is considered ready.
