@@ -7,58 +7,90 @@ release blocker requires reordering.
 
 ## Priority 1 — Post-`2.13.0` Baseline Transition
 
-### [ ] 1.1 Move the next development line only after `2.13.0` resolves
-- [ ] Confirm published `2.13.0` artifacts resolve before changing the baseline.
-- [ ] Resolve `io.github.huynhngochuyhoang:reactive-http-client-starter:2.13.0`.
-- [ ] Resolve `io.github.huynhngochuyhoang:reactive-http-client-test:2.13.0`.
-- [ ] Resolve `io.github.huynhngochuyhoang:reactive-http-client-otel:2.13.0`.
-- [ ] Bump the next development reactor version so it does not equal the
+### [x] 1.1 Move the next development line only after `2.13.0` resolves
+- [x] Confirm published `2.13.0` artifacts resolve before changing the baseline.
+- [x] Resolve `io.github.huynhngochuyhoang:reactive-http-client-starter:2.13.0`.
+- [x] Resolve `io.github.huynhngochuyhoang:reactive-http-client-test:2.13.0`.
+- [x] Resolve `io.github.huynhngochuyhoang:reactive-http-client-otel:2.13.0`.
+- [x] Bump the next development reactor version so it does not equal the
       `2.13.0` API baseline.
-- [ ] Move `api.compatibility.baseline.version` to `2.13.0` only after artifact
+- [x] Move `api.compatibility.baseline.version` to `2.13.0` only after artifact
       resolution succeeds.
-- [ ] Update benchmark published-baseline commands to
+- [x] Update benchmark published-baseline commands to
       `-Dbenchmark.starter.version=2.13.0`.
-- [ ] Update benchmark published-baseline report paths to
+- [x] Update benchmark published-baseline report paths to
       `published-starter-2.13.0`.
-- [ ] Update README, quick start, release compatibility docs, benchmark docs,
+- [x] Update README, quick start, release compatibility docs, benchmark docs,
       changelog links, and generated release evidence together.
-- [ ] Verify root API compatibility passes against published `2.13.0`.
-- [ ] Verify module-scoped starter API compatibility passes against published
+- [x] Verify root API compatibility passes against published `2.13.0`.
+- [x] Verify module-scoped starter API compatibility passes against published
       `2.13.0`.
-- [ ] Verify root self-comparison guard rejects the current reactor version.
-- [ ] Verify module-scoped self-comparison guard rejects the current reactor
+- [x] Verify root self-comparison guard rejects the current reactor version.
+- [x] Verify module-scoped self-comparison guard rejects the current reactor
       version.
-- [ ] Run focused release documentation tests.
-- [ ] Run `git diff --check`.
+- [x] Run focused release documentation tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- `mvn -q dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.13.0` passed.
+- `mvn -q dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.13.0` passed.
+- `mvn -q dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.13.0` passed.
+- Bumped the reactor and module parent versions to `2.14.0`, keeping the next development version distinct from the published `2.13.0` API baseline.
+- Moved `api.compatibility.baseline.version` to `2.13.0` only after published artifact resolution succeeded.
+- Updated README and quick-start dependency snippets to `2.14.0`.
+- Updated release compatibility docs, benchmark published-baseline commands, benchmark comparison paths, and performance-summary baseline wording to use `2.13.0` and `published-starter-2.13.0`.
+- Kept promoted benchmark report links tied to the latest source-controlled `2.12.0` report; no `2.13.0` or `2.14.0` public performance claim was introduced here.
+- Added the `Unreleased` changelog entry for the post-`2.13.0` baseline transition; the `Unreleased` comparison already starts at `v2.13.0...HEAD`.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest#documentedReactiveHttpPropertiesExistInGeneratedMetadata test` passed.
+- `mvn -q -Papi-compatibility -DskipTests verify` passed against the published `2.13.0` baseline.
+- `mvn -q -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify` passed against the published `2.13.0` baseline.
+- `mvn -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.14.0 validate` failed as expected with the self-comparison guard message.
+- `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests -Dapi.compatibility.baseline.version=2.14.0 validate` failed as expected with the self-comparison guard message.
+- `git diff --check` passed.
 
 ---
 
 ## Priority 2 — Generated Release-Prep Consistency Checklist
 
-### [ ] 2.1 Add a generated checklist summary to release evidence
-- [ ] Extend the generated release evidence manifest with one concise
+### [x] 2.1 Add a generated checklist summary to release evidence
+- [x] Extend the generated release evidence manifest with one concise
       checklist-style release-prep summary for the current project version.
-- [ ] Include changelog section status.
-- [ ] Include README, quick-start, and version-snippet status.
-- [ ] Include published-baseline artifact resolution commands.
-- [ ] Include root and module-scoped API compatibility commands.
-- [ ] Include the API compatibility fixture command.
-- [ ] Include benchmark smoke, release, and published-baseline commands.
-- [ ] Include promoted benchmark report status.
-- [ ] Include generated-doc and Markdown-link validation status.
-- [ ] Keep the checklist as a visible manual command list, not hidden automation.
-- [ ] Ensure target-only generated manifests are not committed as release proof.
-- [ ] Add or update tests so release evidence drift fails fast.
-- [ ] Run focused release documentation tests.
-- [ ] Run `git diff --check`.
+- [x] Include changelog section status.
+- [x] Include README, quick-start, and version-snippet status.
+- [x] Include published-baseline artifact resolution commands.
+- [x] Include root and module-scoped API compatibility commands.
+- [x] Include the API compatibility fixture command.
+- [x] Include benchmark smoke, release, and published-baseline commands.
+- [x] Include promoted benchmark report status.
+- [x] Include generated-doc and Markdown-link validation status.
+- [x] Keep the checklist as a visible manual command list, not hidden automation.
+- [x] Ensure target-only generated manifests are not committed as release proof.
+- [x] Add or update tests so release evidence drift fails fast.
+- [x] Run focused release documentation tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added a top-level `releasePrepChecklist` object to the generated release
+  evidence manifest. It includes checklist items for changelog status,
+  README/quick-start version snippets, published-baseline artifact resolution,
+  API compatibility, benchmark evidence, promoted benchmark report status,
+  generated-doc/link status, and target-only evidence handling.
+- The checklist exposes `manualCommands` as the one-place pending release-work
+  list while keeping the generated manifest under `target/release-evidence/`.
+- Updated `docs/20-native-release-compatibility.md` to document the new
+  `releasePrepChecklist` field and the rule that generated target evidence is
+  not source-controlled release proof.
+- Updated `DocumentationReleaseArtifactTest` so release evidence generation fails
+  when the checklist is missing required items, commands, version snippets,
+  changelog compare-link status, generated-doc status, or target-only evidence
+  metadata.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest#documentedReactiveHttpPropertiesExistInGeneratedMetadata test` passed.
+- `jq '.releasePrepChecklist | {status, projectVersion, apiCompatibilityBaselineVersion, itemIds: [.items[].id], manualCommandCount: (.manualCommands | length)}' target/release-evidence/reactive-http-client-release-evidence.json` showed status `pending`, project `2.14.0`, baseline `2.13.0`, eight checklist item IDs, and 11 manual commands.
+- `git diff --check` passed.
 
 ---
 

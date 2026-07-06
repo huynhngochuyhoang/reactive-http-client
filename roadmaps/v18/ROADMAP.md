@@ -42,7 +42,7 @@ Non-goals:
 
 ### 1.1 Move the next development line only after `2.13.0` resolves
 
-**Why:** V17 cut `2.13.0` changelog content while the reactor still declares
+**Why:** V17 cut `2.13.0` changelog content while the reactor still declared
 `2.13.0`. The next development line must avoid API self-comparison and benchmark
 baseline confusion.
 
@@ -61,13 +61,13 @@ baseline confusion.
 
 **Acceptance:**
 
-- [ ] Published `2.13.0` starter, test-helper, and OTel artifacts resolve.
-- [ ] The next reactor version does not equal the API compatibility baseline.
-- [ ] Root and module-scoped self-comparison guards reject the current reactor
+- [x] Published `2.13.0` starter, test-helper, and OTel artifacts resolve.
+- [x] The next reactor version does not equal the API compatibility baseline.
+- [x] Root and module-scoped self-comparison guards reject the current reactor
       version.
-- [ ] Benchmark docs, release evidence, and performance summary name the same
+- [x] Benchmark docs, release evidence, and performance summary name the same
       published baseline version.
-- [ ] Changelog `Unreleased` compare links start at `v2.13.0`.
+- [x] Changelog `Unreleased` compare links start at `v2.13.0`.
 
 ---
 
@@ -91,11 +91,11 @@ artifacts apply to a release.
 
 **Acceptance:**
 
-- [ ] Release evidence has one checklist-style summary for the current version.
-- [ ] The checklist names manual commands without hiding them behind automation.
-- [ ] Documentation tests fail if changelog, version snippets, baseline commands,
+- [x] Release evidence has one checklist-style summary for the current version.
+- [x] The checklist names manual commands without hiding them behind automation.
+- [x] Documentation tests fail if changelog, version snippets, baseline commands,
       or promoted report paths drift.
-- [ ] No generated `target/` evidence is committed.
+- [x] No generated `target/` evidence is committed.
 
 ---
 
