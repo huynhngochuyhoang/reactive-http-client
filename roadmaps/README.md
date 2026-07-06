@@ -36,3 +36,4 @@ Planning documents for the project:
 - [v17/ROADMAP.md](v17/ROADMAP.md) — V17 completed roadmap, released as `2.13.0`
 - [v17/CHECKLIST.md](v17/CHECKLIST.md) — V17 execution checklist
 - [v18/ROADMAP.md](v18/ROADMAP.md) — V18 draft roadmap
+- [v18/CHECKLIST.md](v18/CHECKLIST.md) — V18 execution checklist
