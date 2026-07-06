@@ -96,8 +96,8 @@ class DocumentationReleaseArtifactTest {
                         + baselineVersion)
                 .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
                         + baselineVersion)
-                .contains("### V17 baseline transition")
-                .contains("The V17 post-release transition moved the reactor to `" + projectVersion + "`")
+                .contains("### V18 baseline transition")
+                .contains("The V18 post-release transition moved the reactor to `" + projectVersion + "`")
                 .contains("published `" + baselineVersion + "` starter, test, and OTel artifacts resolved")
                 .contains("compatibility baseline and benchmark published-baseline paths now use `" + baselineVersion + "`")
                 .contains("release evidence compares the `" + projectVersion + "` candidate")
@@ -114,7 +114,14 @@ class DocumentationReleaseArtifactTest {
                         + resilience4jVersion + "` remains the optional resilience baseline")
                 .contains("Compatibility-neutral dependency maintenance includes")
                 .contains("Requires a minor release: raising the Java baseline")
-                .contains("Do not mix a baseline\nupgrade with unrelated feature work");
+                .contains("Do not mix a baseline\nupgrade with unrelated feature work")
+                .contains("`releasePrepChecklist`")
+                .contains("Use its `manualCommands` list as the one-place pending release-work list")
+                .contains("changelog status")
+                .contains("README and quick-start version-snippet")
+                .contains("published-baseline artifact resolution commands")
+                .contains("benchmark\nsmoke/release/published-baseline commands")
+                .contains("generated-doc and Markdown-link status");
 
         assertThat(benchmarkDocs)
                 .contains("The example version must match the root `api.compatibility.baseline.version`")
@@ -122,7 +129,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Dbenchmark.starter.version=" + baselineVersion)
                 .contains("-Dbenchmark.commit=" + baselineVersion)
                 .contains("published-starter-" + baselineVersion + "/release-jmh.md")
-                .contains("For the V17 post-release transition")
+                .contains("For the V18 post-release transition")
                 .contains("this example now uses `" + baselineVersion + "`")
                 .contains("the reactor has been bumped to `" + projectVersion + "`")
                 .contains("published `" + baselineVersion + "`\nartifacts resolve")
@@ -651,6 +658,59 @@ class DocumentationReleaseArtifactTest {
         assertThat(readiness.path("releaseEvidenceDirectory").asText()).isEqualTo("target/release-evidence/");
         assertThat(readiness.path("targetOnlyEvidence").path("sourceControlled").asBoolean()).isFalse();
         assertThat(readiness.path("targetOnlyEvidence").path("commitGeneratedEvidence").asBoolean()).isFalse();
+
+        JsonNode releasePrepChecklist = generated.path("releasePrepChecklist");
+        assertThat(releasePrepChecklist.path("status").asText()).isEqualTo("pending");
+        assertThat(releasePrepChecklist.path("projectVersion").asText()).isEqualTo(generated.path("projectVersion").asText());
+        assertThat(releasePrepChecklist.path("apiCompatibilityBaselineVersion").asText())
+                .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
+        assertThat(streamText(releasePrepChecklist.path("manualCommands")))
+                .containsAll(pendingReleaseCommands);
+        Map<String, JsonNode> releasePrepItems = new LinkedHashMap<>();
+        releasePrepChecklist.path("items").forEach(item -> releasePrepItems.put(item.path("id").asText(), item));
+        assertThat(releasePrepItems.keySet()).containsExactly(
+                "changelog-section",
+                "version-snippets",
+                "published-baseline-artifacts",
+                "api-compatibility",
+                "benchmark-evidence",
+                "promoted-benchmark-report",
+                "generated-docs-and-links",
+                "target-only-evidence");
+        assertThat(releasePrepItems.get("changelog-section").path("status").asText()).isEqualTo("current");
+        assertThat(releasePrepItems.get("changelog-section").path("expectedUnreleasedCompareLink").asText())
+                .contains("v" + pomProperty(pomXml, "api.compatibility.baseline.version") + "...HEAD");
+        assertThat(releasePrepItems.get("version-snippets").path("status").asText()).isEqualTo("current");
+        assertThat(releasePrepItems.get("version-snippets").path("expectedVersion").asText())
+                .isEqualTo(generated.path("projectVersion").asText());
+        assertThat(streamText(releasePrepItems.get("published-baseline-artifacts").path("commands")))
+                .containsExactly(
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
+                                + pomProperty(pomXml, "api.compatibility.baseline.version"),
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:"
+                                + pomProperty(pomXml, "api.compatibility.baseline.version"),
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
+                                + pomProperty(pomXml, "api.compatibility.baseline.version"));
+        assertThat(streamText(releasePrepItems.get("api-compatibility").path("commands")))
+                .containsExactly("mvn -Papi-compatibility -DskipTests verify",
+                        "mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify",
+                        "bash scripts/verify-api-compatibility-fixtures.sh");
+        assertThat(streamText(releasePrepItems.get("benchmark-evidence").path("commands")))
+                .contains("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
+                        generated.path("benchmarkEvidence").path("currentWorkspaceCommand").asText(),
+                        generated.path("benchmarkEvidence").path("publishedStarterCommand").asText());
+        assertThat(releasePrepItems.get("promoted-benchmark-report").path("path").asText())
+                .isEqualTo(expectedPromotedReport);
+        assertThat(releasePrepItems.get("promoted-benchmark-report").path("status").asText())
+                .isEqualTo(Files.exists(root.resolve(expectedPromotedReport)) ? "present" : "missing");
+        assertThat(releasePrepItems.get("generated-docs-and-links").path("status").asText()).isEqualTo("pass");
+        assertThat(releasePrepItems.get("generated-docs-and-links").path("configurationReference").asText())
+                .isEqualTo("current");
+        assertThat(releasePrepItems.get("generated-docs-and-links").path("markdownLinks").asText())
+                .isEqualTo("pass");
+        assertThat(releasePrepItems.get("target-only-evidence").path("status").asText()).isEqualTo("pass");
+        assertThat(releasePrepItems.get("target-only-evidence").path("sourceControlled").asBoolean()).isFalse();
+
         JsonNode dependencyBaselineReview = generated.path("dependencyBaselineReview");
         assertThat(dependencyBaselineReview.path("javaBaseline").asText())
                 .isEqualTo(pomProperty(pomXml, "java.version"));
@@ -1187,8 +1247,11 @@ class DocumentationReleaseArtifactTest {
                         "Harness smoke only; do not publish these numbers."),
                 check("mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)", "pending",
                         "Run when request-path behavior changed or release notes make performance claims."));
-        manifest.put("readiness", releaseReadiness(pom.getParent(), projectVersion, baselineVersion, benchmarkEvidence,
-                publishedBaselineArtifacts, checks));
+        Map<String, Object> readiness = releaseReadiness(pom.getParent(), projectVersion, baselineVersion, benchmarkEvidence,
+                publishedBaselineArtifacts, checks);
+        manifest.put("readiness", readiness);
+        manifest.put("releasePrepChecklist", releasePrepChecklist(pom.getParent(), projectVersion, baselineVersion, readiness,
+                benchmarkEvidence, publishedBaselineArtifacts, checks));
         manifest.put("benchmarkDependencyManagement", benchmarkDependencyManagement(pomXml));
         manifest.put("publishedBaselineArtifacts", publishedBaselineArtifacts);
         manifest.put("benchmarkEvidence", benchmarkEvidence);
@@ -1247,6 +1310,121 @@ class DocumentationReleaseArtifactTest {
                 "sourceControlled", false,
                 "commitGeneratedEvidence", false));
         return readiness;
+    }
+
+    private static Map<String, Object> releasePrepChecklist(Path root,
+                                                            String projectVersion,
+                                                            String baselineVersion,
+                                                            Map<String, Object> readiness,
+                                                            Map<String, Object> benchmarkEvidence,
+                                                            List<Map<String, String>> publishedBaselineArtifacts,
+                                                            List<Map<String, String>> checks) throws IOException {
+        String changelog = Files.readString(root.resolve("CHANGELOG.md"));
+        String expectedUnreleasedCompareLink = "[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v"
+                + baselineVersion + "...HEAD";
+        boolean changelogCurrent = changelog.contains("## [Unreleased]")
+                && changelog.contains(expectedUnreleasedCompareLink);
+        boolean versionSnippetsCurrent = versionSnippetsMatch(root.resolve("README.md"), projectVersion)
+                && versionSnippetsMatch(root.resolve("docs/01-quick-start.md"), projectVersion);
+
+        List<String> publishedBaselineCommands = publishedBaselineArtifacts.stream()
+                .map(artifact -> artifact.get("resolutionCommand"))
+                .toList();
+        List<String> compatibilityCommands = checks.stream()
+                .map(check -> check.get("command"))
+                .filter(command -> command.contains("api-compatibility")
+                        || command.contains("verify-api-compatibility-fixtures"))
+                .toList();
+        List<String> benchmarkCommands = new ArrayList<>(checks.stream()
+                .map(check -> check.get("command"))
+                .filter(command -> command.contains("benchmark"))
+                .toList());
+        benchmarkCommands.add((String) benchmarkEvidence.get("publishedStarterCommand"));
+
+        String configurationReferenceStatus = readinessNestedStatus(readiness, "configurationReference");
+        String markdownLinksStatus = readinessNestedStatus(readiness, "markdownLinks");
+        String staleBenchmarkLinksStatus = readinessNestedStatus(readiness, "staleBenchmarkReportLinks");
+        String promotedReportStatus = readinessNestedStatus(readiness, "promotedBenchmarkReport");
+        boolean generatedDocsAndLinksPass = "current".equals(configurationReferenceStatus)
+                && "pass".equals(markdownLinksStatus)
+                && "pass".equals(staleBenchmarkLinksStatus);
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        items.add(checklistItem("changelog-section", "Changelog section",
+                changelogCurrent ? "current" : "stale", Map.of(
+                        "path", "CHANGELOG.md",
+                        "expectedUnreleasedCompareLink", expectedUnreleasedCompareLink)));
+        items.add(checklistItem("version-snippets", "README and quick-start version snippets",
+                versionSnippetsCurrent ? "current" : "stale", Map.of(
+                        "paths", List.of("README.md", "docs/01-quick-start.md"),
+                        "expectedVersion", projectVersion)));
+        items.add(checklistItem("published-baseline-artifacts", "Published baseline artifact resolution",
+                "pending", Map.of("commands", publishedBaselineCommands)));
+        items.add(checklistItem("api-compatibility", "API compatibility evidence",
+                "pending", Map.of("commands", compatibilityCommands)));
+        items.add(checklistItem("benchmark-evidence", "Benchmark evidence",
+                "pending", Map.of(
+                        "commands", benchmarkCommands,
+                        "currentCandidateReport", benchmarkEvidence.get("currentCandidateReport"),
+                        "publishedBaselineReport", benchmarkEvidence.get("publishedBaselineReport"))));
+        items.add(checklistItem("promoted-benchmark-report", "Promoted benchmark report",
+                promotedReportStatus, Map.of("path", benchmarkEvidence.get("promotedReport"))));
+        items.add(checklistItem("generated-docs-and-links", "Generated docs and Markdown links",
+                generatedDocsAndLinksPass ? "pass" : "fail", Map.of(
+                        "configurationReference", configurationReferenceStatus,
+                        "markdownLinks", markdownLinksStatus,
+                        "staleBenchmarkReportLinks", staleBenchmarkLinksStatus)));
+        items.add(checklistItem("target-only-evidence", "Target-only release evidence",
+                "pass", Map.of(
+                        "directory", "target/release-evidence/",
+                        "sourceControlled", false,
+                        "commitGeneratedEvidence", false)));
+
+        LinkedHashMap<String, Object> checklist = new LinkedHashMap<>();
+        checklist.put("status", "pending");
+        checklist.put("projectVersion", projectVersion);
+        checklist.put("apiCompatibilityBaselineVersion", baselineVersion);
+        checklist.put("items", items);
+        checklist.put("manualCommands", readinessPendingCommands(readiness, "manualReleaseEvidence"));
+        checklist.put("note", "Generated summary only; run the listed manual commands before release.");
+        return checklist;
+    }
+
+    private static Map<String, Object> checklistItem(String id, String title, String status, Map<String, Object> details) {
+        LinkedHashMap<String, Object> item = new LinkedHashMap<>();
+        item.put("id", id);
+        item.put("title", title);
+        item.put("status", status);
+        item.putAll(details);
+        return item;
+    }
+
+    private static String readinessNestedStatus(Map<String, Object> readiness, String key) {
+        Object value = readiness.get(key);
+        if (value instanceof Map<?, ?> map && map.get("status") != null) {
+            return String.valueOf(map.get("status"));
+        }
+        return "unknown";
+    }
+
+    private static List<String> readinessPendingCommands(Map<String, Object> readiness, String key) {
+        Object value = readiness.get(key);
+        if (!(value instanceof Map<?, ?> map) || !(map.get("pendingCommands") instanceof List<?> commands)) {
+            return List.of();
+        }
+        return commands.stream().map(String::valueOf).toList();
+    }
+
+    private static boolean versionSnippetsMatch(Path markdown, String projectVersion) throws IOException {
+        Matcher matcher = PROJECT_VERSION_SNIPPET.matcher(Files.readString(markdown));
+        boolean found = false;
+        while (matcher.find()) {
+            found = true;
+            if (!projectVersion.equals(matcher.group(1))) {
+                return false;
+            }
+        }
+        return found;
     }
 
     private static Map<String, Object> readinessStatus(String status, String note) {
