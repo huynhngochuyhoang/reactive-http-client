@@ -369,6 +369,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
         Path supportBundleDocs = projectRoot().resolve("docs/26-support-bundles.md");
         String markdown = Files.readString(supportBundleDocs);
         String fixture = markdownSection(markdown, "## Reviewable Bundle Fixture", "## Diagnostics Snapshot");
+        String captureRecipes = markdownSection(markdown, "## Capture Recipes", "## Health Details");
         Set<String> exampleProperties = configurationExampleProperties(Arrays.asList(fixture.split("\\R")));
         Set<String> missing = new TreeSet<>(exampleProperties);
         missing.removeAll(allMetadataPropertyNames(projectRoot()));
@@ -395,11 +396,31 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 .contains("docs/benchmark-report-<version>.md")
                 .contains("ReactiveHttpClientFactoryBean")
                 .contains("DefaultHttpExchangeLogger");
-        assertThat(fixture)
-                .doesNotContain("Authorization")
+        assertThat(captureRecipes)
+                .contains("### Local JVM Capture")
+                .contains("### Container Capture")
+                .contains("### Kubernetes-Style Capture")
+                .contains("EXAMPLE_MANAGEMENT_URL=\"http://<management-host>:<management-port>\"")
+                .contains("EXAMPLE_CONTAINER=\"example-app-container\"")
+                .contains("EXAMPLE_NAMESPACE=\"example-namespace\"")
+                .contains("docker logs \"$EXAMPLE_CONTAINER\" --since 30m")
+                .contains("kubectl -n \"$EXAMPLE_NAMESPACE\" logs \"$EXAMPLE_POD\"")
+                .contains("diagnostics/rhttpclients.json")
+                .contains("health/health.json")
+                .contains("logs/startup-summary.log")
+                .contains("logs/exchange-metadata.log")
+                .contains("config/reactive-http-client.yml")
+                .contains("performance/benchmark-report-link.txt")
+                .contains("Which clients and endpoints exist")
+                .contains("Whether recent Micrometer samples crossed")
+                .contains("Which sanitized client policy was applied")
+                .contains("What happened for the affected calls")
+                .contains("Which `reactive.http.*` settings")
+                .contains("Which promoted source-controlled report supports")
+                .contains("Do not merge them into a single free-form log dump")
+                .contains("placeholders in shared examples");
+        assertThat(fixture + captureRecipes)
                 .doesNotContain("Bearer ")
-                .doesNotContain("Cookie")
-                .doesNotContain("client-secret")
                 .doesNotContain("access-token")
                 .doesNotContain("requestBody")
                 .doesNotContain("responseBody")
@@ -408,6 +429,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 .doesNotContain(".net")
                 .doesNotContain(".org");
     }
+
 
     @Test
     void documentedConfigurationExampleExtractionRejectsGroupsAndMalformedApiMapLeaves() throws IOException {

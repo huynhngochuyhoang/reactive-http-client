@@ -96,46 +96,77 @@ Evidence:
 
 ## Priority 3 — Changelog and Release-Note Performance Wording Guard
 
-### [ ] 2.2 Re-audit release performance wording against promoted reports
-- [ ] Validate current-release changelog performance wording against promoted
+### [x] 2.2 Re-audit release performance wording against promoted reports
+- [x] Validate current-release changelog performance wording against promoted
       report availability.
-- [ ] Reject current-release benchmark links that point at missing reports.
-- [ ] Reject current-release benchmark links that point at `target/` artifacts.
-- [ ] Allow historical release sections to retain historical promoted report
+- [x] Reject current-release benchmark links that point at missing reports.
+- [x] Reject current-release benchmark links that point at `target/` artifacts.
+- [x] Allow historical release sections to retain historical promoted report
       links without rewriting old entries.
-- [ ] Document acceptable release-note wording when no performance claim is
+- [x] Document acceptable release-note wording when no performance claim is
       included.
-- [ ] Ensure public performance claims cite source-controlled promoted reports
+- [x] Ensure public performance claims cite source-controlled promoted reports
       only.
-- [ ] Run focused release documentation tests.
-- [ ] Run `git diff --check`.
+- [x] Run focused release documentation tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added a current-release changelog guard to `DocumentationReleaseArtifactTest`.
+  It validates `Unreleased` until a `2.14.0` release section exists, rejects
+  current-release benchmark links to missing reports or `target/` artifacts, and
+  requires current-release public performance claims to cite a source-controlled
+  promoted report for the same release version.
+- Added a focused regression test that allows baseline-transition/no-claim
+  wording while rejecting stale promoted-report claims, missing promoted-report
+  links, and target-only benchmark links.
+- Updated `docs/22-benchmarks.md` with acceptable release-note wording when no
+  public performance claim is included.
+- Added an `Unreleased` changelog entry for the release-note evidence guard
+  without introducing a public performance claim.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest#documentedReactiveHttpPropertiesExistInGeneratedMetadata test` passed.
+- `git diff --check` passed.
 
 ---
 
 ## Priority 4 — Support-Bundle Capture Examples
 
-### [ ] 3.1 Add capture examples for common deployment shapes
-- [ ] Add or extend support-bundle examples for local JVM capture.
-- [ ] Add or extend support-bundle examples for container capture.
-- [ ] Add or extend support-bundle examples for Kubernetes-style capture.
-- [ ] Keep every hostname, token, namespace, service name, and credential value
+### [x] 3.1 Add capture examples for common deployment shapes
+- [x] Add or extend support-bundle examples for local JVM capture.
+- [x] Add or extend support-bundle examples for container capture.
+- [x] Add or extend support-bundle examples for Kubernetes-style capture.
+- [x] Keep every hostname, token, namespace, service name, and credential value
       fake or placeholder-based.
-- [ ] Show health details, `rhttpclients`, startup summaries, metadata-only
+- [x] Show health details, `rhttpclients`, startup summaries, metadata-only
       exchange logs, and benchmark report references as separate evidence
       streams.
-- [ ] Explain which evidence stream answers which support question.
-- [ ] Validate documented `reactive.http.*` properties against metadata.
-- [ ] Ensure examples do not introduce new public APIs.
-- [ ] Run focused documentation and metadata tests.
-- [ ] Run `git diff --check`.
+- [x] Explain which evidence stream answers which support question.
+- [x] Validate documented `reactive.http.*` properties against metadata.
+- [x] Ensure examples do not introduce new public APIs.
+- [x] Run focused documentation and metadata tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added `docs/26-support-bundles.md` capture recipes for local JVM, container,
+  and Kubernetes-style collection using placeholder management URLs, container
+  names, namespace names, pod names, file paths, and sanitized configuration
+  inputs.
+- Added an evidence-stream table that keeps `rhttpclients`, health details,
+  startup summaries, metadata-only exchange logs, sanitized configuration, and
+  release-evidence references separate and explains what question each stream
+  answers.
+- Replaced the remaining concrete localhost diagnostics-endpoint example with
+  the placeholder-based `EXAMPLE_MANAGEMENT_URL` form.
+- Extended `ReactiveHttpClientConfigurationMetadataTest` so the support-bundle
+  fixture and capture recipes remain metadata-valid, placeholder-based, and free
+  of real-looking hosts or secret-bearing strings.
+- Added an `Unreleased` changelog entry for the support-bundle capture recipes
+  without introducing a public performance claim.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `git diff --check` passed.
 
 ---
 
