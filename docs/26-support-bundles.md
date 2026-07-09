@@ -228,9 +228,15 @@ curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diag
 curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
-kubectl -n "$EXAMPLE_NAMESPACE" cp "$EXAMPLE_POD:$EXAMPLE_SANITIZED_CONFIG_IN_POD" support-bundle/config/reactive-http-client.yml -c "$EXAMPLE_CONTAINER"
+kubectl -n "$EXAMPLE_NAMESPACE" exec "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" -- cat "$EXAMPLE_SANITIZED_CONFIG_IN_POD" > support-bundle/config/reactive-http-client.yml
 printf 'docs/benchmark-report-<version>.md\n' > support-bundle/performance/benchmark-report-link.txt
 ```
+
+The Kubernetes recipe uses `kubectl exec ... cat` instead of `kubectl cp` so it
+does not require `tar` in the application image. If the image also lacks `cat`
+or cannot read the sanitized file path, capture the already-sanitized
+configuration from the deployment source and place it at
+`support-bundle/config/reactive-http-client.yml`.
 
 Keep namespace, pod, container, file path, and management URL values as
 placeholders in shared examples. Before attaching a bundle, inspect every file

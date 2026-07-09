@@ -561,8 +561,26 @@ class DocumentationReleaseArtifactTest {
 
                 - **Default path.** Reduced allocations for default starter calls.
                 """;
+        String percentileClaim = """
+                ## [Unreleased]
+
+                - **Default path.** Lower p99 for Get No Body.
+                """;
+        String averageTimeClaim = """
+                ## [Unreleased]
+
+                - **Default path.** Improved average time for default starter calls.
+                """;
+        String unrelatedNoClaim = """
+                ## [Unreleased]
+
+                - **Docs.** Documented performance troubleshooting guidance.
+                - **Logging.** Reduced log noise in support examples.
+                """;
 
         assertThat(currentReleasePerformanceWordingViolations(root, noClaim, "9.9.9"))
+                .isEmpty();
+        assertThat(currentReleasePerformanceWordingViolations(root, unrelatedNoClaim, "9.9.9"))
                 .isEmpty();
         assertThat(currentReleasePerformanceWordingViolations(root, staleClaim, "9.9.9"))
                 .anySatisfy(violation -> assertThat(violation).contains("current release performance claim"));
@@ -573,6 +591,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(currentReleasePerformanceWordingViolations(root, targetInline, "9.9.9"))
                 .anySatisfy(violation -> assertThat(violation).contains("target-only benchmark path"));
         assertThat(currentReleasePerformanceWordingViolations(root, allocationClaim, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("current release performance claim"));
+        assertThat(currentReleasePerformanceWordingViolations(root, percentileClaim, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("current release performance claim"));
+        assertThat(currentReleasePerformanceWordingViolations(root, averageTimeClaim, "9.9.9"))
                 .anySatisfy(violation -> assertThat(violation).contains("current release performance claim"));
     }
 
@@ -1071,13 +1093,10 @@ class DocumentationReleaseArtifactTest {
                 || normalized.contains("benchmark scenarios")) {
             return true;
         }
-        return Pattern.compile("\\b(performance|latency|throughput|allocations?|overhead)\\b.*"
-                        + "\\b(faster|slower|improv\\w*|regress\\w*|reduc\\w*|lower\\w*|higher\\w*|same)\\b|"
-                        + "\\b(faster|slower|improv\\w*|regress\\w*|reduc\\w*|lower\\w*|higher\\w*|same)\\b.*"
-                        + "\\b(performance|latency|throughput|allocations?|overhead)\\b",
-                Pattern.DOTALL)
-                .matcher(normalized)
-                .find();
+        String metric = "\\b(performance|latency|throughput|allocations?|overhead|p50|p95|p99|average time)\\b";
+        String movement = "\\b(faster|slower|improv\\w*|regress\\w*|reduc\\w*|lower\\w*|higher\\w*|same)\\b";
+        Pattern claim = Pattern.compile(metric + ".*" + movement + "|" + movement + ".*" + metric);
+        return normalized.lines().anyMatch(line -> claim.matcher(line).find());
     }
 
     private static void assertPromotedReportMetadata(Path report, String expectedVersion) throws IOException {
