@@ -551,6 +551,16 @@ class DocumentationReleaseArtifactTest {
 
                 - **Performance evidence.** Current release notes cite [release-jmh](reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md).
                 """;
+        String targetInline = """
+                ## [Unreleased]
+
+                - **Performance evidence.** Current release notes cite [Benchmark Report 9.9.9](docs/benchmark-report-9.9.9.md) and `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`.
+                """;
+        String allocationClaim = """
+                ## [Unreleased]
+
+                - **Default path.** Reduced allocations for default starter calls.
+                """;
 
         assertThat(currentReleasePerformanceWordingViolations(root, noClaim, "9.9.9"))
                 .isEmpty();
@@ -559,7 +569,11 @@ class DocumentationReleaseArtifactTest {
         assertThat(currentReleasePerformanceWordingViolations(root, missingClaim, "9.9.9"))
                 .anySatisfy(violation -> assertThat(violation).contains("missing benchmark report"));
         assertThat(currentReleasePerformanceWordingViolations(root, targetLink, "9.9.9"))
-                .anySatisfy(violation -> assertThat(violation).contains("target-only benchmark link"));
+                .anySatisfy(violation -> assertThat(violation).contains("target-only benchmark path"));
+        assertThat(currentReleasePerformanceWordingViolations(root, targetInline, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("target-only benchmark path"));
+        assertThat(currentReleasePerformanceWordingViolations(root, allocationClaim, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("current release performance claim"));
     }
 
     @Test
@@ -1012,6 +1026,9 @@ class DocumentationReleaseArtifactTest {
                                                                            String releaseNotes,
                                                                            String projectVersion) throws IOException {
         List<String> violations = new ArrayList<>();
+        if (releaseNotes.contains("benchmark-reports/") || releaseNotes.contains("smoke-only-jmh.md")) {
+            violations.add("target-only benchmark path in release notes");
+        }
         Matcher linkMatcher = MARKDOWN_LINK.matcher(releaseNotes);
         while (linkMatcher.find()) {
             String target = URLDecoder.decode(linkMatcher.group(1), StandardCharsets.UTF_8);
@@ -1054,10 +1071,10 @@ class DocumentationReleaseArtifactTest {
                 || normalized.contains("benchmark scenarios")) {
             return true;
         }
-        return Pattern.compile("\\b(performance|latency|throughput|allocation|overhead)\\b.*"
-                        + "\\b(faster|slower|improv|regress|reduc|lower|higher|same)\\b|"
-                        + "\\b(faster|slower|improv|regress|reduc|lower|higher|same)\\b.*"
-                        + "\\b(performance|latency|throughput|allocation|overhead)\\b",
+        return Pattern.compile("\\b(performance|latency|throughput|allocations?|overhead)\\b.*"
+                        + "\\b(faster|slower|improv\\w*|regress\\w*|reduc\\w*|lower\\w*|higher\\w*|same)\\b|"
+                        + "\\b(faster|slower|improv\\w*|regress\\w*|reduc\\w*|lower\\w*|higher\\w*|same)\\b.*"
+                        + "\\b(performance|latency|throughput|allocations?|overhead)\\b",
                 Pattern.DOTALL)
                 .matcher(normalized)
                 .find();

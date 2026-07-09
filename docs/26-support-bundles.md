@@ -173,7 +173,7 @@ EXAMPLE_SANITIZED_CONFIG="/path/to/sanitized-reactive-http-client.yml"
 
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
-curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
 grep 'ReactiveHttpClientFactoryBean' "$EXAMPLE_APP_LOG" > support-bundle/logs/startup-summary.log || true
 grep 'DefaultHttpExchangeLogger' "$EXAMPLE_APP_LOG" > support-bundle/logs/exchange-metadata.log || true
 cp "$EXAMPLE_SANITIZED_CONFIG" support-bundle/config/reactive-http-client.yml
@@ -193,7 +193,7 @@ EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER="/path/in/container/sanitized-reactive-htt
 
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
-curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
 docker cp "$EXAMPLE_CONTAINER:$EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER" support-bundle/config/reactive-http-client.yml
@@ -210,16 +210,22 @@ EXAMPLE_NAMESPACE="example-namespace"
 EXAMPLE_POD="example-app-pod"
 EXAMPLE_CONTAINER="example-app-container"
 EXAMPLE_LOCAL_PORT="18080"
+EXAMPLE_MANAGEMENT_PORT="<management-port>"
 EXAMPLE_SANITIZED_CONFIG_IN_POD="/path/in/pod/sanitized-reactive-http-client.yml"
 
-kubectl -n "$EXAMPLE_NAMESPACE" port-forward "pod/$EXAMPLE_POD" "$EXAMPLE_LOCAL_PORT:8080"
+kubectl -n "$EXAMPLE_NAMESPACE" port-forward "pod/$EXAMPLE_POD" "$EXAMPLE_LOCAL_PORT:$EXAMPLE_MANAGEMENT_PORT"
 ```
 
 ```bash
+EXAMPLE_NAMESPACE="example-namespace"
+EXAMPLE_POD="example-app-pod"
+EXAMPLE_CONTAINER="example-app-container"
+EXAMPLE_LOCAL_PORT="18080"
+EXAMPLE_SANITIZED_CONFIG_IN_POD="/path/in/pod/sanitized-reactive-http-client.yml"
 EXAMPLE_MANAGEMENT_URL="http://127.0.0.1:$EXAMPLE_LOCAL_PORT"
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
-curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
 kubectl -n "$EXAMPLE_NAMESPACE" cp "$EXAMPLE_POD:$EXAMPLE_SANITIZED_CONFIG_IN_POD" support-bundle/config/reactive-http-client.yml -c "$EXAMPLE_CONTAINER"
