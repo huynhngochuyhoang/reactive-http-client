@@ -1,12 +1,17 @@
 package io.github.huynhngochuyhoang.httpstarter.benchmarks;
 
+import io.github.huynhngochuyhoang.httpstarter.core.StarterInvocationInternalsBenchmark;
 import org.junit.jupiter.api.Test;
+import org.openjdk.jmh.annotations.Benchmark;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BenchmarkMarkdownReportTest {
 
@@ -70,6 +75,55 @@ class BenchmarkMarkdownReportTest {
                 .doesNotContain("| metadataOnlyExchangeLoggingGetNoBody | Optional starter feature |")
                 .doesNotContain("| diagnosticsNoNetworkOneObserverGetNoBody | Optional starter feature |")
                 .doesNotContain("| runtimeDiagnosticsProviderClientSummaries | Optional starter feature |");
+    }
+
+    @Test
+    void everyCurrentBenchmarkMethodHasAnExplicitClassification() throws Exception {
+        String[] results = Stream.of(
+                        LoopbackClientComparisonBenchmark.class,
+                        StarterDiagnosticsOverheadBenchmark.class,
+                        StarterInvocationBenchmark.class,
+                        StarterInvocationInternalsBenchmark.class)
+                .flatMap(type -> Arrays.stream(type.getDeclaredMethods()))
+                .filter(method -> method.isAnnotationPresent(Benchmark.class))
+                .map(method -> result(method.getDeclaringClass().getName() + "." + method.getName(),
+                        "avgt", 1.0, "us/op"))
+                .toArray(String[]::new);
+
+        assertThat(renderReport(results)).contains("## Raw Results");
+    }
+
+    @Test
+    void rejectsUnclassifiedBenchmarkPrefixes() {
+        assertThatThrownBy(() -> renderReport(result(
+                "io.github.huynhngochuyhoang.httpstarter.benchmarks.NewBenchmark.unclassifiedScenario",
+                "avgt", 1.0, "us/op")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unclassified benchmark method [unclassifiedScenario]")
+                .hasMessageContaining("documented benchmark naming prefix");
+    }
+
+    @Test
+    void rejectsUnknownClientSideSurfaces() {
+        assertThatThrownBy(() -> renderReport(result(
+                "io.github.huynhngochuyhoang.httpstarter.benchmarks.NewBenchmark.clientSideOverheadCustomGetNoBody",
+                "avgt", 1.0, "us/op")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown client-side benchmark surface [CustomGetNoBody]");
+    }
+
+    @Test
+    void rejectsEmptyScenarioSuffixes() {
+        assertThatThrownBy(() -> renderReport(result(
+                "io.github.huynhngochuyhoang.httpstarter.benchmarks.NewBenchmark.starterFeature",
+                "avgt", 1.0, "us/op")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must include a scenario after its classification prefix");
+        assertThatThrownBy(() -> renderReport(result(
+                "io.github.huynhngochuyhoang.httpstarter.benchmarks.NewBenchmark.metadata",
+                "avgt", 1.0, "us/op")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must include a scenario after its classification prefix");
     }
 
     private String renderReport(String... results) throws Exception {

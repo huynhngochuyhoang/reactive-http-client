@@ -352,10 +352,18 @@ different scenario shapes:
   not install equivalent behavior. These rows appear as starter-only
   error-mapping overhead.
 - No-network invocation or diagnostics audits must not use the `starterFeature`
-  prefix. Use descriptive names such as `diagnosticsNoNetwork...`,
-  `metadataOnly...`, or `runtimeDiagnosticsProvider...`; these rows remain in raw
-  results as `No-network starter invocation` and are excluded from optional
-  feature summary tables.
+  prefix. Accepted no-network prefixes are `metadata...`, `cached...`,
+  `argumentResolution...`, `proxyInvocation...`, `diagnosticsDisabled...`,
+  `diagnosticsNoNetwork...`, `metadataOnly...`, `micrometerObserver...`, and
+  `runtimeDiagnosticsProvider...`. These rows remain in raw results as
+  `No-network starter invocation` and are excluded from optional feature
+  summary tables.
+
+Report generation fails for an unknown prefix, an unknown
+`clientSideOverhead` surface, or an empty scenario suffix. Add the classification
+contract and its report test in the same change as any new benchmark method.
+The V18 scope review added no benchmark rows and promoted no report because it
+introduced no public performance claim or changed request path.
 
 ## Metrics
 

@@ -298,26 +298,43 @@ Evidence:
 
 ## Priority 8 — Benchmark Evidence Scope and Classification Review
 
-### [ ] 5.1 Keep benchmark evidence tied to release decisions
-- [ ] Confirm smoke benchmark commands are current for the active release line.
-- [ ] Confirm release benchmark commands are current for the active release line.
-- [ ] Confirm published-baseline benchmark commands are current for the active
+### [x] 5.1 Keep benchmark evidence tied to release decisions
+- [x] Confirm smoke benchmark commands are current for the active release line.
+- [x] Confirm release benchmark commands are current for the active release line.
+- [x] Confirm published-baseline benchmark commands are current for the active
       baseline.
-- [ ] Confirm current and published-baseline report output paths remain distinct.
-- [ ] Add benchmark rows only when they isolate a changed request path, optional
+- [x] Confirm current and published-baseline report output paths remain distinct.
+- [x] Add benchmark rows only when they isolate a changed request path, optional
       feature path, startup validation path, or support endpoint rendering path.
-- [ ] Ensure every new benchmark row has an explicit prefix classification.
-- [ ] Keep no-network rows classified separately from loopback feature rows.
-- [ ] Keep benchmark threshold crossings as manual review triggers, not normal
+- [x] Ensure every new benchmark row has an explicit prefix classification.
+- [x] Keep no-network rows classified separately from loopback feature rows.
+- [x] Keep benchmark threshold crossings as manual review triggers, not normal
       CI hard gates.
-- [ ] Promote release-quality benchmark reports only when public performance
+- [x] Promote release-quality benchmark reports only when public performance
       claims require them.
-- [ ] Run benchmark/report documentation tests.
-- [ ] Run `git diff --check`.
+- [x] Run benchmark/report documentation tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Confirmed smoke and current release commands build the `2.14.0` reactor with
+  `-am`; the published-baseline command intentionally omits `-am`, resolves
+  starter `2.13.0`, and cleans before compiling the baseline-compatible harness.
+- Confirmed current reports remain under `benchmark-reports/release-jmh.*` and
+  published reports under `benchmark-reports/published-starter-2.13.0/`, with
+  comparison output kept target-only and distinct.
+- Added fail-closed report classification for all benchmark naming buckets.
+  Unknown prefixes, unknown client-side surfaces, and empty scenario suffixes
+  now stop report generation instead of silently becoming no-network evidence.
+- Added a reflection-based test proving every current `@Benchmark` method has
+  an explicit classification; no V18 benchmark row was added.
+- Confirmed threshold crossings remain manual review signals because
+  `benchmark.compare.fail-on-review` defaults to `false`.
+- Kept the latest promoted report on `2.12.0`; V18 makes no public performance
+  claim, so no `2.14.0` report was promoted.
+- `mvn -q -Pbenchmarks -pl reactive-http-client-benchmarks -am -DskipTests=false -Dtest=BenchmarkMarkdownReportTest,BenchmarkReportComparatorTest -Dsurefire.failIfNoSpecifiedTests=false test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `git diff --check` passed.
 
 ---
 

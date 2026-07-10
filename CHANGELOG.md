@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Strict validation adoption diagnostics.** Strict retry and built-in SigV4 startup failures now identify inherited or `@ApiRef` endpoint ownership, the unprovable contract, and a concrete remediation path without changing opt-in behavior.
 - **Public API compatibility evidence.** Re-audited documented helper coverage and expanded compatibility fixtures to reject nested fluent-method and public enum-constant removals alongside constructor removals.
 - **Metadata and native readiness audit.** Re-verified generated configuration metadata, nested configuration runtime hints, and optional Actuator/OTel boundaries, including explicit OTel back-off coverage when its API or bean is absent.
+- **Benchmark classification guard.** Generated Markdown now rejects unclassified method prefixes and unknown comparison surfaces, keeping no-network audits separate from loopback feature rows.
 
 ## [2.13.0] - 2026-07-05
 

@@ -23,6 +23,16 @@ final class BenchmarkMarkdownReport {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final DecimalFormat NUMBER_FORMAT =
             new DecimalFormat("0.###", DecimalFormatSymbols.getInstance(Locale.ROOT));
+    private static final List<String> NO_NETWORK_PREFIXES = List.of(
+            "metadata",
+            "cached",
+            "argumentResolution",
+            "proxyInvocation",
+            "diagnosticsDisabled",
+            "diagnosticsNoNetwork",
+            "metadataOnly",
+            "micrometerObserver",
+            "runtimeDiagnosticsProvider");
     private static final List<String> ENVIRONMENT_KEYS = List.of(
             "generatedAt",
             "projectVersion",
@@ -224,21 +234,33 @@ final class BenchmarkMarkdownReport {
         if (benchmarkName.startsWith("clientSideOverhead")) {
             String remainder = benchmarkName.substring("clientSideOverhead".length());
             ClientAndScenario clientAndScenario = clientAndScenario(remainder);
+            requireScenario(benchmarkName, clientAndScenario.scenario());
             return new Classification("Client-side overhead", clientAndScenario.client(), clientAndScenario.scenario(),
                     true, false, sortPrefix("client", clientAndScenario.scenario()));
         }
         if (benchmarkName.startsWith("starterFeature")) {
             String scenario = benchmarkName.substring("starterFeature".length());
+            requireScenario(benchmarkName, scenario);
             return new Classification("Optional starter feature", "Starter", scenario,
                     false, true, sortPrefix("feature", scenario));
         }
         if (benchmarkName.startsWith("starterErrorMapping")) {
             String scenario = benchmarkName.substring("starterErrorMapping".length());
+            requireScenario(benchmarkName, scenario);
             return new Classification("Starter-only error-mapping overhead", "Starter", scenario,
                     false, true, sortPrefix("starter-error", scenario));
         }
-        return new Classification("No-network starter invocation", "Starter", benchmarkName,
-                false, false, sortPrefix("invocation", benchmarkName));
+        String noNetworkPrefix = NO_NETWORK_PREFIXES.stream()
+                .filter(benchmarkName::startsWith)
+                .findFirst()
+                .orElse(null);
+        if (noNetworkPrefix != null) {
+            requireScenario(benchmarkName, benchmarkName.substring(noNetworkPrefix.length()));
+            return new Classification("No-network starter invocation", "Starter", benchmarkName,
+                    false, false, sortPrefix("invocation", benchmarkName));
+        }
+        throw new IllegalArgumentException("Unclassified benchmark method [" + benchmarkName
+                + "]. Use a documented benchmark naming prefix before generating release evidence.");
     }
 
     private static ClientAndScenario clientAndScenario(String remainder) {
@@ -251,7 +273,15 @@ final class BenchmarkMarkdownReport {
         if (remainder.startsWith("Starter")) {
             return new ClientAndScenario("Starter", remainder.substring("Starter".length()));
         }
-        return new ClientAndScenario("Unknown", remainder);
+        throw new IllegalArgumentException("Unknown client-side benchmark surface [" + remainder
+                + "]. Use RawWebClient, SpringHttpExchange, or Starter.");
+    }
+
+    private static void requireScenario(String benchmarkName, String scenario) {
+        if (scenario.isBlank()) {
+            throw new IllegalArgumentException("Benchmark method [" + benchmarkName
+                    + "] must include a scenario after its classification prefix.");
+        }
     }
 
     private static String delta(BenchmarkResult starter, BenchmarkResult baseline) {
