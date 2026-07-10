@@ -183,6 +183,18 @@ their body-signing contract remains application-owned.
 
 `Publisher`, Java stream types, multipart, `@Body Object`, and erased-generic request bodies are not signed by the built-in provider because stable raw bytes are not materialized without consuming or re-encoding the body. Use a repeatable `byte[]`, charset-declared `String`, or concrete JSON object body with an absent or JSON-compatible `Content-Type` and codecs aligned to the starter `ObjectMapper` for built-in signing, or provide a custom auth provider that implements AWS streaming signatures.
 
+Choose signing ownership explicitly:
+
+| Signing owner | Use when | Strict-mode choice |
+|---|---|---|
+| Starter built-in `AwsSigV4AuthProvider` | The method uses one of the supported stable body shapes and its `Content-Type` is absent or statically JSON-compatible for object bodies | Enable `strict-body-signing-validation` after auditing the client |
+| Application `AuthProvider` bean or custom `AuthProviderFactory` | The application signs publisher, multipart, resource, stream, dynamically typed, or externally encoded bodies | Keep built-in strict validation disabled; the custom provider owns byte stability and signing |
+
+Strict failures report the concrete client interface, declaring method,
+endpoint source, body shape, reason, and remediation. A dynamic `Content-Type`
+parameter or header map remains application-owned because startup cannot prove
+that a concrete object will use a JSON-compatible encoder.
+
 ```yaml
 reactive:
   http:

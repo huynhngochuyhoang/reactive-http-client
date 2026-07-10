@@ -97,6 +97,20 @@ given call, so strict startup validation does not treat them as proven-safe
 contracts. Keep strict validation disabled for those dynamic contracts and rely
 on the runtime unsafe-retry warning instead.
 
+Choose the idempotency contract based on who owns the value:
+
+| Contract owner | Recommended mechanism | Strict-mode result |
+|---|---|---|
+| Starter may generate a fresh key for every subscription | Method-level `@IdempotencyKey` | Startup-provable |
+| One immutable deployment value is valid for every call from the client | Client `default-headers.Idempotency-Key`, with no method header parameter or header map that can override it | Startup-provable |
+| Caller, Reactor context, or a dynamic header map owns the key | `@IdempotencyKey` parameter, `@HeaderParam`, header map, or `RequestContext` | Runtime-only; keep strict mode disabled and use the warning |
+
+Failure details report the concrete client interface, the declaring method (so
+inherited endpoints are identifiable), and `endpointSource` for either the HTTP
+method annotation or resolved `@ApiRef` key. The per-method `reason` and
+`remediation` fields identify default-header override conflicts separately from
+a completely missing idempotency contract.
+
 Incremental rollout pattern:
 
 1. Enable resilience with the intended `retry-methods`, but leave
