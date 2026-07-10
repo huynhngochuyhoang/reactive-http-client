@@ -172,28 +172,42 @@ Evidence:
 
 ## Priority 5 — Strict Validation Adoption Message Audit
 
-### [ ] 3.2 Re-audit strict validation failure messages
-- [ ] Review strict retry validation failures for inherited endpoints.
-- [ ] Review strict retry validation failures for `@ApiRef` endpoints.
-- [ ] Review strict retry validation failures for dynamic headers and default
+### [x] 3.2 Re-audit strict validation failure messages
+- [x] Review strict retry validation failures for inherited endpoints.
+- [x] Review strict retry validation failures for `@ApiRef` endpoints.
+- [x] Review strict retry validation failures for dynamic headers and default
       `Idempotency-Key` interactions.
-- [ ] Review strict retry validation behavior for disabled, single-attempt, and
+- [x] Review strict retry validation behavior for disabled, single-attempt, and
       unavailable retry operators.
-- [ ] Review strict SigV4 validation failures for custom auth providers.
-- [ ] Review strict SigV4 validation failures for dynamic content types and
+- [x] Review strict SigV4 validation failures for custom auth providers.
+- [x] Review strict SigV4 validation failures for dynamic content types and
       ambiguous body shapes.
-- [ ] Improve message text only where remediation is unclear.
-- [ ] Keep warning-only runtime behavior unchanged when strict modes are
+- [x] Improve message text only where remediation is unclear.
+- [x] Keep warning-only runtime behavior unchanged when strict modes are
       disabled.
-- [ ] Document how to choose between method annotations, client defaults, and
+- [x] Document how to choose between method annotations, client defaults, and
       custom provider ownership.
-- [ ] Add or update focused tests for any changed message contract.
-- [ ] Run focused tests.
-- [ ] Run `git diff --check`.
+- [x] Add or update focused tests for any changed message contract.
+- [x] Run focused tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Strict retry failures now distinguish direct annotations from resolved
+  `@ApiRef` endpoints, retain concrete-versus-declaring interface context for
+  inherited methods, and report whether the key is missing, runtime-provided,
+  or made unprovable by a dynamic override of a client default.
+- Strict built-in SigV4 failures now report endpoint ownership and a concrete
+  built-in body-contract or custom-provider remediation path while retaining
+  the existing dynamic content-type and ambiguous body-shape reasons.
+- Existing focused coverage confirms strict retry remains dormant when disabled,
+  single-attempt, or unavailable, and strict SigV4 validation continues to skip
+  named providers and custom factory selections.
+- Added retry and SigV4 ownership decision tables to `docs/07-resilience4j.md`
+  and `docs/06-auth-providers.md`.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientFactoryBeanDiagnosticsTest test` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest,DocumentationReleaseArtifactTest test` passed.
+- `git diff --check` passed.
 
 ---
 

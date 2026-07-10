@@ -844,11 +844,15 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             }
             unsupportedMethods.add("clientInterface=" + clientInterface.getName()
                     + ", method=" + methodSignature(method)
+                    + ", endpointSource=" + diagnosticEndpointSource(plan)
                     + ", httpMethod=" + diagnosticHttpMethod(meta, clientConfig)
                     + ", pathTemplate=" + plan.pathTemplate()
                     + ", bodyShape=" + contract.bodyShape()
                     + ", auth=aws-sigv4"
-                    + ", reason=" + contract.reason());
+                    + ", reason=" + contract.reason()
+                    + ", remediation=use an empty, byte[], charset-stable String, or concrete JSON body with a "
+                    + "startup-provable JSON Content-Type; otherwise select a custom AuthProvider and leave built-in "
+                    + "strict body-signing validation disabled");
         }
 
         if (!unsupportedMethods.isEmpty()) {
@@ -1031,11 +1035,13 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             }
             unsafeMethods.add("clientInterface=" + clientInterface.getName()
                     + ", method=" + methodSignature(method)
+                    + ", endpointSource=" + diagnosticEndpointSource(plan)
                     + ", httpMethod=" + httpMethod
                     + ", retry=" + retryInstance
                     + ", retrySource=" + (StringUtils.hasText(plan.retryInstanceName())
                     ? "method-level @Retry" : "client resilience.retry")
-                    + ", retryMethods=" + resilience.getRetryMethods());
+                    + ", retryMethods=" + resilience.getRetryMethods()
+                    + strictRetryDiagnostic(plan, clientConfig));
         }
 
         if (!unsafeMethods.isEmpty()) {
@@ -1078,6 +1084,39 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 || plan.idempotencyKeyParams().stream()
                 .map(RequestPlan.NamedArgumentBinding::name)
                 .anyMatch(name -> "Idempotency-Key".equalsIgnoreCase(name));
+    }
+
+    private static String strictRetryDiagnostic(RequestPlan plan,
+                                                ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        boolean hasDefault = hasDefaultIdempotencyKeyHeaderValue(clientConfig);
+        boolean hasHeaderMap = !plan.headerMapParams().isEmpty();
+        boolean hasDynamicKeyParameter = plan.headerParams().stream()
+                .map(RequestPlan.NamedArgumentBinding::name)
+                .anyMatch(name -> "Idempotency-Key".equalsIgnoreCase(name))
+                || plan.idempotencyKeyParams().stream()
+                .map(RequestPlan.NamedArgumentBinding::name)
+                .anyMatch(name -> "Idempotency-Key".equalsIgnoreCase(name));
+        if (hasDefault && (hasHeaderMap || hasDynamicKeyParameter)) {
+            String source = hasHeaderMap ? "a dynamic header map" : "a dynamic method parameter";
+            return ", reason=the configured default Idempotency-Key can be overridden by " + source
+                    + ", remediation=remove that dynamic Idempotency-Key override or use method-level "
+                    + "@IdempotencyKey generation";
+        }
+        if (hasHeaderMap || hasDynamicKeyParameter) {
+            String source = hasHeaderMap ? "header maps" : "method parameters";
+            return ", reason=Idempotency-Key values from " + source + " can be absent at runtime"
+                    + ", remediation=use method-level @IdempotencyKey generation, a non-overrideable client default, "
+                    + "or keep strict validation disabled for this runtime-provided contract";
+        }
+        return ", reason=no startup-provable Idempotency-Key contract is declared"
+                + ", remediation=use an idempotent HTTP method, method-level @IdempotencyKey generation, or a "
+                + "non-overrideable client default Idempotency-Key";
+    }
+
+    private static String diagnosticEndpointSource(RequestPlan plan) {
+        return StringUtils.hasText(plan.apiRefName())
+                ? "@ApiRef(" + plan.apiRefName() + ")"
+                : "method annotation";
     }
 
     private static String methodSignature(Method method) {

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Post-2.13 baseline transition.** The reactor now targets `2.14.0` while API compatibility and published-baseline benchmark evidence compare against the published `2.13.0` artifacts.
 - **Release-note evidence guard.** Documentation tests now validate current changelog release-note evidence links while allowing no-claim releases to keep benchmark work manual and pending.
 - **Support-bundle capture recipes.** Added placeholder-based local JVM, container, and Kubernetes-style capture commands for sanitized support bundles.
+- **Strict validation adoption diagnostics.** Strict retry and built-in SigV4 startup failures now identify inherited or `@ApiRef` endpoint ownership, the unprovable contract, and a concrete remediation path without changing opt-in behavior.
 
 ## [2.13.0] - 2026-07-05
 

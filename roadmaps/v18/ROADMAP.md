@@ -167,11 +167,11 @@ weakening the guard.
 
 **Acceptance:**
 
-- [ ] Strict-mode failures identify the client, method, unsafe condition, and
+- [x] Strict-mode failures identify the client, method, unsafe condition, and
       remediation path.
-- [ ] Custom providers are not rejected by built-in validation assumptions.
-- [ ] Disabled/no-op retry configurations do not fail strict retry validation.
-- [ ] Docs keep strict modes opt-in and incremental.
+- [x] Custom providers are not rejected by built-in validation assumptions.
+- [x] Disabled/no-op retry configurations do not fail strict retry validation.
+- [x] Docs keep strict modes opt-in and incremental.
 
 ---
 

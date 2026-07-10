@@ -530,8 +530,11 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .hasMessageContaining("clientInterface=" + StrictUnsafeRetryClient.class.getName())
                     .hasMessageContaining("method=" + StrictUnsafeRetryClient.class.getName() + "#create()")
                     .hasMessageContaining("httpMethod=POST")
+                    .hasMessageContaining("endpointSource=method annotation")
                     .hasMessageContaining("retry=default")
                     .hasMessageContaining("retryMethods=[POST]")
+                    .hasMessageContaining("reason=no startup-provable Idempotency-Key contract is declared")
+                    .hasMessageContaining("remediation=use an idempotent HTTP method")
                     .hasMessageContaining("Idempotency-Key")
                     .hasMessageContaining("Runtime-provided idempotency keys");
         } finally {
@@ -612,6 +615,9 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .hasMessageContaining("strict unsafe retry validation")
                     .hasMessageContaining("method=" + StrictHeaderOverrideRetryClient.class.getName()
                             + "#create(java.lang.String)")
+                    .hasMessageContaining("reason=the configured default Idempotency-Key can be overridden by "
+                            + "a dynamic method parameter")
+                    .hasMessageContaining("remediation=remove that dynamic Idempotency-Key override")
                     .hasMessageContaining("Runtime-provided idempotency keys");
         } finally {
             factoryBean.destroy();
@@ -636,6 +642,8 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .hasMessageContaining("strict unsafe retry validation")
                     .hasMessageContaining("method=" + StrictHeaderMapOverrideRetryClient.class.getName()
                             + "#create(java.util.Map)")
+                    .hasMessageContaining("reason=the configured default Idempotency-Key can be overridden by "
+                            + "a dynamic header map")
                     .hasMessageContaining("Runtime-provided idempotency keys");
         } finally {
             factoryBean.destroy();
@@ -663,7 +671,9 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .hasMessageContaining("strict unsafe retry validation")
                     .hasMessageContaining("clientInterface=" + StrictApiRefUnsafeRetryClient.class.getName())
                     .hasMessageContaining("method=" + StrictApiRefUnsafeRetryClient.class.getName() + "#create()")
+                    .hasMessageContaining("endpointSource=@ApiRef(orders.create)")
                     .hasMessageContaining("httpMethod=POST")
+                    .hasMessageContaining("reason=no startup-provable Idempotency-Key contract is declared")
                     .hasMessageContaining("Runtime-provided idempotency keys");
         } finally {
             factoryBean.destroy();
@@ -798,13 +808,16 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .hasMessageContaining("method=" + StrictSigV4StreamingBodyClient.class.getName()
                             + "#uploadPublisher(reactor.core.publisher.Flux)")
                     .hasMessageContaining("bodyShape=publisher")
+                    .hasMessageContaining("endpointSource=method annotation")
                     .hasMessageContaining("method=" + StrictSigV4StreamingBodyClient.class.getName()
                             + "#uploadDataBuffer(org.springframework.core.io.buffer.DataBuffer)")
                     .hasMessageContaining("bodyShape=data-buffer")
                     .hasMessageContaining("method=" + StrictSigV4StreamingBodyClient.class.getName()
                             + "#uploadResource(org.springframework.core.io.Resource)")
                     .hasMessageContaining("bodyShape=resource")
-                    .hasMessageContaining("auth=aws-sigv4");
+                    .hasMessageContaining("auth=aws-sigv4")
+                    .hasMessageContaining("remediation=use an empty, byte[], charset-stable String, or concrete JSON body")
+                    .hasMessageContaining("otherwise select a custom AuthProvider");
         } finally {
             factoryBean.destroy();
         }
@@ -973,7 +986,8 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .hasMessageContaining("method=" + StrictSigV4DynamicContentTypeJsonBodyClient.class.getName()
                             + "#json(java.lang.String,java.util.Map)")
                     .hasMessageContaining("bodyShape=json(java.util.Map)")
-                    .hasMessageContaining("Content-Type is supplied dynamically");
+                    .hasMessageContaining("Content-Type is supplied dynamically")
+                    .hasMessageContaining("startup-provable JSON Content-Type");
         } finally {
             factoryBean.destroy();
         }
