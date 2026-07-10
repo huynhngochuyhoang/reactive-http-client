@@ -1,0 +1,352 @@
+# Reactive HTTP Client — Roadmap V19 Execution Checklist
+
+Companion to [`ROADMAP.md`](ROADMAP.md). Execute priorities in order. Do not
+move the default reactor to Spring Boot 4 until the isolated migration gates
+show that the `3.0.0` line is viable.
+
+---
+
+## Priority 1 — Close `2.14.0` and Establish Release Lanes
+
+### [x] 1.1 Close the published release without moving baselines early
+
+- [x] Record `2.14.0` in `CHANGELOG.md` with release date `2026-07-10`.
+- [x] Move the released V18 entries from `Unreleased` into `2.14.0`.
+- [x] Update the `Unreleased` comparison link to start at `v2.14.0`.
+- [x] Add the `2.14.0` comparison link from `v2.13.0`.
+- [x] Confirm the remote `v2.14.0` tag points at the intended release source.
+- [x] Resolve `reactive-http-client-starter:2.14.0` from the release environment.
+- [x] Resolve `reactive-http-client-test:2.14.0` from the release environment.
+- [x] Resolve `reactive-http-client-otel:2.14.0` from the release environment.
+- [x] Do not move `api.compatibility.baseline.version` until all published
+      artifacts resolve.
+- [x] Define the Boot 3.5 `2.x` maintenance branch and next maintenance version.
+- [x] Document that `2.x` receives security and critical fixes while `3.x`
+      owns Boot 4 migration work.
+- [x] Keep historical V18 release and benchmark evidence unchanged.
+- [x] Run focused release documentation tests.
+- [x] Run `git diff --check`.
+
+Evidence:
+
+- User confirmed `2.14.0` was published on 2026-07-10.
+- Remote tag `v2.14.0` resolves to `2f877a37c747fe92e5cd41d3c44dc0901e891f60`,
+  the current release source whose root POM declares `2.14.0`.
+- Forced mirror refresh resolved published starter, test-helper, and OTel
+  `2.14.0` artifacts.
+- Moved the Boot 3.5 maintenance reactor and all module parents to `2.14.1` only
+  after artifact resolution succeeded.
+- Moved `api.compatibility.baseline.version`, benchmark published-baseline
+  commands, report paths, and generated release evidence to published `2.14.0`.
+- Updated README and quick-start dependency snippets to maintenance version
+  `2.14.1`; historical V18 release and promoted benchmark reports remain
+  unchanged.
+- Defined `2.x` as the Boot 3.5 maintenance branch rooted at `v2.14.0`, with
+  `2.14.1` as its next version and Boot 4 work isolated for future `3.x`.
+- `mvn -U -q dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.14.0` passed.
+- `mvn -U -q dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.14.0` passed.
+- `mvn -U -q dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.14.0` passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `mvn -q -Papi-compatibility -DskipTests verify` passed against published
+  `2.14.0`.
+- `mvn -q -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify`
+  passed against published `2.14.0`.
+- `git diff --check` passed.
+
+---
+
+## Priority 2 — Latest Spring Boot 3.5 Migration Bridge
+
+### [ ] 2.1 Prepare the supported line before Boot 4
+
+- [ ] Query the latest published Spring Boot `3.5.x` patch when execution starts.
+- [ ] Compare it with the V18-reviewed `3.5.16` candidate.
+- [ ] Record exact managed Spring Framework, WebFlux, Reactor Netty, Netty,
+      Micrometer, OTel, Jackson, and test versions.
+- [ ] Run the full reactor with the selected Boot 3.5 patch override.
+- [ ] Run release smoke with the selected patch.
+- [ ] Run AOT and native smoke with the selected patch.
+- [ ] Run configuration metadata and generated documentation tests.
+- [ ] Run optional Actuator, Micrometer, OTel, and Resilience4j absence/presence
+      tests.
+- [ ] Audit production use of APIs deprecated in the latest Boot 3.5 line.
+- [ ] Remove deprecated use only where the change remains compatible with `2.x`.
+- [ ] Decide whether the patch movement ships as a separate `2.x` maintenance
+      release or remains deferred with evidence.
+- [ ] Do not include Boot 4 public API changes in this priority.
+- [ ] Run API compatibility against published `2.14.0` after the baseline can
+      safely move.
+- [ ] Run `git diff --check`.
+
+Evidence:
+
+- Pending.
+
+---
+
+## Priority 3 — Isolated Spring Boot 4 Build Spike
+
+### [ ] 3.1 Establish a reproducible migration profile
+
+- [ ] Select and document the minimum Boot 4 line under evaluation.
+- [ ] Select and document the current stable Boot 4 line for the test matrix.
+- [ ] Create an isolated profile, branch, or temporary reactor property for the
+      Boot 4 spike.
+- [ ] Keep the normal `2.x` build on Boot 3.5 during the spike.
+- [ ] Resolve Boot 4 artifacts from a repository known to contain them.
+- [ ] Distinguish local mirror failures from dependency or source failures.
+- [ ] Compile starter, test-helper, OTel, and benchmark modules independently.
+- [ ] Record exact managed dependency versions and management sources.
+- [ ] Classify failures as module/package, Jackson, test infrastructure,
+      optional integration, AOT/native, or transport issues.
+- [ ] Add a deterministic CI matrix only after local resolution and compilation
+      are repeatable.
+- [ ] Ensure no experimental Boot 4 artifact can be published.
+- [ ] Run `git diff --check`.
+
+Evidence:
+
+- An initial Boot `4.1.0` override resolved its BOM but the configured internal
+  mirror lacked several managed artifacts; this is repository evidence, not a
+  source-compatibility result.
+
+---
+
+## Priority 4 — Boot 4 Module and Auto-Configuration Migration
+
+### [ ] 4.1 Replace Boot 3 module assumptions
+
+- [ ] Inventory every production `org.springframework.boot.*` import.
+- [ ] Map each import to its Boot 4 module, package, and dependency owner.
+- [ ] Replace broad or obsolete dependencies with focused Boot 4 modules.
+- [ ] Update auto-configuration imports and registration metadata.
+- [ ] Migrate `WebClientCustomizer` integration to the supported Boot 4 API.
+- [ ] Migrate configuration-properties and metadata processing dependencies.
+- [ ] Migrate Actuator health and endpoint imports.
+- [ ] Preserve conditional back-off when Actuator is absent.
+- [ ] Verify `rhttpclients` endpoint discovery and alphanumeric endpoint ID.
+- [ ] Use `spring-boot-starter-classic` only as a temporary diagnostic if needed.
+- [ ] Remove classic compatibility dependencies from the final graph.
+- [ ] Add focused packaged-application auto-configuration tests.
+- [ ] Run generated metadata and Markdown-link tests.
+- [ ] Run `git diff --check`.
+
+Evidence:
+
+- Pending.
+
+---
+
+## Priority 5 — Jackson 3 and Codec Ownership
+
+### [ ] 5.1 Define the `3.0.0` serialization contract
+
+- [ ] Inventory public and internal Jackson 2 types in all modules.
+- [ ] Record public APIs that expose `com.fasterxml.jackson.databind.ObjectMapper`.
+- [ ] Decide whether public customization uses Jackson 3 directly or a narrow
+      starter-owned serialization contract.
+- [ ] Keep default Boot 4 applications free from a required Jackson 2 mapper.
+- [ ] Ensure WebClient encoding and auth signing consume the same bytes.
+- [ ] Migrate built-in SigV4 JSON signing and charset-sensitive String signing.
+- [ ] Migrate Problem Detail mapping.
+- [ ] Migrate OAuth2 sanitized error-body decoding without losing configured
+      codecs or typed response metadata.
+- [ ] Migrate diagnostics and contract snapshot JSON rendering.
+- [ ] Migrate mock helper body serialization and assertions.
+- [ ] Cover Java time modules, naming strategies, Kotlin, custom serializers,
+      and unknown-property behavior.
+- [ ] Keep any Jackson 2 compatibility module temporary and deprecated.
+- [ ] Add every public serialization break to the `3.0.0` migration guide.
+- [ ] Run focused serialization, auth, error, and test-helper tests.
+- [ ] Run `git diff --check`.
+
+Evidence:
+
+- Pending.
+
+---
+
+## Priority 6 — Framework 7 and Transport Correctness
+
+### [ ] 6.1 Revalidate request framing and response ownership
+
+- [ ] Run real-server JSON, `ResponseEntity`, streaming, bodiless, redirect,
+      timeout, cancellation, and error-drain tests on the Boot 4 stack.
+- [ ] Add a raw HTTP/1.1 fixture that sends POST then PUT on one persistent
+      connection.
+- [ ] Confirm the normal sequence produces no decoder warning or leaked bytes.
+- [ ] Add a deliberately malformed `Content-Length` fixture that reproduces a
+      framing failure.
+- [ ] Verify Netty's synthetic `GET /bad-request HTTP/1.0` is reported only as a
+      decoder placeholder, never as the application endpoint.
+- [ ] Audit default headers, `@HeaderParam`, header maps, customizers, and inbound
+      forwarding for hop-by-hop/framing headers.
+- [ ] Define supported behavior for `Content-Length`, `Transfer-Encoding`,
+      `Connection`, `Expect`, and `Host` overrides.
+- [ ] Cover direct loopback and one representative proxy or sidecar path where
+      available.
+- [ ] Revalidate HTTP/1.1, TLS H2, and H2C separately.
+- [ ] Revalidate unexpected bodiless responses and pooled connection reuse.
+- [ ] Revalidate streaming body ownership after outer publisher completion.
+- [ ] Document the full decoder cause required for future transport reports.
+- [ ] Run transport-focused tests and `git diff --check`.
+
+Evidence:
+
+- Pending.
+
+---
+
+## Priority 7 — Optional Integrations and Resilience
+
+### [ ] 7.1 Preserve optional activation and no-op behavior
+
+- [ ] Review Resilience4j compatibility with Framework 7 and the selected
+      Reactor line.
+- [ ] Keep Resilience4j dependencies optional and version-managed explicitly.
+- [ ] Verify no-registry/no-operator fallback behavior.
+- [ ] Verify retry, circuit breaker, rate limiter, bulkhead, and metrics
+      independently.
+- [ ] Verify strict retry diagnostics match actual operator availability.
+- [ ] Verify Micrometer observer and health activation/back-off.
+- [ ] Verify OTel observer, propagation, semantic attributes, and back-off.
+- [ ] Verify OAuth2 client credentials under Boot 4 codecs.
+- [ ] Verify AWS SigV4 under Boot 4 codecs and transport.
+- [ ] Keep diagnostics endpoint and health details opt-in and sanitized.
+- [ ] Add minimal-classpath tests without Actuator, Micrometer, OTel, or
+      Resilience4j.
+- [ ] Check published POMs for accidental transitive optional integrations.
+- [ ] Run focused optional-integration tests and `git diff --check`.
+
+Evidence:
+
+- Pending.
+
+---
+
+## Priority 8 — Boot 4 AOT and Native Image Baseline
+
+### [ ] 8.1 Rebuild native evidence
+
+- [ ] Select the GraalVM/native-image baseline supported by the chosen Boot 4
+      line.
+- [ ] Update native build commands and generated release evidence.
+- [ ] Re-audit reflection hints for client interfaces and inherited methods.
+- [ ] Re-audit proxy hints and nested configuration binding hints.
+- [ ] Re-audit metadata, Maven version resource, and diagnostics resources.
+- [ ] Verify diagnostics endpoint and health behavior in native mode.
+- [ ] Build a native smoke application that performs a loopback request.
+- [ ] Exercise inherited generic endpoints and Problem Detail mapping.
+- [ ] Exercise one auth provider and one optional observability integration.
+- [ ] Record Java, GraalVM, Boot, Framework, starter, and commit versions.
+- [ ] Run AOT/native tests and `git diff --check`.
+
+Evidence:
+
+- Pending.
+
+---
+
+## Priority 9 — Public API and `3.0.0` Migration Guide
+
+### [ ] 9.1 Make every major-line break explicit
+
+- [ ] Freeze the latest published `2.x` public surface map.
+- [ ] Produce a report-only API diff from published `2.x` to the `3.0.0`
+      candidate.
+- [ ] Categorize every break as required, intentional, or accidental.
+- [ ] Remove unrelated accidental API breaks.
+- [ ] Preserve annotation and exception semantics where Boot 4 does not require
+      a change.
+- [ ] Preserve lifecycle, observer, diagnostic sanitization, and retry semantics.
+- [ ] Document dependency and package changes.
+- [ ] Document Jackson 2 to Jackson 3 migration.
+- [ ] Document Actuator, AOT/native, configuration, and test-helper changes.
+- [ ] Add complete Boot 3 `2.x` and Boot 4 `3.x` Maven examples.
+- [ ] Add complete before/after YAML examples.
+- [ ] Add metadata deprecations or replacements for changed properties.
+- [ ] Run public-surface documentation and compatibility-fixture tests.
+- [ ] Run `git diff --check`.
+
+Evidence:
+
+- Pending.
+
+---
+
+## Priority 10 — Boot 4 Consumer and Test-Helper Fixtures
+
+### [ ] 10.1 Prove behavior in assembled applications
+
+- [ ] Add a minimal Boot 4 WebFlux consumer fixture.
+- [ ] Exercise a real declarative loopback request.
+- [ ] Add inherited generic endpoint and `@ApiRef` fixtures.
+- [ ] Add OAuth2 and SigV4 fixtures.
+- [ ] Add strict retry and diagnostics endpoint fixtures.
+- [ ] Add health and OTel activation/back-off fixtures.
+- [ ] Migrate `reactive-http-client-test` to the selected serialization contract.
+- [ ] Verify lifecycle ordering and final outbound metadata.
+- [ ] Verify retry attempt counts and idempotency-key behavior.
+- [ ] Verify redirects, streaming ownership, and multi-value headers.
+- [ ] Keep Boot 3 fixtures on the `2.x` maintenance line rather than publishing
+      a dual-generation helper jar.
+- [ ] Run consumer and helper tests from a clean local repository.
+- [ ] Run `git diff --check`.
+
+Evidence:
+
+- Pending.
+
+---
+
+## Priority 11 — Boot 4 Benchmark Baseline
+
+### [ ] 11.1 Re-establish same-stack performance evidence
+
+- [ ] Run raw WebClient, Spring HTTP Interface, and starter on the same Boot 4
+      BOM and transport.
+- [ ] Re-run default success, JSON, `ResponseEntity`, and small error paths.
+- [ ] Re-run Problem Detail, diagnostics, observer, and lifecycle rows affected
+      by migration.
+- [ ] Keep no-network rows classified separately from loopback rows.
+- [ ] Label Boot 3 versus Boot 4 results as stack-migration context.
+- [ ] Do not describe cross-stack movement as a pure starter optimization.
+- [ ] Record Boot, Framework, Reactor Netty, Netty, Jackson, Micrometer, OTel,
+      Java, starter, baseline, and commit versions.
+- [ ] Keep thresholds as manual review signals.
+- [ ] Promote a clean source-controlled report only if release notes make a
+      public performance claim.
+- [ ] Run benchmark report/classification tests and `git diff --check`.
+
+Evidence:
+
+- Pending.
+
+---
+
+## Priority 12 — `3.0.0` Go/No-Go and Release Readiness
+
+### [ ] 12.1 Release only with complete migration evidence
+
+- [ ] Document the selected minimum and current Boot 4 test matrix.
+- [ ] Verify all mandatory priorities above are complete or explicitly blocked.
+- [ ] Run full JVM tests.
+- [ ] Run packaged Boot 4 consumer fixtures.
+- [ ] Run AOT and native smoke.
+- [ ] Run optional-integration presence/absence tests.
+- [ ] Run generated configuration docs and Markdown-link validation.
+- [ ] Run the `2.x` to `3.x` report-only API diff.
+- [ ] Run API compatibility fixtures for the intended `3.x` surface.
+- [ ] Verify dependency provenance and published POM contents.
+- [ ] Promote benchmark evidence or explicitly defer it based on release claims.
+- [ ] Verify starter, test-helper, and OTel versions are all `3.0.0`.
+- [ ] Keep `2.x` maintenance instructions visible in release notes.
+- [ ] Record a **go** decision only when all mandatory gates pass.
+- [ ] Otherwise record a **no-go** decision with blockers and keep `2.x`
+      releasable.
+- [ ] Run `git diff --check`.
+- [ ] Mark `ROADMAP.md` completed only after the go/no-go evidence is recorded.
+
+Evidence:
+
+- Pending.
