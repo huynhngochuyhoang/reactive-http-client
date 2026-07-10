@@ -266,6 +266,7 @@ class DocumentationReleaseArtifactTest {
         Path promotedReport = root.resolve("docs/benchmark-report-" + promotedReportVersion + ".md");
         String readmeDocs = Files.readString(root.resolve("README.md"));
         String changelogDocs = Files.readString(root.resolve("CHANGELOG.md"));
+        String currentReleaseNotes = currentReleaseChangelogSection(changelogDocs, projectVersion);
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         String releaseNoteBenchmarkBlock = releaseNoteBenchmarkBlock(benchmarkDocs);
         String benchmarkConsumerDocs = Files.readString(root.resolve("docs/24-benchmark-consumer-examples.md"));
@@ -365,6 +366,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted")
                 .doesNotContain("docs/benchmark-report-" + promotedReportVersion + ".md")
                 .doesNotContain("[Benchmark Report " + promotedReportVersion + "]");
+        assertThat(currentReleasePerformanceWordingViolations(root, currentReleaseNotes, projectVersion))
+                .as("current changelog release-note performance wording")
+                .isEmpty();
+        assertThat(benchmarkDocs)
+                .contains("When a release has no public performance claim")
+                .contains("Do not mention\nfaster/slower movement, overhead reductions, latency changes, throughput changes,")
+                .contains("source-controlled promoted report for that release version");
 
         assertThat(promotedReportDocs)
                 .startsWith("# Reactive HTTP Client Benchmark Report")
@@ -518,6 +526,76 @@ class DocumentationReleaseArtifactTest {
                 .as("public docs should link the promoted current-version benchmark report")
                 .contains("docs/benchmark-report-" + promotedReportVersion + ".md",
                         "benchmark-report-" + promotedReportVersion + ".md");
+    }
+
+    @Test
+    void currentReleasePerformanceWordingGuardRejectsStaleMissingAndTargetBenchmarkEvidence() throws Exception {
+        Path root = projectRoot();
+        String noClaim = """
+                ## [Unreleased]
+
+                - **Post-release baseline transition.** API compatibility and published-baseline benchmark evidence compare against the last published artifacts.
+                """;
+        String staleClaim = """
+                ## [Unreleased]
+
+                - **Performance evidence.** Current release notes cite [Benchmark Report 2.12.0](docs/benchmark-report-2.12.0.md).
+                """;
+        String missingClaim = """
+                ## [Unreleased]
+
+                - **Performance evidence.** Current release notes cite [Benchmark Report 9.9.9](docs/benchmark-report-9.9.9.md).
+                """;
+        String targetLink = """
+                ## [Unreleased]
+
+                - **Performance evidence.** Current release notes cite [release-jmh](reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md).
+                """;
+        String targetInline = """
+                ## [Unreleased]
+
+                - **Performance evidence.** Current release notes cite [Benchmark Report 9.9.9](docs/benchmark-report-9.9.9.md) and `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`.
+                """;
+        String allocationClaim = """
+                ## [Unreleased]
+
+                - **Default path.** Reduced allocations for default starter calls.
+                """;
+        String percentileClaim = """
+                ## [Unreleased]
+
+                - **Default path.** Lower p99 for Get No Body.
+                """;
+        String averageTimeClaim = """
+                ## [Unreleased]
+
+                - **Default path.** Improved average time for default starter calls.
+                """;
+        String unrelatedNoClaim = """
+                ## [Unreleased]
+
+                - **Docs.** Documented performance troubleshooting guidance.
+                - **Logging.** Reduced log noise in support examples.
+                """;
+
+        assertThat(currentReleasePerformanceWordingViolations(root, noClaim, "9.9.9"))
+                .isEmpty();
+        assertThat(currentReleasePerformanceWordingViolations(root, unrelatedNoClaim, "9.9.9"))
+                .isEmpty();
+        assertThat(currentReleasePerformanceWordingViolations(root, staleClaim, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("current release performance claim"));
+        assertThat(currentReleasePerformanceWordingViolations(root, missingClaim, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("missing benchmark report"));
+        assertThat(currentReleasePerformanceWordingViolations(root, targetLink, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("target-only benchmark path"));
+        assertThat(currentReleasePerformanceWordingViolations(root, targetInline, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("target-only benchmark path"));
+        assertThat(currentReleasePerformanceWordingViolations(root, allocationClaim, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("current release performance claim"));
+        assertThat(currentReleasePerformanceWordingViolations(root, percentileClaim, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("current release performance claim"));
+        assertThat(currentReleasePerformanceWordingViolations(root, averageTimeClaim, "9.9.9"))
+                .anySatisfy(violation -> assertThat(violation).contains("current release performance claim"));
     }
 
     @Test
@@ -957,6 +1035,68 @@ class DocumentationReleaseArtifactTest {
                 + "| Key | Value |\n"
                 + "| --- | --- |\n"
                 + "| `benchmarkCommit` | " + commit + " |\n";
+    }
+
+    private static String currentReleaseChangelogSection(String changelog, String projectVersion) {
+        if (changelog.contains("## [" + projectVersion + "]")) {
+            return changelogSection(changelog, projectVersion);
+        }
+        return changelogSection(changelog, "Unreleased");
+    }
+
+    private static List<String> currentReleasePerformanceWordingViolations(Path root,
+                                                                           String releaseNotes,
+                                                                           String projectVersion) throws IOException {
+        List<String> violations = new ArrayList<>();
+        if (releaseNotes.contains("benchmark-reports/") || releaseNotes.contains("smoke-only-jmh.md")) {
+            violations.add("target-only benchmark path in release notes");
+        }
+        Matcher linkMatcher = MARKDOWN_LINK.matcher(releaseNotes);
+        while (linkMatcher.find()) {
+            String target = URLDecoder.decode(linkMatcher.group(1), StandardCharsets.UTF_8);
+            if (target.contains("benchmark-reports/") || target.contains("smoke-only-jmh.md")) {
+                violations.add("target-only benchmark link: " + target);
+            }
+            if (target.contains("benchmark-report-")) {
+                String pathOnly = target.split("#", 2)[0];
+                if (!isExternal(pathOnly) && !Files.exists(root.resolve(pathOnly).normalize())) {
+                    violations.add("missing benchmark report: " + target);
+                }
+            }
+        }
+
+        List<String> reportVersions = benchmarkReportVersions(releaseNotes);
+        for (String reportVersion : reportVersions) {
+            if (!projectVersion.equals(reportVersion)) {
+                violations.add("current release performance claim must cite benchmark-report-"
+                        + projectVersion + ".md, not benchmark-report-" + reportVersion + ".md");
+            }
+        }
+
+        if (containsPublicPerformanceClaim(releaseNotes)) {
+            String currentReport = "docs/benchmark-report-" + projectVersion + ".md";
+            if (!releaseNotes.contains(currentReport)) {
+                violations.add("current release performance claim must cite " + currentReport);
+            }
+            if (!Files.exists(root.resolve(currentReport))) {
+                violations.add("missing benchmark report: " + currentReport);
+            }
+        }
+        return violations;
+    }
+
+    private static boolean containsPublicPerformanceClaim(String releaseNotes) {
+        String normalized = releaseNotes.toLowerCase(Locale.ROOT);
+        if (normalized.contains("benchmark report")
+                || normalized.contains("performance evidence")
+                || normalized.contains("release-quality evidence")
+                || normalized.contains("benchmark scenarios")) {
+            return true;
+        }
+        String metric = "\\b(performance|latency|throughput|allocations?|overhead|p50|p95|p99|average time)\\b";
+        String movement = "\\b(faster|slower|improv\\w*|regress\\w*|reduc\\w*|lower\\w*|higher\\w*|same)\\b";
+        Pattern claim = Pattern.compile(metric + ".*" + movement + "|" + movement + ".*" + metric);
+        return normalized.lines().anyMatch(line -> claim.matcher(line).find());
     }
 
     private static void assertPromotedReportMetadata(Path report, String expectedVersion) throws IOException {

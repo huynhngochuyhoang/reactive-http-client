@@ -116,11 +116,11 @@ performance wording can slip in.
 
 **Acceptance:**
 
-- [ ] Current-release performance claims require a source-controlled promoted
+- [x] Current-release performance claims require a source-controlled promoted
       benchmark report.
-- [ ] Historical changelog sections can retain historical report links.
-- [ ] Target-only benchmark paths are rejected in public release notes.
-- [ ] Releases without performance claims have clear allowed wording.
+- [x] Historical changelog sections can retain historical report links.
+- [x] Target-only benchmark paths are rejected in public release notes.
+- [x] Releases without performance claims have clear allowed wording.
 
 ---
 
@@ -143,10 +143,10 @@ without inventing new APIs.
 
 **Acceptance:**
 
-- [ ] Examples are sanitized and use placeholder endpoints only.
-- [ ] Configuration snippets pass metadata validation.
-- [ ] The docs explain which evidence stream answers which support question.
-- [ ] No new public API is introduced for examples alone.
+- [x] Examples are sanitized and use placeholder endpoints only.
+- [x] Configuration snippets pass metadata validation.
+- [x] The docs explain which evidence stream answers which support question.
+- [x] No new public API is introduced for examples alone.
 
 ---
 

@@ -189,6 +189,12 @@ benchmark entry in the generated release evidence manifest is not enough for a
 release that publishes performance wording; run the current candidate benchmark,
 promote the report, and cite the promoted report from the release notes.
 
+When a release has no public performance claim, release notes may say that
+benchmark evidence remains manual, pending, or unchanged. Do not mention
+faster/slower movement, overhead reductions, latency changes, throughput changes,
+or allocation changes unless the current release section links to a
+source-controlled promoted report for that release version.
+
 ## Release-Maintainer Performance Claim Checklist
 
 Before adding or approving a public performance claim in `CHANGELOG.md`, release

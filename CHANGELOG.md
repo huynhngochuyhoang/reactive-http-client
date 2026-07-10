@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Post-2.13 baseline transition.** The reactor now targets `2.14.0` while API compatibility and published-baseline benchmark evidence compare against the published `2.13.0` artifacts.
+- **Release-note evidence guard.** Documentation tests now validate current changelog release-note evidence links while allowing no-claim releases to keep benchmark work manual and pending.
+- **Support-bundle capture recipes.** Added placeholder-based local JVM, container, and Kubernetes-style capture commands for sanitized support bundles.
 
 ## [2.13.0] - 2026-07-05
 

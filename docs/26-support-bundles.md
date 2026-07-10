@@ -135,8 +135,113 @@ management:
 ```
 
 ```bash
-curl -s http://localhost:8080/actuator/rhttpclients
+EXAMPLE_MANAGEMENT_URL="http://<management-host>:<management-port>"
+curl -s "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients"
 ```
+
+## Capture Recipes
+
+Use the same artifact names for every environment so reviewers can compare
+bundles without learning a deployment-specific layout. The commands below use
+placeholder names only. Replace them with local values inside your incident
+workspace, and sanitize configuration files before adding them to the bundle.
+
+Each recipe captures separate evidence streams:
+
+| Stream | File | Answers |
+|---|---|---|
+| Diagnostics endpoint | `diagnostics/rhttpclients.json` | Which clients and endpoints exist, plus sanitized effective policy such as timeout source, auth mode, resilience, redirect policy, inherited endpoint counts, and strict-validation flags. |
+| Health details | `health/health.json` | Whether recent Micrometer samples crossed the configured per-client error-rate threshold. |
+| Startup summary | `logs/startup-summary.log` | Which sanitized client policy was applied when the proxy was created. |
+| Metadata-only exchange logs | `logs/exchange-metadata.log` | What happened for the affected calls: method, path template, status, duration, error, and subscription-attempt count. |
+| Sanitized configuration | `config/reactive-http-client.yml` | Which `reactive.http.*` settings the application intended to use, without secrets or concrete internal URLs. |
+| Release evidence reference | `performance/benchmark-report-link.txt` | Which promoted source-controlled report supports a benchmark-based claim, when the ticket includes one. |
+
+The diagnostics endpoint, health details, startup summaries, exchange logs,
+configuration snippets, and release-evidence reference answer different
+questions. Do not merge them into a single free-form log dump.
+
+### Local JVM Capture
+
+Use this when the application process and its management endpoint are reachable
+from the same shell:
+
+```bash
+EXAMPLE_MANAGEMENT_URL="http://<management-host>:<management-port>"
+EXAMPLE_APP_LOG="/path/to/sanitized-application.log"
+EXAMPLE_SANITIZED_CONFIG="/path/to/sanitized-reactive-http-client.yml"
+
+mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
+curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
+curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+grep 'ReactiveHttpClientFactoryBean' "$EXAMPLE_APP_LOG" > support-bundle/logs/startup-summary.log || true
+grep 'DefaultHttpExchangeLogger' "$EXAMPLE_APP_LOG" > support-bundle/logs/exchange-metadata.log || true
+cp "$EXAMPLE_SANITIZED_CONFIG" support-bundle/config/reactive-http-client.yml
+printf 'docs/benchmark-report-<version>.md\n' > support-bundle/performance/benchmark-report-link.txt
+```
+
+### Container Capture
+
+Use this when the application runs in a container and logs are read through the
+container runtime. The configuration file copied into the bundle must already be
+sanitized:
+
+```bash
+EXAMPLE_CONTAINER="example-app-container"
+EXAMPLE_MANAGEMENT_URL="http://<management-host>:<management-port>"
+EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER="/path/in/container/sanitized-reactive-http-client.yml"
+
+mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
+curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
+curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
+docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
+docker cp "$EXAMPLE_CONTAINER:$EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER" support-bundle/config/reactive-http-client.yml
+printf 'docs/benchmark-report-<version>.md\n' > support-bundle/performance/benchmark-report-link.txt
+```
+
+### Kubernetes-Style Capture
+
+Use this shape for a pod-based deployment. Run the port-forward command in a
+separate terminal, then capture the bundle from another shell:
+
+```bash
+EXAMPLE_NAMESPACE="example-namespace"
+EXAMPLE_POD="example-app-pod"
+EXAMPLE_CONTAINER="example-app-container"
+EXAMPLE_LOCAL_PORT="18080"
+EXAMPLE_MANAGEMENT_PORT="<management-port>"
+EXAMPLE_SANITIZED_CONFIG_IN_POD="/path/in/pod/sanitized-reactive-http-client.yml"
+
+kubectl -n "$EXAMPLE_NAMESPACE" port-forward "pod/$EXAMPLE_POD" "$EXAMPLE_LOCAL_PORT:$EXAMPLE_MANAGEMENT_PORT"
+```
+
+```bash
+EXAMPLE_NAMESPACE="example-namespace"
+EXAMPLE_POD="example-app-pod"
+EXAMPLE_CONTAINER="example-app-container"
+EXAMPLE_LOCAL_PORT="18080"
+EXAMPLE_SANITIZED_CONFIG_IN_POD="/path/in/pod/sanitized-reactive-http-client.yml"
+EXAMPLE_MANAGEMENT_URL="http://127.0.0.1:$EXAMPLE_LOCAL_PORT"
+mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
+curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
+curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
+kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
+kubectl -n "$EXAMPLE_NAMESPACE" exec "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" -- cat "$EXAMPLE_SANITIZED_CONFIG_IN_POD" > support-bundle/config/reactive-http-client.yml
+printf 'docs/benchmark-report-<version>.md\n' > support-bundle/performance/benchmark-report-link.txt
+```
+
+The Kubernetes recipe uses `kubectl exec ... cat` instead of `kubectl cp` so it
+does not require `tar` in the application image. If the image also lacks `cat`
+or cannot read the sanitized file path, capture the already-sanitized
+configuration from the deployment source and place it at
+`support-bundle/config/reactive-http-client.yml`.
+
+Keep namespace, pod, container, file path, and management URL values as
+placeholders in shared examples. Before attaching a bundle, inspect every file
+for concrete hosts, credentials, cookies, authorization headers, request bodies,
+response bodies, and customer data.
 
 ## Health Details
 
