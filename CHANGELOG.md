@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release-note evidence guard.** Documentation tests now validate current changelog release-note evidence links while allowing no-claim releases to keep benchmark work manual and pending.
 - **Support-bundle capture recipes.** Added placeholder-based local JVM, container, and Kubernetes-style capture commands for sanitized support bundles.
 - **Strict validation adoption diagnostics.** Strict retry and built-in SigV4 startup failures now identify inherited or `@ApiRef` endpoint ownership, the unprovable contract, and a concrete remediation path without changing opt-in behavior.
+- **Public API compatibility evidence.** Re-audited documented helper coverage and expanded compatibility fixtures to reject nested fluent-method and public enum-constant removals alongside constructor removals.
 
 ## [2.13.0] - 2026-07-05
 

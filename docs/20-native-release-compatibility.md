@@ -58,8 +58,9 @@ mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify
 
 The Maven profile produces japicmp reports under each module's
 `target/japicmp/` directory and fails for binary-incompatible changes. The
-fixture script verifies that additive APIs pass while removal of a public
-constructor fails. The filtered comparison covers the documented extension
+fixture script verifies that additive APIs pass while removals of a public
+constructor, nested fluent method, or public enum constant fail. The filtered
+comparison covers the documented extension
 points, annotations, exceptions, observability types, configuration properties,
 test-helper package, OpenTelemetry companion package, documented cache and
 redaction helpers such as `MethodMetadataCache`, `MethodMetadata`, and
@@ -109,8 +110,8 @@ the POM include set or lacks an explicit support status.
 | `io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot` | Request context snapshot model | Immutable context snapshot exports | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ResilienceOperatorApplier*` | Contract snapshot resilience hook | Operator availability and instance-type hook | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.SensitiveHeaders` | Header redaction helper | Custom exchange logger redaction checks | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | Mock client builder, assertions, retry and auth test helpers | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | OTel auto-configuration and extension-facing types | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, `RecordedExchange`, `RecordedExchangeAssertions`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | `OpenTelemetryHttpClientObserver`, `OpenTelemetryContextWebFilter`, `OpenTelemetryContextExchangeFilter`, and `OpenTelemetryHttpClientAutoConfiguration` | Supported |
 
 No compatibility-covered type is currently deprecated. If a future public type is
 reserved for removal or replacement in a future major release, mark its row as

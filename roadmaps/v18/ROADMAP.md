@@ -192,10 +192,10 @@ and OTel companion types. Future drift must be caught before release.
 
 **Acceptance:**
 
-- [ ] Every documented public helper has an explicit compatibility story.
-- [ ] Japicmp includes cover documented nested public APIs.
-- [ ] Compatibility fixtures catch representative incompatible removals.
-- [ ] Docs avoid presenting internal classes as replacement surfaces.
+- [x] Every documented public helper has an explicit compatibility story.
+- [x] Japicmp includes cover documented nested public APIs.
+- [x] Compatibility fixtures catch representative incompatible removals.
+- [x] Docs avoid presenting internal classes as replacement surfaces.
 
 ---
 
