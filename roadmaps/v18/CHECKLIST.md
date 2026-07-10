@@ -340,49 +340,99 @@ Evidence:
 
 ## Priority 9 — Dependency Baseline Review Preparation
 
-### [ ] 5.2 Prepare dependency baseline review without upgrading by default
-- [ ] Review Spring Boot 3.5.x patch movement and managed WebFlux/Reactor
+### [x] 5.2 Prepare dependency baseline review without upgrading by default
+- [x] Review Spring Boot 3.5.x patch movement and managed WebFlux/Reactor
       Netty/Micrometer/OpenTelemetry versions.
-- [ ] Review Resilience4j baseline compatibility and optional dependency
+- [x] Review Resilience4j baseline compatibility and optional dependency
       behavior.
-- [ ] Confirm dependency docs still name Java 21 and Spring Boot 3.5.x support.
-- [ ] Confirm versionless module dependencies continue to inherit managed
+- [x] Confirm dependency docs still name Java 21 and Spring Boot 3.5.x support.
+- [x] Confirm versionless module dependencies continue to inherit managed
       versions.
-- [ ] Confirm benchmark reports continue to record dependency-management source.
-- [ ] Document any proposed baseline upgrade separately from feature work.
-- [ ] Ensure no dependency drift bypasses generated release evidence.
-- [ ] Run focused dependency/release documentation tests.
-- [ ] Run `git diff --check`.
+- [x] Confirm benchmark reports continue to record dependency-management source.
+- [x] Document any proposed baseline upgrade separately from feature work.
+- [x] Ensure no dependency drift bypasses generated release evidence.
+- [x] Run focused dependency/release documentation tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Kept the project on Java 21, Spring Boot `3.5.0`, and Resilience4j `2.2.0`;
+  this priority makes no dependency baseline change.
+- Compared effective POMs for the pinned Boot `3.5.0` BOM and separately
+  evaluated `3.5.16` candidate. The managed versions move from WebFlux
+  `6.2.7` to `6.2.19`, Reactor Netty HTTP `1.2.6` to `1.2.18`, and Micrometer
+  Core `1.15.0` to `1.15.12`; OpenTelemetry API remains `1.49.0`.
+- Documented the `3.5.16` candidate as deferred in
+  `docs/20-native-release-compatibility.md`, with a separate-upgrade policy and
+  required release-smoke, AOT, optional-integration, documentation,
+  compatibility, and benchmark metadata checks.
+- Added generated release-evidence fields for the review date, candidate,
+  decision, and exact candidate-managed versions so dependency review cannot
+  drift independently of release evidence.
+- Added module-POM guards covering versionless Spring Boot-managed dependencies
+  in starter, test-helper, OTel, and benchmark modules. The guards also require
+  starter Resilience4j, Micrometer, and Actuator integrations to remain
+  optional and versionless.
+- Confirmed benchmark environment reports continue to record
+  `dependencyManagement=spring-boot-dependencies:<spring-boot.version>` and
+  exact resolved WebFlux/Reactor Netty versions.
+- `mvn -q -pl reactive-http-client-otel help:effective-pom -Doutput=/tmp/reactive-http-client-effective-3.5.0.xml` passed.
+- `mvn -q -pl reactive-http-client-otel -Dspring-boot.version=3.5.16 help:effective-pom -Doutput=/tmp/reactive-http-client-effective-3.5.16.xml` passed.
+- `mvn -q -Dspring-boot.version=3.5.16 -Prelease-smoke test` passed for the full reactor.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `mvn -q -Pbenchmarks -pl reactive-http-client-benchmarks -am -DskipTests=false -Dtest=BenchmarkMarkdownReportTest -Dsurefire.failIfNoSpecifiedTests=false test` passed.
+- `git diff --check` passed.
 
 ---
 
 ## Priority 10 — V18 Release Readiness
 
-### [ ] 6.1 Keep V18 small enough to release confidently
-- [ ] Decide patch versus minor after V18 scope is finalized.
-- [ ] Keep changelog entries under `Unreleased` while V18 work is active.
-- [ ] Ensure release evidence names the selected next version.
-- [ ] Ensure release evidence names the selected API baseline.
-- [ ] Verify generated configuration docs are current.
-- [ ] Verify Markdown links pass across docs and roadmaps.
-- [ ] Verify baseline artifact resolution commands are listed.
-- [ ] Verify root and module-scoped API compatibility commands are listed.
-- [ ] Verify API compatibility fixture command is listed.
-- [ ] Verify benchmark smoke, release, and published-baseline commands are listed
+### [x] 6.1 Keep V18 small enough to release confidently
+- [x] Decide patch versus minor after V18 scope is finalized.
+- [x] Keep changelog entries under `Unreleased` while V18 work is active.
+- [x] Ensure release evidence names the selected next version.
+- [x] Ensure release evidence names the selected API baseline.
+- [x] Verify generated configuration docs are current.
+- [x] Verify Markdown links pass across docs and roadmaps.
+- [x] Verify baseline artifact resolution commands are listed.
+- [x] Verify root and module-scoped API compatibility commands are listed.
+- [x] Verify API compatibility fixture command is listed.
+- [x] Verify benchmark smoke, release, and published-baseline commands are listed
       when performance evidence is needed.
-- [ ] Run focused release documentation tests.
-- [ ] Run full reactor tests.
-- [ ] Run API compatibility.
-- [ ] Run module-scoped starter API compatibility.
-- [ ] Run API compatibility fixture script.
-- [ ] Run `git diff --check`.
-- [ ] Mark `ROADMAP.md` completed only after implementation and evidence are
+- [x] Run focused release documentation tests.
+- [x] Run full reactor tests.
+- [x] Run API compatibility.
+- [x] Run module-scoped starter API compatibility.
+- [x] Run API compatibility fixture script.
+- [x] Run `git diff --check`.
+- [x] Mark `ROADMAP.md` completed only after implementation and evidence are
       complete.
 
 Evidence:
 
-- Pending.
+- Selected `2.14.0` as the minor release candidate. The reactor, README,
+  quick-start snippets, release guide, and generated release evidence already
+  use `2.14.0`; changing back to a patch line would create version drift without
+  a compatibility benefit.
+- Kept all V18 changelog entries under `Unreleased`. Release dating, tagging,
+  signing, and publication remain separate release-prep actions.
+- Generated release evidence names project version `2.14.0` and published API
+  compatibility baseline `2.13.0`.
+- The release-prep checklist lists published-baseline artifact resolution for
+  starter, test-helper, and OTel `2.13.0`, root and module-scoped compatibility
+  commands, the compatibility fixture script, and benchmark compile, smoke,
+  release, and published-baseline commands.
+- Deferred a `2.14.0` promoted benchmark report. V18 does not change a measured
+  request path, optional-feature overhead path, or publish a performance claim;
+  the latest promoted report therefore remains `2.12.0` and manual benchmark
+  commands remain visible in generated evidence.
+- Marked `roadmaps/v18/ROADMAP.md` completed for the `2.14.0` candidate line only
+  after implementation and release evidence passed.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest,ReactiveHttpClientConfigurationMetadataTest test` passed.
+- `mvn -q test` passed for the full reactor.
+- `mvn -q -Papi-compatibility -DskipTests verify` passed against published `2.13.0`.
+- `mvn -q -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify` passed against published `2.13.0`.
+- `bash scripts/verify-api-compatibility-fixtures.sh` passed: additive API was
+  accepted, while constructor, nested method, and enum constant removals were
+  rejected.
+- `git diff --check` passed.
