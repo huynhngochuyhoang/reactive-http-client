@@ -213,29 +213,45 @@ Evidence:
 
 ## Priority 6 — Public API Compatibility Coverage Alignment
 
-### [ ] 4.1 Keep documented helper usage aligned with japicmp includes
-- [ ] Re-run the documented public surface map against japicmp include patterns.
-- [ ] Confirm diagnostics snapshot helpers are compatibility-covered.
-- [ ] Confirm contract snapshot helpers and nested fluent types are
+### [x] 4.1 Keep documented helper usage aligned with japicmp includes
+- [x] Re-run the documented public surface map against japicmp include patterns.
+- [x] Confirm diagnostics snapshot helpers are compatibility-covered.
+- [x] Confirm contract snapshot helpers and nested fluent types are
       compatibility-covered.
-- [ ] Confirm redaction helpers documented for custom loggers are
+- [x] Confirm redaction helpers documented for custom loggers are
       compatibility-covered or explicitly excluded.
-- [ ] Confirm metadata cache replacement types are compatibility-covered or no
+- [x] Confirm metadata cache replacement types are compatibility-covered or no
       longer documented as replacement surfaces.
-- [ ] Confirm test helper public APIs documented for applications are covered.
-- [ ] Confirm OTel companion public types are covered or explicitly scoped.
-- [ ] Add API compatibility fixtures for any newly covered helper before
+- [x] Confirm test helper public APIs documented for applications are covered.
+- [x] Confirm OTel companion public types are covered or explicitly scoped.
+- [x] Add API compatibility fixtures for any newly covered helper before
       release.
-- [ ] Keep internal implementation classes out of compatibility promises.
-- [ ] Run focused release documentation tests.
-- [ ] Run API compatibility fixture script.
-- [ ] Run root API compatibility.
-- [ ] Run module-scoped starter API compatibility.
-- [ ] Run `git diff --check`.
+- [x] Keep internal implementation classes out of compatibility promises.
+- [x] Run focused release documentation tests.
+- [x] Run API compatibility fixture script.
+- [x] Run root API compatibility.
+- [x] Run module-scoped starter API compatibility.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- The documented public-surface map and the root japicmp include set remain an
+  exact match. No production include pattern was added: diagnostics snapshots,
+  contract snapshot nested APIs, `SensitiveHeaders`, `MethodMetadataCache`,
+  `MethodMetadata*`, and `ResilienceOperatorApplier*` were already covered.
+- Confirmed the package-level test-helper pattern covers every documented helper
+  in `reactive-http-client-test`, and the OTel package pattern covers all four
+  public companion types. The compatibility guide now lists those types
+  explicitly.
+- Kept proxy invocation, URI/argument resolution, transport/TLS, and generated
+  release-test implementation classes outside the compatibility promise.
+- Expanded the compatibility fixtures so additive changes pass while removal of
+  a public constructor, nested fluent method, or public enum constant fails.
+- `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `bash scripts/verify-api-compatibility-fixtures.sh` passed.
+- `mvn -q -Papi-compatibility -DskipTests verify` passed against published `2.13.0`.
+- `mvn -q -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify` passed against published `2.13.0`.
+- `git diff --check` passed.
 
 ---
 

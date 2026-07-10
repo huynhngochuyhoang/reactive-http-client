@@ -8,16 +8,12 @@ public class PublicApi {
 
     public static class Builder {
 
-        public Builder option(String value) {
-            return this;
-        }
-
         public PublicApi build() {
             return new PublicApi();
         }
     }
 
-    private PublicApi() {
+    public PublicApi() {
     }
 
     public String value() {

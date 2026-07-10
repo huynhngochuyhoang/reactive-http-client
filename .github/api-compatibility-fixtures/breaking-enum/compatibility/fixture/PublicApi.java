@@ -3,7 +3,7 @@ package compatibility.fixture;
 public class PublicApi {
 
     public enum Mode {
-        DEFAULT
+        REPLACEMENT
     }
 
     public static class Builder {
@@ -17,7 +17,7 @@ public class PublicApi {
         }
     }
 
-    private PublicApi() {
+    public PublicApi() {
     }
 
     public String value() {

@@ -17,6 +17,8 @@ compile_fixture() {
 compile_fixture old
 compile_fixture additive
 compile_fixture breaking
+compile_fixture breaking-nested
+compile_fixture breaking-enum
 
 mvn -q -f "$ROOT_DIR/.github/api-compatibility-fixtures/pom.xml" \
   -Dold.jar="$WORK_DIR/old.jar" \
@@ -32,4 +34,22 @@ if mvn -q -f "$ROOT_DIR/.github/api-compatibility-fixtures/pom.xml" \
   exit 1
 fi
 
-echo "API compatibility fixtures passed: additive API accepted; constructor removal rejected."
+if mvn -q -f "$ROOT_DIR/.github/api-compatibility-fixtures/pom.xml" \
+    -Dold.jar="$WORK_DIR/old.jar" \
+    -Dnew.jar="$WORK_DIR/breaking-nested.jar" \
+    verify \
+    > "$WORK_DIR/breaking-nested.log" 2>&1; then
+  echo "Expected nested public method removal fixture to fail binary compatibility check" >&2
+  exit 1
+fi
+
+if mvn -q -f "$ROOT_DIR/.github/api-compatibility-fixtures/pom.xml" \
+    -Dold.jar="$WORK_DIR/old.jar" \
+    -Dnew.jar="$WORK_DIR/breaking-enum.jar" \
+    verify \
+    > "$WORK_DIR/breaking-enum.log" 2>&1; then
+  echo "Expected public enum constant removal fixture to fail binary compatibility check" >&2
+  exit 1
+fi
+
+echo "API compatibility fixtures passed: additive API accepted; constructor, nested method, and enum constant removals rejected."
