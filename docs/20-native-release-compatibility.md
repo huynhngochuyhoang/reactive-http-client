@@ -178,6 +178,24 @@ For the `2.14.0` reactor, the guard must reject
 `-Dapi.compatibility.baseline.version=2.14.0`; that self-comparison is never
 valid release evidence.
 
+### Configuration metadata and native-hint ownership
+
+The generated [configuration reference](configuration-properties.md) combines
+the starter and OTel metadata resources. Starter metadata source types and
+nested client-group source methods are validated on the starter classpath;
+OTel metadata source types are validated by
+`OpenTelemetryConfigurationMetadataTest` on the companion module classpath.
+This keeps the starter independent from the optional OTel implementation while
+still failing documentation generation when either metadata source drifts.
+
+`ReactiveHttpClientAotSmokeTest` requires reflection hints for every public
+nested type declared by `ReactiveHttpClientProperties`, including diagnostics,
+health, histogram, auth, resilience, proxy, TLS, pool, correlation, and inbound
+header configuration. Optional Actuator endpoint creation remains guarded by
+the endpoint API class and the explicit diagnostics property. Optional OTel
+auto-configuration remains guarded by both the OTel API class and an
+`OpenTelemetry` bean; focused tests exercise both missing-dependency paths.
+
 ### Release baseline sequence
 
 While cutting `2.14.0`, keep `api.compatibility.baseline.version` on `2.13.0`

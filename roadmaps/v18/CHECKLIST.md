@@ -257,24 +257,42 @@ Evidence:
 
 ## Priority 7 — Configuration Metadata and Native Hint Re-Audit
 
-### [ ] 4.2 Re-audit generated metadata, docs, and runtime hints
-- [ ] Verify generated configuration reference matches metadata.
-- [ ] Verify documented `reactive.http.*` property names exist in metadata.
-- [ ] Verify YAML and properties examples do not assign scalar values to groups.
-- [ ] Verify metadata source types and source methods resolve for nested client
+### [x] 4.2 Re-audit generated metadata, docs, and runtime hints
+- [x] Verify generated configuration reference matches metadata.
+- [x] Verify documented `reactive.http.*` property names exist in metadata.
+- [x] Verify YAML and properties examples do not assign scalar values to groups.
+- [x] Verify metadata source types and source methods resolve for nested client
       groups.
-- [ ] Verify OTel metadata checks remain in the OTel module or an appropriate
+- [x] Verify OTel metadata checks remain in the OTel module or an appropriate
       test classpath.
-- [ ] Verify runtime hints cover public nested configuration property types.
-- [ ] Verify optional Actuator behavior remains conditional.
-- [ ] Verify optional OTel behavior remains conditional.
-- [ ] Run configuration metadata tests.
-- [ ] Run focused native/AOT smoke tests if runtime hints change.
-- [ ] Run `git diff --check`.
+- [x] Verify runtime hints cover public nested configuration property types.
+- [x] Verify optional Actuator behavior remains conditional.
+- [x] Verify optional OTel behavior remains conditional.
+- [x] Run configuration metadata tests.
+- [x] Run focused native/AOT smoke tests if runtime hints change.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Confirmed `docs/configuration-properties.md` exactly matches the generated
+  reference from both starter and OTel metadata resources.
+- Confirmed every documented `reactive.http.*` name and every YAML/properties
+  scalar leaf resolves to property metadata; group-only assignments and
+  malformed API-map leaves remain rejected.
+- Starter metadata tests resolve nested client-group source types, source
+  methods, and declared return types on the starter classpath. OTel group source
+  types remain validated separately by `OpenTelemetryConfigurationMetadataTest`
+  on the companion module classpath.
+- Confirmed `ReactiveHttpClientRuntimeHints` covers every public nested
+  `ReactiveHttpClientProperties` type. No production hint change was needed;
+  the existing dynamic AOT assertion prevents future nested-type omissions.
+- Existing starter coverage confirms the diagnostics endpoint is disabled by
+  default and backs off when Actuator endpoint classes are unavailable.
+- Added OTel auto-configuration tests proving it backs off when either the
+  `OpenTelemetry` bean or OTel API classes are absent.
+- `mvn -q -pl reactive-http-client-starter -Dtest=ReactiveHttpClientConfigurationMetadataTest,DocumentationReleaseArtifactTest,ReactiveHttpClientAotSmokeTest,ReactiveHttpClientAutoConfigurationTest test` passed.
+- `mvn -q -pl reactive-http-client-otel -am -Dtest=OpenTelemetryConfigurationMetadataTest,OpenTelemetryHttpClientAutoConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false test` passed.
+- `git diff --check` passed.
 
 ---
 

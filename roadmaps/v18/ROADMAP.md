@@ -214,10 +214,10 @@ property string.
 
 **Acceptance:**
 
-- [ ] Generated configuration reference is current.
-- [ ] Public docs do not mention non-existent `reactive.http.*` properties.
-- [ ] AOT smoke tests cover any new runtime hint needs.
-- [ ] Optional integrations remain optional in JVM and native builds.
+- [x] Generated configuration reference is current.
+- [x] Public docs do not mention non-existent `reactive.http.*` properties.
+- [x] AOT smoke tests cover any new runtime hint needs.
+- [x] Optional integrations remain optional in JVM and native builds.
 
 ---
 
