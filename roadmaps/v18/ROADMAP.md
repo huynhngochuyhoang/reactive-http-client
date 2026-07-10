@@ -239,11 +239,11 @@ audit the result.
 
 **Acceptance:**
 
-- [ ] Benchmark docs name current and published-baseline commands for the active
+- [x] Benchmark docs name current and published-baseline commands for the active
       release line.
-- [ ] Any new benchmark row has an explicit classification.
-- [ ] Public performance claims cite promoted release-quality reports only.
-- [ ] Benchmark threshold crossings remain manual review triggers.
+- [x] Any new benchmark row has an explicit classification.
+- [x] Public performance claims cite promoted release-quality reports only.
+- [x] Benchmark threshold crossings remain manual review triggers.
 
 ---
 
