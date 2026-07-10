@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V18
 
-> **Status:** draft after the `2.13.0` release cut. V17 completed the
+> **Status:** completed for the `2.14.0` candidate line on 2026-07-10. V17 completed the
 > post-`2.12.0` baseline transition, diagnostics/support-bundle stabilization,
 > strict-mode adoption audits, native hint re-audit, and dependency-baseline
 > readiness. V18 should stay focused on the next baseline transition, release
@@ -263,11 +263,11 @@ feature work.
 
 **Acceptance:**
 
-- [ ] Dependency docs still name Java 21 and Spring Boot 3.5.x support.
-- [ ] Versionless module dependencies continue to inherit managed versions.
-- [ ] Proposed baseline upgrades have separate release notes and compatibility
+- [x] Dependency docs still name Java 21 and Spring Boot 3.5.x support.
+- [x] Versionless module dependencies continue to inherit managed versions.
+- [x] Proposed baseline upgrades have separate release notes and compatibility
       checks.
-- [ ] No dependency drift bypasses generated release evidence.
+- [x] No dependency drift bypasses generated release evidence.
 
 ---
 
@@ -290,9 +290,9 @@ clear evidence rather than a broad backlog of partially verified improvements.
 
 **Acceptance:**
 
-- [ ] Release evidence names the selected next version and API baseline.
-- [ ] Changelog entries stay under `Unreleased` until release prep starts.
-- [ ] Generated docs and Markdown links pass.
-- [ ] Full tests, API compatibility, and `git diff --check` pass.
-- [ ] Benchmark evidence is promoted or explicitly deferred based on release
+- [x] Release evidence names the selected next version and API baseline.
+- [x] Changelog entries stay under `Unreleased` until release prep starts.
+- [x] Generated docs and Markdown links pass.
+- [x] Full tests, API compatibility, and `git diff --check` pass.
+- [x] Benchmark evidence is promoted or explicitly deferred based on release
       claims.

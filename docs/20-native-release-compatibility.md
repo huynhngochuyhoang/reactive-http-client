@@ -36,6 +36,26 @@ upgrade with unrelated feature work; make the baseline change visible in release
 evidence, generated configuration metadata, and benchmark metadata in the same
 change.
 
+### V18 dependency patch review
+
+The V18 review on `2026-07-10` compared the pinned Spring Boot `3.5.0` BOM with
+the separately evaluated `3.5.16` patch candidate:
+
+| Managed dependency | Pinned `3.5.0` BOM | Reviewed `3.5.16` candidate |
+|---|---:|---:|
+| Spring WebFlux | `6.2.7` | `6.2.19` |
+| Reactor Netty HTTP | `1.2.6` | `1.2.18` |
+| Micrometer Core | `1.15.0` | `1.15.12` |
+| OpenTelemetry API | `1.49.0` | `1.49.0` |
+
+The candidate is **deferred**. This review does not change the Java 21 or Spring
+Boot 3.5.x support contract and does not pin any managed module dependency.
+Evaluate the candidate in a separate dependency-baseline change with release
+smoke, AOT smoke, optional-integration, generated-documentation, compatibility,
+and benchmark metadata checks. Resilience4j remains independently managed by
+its `2.2.0` BOM and optional in the starter; the no-registry/no-operator fallback
+continues to be part of the supported runtime contract.
+
 ## Public API compatibility
 
 The `api-compatibility` profile compares the supported public surfaces of all

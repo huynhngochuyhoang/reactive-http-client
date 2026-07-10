@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Public API compatibility evidence.** Re-audited documented helper coverage and expanded compatibility fixtures to reject nested fluent-method and public enum-constant removals alongside constructor removals.
 - **Metadata and native readiness audit.** Re-verified generated configuration metadata, nested configuration runtime hints, and optional Actuator/OTel boundaries, including explicit OTel back-off coverage when its API or bean is absent.
 - **Benchmark classification guard.** Generated Markdown now rejects unclassified method prefixes and unknown comparison surfaces, keeping no-network audits separate from loopback feature rows.
+- **Dependency baseline review.** Recorded the separately evaluated Spring Boot `3.5.16` patch candidate and managed library versions while retaining Java 21, Spring Boot `3.5.0`, versionless module dependencies, and optional Resilience4j behavior for this release line.
+- **V18 release readiness.** Selected `2.14.0` as the minor release candidate and completed full reactor, generated documentation, link, API compatibility, and compatibility-fixture validation.
 
 ## [2.13.0] - 2026-07-05
 

@@ -263,6 +263,56 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void moduleDependenciesStayManagedAndOptionalIntegrationsStayOptional() throws Exception {
+        Path root = projectRoot();
+        String starterPom = Files.readString(root.resolve("reactive-http-client-starter/pom.xml"));
+        String testPom = Files.readString(root.resolve("reactive-http-client-test/pom.xml"));
+        String otelPom = Files.readString(root.resolve("reactive-http-client-otel/pom.xml"));
+        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+
+        for (String artifactId : List.of("spring-boot-autoconfigure", "spring-webflux", "reactor-netty-http",
+                "jackson-databind", "micrometer-core", "spring-boot-actuator", "slf4j-api")) {
+            assertThat(dependencyBlock(starterPom, artifactId)).doesNotContain("<version>");
+        }
+        for (String artifactId : List.of("resilience4j-reactor", "resilience4j-circuitbreaker",
+                "resilience4j-retry", "resilience4j-bulkhead", "resilience4j-ratelimiter",
+                "resilience4j-micrometer", "micrometer-core", "spring-boot-actuator")) {
+            assertThat(dependencyBlock(starterPom, artifactId))
+                    .doesNotContain("<version>")
+                    .contains("<optional>true</optional>");
+        }
+        for (String artifactId : List.of("spring-webflux", "reactor-core", "spring-test", "assertj-core",
+                "junit-jupiter-api")) {
+            assertThat(dependencyBlock(testPom, artifactId)).doesNotContain("<version>");
+        }
+        for (String artifactId : List.of("spring-boot-autoconfigure", "opentelemetry-api",
+                "spring-boot-configuration-processor", "opentelemetry-sdk", "opentelemetry-sdk-testing",
+                "micrometer-core")) {
+            assertThat(dependencyBlock(otelPom, artifactId)).doesNotContain("<version>");
+        }
+
+        assertThat(releaseDocs)
+                .contains("### V18 dependency patch review")
+                .contains("| Spring WebFlux | `6.2.7` | `6.2.19` |")
+                .contains("| Reactor Netty HTTP | `1.2.6` | `1.2.18` |")
+                .contains("| Micrometer Core | `1.15.0` | `1.15.12` |")
+                .contains("| OpenTelemetry API | `1.49.0` | `1.49.0` |")
+                .contains("The candidate is **deferred**")
+                .contains("Resilience4j remains independently managed by")
+                .contains("its `2.2.0` BOM and optional");
+
+        JsonNode review = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")))
+                .path("dependencyBaselineReview");
+        assertThat(review.path("reviewedAt").asText()).isEqualTo("2026-07-10");
+        assertThat(review.path("springBootPatchCandidate").asText()).isEqualTo("3.5.16");
+        assertThat(review.path("candidateDecision").asText()).isEqualTo("deferred");
+        assertThat(review.path("candidateManagedVersions").path("springWebFlux").asText()).isEqualTo("6.2.19");
+        assertThat(review.path("candidateManagedVersions").path("reactorNettyHttp").asText()).isEqualTo("1.2.18");
+        assertThat(review.path("candidateManagedVersions").path("micrometerCore").asText()).isEqualTo("1.15.12");
+        assertThat(review.path("candidateManagedVersions").path("openTelemetryApi").asText()).isEqualTo("1.49.0");
+    }
+
+    @Test
     void benchmarkDocumentationScopesPerformanceClaimsToReleaseQualityReports() throws Exception {
         Path root = projectRoot();
         String projectVersion = projectVersion(root.resolve("pom.xml"));
@@ -1697,6 +1747,14 @@ class DocumentationReleaseArtifactTest {
         review.put("testDependencyVersionSource", "spring-boot-dependencies:" + springBootVersion
                 + "; explicit test-only pins stay local to module POMs");
         review.put("jmhVersion", pomProperty(pomXml, "jmh.version"));
+        review.put("reviewedAt", "2026-07-10");
+        review.put("springBootPatchCandidate", "3.5.16");
+        review.put("candidateDecision", "deferred");
+        review.put("candidateManagedVersions", Map.of(
+                "springWebFlux", "6.2.19",
+                "reactorNettyHttp", "1.2.18",
+                "micrometerCore", "1.15.12",
+                "openTelemetryApi", "1.49.0"));
         review.put("compatibilityNeutralUpgrades", List.of(
                 "Spring Boot patch upgrades within the documented baseline line",
                 "managed WebFlux, Reactor Netty, Micrometer, and OpenTelemetry patch movement from that Boot line",
