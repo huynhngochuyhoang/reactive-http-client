@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.opentelemetry.api.OpenTelemetry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
 import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
 import org.springframework.context.annotation.Bean;
@@ -17,9 +18,31 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class OpenTelemetryHttpClientAutoConfigurationTest {
 
-    private final ReactiveWebApplicationContextRunner runner = new ReactiveWebApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(OpenTelemetryHttpClientAutoConfiguration.class))
+    private final ReactiveWebApplicationContextRunner baseRunner = new ReactiveWebApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(OpenTelemetryHttpClientAutoConfiguration.class));
+
+    private final ReactiveWebApplicationContextRunner runner = baseRunner
             .withUserConfiguration(OpenTelemetryConfig.class);
+
+    @Test
+    void autoConfigurationBacksOffWithoutOpenTelemetryBean() {
+        baseRunner.run(context -> {
+            assertThat(context).doesNotHaveBean(HttpClientObserver.class);
+            assertThat(context).doesNotHaveBean(OpenTelemetryContextWebFilter.class);
+            assertThat(context).doesNotHaveBean("openTelemetryContextWebClientCustomizer");
+        });
+    }
+
+    @Test
+    void autoConfigurationBacksOffWithoutOpenTelemetryApi() {
+        baseRunner.withClassLoader(new FilteredClassLoader("io.opentelemetry.api"))
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(HttpClientObserver.class);
+                    assertThat(context).doesNotHaveBean(OpenTelemetryContextWebFilter.class);
+                    assertThat(context).doesNotHaveBean("openTelemetryContextWebClientCustomizer");
+                });
+    }
 
     @Test
     void defaultConfigurationRegistersObserverAndPropagation() {
