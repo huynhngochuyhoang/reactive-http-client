@@ -60,8 +60,8 @@ continues to be part of the supported runtime contract.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. While the project version remains `2.14.0`,
-the baseline stays on `2.13.0`:
+from the current reactor version. While the project version remains `2.14.1`,
+the baseline stays on `2.14.0`:
 
 ```bash
 mvn -Papi-compatibility -DskipTests verify
@@ -194,8 +194,8 @@ The profile also fails during `validate` when
 `api.compatibility.baseline.version` equals the current reactor
 `project.version`. Keep the baseline pointed at the last published release so
 Maven cannot satisfy the old artifact from the current reactor or local build.
-For the `2.14.0` reactor, the guard must reject
-`-Dapi.compatibility.baseline.version=2.14.0`; that self-comparison is never
+For the `2.14.1` reactor, the guard must reject
+`-Dapi.compatibility.baseline.version=2.14.1`; that self-comparison is never
 valid release evidence.
 
 ### Configuration metadata and native-hint ownership
@@ -218,24 +218,43 @@ auto-configuration remains guarded by both the OTel API class and an
 
 ### Release baseline sequence
 
-While cutting `2.14.0`, keep `api.compatibility.baseline.version` on `2.13.0`
-until the `2.14.0` artifacts are published and resolve. Before publishing,
-resolve every published `2.13.0` baseline artifact that the release evidence
+While cutting `2.14.1`, keep `api.compatibility.baseline.version` on `2.14.0`
+until the `2.14.1` artifacts are published and resolve. Before publishing,
+resolve every published `2.14.0` baseline artifact that the release evidence
 manifest lists:
 
 ```bash
-mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.13.0
-mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.13.0
-mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.13.0
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.14.0
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.14.0
+mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.14.0
 ```
 
 Run the root API compatibility command and at least one module-scoped
 compatibility command before release so the inherited guard is exercised outside
-the full reactor. After `2.14.0` is published and resolves, the next development
+the full reactor. After `2.14.1` is published and resolves, the next development
 cycle may bump the reactor to the next version and update
-`api.compatibility.baseline.version` to `2.14.0`. Update benchmark
+`api.compatibility.baseline.version` to `2.14.1`. Update benchmark
 published-baseline commands, release evidence docs, and promoted-report pairing
 wording in the same change whenever that baseline property changes.
+
+### V19 baseline transition
+
+The V19 post-release transition moved the maintenance reactor to `2.14.1` only
+after the remote `v2.14.0` tag was verified and the
+published `2.14.0` starter, test, and OTel artifacts resolved. The API
+compatibility baseline and benchmark published-baseline paths now use `2.14.0`,
+so release evidence compares the `2.14.1` candidate against the last published
+`2.x` release. The default reactor remains on Boot 3.5; Boot 4 work remains
+isolated for the future `3.x` line.
+
+### V19 release lanes
+
+The Boot 3.5 maintenance branch is named `2.x` and is rooted at `v2.14.0`;
+`2.14.1` is its next maintenance reactor version. The line accepts security and
+critical correctness fixes, keeps API compatibility against the latest published
+`2.x` artifact, and forward-ports applicable fixes to the future `3.x` line.
+Boot 4 migration work stays isolated until the V19 `3.0.0` go/no-go gates pass.
+Do not make one published jar detect or support both Boot generations.
 
 ### V18 baseline transition
 

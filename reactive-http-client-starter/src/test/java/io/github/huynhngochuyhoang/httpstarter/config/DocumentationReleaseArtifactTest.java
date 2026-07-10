@@ -96,12 +96,11 @@ class DocumentationReleaseArtifactTest {
                         + baselineVersion)
                 .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
                         + baselineVersion)
-                .contains("### V18 baseline transition")
-                .contains("The V18 post-release transition moved the reactor to `" + projectVersion + "`")
+                .contains("### V19 baseline transition")
+                .contains("The V19 post-release transition moved the maintenance reactor to `" + projectVersion + "`")
                 .contains("published `" + baselineVersion + "` starter, test, and OTel artifacts resolved")
                 .contains("compatibility baseline and benchmark published-baseline paths now use `" + baselineVersion + "`")
                 .contains("release evidence compares the `" + projectVersion + "` candidate")
-                .contains("baseline on `" + baselineVersion + "`")
                 .contains("Diagnostics snapshot version metadata from the packaged Maven\n  `pom.properties` resource")
                 .contains("The `rhttpclients` Actuator endpoint remains optional in native images")
                 .contains("reactive.http.observability.diagnostics-endpoint.enabled")
@@ -129,9 +128,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Dbenchmark.starter.version=" + baselineVersion)
                 .contains("-Dbenchmark.commit=" + baselineVersion)
                 .contains("published-starter-" + baselineVersion + "/release-jmh.md")
-                .contains("For the V18 post-release transition")
+                .contains("For the V19 post-release transition")
                 .contains("this example now uses `" + baselineVersion + "`")
-                .contains("the reactor has been bumped to `" + projectVersion + "`")
+                .contains("the maintenance reactor has been bumped to `" + projectVersion + "`")
                 .contains("published `" + baselineVersion + "`\nartifacts resolve")
                 .contains("Move both `benchmark.starter.version` and `published-starter-<version>` paths together");
 
@@ -811,8 +810,13 @@ class DocumentationReleaseArtifactTest {
                 "generated-docs-and-links",
                 "target-only-evidence");
         assertThat(releasePrepItems.get("changelog-section").path("status").asText()).isEqualTo("current");
+        String manifestProjectVersion = generated.path("projectVersion").asText();
+        String unreleasedCompareVersion = Files.readString(root.resolve("CHANGELOG.md"))
+                .contains("## [" + manifestProjectVersion + "] - ")
+                ? manifestProjectVersion
+                : generated.path("apiCompatibilityBaselineVersion").asText();
         assertThat(releasePrepItems.get("changelog-section").path("expectedUnreleasedCompareLink").asText())
-                .contains("v" + pomProperty(pomXml, "api.compatibility.baseline.version") + "...HEAD");
+                .contains("v" + unreleasedCompareVersion + "...HEAD");
         assertThat(releasePrepItems.get("version-snippets").path("status").asText()).isEqualTo("current");
         assertThat(releasePrepItems.get("version-snippets").path("expectedVersion").asText())
                 .isEqualTo(generated.path("projectVersion").asText());
@@ -1515,8 +1519,11 @@ class DocumentationReleaseArtifactTest {
                                                             List<Map<String, String>> publishedBaselineArtifacts,
                                                             List<Map<String, String>> checks) throws IOException {
         String changelog = Files.readString(root.resolve("CHANGELOG.md"));
+        String unreleasedCompareVersion = changelog.contains("## [" + projectVersion + "] - ")
+                ? projectVersion
+                : baselineVersion;
         String expectedUnreleasedCompareLink = "[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v"
-                + baselineVersion + "...HEAD";
+                + unreleasedCompareVersion + "...HEAD";
         boolean changelogCurrent = changelog.contains("## [Unreleased]")
                 && changelog.contains(expectedUnreleasedCompareLink);
         boolean versionSnippetsCurrent = versionSnippetsMatch(root.resolve("README.md"), projectVersion)

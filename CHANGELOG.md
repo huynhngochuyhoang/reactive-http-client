@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Post-2.14 maintenance transition.** The Boot 3.5 maintenance reactor now targets `2.14.1` while API compatibility and published-baseline benchmark evidence compare against published `2.14.0`; Spring Boot 4 migration remains isolated for the future `3.x` line.
+
+## [2.14.0] - 2026-07-10
+
+### Changed
+
 - **Post-2.13 baseline transition.** The reactor now targets `2.14.0` while API compatibility and published-baseline benchmark evidence compare against the published `2.13.0` artifacts.
 - **Release-note evidence guard.** Documentation tests now validate current changelog release-note evidence links while allowing no-claim releases to keep benchmark work manual and pending.
 - **Support-bundle capture recipes.** Added placeholder-based local JVM, container, and Kubernetes-style capture commands for sanitized support bundles.
@@ -1245,7 +1251,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.13.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.0...HEAD
+[2.14.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.13.0...v2.14.0
 [2.13.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.10.0...v2.11.0
