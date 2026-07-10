@@ -426,6 +426,10 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 .contains("Which promoted source-controlled report supports")
                 .contains("Do not merge them into a single free-form log dump")
                 .contains("placeholders in shared examples");
+        assertThat(fixture)
+                .doesNotContain("Authorization")
+                .doesNotContain("Cookie")
+                .doesNotContain("client-secret");
         assertThat(fixture + captureRecipes)
                 .doesNotContain("Bearer ")
                 .doesNotContain("access-token")
