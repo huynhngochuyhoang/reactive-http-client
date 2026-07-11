@@ -111,29 +111,60 @@ Evidence:
 
 ## Priority 3 — Isolated Spring Boot 4 Build Spike
 
-### [ ] 3.1 Establish a reproducible migration profile
+### [x] 3.1 Establish a reproducible migration profile
 
-- [ ] Select and document the minimum Boot 4 line under evaluation.
-- [ ] Select and document the current stable Boot 4 line for the test matrix.
-- [ ] Create an isolated profile, branch, or temporary reactor property for the
+- [x] Select and document the minimum Boot 4 line under evaluation.
+- [x] Select and document the current stable Boot 4 line for the test matrix.
+- [x] Create an isolated profile, branch, or temporary reactor property for the
       Boot 4 spike.
-- [ ] Keep the normal `2.x` build on Boot 3.5 during the spike.
-- [ ] Resolve Boot 4 artifacts from a repository known to contain them.
-- [ ] Distinguish local mirror failures from dependency or source failures.
-- [ ] Compile starter, test-helper, OTel, and benchmark modules independently.
-- [ ] Record exact managed dependency versions and management sources.
-- [ ] Classify failures as module/package, Jackson, test infrastructure,
+- [x] Keep the normal `2.x` build on Boot 3.5 during the spike.
+- [x] Resolve Boot 4 artifacts from a repository known to contain them.
+- [x] Distinguish local mirror failures from dependency or source failures.
+- [x] Compile starter, test-helper, OTel, and benchmark modules independently.
+- [x] Record exact managed dependency versions and management sources.
+- [x] Classify failures as module/package, Jackson, test infrastructure,
       optional integration, AOT/native, or transport issues.
-- [ ] Add a deterministic CI matrix only after local resolution and compilation
+- [x] Add a deterministic CI matrix only after local resolution and compilation
       are repeatable.
-- [ ] Ensure no experimental Boot 4 artifact can be published.
-- [ ] Run `git diff --check`.
+- [x] Ensure no experimental Boot 4 artifact can be published.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- An initial Boot `4.1.0` override resolved its BOM but the configured internal
-  mirror lacked several managed artifacts; this is repository evidence, not a
-  source-compatibility result.
+- Selected Boot `4.0.0` as the minimum line under evaluation and Boot `4.1.0`
+  as the current stable line listed by Maven Central metadata on 2026-07-11.
+- Added the opt-in `boot4-spike` profile. It defaults to `4.0.0`, allows a
+  `-Dspring-boot.version=4.1.0` override, and sets `maven.deploy.skip=true` plus
+  `skipPublishing=true`. The normal reactor still resolves Boot `3.5.16`.
+- Added `.mvn/boot4-spike-settings.xml`, which routes only explicit spike
+  commands to Maven Central. The configured internal mirror could not resolve
+  the Boot `4.0.0` BOM; direct Central effective-POM and compile resolution
+  succeeded, separating repository availability from source compatibility.
+- Boot `4.0.0` resolves Spring/WebFlux/Test `7.0.1`, Reactor Netty `1.3.0`,
+  Netty `4.2.7.Final`, Micrometer `1.16.0`, OTel `1.55.0`, Jackson 3 `3.0.2`,
+  Jackson 2 compatibility `2.20.1`, JUnit `6.0.1`, and Mockito `5.20.0`.
+- Boot `4.1.0` resolves Spring/WebFlux/Test `7.0.8`, Reactor Netty `1.3.6`,
+  Netty `4.2.15.Final`, Micrometer `1.17.0`, OTel `1.62.0`, Jackson 3 `3.1.4`,
+  Jackson 2 compatibility `2.21.4`, JUnit `6.0.3`, and Mockito `5.23.0`.
+- Independent starter compiles on both lines reach source compilation and fail
+  on relocated Actuator health types and `WebClientCustomizer`; these are Boot
+  module/package ownership failures for Priority 4.
+- Independent test-helper compiles on both lines fail because Spring 7
+  `HttpHeaders` no longer exposes the used `containsKey` contract; this is a
+  Spring/test-helper API migration.
+- Independent OTel compiles on both lines fail on relocated
+  `WebClientCustomizer`; this is optional-integration/module ownership.
+- The benchmark harness compiles on both lines while consuming the locally
+  installed Boot 3 starter. This verifies only harness source compatibility,
+  not a Boot 4 starter path.
+- Reactor Netty and Netty resolve without a transport compile finding. Jackson
+  3 and AOT/native remain downstream gates because starter compilation stops
+  first; they are not reported as passing.
+- No Boot 4 CI row was added because starter, test-helper, and OTel compilation
+  is not repeatable yet. Later priorities own those migrations.
+- `mvn -q -DforceStdout help:evaluate -Dexpression=spring-boot.version` returned
+  `3.5.16` without the spike profile.
+- `git diff --check` passed.
 
 ---
 

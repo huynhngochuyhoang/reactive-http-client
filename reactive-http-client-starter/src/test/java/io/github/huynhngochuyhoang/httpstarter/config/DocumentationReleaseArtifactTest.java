@@ -317,6 +317,33 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void boot4SpikeProfileIsIsolatedNonPublishingAndDocumented() throws Exception {
+        Path root = projectRoot();
+        String pomXml = Files.readString(root.resolve("pom.xml"));
+        String settings = Files.readString(root.resolve(".mvn/boot4-spike-settings.xml"));
+        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+
+        assertThat(pomXml)
+                .contains("<spring-boot.version>3.5.16</spring-boot.version>")
+                .contains("<id>boot4-spike</id>")
+                .contains("<spring-boot.version>4.0.0</spring-boot.version>")
+                .contains("<maven.deploy.skip>true</maven.deploy.skip>")
+                .contains("<skipPublishing>true</skipPublishing>");
+        assertThat(settings)
+                .contains("<id>boot4-spike-central</id>")
+                .contains("<url>https://repo.maven.apache.org/maven2</url>")
+                .contains("<mirrorOf>*</mirrorOf>");
+        assertThat(releaseDocs)
+                .contains("### V19 isolated Spring Boot 4 build spike")
+                .contains("Boot `4.0.0`, the minimum major line under\nevaluation")
+                .contains("`-Dspring-boot.version=4.1.0`")
+                .contains("Starter | Fails on relocated Actuator health and `WebClientCustomizer` APIs")
+                .contains("Test helper | Fails because Spring 7 `HttpHeaders`")
+                .contains("Benchmark harness | Compiles while consuming the locally installed Boot 3 starter")
+                .contains("Do not add a\nBoot 4 CI matrix until starter, test-helper, and OTel compilation is repeatable");
+    }
+
+    @Test
     void benchmarkDocumentationScopesPerformanceClaimsToReleaseQualityReports() throws Exception {
         Path root = projectRoot();
         String projectVersion = projectVersion(root.resolve("pom.xml"));
