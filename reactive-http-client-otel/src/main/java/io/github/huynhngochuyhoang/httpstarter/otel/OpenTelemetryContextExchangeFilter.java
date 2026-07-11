@@ -61,7 +61,7 @@ public final class OpenTelemetryContextExchangeFilter {
             ClientRequest enriched = ClientRequest.from(request)
                     .headers(h -> headers.forEach((name, value) -> {
                         // Don't clobber values the caller already set explicitly.
-                        if (!h.containsKey(name)) {
+                        if (h.get(name) == null) {
                             h.set(name, value);
                         }
                     }))

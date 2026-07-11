@@ -1,11 +1,11 @@
 package io.github.huynhngochuyhoang.httpstarter.otel;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer;
 import io.opentelemetry.api.OpenTelemetry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -78,7 +78,7 @@ public class OpenTelemetryHttpClientAutoConfiguration {
          */
         @Bean(name = "openTelemetryContextWebClientCustomizer")
         @ConditionalOnMissingBean(name = "openTelemetryContextWebClientCustomizer")
-        WebClientCustomizer openTelemetryContextWebClientCustomizer(OpenTelemetry openTelemetry) {
+        ReactiveHttpClientCustomizer openTelemetryContextWebClientCustomizer(OpenTelemetry openTelemetry) {
             return builder -> builder.filter(OpenTelemetryContextExchangeFilter.create(openTelemetry));
         }
     }

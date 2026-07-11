@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.otel;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientAutoConfiguration;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
-import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -51,7 +51,7 @@ class OpenTelemetryHttpClientAutoConfigurationTest {
             assertThat(context).hasSingleBean(OpenTelemetryContextWebFilter.class);
             assertThat(context).hasBean("openTelemetryContextWebClientCustomizer");
             assertThat(context.getBean("openTelemetryContextWebClientCustomizer"))
-                    .isInstanceOf(WebClientCustomizer.class);
+                    .isInstanceOf(ReactiveHttpClientCustomizer.class);
         });
     }
 

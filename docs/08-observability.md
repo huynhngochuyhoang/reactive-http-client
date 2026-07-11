@@ -216,7 +216,7 @@ When `opentelemetry-api` is on the classpath and an `OpenTelemetry` bean is pres
 
 - `OpenTelemetryHttpClientObserver` for outbound client spans.
 - `OpenTelemetryContextWebFilter` in reactive web applications, which extracts inbound OTel context from request headers and stores it in Reactor `Context`.
-- A `WebClientCustomizer` that adds `OpenTelemetryContextExchangeFilter` to starter-built clients, injecting configured propagation headers onto outbound requests.
+- A `ReactiveHttpClientCustomizer` that adds `OpenTelemetryContextExchangeFilter` to starter-built clients, injecting configured propagation headers onto outbound requests.
 
 Disable without removing the dependency:
 
@@ -283,7 +283,7 @@ OpenTelemetry openTelemetry() {
 
 The outbound filter falls back to `io.opentelemetry.context.Context.current()` when no Reactor context entry exists, so calls made inside a manually scoped OTel context still propagate. Caller-supplied headers win: if a request already has `traceparent`, `baggage`, or another propagator header, the filter leaves that value untouched.
 
-The outbound propagation filter is added through a Spring `WebClientCustomizer`
+The outbound propagation filter is added through a starter `ReactiveHttpClientCustomizer`
 before starter per-client built-ins. Per-client `ReactiveHttpClientCustomizer`
 filters run later, after correlation ID, auth, and exchange logging have been
 wired.

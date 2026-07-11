@@ -337,10 +337,11 @@ class DocumentationReleaseArtifactTest {
                 .contains("### V19 isolated Spring Boot 4 build spike")
                 .contains("Boot `4.0.0`, the minimum major line under\nevaluation")
                 .contains("`-Dspring-boot.version=4.1.0`")
-                .contains("Starter | Fails on relocated Actuator health and `WebClientCustomizer` APIs")
-                .contains("Test helper | Fails because Spring 7 `HttpHeaders`")
-                .contains("Benchmark harness | Compiles while consuming the locally installed Boot 3 starter")
-                .contains("Do not add a\nBoot 4 CI matrix until starter, test-helper, and OTel compilation is repeatable");
+                .contains("Starter, test-helper, and OTel compilation now succeeds")
+                .contains("`spring-boot-webclient`, `org.springframework.boot.webclient`")
+                .contains("`spring-boot-health`, `org.springframework.boot.health.contributor`")
+                .contains("No runtime\npackage detection or `spring-boot-starter-classic` dependency is used")
+                .contains("startup when optional Actuator modules are hidden");
     }
 
     @Test

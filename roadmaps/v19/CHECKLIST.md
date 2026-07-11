@@ -170,26 +170,36 @@ Evidence:
 
 ## Priority 4 — Boot 4 Module and Auto-Configuration Migration
 
-### [ ] 4.1 Replace Boot 3 module assumptions
+### [x] 4.1 Replace Boot 3 module assumptions
 
-- [ ] Inventory every production `org.springframework.boot.*` import.
-- [ ] Map each import to its Boot 4 module, package, and dependency owner.
-- [ ] Replace broad or obsolete dependencies with focused Boot 4 modules.
-- [ ] Update auto-configuration imports and registration metadata.
-- [ ] Migrate `WebClientCustomizer` integration to the supported Boot 4 API.
-- [ ] Migrate configuration-properties and metadata processing dependencies.
-- [ ] Migrate Actuator health and endpoint imports.
-- [ ] Preserve conditional back-off when Actuator is absent.
-- [ ] Verify `rhttpclients` endpoint discovery and alphanumeric endpoint ID.
-- [ ] Use `spring-boot-starter-classic` only as a temporary diagnostic if needed.
-- [ ] Remove classic compatibility dependencies from the final graph.
-- [ ] Add focused packaged-application auto-configuration tests.
-- [ ] Run generated metadata and Markdown-link tests.
-- [ ] Run `git diff --check`.
+- [x] Inventory every production `org.springframework.boot.*` import.
+- [x] Map each import to its Boot 4 module, package, and dependency owner.
+- [x] Replace broad or obsolete dependencies with focused Boot 4 modules.
+- [x] Update auto-configuration imports and registration metadata.
+- [x] Migrate `WebClientCustomizer` integration to the supported Boot 4 API.
+- [x] Migrate configuration-properties and metadata processing dependencies.
+- [x] Migrate Actuator health and endpoint imports.
+- [x] Preserve conditional back-off when Actuator is absent.
+- [x] Verify `rhttpclients` endpoint discovery and alphanumeric endpoint ID.
+- [x] Use `spring-boot-starter-classic` only as a temporary diagnostic if needed.
+- [x] Remove classic compatibility dependencies from the final graph.
+- [x] Add focused packaged-application auto-configuration tests.
+- [x] Run generated metadata and Markdown-link tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Inventoried every production Boot import and documented its Boot 3.5 and Boot 4 artifact/package owner in `docs/20-native-release-compatibility.md`.
+- Added profile-selected Boot 4 adapters for `WebClientCustomizer` and Actuator health. The Boot 4 graph uses focused `spring-boot-webclient` and optional `spring-boot-health`; it does not contain `spring-boot-starter-classic`.
+- Kept auto-configuration registration in the existing `AutoConfiguration.imports` resources and retained the optional endpoint condition.
+- Migrated OTel propagation to the starter-owned `ReactiveHttpClientCustomizer`, avoiding a direct dependency on either Boot customizer package.
+- Added `Boot4AutoConfigurationTest` for builder customization, health registration, the alphanumeric `rhttpclients` endpoint ID, and optional Actuator absence.
+- Replaced Spring 7-removed header map calls with Spring 6/7-compatible reads and moved streaming envelopes to `retrieve().toEntityFlux(...)` while preserving pooled-buffer discard release.
+- `mvn -s .mvn/boot4-spike-settings.xml -q -Pboot4-spike -pl reactive-http-client-starter,reactive-http-client-test,reactive-http-client-otel -am test` passed on Boot `4.0.0`.
+- Boot `4.1.0` multi-module compilation and focused `Boot4AutoConfigurationTest,StreamingResponseTest` passed.
+- Normal Boot 3.5 starter, test-helper, and OTel compilation passed; focused auto-configuration, streaming, and OTel tests passed.
+- Generated metadata/documentation checks and the full normal reactor verification passed.
+- `git diff --check` passed.
 
 ---
 
