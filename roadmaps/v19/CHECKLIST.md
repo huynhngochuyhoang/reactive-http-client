@@ -192,8 +192,8 @@ Evidence:
 - Inventoried every production Boot import and documented its Boot 3.5 and Boot 4 artifact/package owner in `docs/20-native-release-compatibility.md`.
 - Added profile-selected Boot 4 adapters for `WebClientCustomizer` and Actuator health. The Boot 4 graph uses focused `spring-boot-webclient` and optional `spring-boot-health`; it does not contain `spring-boot-starter-classic`.
 - Kept auto-configuration registration in the existing `AutoConfiguration.imports` resources and retained the optional endpoint condition.
-- Migrated OTel propagation to the starter-owned `ReactiveHttpClientCustomizer`, avoiding a direct dependency on either Boot customizer package.
-- Added `Boot4AutoConfigurationTest` for builder customization, health registration, the alphanumeric `rhttpclients` endpoint ID, and optional Actuator absence.
+- Added generation-specific OTel `WebClientCustomizer` bridges so propagation remains on the starter prototype builder in both Boot lines.
+- Added `Boot4AutoConfigurationTest` for Boot 4 metrics ordering, builder customization, typed health registration, the alphanumeric `rhttpclients` endpoint ID, and optional Actuator absence.
 - Replaced Spring 7-removed header map calls with Spring 6/7-compatible reads and moved streaming envelopes to `retrieve().toEntityFlux(...)` while preserving pooled-buffer discard release.
 - `mvn -s .mvn/boot4-spike-settings.xml -q -Pboot4-spike -pl reactive-http-client-starter,reactive-http-client-test,reactive-http-client-otel -am test` passed on Boot `4.0.0`.
 - Boot `4.1.0` multi-module compilation and focused `Boot4AutoConfigurationTest,StreamingResponseTest` passed.
