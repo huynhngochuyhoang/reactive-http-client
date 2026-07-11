@@ -107,8 +107,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("## Dependency baseline readiness")
                 .contains("| Java runtime/compiler | Root `java.version`, `maven.compiler.source`, and `maven.compiler.target` | `"
                         + javaVersion + "` is the supported baseline")
-                .contains("| Spring Boot baseline | Root `spring-boot.version` | `" + springBootVersion
-                        + "` is the minimum tested baseline")
+                .contains("| Spring Boot baseline | Root `spring-boot.version` | `3.5.0` is the minimum tested baseline and `"
+                        + springBootVersion + "` is the default managed patch")
                 .contains("| Resilience4j | Root `resilience4j.version` plus `resilience4j-bom` | `"
                         + resilience4jVersion + "` remains the optional resilience baseline")
                 .contains("Compatibility-neutral dependency maintenance includes")
@@ -303,12 +303,17 @@ class DocumentationReleaseArtifactTest {
         JsonNode review = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")))
                 .path("dependencyBaselineReview");
         assertThat(review.path("reviewedAt").asText()).isEqualTo("2026-07-10");
+        assertThat(review.path("minimumTestedSpringBootVersion").asText()).isEqualTo("3.5.0");
         assertThat(review.path("springBootPatchCandidate").asText()).isEqualTo("3.5.16");
-        assertThat(review.path("candidateDecision").asText()).isEqualTo("deferred");
+        assertThat(review.path("candidateDecision").asText()).isEqualTo("adopted-in-2.14.1");
         assertThat(review.path("candidateManagedVersions").path("springWebFlux").asText()).isEqualTo("6.2.19");
         assertThat(review.path("candidateManagedVersions").path("reactorNettyHttp").asText()).isEqualTo("1.2.18");
+        assertThat(review.path("candidateManagedVersions").path("nettyHttpCodec").asText()).isEqualTo("4.1.135.Final");
         assertThat(review.path("candidateManagedVersions").path("micrometerCore").asText()).isEqualTo("1.15.12");
         assertThat(review.path("candidateManagedVersions").path("openTelemetryApi").asText()).isEqualTo("1.49.0");
+        assertThat(review.path("candidateManagedVersions").path("jacksonDatabind").asText()).isEqualTo("2.21.4");
+        assertThat(review.path("candidateManagedVersions").path("junitJupiter").asText()).isEqualTo("5.12.2");
+        assertThat(review.path("candidateManagedVersions").path("mockitoCore").asText()).isEqualTo("5.17.0");
     }
 
     @Test
@@ -1755,13 +1760,18 @@ class DocumentationReleaseArtifactTest {
                 + "; explicit test-only pins stay local to module POMs");
         review.put("jmhVersion", pomProperty(pomXml, "jmh.version"));
         review.put("reviewedAt", "2026-07-10");
+        review.put("minimumTestedSpringBootVersion", "3.5.0");
         review.put("springBootPatchCandidate", "3.5.16");
-        review.put("candidateDecision", "deferred");
+        review.put("candidateDecision", "adopted-in-2.14.1");
         review.put("candidateManagedVersions", Map.of(
                 "springWebFlux", "6.2.19",
                 "reactorNettyHttp", "1.2.18",
+                "nettyHttpCodec", "4.1.135.Final",
                 "micrometerCore", "1.15.12",
-                "openTelemetryApi", "1.49.0"));
+                "openTelemetryApi", "1.49.0",
+                "jacksonDatabind", "2.21.4",
+                "junitJupiter", "5.12.2",
+                "mockitoCore", "5.17.0"));
         review.put("compatibilityNeutralUpgrades", List.of(
                 "Spring Boot patch upgrades within the documented baseline line",
                 "managed WebFlux, Reactor Netty, Micrometer, and OpenTelemetry patch movement from that Boot line",

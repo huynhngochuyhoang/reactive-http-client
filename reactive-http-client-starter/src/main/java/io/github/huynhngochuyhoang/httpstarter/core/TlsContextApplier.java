@@ -44,7 +44,8 @@ final class TlsContextApplier {
             if (usesTlsHttp2(httpClient)) {
                 Http2SslContextSpec sslContextSpec = Http2SslContextSpec.forClient()
                         .configure(builder -> configureBuilder(builder, config, trustManagerFactory, keyManagerFactory));
-                return httpClient.secure(spec -> spec.sslContext(sslContextSpec));
+                SslContext sslContext = sslContextSpec.sslContext();
+                return httpClient.secure(spec -> spec.sslContext(sslContext));
             }
 
             SslContextBuilder builder = SslContextBuilder.forClient();
