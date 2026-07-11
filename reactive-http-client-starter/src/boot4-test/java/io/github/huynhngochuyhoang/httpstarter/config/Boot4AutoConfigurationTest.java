@@ -7,6 +7,7 @@ import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.health.contributor.HealthIndicator;
@@ -26,6 +27,16 @@ class Boot4AutoConfigurationTest {
             .withConfiguration(AutoConfigurations.of(ReactiveHttpClientAutoConfiguration.class));
 
     @Test
+    void ordersAfterBoot4MetricsAutoConfigurations() {
+        AutoConfigureAfter ordering =
+                ReactiveHttpClientAutoConfiguration.class.getAnnotation(AutoConfigureAfter.class);
+
+        assertThat(ordering.name()).contains(
+                "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
+                "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration");
+    }
+
+    @Test
     void loadsFocusedBoot4ModulesAndDiscoversOptionalActuatorContracts() {
         AtomicBoolean customized = new AtomicBoolean();
         contextRunner
@@ -37,8 +48,8 @@ class Boot4AutoConfigurationTest {
                     assertThat(context.getBeansOfType(WebClient.Builder.class)).hasSize(1);
                     context.getBean(WebClient.Builder.class);
                     assertThat(customized).isTrue();
-                    assertThat(context.getBean("reactiveHttpClientHealthIndicator"))
-                            .isInstanceOf(HealthIndicator.class);
+                    assertThat(context.getBeansOfType(HealthIndicator.class))
+                            .containsKey("reactiveHttpClientHealthIndicator");
                     ReactiveHttpClientDiagnosticsEndpoint endpoint =
                             context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class);
                     assertThat(endpoint.getClass().getAnnotation(Endpoint.class).id())

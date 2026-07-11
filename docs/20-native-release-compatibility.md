@@ -138,11 +138,14 @@ package detection or `spring-boot-starter-classic` dependency is used.
 | Configuration properties | `spring-boot` / `spring-boot-autoconfigure` | `spring-boot` / `spring-boot-autoconfigure` |
 | Metadata processor | `spring-boot-configuration-processor` | `spring-boot-configuration-processor` |
 
-The OTel companion now publishes its propagation filter through the
-starter-owned `ReactiveHttpClientCustomizer`, removing its direct dependency on
-either Boot customizer package. Spring 7 header reads use APIs shared with
-Spring 6, and streaming `ResponseEntity<Flux<DataBuffer>>` handling uses
-`retrieve().toEntityFlux(...)` with explicit discarded-buffer release.
+The OTel companion uses profile-selected Spring Boot `WebClientCustomizer`
+bridges, preserving propagation on the starter prototype builder on both Boot
+generations. Health beans are likewise declared by generation-specific
+configuration with their concrete contributor return type. Spring 7 header
+reads use APIs shared with Spring 6, and streaming
+`ResponseEntity<Flux<DataBuffer>>` handling uses `retrieve().toEntityFlux(...)`
+with explicit discarded-buffer release and status/header capture before error
+decoding.
 
 Starter, test-helper, and OTel compilation now succeeds on Boot `4.0.0` and
 `4.1.0`. The Boot 4 test source set verifies ordered customizer application,

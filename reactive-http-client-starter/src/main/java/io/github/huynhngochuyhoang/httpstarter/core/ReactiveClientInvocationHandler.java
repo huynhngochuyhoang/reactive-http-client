@@ -539,7 +539,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return Mono.deferContextual(context -> {
             SubscriptionState state = subscriptionState(context);
             return requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.retrieve()
-                    .onStatus(HttpStatusCode::isError, this::decodeErrorResponse)
+                    .onStatus(HttpStatusCode::isError, response -> {
+                        state.responseStatus.set(response.statusCode());
+                        state.responseHeaders.set(copyHeaders(response));
+                        return decodeErrorResponse(response);
+                    })
                     .toEntityFlux(DataBuffer.class)
                     .map(this::withDiscardRelease)
                     .doOnNext(entity -> {

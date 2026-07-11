@@ -199,7 +199,8 @@
                                 <exclude>io/github/huynhngochuyhoang/httpstarter/config/Boot3WebClientCustomizers.java</exclude>
                                 <exclude>io/github/huynhngochuyhoang/httpstarter/config/BootWebClientCustomizersConfiguration.java</exclude>
                                 <exclude>io/github/huynhngochuyhoang/httpstarter/observability/HttpClientHealthIndicator.java</exclude>
-                                <exclude>io/github/huynhngochuyhoang/httpstarter/config/BootHealthIndicatorFactory.java</exclude>
+                                <exclude>io/github/huynhngochuyhoang/httpstarter/config/Boot3HealthIndicatorAutoConfiguration.java</exclude>
+                                <exclude>io/github/huynhngochuyhoang/httpstarter/otel/Boot3OpenTelemetryWebClientCustomizerConfiguration.java</exclude>
                             </excludes>
                             <testExcludes>
                                 <testExclude>**/ReactiveHttpClientAutoConfigurationTest.java</testExclude>

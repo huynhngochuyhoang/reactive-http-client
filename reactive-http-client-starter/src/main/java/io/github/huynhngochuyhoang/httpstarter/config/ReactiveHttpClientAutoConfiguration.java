@@ -49,11 +49,16 @@ import org.springframework.web.reactive.function.client.WebClient;
 @AutoConfiguration
 @AutoConfigureAfter(name = {
         "org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration",
-        "org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration"
+        "org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration",
+        "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
+        "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration"
 })
 @EnableConfigurationProperties(ReactiveHttpClientProperties.class)
 @ImportRuntimeHints(ReactiveHttpClientRuntimeHints.class)
-@org.springframework.context.annotation.Import(BootWebClientCustomizersConfiguration.class)
+@org.springframework.context.annotation.Import({
+        BootWebClientCustomizersConfiguration.class,
+        BootHealthIndicatorAutoConfiguration.class
+})
 public class ReactiveHttpClientAutoConfiguration {
 
     @Bean
@@ -210,37 +215,6 @@ public class ReactiveHttpClientAutoConfiguration {
         }
     }
 
-    /**
-     * Registers the reactive HTTP client health indicator when {@code spring-boot-actuator}
-     * is on the classpath and a {@link MeterRegistry} bean is available. The
-     * indicator reads the existing {@code reactive.http.client.requests} timer meters, so
-     * no additional observation path is required and the user-override contract
-     * on {@link HttpClientObserver} is preserved.
-     */
-    @Configuration(proxyBeanMethods = false)
-    @org.springframework.context.annotation.Conditional(BootHealthAvailableCondition.class)
-    @ConditionalOnClass(MeterRegistry.class)
-    @ConditionalOnBean(MeterRegistry.class)
-    @ConditionalOnProperty(
-            prefix = "reactive.http.observability.health",
-            name = "enabled",
-            havingValue = "true",
-            matchIfMissing = true)
-    static class HttpClientHealthIndicatorAutoConfiguration {
 
-        @Bean
-        @ConditionalOnMissingBean(name = "reactiveHttpClientHealthIndicator")
-        public Object reactiveHttpClientHealthIndicator(
-                MeterRegistry meterRegistry,
-                ReactiveHttpClientProperties properties,
-                BootHealthIndicatorFactory healthIndicatorFactory) {
-            return healthIndicatorFactory.create(meterRegistry, properties);
-        }
-
-        @Bean
-        BootHealthIndicatorFactory bootHealthIndicatorFactory() {
-            return new BootHealthIndicatorFactory();
-        }
-    }
 
 }
