@@ -86,6 +86,59 @@ configured internal Maven mirror lacked the optional GraalVM reachability-metada
 repository ZIP, so that isolated build resolved the ZIP directly from Maven
 Central; the scheduled workflow remains the clean-environment native gate.
 
+### V19 isolated Spring Boot 4 build spike
+
+The `boot4-spike` Maven profile evaluates Boot 4 without changing the normal
+Boot 3.5 reactor. It defaults to Boot `4.0.0`, the minimum major line under
+evaluation, and accepts `-Dspring-boot.version=4.1.0` for the current stable
+line verified on 2026-07-11. The profile sets both `maven.deploy.skip` and the
+Central Publishing plugin's `skipPublishing` property to `true`; artifacts
+produced by this profile are experimental and must not be published.
+
+Use the credential-free spike settings file when an application-level Maven
+mirror does not contain Boot 4 artifacts:
+
+```bash
+mvn -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
+  -pl reactive-http-client-starter -DskipTests clean compile
+mvn -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
+  -Dspring-boot.version=4.1.0 -pl reactive-http-client-starter \
+  -DskipTests clean compile
+```
+
+The settings file mirrors only this explicit spike invocation to Maven Central.
+The configured internal mirror failed while resolving the Boot `4.0.0` BOM;
+the same effective-POM and compile commands resolved from Maven Central, so the
+remaining failures below are source/module compatibility failures rather than
+repository failures.
+
+| Managed dependency | Boot `4.0.0` | Boot `4.1.0` |
+|---|---:|---:|
+| Spring Framework / WebFlux / Test | `7.0.1` | `7.0.8` |
+| Reactor Netty HTTP | `1.3.0` | `1.3.6` |
+| Netty HTTP codec | `4.2.7.Final` | `4.2.15.Final` |
+| Micrometer Core | `1.16.0` | `1.17.0` |
+| OpenTelemetry API | `1.55.0` | `1.62.0` |
+| Jackson 3 Databind | `3.0.2` | `3.1.4` |
+| Jackson 2 Databind compatibility line | `2.20.1` | `2.21.4` |
+| JUnit Jupiter | `6.0.1` | `6.0.3` |
+| Mockito Core | `5.20.0` | `5.23.0` |
+
+Independent compile results are the same on both Boot 4 lines:
+
+| Module | Result | Classification |
+|---|---|---|
+| Starter | Fails on relocated Actuator health and `WebClientCustomizer` APIs | Boot module/package ownership |
+| Test helper | Fails because Spring 7 `HttpHeaders` no longer exposes the used `containsKey` contract | Spring/test-helper API migration |
+| OTel companion | Fails on the relocated `WebClientCustomizer` API | Optional integration/module ownership |
+| Benchmark harness | Compiles while consuming the locally installed Boot 3 starter | Harness-only success; not Boot 4 starter compatibility |
+
+Reactor Netty and Netty artifacts resolve on both lines, so no transport source
+failure has been identified yet. Jackson 3 codec ownership and AOT/native work
+remain downstream gates because starter compilation stops first. Do not add a
+Boot 4 CI matrix until starter, test-helper, and OTel compilation is repeatable;
+the normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
+
 ## Public API compatibility
 
 The `api-compatibility` profile compares the supported public surfaces of all
