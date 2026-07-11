@@ -57,30 +57,55 @@ Evidence:
 
 ## Priority 2 — Latest Spring Boot 3.5 Migration Bridge
 
-### [ ] 2.1 Prepare the supported line before Boot 4
+### [x] 2.1 Prepare the supported line before Boot 4
 
-- [ ] Query the latest published Spring Boot `3.5.x` patch when execution starts.
-- [ ] Compare it with the V18-reviewed `3.5.16` candidate.
-- [ ] Record exact managed Spring Framework, WebFlux, Reactor Netty, Netty,
+- [x] Query the latest published Spring Boot `3.5.x` patch when execution starts.
+- [x] Compare it with the V18-reviewed `3.5.16` candidate.
+- [x] Record exact managed Spring Framework, WebFlux, Reactor Netty, Netty,
       Micrometer, OTel, Jackson, and test versions.
-- [ ] Run the full reactor with the selected Boot 3.5 patch override.
-- [ ] Run release smoke with the selected patch.
-- [ ] Run AOT and native smoke with the selected patch.
-- [ ] Run configuration metadata and generated documentation tests.
-- [ ] Run optional Actuator, Micrometer, OTel, and Resilience4j absence/presence
+- [x] Run the full reactor with the selected Boot 3.5 patch override.
+- [x] Run release smoke with the selected patch.
+- [x] Run AOT and native smoke with the selected patch.
+- [x] Run configuration metadata and generated documentation tests.
+- [x] Run optional Actuator, Micrometer, OTel, and Resilience4j absence/presence
       tests.
-- [ ] Audit production use of APIs deprecated in the latest Boot 3.5 line.
-- [ ] Remove deprecated use only where the change remains compatible with `2.x`.
-- [ ] Decide whether the patch movement ships as a separate `2.x` maintenance
+- [x] Audit production use of APIs deprecated in the latest Boot 3.5 line.
+- [x] Remove deprecated use only where the change remains compatible with `2.x`.
+- [x] Decide whether the patch movement ships as a separate `2.x` maintenance
       release or remains deferred with evidence.
-- [ ] Do not include Boot 4 public API changes in this priority.
-- [ ] Run API compatibility against published `2.14.0` after the baseline can
+- [x] Do not include Boot 4 public API changes in this priority.
+- [x] Run API compatibility against published `2.14.0` after the baseline can
       safely move.
-- [ ] Run `git diff --check`.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Maven Central metadata queried on 2026-07-10 listed `3.5.16` as the latest
+  published `3.5.x` patch, matching the V18 candidate.
+- Adopted Boot `3.5.16` as the default dependency-management patch for the
+  `2.14.1` maintenance release. CI retains `3.5.0` as the minimum smoke row and
+  adds `3.5.16`; Boot 4 work remains isolated.
+- Resolved versions: Spring Framework/WebFlux/Test `6.2.19`, Reactor Netty HTTP
+  `1.2.18`, Netty HTTP codec `4.1.135.Final`, Micrometer Core `1.15.12`, OTel API
+  `1.49.0`, Jackson Databind `2.21.4`, JUnit Jupiter `5.12.2`, and Mockito Core
+  `5.17.0`.
+- `mvn -Dspring-boot.version=3.5.16 verify` passed all 763 tests before changing
+  the default; `mvn -q verify` then passed with `3.5.16` as the default.
+- `mvn -q -Dspring-boot.version=3.5.16 -Prelease-smoke test` passed.
+- `mvn -q -Prelease-smoke -Dspring-boot.version=3.5.0 test` passed, preserving
+  minimum-patch evidence.
+- Focused TLS, AOT, configuration-metadata, and generated-documentation tests
+  passed; the full suite covered Actuator/Micrometer absence, Resilience4j
+  presence/absence, and OTel presence/absence paths.
+- Deprecation compilation removed the Reactor Netty TLS warning. Only calls to
+  the starter-owned deprecated timeout compatibility accessor remain, by design.
+- The Boot `3.5.16` native fixture passed JVM AOT processing, compiled with
+  GraalVM Community Java 21, and its generated executable started successfully.
+  The internal mirror lacked the optional reachability-metadata ZIP, so the
+  isolated container resolved that ZIP from Maven Central.
+- `mvn -q -Papi-compatibility -DskipTests verify` passed against published
+  `2.14.0`.
+- `git diff --check` passed.
 
 ---
 

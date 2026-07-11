@@ -2,11 +2,11 @@
 
 ## Supported Spring Boot baseline
 
-The supported baseline is Java 21 with Spring Boot `3.5.0`. CI runs the release
-smoke profile against that minimum tested baseline. Patch upgrades within the
-Spring Boot `3.5.x` line are expected to remain compatible, but adding another
-Spring Boot minor line requires an explicit release-smoke matrix entry before it
-is documented as supported.
+The supported baseline is Java 21 with Spring Boot `3.5.0`. The default dependency
+management uses Spring Boot `3.5.16`, the latest published `3.5.x` patch verified
+on 2026-07-10. CI runs release smoke against both the minimum and default patch.
+Adding another Spring Boot minor line requires an explicit release-smoke matrix
+entry before it is documented as supported.
 
 ## Dependency baseline readiness
 
@@ -15,7 +15,7 @@ Current release-line dependency inputs:
 | Area | Source | Current policy |
 |---|---|---|
 | Java runtime/compiler | Root `java.version`, `maven.compiler.source`, and `maven.compiler.target` | `21` is the supported baseline. Raising it requires a minor release, release-smoke review, and native-smoke review. |
-| Spring Boot baseline | Root `spring-boot.version` | `3.5.0` is the minimum tested baseline. Patch upgrades within `3.5.x` are compatibility-neutral when release smoke, AOT smoke, and generated documentation tests pass. A new Spring Boot minor line requires a minor release and an expanded release-smoke matrix. |
+| Spring Boot baseline | Root `spring-boot.version` | `3.5.0` is the minimum tested baseline and `3.5.16` is the default managed patch. Patch upgrades within `3.5.x` are compatibility-neutral when release smoke, AOT smoke, and generated documentation tests pass. A new Spring Boot minor line requires a minor release and an expanded release-smoke matrix. |
 | Spring WebFlux, Reactor Netty, Micrometer, and OpenTelemetry API | Spring Boot dependency management | Keep module POMs versionless for these artifacts. Review exact resolved versions from the effective POM or release evidence when `spring-boot.version` changes. |
 | Resilience4j | Root `resilience4j.version` plus `resilience4j-bom` | `2.2.0` remains the optional resilience baseline. Patch-compatible updates are acceptable with operator and diagnostics tests; a major or behavior-changing baseline update requires a minor release. |
 | Test dependencies | Spring Boot dependency management plus explicit test-only pins | Test-only updates are compatibility-neutral when they do not change published test-helper APIs or release fixtures. Explicit pins such as the TLS fixture dependency stay local to tests. |
@@ -36,7 +36,7 @@ upgrade with unrelated feature work; make the baseline change visible in release
 evidence, generated configuration metadata, and benchmark metadata in the same
 change.
 
-### V18 dependency patch review
+### V18 dependency patch review (historical)
 
 The V18 review on `2026-07-10` compared the pinned Spring Boot `3.5.0` BOM with
 the separately evaluated `3.5.16` patch candidate:
@@ -55,6 +55,36 @@ smoke, AOT smoke, optional-integration, generated-documentation, compatibility,
 and benchmark metadata checks. Resilience4j remains independently managed by
 its `2.2.0` BOM and optional in the starter; the no-registry/no-operator fallback
 continues to be part of the supported runtime contract.
+
+### V19 Spring Boot 3.5 migration bridge
+
+Maven Central metadata queried on 2026-07-10 confirmed `3.5.16` as the latest
+published Spring Boot `3.5.x` patch, matching the candidate reviewed in V18. V19
+adopts that patch as the default dependency-management version for the `2.14.1`
+maintenance reactor while retaining `3.5.0` as the minimum release-smoke row.
+
+| Managed dependency | Boot `3.5.16` resolved version |
+|---|---:|
+| Spring Framework / WebFlux / Test | `6.2.19` |
+| Reactor Netty HTTP | `1.2.18` |
+| Netty HTTP codec | `4.1.135.Final` |
+| Micrometer Core | `1.15.12` |
+| OpenTelemetry API | `1.49.0` |
+| Jackson Databind | `2.21.4` |
+| JUnit Jupiter | `5.12.2` |
+| Mockito Core | `5.17.0` |
+
+The full reactor, release-smoke profile, focused AOT/configuration metadata,
+optional-integration paths, and API compatibility checks pass with `3.5.16`.
+Production deprecation compilation found one Reactor Netty TLS overload, which
+was replaced by the non-deprecated built-context overload. Calls to the starter's
+own deprecated `resilience.timeout-ms` accessor remain intentionally to preserve
+the documented `2.x` compatibility fallback. The native consumer fixture now
+uses `3.5.16`. Its AOT processing, GraalVM Community Java 21 native compilation,
+and generated executable all ran successfully in an isolated container. The
+configured internal Maven mirror lacked the optional GraalVM reachability-metadata
+repository ZIP, so that isolated build resolved the ZIP directly from Maven
+Central; the scheduled workflow remains the clean-environment native gate.
 
 ## Public API compatibility
 
@@ -413,6 +443,7 @@ The CI release smoke job currently runs:
 | Java | Spring Boot | Command |
 |---|---|---|
 | 21 | 3.5.0 | `mvn -B -ntp -Prelease-smoke -Dspring-boot.version=3.5.0 test` |
+| 21 | 3.5.16 | `mvn -B -ntp -Prelease-smoke -Dspring-boot.version=3.5.16 test` |
 
 Expand the matrix before release when adding support for another Java or Spring
 Boot baseline. Core starter AOT/native smoke ownership is distinct from optional
