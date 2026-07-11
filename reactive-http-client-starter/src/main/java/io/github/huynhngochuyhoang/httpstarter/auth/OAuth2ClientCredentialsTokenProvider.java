@@ -224,7 +224,7 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         if (contentType != null) {
             sanitizedHeaders.setContentType(new MediaType(contentType, StandardCharsets.UTF_8));
         }
-        if (sanitizedHeaders.containsKey(HttpHeaders.CONTENT_LENGTH)) {
+        if (sanitizedHeaders.get(HttpHeaders.CONTENT_LENGTH) != null) {
             sanitizedHeaders.setContentLength(body.length);
         }
         WebClientResponseException sanitized = WebClientResponseException.create(

@@ -68,4 +68,16 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <profile>
+            <id>boot4-spike</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-webclient</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

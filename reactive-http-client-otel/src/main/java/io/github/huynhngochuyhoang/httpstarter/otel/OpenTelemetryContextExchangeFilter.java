@@ -28,8 +28,8 @@ import java.util.Objects;
  *
  * <p>Registered automatically by
  * {@link OpenTelemetryHttpClientAutoConfiguration} as a
- * {@link org.springframework.boot.web.reactive.function.client.WebClientCustomizer},
- * so every {@code @ReactiveHttpClient}-built {@code WebClient} picks it up.
+ * a Spring Boot {@code WebClientCustomizer}, so both the starter prototype
+ * builder and every {@code @ReactiveHttpClient}-built {@code WebClient} pick it up.
  */
 public final class OpenTelemetryContextExchangeFilter {
 
@@ -61,7 +61,7 @@ public final class OpenTelemetryContextExchangeFilter {
             ClientRequest enriched = ClientRequest.from(request)
                     .headers(h -> headers.forEach((name, value) -> {
                         // Don't clobber values the caller already set explicitly.
-                        if (!h.containsKey(name)) {
+                        if (h.get(name) == null) {
                             h.set(name, value);
                         }
                     }))

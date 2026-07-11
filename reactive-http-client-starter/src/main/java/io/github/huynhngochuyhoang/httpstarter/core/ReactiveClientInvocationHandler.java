@@ -538,27 +538,28 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono) {
         return Mono.deferContextual(context -> {
             SubscriptionState state = subscriptionState(context);
-            return requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.exchange().flatMap(clientResponse -> {
-                state.responseStatus.set(clientResponse.statusCode());
-                state.responseHeaders.set(copyHeaders(clientResponse));
-
-                if (clientResponse.statusCode().isError()) {
-                    return decodeErrorResponse(clientResponse).flatMap(Mono::error);
-                }
-                return buildStreamingResponseEntity(clientResponse);
-            }));
+            return requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.retrieve()
+                    .onStatus(HttpStatusCode::isError, response -> {
+                        state.responseStatus.set(response.statusCode());
+                        state.responseHeaders.set(copyHeaders(response));
+                        return decodeErrorResponse(response);
+                    })
+                    .toEntityFlux(DataBuffer.class)
+                    .map(this::withDiscardRelease)
+                    .doOnNext(entity -> {
+                        state.responseStatus.set(entity.getStatusCode());
+                        state.responseHeaders.set(copyHeaders(entity.getHeaders()));
+                    }));
         });
     }
 
     @SuppressWarnings("deprecation")
     private Mono<ResponseEntity<Flux<DataBuffer>>> exchangeStreamingResponseEntityStateless(
             Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono) {
-        return requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.exchange().flatMap(clientResponse -> {
-            if (clientResponse.statusCode().isError()) {
-                return decodeErrorResponse(clientResponse).flatMap(Mono::error);
-            }
-            return buildStreamingResponseEntity(clientResponse);
-        }));
+        return requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.retrieve()
+                .onStatus(HttpStatusCode::isError, this::decodeErrorResponse)
+                .toEntityFlux(DataBuffer.class)
+                .map(this::withDiscardRelease));
     }
 
     private URI buildRequestUri(
@@ -630,6 +631,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return response.bodyToMono(responseClass);
         }
         return response.bodyToMono(ParameterizedTypeReference.forType(responseType));
+    }
+
+    private ResponseEntity<Flux<DataBuffer>> withDiscardRelease(
+            ResponseEntity<Flux<DataBuffer>> entity) {
+        return ResponseEntity.status(entity.getStatusCode())
+                .headers(entity.getHeaders())
+                .body(entity.getBody().doOnDiscard(DataBuffer.class, DataBufferUtils::release));
     }
 
     private Flux<DataBuffer> streamingDataBuffers(ClientResponse response) {
@@ -1402,6 +1410,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private Map<String, List<String>> copyHeaders(ClientResponse response) {
         Map<String, List<String>> copied = new LinkedHashMap<>();
         response.headers().asHttpHeaders().forEach((key, values) -> copied.put(key, List.copyOf(values)));
+        return copied;
+    }
+
+    private Map<String, List<String>> copyHeaders(HttpHeaders headers) {
+        Map<String, List<String>> copied = new LinkedHashMap<>();
+        headers.forEach((key, values) -> copied.put(key, List.copyOf(values)));
         return copied;
     }
 

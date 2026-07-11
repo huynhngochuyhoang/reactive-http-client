@@ -114,7 +114,7 @@ public final class RecordedExchangeAssertions {
         /** Asserts Authorization is absent without exposing its value on failure. */
         public RecordedExchangeAssert doesNotHaveAuthorizationHeader() {
             isNotNull();
-            if (actual.headers().containsKey(HttpHeaders.AUTHORIZATION)) {
+            if (actual.headers().get(HttpHeaders.AUTHORIZATION) != null) {
                 failWithMessage("expected Authorization header to be absent but was <%s>", REDACTED);
             }
             return myself;
@@ -176,7 +176,7 @@ public final class RecordedExchangeAssertions {
 
         public RecordedExchangeAssert doesNotHaveInboundHeader(String name) {
             isNotNull();
-            if (actual.inboundHeaders().containsKey(name)) {
+            if (actual.inboundHeaders().get(name) != null) {
                 failWithMessage("expected captured inbound header <%s> to be absent but was <%s>",
                         name, actual.inboundHeaders().get(name));
             }
@@ -185,7 +185,7 @@ public final class RecordedExchangeAssertions {
 
         public RecordedExchangeAssert doesNotHaveHeader(String name) {
             isNotNull();
-            if (actual.headers().containsKey(name)) {
+            if (actual.headers().get(name) != null) {
                 failWithMessage("expected header <%s> to be absent but was <%s>", name, actual.headers().get(name));
             }
             return myself;

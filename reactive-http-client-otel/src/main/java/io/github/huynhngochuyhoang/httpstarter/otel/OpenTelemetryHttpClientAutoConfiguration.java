@@ -5,7 +5,6 @@ import io.opentelemetry.api.OpenTelemetry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -30,6 +29,7 @@ import org.springframework.context.annotation.Configuration;
         havingValue = "true",
         matchIfMissing = true)
 @EnableConfigurationProperties(ReactiveHttpClientProperties.class)
+@org.springframework.context.annotation.Import(BootOpenTelemetryWebClientCustomizerConfiguration.class)
 public class OpenTelemetryHttpClientAutoConfiguration {
 
     @Configuration(proxyBeanMethods = false)
@@ -69,17 +69,6 @@ public class OpenTelemetryHttpClientAutoConfiguration {
             return new OpenTelemetryContextWebFilter(openTelemetry);
         }
 
-        /**
-         * Adds an outbound {@link OpenTelemetryContextExchangeFilter} to every
-         * starter-built {@code WebClient} so the captured OTel context (or
-         * {@link io.opentelemetry.context.Context#current()} as fallback) is
-         * injected onto downstream requests as {@code traceparent} / {@code baggage}
-         * / any other configured propagation headers.
-         */
-        @Bean(name = "openTelemetryContextWebClientCustomizer")
-        @ConditionalOnMissingBean(name = "openTelemetryContextWebClientCustomizer")
-        WebClientCustomizer openTelemetryContextWebClientCustomizer(OpenTelemetry openTelemetry) {
-            return builder -> builder.filter(OpenTelemetryContextExchangeFilter.create(openTelemetry));
-        }
+
     }
 }

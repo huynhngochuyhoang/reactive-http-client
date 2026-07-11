@@ -9,7 +9,6 @@ import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
 import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
-import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientHealthIndicator;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
@@ -23,17 +22,13 @@ import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.MeterBinder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportRuntimeHints;
@@ -54,13 +49,17 @@ import org.springframework.web.reactive.function.client.WebClient;
 @AutoConfiguration
 @AutoConfigureAfter(name = {
         "org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration",
-        "org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration"
+        "org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration",
+        "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
+        "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration"
 })
 @EnableConfigurationProperties(ReactiveHttpClientProperties.class)
 @ImportRuntimeHints(ReactiveHttpClientRuntimeHints.class)
+@org.springframework.context.annotation.Import({
+        BootWebClientCustomizersConfiguration.class,
+        BootHealthIndicatorAutoConfiguration.class
+})
 public class ReactiveHttpClientAutoConfiguration {
-
-    private static final Logger log = LoggerFactory.getLogger(ReactiveHttpClientAutoConfiguration.class);
 
     @Bean
     public static BeanFactoryInitializationAotProcessor reactiveHttpClientBeanFactoryInitializationAotProcessor() {
@@ -70,15 +69,9 @@ public class ReactiveHttpClientAutoConfiguration {
     @Bean
     @Scope("prototype")
     @ConditionalOnMissingBean
-    public WebClient.Builder starterWebClientBuilder(ObjectProvider<WebClientCustomizer> customizerProvider) {
+    public WebClient.Builder starterWebClientBuilder(BootWebClientCustomizers customizers) {
         WebClient.Builder builder = WebClient.builder();
-        customizerProvider.orderedStream().forEach(customizer -> {
-            if (log.isDebugEnabled()) {
-                log.debug("Applying WebClientCustomizer [{}] to starter WebClient.Builder",
-                        customizer.getClass().getName());
-            }
-            customizer.customize(builder);
-        });
+        customizers.customize(builder);
         return builder;
     }
 
@@ -222,30 +215,6 @@ public class ReactiveHttpClientAutoConfiguration {
         }
     }
 
-    /**
-     * Registers {@link HttpClientHealthIndicator} when {@code spring-boot-actuator}
-     * is on the classpath and a {@link MeterRegistry} bean is available. The
-     * indicator reads the existing {@code reactive.http.client.requests} timer meters, so
-     * no additional observation path is required and the user-override contract
-     * on {@link HttpClientObserver} is preserved.
-     */
-    @Configuration(proxyBeanMethods = false)
-    @ConditionalOnClass({HealthIndicator.class, MeterRegistry.class})
-    @ConditionalOnBean(MeterRegistry.class)
-    @ConditionalOnProperty(
-            prefix = "reactive.http.observability.health",
-            name = "enabled",
-            havingValue = "true",
-            matchIfMissing = true)
-    static class HttpClientHealthIndicatorAutoConfiguration {
 
-        @Bean
-        @ConditionalOnMissingBean(name = "reactiveHttpClientHealthIndicator")
-        public HttpClientHealthIndicator reactiveHttpClientHealthIndicator(
-                MeterRegistry meterRegistry,
-                ReactiveHttpClientProperties properties) {
-            return new HttpClientHealthIndicator(meterRegistry, properties.getObservability());
-        }
-    }
 
 }

@@ -124,20 +124,36 @@ repository failures.
 | JUnit Jupiter | `6.0.1` | `6.0.3` |
 | Mockito Core | `5.20.0` | `5.23.0` |
 
-Independent compile results are the same on both Boot 4 lines:
+Priority 4 replaces the failed package assumptions with profile-selected source
+adapters. The normal reactor compiles the Boot 3 adapters; `boot4-spike` adds
+`src/boot4/java` and excludes only their Boot 3 counterparts. No runtime
+package detection or `spring-boot-starter-classic` dependency is used.
 
-| Module | Result | Classification |
+| Production contract | Boot 3.5 owner | Boot 4 owner |
 |---|---|---|
-| Starter | Fails on relocated Actuator health and `WebClientCustomizer` APIs | Boot module/package ownership |
-| Test helper | Fails because Spring 7 `HttpHeaders` no longer exposes the used `containsKey` contract | Spring/test-helper API migration |
-| OTel companion | Fails on the relocated `WebClientCustomizer` API | Optional integration/module ownership |
-| Benchmark harness | Compiles while consuming the locally installed Boot 3 starter | Harness-only success; not Boot 4 starter compatibility |
+| Auto-configuration and conditions | `spring-boot-autoconfigure` | `spring-boot-autoconfigure` |
+| `WebClientCustomizer` | `spring-boot-autoconfigure`, `org.springframework.boot.web.reactive.function.client` | `spring-boot-webclient`, `org.springframework.boot.webclient` |
+| Health contributor API | `spring-boot-actuator`, `org.springframework.boot.actuate.health` | `spring-boot-health`, `org.springframework.boot.health.contributor` |
+| `Endpoint` / `ReadOperation` | `spring-boot-actuator` | `spring-boot-actuator` |
+| Configuration properties | `spring-boot` / `spring-boot-autoconfigure` | `spring-boot` / `spring-boot-autoconfigure` |
+| Metadata processor | `spring-boot-configuration-processor` | `spring-boot-configuration-processor` |
 
-Reactor Netty and Netty artifacts resolve on both lines, so no transport source
-failure has been identified yet. Jackson 3 codec ownership and AOT/native work
-remain downstream gates because starter compilation stops first. Do not add a
-Boot 4 CI matrix until starter, test-helper, and OTel compilation is repeatable;
-the normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
+The OTel companion uses profile-selected Spring Boot `WebClientCustomizer`
+bridges, preserving propagation on the starter prototype builder on both Boot
+generations. Health beans are likewise declared by generation-specific
+configuration with their concrete contributor return type. Spring 7 header
+reads use APIs shared with Spring 6, and streaming
+`ResponseEntity<Flux<DataBuffer>>` handling uses `retrieve().toEntityFlux(...)`
+with explicit discarded-buffer release and status/header capture before error
+decoding.
+
+Starter, test-helper, and OTel compilation now succeeds on Boot `4.0.0` and
+`4.1.0`. The Boot 4 test source set verifies ordered customizer application,
+health contributor registration, `rhttpclients` endpoint discovery, and
+startup when optional Actuator modules are hidden. The auto-configuration
+imports metadata remains unchanged and packaged in each module. Jackson 3,
+AOT/native, and transport release gates remain owned by later priorities. The
+normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 ## Public API compatibility
 

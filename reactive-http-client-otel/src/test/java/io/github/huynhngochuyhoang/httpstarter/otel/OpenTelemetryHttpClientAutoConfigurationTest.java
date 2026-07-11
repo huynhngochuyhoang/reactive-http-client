@@ -10,9 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
-import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -51,7 +51,7 @@ class OpenTelemetryHttpClientAutoConfigurationTest {
             assertThat(context).hasSingleBean(OpenTelemetryContextWebFilter.class);
             assertThat(context).hasBean("openTelemetryContextWebClientCustomizer");
             assertThat(context.getBean("openTelemetryContextWebClientCustomizer"))
-                    .isInstanceOf(WebClientCustomizer.class);
+                    .isNotNull();
         });
     }
 
@@ -83,6 +83,17 @@ class OpenTelemetryHttpClientAutoConfigurationTest {
                     assertThat(context).doesNotHaveBean(OpenTelemetryContextWebFilter.class);
                     assertThat(context).doesNotHaveBean("openTelemetryContextWebClientCustomizer");
                 });
+    }
+
+    @Test
+    void propagationCustomizerAppliesToStarterPrototypeBuilder() {
+        new ReactiveWebApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(
+                        ReactiveHttpClientAutoConfiguration.class,
+                        OpenTelemetryHttpClientAutoConfiguration.class))
+                .withUserConfiguration(OpenTelemetryConfig.class)
+                .run(context -> context.getBean(WebClient.Builder.class)
+                        .filters(filters -> assertThat(filters).hasSize(1)));
     }
 
     @Test

@@ -235,6 +235,37 @@ class StreamingResponseTest {
     }
 
     @Test
+    void responseEntityFluxDataBufferReportsStatusWhenEnvelopeFails() {
+        ClientResponse response = ClientResponse.create(HttpStatus.BAD_GATEWAY)
+                .header("X-Error", "downstream")
+                .body("failed")
+                .build();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://stream.test")
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(req -> Mono.just(response))
+                .build();
+        RecordingLogger logger = new RecordingLogger();
+        RecordingHook hook = new RecordingHook();
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, logger, observed::add, hook);
+
+        StepVerifier.create(invokeStreamEntity(handler))
+                .expectError()
+                .verify();
+
+        assertThat(logger.contexts).singleElement()
+                .extracting(HttpExchangeLogContext::responseStatus)
+                .isEqualTo(HttpStatus.BAD_GATEWAY.value());
+        assertThat(observed).singleElement()
+                .extracting(HttpClientObserverEvent::getStatusCode)
+                .isEqualTo(HttpStatus.BAD_GATEWAY.value());
+        assertThat(hook.errors).singleElement()
+                .extracting(ReactiveHttpClientLifecycleContext::statusCode)
+                .isEqualTo(HttpStatus.BAD_GATEWAY.value());
+    }
+
+    @Test
     void fluxOfDataBufferLeavesEmittedBuffersForCallerToRelease() {
         List<PooledDataBuffer> buffers = pooledBuffers("one", "two", "three");
         WebClient webClient = WebClient.builder()
@@ -472,10 +503,16 @@ class StreamingResponseTest {
 
     static final class RecordingHook implements ReactiveHttpClientLifecycleHook {
         private final List<ReactiveHttpClientLifecycleContext> successes = new CopyOnWriteArrayList<>();
+        private final List<ReactiveHttpClientLifecycleContext> errors = new CopyOnWriteArrayList<>();
 
         @Override
         public void onSuccess(ReactiveHttpClientLifecycleContext context) {
             successes.add(context);
+        }
+
+        @Override
+        public void onError(ReactiveHttpClientLifecycleContext context) {
+            errors.add(context);
         }
     }
 

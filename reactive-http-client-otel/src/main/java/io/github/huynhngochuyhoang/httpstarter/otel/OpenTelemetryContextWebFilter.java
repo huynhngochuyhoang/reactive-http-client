@@ -38,7 +38,12 @@ public class OpenTelemetryContextWebFilter implements WebFilter {
     private static final TextMapGetter<HttpHeaders> HEADER_GETTER = new TextMapGetter<>() {
         @Override
         public Iterable<String> keys(HttpHeaders carrier) {
-            return carrier == null ? java.util.List.of() : carrier.keySet();
+            if (carrier == null) {
+                return java.util.List.of();
+            }
+            java.util.List<String> names = new java.util.ArrayList<>();
+            carrier.forEach((name, values) -> names.add(name));
+            return names;
         }
 
         @Override

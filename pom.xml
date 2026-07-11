@@ -166,6 +166,51 @@
                 <maven.deploy.skip>true</maven.deploy.skip>
                 <skipPublishing>true</skipPublishing>
             </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>3.6.1</version>
+                        <executions>
+                            <execution>
+                                <id>add-boot4-sources</id>
+                                <phase>generate-sources</phase>
+                                <goals><goal>add-source</goal></goals>
+                                <configuration>
+                                    <sources><source>src/boot4/java</source></sources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>add-boot4-test-sources</id>
+                                <phase>generate-test-sources</phase>
+                                <goals><goal>add-test-source</goal></goals>
+                                <configuration>
+                                    <sources><source>src/boot4-test/java</source></sources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>io/github/huynhngochuyhoang/httpstarter/config/Boot3WebClientCustomizers.java</exclude>
+                                <exclude>io/github/huynhngochuyhoang/httpstarter/config/BootWebClientCustomizersConfiguration.java</exclude>
+                                <exclude>io/github/huynhngochuyhoang/httpstarter/observability/HttpClientHealthIndicator.java</exclude>
+                                <exclude>io/github/huynhngochuyhoang/httpstarter/config/Boot3HealthIndicatorAutoConfiguration.java</exclude>
+                                <exclude>io/github/huynhngochuyhoang/httpstarter/otel/Boot3OpenTelemetryWebClientCustomizerConfiguration.java</exclude>
+                            </excludes>
+                            <testExcludes>
+                                <testExclude>**/ReactiveHttpClientAutoConfigurationTest.java</testExclude>
+                                <testExclude>**/ReleaseCompatibilitySmokeTest.java</testExclude>
+                                <testExclude>**/HttpClientHealthIndicatorTest.java</testExclude>
+                            </testExcludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
         <profile>
             <id>release-smoke</id>
