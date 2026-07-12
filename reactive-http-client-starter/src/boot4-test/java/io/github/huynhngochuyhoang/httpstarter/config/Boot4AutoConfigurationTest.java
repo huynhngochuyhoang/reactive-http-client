@@ -48,7 +48,8 @@ class Boot4AutoConfigurationTest {
 
         assertThat(ordering.name()).contains(
                 "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
-                "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration");
+                "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration",
+                "org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration");
     }
 
     @Test
@@ -146,6 +147,8 @@ class Boot4AutoConfigurationTest {
                 .run()) {
             assertThat(context.getBeansOfType(ReactiveHttpClientProperties.class)).hasSize(1);
             assertThat(context.getBeansOfType(WebClient.Builder.class)).hasSize(1);
+            assertThat(context.getBean(ReactiveHttpClientJsonCodec.class))
+                    .isInstanceOf(Jackson3ReactiveHttpClientJsonCodec.class);
         }
     }
 
