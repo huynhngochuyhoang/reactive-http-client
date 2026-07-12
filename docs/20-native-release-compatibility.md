@@ -407,22 +407,42 @@ properties, and scanned `@ReactiveHttpClient` interfaces. During AOT processing,
 each registered reactive client factory contributes a JDK proxy hint for the
 client interface and reflection metadata for its annotated methods.
 
-Supported native-image path:
+Supported Boot 4 native-image path:
 
-- Spring Boot AOT processing with Java 21.
+- Java 21 remains the source and bytecode baseline. Native compilation and
+  execution use GraalVM Java 25, as required by the selected Boot 4 line.
 - Declarative clients discovered through `@EnableReactiveHttpClients`.
 - JDK dynamic proxies created by the starter for `@ReactiveHttpClient`
   interfaces.
+- Inherited generic endpoint response types resolved through the concrete
+  client interface.
 - Starter configuration properties under `reactive.http.*`.
-- Micrometer-backed client metrics when Micrometer is present.
+- Problem Detail error mapping, a named auth provider, and Micrometer-backed
+  client metrics.
+- The optional `rhttpclients` Actuator endpoint and reactive health indicator.
 - Diagnostics snapshot version metadata from the packaged Maven
   `pom.properties` resource.
 
+The scheduled smoke installs the isolated Boot 4 reactor, compiles the fixture,
+and runs the generated executable:
+
+```bash
+mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
+  -DskipTests -Dmaven.javadoc.skip=true install
+mvn -B -ntp -s .mvn/boot4-spike-settings.xml \
+  -f .github/native-smoke/pom.xml -Pnative \
+  -Dreactive-http-client.version=2.14.1 native:compile
+.github/native-smoke/target/reactive-http-client-native-smoke
+```
+
+Netty 4.2 uses shared Foreign Function and Memory API arenas. The GraalVM 25
+fixture therefore enables `-H:+SharedArenaSupport`; removing that build option
+must be accompanied by a successful executable smoke run.
+
 Limits:
 
-- The scheduled native smoke covers core bootstrap, client scanning, JDK proxy
-  creation, and the default Reactor Netty transport classes. It does not exercise
-  outbound network calls, auth flows, or custom TLS configuration.
+- The scheduled native smoke uses a real Reactor Netty loopback request. It does
+  not exercise custom TLS configuration, Resilience4j, or OTel exporters.
 - Optional libraries still require native support and runtime hints from their
   owners, including Resilience4j, alternate TLS providers, and OpenTelemetry
   exporters.
@@ -433,10 +453,6 @@ Limits:
 - Client interfaces must be visible during Spring AOT processing. Dynamically
   generating or registering new client interfaces after AOT processing is not
   supported.
-- Native-image compilation itself is not run by the default CI job. The starter
-  includes AOT smoke coverage that processes a minimal annotated client context,
-  verifies inherited-method proxy hints, and tolerates unrelated unresolvable
-  factory metadata.
 
 ## Release evidence manifest
 
@@ -506,7 +522,7 @@ mvn -Prelease-smoke test
 
 Normal CI keeps the fast Spring AOT smoke tests. The manually triggered and
 weekly `native-smoke.yml` workflow also builds and runs one minimal native image
-whose consumer classpath omits optional integrations.
+which includes Micrometer and Actuator while omitting Resilience4j and OpenTelemetry.
 
 The CI release smoke job currently runs:
 

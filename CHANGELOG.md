@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Jackson 3 codec ownership.** Added `ReactiveHttpClientJsonCodec`, generation-specific Jackson adapters, exact shared signing/wire bytes for authenticated JSON, Jackson 3 Problem Detail support, and deprecated Jackson 2 compatibility shims for migration.
 - **Framework 7 transport correctness.** Added real HTTP/1.1 POST-then-PUT connection-reuse and malformed-framing regressions, revalidated streaming/bodiless/redirect/timeout/error ownership on Boot 4, and rejected application-supplied framing and authority headers so Reactor Netty remains the sole transport owner.
 - **Boot 4 optional integrations.** Moved the isolated Boot 4 lane to Resilience4j `2.4.0`, verified independent resilience operators and metrics, minimal-classpath back-off, Micrometer health/observer behavior, OTel propagation/semantics, OAuth2, and SigV4, while preserving optional dependency boundaries.
+- **Boot 4 AOT and native baseline.** Moved the native smoke lane to GraalVM Java 25, added a real loopback client covering inherited generic decoding, Problem Detail mapping, auth, Micrometer, diagnostics, and health, and preserved AOT client discovery from generated factory metadata.
 
 ## [2.14.0] - 2026-07-10
 

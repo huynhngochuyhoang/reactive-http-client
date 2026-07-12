@@ -123,6 +123,9 @@ public class ReactiveHttpClientDiagnosticsProvider {
     private Class<?> clientInterface(String beanName) {
         BeanDefinition definition = beanFactory.getBeanDefinition(beanName);
         Object objectType = definition.getAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
+        if (objectType == null && ReactiveHttpClientFactoryBean.class.getName().equals(definition.getBeanClassName())) {
+            objectType = definition.getPropertyValues().get("type");
+        }
         if (objectType instanceof Class<?> clazz && clazz.isInterface()
                 && clazz.isAnnotationPresent(ReactiveHttpClient.class)) {
             return clazz;

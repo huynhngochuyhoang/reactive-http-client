@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.16</version>
+        <version>4.0.0</version>
     </parent>
 
     <groupId>io.github.huynhngochuyhoang</groupId>
@@ -16,7 +16,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <reactive-http-client.version>2.8.0</reactive-http-client.version>
+        <reactive-http-client.version>2.14.1</reactive-http-client.version>
         <native.maven.plugin.version>0.11.1</native.maven.plugin.version>
     </properties>
 
@@ -28,7 +28,23 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webclient</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
     </dependencies>
 
@@ -43,6 +59,11 @@
                 <artifactId>native-maven-plugin</artifactId>
                 <version>${native.maven.plugin.version}</version>
                 <extensions>true</extensions>
+                <configuration>
+                    <buildArgs>
+                        <buildArg>-H:+SharedArenaSupport</buildArg>
+                    </buildArgs>
+                </configuration>
             </plugin>
         </plugins>
     </build>
