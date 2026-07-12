@@ -230,9 +230,9 @@ RecordedExchangeAssertions.assertThat(mock.lastExchange())
 ```
 
 Installing an auth provider also enables production-style request-body preparation.
-Pass the application mapper with `objectMapper(applicationObjectMapper)` when DTOs
-depend on custom Jackson modules or naming rules; otherwise the helper uses a
-default mapper as a compatibility fallback.
+Pass the application codec with `jsonCodec(reactiveHttpClientJsonCodec)` when DTOs
+depend on custom Jackson modules or naming rules. The deprecated
+`objectMapper(...)` method remains a Jackson 2 compatibility adapter.
 For ordinary JSON DTO bodies, the provider receives raw `byte[]` matching the
 serialized body sent by the mock, so signing providers can verify payload hashes.
 

@@ -205,30 +205,39 @@ Evidence:
 
 ## Priority 5 — Jackson 3 and Codec Ownership
 
-### [ ] 5.1 Define the `3.0.0` serialization contract
+### [x] 5.1 Define the `3.0.0` serialization contract
 
-- [ ] Inventory public and internal Jackson 2 types in all modules.
-- [ ] Record public APIs that expose `com.fasterxml.jackson.databind.ObjectMapper`.
-- [ ] Decide whether public customization uses Jackson 3 directly or a narrow
+- [x] Inventory public and internal Jackson 2 types in all modules.
+- [x] Record public APIs that expose `com.fasterxml.jackson.databind.ObjectMapper`.
+- [x] Decide whether public customization uses Jackson 3 directly or a narrow
       starter-owned serialization contract.
-- [ ] Keep default Boot 4 applications free from a required Jackson 2 mapper.
-- [ ] Ensure WebClient encoding and auth signing consume the same bytes.
-- [ ] Migrate built-in SigV4 JSON signing and charset-sensitive String signing.
-- [ ] Migrate Problem Detail mapping.
-- [ ] Migrate OAuth2 sanitized error-body decoding without losing configured
+- [x] Keep default Boot 4 applications free from a required Jackson 2 mapper.
+- [x] Ensure WebClient encoding and auth signing consume the same bytes.
+- [x] Migrate built-in SigV4 JSON signing and charset-sensitive String signing.
+- [x] Migrate Problem Detail mapping.
+- [x] Migrate OAuth2 sanitized error-body decoding without losing configured
       codecs or typed response metadata.
-- [ ] Migrate diagnostics and contract snapshot JSON rendering.
-- [ ] Migrate mock helper body serialization and assertions.
-- [ ] Cover Java time modules, naming strategies, Kotlin, custom serializers,
+- [x] Migrate diagnostics and contract snapshot JSON rendering.
+- [x] Migrate mock helper body serialization and assertions.
+- [x] Cover Java time modules, naming strategies, Kotlin, custom serializers,
       and unknown-property behavior.
-- [ ] Keep any Jackson 2 compatibility module temporary and deprecated.
-- [ ] Add every public serialization break to the `3.0.0` migration guide.
-- [ ] Run focused serialization, auth, error, and test-helper tests.
-- [ ] Run `git diff --check`.
+- [x] Keep any Jackson 2 compatibility module temporary and deprecated.
+- [x] Add every public serialization break to the `3.0.0` migration guide.
+- [x] Run focused serialization, auth, error, and test-helper tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Inventoried production Jackson ownership. Runtime factory, signing, Problem Detail, and mock paths now depend on `ReactiveHttpClientJsonCodec`; remaining Jackson 2 production references are deprecated compatibility adapters or generation-selected Boot 3 sources.
+- Boot 4 selects `Jackson3ReactiveHttpClientJsonCodec` from the application `tools.jackson.databind.ObjectMapper`. Its effective POM owns Jackson 3 and marks Jackson 2 optional, so consumers do not require a Jackson 2 mapper.
+- Authenticated JSON is materialized once and the same `byte[]` is supplied to auth/signing and written by WebClient. Existing charset-aware String signing remains the exact wire-byte path.
+- Problem Detail uses the codec SPI. OAuth2 token and sanitized error decoding remains on configured WebClient codecs, preserving typed decoding and HTTP metadata. Diagnostics and contract snapshots already use starter-owned deterministic renderers and required no mapper migration.
+- `MockReactiveHttpClient.Builder.jsonCodec(...)` is the primary helper API; generation-specific defaults avoid Jackson 2 on Boot 4. The deprecated `objectMapper(...)` method remains a temporary Boot 3 compatibility shim.
+- Boot 4 tests hide Jackson 2 and cover Jackson 3 Problem Detail, naming strategy, Java time, and unknown-property behavior. Kotlin modules and custom serializers are preserved by delegating without modification to the application mapper/codec.
+- Added `docs/28-spring-boot-4-jackson-migration.md` with all public source changes and compatibility shims. Added the codec surface to japicmp/documented-public-surface checks.
+- Full Boot `4.0.0` starter, test-helper, and OTel suites passed. Boot `4.1.0` multi-module compilation plus focused serialization, signing, Problem Detail, and mock-helper tests passed.
+- Full normal Boot `3.5.16` `mvn -q verify` passed.
+- `git diff --check` passed.
 
 ---
 

@@ -180,10 +180,10 @@ bodies that should become a more specific exception. Mappers are discovered in
 @Component
 public class PaymentErrorMapper implements ErrorResponseMapper {
 
-    private final ObjectMapper objectMapper;
+    private final ReactiveHttpClientJsonCodec jsonCodec;
 
-    public PaymentErrorMapper(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public PaymentErrorMapper(ReactiveHttpClientJsonCodec jsonCodec) {
+        this.jsonCodec = jsonCodec;
     }
 
     @Override
@@ -196,7 +196,9 @@ public class PaymentErrorMapper implements ErrorResponseMapper {
         if (context.responseBodyTruncated()) {
             return Optional.empty();
         }
-        PaymentError error = objectMapper.readValue(context.responseBody(), PaymentError.class);
+        PaymentError error = jsonCodec.read(
+                context.responseBody().getBytes(StandardCharsets.UTF_8),
+                PaymentError.class);
         if (!"DECLINED".equals(error.code())) {
             return Optional.empty();
         }
@@ -223,8 +225,8 @@ Problem Detail consistently:
 
 ```java
 @Bean
-ErrorResponseMapper problemDetailErrorResponseMapper(ObjectMapper objectMapper) {
-    return new ProblemDetailErrorResponseMapper(objectMapper);
+ErrorResponseMapper problemDetailErrorResponseMapper(ReactiveHttpClientJsonCodec jsonCodec) {
+    return new ProblemDetailErrorResponseMapper(jsonCodec);
 }
 ```
 

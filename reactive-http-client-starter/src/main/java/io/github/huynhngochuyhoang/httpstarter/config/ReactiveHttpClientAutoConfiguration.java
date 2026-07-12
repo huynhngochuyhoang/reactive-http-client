@@ -42,22 +42,25 @@ import org.springframework.web.reactive.function.client.WebClient;
  * Individual client instances are created by
  * {@link io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean}.
  *
- * <p>This class is ordered AFTER Micrometer's auto-configuration so that a
- * {@link MeterRegistry} bean is guaranteed to be present before the
- * {@link HttpClientObserver} condition is evaluated.
+ * <p>This class is ordered after Micrometer and Jackson auto-configuration so
+ * their managed registry and JSON mapper beans are available before the nested
+ * observer, health, and codec conditions are evaluated.
  */
 @AutoConfiguration
 @AutoConfigureAfter(name = {
         "org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration",
         "org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration",
         "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
-        "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration"
+        "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration",
+        "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration",
+        "org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration"
 })
 @EnableConfigurationProperties(ReactiveHttpClientProperties.class)
 @ImportRuntimeHints(ReactiveHttpClientRuntimeHints.class)
 @org.springframework.context.annotation.Import({
         BootWebClientCustomizersConfiguration.class,
-        BootHealthIndicatorAutoConfiguration.class
+        BootHealthIndicatorAutoConfiguration.class,
+        BootJsonCodecAutoConfiguration.class
 })
 public class ReactiveHttpClientAutoConfiguration {
 

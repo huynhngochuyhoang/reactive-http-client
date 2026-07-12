@@ -200,7 +200,9 @@
                                 <exclude>io/github/huynhngochuyhoang/httpstarter/config/BootWebClientCustomizersConfiguration.java</exclude>
                                 <exclude>io/github/huynhngochuyhoang/httpstarter/observability/HttpClientHealthIndicator.java</exclude>
                                 <exclude>io/github/huynhngochuyhoang/httpstarter/config/Boot3HealthIndicatorAutoConfiguration.java</exclude>
+                                <exclude>io/github/huynhngochuyhoang/httpstarter/config/Boot3JsonCodecAutoConfiguration.java</exclude>
                                 <exclude>io/github/huynhngochuyhoang/httpstarter/otel/Boot3OpenTelemetryWebClientCustomizerConfiguration.java</exclude>
+                                <exclude>io/github/huynhngochuyhoang/httpstarter/test/Boot3MockJsonCodecFactory.java</exclude>
                             </excludes>
                             <testExcludes>
                                 <testExclude>**/ReactiveHttpClientAutoConfigurationTest.java</testExclude>
@@ -304,6 +306,7 @@
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata*</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper</include>
+                                    <include>io.github.huynhngochuyhoang.httpstarter.core.*ReactiveHttpClientJsonCodec</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook</include>

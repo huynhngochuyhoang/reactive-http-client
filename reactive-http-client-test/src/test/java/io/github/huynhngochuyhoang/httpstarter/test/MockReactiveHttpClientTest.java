@@ -6,10 +6,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
-import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext;
-import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook;
-import io.github.huynhngochuyhoang.httpstarter.core.RequestContext;
-import io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot;
+import io.github.huynhngochuyhoang.httpstarter.core.*;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.junit.jupiter.api.Test;
@@ -272,7 +269,7 @@ class MockReactiveHttpClientTest {
         ObjectMapper applicationObjectMapper = new ObjectMapper()
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
-                .objectMapper(applicationObjectMapper)
+                .jsonCodec(new Jackson2ReactiveHttpClientJsonCodec(applicationObjectMapper))
                 .withAuthProvider(request -> {
                     capturedAuthBody.set(request.requestBody());
                     return Mono.just(AuthContext.empty());
@@ -288,6 +285,7 @@ class MockReactiveHttpClientTest {
         assertThat(capturedAuthBody.get()).isInstanceOf(byte[].class);
         String serializedBody = new String((byte[]) capturedAuthBody.get(), StandardCharsets.UTF_8);
         assertThat(serializedBody).contains("order_id", "order-1", "amount", "10").doesNotContain("orderId");
+        assertThat(mock.lastExchange().bodyAsString()).isEqualTo(serializedBody);
         assertThat(mock.lastExchange().bodyAsString()).isEqualTo(serializedBody);
     }
 

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Spring Boot 3.5 migration bridge.** Updated the default managed dependency baseline from Spring Boot `3.5.0` to the latest published `3.5.16` patch, retained `3.5.0` as the minimum release-smoke row, and removed use of a deprecated Reactor Netty TLS API before the isolated Boot 4 migration.
 - **Isolated Spring Boot 4 build spike.** Added a non-publishing `boot4-spike` profile and Maven Central settings file, recorded the Boot `4.0.0`/`4.1.0` managed dependency matrix, and classified starter, test-helper, OTel, and benchmark compile outcomes without changing the Boot 3.5 release line.
 - **Spring Boot 4 module migration.** Added profile-selected Boot 4 WebClient and health adapters backed by focused `spring-boot-webclient` and `spring-boot-health` modules, preserved OTel propagation through generation-specific Boot customizer bridges, and added Boot 4 auto-configuration and optional-Actuator regression coverage without adding `starter-classic`.
+- **Jackson 3 codec ownership.** Added `ReactiveHttpClientJsonCodec`, generation-specific Jackson adapters, exact shared signing/wire bytes for authenticated JSON, Jackson 3 Problem Detail support, and deprecated Jackson 2 compatibility shims for migration.
 
 ## [2.14.0] - 2026-07-10
 

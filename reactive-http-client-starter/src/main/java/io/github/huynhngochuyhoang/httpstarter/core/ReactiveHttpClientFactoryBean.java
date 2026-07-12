@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.auth.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
@@ -131,8 +130,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         ResilienceOperatorApplier resilienceOperatorApplier = resolveResilienceOperatorApplier(
                 circuitBreakerRegistry, retryRegistry, bulkheadRegistry, rateLimiterRegistry);
         logStartupSummary(type, clientName, config, metadataCache, resilienceOperatorApplier, properties.getObservability());
-        ObjectMapper objectMapper = applicationContext.getBeanProvider(ObjectMapper.class).getIfAvailable();
-        validateStrictBodySigningContracts(type, metadataCache, config, authProvider, objectMapper, clientName);
+        ReactiveHttpClientJsonCodec jsonCodec = applicationContext.getBeanProvider(ReactiveHttpClientJsonCodec.class).getIfAvailable();
+        validateStrictBodySigningContracts(type, metadataCache, config, authProvider, jsonCodec, clientName);
 
         if (config.getResilience() != null && config.getResilience().isEnabled()) {
             validatePerMethodResilienceInstances(type, metadataCache, resilienceOperatorApplier, clientName);
@@ -140,7 +139,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             logMethodResilienceDiagnostics(type, metadataCache, config, resilienceOperatorApplier, clientName);
         }
 
-        ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+        ReactiveClientInvocationHandler handler = ReactiveClientInvocationHandler.create(
                 webClient,
                 metadataCache,
                 new RequestArgumentResolver(),
@@ -150,7 +149,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 type,
                 applicationContext,
                 resilienceOperatorApplier,
-                objectMapper,
+                jsonCodec,
                 properties.getObservability()
         );
 
@@ -827,7 +826,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                                                     MethodMetadataCache metadataCache,
                                                     ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                     AuthProvider authProvider,
-                                                    ObjectMapper objectMapper,
+                                                    ReactiveHttpClientJsonCodec jsonCodec,
                                                     String clientName) {
         if (!usesStrictBuiltInAwsSigV4(clientConfig, authProvider)) {
             return;
@@ -838,7 +837,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             if (!isDeclarativeClientMethod(method)) continue;
             MethodMetadata meta = metadataCache.get(method);
             RequestPlan plan = RequestPlan.from(meta, clientInterface);
-            BodySigningContract contract = bodySigningContract(plan, clientConfig, objectMapper);
+            BodySigningContract contract = bodySigningContract(plan, clientConfig, jsonCodec);
             if (contract.supported()) {
                 continue;
             }
@@ -882,7 +881,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
 
     private static BodySigningContract bodySigningContract(RequestPlan plan,
                                                            ReactiveHttpClientProperties.ClientConfig clientConfig,
-                                                           ObjectMapper objectMapper) {
+                                                           ReactiveHttpClientJsonCodec jsonCodec) {
         if (plan.multipart()) {
             return BodySigningContract.unsupported("multipart",
                     "multipart bodies do not expose stable raw bytes for built-in SigV4 signing");
@@ -927,9 +926,9 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         if (!contentTypeContract.supported()) {
             return contentTypeContract;
         }
-        if (objectMapper == null) {
+        if (jsonCodec == null) {
             return BodySigningContract.unsupported("json(" + typeName + ")",
-                    "JSON body signing requires an ObjectMapper bean to materialize raw bytes");
+                    "JSON body signing requires a ReactiveHttpClientJsonCodec bean to materialize raw bytes");
         }
         return BodySigningContract.supported("json(" + typeName + ")");
     }

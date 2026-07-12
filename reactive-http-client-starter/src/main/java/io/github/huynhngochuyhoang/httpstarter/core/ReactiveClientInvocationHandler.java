@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.FormFile;
 import io.github.huynhngochuyhoang.httpstarter.annotation.LogHttpExchange;
@@ -96,7 +95,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final AtomicBoolean resilienceWarningKeysLimitWarningLogged = new AtomicBoolean(false);
 
     private final ResilienceOperatorApplier resilienceOperatorApplier;
-    private final ObjectMapper objectMapper;
+    private final ReactiveHttpClientJsonCodec jsonCodec;
 
     // Observability – resolved lazily on first request to avoid ordering issues during
     // context initialization (the observer bean may not yet exist when this handler is constructed)
@@ -104,6 +103,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final org.springframework.beans.factory.ObjectProvider<HttpClientObserver> observerProvider;
     private final org.springframework.beans.factory.ObjectProvider<ReactiveHttpClientLifecycleHook> lifecycleHookProvider;
 
+    @Deprecated(since = "3.0.0", forRemoval = false)
     public ReactiveClientInvocationHandler(
             WebClient webClient,
             MethodMetadataCache metadataCache,
@@ -119,6 +119,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 applicationContext, resilienceOperatorApplier, objectMapper, observabilityConfig);
     }
 
+    @Deprecated(since = "3.0.0", forRemoval = false)
     public ReactiveClientInvocationHandler(
             WebClient webClient,
             MethodMetadataCache metadataCache,
@@ -131,6 +132,41 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             ResilienceOperatorApplier resilienceOperatorApplier,
             ObjectMapper objectMapper,
             ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
+        this(webClient, metadataCache, argumentResolver, errorDecoder, clientConfig, clientName,
+                clientInterface, applicationContext, resilienceOperatorApplier,
+                objectMapper == null ? null : new Jackson2ReactiveHttpClientJsonCodec(objectMapper),
+                observabilityConfig);
+    }
+
+    public static ReactiveClientInvocationHandler create(
+            WebClient webClient,
+            MethodMetadataCache metadataCache,
+            RequestArgumentResolver argumentResolver,
+            DefaultErrorDecoder errorDecoder,
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            String clientName,
+            Class<?> clientInterface,
+            ApplicationContext applicationContext,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            ReactiveHttpClientJsonCodec jsonCodec,
+            ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
+        return new ReactiveClientInvocationHandler(webClient, metadataCache, argumentResolver, errorDecoder,
+                clientConfig, clientName, clientInterface, applicationContext, resilienceOperatorApplier,
+                jsonCodec, observabilityConfig);
+    }
+
+    private ReactiveClientInvocationHandler(
+            WebClient webClient,
+            MethodMetadataCache metadataCache,
+            RequestArgumentResolver argumentResolver,
+            DefaultErrorDecoder errorDecoder,
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            String clientName,
+            Class<?> clientInterface,
+            ApplicationContext applicationContext,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            ReactiveHttpClientJsonCodec jsonCodec,
+            ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
         this.webClient = webClient;
         this.metadataCache = metadataCache;
         this.argumentResolver = argumentResolver;
@@ -142,7 +178,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         this.resilienceOperatorApplier = resilienceOperatorApplier != null
                 ? resilienceOperatorApplier
                 : new NoopResilienceOperatorApplier();
-        this.objectMapper = objectMapper;
+        this.jsonCodec = jsonCodec;
         this.observerProvider = applicationContext.getBeanProvider(HttpClientObserver.class);
         this.lifecycleHookProvider = applicationContext.getBeanProvider(ReactiveHttpClientLifecycleHook.class);
         this.observabilityConfig = observabilityConfig;
@@ -1079,15 +1115,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (body instanceof String text) {
             return Mono.just(new SerializedRequestBody(body, text, text.getBytes(rawBodyCharset(contentTypeHeader))));
         }
-        if (!shouldProvideJsonRawBody(contentTypeHeader) || objectMapper == null) {
+        if (!shouldProvideJsonRawBody(contentTypeHeader) || jsonCodec == null) {
             return Mono.just(new SerializedRequestBody(body, body, null));
         }
         return Mono.fromCallable(() -> {
-                    byte[] json = objectMapper.writeValueAsBytes(body);
+                    byte[] json = jsonCodec.write(body);
                     return new SerializedRequestBody(body, json, json);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .onErrorMap(JsonProcessingException.class, e -> new RequestSerializationException(clientName, e));
+                .onErrorMap(e -> new RequestSerializationException(clientName, e));
     }
 
     private Charset rawBodyCharset(String contentTypeHeader) {
