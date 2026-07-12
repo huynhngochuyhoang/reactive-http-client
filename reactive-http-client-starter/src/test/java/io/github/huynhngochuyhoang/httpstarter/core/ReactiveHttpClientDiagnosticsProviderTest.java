@@ -78,6 +78,23 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void discoversClientFromAotPreservedFactoryTypeProperty() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.getPropertyValues().add("type", DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, new ReactiveHttpClientProperties(), new MethodMetadataCache());
+
+        assertThat(provider.clientSummaries())
+                .singleElement()
+                .extracting(ReactiveHttpClientDiagnosticsProvider.ClientSummary::clientInterface)
+                .isEqualTo(DiagnosticClient.class.getName());
+    }
+
+    @Test
     void clientSummariesDoNotResolveStrictAuthProviders() {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         GenericBeanDefinition definition = new GenericBeanDefinition();

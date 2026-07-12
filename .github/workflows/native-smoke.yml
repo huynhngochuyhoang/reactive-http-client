@@ -17,22 +17,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up GraalVM JDK 21
+      - name: Set up GraalVM JDK 25
         uses: graalvm/setup-graalvm@v1
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: graalvm-community
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: maven
 
       - name: Install current starter artifacts
-        run: mvn -B -ntp -DskipTests install
+        run: mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike -DskipTests -Dmaven.javadoc.skip=true install
 
       - name: Resolve current project version
         run: echo "PROJECT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)" >> "$GITHUB_ENV"
 
+      - name: Record native toolchain
+        run: |
+          java -version
+          native-image --version
+          echo "commit=$(git rev-parse HEAD)"
+          echo "starter=$PROJECT_VERSION"
+          echo "boot=$(mvn -q -s .mvn/boot4-spike-settings.xml -f .github/native-smoke/pom.xml -DforceStdout help:evaluate -Dexpression=project.parent.version)"
+          mvn -B -ntp -s .mvn/boot4-spike-settings.xml -f .github/native-smoke/pom.xml dependency:list -DincludeArtifactIds=spring-core
+
       - name: Build minimal native image
-        run: mvn -B -ntp -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version="$PROJECT_VERSION" native:compile
+        run: mvn -B -ntp -s .mvn/boot4-spike-settings.xml -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version="$PROJECT_VERSION" native:compile
 
       - name: Run minimal native image
         run: .github/native-smoke/target/reactive-http-client-native-smoke

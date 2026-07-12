@@ -320,24 +320,46 @@ Evidence:
 
 ## Priority 8 — Boot 4 AOT and Native Image Baseline
 
-### [ ] 8.1 Rebuild native evidence
+### [x] 8.1 Rebuild native evidence
 
-- [ ] Select the GraalVM/native-image baseline supported by the chosen Boot 4
+- [x] Select the GraalVM/native-image baseline supported by the chosen Boot 4
       line.
-- [ ] Update native build commands and generated release evidence.
-- [ ] Re-audit reflection hints for client interfaces and inherited methods.
-- [ ] Re-audit proxy hints and nested configuration binding hints.
-- [ ] Re-audit metadata, Maven version resource, and diagnostics resources.
-- [ ] Verify diagnostics endpoint and health behavior in native mode.
-- [ ] Build a native smoke application that performs a loopback request.
-- [ ] Exercise inherited generic endpoints and Problem Detail mapping.
-- [ ] Exercise one auth provider and one optional observability integration.
-- [ ] Record Java, GraalVM, Boot, Framework, starter, and commit versions.
-- [ ] Run AOT/native tests and `git diff --check`.
+- [x] Update native build commands and generated release evidence.
+- [x] Re-audit reflection hints for client interfaces and inherited methods.
+- [x] Re-audit proxy hints and nested configuration binding hints.
+- [x] Re-audit metadata, Maven version resource, and diagnostics resources.
+- [x] Verify diagnostics endpoint and health behavior in native mode.
+- [x] Build a native smoke application that performs a loopback request.
+- [x] Exercise inherited generic endpoints and Problem Detail mapping.
+- [x] Exercise one auth provider and one optional observability integration.
+- [x] Record Java, GraalVM, Boot, Framework, starter, and commit versions.
+- [x] Run AOT/native tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Selected Oracle GraalVM native-image `25.0.3` for the Boot `4.0.0` baseline;
+  project source and bytecode remain on Java 21. The fixture resolved Spring
+  Framework `7.0.1` and workspace starter `2.14.1` from commit `53a87bd` plus
+  the reviewed Priority 8 worktree.
+- Updated the scheduled native job to install the isolated Boot 4 reactor,
+  record Java, native-image, Boot, Framework, starter, and commit coordinates,
+  compile with GraalVM 25, and run the executable.
+- Generated reachability metadata contains the client interface and proxy,
+  inherited endpoint methods, `NativeOrderResponse`, nested diagnostics
+  configuration binding, and the starter Maven `pom.properties` resource.
+- Added an AOT factory-metadata fallback and regression test so diagnostics
+  inventory discovers clients from the generated factory `type` property
+  without instantiating a client or auth provider.
+- The native fixture performed a real Reactor Netty loopback request, decoded
+  an inherited generic response, mapped a 502 `application/problem+json`
+  response, applied a named auth provider, recorded a Micrometer timer, and
+  verified the opt-in diagnostics endpoint, reactive health indicator, and
+  sanitized diagnostics inventory.
+- Netty `4.2.7.Final` requires GraalVM shared-arena support; the fixture records
+  `-H:+SharedArenaSupport` and the generated executable completed with exit 0.
+- Boot 4 AOT smoke, Boot 4 auto-configuration tests, diagnostics-provider
+  regressions, the native compile/run, normal documentation tests, and
+  `git diff --check` passed.
 
 ---
 
