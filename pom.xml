@@ -163,6 +163,7 @@
             <id>boot4-spike</id>
             <properties>
                 <spring-boot.version>4.0.0</spring-boot.version>
+                <resilience4j.version>2.4.0</resilience4j.version>
                 <maven.deploy.skip>true</maven.deploy.skip>
                 <skipPublishing>true</skipPublishing>
             </properties>

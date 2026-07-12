@@ -1,8 +1,15 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
 import io.github.huynhngochuyhoang.httpstarter.core.Jackson3ReactiveHttpClientJsonCodec;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientJsonCodec;
 import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import io.github.resilience4j.retry.RetryRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.MeterBinder;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
@@ -126,6 +133,22 @@ class Boot4AutoConfigurationTest {
     }
 
     @Test
+    void activatesEachResilienceMetricsBinderWhenRegistriesArePresent() {
+        contextRunner
+                .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(CircuitBreakerRegistry.class, CircuitBreakerRegistry::ofDefaults)
+                .withBean(RetryRegistry.class, RetryRegistry::ofDefaults)
+                .withBean(BulkheadRegistry.class, BulkheadRegistry::ofDefaults)
+                .withBean(RateLimiterRegistry.class, RateLimiterRegistry::ofDefaults)
+                .run(context -> assertThat(context.getBeansOfType(MeterBinder.class))
+                        .containsKeys(
+                                "reactiveHttpCircuitBreakerMeterBinder",
+                                "reactiveHttpRetryMeterBinder",
+                                "reactiveHttpBulkheadMeterBinder",
+                                "reactiveHttpRateLimiterMeterBinder"));
+    }
+
+    @Test
     void startsWhenOptionalActuatorModulesAreAbsent() {
         contextRunner
                 .withClassLoader(new FilteredClassLoader(
@@ -134,6 +157,30 @@ class Boot4AutoConfigurationTest {
                 .withPropertyValues("reactive.http.observability.diagnostics-endpoint.enabled=true")
                 .run(context -> {
                     assertThat(context.getBeansOfType(WebClient.Builder.class)).hasSize(1);
+                    assertThat(context).doesNotHaveBean("reactiveHttpClientHealthIndicator");
+                    assertThat(context).doesNotHaveBean("reactiveHttpClientDiagnosticsEndpoint");
+                });
+    }
+
+    @Test
+    void startsWithAllOptionalIntegrationNamespacesHidden() {
+        contextRunner
+                .withClassLoader(new FilteredClassLoader(
+                        "io.github.resilience4j",
+                        "io.micrometer",
+                        "io.opentelemetry",
+                        "org.springframework.boot.actuate",
+                        "org.springframework.boot.health"))
+                .withPropertyValues(
+                        "reactive.http.observability.diagnostics-endpoint.enabled=true",
+                        "reactive.http.clients.minimal.base-url=http://minimal.example",
+                        "reactive.http.clients.minimal.resilience.enabled=true",
+                        "reactive.http.clients.minimal.resilience.strict-unsafe-retry-validation=true")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBeansOfType(WebClient.Builder.class)).hasSize(1);
+                    assertThat(context).hasSingleBean(ReactiveHttpClientDiagnosticsProvider.class);
+                    assertThat(context).doesNotHaveBean("micrometerHttpClientObserver");
                     assertThat(context).doesNotHaveBean("reactiveHttpClientHealthIndicator");
                     assertThat(context).doesNotHaveBean("reactiveHttpClientDiagnosticsEndpoint");
                 });

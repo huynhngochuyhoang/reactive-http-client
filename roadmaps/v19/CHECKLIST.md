@@ -282,28 +282,39 @@ Evidence:
 
 ## Priority 7 — Optional Integrations and Resilience
 
-### [ ] 7.1 Preserve optional activation and no-op behavior
+### [x] 7.1 Preserve optional activation and no-op behavior
 
-- [ ] Review Resilience4j compatibility with Framework 7 and the selected
+- [x] Review Resilience4j compatibility with Framework 7 and the selected
       Reactor line.
-- [ ] Keep Resilience4j dependencies optional and version-managed explicitly.
-- [ ] Verify no-registry/no-operator fallback behavior.
-- [ ] Verify retry, circuit breaker, rate limiter, bulkhead, and metrics
+- [x] Keep Resilience4j dependencies optional and version-managed explicitly.
+- [x] Verify no-registry/no-operator fallback behavior.
+- [x] Verify retry, circuit breaker, rate limiter, bulkhead, and metrics
       independently.
-- [ ] Verify strict retry diagnostics match actual operator availability.
-- [ ] Verify Micrometer observer and health activation/back-off.
-- [ ] Verify OTel observer, propagation, semantic attributes, and back-off.
-- [ ] Verify OAuth2 client credentials under Boot 4 codecs.
-- [ ] Verify AWS SigV4 under Boot 4 codecs and transport.
-- [ ] Keep diagnostics endpoint and health details opt-in and sanitized.
-- [ ] Add minimal-classpath tests without Actuator, Micrometer, OTel, or
+- [x] Verify strict retry diagnostics match actual operator availability.
+- [x] Verify Micrometer observer and health activation/back-off.
+- [x] Verify OTel observer, propagation, semantic attributes, and back-off.
+- [x] Verify OAuth2 client credentials under Boot 4 codecs.
+- [x] Verify AWS SigV4 under Boot 4 codecs and transport.
+- [x] Keep diagnostics endpoint and health details opt-in and sanitized.
+- [x] Add minimal-classpath tests without Actuator, Micrometer, OTel, or
       Resilience4j.
-- [ ] Check published POMs for accidental transitive optional integrations.
-- [ ] Run focused optional-integration tests and `git diff --check`.
+- [x] Check published POMs for accidental transitive optional integrations.
+- [x] Run focused optional-integration tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Maven Central published `resilience4j-spring-boot4:2.4.0`; the isolated Boot 4 profile now manages the matching Resilience4j `2.4.0` BOM while the Boot 3.5 maintenance line remains on `2.2.0`.
+- Full Boot 4.0.0 and 4.1.0 starter, test-helper, and OTel suites passed with Framework 7, their Boot-managed Reactor lines, and Resilience4j 2.4.0.
+- Operator tests independently covered retry, circuit breaker failure recording, saturated bulkhead rejection, rate-limiter rejection, and null-registry/no-op pass-through. Boot 4 auto-configuration coverage verifies all four tagged metrics binders independently.
+- Strict retry startup and support diagnostics remain gated by actual Retry operator availability and configured multi-attempt instances; unavailable operators continue to report disabled.
+- Micrometer observer, bounded health details, disabled/missing-registry back-off, and missing-Micrometer startup paths passed. Diagnostics endpoint discovery remains opt-in and snapshots/health details remain sanitized.
+- OTel companion tests passed API absence back-off, observer activation, starter-builder propagation, W3C trace/baggage propagation, semantic attributes, and disabled propagation.
+- OAuth2 token success, refresh, malformed/HTTP error sanitization, typed decoding, and configured WebClient codec tests passed under Boot 4. SigV4 tests passed exact raw-body hashing, unsupported-body rejection, and authenticated JSON wire-byte parity.
+- Added a combined Boot 4 minimal-classpath fixture hiding Resilience4j, Micrometer core, OTel, Actuator endpoint, and health namespaces; the core WebClient and static diagnostics provider still start without optional beans.
+- Source and generated POM checks keep Resilience4j, `micrometer-core`, and Actuator optional. A clean `2.14.1` consumer runtime tree contained no Resilience4j module, `micrometer-core`, Actuator, or OTel dependency; Spring WebFlux retained only its own `micrometer-observation` dependency.
+- Updated `docs/07-resilience4j.md` with separate Boot 3.5 and Boot 4 dependency guidance and recorded optional-integration ownership in `docs/20-native-release-compatibility.md`.
+- Normal Boot 3.5 documentation, auto-configuration, operator, and strict-diagnostics tests passed.
+- `git diff --check` passed.
 
 ---
 
