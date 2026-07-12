@@ -535,3 +535,19 @@ codecs, while deterministic diagnostics and contract snapshots require no
 application mapper. Boot 4 tests cover Jackson 2 absence, Problem Detail, naming
 strategy, Java time, unknown properties, and mock-helper byte parity. See the
 [Jackson migration guide](28-spring-boot-4-jackson-migration.md).
+
+### V19 optional integrations on Boot 4
+
+The isolated Boot 4 profile manages Resilience4j `2.4.0`, including the
+published `resilience4j-spring-boot4` generation, while the Boot 3.5 maintenance
+line remains on `2.2.0`. Retry, circuit breaker, bulkhead, rate limiter, and
+tagged metrics tests pass with Spring Framework 7 and the Boot-managed Reactor
+line. A combined minimal-classpath test hides Resilience4j, Micrometer core,
+Actuator health/endpoint APIs, and OpenTelemetry while retaining the starter
+WebClient and static sanitized diagnostics provider.
+
+A clean consumer dependency tree contains no Resilience4j module,
+`micrometer-core`, Actuator, or OpenTelemetry dependency. Spring WebFlux still
+owns its normal `micrometer-observation` dependency. The OTel companion remains
+explicit opt-in and activates observer, propagation, and semantic attributes
+only when its API and beans are present.

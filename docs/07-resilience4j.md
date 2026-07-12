@@ -6,7 +6,11 @@ The starter provides opt-in Resilience4j support per client: retry, rate limiter
 
 ## Dependencies
 
-Add these to your application's `pom.xml`:
+Resilience4j is optional. Add the generation-specific Spring Boot integration
+and Reactor adapter to the consuming application; the starter does not pull
+them transitively.
+
+Spring Boot 3.5 maintenance applications use the managed `2.2.x` line:
 
 ```xml
 <dependency>
@@ -18,6 +22,22 @@ Add these to your application's `pom.xml`:
   <artifactId>resilience4j-reactor</artifactId>
 </dependency>
 ```
+
+Spring Boot 4 applications use the published Resilience4j `2.4.x` Boot 4 line:
+
+```xml
+<dependency>
+  <groupId>io.github.resilience4j</groupId>
+  <artifactId>resilience4j-spring-boot4</artifactId>
+</dependency>
+<dependency>
+  <groupId>io.github.resilience4j</groupId>
+  <artifactId>resilience4j-reactor</artifactId>
+</dependency>
+```
+
+Keep all Resilience4j modules on one BOM-managed version. The V19 Boot 4 build
+uses `2.4.0`; the Boot 3.5 maintenance build remains on `2.2.0`.
 
 ---
 
