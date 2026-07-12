@@ -206,7 +206,7 @@ public final class MockReactiveHttpClient<T> {
         private ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
         private ResilienceOperatorApplier resilienceOperatorApplier = new NoopResilienceOperatorApplier();
         private AuthProvider authProvider;
-        private ObjectMapper objectMapper;
+        private ReactiveHttpClientJsonCodec jsonCodec;
         private HttpClientObserver observer;
         private final List<ReactiveHttpClientLifecycleHook> lifecycleHooks = new ArrayList<>();
 
@@ -257,9 +257,17 @@ public final class MockReactiveHttpClient<T> {
             return this;
         }
 
-        /** Uses the application ObjectMapper for auth-aware JSON request serialization. */
+        /** @deprecated Use {@link #jsonCodec(ReactiveHttpClientJsonCodec)}. */
+        @Deprecated(since = "3.0.0", forRemoval = false)
         public Builder<T> objectMapper(ObjectMapper objectMapper) {
-            this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
+            this.jsonCodec = new Jackson2ReactiveHttpClientJsonCodec(
+                    Objects.requireNonNull(objectMapper, "objectMapper"));
+            return this;
+        }
+
+        /** Uses the application JSON codec for auth-aware request byte materialization. */
+        public Builder<T> jsonCodec(ReactiveHttpClientJsonCodec jsonCodec) {
+            this.jsonCodec = Objects.requireNonNull(jsonCodec, "jsonCodec");
             return this;
         }
 
@@ -371,17 +379,17 @@ public final class MockReactiveHttpClient<T> {
             }
             appCtx.refresh();
 
-            ObjectMapper effectiveObjectMapper = objectMapper;
+            ReactiveHttpClientJsonCodec effectiveJsonCodec = jsonCodec;
             if (authProvider != null) {
                 if (!clientConfig.hasAuthConfigured()) {
                     clientConfig.setAuthProvider("mock-auth-provider");
                 }
-                if (effectiveObjectMapper == null) {
-                    effectiveObjectMapper = new ObjectMapper();
+                if (effectiveJsonCodec == null) {
+                    effectiveJsonCodec = new MockJsonCodecFactory().create();
                 }
             }
 
-            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+            ReactiveClientInvocationHandler handler = ReactiveClientInvocationHandler.create(
                     webClient,
                     new MethodMetadataCache(),
                     new RequestArgumentResolver(),
@@ -391,7 +399,7 @@ public final class MockReactiveHttpClient<T> {
                     clientInterface,
                     appCtx,
                     resilienceOperatorApplier,
-                    effectiveObjectMapper,
+                    effectiveJsonCodec,
                     new ReactiveHttpClientProperties.ObservabilityConfig()
             );
 

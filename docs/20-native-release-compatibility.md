@@ -218,6 +218,7 @@ the POM include set or lacks an explicit support status.
 | `io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache` | Replaceable metadata cache | `methodMetadataCache` bean replacement | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata*` | Metadata cache model | Public metadata returned by cache implementations | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper` | Problem Detail mapper | Built-in RFC 9457 mapper | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.*ReactiveHttpClientJsonCodec` | JSON codec SPI and generation adapters | Starter-owned JSON byte materialization and migration compatibility | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer` | WebClient builder customizer SPI | Per-client builder filters and codecs | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext` | Lifecycle hook context | Attempt/subscription metadata | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook` | Lifecycle hook SPI | Audit and side-effect callbacks | Supported |
@@ -518,3 +519,19 @@ Expand the matrix before release when adding support for another Java or Spring
 Boot baseline. Core starter AOT/native smoke ownership is distinct from optional
 integration ownership: Resilience4j, alternate TLS providers, and OpenTelemetry
 exporters must supply their own native support where needed.
+
+### V19 Jackson 3 codec ownership
+
+`ReactiveHttpClientJsonCodec` is the serialization boundary for bytes owned by
+the starter. Boot 3 selects the deprecated Jackson 2 adapter; Boot 4 selects
+`Jackson3ReactiveHttpClientJsonCodec` from the application Jackson 3 mapper.
+The effective Boot 4 POM marks Jackson 2 optional and owns Jackson 3 through
+`spring-boot-jackson` and `tools.jackson.core:jackson-databind`.
+
+Authenticated JSON is serialized once. The resulting `byte[]` is both the raw
+body supplied to auth/signing and the body written by WebClient. Problem Detail
+uses the same codec. OAuth2 token/error decoding remains on configured WebClient
+codecs, while deterministic diagnostics and contract snapshots require no
+application mapper. Boot 4 tests cover Jackson 2 absence, Problem Detail, naming
+strategy, Java time, unknown properties, and mock-helper byte parity. See the
+[Jackson migration guide](28-spring-boot-4-jackson-migration.md).

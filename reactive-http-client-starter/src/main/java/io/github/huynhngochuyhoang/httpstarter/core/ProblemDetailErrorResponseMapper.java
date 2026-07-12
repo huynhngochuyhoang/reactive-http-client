@@ -15,10 +15,16 @@ import java.util.Optional;
  */
 public class ProblemDetailErrorResponseMapper implements ErrorResponseMapper {
 
-    private final ObjectMapper objectMapper;
+    private final ReactiveHttpClientJsonCodec jsonCodec;
 
+    public ProblemDetailErrorResponseMapper(ReactiveHttpClientJsonCodec jsonCodec) {
+        this.jsonCodec = Objects.requireNonNull(jsonCodec, "jsonCodec must not be null");
+    }
+
+    /** @deprecated Use {@link #ProblemDetailErrorResponseMapper(ReactiveHttpClientJsonCodec)}. */
+    @Deprecated(since = "3.0.0", forRemoval = false)
     public ProblemDetailErrorResponseMapper(ObjectMapper objectMapper) {
-        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+        this(new Jackson2ReactiveHttpClientJsonCodec(objectMapper));
     }
 
     @Override
@@ -33,7 +39,7 @@ public class ProblemDetailErrorResponseMapper implements ErrorResponseMapper {
             return Optional.empty();
         }
 
-        ProblemDetail problemDetail = objectMapper.readValue(context.responseBody(), ProblemDetail.class);
+        ProblemDetail problemDetail = jsonCodec.read(context.responseBody().getBytes(java.nio.charset.StandardCharsets.UTF_8), ProblemDetail.class);
         if (statusCode < 500) {
             return Optional.of(new ProblemDetailHttpClientException(
                     statusCode,

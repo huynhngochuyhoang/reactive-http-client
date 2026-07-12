@@ -870,7 +870,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
-    void strictBodySigningValidationRejectsJsonBodyWhenObjectMapperUnavailable() {
+    void strictBodySigningValidationRejectsJsonBodyWhenJsonCodecUnavailable() {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
 
@@ -881,7 +881,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("failed strict body-signing validation")
                     .hasMessageContaining("bodyShape=json(java.util.Map)")
-                    .hasMessageContaining("JSON body signing requires an ObjectMapper bean");
+                    .hasMessageContaining("JSON body signing requires a ReactiveHttpClientJsonCodec bean");
         } finally {
             factoryBean.destroy();
         }
@@ -1624,6 +1624,11 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ObjectProvider<ObjectMapper> objectMapperProvider = mock(ObjectProvider.class);
         when(objectMapperProvider.getIfAvailable()).thenReturn(objectMapper);
         when(ctx.getBeanProvider(ObjectMapper.class)).thenReturn(objectMapperProvider);
+
+        ObjectProvider<ReactiveHttpClientJsonCodec> jsonCodecProvider = mock(ObjectProvider.class);
+        when(jsonCodecProvider.getIfAvailable()).thenReturn(
+                objectMapper == null ? null : new Jackson2ReactiveHttpClientJsonCodec(objectMapper));
+        when(ctx.getBeanProvider(ReactiveHttpClientJsonCodec.class)).thenReturn(jsonCodecProvider);
 
         ReactiveHttpClientFactoryBean<T> factoryBean = new ReactiveHttpClientFactoryBean<>();
         factoryBean.setType(type);

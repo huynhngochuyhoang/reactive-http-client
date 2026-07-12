@@ -57,7 +57,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 @ImportRuntimeHints(ReactiveHttpClientRuntimeHints.class)
 @org.springframework.context.annotation.Import({
         BootWebClientCustomizersConfiguration.class,
-        BootHealthIndicatorAutoConfiguration.class
+        BootHealthIndicatorAutoConfiguration.class,
+        BootJsonCodecAutoConfiguration.class
 })
 public class ReactiveHttpClientAutoConfiguration {
 
