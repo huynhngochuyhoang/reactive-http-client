@@ -48,3 +48,11 @@ mock clients with `jsonCodec(...)`. `Jackson2ReactiveHttpClientJsonCodec` is
 available only for Boot 3/source migration and is deprecated. Boot 4 marks its
 Jackson 2 dependency optional; default consumers use Jackson 3 and do not need a
 Jackson 2 mapper.
+
+## Transport header ownership
+
+The `3.x` transport rejects application-supplied `Content-Length`,
+`Transfer-Encoding`, `Connection`, `Expect`, and `Host` values from defaults,
+method parameters, header maps, inbound forwarding, and client customizers.
+Reactor Netty computes these framing and authority headers. An attempted override
+fails before network I/O with `IllegalArgumentException`.

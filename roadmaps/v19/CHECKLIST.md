@@ -243,32 +243,40 @@ Evidence:
 
 ## Priority 6 — Framework 7 and Transport Correctness
 
-### [ ] 6.1 Revalidate request framing and response ownership
+### [x] 6.1 Revalidate request framing and response ownership
 
-- [ ] Run real-server JSON, `ResponseEntity`, streaming, bodiless, redirect,
+- [x] Run real-server JSON, `ResponseEntity`, streaming, bodiless, redirect,
       timeout, cancellation, and error-drain tests on the Boot 4 stack.
-- [ ] Add a raw HTTP/1.1 fixture that sends POST then PUT on one persistent
+- [x] Add a raw HTTP/1.1 fixture that sends POST then PUT on one persistent
       connection.
-- [ ] Confirm the normal sequence produces no decoder warning or leaked bytes.
-- [ ] Add a deliberately malformed `Content-Length` fixture that reproduces a
+- [x] Confirm the normal sequence produces no decoder warning or leaked bytes.
+- [x] Add a deliberately malformed `Content-Length` fixture that reproduces a
       framing failure.
-- [ ] Verify Netty's synthetic `GET /bad-request HTTP/1.0` is reported only as a
+- [x] Verify Netty's synthetic `GET /bad-request HTTP/1.0` is reported only as a
       decoder placeholder, never as the application endpoint.
-- [ ] Audit default headers, `@HeaderParam`, header maps, customizers, and inbound
+- [x] Audit default headers, `@HeaderParam`, header maps, customizers, and inbound
       forwarding for hop-by-hop/framing headers.
-- [ ] Define supported behavior for `Content-Length`, `Transfer-Encoding`,
+- [x] Define supported behavior for `Content-Length`, `Transfer-Encoding`,
       `Connection`, `Expect`, and `Host` overrides.
-- [ ] Cover direct loopback and one representative proxy or sidecar path where
+- [x] Cover direct loopback and one representative proxy or sidecar path where
       available.
-- [ ] Revalidate HTTP/1.1, TLS H2, and H2C separately.
-- [ ] Revalidate unexpected bodiless responses and pooled connection reuse.
-- [ ] Revalidate streaming body ownership after outer publisher completion.
-- [ ] Document the full decoder cause required for future transport reports.
-- [ ] Run transport-focused tests and `git diff --check`.
+- [x] Revalidate HTTP/1.1, TLS H2, and H2C separately.
+- [x] Revalidate unexpected bodiless responses and pooled connection reuse.
+- [x] Revalidate streaming body ownership after outer publisher completion.
+- [x] Document the full decoder cause required for future transport reports.
+- [x] Run transport-focused tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added `Framework7TransportCorrectnessTest`: a raw socket sends POST then PUT on one persistent HTTP/1.1 connection and proves the same channel receives exact body boundaries without leaked bytes.
+- The malformed `Content-Length: invalid` fixture deterministically reproduces Reactor Netty's decoder warning and HTTP 400. It proves `POST /orders` never reaches the application handler and any surfaced route is only the synthetic `GET /bad-request`.
+- Added a final outbound filter that rejects application-supplied `Content-Length`, `Transfer-Encoding`, `Connection`, `Expect`, and `Host` after client customizers. Transport-generated headers remain connector-owned; ordinary end-to-end headers remain supported.
+- Direct loopback coverage passed. No representative CONNECT-capable proxy or sidecar was available in the local harness; existing proxy selection/configuration tests remain green and no proxy runtime claim is made.
+- Real H2C negotiation passed, TLS H2 integration passed, and the raw fixture covered persistent HTTP/1.1.
+- Boot 4.0.0 and 4.1.0 focused matrices passed JSON, `ResponseEntity`, delayed streaming-envelope consumption, bodiless connection reuse, redirects, timeout/cancellation reporting, truncated error draining, TLS H2, and H2C.
+- `docs/12-proxy-tls.md` now defines transport-owned headers, distinguishes Netty's synthetic decoder placeholder from the application endpoint, and lists the complete decoder context required in future incident reports.
+- Normal Boot 3.5 focused transport tests passed.
+- `git diff --check` passed.
 
 ---
 

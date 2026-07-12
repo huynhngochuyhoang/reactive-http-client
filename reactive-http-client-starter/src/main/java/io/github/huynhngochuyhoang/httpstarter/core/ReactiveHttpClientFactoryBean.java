@@ -50,6 +50,12 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     private static final int MAX_CODEC_MAX_IN_MEMORY_SIZE_MB = Integer.MAX_VALUE / (1024 * 1024);
     private static final Set<String> SUPPORTED_OUTBOUND_HTTP_METHODS = Set.of(
             "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS");
+    private static final Set<String> UNSAFE_APPLICATION_REQUEST_HEADERS = Set.of(
+            HttpHeaders.CONTENT_LENGTH.toLowerCase(Locale.ROOT),
+            HttpHeaders.TRANSFER_ENCODING.toLowerCase(Locale.ROOT),
+            HttpHeaders.CONNECTION.toLowerCase(Locale.ROOT),
+            HttpHeaders.EXPECT.toLowerCase(Locale.ROOT),
+            HttpHeaders.HOST.toLowerCase(Locale.ROOT));
 
     private Class<T> type;
     private ApplicationContext applicationContext;
@@ -305,8 +311,23 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     customizer.customize(finalConfigured);
                 });
 
+        finalConfigured.filter(outboundFramingHeaderFilter());
         finalConfigured.filter(ReactiveClientInvocationHandler.finalRequestObservationFilter());
         return configured.build();
+    }
+
+    static ExchangeFilterFunction outboundFramingHeaderFilter() {
+        return (request, next) -> {
+            for (Map.Entry<String, List<String>> header : request.headers().headerSet()) {
+                String headerName = header.getKey();
+                if (UNSAFE_APPLICATION_REQUEST_HEADERS.contains(headerName.toLowerCase(Locale.ROOT))) {
+                    return reactor.core.publisher.Mono.error(new IllegalArgumentException(
+                            "Application-supplied outbound header '" + headerName + "' is not supported; "
+                                    + "HTTP framing and authority headers are owned by the configured transport"));
+                }
+            }
+            return next.exchange(request);
+        };
     }
 
     static HttpClient applyHttpProtocol(HttpClient httpClient,

@@ -19,6 +19,24 @@ reactive:
 
 This keeps the starter-managed Reactor Netty connector, so global and per-client settings for connection pool, timeouts, compression, proxy, TLS/mTLS, logging, auth, and observability continue to apply.
 
+### Transport-owned request headers
+
+The starter rejects application-supplied `Content-Length`, `Transfer-Encoding`,
+`Connection`, `Expect`, and `Host` headers. This applies consistently to default
+headers, `@HeaderParam`, header maps, inbound-header forwarding, and
+`ReactiveHttpClientCustomizer` filters. Reactor Netty owns framing and authority
+for HTTP/1.1, HTTP/2, redirects, TLS, and proxy connections; headers generated
+by the connector are unaffected. Use end-to-end headers such as `Content-Type`,
+`Accept`, `Authorization`, correlation IDs, and application metadata normally.
+
+A Reactor Netty warning that renders `GET /bad-request HTTP/1.0` is a synthetic
+decoder placeholder, not evidence that the application sent that endpoint. For a
+transport incident, retain the complete warning: decoder exception and message,
+original decoded request lines, channel ID and local/remote addresses, protocol
+and TLS mode, proxy/sidecar path, and the immediately preceding requests on that
+connection. A malformed or conflicting body length can leave bytes that are then
+parsed as another request; the first decoder failure is the useful cause.
+
 ---
 
 ## HTTP proxy
