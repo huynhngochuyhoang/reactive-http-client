@@ -365,28 +365,53 @@ Evidence:
 
 ## Priority 9 — Public API and `3.0.0` Migration Guide
 
-### [ ] 9.1 Make every major-line break explicit
+### [x] 9.1 Make every major-line break explicit
 
-- [ ] Freeze the latest published `2.x` public surface map.
-- [ ] Produce a report-only API diff from published `2.x` to the `3.0.0`
+- [x] Freeze the latest published `2.x` public surface map.
+- [x] Produce a report-only API diff from published `2.x` to the `3.0.0`
       candidate.
-- [ ] Categorize every break as required, intentional, or accidental.
-- [ ] Remove unrelated accidental API breaks.
-- [ ] Preserve annotation and exception semantics where Boot 4 does not require
+- [x] Categorize every break as required, intentional, or accidental.
+- [x] Remove unrelated accidental API breaks.
+- [x] Preserve annotation and exception semantics where Boot 4 does not require
       a change.
-- [ ] Preserve lifecycle, observer, diagnostic sanitization, and retry semantics.
-- [ ] Document dependency and package changes.
-- [ ] Document Jackson 2 to Jackson 3 migration.
-- [ ] Document Actuator, AOT/native, configuration, and test-helper changes.
-- [ ] Add complete Boot 3 `2.x` and Boot 4 `3.x` Maven examples.
-- [ ] Add complete before/after YAML examples.
-- [ ] Add metadata deprecations or replacements for changed properties.
-- [ ] Run public-surface documentation and compatibility-fixture tests.
-- [ ] Run `git diff --check`.
+- [x] Preserve lifecycle, observer, diagnostic sanitization, and retry semantics.
+- [x] Document dependency and package changes.
+- [x] Document Jackson 2 to Jackson 3 migration.
+- [x] Document Actuator, AOT/native, configuration, and test-helper changes.
+- [x] Add complete Boot 3 `2.x` and Boot 4 `3.x` Maven examples.
+- [x] Add complete before/after YAML examples.
+- [x] Add metadata deprecations or replacements for changed properties.
+- [x] Run public-surface documentation and compatibility-fixture tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Froze the published `2.14.0` starter, test-helper, and OTel surface through
+  the documented japicmp include map and added the source-controlled
+  `docs/api-report-2.14.0-to-3.0.0-candidate.md` review summary.
+- Added `major-api-report`, which changes only binary-break failure and missing
+  generation-class handling for an explicit cross-major report. Strict defaults
+  remain enabled for the normal `api-compatibility` profile.
+- The Boot 4 report found one binary/source incompatibility: Boot 3
+  `HttpClientHealthIndicator` is replaced by `Boot4HttpClientHealthIndicator`
+  because Boot 4 relocated health contracts and changed the `health()` return
+  type. The guide provides the direct-type and stable bean-name migration.
+- Classified JSON codec, Jackson 2/3 adapters, Problem Detail codec constructor,
+  and mock `jsonCodec(...)` support as intentional additive migration APIs. No
+  accidental or unrelated break was found.
+- Japicmp reported no changes to annotations, exception categories, lifecycle,
+  observer, diagnostics sanitization, retry/idempotency, request-context, auth
+  SPI, or OTel observer/filter contracts.
+- Expanded `docs/28-spring-boot-4-jackson-migration.md` with complete Boot 3
+  `2.x` and Boot 4 `3.x` Maven examples, unchanged before/after YAML, package
+  and module moves, Jackson 3 codec ownership, Actuator, AOT/native,
+  Resilience4j, transport, and test-helper migration instructions.
+- No `reactive.http.*` property changed for Boot 4, so no new replacement was
+  invented. Existing timeout metadata deprecations remain intact; the public
+  surface inventory now identifies the intentional Jackson 2 migration shims.
+- The report-only Boot 4 comparison passed for all three modules. The strict
+  Boot 3 comparison against published `2.14.0`, compatibility fixtures,
+  documentation/metadata tests, and `git diff --check` passed.
 
 ---
 
