@@ -61,26 +61,53 @@ Evidence:
 
 ## Priority 2 - Establish the Actual `3.x` Reactor
 
-### [ ] 2.1 Make Boot 4 the default development line
+### [x] 2.1 Make Boot 4 the default development line
 
-- [ ] Move reactor and module coordinates to the selected `3.0.0` development version.
-- [ ] Set Spring Boot 4 dependency management as the default build baseline.
-- [ ] Keep Java 21 as the project minimum unless a separate decision changes it.
-- [ ] Promote Boot 4 production sources out of spike-only profile selection.
-- [ ] Remove `maven.deploy.skip` and equivalent non-publishing defaults from the
+- [x] Move reactor and module coordinates to the selected `3.0.0` development version.
+- [x] Set Spring Boot 4 dependency management as the default build baseline.
+- [x] Keep Java 21 as the project minimum unless a separate decision changes it.
+- [x] Promote Boot 4 production sources out of spike-only profile selection.
+- [x] Remove `maven.deploy.skip` and equivalent non-publishing defaults from the
       intended `3.x` release path.
-- [ ] Prevent Boot 3 adapters from compiling or packaging in the `3.x` reactor.
-- [ ] Remove `spring-boot-starter-classic` from all production dependency graphs.
-- [ ] Keep any `2.x` build support in its maintenance lane, not in the `3.x` jar.
+- [x] Prevent Boot 3 adapters from compiling or packaging in the `3.x` reactor.
+- [x] Remove `spring-boot-starter-classic` from all production dependency graphs.
+- [x] Keep any `2.x` build support in its maintenance lane, not in the `3.x` jar.
 
-### [ ] 2.2 Verify default-build identity
+### [x] 2.2 Verify default-build identity
 
-- [ ] Run `mvn verify` without `-Pboot4-spike`.
-- [ ] Verify all generated manifests, POMs, metadata, docs, and support snapshots
+- [x] Run `mvn verify` without `-Pboot4-spike`.
+- [x] Verify all generated manifests, POMs, metadata, docs, and support snapshots
       report the same `3.x` version.
-- [ ] Verify no normal release command depends on the old spike profile.
-- [ ] Add a build guard that rejects Boot 3 implementation leakage into `3.x` artifacts.
-- [ ] Run `git diff --check`.
+- [x] Verify no normal release command depends on the old spike profile.
+- [x] Add a build guard that rejects Boot 3 implementation leakage into `3.x` artifacts.
+- [x] Run `git diff --check`.
+
+Evidence:
+
+- The root and all published modules now declare `3.0.0`, use Java 21, import
+  Spring Boot `4.0.0`, manage Resilience4j `2.4.0`, and compare across the major
+  boundary with published `2.14.1`. Maven reports no active default profile.
+- Boot 4 WebClient, health, Jackson 3, OTel, test-helper, and benchmark adapters
+  now live under normal `src/main` and `src/test` roots. The spike profile,
+  build-helper source selection, publishing skips, and Boot 3 implementation
+  adapters were removed; the deprecated Jackson 2 migration shim remains an
+  optional compatibility dependency for the later public-API migration work.
+- The starter dependency tree resolves Boot `4.0.0` focused modules and contains
+  no `spring-boot-starter-classic`. CI release smoke now covers Boot `4.0.0` and
+  `4.1.0`, while Boot 3.5 maintenance remains reconstructable from `v2.14.1`.
+- `DocumentationReleaseArtifactTest` now rejects the old spike profile,
+  publishing skips, Boot 3 adapter paths, classic starter dependency, and a
+  non-Boot-4 release-smoke matrix.
+- `mvn -q -s .mvn/maven-central-settings.xml test` passed, including 726 starter
+  tests and the test-helper and OTel suites.
+- `mvn -q -s .mvn/maven-central-settings.xml verify` passed without the old
+  profile and produced binary, source, and Javadoc jars for all three published
+  modules. Their packaged `pom.properties` resources report `3.0.0`.
+- `mvn -q -s .mvn/maven-central-settings.xml -Dspring-boot.version=4.1.0
+  -Prelease-smoke test` passed. Generated release evidence reports project
+  `3.0.0` and API baseline `2.14.1`; README and quick-start snippets also use
+  `3.0.0`.
+- `git diff --check` passed.
 
 ---
 

@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.huynhngochuyhoang</groupId>
         <artifactId>reactive-http-client</artifactId>
-        <version>2.14.1</version>
+        <version>3.0.0</version>
     </parent>
 
     <artifactId>reactive-http-client-starter</artifactId>
@@ -19,6 +19,19 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webclient</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-health</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- WebFlux (WebClient) -->
@@ -33,10 +46,17 @@
             <artifactId>reactor-netty-http</artifactId>
         </dependency>
 
-        <!-- Jackson for JSON -->
+        <!-- Jackson 3 is the 3.x JSON baseline. -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- Deprecated Jackson 2 source-compatibility shim. -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- Resilience4j – optional; bring your own in consuming app -->
@@ -117,33 +137,4 @@
         </dependency>
     </dependencies>
 
-    <profiles>
-        <profile>
-            <id>boot4-spike</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-webclient</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-health</artifactId>
-                    <optional>true</optional>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-jackson</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>tools.jackson.core</groupId>
-                    <artifactId>jackson-databind</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                    <artifactId>jackson-databind</artifactId>
-                    <optional>true</optional>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
 </project>

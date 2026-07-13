@@ -67,85 +67,30 @@ class DocumentationReleaseArtifactTest {
     void apiCompatibilityBaselineReleaseDocsStayAlignedWithPom() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
-        String projectVersion = projectVersion(root.resolve("pom.xml"));
-        String baselineVersion = pomProperty(pomXml, "api.compatibility.baseline.version");
-        String javaVersion = pomProperty(pomXml, "java.version");
-        String springBootVersion = pomProperty(pomXml, "spring-boot.version");
-        String resilience4jVersion = pomProperty(pomXml, "resilience4j.version");
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
 
-        assertThat(projectVersion).isNotEqualTo(baselineVersion);
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.0.0");
+        assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("2.14.1");
+        assertThat(pomProperty(pomXml, "spring-boot.version")).isEqualTo("4.0.0");
+        assertThat(pomProperty(pomXml, "resilience4j.version")).isEqualTo("2.4.0");
         assertThat(releaseDocs)
-                .contains("While the project version remains `" + projectVersion + "`")
-                .contains("the baseline stays on `" + baselineVersion + "`")
-                .contains("mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests validate")
-                .contains("mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify")
-                .contains("guard must reject\n`-Dapi.compatibility.baseline.version=" + projectVersion + "`")
-                .contains("self-comparison is never\nvalid release evidence")
-                .contains("While cutting `" + projectVersion + "`, keep `api.compatibility.baseline.version` on `"
-                        + baselineVersion + "`")
-                .contains("until the `" + projectVersion + "` artifacts are published and resolve")
-                .contains("next development\ncycle may bump the reactor to the next version")
-                .contains("update\n`api.compatibility.baseline.version` to `" + projectVersion + "`")
-                .contains("Update benchmark\npublished-baseline commands")
-                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
-                        + baselineVersion)
-                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:"
-                        + baselineVersion)
-                .contains("mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
-                        + baselineVersion)
-                .contains("### V19 baseline transition")
-                .contains("The V19 post-release transition moved the maintenance reactor to `" + projectVersion + "`")
-                .contains("published `" + baselineVersion + "` starter, test, and OTel artifacts resolved")
-                .contains("compatibility baseline and benchmark published-baseline paths now use `" + baselineVersion + "`")
-                .contains("release evidence compares the `" + projectVersion + "` candidate")
-                .contains("Diagnostics snapshot version metadata from the packaged Maven\n  `pom.properties` resource")
-                .contains("The `rhttpclients` Actuator endpoint remains optional in native images")
-                .contains("reactive.http.observability.diagnostics-endpoint.enabled")
-                .contains("## Dependency baseline readiness")
-                .contains("| Java runtime/compiler | Root `java.version`, `maven.compiler.source`, and `maven.compiler.target` | `"
-                        + javaVersion + "` is the supported baseline")
-                .contains("| Spring Boot baseline | Root `spring-boot.version` | `3.5.0` is the minimum tested baseline and `"
-                        + springBootVersion + "` is the default managed patch")
-                .contains("| Resilience4j | Root `resilience4j.version` plus `resilience4j-bom` | `"
-                        + resilience4jVersion + "` remains the optional resilience baseline")
-                .contains("Compatibility-neutral dependency maintenance includes")
-                .contains("Requires a minor release: raising the Java baseline")
-                .contains("Do not mix a baseline\nupgrade with unrelated feature work")
-                .contains("`releasePrepChecklist`")
-                .contains("Use its `manualCommands` list as the one-place pending release-work list")
-                .contains("changelog status")
-                .contains("README and quick-start version-snippet")
-                .contains("published-baseline artifact resolution commands")
-                .contains("benchmark\nsmoke/release/published-baseline commands")
-                .contains("generated-doc and Markdown-link status");
-
+                .contains("### V20 default Spring Boot 4 reactor")
+                .contains("default reactor now declares `3.0.0`")
+                .contains("uses published `2.14.1` as its cross-major compatibility baseline")
+                .contains("mvn -s .mvn/maven-central-settings.xml verify")
+                .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`");
         assertThat(benchmarkDocs)
-                .contains("The example version must match the root `api.compatibility.baseline.version`")
-                .contains("(`" + baselineVersion + "` for this release line)")
-                .contains("-Dbenchmark.starter.version=" + baselineVersion)
-                .contains("-Dbenchmark.commit=" + baselineVersion)
-                .contains("published-starter-" + baselineVersion + "/release-jmh.md")
-                .contains("For the V19 post-release transition")
-                .contains("this example now uses `" + baselineVersion + "`")
-                .contains("the maintenance reactor has been bumped to `" + projectVersion + "`")
-                .contains("published `" + baselineVersion + "`\nartifacts resolve")
-                .contains("Move both `benchmark.starter.version` and `published-starter-<version>` paths together");
-
+                .contains("-Dbenchmark.starter.version=2.14.1")
+                .contains("-Dbenchmark.commit=2.14.1")
+                .contains("published-starter-2.14.1/release-jmh.md");
         assertThat(manifest.path("publishedBaselineArtifacts"))
                 .extracting(artifact -> artifact.path("resolutionCommand").asText())
                 .containsExactly(
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
-                                + baselineVersion,
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:"
-                                + baselineVersion,
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
-                                + baselineVersion);
-        assertThat(manifest.path("benchmarkEvidence").path("publishedStarterCommand").asText())
-                .contains("-Dbenchmark.starter.version=" + baselineVersion)
-                .contains("-Dbenchmark.commit=" + baselineVersion);
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.14.1",
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.14.1",
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.14.1");
     }
 
     @Test
@@ -166,7 +111,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("<artifactId>spring-boot-starter-actuator</artifactId>");
         assertThat(workflow)
                 .contains("boot4-consumer:")
-                .contains("-Pboot4-spike -Dmaven.javadoc.skip=true install")
+                .contains("-Dmaven.javadoc.skip=true install")
                 .contains("-Dtest=Boot4MockReactiveHttpClientTest")
                 .contains("-f .github/boot4-consumer/pom.xml")
                 .contains("-Dreactive-http-client.version=\"$PROJECT_VERSION\"");
@@ -175,7 +120,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("real inherited-generic and configured")
                 .contains("OAuth2, SigV4 raw-body signing")
                 .contains("no dual-generation")
-                .contains("helper artifact is published");
+                .contains("no dual-generation helper");
     }
 
     @Test
@@ -183,25 +128,21 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String benchmarkPom = Files.readString(root.resolve("reactive-http-client-benchmarks/pom.xml"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
-        String changelog = Files.readString(root.resolve("CHANGELOG.md"));
 
         assertThat(benchmarkPom)
-                .contains("Spring Boot 4 migration candidate")
+                .contains("Spring Boot 4 release baseline")
                 .contains("benchmark.netty.artifact")
                 .contains("benchmark.jackson.artifact")
                 .contains("benchmark.micrometer.artifact")
                 .contains("benchmark.opentelemetry.artifact")
-                .contains("META-INF/*.SF");
+                .contains("META-INF/*.SF")
+                .doesNotContain("<id>boot4-spike</id>");
         assertThat(benchmarkDocs)
                 .contains("### Spring Boot 4 migration baseline")
-                .contains("-Pboot4-spike,benchmarks,benchmark-smoke")
+                .contains("-Pbenchmarks,benchmark-smoke")
+                .doesNotContain("-Pboot4-spike,benchmarks")
                 .contains("Boot 3 versus Boot 4 movement is migration context")
-                .contains("V19 does not promote this smoke report")
                 .contains("Review thresholds remain manual signals");
-        assertThat(currentReleaseChangelogSection(changelog, projectVersion(root.resolve("pom.xml"))))
-                .contains("Boot 4 benchmark baseline")
-                .contains("no public numerical claim")
-                .doesNotContain("docs/benchmark-report-3.0.0.md");
     }
 
     @Test
@@ -219,7 +160,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
         assertThat(guide)
                 .contains("<version>3.5.16</version>")
-                .contains("<reactive-http-client.version>2.14.0</reactive-http-client.version>")
+                .contains("<reactive-http-client.version>2.14.1</reactive-http-client.version>")
                 .contains("<version>4.0.0</version>")
                 .contains("<reactive-http-client.version>3.0.0</reactive-http-client.version>")
                 .contains("org.springframework.boot.webclient.WebClientCustomizer")
@@ -343,15 +284,13 @@ class DocumentationReleaseArtifactTest {
         String pomXml = Files.readString(root.resolve("pom.xml"));
 
         assertThat(releaseDocs)
-                .contains("immutable reconstruction\npoint for a security or critical correctness fix is `v2.14.1`")
-                .contains("Create a\ndedicated maintenance branch from that tag")
-                .contains("normal API compatibility\nbaseline remains `2.14.0`")
-                .contains("Once the reactor identity moves to `3.x`, update the cross-major\npublished baseline to `2.14.1`")
-                .contains("Fresh-repository resolution\nof the `2.14.1` starter, test-helper, and OTel artifacts is required");
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("2.14.1");
+                .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`")
+                .contains("Create a dedicated maintenance branch from that tag")
+                .contains("do not compile Boot 3 adapters into the `3.x` artifacts");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.0.0");
         assertThat(pomXml)
-                .contains("<spring-boot.version>3.5.16</spring-boot.version>")
-                .contains("<api.compatibility.baseline.version>2.14.0</api.compatibility.baseline.version>");
+                .contains("<spring-boot.version>4.0.0</spring-boot.version>")
+                .contains("<api.compatibility.baseline.version>2.14.1</api.compatibility.baseline.version>");
     }
 
     @Test
@@ -465,31 +404,34 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void boot4SpikeProfileIsIsolatedNonPublishingAndDocumented() throws Exception {
+    void defaultBoot4ReactorIsPublishableAndRejectsBoot3Leakage() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
-        String settings = Files.readString(root.resolve(".mvn/boot4-spike-settings.xml"));
-        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        String starterPom = Files.readString(root.resolve("reactive-http-client-starter/pom.xml"));
+        String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
+        String settings = Files.readString(root.resolve(".mvn/maven-central-settings.xml"));
 
         assertThat(pomXml)
-                .contains("<spring-boot.version>3.5.16</spring-boot.version>")
-                .contains("<id>boot4-spike</id>")
+                .contains("<version>3.0.0</version>")
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
-                .contains("<maven.deploy.skip>true</maven.deploy.skip>")
-                .contains("<skipPublishing>true</skipPublishing>");
+                .doesNotContain("<id>boot4-spike</id>")
+                .doesNotContain("<maven.deploy.skip>true</maven.deploy.skip>")
+                .doesNotContain("<skipPublishing>true</skipPublishing>");
+        assertThat(starterPom)
+                .contains("<artifactId>spring-boot-webclient</artifactId>")
+                .contains("<artifactId>spring-boot-jackson</artifactId>")
+                .contains("<groupId>tools.jackson.core</groupId>")
+                .doesNotContain("spring-boot-starter-classic")
+                .doesNotContain("build-helper-maven-plugin");
+        assertThat(workflow)
+                .doesNotContain("-Pboot4-spike")
+                .contains("spring-boot: ['4.0.0', '4.1.0']");
         assertThat(settings)
-                .contains("<id>boot4-spike-central</id>")
-                .contains("<url>https://repo.maven.apache.org/maven2</url>")
-                .contains("<mirrorOf>*</mirrorOf>");
-        assertThat(releaseDocs)
-                .contains("### V19 isolated Spring Boot 4 build spike")
-                .contains("Boot `4.0.0`, the minimum major line under\nevaluation")
-                .contains("`-Dspring-boot.version=4.1.0`")
-                .contains("Starter, test-helper, and OTel compilation now succeeds")
-                .contains("`spring-boot-webclient`, `org.springframework.boot.webclient`")
-                .contains("`spring-boot-health`, `org.springframework.boot.health.contributor`")
-                .contains("No runtime\npackage detection or `spring-boot-starter-classic` dependency is used")
-                .contains("startup when optional Actuator modules are hidden");
+                .contains("<id>maven-central</id>")
+                .contains("<url>https://repo.maven.apache.org/maven2</url>");
+        assertThat(root.resolve("reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/Boot3JsonCodecAutoConfiguration.java")).doesNotExist();
+        assertThat(root.resolve("reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/Boot3WebClientCustomizers.java")).doesNotExist();
+        assertThat(root.resolve("reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/observability/HttpClientHealthIndicator.java")).doesNotExist();
     }
 
     @Test

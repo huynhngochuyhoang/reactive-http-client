@@ -9,7 +9,7 @@ import io.github.huynhngochuyhoang.httpstarter.auth.OAuth2ClientCredentialsAuthP
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsSnapshot;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
-import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientHealthIndicator;
+import io.github.huynhngochuyhoang.httpstarter.observability.Boot4HttpClientHealthIndicator;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
@@ -35,7 +35,7 @@ import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
+import org.springframework.boot.webclient.WebClientCustomizer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -532,7 +532,7 @@ class ReactiveHttpClientAutoConfigurationTest {
     void healthIndicatorSkippedWhenHealthDisabled() {
         runner.withUserConfiguration(SimpleMeterRegistryConfig.class)
                 .withPropertyValues("reactive.http.observability.health.enabled=false")
-                .run(context -> assertThat(context).doesNotHaveBean(HttpClientHealthIndicator.class));
+                .run(context -> assertThat(context).doesNotHaveBean(Boot4HttpClientHealthIndicator.class));
     }
 
     @Test

@@ -4,23 +4,23 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.Status;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for {@link HttpClientHealthIndicator}. Uses a {@link SimpleMeterRegistry}
+ * Tests for {@link Boot4HttpClientHealthIndicator}. Uses a {@link SimpleMeterRegistry}
  * plus the real {@link MicrometerHttpClientObserver} to seed realistic
  * {@code reactive.http.client.requests} meters, then probes {@code health()} and asserts
  * on the probe-to-probe delta semantics.
  */
-class HttpClientHealthIndicatorTest {
+class Boot4HttpClientHealthIndicatorTest {
 
     @Test
     void reportsUpAndNoSamplesOnFirstProbeWithEmptyRegistry() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        HttpClientHealthIndicator indicator = indicator(registry, defaults());
+        Boot4HttpClientHealthIndicator indicator = indicator(registry, defaults());
 
         Health health = indicator.health();
 
@@ -36,7 +36,7 @@ class HttpClientHealthIndicatorTest {
         ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
         config.getHealth().setMinSamples(5);
         config.getHealth().setErrorRateThreshold(0.5);
-        HttpClientHealthIndicator indicator = indicator(registry, config);
+        Boot4HttpClientHealthIndicator indicator = indicator(registry, config);
 
         // Seed 3 successes + 7 errors = 70% error rate
         record(registry, config, "failing-client", 3, 7);
@@ -66,7 +66,7 @@ class HttpClientHealthIndicatorTest {
         ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
         config.getHealth().setMinSamples(5);
         config.getHealth().setErrorRateThreshold(0.5);
-        HttpClientHealthIndicator indicator = indicator(registry, config);
+        Boot4HttpClientHealthIndicator indicator = indicator(registry, config);
 
         record(registry, config, "healthy-client", 9, 1); // 10% error rate
 
@@ -90,7 +90,7 @@ class HttpClientHealthIndicatorTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
         config.getHealth().setMinSamples(10);
-        HttpClientHealthIndicator indicator = indicator(registry, config);
+        Boot4HttpClientHealthIndicator indicator = indicator(registry, config);
 
         // 2 errors out of 2 invocations is 100%, but below minSamples
         record(registry, config, "quiet-client", 0, 2);
@@ -115,7 +115,7 @@ class HttpClientHealthIndicatorTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
         config.getHealth().setMinSamples(5);
-        HttpClientHealthIndicator indicator = indicator(registry, config);
+        Boot4HttpClientHealthIndicator indicator = indicator(registry, config);
 
         record(registry, config, "idle-client", 3, 0);
         indicator.health();
@@ -141,7 +141,7 @@ class HttpClientHealthIndicatorTest {
         ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
         config.getHealth().setMinSamples(5);
         config.getHealth().setErrorRateThreshold(0.5);
-        HttpClientHealthIndicator indicator = indicator(registry, config);
+        Boot4HttpClientHealthIndicator indicator = indicator(registry, config);
 
         // Window 1: 10 successful calls — baseline that should NOT count toward probe #2
         record(registry, config, "flaky-client", 10, 0);
@@ -168,7 +168,7 @@ class HttpClientHealthIndicatorTest {
         ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
         config.getHealth().setMinSamples(5);
         config.getHealth().setErrorRateThreshold(0.5);
-        HttpClientHealthIndicator indicator = indicator(registry, config);
+        Boot4HttpClientHealthIndicator indicator = indicator(registry, config);
 
         record(registry, config, "healthy-client", 10, 0);
         record(registry, config, "broken-client", 2, 8);
@@ -188,10 +188,10 @@ class HttpClientHealthIndicatorTest {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static HttpClientHealthIndicator indicator(
+    private static Boot4HttpClientHealthIndicator indicator(
             SimpleMeterRegistry registry,
             ReactiveHttpClientProperties.ObservabilityConfig config) {
-        return new HttpClientHealthIndicator(registry, config);
+        return new Boot4HttpClientHealthIndicator(registry, config);
     }
 
     private static ReactiveHttpClientProperties.ObservabilityConfig defaults() {

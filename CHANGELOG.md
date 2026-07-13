@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Default Spring Boot 4 reactor.** Moved the project to `3.0.0` with Spring Boot `4.0.0`, Resilience4j `2.4.0`, and published `2.14.1` as the cross-major compatibility baseline; promoted Boot 4/Jackson 3 adapters into normal sources and removed the non-publishing `boot4-spike` profile.
+
 ## [2.14.1] - 2026-07-13
 
 ### Changed

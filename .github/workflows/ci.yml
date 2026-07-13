@@ -55,14 +55,14 @@ jobs:
       - name: Resolve current project version
         run: echo "PROJECT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)" >> "$GITHUB_ENV"
 
-      - name: Test and install isolated Boot 4 candidate
-        run: mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike -Dmaven.javadoc.skip=true install
+      - name: Install current Boot 4 reactor
+        run: mvn -B -ntp -Dmaven.javadoc.skip=true install
 
       - name: Verify Boot 4 test helper
-        run: mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike -pl reactive-http-client-test -am -Dtest=Boot4MockReactiveHttpClientTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -ntp -pl reactive-http-client-test -am -Dtest=Boot4MockReactiveHttpClientTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - name: Run assembled Boot 4 consumer
-        run: mvn -B -ntp -s .mvn/boot4-spike-settings.xml -f .github/boot4-consumer/pom.xml -Dreactive-http-client.version="$PROJECT_VERSION" test
+        run: mvn -B -ntp -f .github/boot4-consumer/pom.xml -Dreactive-http-client.version="$PROJECT_VERSION" test
 
       - name: Upload Boot 4 consumer results
         if: always()
@@ -74,7 +74,7 @@ jobs:
 
 
   api-compatibility:
-    name: Public API Compatibility (baseline 2.7.0)
+    name: Public API Compatibility (baseline 2.14.1)
     runs-on: ubuntu-latest
 
     steps:
@@ -88,7 +88,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Compare published APIs to 2.7.0
+      - name: Compare published APIs to 2.14.1
         run: mvn -B -ntp -Papi-compatibility -DskipTests verify
 
       - name: Verify compatibility guard fixtures
@@ -109,7 +109,7 @@ jobs:
       fail-fast: false
       matrix:
         java: ['21']
-        spring-boot: ['3.5.0', '3.5.16']
+        spring-boot: ['4.0.0', '4.1.0']
 
     steps:
       - name: Checkout

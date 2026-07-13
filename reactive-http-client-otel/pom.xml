@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.huynhngochuyhoang</groupId>
         <artifactId>reactive-http-client</artifactId>
-        <version>2.14.1</version>
+        <version>3.0.0</version>
     </parent>
 
     <artifactId>reactive-http-client-otel</artifactId>
@@ -26,6 +26,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webclient</artifactId>
         </dependency>
 
         <!-- OpenTelemetry API (compile) -->
@@ -74,15 +78,4 @@
         </dependency>
     </dependencies>
 
-    <profiles>
-        <profile>
-            <id>boot4-spike</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-webclient</artifactId>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
 </project>
