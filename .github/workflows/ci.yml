@@ -89,7 +89,7 @@ jobs:
           cache: maven
 
       - name: Compare published APIs to 2.14.1
-        run: mvn -B -ntp -Papi-compatibility -DskipTests verify
+        run: mvn -B -ntp -Papi-compatibility,major-api-report -DskipTests verify
 
       - name: Verify compatibility guard fixtures
         run: bash scripts/verify-api-compatibility-fixtures.sh

@@ -151,6 +151,7 @@ class DocumentationReleaseArtifactTest {
         String pomXml = Files.readString(root.resolve("pom.xml"));
         String guide = Files.readString(root.resolve("docs/28-spring-boot-4-jackson-migration.md"));
         String report = Files.readString(root.resolve("docs/api-report-2.14.0-to-3.0.0-candidate.md"));
+        String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
 
         assertThat(pomXml)
                 .contains("<id>major-api-report</id>")
@@ -158,6 +159,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("<api.compatibility.ignore-missing-classes>false</api.compatibility.ignore-missing-classes>")
                 .contains("<api.compatibility.break-on-binary-incompatible>false</api.compatibility.break-on-binary-incompatible>")
                 .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
+        assertThat(workflow)
+                .contains("mvn -B -ntp -Papi-compatibility,major-api-report -DskipTests verify")
+                .doesNotContain("mvn -B -ntp -Papi-compatibility -DskipTests verify");
         assertThat(guide)
                 .contains("<version>3.5.16</version>")
                 .contains("<reactive-http-client.version>2.14.1</reactive-http-client.version>")
