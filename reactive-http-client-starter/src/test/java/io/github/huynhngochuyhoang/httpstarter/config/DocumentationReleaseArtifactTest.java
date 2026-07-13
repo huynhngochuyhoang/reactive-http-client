@@ -149,6 +149,36 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void boot4AssembledConsumerFixtureStaysVersionAlignedAndDocumented() throws IOException {
+        Path root = projectRoot();
+        String fixturePom = Files.readString(root.resolve(".github/boot4-consumer/pom.xml"));
+        String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
+        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+
+        assertThat(fixturePom)
+                .contains("<version>4.0.0</version>")
+                .contains("<artifactId>reactive-http-client-starter</artifactId>")
+                .contains("<artifactId>reactive-http-client-test</artifactId>")
+                .contains("<artifactId>reactive-http-client-otel</artifactId>")
+                .contains("<artifactId>spring-boot-webclient</artifactId>")
+                .contains("<artifactId>spring-boot-jackson</artifactId>")
+                .contains("<groupId>tools.jackson.core</groupId>")
+                .contains("<artifactId>spring-boot-starter-actuator</artifactId>");
+        assertThat(workflow)
+                .contains("boot4-consumer:")
+                .contains("-Pboot4-spike -Dmaven.javadoc.skip=true install")
+                .contains("-Dtest=Boot4MockReactiveHttpClientTest")
+                .contains("-f .github/boot4-consumer/pom.xml")
+                .contains("-Dreactive-http-client.version=\"$PROJECT_VERSION\"");
+        assertThat(releaseDocs)
+                .contains("### Boot 4 assembled consumer fixture")
+                .contains("real inherited-generic and configured")
+                .contains("OAuth2, SigV4 raw-body signing")
+                .contains("no dual-generation")
+                .contains("helper artifact is published");
+    }
+
+    @Test
     void boot4MajorMigrationEvidenceIsCompleteAndReportOnly() throws IOException {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

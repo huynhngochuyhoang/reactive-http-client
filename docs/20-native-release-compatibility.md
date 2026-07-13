@@ -432,7 +432,11 @@ and runs the generated executable:
 
 ```bash
 mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
-  -DskipTests -Dmaven.javadoc.skip=true install
+  -Dmaven.javadoc.skip=true install
+mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
+  -pl reactive-http-client-test -am \
+  -Dtest=Boot4MockReactiveHttpClientTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/boot4-spike-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
   -Dreactive-http-client.version=2.14.1 native:compile
@@ -539,6 +543,39 @@ Expand the matrix before release when adding support for another Java or Spring
 Boot baseline. Core starter AOT/native smoke ownership is distinct from optional
 integration ownership: Resilience4j, alternate TLS providers, and OpenTelemetry
 exporters must supply their own native support where needed.
+
+### Boot 4 assembled consumer fixture
+
+The external fixture under `.github/boot4-consumer` is not a reactor module and
+cannot be published. It consumes installed artifacts through an independent
+Boot 4 POM, so missing dependencies or auto-configuration imports fail at the
+application boundary.
+
+```bash
+PROJECT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
+mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
+  -Dmaven.javadoc.skip=true install
+mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
+  -pl reactive-http-client-test -am \
+  -Dtest=Boot4MockReactiveHttpClientTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B -ntp -s .mvn/boot4-spike-settings.xml \
+  -f .github/boot4-consumer/pom.xml \
+  -Dreactive-http-client.version="$PROJECT_VERSION" test
+```
+
+The assembled application performs real inherited-generic and configured
+`@ApiRef` loopback calls and verifies strict retry startup, diagnostics,
+health, Micrometer, and OTel activation. The full `boot4-spike` reactor test
+run supplies detailed OAuth2, SigV4 raw-body signing, optional integration
+absence, redirect, streaming, bodiless, repeated-header, lifecycle, retry, and
+idempotency fixtures. The Boot 4 helper source set additionally verifies
+Jackson 3 signing bytes and final outbound metadata through
+`MockReactiveHttpClient`.
+
+The normal reactor and release-smoke matrix remain on Boot 3.5 for maintenance
+`2.x`. Generation-specific helper codec factories are selected only for the
+isolated Boot 4 candidate; no dual-generation helper artifact is published.
 
 ### V19 Jackson 3 codec ownership
 

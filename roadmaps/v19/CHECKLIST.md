@@ -417,26 +417,43 @@ Evidence:
 
 ## Priority 10 — Boot 4 Consumer and Test-Helper Fixtures
 
-### [ ] 10.1 Prove behavior in assembled applications
+### [x] 10.1 Prove behavior in assembled applications
 
-- [ ] Add a minimal Boot 4 WebFlux consumer fixture.
-- [ ] Exercise a real declarative loopback request.
-- [ ] Add inherited generic endpoint and `@ApiRef` fixtures.
-- [ ] Add OAuth2 and SigV4 fixtures.
-- [ ] Add strict retry and diagnostics endpoint fixtures.
-- [ ] Add health and OTel activation/back-off fixtures.
-- [ ] Migrate `reactive-http-client-test` to the selected serialization contract.
-- [ ] Verify lifecycle ordering and final outbound metadata.
-- [ ] Verify retry attempt counts and idempotency-key behavior.
-- [ ] Verify redirects, streaming ownership, and multi-value headers.
-- [ ] Keep Boot 3 fixtures on the `2.x` maintenance line rather than publishing
+- [x] Add a minimal Boot 4 WebFlux consumer fixture.
+- [x] Exercise a real declarative loopback request.
+- [x] Add inherited generic endpoint and `@ApiRef` fixtures.
+- [x] Add OAuth2 and SigV4 fixtures.
+- [x] Add strict retry and diagnostics endpoint fixtures.
+- [x] Add health and OTel activation/back-off fixtures.
+- [x] Migrate `reactive-http-client-test` to the selected serialization contract.
+- [x] Verify lifecycle ordering and final outbound metadata.
+- [x] Verify retry attempt counts and idempotency-key behavior.
+- [x] Verify redirects, streaming ownership, and multi-value headers.
+- [x] Keep Boot 3 fixtures on the `2.x` maintenance line rather than publishing
       a dual-generation helper jar.
-- [ ] Run consumer and helper tests from a clean local repository.
-- [ ] Run `git diff --check`.
+- [x] Run consumer and helper tests from a clean local repository.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added the independent, non-reactor `.github/boot4-consumer` application. It
+  consumes the installed candidate through a Boot 4 POM and performs real
+  loopback calls for inherited generic and configured `@ApiRef` endpoints.
+- The assembled fixture verifies strict retry startup, the `rhttpclients`
+  diagnostics endpoint, health, Micrometer observations, and OTel activation.
+  CI resolves the reactor version and supplies it explicitly to the fixture.
+- Added a Boot 4 helper source-set test using the Jackson 3 codec. It verifies
+  identical signing and wire bytes, stable generated idempotency keys across
+  retry attempts, repeated headers, ordered lifecycle callbacks, and terminal
+  observer status, attempt count, URL, and headers.
+- The full isolated Boot 4 reactor tests cover OAuth2, SigV4 raw-body signing,
+  optional-integration absence, redirect handling, streaming ownership,
+  bodiless responses, repeated headers, lifecycle callbacks, retry, and
+  idempotency. The normal Boot 3 helper artifact and tests remain unchanged.
+- Passed the full `boot4-spike` reactor suite, a clean Boot 4 candidate install,
+  the clean external consumer test, the focused Boot 4 helper test, the normal
+  Boot 3 `reactive-http-client-test` suite, the release-artifact drift test,
+  and `git diff --check`.
 
 ---
 
