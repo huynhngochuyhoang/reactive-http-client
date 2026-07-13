@@ -354,12 +354,20 @@ isolated for the future `3.x` line.
 
 ### V19 release lanes
 
-The Boot 3.5 maintenance branch is named `2.x` and is rooted at `v2.14.0`;
-`2.14.1` is its next maintenance reactor version. The line accepts security and
-critical correctness fixes, keeps API compatibility against the latest published
-`2.x` artifact, and forward-ports applicable fixes to the future `3.x` line.
-Boot 4 migration work stays isolated until the V19 `3.0.0` go/no-go gates pass.
-Do not make one published jar detect or support both Boot generations.
+V19 established the Boot 3.5 maintenance lane from `v2.14.0` and produced
+`2.14.1` as its next release. After that release, the immutable reconstruction
+point for a security or critical correctness fix is `v2.14.1`. Create a
+dedicated maintenance branch from that tag when a fix is required; do not base
+it on the Boot 4 migration work. Applicable fixes are forward-ported to the
+future `3.x` line. Do not make one published jar detect or support both Boot
+generations.
+
+The checked-in reactor still declares `2.14.1`, so its normal API compatibility
+baseline remains `2.14.0`: changing it to `2.14.1` now would compare the reactor
+with itself. Once the reactor identity moves to `3.x`, update the cross-major
+published baseline to `2.14.1` in the same change. Fresh-repository resolution
+of the `2.14.1` starter, test-helper, and OTel artifacts is required before that
+transition.
 
 The V19 audit selected **no-go** for publishing `3.0.0`. Runtime, consumer,
 AOT/native, and API migration evidence passed, but the candidate still has the

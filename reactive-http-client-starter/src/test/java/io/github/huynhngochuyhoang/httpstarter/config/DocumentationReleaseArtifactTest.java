@@ -337,6 +337,24 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v20MaintenanceLaneUsesPublishedReleaseTagWithoutSelfComparison() throws Exception {
+        Path root = projectRoot();
+        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        String pomXml = Files.readString(root.resolve("pom.xml"));
+
+        assertThat(releaseDocs)
+                .contains("immutable reconstruction\npoint for a security or critical correctness fix is `v2.14.1`")
+                .contains("Create a\ndedicated maintenance branch from that tag")
+                .contains("normal API compatibility\nbaseline remains `2.14.0`")
+                .contains("Once the reactor identity moves to `3.x`, update the cross-major\npublished baseline to `2.14.1`")
+                .contains("Fresh-repository resolution\nof the `2.14.1` starter, test-helper, and OTel artifacts is required");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("2.14.1");
+        assertThat(pomXml)
+                .contains("<spring-boot.version>3.5.16</spring-boot.version>")
+                .contains("<api.compatibility.baseline.version>2.14.0</api.compatibility.baseline.version>");
+    }
+
+    @Test
     void v16ToV17AdoptionGuideDocumentsDiagnosticsFirstStrictValidationRollout() throws IOException {
         Path root = projectRoot();
         String readme = Files.readString(root.resolve("README.md"));
