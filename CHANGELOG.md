@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Boot 4 optional integrations.** Moved the isolated Boot 4 lane to Resilience4j `2.4.0`, verified independent resilience operators and metrics, minimal-classpath back-off, Micrometer health/observer behavior, OTel propagation/semantics, OAuth2, and SigV4, while preserving optional dependency boundaries.
 - **Boot 4 AOT and native baseline.** Moved the native smoke lane to GraalVM Java 25, added a real loopback client covering inherited generic decoding, Problem Detail mapping, auth, Micrometer, diagnostics, and health, and preserved AOT client discovery from generated factory metadata.
 - **Boot 4 public API migration evidence.** Added a report-only cross-major compatibility profile, froze the published `2.14.0` public surface, categorized the required Boot 4 health API break, and expanded the `3.x` migration guide with complete Maven, YAML, Jackson, Actuator, native, and test-helper instructions.
+- **Boot 4 assembled consumer and helper fixtures.** Added an independent Boot 4 WebFlux consumer with real inherited and `@ApiRef` loopback calls, optional diagnostics/health/OTel activation, strict retry startup, and a Jackson 3 mock-helper fixture covering signing bytes, retries, idempotency, lifecycle ordering, final metadata, and repeated headers.
 
 ## [2.14.0] - 2026-07-10
 
