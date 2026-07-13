@@ -270,7 +270,8 @@ current minor line:
   `RecordedExchangeAssertions`, `ErrorCategoryAssertions`, and
   `MockHttpServerExtension`, are supported test APIs. Package-private
   constructors remain internal; public factory, builder, accessor, response,
-  retry, auth, observer, lifecycle, and assertion methods should remain
+  retry, auth, observer, lifecycle, exchange-logger, and assertion methods should
+  remain
   additive in the current minor line.
 - `ResilienceOperatorApplier.InstanceType` is a public nested enum used by
   diagnostics and contract snapshots. Do not remove or rename enum constants in
@@ -359,6 +360,12 @@ critical correctness fixes, keeps API compatibility against the latest published
 `2.x` artifact, and forward-ports applicable fixes to the future `3.x` line.
 Boot 4 migration work stays isolated until the V19 `3.0.0` go/no-go gates pass.
 Do not make one published jar detect or support both Boot generations.
+
+The V19 audit selected **no-go** for publishing `3.0.0`. Runtime, consumer,
+AOT/native, and API migration evidence passed, but the candidate still has the
+`2.14.1` maintenance identity and Boot 4 Javadoc packaging is not release-ready.
+See the [V19 release decision](29-v19-release-decision.md) for the complete gate
+record and required next actions.
 
 ### V18 baseline transition
 

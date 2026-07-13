@@ -22,9 +22,7 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Proxy;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -209,6 +207,8 @@ public final class MockReactiveHttpClient<T> {
         private ReactiveHttpClientJsonCodec jsonCodec;
         private HttpClientObserver observer;
         private final List<ReactiveHttpClientLifecycleHook> lifecycleHooks = new ArrayList<>();
+        private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> exchangeLoggers =
+                new LinkedHashMap<>();
 
         private Builder(Class<T> clientInterface) {
             this.clientInterface = clientInterface;
@@ -298,6 +298,21 @@ public final class MockReactiveHttpClient<T> {
         }
 
         /**
+         * Registers an exchange logger in the mock's isolated application context.
+         * The logger is selected when {@code @LogHttpExchange} references its concrete class.
+         */
+        public Builder<T> withExchangeLogger(HttpExchangeLogger exchangeLogger) {
+            Objects.requireNonNull(exchangeLogger, "exchangeLogger");
+            Class<? extends HttpExchangeLogger> loggerClass =
+                    exchangeLogger.getClass().asSubclass(HttpExchangeLogger.class);
+            if (exchangeLoggers.putIfAbsent(loggerClass, exchangeLogger) != null) {
+                throw new IllegalArgumentException(
+                        "HttpExchangeLogger already registered for class [" + loggerClass.getName() + "]");
+            }
+            return this;
+        }
+
+        /**
          * Enables a lightweight retry operator for mock-client tests.
          * {@code maxAttempts} includes the initial request.
          */
@@ -371,6 +386,11 @@ public final class MockReactiveHttpClient<T> {
 
             StaticApplicationContext appCtx = new StaticApplicationContext();
             appCtx.getDefaultListableBeanFactory().setDependencyComparator(AnnotationAwareOrderComparator.INSTANCE);
+            int exchangeLoggerIndex = 0;
+            for (HttpExchangeLogger exchangeLogger : exchangeLoggers.values()) {
+                appCtx.getBeanFactory().registerSingleton(
+                        "mockHttpExchangeLogger" + exchangeLoggerIndex++, exchangeLogger);
+            }
             if (observer != null) {
                 appCtx.getBeanFactory().registerSingleton("mockHttpClientObserver", observer);
             }

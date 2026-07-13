@@ -179,7 +179,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void boot4BenchmarkBaselineStaysSameStackAndSmokeOnly() throws IOException {
+    void boot4BenchmarkBaselineStaysSameStackAndSmokeOnly() throws Exception {
         Path root = projectRoot();
         String benchmarkPom = Files.readString(root.resolve("reactive-http-client-benchmarks/pom.xml"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
@@ -198,7 +198,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("Boot 3 versus Boot 4 movement is migration context")
                 .contains("V19 does not promote this smoke report")
                 .contains("Review thresholds remain manual signals");
-        assertThat(changelogSection(changelog, "Unreleased"))
+        assertThat(currentReleaseChangelogSection(changelog, projectVersion(root.resolve("pom.xml"))))
                 .contains("Boot 4 benchmark baseline")
                 .contains("no public numerical claim")
                 .doesNotContain("docs/benchmark-report-3.0.0.md");
@@ -298,6 +298,42 @@ class DocumentationReleaseArtifactTest {
                 .contains("mvn -Papi-compatibility -DskipTests verify")
                 .contains("mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify")
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh");
+    }
+
+    @Test
+    void mockExchangeLoggerRegistrationIsDocumentedAndCompatibilityCovered() throws IOException {
+        Path root = projectRoot();
+        String exchangeLogging = Files.readString(root.resolve("docs/13-exchange-logging.md"));
+        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        String pomXml = Files.readString(root.resolve("pom.xml"));
+
+        assertThat(exchangeLogging)
+                .contains("MockReactiveHttpClient` uses an isolated application context")
+                .contains(".withExchangeLogger(logger)")
+                .contains("either `@Bean` or component scanning, not\nboth");
+        assertThat(releaseDocs).contains("exchange-logger, and assertion methods");
+        assertThat(pomXml).contains("<include>io.github.huynhngochuyhoang.httpstarter.test</include>");
+    }
+
+    @Test
+    void v19NoGoDecisionKeepsBoot4BlockersAndMaintenanceLaneVisible() throws IOException {
+        Path root = projectRoot();
+        String decision = Files.readString(root.resolve("docs/29-v19-release-decision.md"));
+        String roadmap = Files.readString(root.resolve("roadmaps/v19/ROADMAP.md"));
+        String readme = Files.readString(root.resolve("README.md"));
+
+        assertThat(decision)
+                .contains("**Decision:** no-go for publishing `3.0.0`")
+                .contains("| `3.x` minimum candidate | `4.0.0`")
+                .contains("| `3.x` current candidate | `4.1.0`")
+                .contains("Artifact identity is not `3.0.0`")
+                .contains("Boot 4 release packaging fails")
+                .contains("Benchmark report promotion is explicitly deferred")
+                .contains("## `2.x` Maintenance Lane");
+        assertThat(roadmap)
+                .contains("completed with a `3.0.0` no-go decision")
+                .contains("[V19 release decision](../../docs/29-v19-release-decision.md)");
+        assertThat(readme).contains("[V19 3.0.0 Release Decision](docs/29-v19-release-decision.md)");
     }
 
     @Test

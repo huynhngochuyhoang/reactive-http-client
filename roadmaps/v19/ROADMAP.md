@@ -1,7 +1,7 @@
 # Reactive HTTP Client — Roadmap V19
 
-> **Status:** draft after `2.14.0` was released on 2026-07-10.
-> V19 prepares a Spring Boot 4 generation without silently dropping the
+> **Status:** completed with a `3.0.0` no-go decision on 2026-07-13.
+> V19 prepared a Spring Boot 4 generation without silently dropping the
 > supported Spring Boot 3.5 line or mixing a major dependency migration with
 > unrelated feature work.
 
@@ -442,3 +442,14 @@ V19 is complete when one of these outcomes is recorded:
    releasable.
 
 A root POM version change alone does not complete V19.
+
+## Recorded Outcome
+
+V19 completed with the **no-go** outcome. Boot 4 JVM, external consumer,
+AOT/native, optional-integration, API-report, and compatibility-fixture gates
+pass. Publication remains blocked because the reactor and all published modules
+still use the Boot 3.5 `2.14.1` maintenance identity, the Boot 4 profile disables
+publishing, and Boot 4 attached Javadocs still scan generation-incompatible Boot
+3 sources. See the source-controlled
+[V19 release decision](../../docs/29-v19-release-decision.md) for evidence and
+next actions. The Boot 3.5 `2.x` line remains releasable.
