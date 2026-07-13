@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.benchmarks;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.benchmarks.client.BenchmarkUser;
 import io.github.huynhngochuyhoang.httpstarter.benchmarks.client.StarterBenchmarkClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
@@ -144,16 +143,17 @@ public class StarterDiagnosticsOverheadBenchmark {
         context.refresh();
         contexts.add(context);
 
-        ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+        ReactiveClientInvocationHandler handler = ReactiveClientInvocationHandler.create(
                 benchmarkWebClient(),
                 new MethodMetadataCache(),
                 new RequestArgumentResolver(),
                 new DefaultErrorDecoder(),
                 clientConfig,
                 CLIENT_NAME,
+                StarterBenchmarkClient.class,
                 context,
                 new NoopResilienceOperatorApplier(),
-                new ObjectMapper(),
+                new BenchmarkJsonCodecFactory().create(),
                 new ReactiveHttpClientProperties.ObservabilityConfig());
 
         return (StarterBenchmarkClient) Proxy.newProxyInstance(

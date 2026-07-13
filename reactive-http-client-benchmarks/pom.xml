@@ -19,6 +19,8 @@
         <benchmark.commit>unknown</benchmark.commit>
         <benchmark.starter.version>${project.version}</benchmark.starter.version>
         <benchmark.include>.*Benchmark.*</benchmark.include>
+        <benchmark.stack.context>Spring Boot 3 maintenance baseline</benchmark.stack.context>
+        <benchmark.jackson.artifact>${com.fasterxml.jackson.core:jackson-databind:jar}</benchmark.jackson.artifact>
     </properties>
 
     <dependencies>
@@ -38,6 +40,18 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
         </dependency>
         <dependency>
             <groupId>io.github.resilience4j</groupId>
@@ -123,6 +137,16 @@
                         <configuration>
                             <finalName>benchmarks</finalName>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>io.github.huynhngochuyhoang.httpstarter.benchmarks.BenchmarkRunner</mainClass>
@@ -136,6 +160,23 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>boot4-spike</id>
+            <properties>
+                <benchmark.stack.context>Spring Boot 4 migration candidate</benchmark.stack.context>
+                <benchmark.jackson.artifact>${tools.jackson.core:jackson-databind:jar}</benchmark.jackson.artifact>
+            </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-jackson</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>tools.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
         <profile>
             <id>benchmark-smoke</id>
             <build>
@@ -158,8 +199,13 @@
                                         <argument>-Dbenchmark.starter.version=${benchmark.starter.version}</argument>
                                         <argument>-Dbenchmark.api.compatibility.baseline.version=${api.compatibility.baseline.version}</argument>
                                         <argument>-Dbenchmark.spring-boot.version=${spring-boot.version}</argument>
+                                        <argument>-Dbenchmark.stack.context=${benchmark.stack.context}</argument>
                                         <argument>-Dbenchmark.spring-webflux.artifact=${org.springframework:spring-webflux:jar}</argument>
                                         <argument>-Dbenchmark.reactor-netty.artifact=${io.projectreactor.netty:reactor-netty-http:jar}</argument>
+                                        <argument>-Dbenchmark.netty.artifact=${io.netty:netty-codec-http:jar}</argument>
+                                        <argument>-Dbenchmark.jackson.artifact=${benchmark.jackson.artifact}</argument>
+                                        <argument>-Dbenchmark.micrometer.artifact=${io.micrometer:micrometer-core:jar}</argument>
+                                        <argument>-Dbenchmark.opentelemetry.artifact=${io.opentelemetry:opentelemetry-api:jar}</argument>
                                         <argument>-Dbenchmark.commit=${benchmark.commit}</argument>
                                         <argument>-Dorg.slf4j.simpleLogger.logFile=${project.build.directory}/benchmark-logger.log</argument>
                                         <argument>-jar</argument>
@@ -210,8 +256,13 @@
                                         <argument>-Dbenchmark.starter.version=${benchmark.starter.version}</argument>
                                         <argument>-Dbenchmark.api.compatibility.baseline.version=${api.compatibility.baseline.version}</argument>
                                         <argument>-Dbenchmark.spring-boot.version=${spring-boot.version}</argument>
+                                        <argument>-Dbenchmark.stack.context=${benchmark.stack.context}</argument>
                                         <argument>-Dbenchmark.spring-webflux.artifact=${org.springframework:spring-webflux:jar}</argument>
                                         <argument>-Dbenchmark.reactor-netty.artifact=${io.projectreactor.netty:reactor-netty-http:jar}</argument>
+                                        <argument>-Dbenchmark.netty.artifact=${io.netty:netty-codec-http:jar}</argument>
+                                        <argument>-Dbenchmark.jackson.artifact=${benchmark.jackson.artifact}</argument>
+                                        <argument>-Dbenchmark.micrometer.artifact=${io.micrometer:micrometer-core:jar}</argument>
+                                        <argument>-Dbenchmark.opentelemetry.artifact=${io.opentelemetry:opentelemetry-api:jar}</argument>
                                         <argument>-Dbenchmark.commit=${benchmark.commit}</argument>
                                         <argument>-Dorg.slf4j.simpleLogger.logFile=${project.build.directory}/benchmark-logger.log</argument>
                                         <argument>-jar</argument>

@@ -459,26 +459,48 @@ Evidence:
 
 ## Priority 11 — Boot 4 Benchmark Baseline
 
-### [ ] 11.1 Re-establish same-stack performance evidence
+### [x] 11.1 Re-establish same-stack performance evidence
 
-- [ ] Run raw WebClient, Spring HTTP Interface, and starter on the same Boot 4
+- [x] Run raw WebClient, Spring HTTP Interface, and starter on the same Boot 4
       BOM and transport.
-- [ ] Re-run default success, JSON, `ResponseEntity`, and small error paths.
-- [ ] Re-run Problem Detail, diagnostics, observer, and lifecycle rows affected
+- [x] Re-run default success, JSON, `ResponseEntity`, and small error paths.
+- [x] Re-run Problem Detail, diagnostics, observer, and lifecycle rows affected
       by migration.
-- [ ] Keep no-network rows classified separately from loopback rows.
-- [ ] Label Boot 3 versus Boot 4 results as stack-migration context.
-- [ ] Do not describe cross-stack movement as a pure starter optimization.
-- [ ] Record Boot, Framework, Reactor Netty, Netty, Jackson, Micrometer, OTel,
+- [x] Keep no-network rows classified separately from loopback rows.
+- [x] Label Boot 3 versus Boot 4 results as stack-migration context.
+- [x] Do not describe cross-stack movement as a pure starter optimization.
+- [x] Record Boot, Framework, Reactor Netty, Netty, Jackson, Micrometer, OTel,
       Java, starter, baseline, and commit versions.
-- [ ] Keep thresholds as manual review signals.
-- [ ] Promote a clean source-controlled report only if release notes make a
+- [x] Keep thresholds as manual review signals.
+- [x] Promote a clean source-controlled report only if release notes make a
       public performance claim.
-- [ ] Run benchmark report/classification tests and `git diff --check`.
+- [x] Run benchmark report/classification tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added generation-selected benchmark JSON codecs: Boot 3 uses Jackson 2 and
+  Boot 4 uses Jackson 3 for starter-owned serialization and Problem Detail.
+  Raw WebClient, Spring HTTP Interface, and starter retain the shared loopback
+  server, Reactor Netty connector policy, codec limit, and validation guards.
+- Expanded report provenance with stack context, comparison policy, Spring
+  Framework, Netty, selected Jackson, Micrometer, and OpenTelemetry versions.
+  The shaded harness now removes dependency signature files so the Boot 4
+  executable benchmark JAR starts reliably.
+- The targeted Boot 4 smoke run completed with 56 JMH rows covering all three
+  clients for default GET, JSON POST, `ResponseEntity`, and small 4xx/5xx paths,
+  plus Problem Detail, Micrometer, observer, and lifecycle scenarios. Its local
+  metadata records Boot `4.0.0`, Framework/WebFlux `7.0.1`, Reactor Netty
+  `1.3.0`, Netty `4.2.7.Final`, Jackson `3.0.2`, Micrometer `1.16.0`, OTel
+  `1.55.0`, Java `21.0.8`, starter `2.14.1`, and baseline `2.14.0`.
+- Reports explicitly classify no-network rows separately, describe cross-stack
+  movement only as migration context, and keep thresholds as manual signals.
+- Report promotion is deferred: the run is smoke-only from a dirty tree and the
+  Unreleased section makes no public numerical claim. No report was copied to
+  `docs/`; a clean release-quality run is required if `3.0.0` later publishes a
+  performance claim.
+- Passed complete benchmark-module tests on Boot 3 and Boot 4, the focused
+  release-documentation suite, the targeted Boot 4 smoke matrix, and
+  `git diff --check`.
 
 ---
 

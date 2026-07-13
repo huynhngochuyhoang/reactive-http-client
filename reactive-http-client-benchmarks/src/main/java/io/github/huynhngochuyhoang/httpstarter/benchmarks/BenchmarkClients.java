@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.benchmarks;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.benchmarks.client.SpringHttpExchangeBenchmarkClient;
 import io.github.huynhngochuyhoang.httpstarter.benchmarks.client.StarterBenchmarkClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
@@ -8,6 +7,7 @@ import io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder;
 import io.github.huynhngochuyhoang.httpstarter.core.DefaultHttpExchangeLogger;
 import io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogContext;
 import io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientJsonCodec;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
@@ -99,11 +99,11 @@ final class BenchmarkClients implements AutoCloseable {
 
         StarterClientResources defaultStarter = createStarter(baseUrl, "benchmark-starter-default", config -> {}, (context, properties) -> {});
         StarterClientResources problemDetailStarter = createStarter(baseUrl, "benchmark-starter-problem-detail", config -> {}, (context, properties) -> {
-            ObjectMapper objectMapper = new ObjectMapper();
-            context.registerBean(ObjectMapper.class, () -> objectMapper);
+            ReactiveHttpClientJsonCodec jsonCodec = new BenchmarkJsonCodecFactory().create();
+            context.registerBean(ReactiveHttpClientJsonCodec.class, () -> jsonCodec);
             context.registerBean(DefaultErrorDecoder.class, () -> new DefaultErrorDecoder(
                     STARTER_CLIENT_NAME,
-                    List.of(new ProblemDetailErrorResponseMapper(objectMapper))));
+                    List.of(new ProblemDetailErrorResponseMapper(jsonCodec))));
         });
         StarterClientResources exchangeLoggingStarter = createStarter(baseUrl, "benchmark-starter-exchange-logging", config -> {
             config.setLogExchange(true);

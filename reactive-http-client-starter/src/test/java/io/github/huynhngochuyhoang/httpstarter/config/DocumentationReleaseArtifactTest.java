@@ -179,6 +179,32 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void boot4BenchmarkBaselineStaysSameStackAndSmokeOnly() throws IOException {
+        Path root = projectRoot();
+        String benchmarkPom = Files.readString(root.resolve("reactive-http-client-benchmarks/pom.xml"));
+        String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
+        String changelog = Files.readString(root.resolve("CHANGELOG.md"));
+
+        assertThat(benchmarkPom)
+                .contains("Spring Boot 4 migration candidate")
+                .contains("benchmark.netty.artifact")
+                .contains("benchmark.jackson.artifact")
+                .contains("benchmark.micrometer.artifact")
+                .contains("benchmark.opentelemetry.artifact")
+                .contains("META-INF/*.SF");
+        assertThat(benchmarkDocs)
+                .contains("### Spring Boot 4 migration baseline")
+                .contains("-Pboot4-spike,benchmarks,benchmark-smoke")
+                .contains("Boot 3 versus Boot 4 movement is migration context")
+                .contains("V19 does not promote this smoke report")
+                .contains("Review thresholds remain manual signals");
+        assertThat(changelogSection(changelog, "Unreleased"))
+                .contains("Boot 4 benchmark baseline")
+                .contains("no public numerical claim")
+                .doesNotContain("docs/benchmark-report-3.0.0.md");
+    }
+
+    @Test
     void boot4MajorMigrationEvidenceIsCompleteAndReportOnly() throws IOException {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

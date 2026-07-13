@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Boot 4 AOT and native baseline.** Moved the native smoke lane to GraalVM Java 25, added a real loopback client covering inherited generic decoding, Problem Detail mapping, auth, Micrometer, diagnostics, and health, and preserved AOT client discovery from generated factory metadata.
 - **Boot 4 public API migration evidence.** Added a report-only cross-major compatibility profile, froze the published `2.14.0` public surface, categorized the required Boot 4 health API break, and expanded the `3.x` migration guide with complete Maven, YAML, Jackson, Actuator, native, and test-helper instructions.
 - **Boot 4 assembled consumer and helper fixtures.** Added an independent Boot 4 WebFlux consumer with real inherited and `@ApiRef` loopback calls, optional diagnostics/health/OTel activation, strict retry startup, and a Jackson 3 mock-helper fixture covering signing bytes, retries, idempotency, lifecycle ordering, final metadata, and repeated headers.
+- **Boot 4 benchmark baseline.** Re-established the same-stack smoke harness for raw WebClient, Spring HTTP Interface, and the starter; recorded the complete Boot 4 dependency context, kept no-network diagnostics separate, and explicitly deferred report promotion because this release section makes no public numerical claim.
 
 ## [2.14.0] - 2026-07-10
 
