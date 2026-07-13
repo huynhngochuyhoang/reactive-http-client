@@ -186,7 +186,7 @@ from the current reactor version. While the project version remains `3.0.0`,
 the cross-major baseline stays on published `2.14.1`:
 
 ```bash
-mvn -Papi-compatibility -DskipTests verify
+mvn -Papi-compatibility,major-api-report -DskipTests verify
 bash scripts/verify-api-compatibility-fixtures.sh
 ```
 
@@ -194,12 +194,13 @@ For module-scoped compatibility checks, the inherited baseline guard must still
 run before japicmp:
 
 ```bash
-mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests validate
-mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify
+mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests validate
+mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests verify
 ```
 
-The Maven profile produces japicmp reports under each module's
-`target/japicmp/` directory and fails for binary-incompatible changes. The
+The Maven profiles produce japicmp reports under each module's
+`target/japicmp/` directory. `api-compatibility` remains strict; adding
+`major-api-report` makes this intentional cross-major comparison report-only. The
 fixture script verifies that additive APIs pass while removals of a public
 constructor, nested fluent method, or public enum constant fail. The filtered
 comparison covers the documented extension
@@ -218,9 +219,9 @@ transport/TLS applicators, and generated release-test fixtures.
 ### Documented public surface map
 
 This source-controlled map is the release contract between the public docs and
-The published `2.14.0` form of this map is frozen as the baseline for the
-[3.0.0 candidate API report](api-report-2.14.0-to-3.0.0-candidate.md).
-the `api-compatibility` japicmp include filter.
+the `api-compatibility` japicmp include filter. The published `2.14.1` form is
+frozen as the baseline for the
+[3.0.0 API report](api-report-2.14.1-to-3.0.0.md).
 `DocumentationReleaseArtifactTest` fails when a mapped pattern is missing from
 the POM include set or lacks an explicit support status.
 

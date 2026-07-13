@@ -7,7 +7,7 @@ latest published `3.x` version when consuming it from a release repository.
 Annotations, exception categories, lifecycle hooks, observers, retry and
 idempotency behavior, diagnostics sanitization, and reactive.http property names
 remain unchanged. Review the
-[2.14.0 to 3.0.0 Candidate API Report](api-report-2.14.0-to-3.0.0-candidate.md).
+[2.14.1 to 3.0.0 API Report](api-report-2.14.1-to-3.0.0.md).
 
 ## Maven dependencies
 
