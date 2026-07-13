@@ -149,6 +149,43 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void boot4MajorMigrationEvidenceIsCompleteAndReportOnly() throws IOException {
+        Path root = projectRoot();
+        String pomXml = Files.readString(root.resolve("pom.xml"));
+        String guide = Files.readString(root.resolve("docs/28-spring-boot-4-jackson-migration.md"));
+        String report = Files.readString(root.resolve("docs/api-report-2.14.0-to-3.0.0-candidate.md"));
+
+        assertThat(pomXml)
+                .contains("<id>major-api-report</id>")
+                .contains("<api.compatibility.break-on-binary-incompatible>true</api.compatibility.break-on-binary-incompatible>")
+                .contains("<api.compatibility.ignore-missing-classes>false</api.compatibility.ignore-missing-classes>")
+                .contains("<api.compatibility.break-on-binary-incompatible>false</api.compatibility.break-on-binary-incompatible>")
+                .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
+        assertThat(guide)
+                .contains("<version>3.5.16</version>")
+                .contains("<reactive-http-client.version>2.14.0</reactive-http-client.version>")
+                .contains("<version>4.0.0</version>")
+                .contains("<reactive-http-client.version>3.0.0</reactive-http-client.version>")
+                .contains("org.springframework.boot.webclient.WebClientCustomizer")
+                .contains("org.springframework.boot.health.contributor")
+                .contains("tools.jackson.databind.ObjectMapper")
+                .contains("MockReactiveHttpClient.Builder.jsonCodec")
+                .contains("No reactive.http property was renamed for Boot 4")
+                .contains("Before, Boot 3.5 and starter 2.x")
+                .contains("After, Boot 4 and starter 3.x")
+                .contains("GraalVM Java 25");
+        assertThat(report)
+                .contains("published 2.14.0", "Frozen baseline surface")
+                .contains("Required by Boot 4")
+                .contains("Intentional additive migration APIs")
+                .contains("Accidental or unrelated breaks")
+                .contains("None. There are no changes")
+                .contains("HttpClientHealthIndicator")
+                .contains("Boot4HttpClientHealthIndicator")
+                .contains("-Pboot4-spike,api-compatibility,major-api-report");
+    }
+
+    @Test
     void documentedPublicSurfaceMapMatchesApiCompatibilityIncludes() throws IOException {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
@@ -185,7 +222,8 @@ class DocumentationReleaseArtifactTest {
                 .as("api-compatibility japicmp includes")
                 .containsExactlyInAnyOrderElementsOf(documentedIncludes);
         assertThat(releaseDocs)
-                .contains("No compatibility-covered type is currently deprecated")
+                .contains("Jackson2ReactiveHttpClientJsonCodec` and mapper-based Jackson 2 overloads are")
+                .contains("No other\ncompatibility-covered type is reserved for removal")
                 .contains("### Constructor and mutable model policy")
                 .contains("The `MethodMetadata` no-arg constructor")
                 .contains("canonical\n  record constructors")

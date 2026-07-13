@@ -36,6 +36,8 @@
         <japicmp-maven-plugin.version>0.26.0</japicmp-maven-plugin.version>
         <jmh.version>1.37</jmh.version>
         <api.compatibility.baseline.version>2.14.0</api.compatibility.baseline.version>
+        <api.compatibility.break-on-binary-incompatible>true</api.compatibility.break-on-binary-incompatible>
+        <api.compatibility.ignore-missing-classes>false</api.compatibility.ignore-missing-classes>
     </properties>
 
     <dependencyManagement>
@@ -240,6 +242,14 @@
         </profile>
 
         <profile>
+            <id>major-api-report</id>
+            <properties>
+                <api.compatibility.break-on-binary-incompatible>false</api.compatibility.break-on-binary-incompatible>
+                <api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>
+            </properties>
+        </profile>
+
+        <profile>
             <id>api-compatibility</id>
             <build>
                 <plugins>
@@ -284,8 +294,9 @@
                                     <path>${project.build.directory}/${project.build.finalName}.jar</path>
                                 </file>
                             </newVersion>
-                            <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
+                            <breakBuildOnBinaryIncompatibleModifications>${api.compatibility.break-on-binary-incompatible}</breakBuildOnBinaryIncompatibleModifications>
                             <parameter>
+                                <ignoreMissingClasses>${api.compatibility.ignore-missing-classes}</ignoreMissingClasses>
                                 <accessModifier>public</accessModifier>
                                 <onlyModified>true</onlyModified>
                                 <ignoreMissingOptionalDependency>true</ignoreMissingOptionalDependency>

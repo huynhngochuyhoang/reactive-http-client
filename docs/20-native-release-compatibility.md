@@ -195,6 +195,8 @@ transport/TLS applicators, and generated release-test fixtures.
 ### Documented public surface map
 
 This source-controlled map is the release contract between the public docs and
+The published `2.14.0` form of this map is frozen as the baseline for the
+[3.0.0 candidate API report](api-report-2.14.0-to-3.0.0-candidate.md).
 the `api-compatibility` japicmp include filter.
 `DocumentationReleaseArtifactTest` fails when a mapped pattern is missing from
 the POM include set or lacks an explicit support status.
@@ -233,9 +235,11 @@ the POM include set or lacks an explicit support status.
 | `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, `RecordedExchange`, `RecordedExchangeAssertions`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | `OpenTelemetryHttpClientObserver`, `OpenTelemetryContextWebFilter`, `OpenTelemetryContextExchangeFilter`, and `OpenTelemetryHttpClientAutoConfiguration` | Supported |
 
-No compatibility-covered type is currently deprecated. If a future public type is
-reserved for removal or replacement in a future major release, mark its row as
-`Reserved` or `Deprecated` and link to the migration note in the same change.
+`Jackson2ReactiveHttpClientJsonCodec` and mapper-based Jackson 2 overloads are
+deprecated migration shims for the future `3.x` line and are documented in the
+[Boot 4 migration guide](28-spring-boot-4-jackson-migration.md). No other
+compatibility-covered type is reserved for removal. Any future deprecation must
+link to its migration note in the same change.
 
 ### Constructor and mutable model policy
 
