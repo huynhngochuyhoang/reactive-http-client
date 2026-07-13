@@ -43,6 +43,8 @@ public final class BenchmarkRunner {
                 System.getProperty("benchmark.api.compatibility.baseline.version", "unknown"));
         properties.setProperty("benchmarkCommit", System.getProperty("benchmark.commit", "unknown"));
         properties.setProperty("springBootVersion", System.getProperty("benchmark.spring-boot.version", "unknown"));
+        properties.setProperty("stackContext", System.getProperty("benchmark.stack.context", "unknown"));
+        properties.setProperty("comparisonPolicy", "same-stack only; cross-stack results are migration context");
         properties.setProperty("springWebFluxVersion", System.getProperty("benchmark.spring-webflux.version",
                 artifactVersion("benchmark.spring-webflux.artifact", "spring-webflux")
                         .or(() -> loadedSpringVersion())
@@ -53,6 +55,20 @@ public final class BenchmarkRunner {
                         .or(() -> loadedReactorNettyVersion())
                         .or(() -> mavenVersion("io.projectreactor.netty", "reactor-netty-http"))
                         .orElseGet(() -> packageVersion(HttpClient.class))));
+        properties.setProperty("springFrameworkVersion", properties.getProperty("springWebFluxVersion", "unknown"));
+        properties.setProperty("nettyVersion", artifactVersion("benchmark.netty.artifact", "netty-codec-http")
+                .or(() -> mavenVersion("io.netty", "netty-codec-http"))
+                .orElse("unknown"));
+        properties.setProperty("jacksonVersion", artifactVersion("benchmark.jackson.artifact", "jackson-databind")
+                .or(() -> mavenVersion("tools.jackson.core", "jackson-databind"))
+                .or(() -> mavenVersion("com.fasterxml.jackson.core", "jackson-databind"))
+                .orElse("unknown"));
+        properties.setProperty("micrometerVersion", artifactVersion("benchmark.micrometer.artifact", "micrometer-core")
+                .or(() -> mavenVersion("io.micrometer", "micrometer-core"))
+                .orElse("unknown"));
+        properties.setProperty("openTelemetryVersion", artifactVersion("benchmark.opentelemetry.artifact", "opentelemetry-api")
+                .or(() -> mavenVersion("io.opentelemetry", "opentelemetry-api"))
+                .orElse("unknown"));
         properties.setProperty("baselineSpringWebFluxVersion", properties.getProperty("springWebFluxVersion", "unknown"));
         properties.setProperty("baselineReactorNettyVersion", properties.getProperty("reactorNettyVersion", "unknown"));
         properties.setProperty("dependencyManagement",

@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.benchmarks;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.benchmarks.client.BenchmarkUser;
 import io.github.huynhngochuyhoang.httpstarter.benchmarks.client.StarterBenchmarkClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
@@ -50,16 +49,17 @@ public class StarterInvocationBenchmark {
                         .build()))
                 .build();
 
-        ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+        ReactiveClientInvocationHandler handler = ReactiveClientInvocationHandler.create(
                 webClient,
                 metadataCache,
                 new RequestArgumentResolver(),
                 new DefaultErrorDecoder(),
                 new ReactiveHttpClientProperties.ClientConfig(),
                 "benchmark-starter",
+                StarterBenchmarkClient.class,
                 applicationContext,
                 new NoopResilienceOperatorApplier(),
-                new ObjectMapper(),
+                new BenchmarkJsonCodecFactory().create(),
                 new ReactiveHttpClientProperties.ObservabilityConfig());
 
         starterClient = (StarterBenchmarkClient) Proxy.newProxyInstance(

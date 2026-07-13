@@ -39,9 +39,16 @@ final class BenchmarkMarkdownReport {
             "starterVersion",
             "apiCompatibilityBaselineVersion",
             "benchmarkCommit",
+            "stackContext",
+            "comparisonPolicy",
             "springBootVersion",
+            "springFrameworkVersion",
             "springWebFluxVersion",
             "reactorNettyVersion",
+            "nettyVersion",
+            "jacksonVersion",
+            "micrometerVersion",
+            "openTelemetryVersion",
             "baselineSpringWebFluxVersion",
             "baselineReactorNettyVersion",
             "dependencyManagement",
@@ -129,11 +136,16 @@ final class BenchmarkMarkdownReport {
         markdown.append("- Run label: **").append(runLabel).append("**\n\n");
 
         markdown.append("## Interpretation\n\n");
+        markdown.append("- Stack context: **")
+                .append(escapeInline(environment.getProperty("stackContext", "unknown")))
+                .append("**. Comparisons within this report use one dependency stack.\n");
         markdown.append("- Client-side overhead comparisons use the same local loopback server, request shape, transport, codecs, and validation guardrails for raw `WebClient`, Spring HTTP Interface, and the starter.\n");
+        markdown.append("- Boot 3 versus Boot 4 movement is stack-migration context, not evidence of a pure starter optimization.\n");
         markdown.append("- Smoke-only results prove the harness starts and writes artifacts; do not publish them as performance evidence.\n");
         markdown.append("- Optional starter feature rows enable exactly one feature at a time and are not claims about default runtime overhead.\n");
         markdown.append("- Starter-only rows measure starter-specific work, such as Problem Detail error mapping, where the baselines do not install equivalent behavior.\n");
-        markdown.append("- Local loopback, JVM warmup, CPU scheduling, and Netty event-loop behavior affect the numbers; use this report as trend evidence for named scenarios.\n\n");
+        markdown.append("- Local loopback, JVM warmup, CPU scheduling, and Netty event-loop behavior affect the numbers; use this report as trend evidence for named scenarios.\n");
+        markdown.append("- Review thresholds are manual signals; this harness does not enforce hard performance gates.\n\n");
 
         appendEnvironment(markdown, environment);
         appendComparisonSummary(markdown, results);

@@ -306,6 +306,42 @@ evidence.
 
 ## Current Scope
 
+### Spring Boot 4 migration baseline
+
+V19 re-establishes the harness on one Boot 4 dependency stack before any
+cross-generation interpretation. Run the targeted smoke matrix with:
+
+```bash
+BOOT4_SCENARIOS='.*(clientSideOverhead.*(GetNoBody|PostJson|ResponseEntity|ClientErrorSmallBody|ServerErrorSmallBody)|starterErrorMappingProblemDetailSmallBody|starterFeatureMicrometerObserverGetNoBody|diagnosticsDisabledGetNoBody|diagnosticsNoNetwork(OneObserver|MultipleObservers|OneLifecycleHook|MultipleLifecycleHooks)GetNoBody).*'
+mvn -s .mvn/boot4-spike-settings.xml \
+  -Pboot4-spike,benchmarks,benchmark-smoke \
+  -pl reactive-http-client-benchmarks -am \
+  -DskipTests -Dmaven.javadoc.skip=true \
+  -Dbenchmark.commit=$(git rev-parse --short HEAD)-dirty \
+  -Dbenchmark.include="$BOOT4_SCENARIOS" verify
+```
+
+This is a smoke-only harness check. It exercises raw `WebClient`, Spring HTTP
+Interface, and the starter against the same local server, Reactor Netty
+transport setup, Boot 4 BOM, and request/response validation. Boot 4 selects
+the Jackson 3 starter codec for starter-owned serialization; Boot 3 keeps the
+Jackson 2 codec on the maintenance lane. Problem Detail remains a
+starter-specific error-mapping row because neither baseline installs that
+mapper.
+
+Generated metadata records Spring Boot, Spring Framework/WebFlux, Reactor
+Netty, Netty, the selected Jackson generation, Micrometer, OpenTelemetry, Java,
+starter, API baseline, and commit versions. Reports label their stack context
+and state that Boot 3 versus Boot 4 movement is migration context, not evidence
+of a pure starter optimization. Review thresholds remain manual signals.
+
+V19 does not promote this smoke report. The Unreleased notes make no numerical
+performance movement claim, and a dirty smoke run is neither immutable nor
+release-quality evidence. If `3.0.0` release notes later make a public
+performance claim, rerun the required rows with `benchmark-release` from a clean
+commit, promote the sanitized versioned report into `docs/`, and cite only the
+same-stack scenarios that support the claim.
+
 The benchmark module currently includes:
 
 - A no-network starter invocation benchmark for metadata lookup, cached

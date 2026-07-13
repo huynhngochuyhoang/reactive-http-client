@@ -206,6 +206,7 @@
                                 <exclude>io/github/huynhngochuyhoang/httpstarter/config/Boot3JsonCodecAutoConfiguration.java</exclude>
                                 <exclude>io/github/huynhngochuyhoang/httpstarter/otel/Boot3OpenTelemetryWebClientCustomizerConfiguration.java</exclude>
                                 <exclude>io/github/huynhngochuyhoang/httpstarter/test/Boot3MockJsonCodecFactory.java</exclude>
+                                <exclude>io/github/huynhngochuyhoang/httpstarter/benchmarks/Boot3BenchmarkJsonCodecFactory.java</exclude>
                             </excludes>
                             <testExcludes>
                                 <testExclude>**/ReactiveHttpClientAutoConfigurationTest.java</testExclude>

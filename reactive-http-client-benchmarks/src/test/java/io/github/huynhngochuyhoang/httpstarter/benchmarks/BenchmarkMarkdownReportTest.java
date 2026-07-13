@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Properties;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,6 +79,34 @@ class BenchmarkMarkdownReportTest {
     }
 
     @Test
+    void rendersBoot4SameStackContextAndCompleteVersionMetadata() throws Exception {
+        Properties environment = new Properties();
+        environment.setProperty("stackContext", "Spring Boot 4 migration candidate");
+        environment.setProperty("comparisonPolicy", "same-stack only; cross-stack results are migration context");
+        environment.setProperty("springBootVersion", "4.0.0");
+        environment.setProperty("springFrameworkVersion", "7.0.1");
+        environment.setProperty("reactorNettyVersion", "1.3.0");
+        environment.setProperty("nettyVersion", "4.2.7.Final");
+        environment.setProperty("jacksonVersion", "3.0.3");
+        environment.setProperty("micrometerVersion", "1.16.1");
+        environment.setProperty("openTelemetryVersion", "1.55.0");
+
+        String report = renderReport(environment, result(
+                "io.github.huynhngochuyhoang.httpstarter.benchmarks.LoopbackClientComparisonBenchmark.clientSideOverheadStarterGetNoBody",
+                "avgt", 10.0, "us/op"));
+
+        assertThat(report)
+                .contains("Stack context: **Spring Boot 4 migration candidate**")
+                .contains("Boot 3 versus Boot 4 movement is stack-migration context")
+                .contains("Review thresholds are manual signals")
+                .contains("| `springFrameworkVersion` | 7.0.1 |")
+                .contains("| `nettyVersion` | 4.2.7.Final |")
+                .contains("| `jacksonVersion` | 3.0.3 |")
+                .contains("| `micrometerVersion` | 1.16.1 |")
+                .contains("| `openTelemetryVersion` | 1.55.0 |");
+    }
+
+    @Test
     void everyCurrentBenchmarkMethodHasAnExplicitClassification() throws Exception {
         String[] results = Stream.of(
                         LoopbackClientComparisonBenchmark.class,
@@ -127,8 +156,15 @@ class BenchmarkMarkdownReportTest {
     }
 
     private String renderReport(String... results) throws Exception {
+        return renderReport(new Properties(), results);
+    }
+
+    private String renderReport(Properties environment, String... results) throws Exception {
         Path result = tempDir.resolve("release-jmh.json");
         Files.writeString(result, "[" + String.join(",", results) + "]");
+        try (var output = Files.newOutputStream(tempDir.resolve("release-jmh.json.environment.properties"))) {
+            environment.store(output, "test benchmark environment");
+        }
         BenchmarkMarkdownReport.writeIfResultFilePresent(new String[]{"-rff", result.toString()});
         return Files.readString(tempDir.resolve("release-jmh.md"));
     }
