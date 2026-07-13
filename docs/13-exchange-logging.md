@@ -181,6 +181,27 @@ AuditExchangeLogger auditExchangeLogger(AuditService auditService) {
 
 The runtime will resolve the bean by class and reuse it across all methods that reference `AuditExchangeLogger.class`. Different methods can reference different logger classes — there is no global limit of one logger bean.
 
+`MockReactiveHttpClient` uses an isolated application context and does not import
+logger beans from the application test context. Register each constructor-injected
+logger instance explicitly on the mock builder:
+
+```java
+AuditExchangeLogger logger = new AuditExchangeLogger(auditService);
+
+MockReactiveHttpClient<OrdersClient> mock = MockReactiveHttpClient
+        .forClient(OrdersClient.class)
+        .withExchangeLogger(logger)
+        .respondTo(HttpMethod.POST, "/orders",
+                exchange -> MockReactiveHttpClient.json(201, "{\"id\":1}"))
+        .build();
+```
+
+The annotation still selects the logger by concrete class at interface or method
+level. Repeated registrations may use different logger classes; registering two
+instances of the same concrete class is rejected as ambiguous. In the production
+application, register a logger through either `@Bean` or component scanning, not
+both.
+
 When `@LogHttpExchange` is used without a `logger` attribute (i.e. `logger = DefaultHttpExchangeLogger.class`), the runtime resolves `DefaultHttpExchangeLogger` through the same look-up/instantiation path.
 
 `log-preset` is applied by `DefaultHttpExchangeLogger`. Custom `HttpExchangeLogger` implementations receive the preset in `HttpExchangeLogContext` and may choose to honor or ignore it.

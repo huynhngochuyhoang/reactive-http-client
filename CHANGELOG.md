@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.1] - 2026-07-13
+
 ### Changed
 
 - **Post-2.14 maintenance transition.** The Boot 3.5 maintenance reactor now targets `2.14.1` while API compatibility and published-baseline benchmark evidence compare against published `2.14.0`; Spring Boot 4 migration remains isolated for the future `3.x` line.
@@ -22,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Boot 4 public API migration evidence.** Added a report-only cross-major compatibility profile, froze the published `2.14.0` public surface, categorized the required Boot 4 health API break, and expanded the `3.x` migration guide with complete Maven, YAML, Jackson, Actuator, native, and test-helper instructions.
 - **Boot 4 assembled consumer and helper fixtures.** Added an independent Boot 4 WebFlux consumer with real inherited and `@ApiRef` loopback calls, optional diagnostics/health/OTel activation, strict retry startup, and a Jackson 3 mock-helper fixture covering signing bytes, retries, idempotency, lifecycle ordering, final metadata, and repeated headers.
 - **Boot 4 benchmark baseline.** Re-established the same-stack smoke harness for raw WebClient, Spring HTTP Interface, and the starter; recorded the complete Boot 4 dependency context, kept no-network diagnostics separate, and explicitly deferred report promotion because this release section makes no public numerical claim.
+- **Mock custom exchange loggers.** Added `MockReactiveHttpClient.Builder.withExchangeLogger(...)` so constructor-injected loggers selected by interface- or method-level `@LogHttpExchange` can be registered in the helper's isolated context; distinct logger classes are supported and duplicate concrete-class registrations are rejected.
+- **V19 release decision.** Recorded a no-go for publishing `3.0.0`: Boot 4 JVM, consumer, AOT/native, optional-integration, and API migration gates pass, but the reactor still publishes the Boot 3.5 `2.14.1` lane and Boot 4 Javadoc packaging is not release-ready. The `2.x` maintenance lane remains supported.
 
 ## [2.14.0] - 2026-07-10
 
@@ -1261,7 +1265,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.1...HEAD
+[2.14.1]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.0...v2.14.1
 [2.14.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.13.0...v2.14.0
 [2.13.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.11.0...v2.12.0

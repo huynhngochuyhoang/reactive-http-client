@@ -502,31 +502,76 @@ Evidence:
   release-documentation suite, the targeted Boot 4 smoke matrix, and
   `git diff --check`.
 
+### [x] 11.2 Restore custom exchange-logger parity in mock clients
+
+- [x] Add an explicit `MockReactiveHttpClient.Builder` registration API for
+      constructor-injected `HttpExchangeLogger` instances.
+- [x] Resolve registered instances through the mock isolated Spring context.
+- [x] Preserve production annotation selection and no-arg fallback behavior.
+- [x] Cover method-level and interface-level `@LogHttpExchange` declarations.
+- [x] Cover multiple distinct logger classes.
+- [x] Reject duplicate registrations for the same concrete logger class.
+- [x] Document that application logger beans are not automatically imported
+      into the isolated mock context.
+- [x] Keep the helper API covered by compatibility checks.
+- [x] Run Boot 3 and Boot 4 helper tests and `git diff --check`.
+
+Evidence:
+
+- Added `MockReactiveHttpClient.Builder.withExchangeLogger(...)`, which registers supplied logger instances in the helper's isolated `StaticApplicationContext` by concrete class while leaving production annotation lookup and no-arg fallback unchanged.
+- Added method-level, interface-level, multiple-distinct-class, constructor-injection, and duplicate-class rejection regressions in `MockReactiveHttpClientTest`.
+- Documented isolated mock-context registration and single production bean registration in `docs/13-exchange-logging.md`; the public test-helper package remains covered by japicmp and the compatibility map.
+- Passed `mvn -q -pl reactive-http-client-test test`, the focused Boot 4 `MockReactiveHttpClientTest` reactor run, `DocumentationReleaseArtifactTest`, and `git diff --check`.
+
 ---
 
 ## Priority 12 — `3.0.0` Go/No-Go and Release Readiness
 
-### [ ] 12.1 Release only with complete migration evidence
+### [x] 12.1 Release only with complete migration evidence
 
-- [ ] Document the selected minimum and current Boot 4 test matrix.
-- [ ] Verify all mandatory priorities above are complete or explicitly blocked.
-- [ ] Run full JVM tests.
-- [ ] Run packaged Boot 4 consumer fixtures.
-- [ ] Run AOT and native smoke.
-- [ ] Run optional-integration presence/absence tests.
-- [ ] Run generated configuration docs and Markdown-link validation.
-- [ ] Run the `2.x` to `3.x` report-only API diff.
-- [ ] Run API compatibility fixtures for the intended `3.x` surface.
-- [ ] Verify dependency provenance and published POM contents.
-- [ ] Promote benchmark evidence or explicitly defer it based on release claims.
-- [ ] Verify starter, test-helper, and OTel versions are all `3.0.0`.
-- [ ] Keep `2.x` maintenance instructions visible in release notes.
-- [ ] Record a **go** decision only when all mandatory gates pass.
-- [ ] Otherwise record a **no-go** decision with blockers and keep `2.x`
+- [x] Document the selected minimum and current Boot 4 test matrix.
+- [x] Verify all mandatory priorities above are complete or explicitly blocked.
+- [x] Run full JVM tests.
+- [x] Run packaged Boot 4 consumer fixtures.
+- [x] Run AOT and native smoke.
+- [x] Run optional-integration presence/absence tests.
+- [x] Run generated configuration docs and Markdown-link validation.
+- [x] Run the `2.x` to `3.x` report-only API diff.
+- [x] Run API compatibility fixtures for the intended `3.x` surface.
+- [x] Audit dependency provenance and candidate POM readiness; result: no staged
+      `3.0.0` POM exists.
+- [x] Promote benchmark evidence or explicitly defer it based on release claims.
+- [x] Verify starter, test-helper, and OTel artifact versions; result: all remain
+      `2.14.1`, which blocks `3.0.0` publication.
+- [x] Keep `2.x` maintenance instructions visible in release notes.
+- [x] Evaluate the **go** outcome; do not select it because mandatory gates fail.
+- [x] Otherwise record a **no-go** decision with blockers and keep `2.x`
       releasable.
-- [ ] Run `git diff --check`.
-- [ ] Mark `ROADMAP.md` completed only after the go/no-go evidence is recorded.
+- [x] Run `git diff --check`.
+- [x] Mark `ROADMAP.md` completed only after the go/no-go evidence is recorded.
 
 Evidence:
 
-- Pending.
+- Recorded the no-go decision, Boot 4 `4.0.0` minimum and `4.1.0` current
+  matrix, blockers, next actions, benchmark deferral, and `2.x` maintenance
+  instructions in `docs/29-v19-release-decision.md`.
+- `mvn -q verify` passed the complete Boot 3.5 reactor. Full Boot 4 JVM tests
+  passed on `4.0.0` and `4.1.0`, including optional-integration presence,
+  absence, and no-op paths.
+- The independent Boot 4 consumer fixture passed against locally installed
+  profile artifacts.
+- Clean Spring AOT processing passed. GraalVM `25.0.3` built the Boot `4.0.0`
+  native fixture, and the executable completed its real loopback smoke.
+- The report-only `2.14.0` to Boot 4 candidate API comparison passed. API
+  compatibility fixtures accepted additive changes and rejected constructor,
+  nested-method, and enum-constant removals.
+- Target-only dependency-tree and effective-POM evidence confirms the focused
+  Boot 4 graph and optional integration scopes. It also confirms the release
+  blockers: all modules remain `2.14.1`, the profile disables deployment, and
+  no staged `3.0.0` POM exists.
+- A full Boot 4 `verify` failed at attached Javadoc generation because Boot
+  3-only health and WebClient customizer sources remain in its Javadoc scan.
+- Benchmark report promotion remains deferred because Unreleased makes no
+  numerical performance claim.
+- Generated documentation, Markdown-link validation, the focused release
+  documentation test, and `git diff --check` passed after recording the decision.

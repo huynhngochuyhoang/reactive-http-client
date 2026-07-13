@@ -125,6 +125,56 @@ class MockReactiveHttpClientTest {
         Mono<String> getItem(@PathVar("id") long id, @HeaderParam("X-Trace") String trace);
     }
 
+    @ReactiveHttpClient(name = "method-logged-client")
+    interface MethodLoggedClient {
+        @GET("/logged/first")
+        @LogHttpExchange(logger = FirstInjectedExchangeLogger.class)
+        Mono<String> first();
+
+        @GET("/logged/second")
+        @LogHttpExchange(logger = SecondInjectedExchangeLogger.class)
+        Mono<String> second();
+    }
+
+    @ReactiveHttpClient(name = "interface-logged-client")
+    @LogHttpExchange(logger = InterfaceInjectedExchangeLogger.class)
+    interface InterfaceLoggedClient {
+        @GET("/logged/interface")
+        Mono<String> get();
+    }
+
+    private abstract static class RecordingExchangeLogger implements HttpExchangeLogger {
+        final Object dependency;
+        final List<HttpExchangeLogContext> contexts = new CopyOnWriteArrayList<>();
+
+        private RecordingExchangeLogger(Object dependency) {
+            this.dependency = dependency;
+        }
+
+        @Override
+        public void log(HttpExchangeLogContext context) {
+            contexts.add(context);
+        }
+    }
+
+    private static final class FirstInjectedExchangeLogger extends RecordingExchangeLogger {
+        private FirstInjectedExchangeLogger(Object dependency) {
+            super(dependency);
+        }
+    }
+
+    private static final class SecondInjectedExchangeLogger extends RecordingExchangeLogger {
+        private SecondInjectedExchangeLogger(Object dependency) {
+            super(dependency);
+        }
+    }
+
+    private static final class InterfaceInjectedExchangeLogger extends RecordingExchangeLogger {
+        private InterfaceInjectedExchangeLogger(Object dependency) {
+            super(dependency);
+        }
+    }
+
     @Test
     void servesRegisteredResponseAndRecordsTheExchange() {
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
@@ -551,6 +601,69 @@ class MockReactiveHttpClientTest {
             assertThat(context.clientName()).isEqualTo("named-client");
             assertThat(context.requestUrl()).isEqualTo(URI.create("http://named.mock.local:8081/items/42"));
         });
+    }
+
+    @Test
+    void constructorInjectedMethodLoggersResolveFromMockContext() {
+        Object firstDependency = new Object();
+        Object secondDependency = new Object();
+        FirstInjectedExchangeLogger firstLogger = new FirstInjectedExchangeLogger(firstDependency);
+        SecondInjectedExchangeLogger secondLogger = new SecondInjectedExchangeLogger(secondDependency);
+        MockReactiveHttpClient<MethodLoggedClient> mock = MockReactiveHttpClient
+                .forClient(MethodLoggedClient.class)
+                .withExchangeLogger(firstLogger)
+                .withExchangeLogger(secondLogger)
+                .respondTo(HttpMethod.GET, "/logged/first",
+                        ex -> MockReactiveHttpClient.text(200, "first"))
+                .respondTo(HttpMethod.GET, "/logged/second",
+                        ex -> MockReactiveHttpClient.text(200, "second"))
+                .build();
+
+        StepVerifier.create(mock.proxy().first()).expectNext("first").verifyComplete();
+        StepVerifier.create(mock.proxy().second()).expectNext("second").verifyComplete();
+
+        assertThat(firstLogger.dependency).isSameAs(firstDependency);
+        assertThat(firstLogger.contexts).singleElement().satisfies(context -> {
+            assertThat(context.clientName()).isEqualTo("method-logged-client");
+            assertThat(context.pathTemplate()).isEqualTo("/logged/first");
+            assertThat(context.responseStatus()).isEqualTo(200);
+        });
+        assertThat(secondLogger.dependency).isSameAs(secondDependency);
+        assertThat(secondLogger.contexts).singleElement().satisfies(context ->
+                assertThat(context.pathTemplate()).isEqualTo("/logged/second"));
+    }
+
+    @Test
+    void constructorInjectedInterfaceLoggerResolvesFromMockContext() {
+        Object dependency = new Object();
+        InterfaceInjectedExchangeLogger logger = new InterfaceInjectedExchangeLogger(dependency);
+        MockReactiveHttpClient<InterfaceLoggedClient> mock = MockReactiveHttpClient
+                .forClient(InterfaceLoggedClient.class)
+                .withExchangeLogger(logger)
+                .respondTo(HttpMethod.GET, "/logged/interface",
+                        ex -> MockReactiveHttpClient.text(200, "ok"))
+                .build();
+
+        StepVerifier.create(mock.proxy().get()).expectNext("ok").verifyComplete();
+
+        assertThat(logger.dependency).isSameAs(dependency);
+        assertThat(logger.contexts).singleElement().satisfies(context -> {
+            assertThat(context.clientName()).isEqualTo("interface-logged-client");
+            assertThat(context.pathTemplate()).isEqualTo("/logged/interface");
+        });
+    }
+
+    @Test
+    void duplicateExchangeLoggerClassIsRejected() {
+        MockReactiveHttpClient.Builder<MethodLoggedClient> builder =
+                MockReactiveHttpClient.forClient(MethodLoggedClient.class)
+                        .withExchangeLogger(new FirstInjectedExchangeLogger(new Object()));
+
+        assertThatThrownBy(() -> builder.withExchangeLogger(
+                new FirstInjectedExchangeLogger(new Object())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("HttpExchangeLogger already registered")
+                .hasMessageContaining(FirstInjectedExchangeLogger.class.getName());
     }
 
     @Test

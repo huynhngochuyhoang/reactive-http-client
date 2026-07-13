@@ -227,6 +227,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [V16 to V17 Adoption Guide](docs/27-v16-to-v17-adoption.md) | Diagnostics-first strict validation rollout |
 | [Spring Boot 4 and Starter 3.x Migration](docs/28-spring-boot-4-jackson-migration.md) | Complete dependency, package, configuration, Jackson, Actuator, native, and test-helper migration |
 | [2.14.0 to 3.0.0 Candidate API Report](docs/api-report-2.14.0-to-3.0.0-candidate.md) | Reviewed cross-major public API diff |
+| [V19 3.0.0 Release Decision](docs/29-v19-release-decision.md) | Evidence-backed no-go decision and remaining release blockers |
 | [Configuration Properties](docs/configuration-properties.md) | Generated property reference |
 | [Examples](docs/examples/README.md) | Copy-paste snippets |
 
