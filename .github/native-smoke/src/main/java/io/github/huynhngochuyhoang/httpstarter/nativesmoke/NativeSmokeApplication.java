@@ -39,6 +39,8 @@ public class NativeSmokeApplication {
         application.setDefaultProperties(Map.of(
                 "reactive.http.clients.native-smoke.base-url", "http://127.0.0.1:" + server.port(),
                 "reactive.http.clients.native-smoke.auth-provider", "nativeAuthProvider",
+                "reactive.http.clients.native-smoke.apis.native-problem.method", "GET",
+                "reactive.http.clients.native-smoke.apis.native-problem.path", "/api/problem",
                 "reactive.http.observability.diagnostics-endpoint.enabled", "true"));
         try (ConfigurableApplicationContext context = application.run(args)) {
             NativeSmokeClient client = context.getBean(NativeSmokeClient.class);

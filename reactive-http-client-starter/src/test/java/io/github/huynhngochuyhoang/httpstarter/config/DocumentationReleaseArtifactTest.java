@@ -474,6 +474,52 @@ class DocumentationReleaseArtifactTest {
         assertThat(root.resolve("reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/observability/HttpClientHealthIndicator.java")).doesNotExist();
     }
 
+
+    @Test
+    void boot4RuntimeAndNativeContractsStayReleaseReady() throws IOException {
+        Path root = projectRoot();
+        String autoConfiguration = Files.readString(root.resolve(
+                "reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/ReactiveHttpClientAutoConfiguration.java"));
+        String runtimeHints = Files.readString(root.resolve(
+                "reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/ReactiveHttpClientRuntimeHints.java"));
+        String nativeClient = Files.readString(root.resolve(
+                ".github/native-smoke/src/main/java/io/github/huynhngochuyhoang/httpstarter/nativesmoke/NativeSmokeClient.java"));
+        String nativeApplication = Files.readString(root.resolve(
+                ".github/native-smoke/src/main/java/io/github/huynhngochuyhoang/httpstarter/nativesmoke/NativeSmokeApplication.java"));
+        String nativePom = Files.readString(root.resolve(".github/native-smoke/pom.xml"));
+        String nativeWorkflow = Files.readString(root.resolve(".github/workflows/native-smoke.yml"));
+        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+
+        assertThat(autoConfiguration).contains(
+                "org.springframework.boot.webclient.autoconfigure.WebClientAutoConfiguration",
+                "org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration",
+                "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
+                "org.springframework.boot.health.autoconfigure.registry.HealthContributorRegistryAutoConfiguration");
+        assertThat(runtimeHints).contains(
+                "ReactiveHttpClientProperties.DiagnosticsEndpointConfig.class",
+                "ReactiveHttpClientProperties.HealthConfig.class",
+                "POM_PROPERTIES_RESOURCE");
+        assertThat(nativeClient).contains(
+                "extends NativeSmokeOperations<NativeOrderResponse>",
+                "@ApiRef(\"native-problem\")");
+        assertThat(nativeApplication).contains(
+                "apis.native-problem.method",
+                "ProblemDetailRemoteServiceException",
+                "reactiveHttpClientDiagnosticsEndpoint",
+                "reactiveHttpClientHealthIndicator",
+                "reactive.http.client.requests");
+        assertThat(nativePom).contains("-J-Xmx6g", "-H:NumberOfThreads=4", "-H:+SharedArenaSupport");
+        assertThat(nativeWorkflow).contains(
+                "target/release-evidence/v20-priority6/native-provenance.txt",
+                "native-smoke-provenance",
+                "actions/upload-artifact@v4");
+        assertThat(releaseDocs).contains(
+                "configured inherited",
+                "@ApiRef",
+                "6 GiB",
+                "native-smoke-provenance");
+    }
+
     @Test
     void publishableModulePomsAndStagedConsumerGuardStayReleaseReady() throws IOException {
         Path root = projectRoot();

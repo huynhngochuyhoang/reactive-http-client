@@ -42,15 +42,17 @@ import org.springframework.web.reactive.function.client.WebClient;
  * Individual client instances are created by
  * {@link io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean}.
  *
- * <p>This class is ordered after Micrometer and Jackson auto-configuration so
- * their managed registry and JSON mapper beans are available before the nested
- * observer, health, and codec conditions are evaluated.
+ * <p>This class is ordered after Boot's WebClient, Jackson, Micrometer, and
+ * health infrastructure so their managed beans are available before the
+ * starter's nested integration conditions are evaluated.
  */
 @AutoConfiguration
 @AutoConfigureAfter(name = {
+        "org.springframework.boot.webclient.autoconfigure.WebClientAutoConfiguration",
         "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
         "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration",
-        "org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration"
+        "org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration",
+        "org.springframework.boot.health.autoconfigure.registry.HealthContributorRegistryAutoConfiguration"
 })
 @EnableConfigurationProperties(ReactiveHttpClientProperties.class)
 @ImportRuntimeHints(ReactiveHttpClientRuntimeHints.class)

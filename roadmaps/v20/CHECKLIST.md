@@ -255,24 +255,34 @@ Evidence:
 
 ## Priority 6 - Revalidate Auto-Configuration, Actuator, AOT, and Native Contracts
 
-### [ ] 6.1 Verify Boot 4 runtime integration
+### [x] 6.1 Verify Boot 4 runtime integration
 
-- [ ] Verify auto-configuration ordering after WebClient, Jackson, metrics, and health setup.
-- [ ] Verify configuration-properties binding and generated metadata.
-- [ ] Verify diagnostics endpoint discovery and sanitized output.
-- [ ] Verify health contributor discovery, details, thresholds, and back-off behavior.
-- [ ] Verify Micrometer observers and OTel propagation with integrations present.
-- [ ] Verify clean back-off when Actuator, Micrometer, or OTel APIs are absent.
+- [x] Verify auto-configuration ordering after WebClient, Jackson, metrics, and health setup.
+- [x] Verify configuration-properties binding and generated metadata.
+- [x] Verify diagnostics endpoint discovery and sanitized output.
+- [x] Verify health contributor discovery, details, thresholds, and back-off behavior.
+- [x] Verify Micrometer observers and OTel propagation with integrations present.
+- [x] Verify clean back-off when Actuator, Micrometer, or OTel APIs are absent.
 
-### [ ] 6.2 Verify AOT and native execution
+### [x] 6.2 Verify AOT and native execution
 
-- [ ] Re-audit reflection, resource, serialization, and proxy hints for Boot 4 types.
-- [ ] Run AOT processing from the default `3.x` reactor.
-- [ ] Verify inherited generic and `@ApiRef` clients are discovered from generated metadata.
-- [ ] Build the native fixture with the documented GraalVM baseline.
-- [ ] Run the native executable against real loopback success, auth, and Problem Detail endpoints.
-- [ ] Record dependency and native-image provenance.
-- [ ] Run `git diff --check`.
+- [x] Re-audit reflection, resource, serialization, and proxy hints for Boot 4 types.
+- [x] Run AOT processing from the default `3.x` reactor.
+- [x] Verify inherited generic and `@ApiRef` clients are discovered from generated metadata.
+- [x] Build the native fixture with the documented GraalVM baseline.
+- [x] Run the native executable against real loopback success, auth, and Problem Detail endpoints.
+- [x] Record dependency and native-image provenance.
+- [x] Run `git diff --check`.
+
+
+Evidence:
+
+- Boot 4 auto-configuration now declares ordering after WebClient, Jackson, Micrometer metrics, and the health contributor registry. Focused context tests passed for property binding, sanitized diagnostics endpoint discovery, health registration and thresholds, user back-off, Micrometer observers, resilience metrics, OTel propagation, and clean startup with optional namespaces hidden.
+- Runtime-hint and generated-metadata tests passed for every public nested configuration type, annotation reflection, the packaged version resource, and scanned client JDK proxies. Default-reactor AOT processing generated reachability metadata for ApiRef and NativeSmokeClient.
+- The native fixture now routes its inherited Problem Detail method through configured @ApiRef("native-problem") metadata while retaining inherited generic success decoding and named auth propagation. Generated metadata contains the concrete client proxy and API-ref annotation.
+- GraalVM Oracle Java 25.0.3 native compilation passed in the documented Boot 4.0.0 fixture. The fixture is bounded to 6 GiB and four workers; the completed build peaked at 5.54 GiB RSS and produced a 123.15 MiB executable in 4m22s.
+- The native executable passed real Reactor Netty loopback assertions for success, auth, configured @ApiRef, Problem Detail status and payload, sanitized diagnostics, health registration, and Micrometer request metrics. The workflow now uploads complete toolchain and dependency provenance as native-smoke-provenance.
+- Focused starter and OTel suites, default-reactor AOT processing, native compilation and execution, and git diff --check passed.
 
 ---
 

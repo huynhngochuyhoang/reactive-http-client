@@ -48,14 +48,16 @@ class Boot4AutoConfigurationTest {
             .withConfiguration(AutoConfigurations.of(ReactiveHttpClientAutoConfiguration.class));
 
     @Test
-    void ordersAfterBoot4MetricsAutoConfigurations() {
+    void ordersAfterBoot4IntegrationAutoConfigurations() {
         AutoConfigureAfter ordering =
                 ReactiveHttpClientAutoConfiguration.class.getAnnotation(AutoConfigureAfter.class);
 
         assertThat(ordering.name()).contains(
+                "org.springframework.boot.webclient.autoconfigure.WebClientAutoConfiguration",
                 "org.springframework.boot.micrometer.metrics.autoconfigure.MetricsAutoConfiguration",
                 "org.springframework.boot.micrometer.metrics.autoconfigure.CompositeMeterRegistryAutoConfiguration",
-                "org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration");
+                "org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration",
+                "org.springframework.boot.health.autoconfigure.registry.HealthContributorRegistryAutoConfiguration");
     }
 
     @Test
@@ -128,6 +130,26 @@ class Boot4AutoConfigurationTest {
                             context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class);
                     assertThat(endpoint.getClass().getAnnotation(Endpoint.class).id())
                             .isEqualTo("rhttpclients");
+                });
+    }
+
+    @Test
+    void bindsBoot4ObservabilityPropertiesUsedByActuatorContracts() {
+        contextRunner
+                .withBean(SimpleMeterRegistry.class, SimpleMeterRegistry::new)
+                .withPropertyValues(
+                        "reactive.http.observability.diagnostics-endpoint.enabled=true",
+                        "reactive.http.observability.health.enabled=true",
+                        "reactive.http.observability.health.min-samples=7",
+                        "reactive.http.observability.health.error-rate-threshold=0.25")
+                .run(context -> {
+                    ReactiveHttpClientProperties properties = context.getBean(ReactiveHttpClientProperties.class);
+                    assertThat(properties.getObservability().getDiagnosticsEndpoint().isEnabled()).isTrue();
+                    assertThat(properties.getObservability().getHealth().isEnabled()).isTrue();
+                    assertThat(properties.getObservability().getHealth().getMinSamples()).isEqualTo(7);
+                    assertThat(properties.getObservability().getHealth().getErrorRateThreshold()).isEqualTo(0.25);
+                    assertThat(context).hasSingleBean(ReactiveHttpClientDiagnosticsEndpoint.class);
+                    assertThat(context).hasSingleBean(HealthIndicator.class);
                 });
     }
 

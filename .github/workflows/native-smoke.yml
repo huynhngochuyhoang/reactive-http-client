@@ -33,15 +33,24 @@ jobs:
 
       - name: Record native toolchain
         run: |
-          java -version
-          native-image --version
-          echo "commit=$(git rev-parse HEAD)"
-          echo "starter=$PROJECT_VERSION"
-          echo "boot=$(mvn -q -f .github/native-smoke/pom.xml -DforceStdout help:evaluate -Dexpression=project.parent.version)"
-          mvn -B -ntp -f .github/native-smoke/pom.xml -Dreactive-http-client.version="$PROJECT_VERSION" dependency:list -DincludeArtifactIds=spring-core
+          mkdir -p target/release-evidence/v20-priority6
+          {
+            java -version
+            native-image --version
+            echo "commit=$(git rev-parse HEAD)"
+            echo "starter=$PROJECT_VERSION"
+            echo "boot=$(mvn -q -f .github/native-smoke/pom.xml -DforceStdout help:evaluate -Dexpression=project.parent.version)"
+            mvn -B -ntp -f .github/native-smoke/pom.xml -Dreactive-http-client.version="$PROJECT_VERSION" dependency:list
+          } 2>&1 | tee target/release-evidence/v20-priority6/native-provenance.txt
 
       - name: Build minimal native image
         run: mvn -B -ntp -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version="$PROJECT_VERSION" native:compile
 
       - name: Run minimal native image
         run: .github/native-smoke/target/reactive-http-client-native-smoke
+
+      - name: Upload native provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-smoke-provenance
+          path: target/release-evidence/v20-priority6/native-provenance.txt

@@ -491,6 +491,8 @@ Supported Boot 4 native-image path:
   interfaces.
 - Inherited generic endpoint response types resolved through the concrete
   client interface.
+- A configured inherited `@ApiRef` endpoint discovered during AOT and invoked
+  by the generated native client proxy.
 - Starter configuration properties under `reactive.http.*`.
 - Problem Detail error mapping, a named auth provider, and Micrometer-backed
   client metrics.
@@ -499,7 +501,9 @@ Supported Boot 4 native-image path:
   `pom.properties` resource.
 
 The scheduled smoke installs the default Boot 4 reactor, compiles the fixture,
-and runs the generated executable:
+and runs the generated executable. Native compilation is bounded to 6 GiB and
+four worker threads so the fixture remains usable on modest CI and developer
+machines:
 
 ```bash
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
@@ -513,6 +517,11 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dreactive-http-client.version=3.0.0 native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
+
+The workflow uploads `native-smoke-provenance` containing the exact Java and
+native-image toolchains, source commit, starter and Boot versions, and complete
+fixture dependency list. Local generated evidence remains target-only under
+`target/release-evidence/v20-priority6/`.
 
 Netty 4.2 uses shared Foreign Function and Memory API arenas. The GraalVM 25
 fixture therefore enables `-H:+SharedArenaSupport`; removing that build option

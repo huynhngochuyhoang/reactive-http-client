@@ -62,6 +62,8 @@
                 <configuration>
                     <buildArgs>
                         <buildArg>-H:+SharedArenaSupport</buildArg>
+                        <buildArg>-J-Xmx6g</buildArg>
+                        <buildArg>-H:NumberOfThreads=4</buildArg>
                     </buildArgs>
                 </configuration>
             </plugin>
