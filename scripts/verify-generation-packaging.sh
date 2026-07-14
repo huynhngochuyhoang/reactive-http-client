@@ -38,7 +38,7 @@ for module in "${MODULES[@]}"; do
   javadoc_jar="$ROOT_DIR/$module/target/$module-$PROJECT_VERSION-javadoc.jar"
 
   for artifact in "$binary_jar" "$sources_jar" "$javadoc_jar"; do
-    [[ -f "$artifact" ]] || fail "missing artifact $artifact; run mvn clean verify first"
+    [[ -f "$artifact" ]] || fail "missing artifact $artifact; run mvn clean verify before this guard"
 
     entries_file="$WORK_DIR/$(basename "$artifact").entries"
     jar tf "$artifact" > "$entries_file"
@@ -59,18 +59,15 @@ for module in "${MODULES[@]}"; do
     fail "$sources_jar does not match $module/src/main/java; see $WORK_DIR/$module.sources.diff"
   fi
 
-  while IFS= read -r class_entry; do
-    class_name="${class_entry%.class}"
-    class_name="${class_name//\//.}"
-    source_file="$(javap -classpath "$binary_jar" -verbose "$class_name" 2>/dev/null \
-      | sed -n 's/.*SourceFile: "\([^"]*\)"/\1/p' | head -n 1)"
-    [[ -n "$source_file" ]] || fail "unable to resolve SourceFile for $class_entry"
-    package_path="${class_entry%/*}"
-    source_entry="$package_path/$source_file"
-    if ! grep -Fxq "$source_entry" "$expected_sources"; then
-      fail "$binary_jar contains orphan class $class_entry without current source $source_entry"
-    fi
-  done < <(jar tf "$binary_jar" | grep '\.class$' | sort)
+  compiler_classes="$ROOT_DIR/$module/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst"
+  [[ -f "$compiler_classes" ]] || fail "missing current compiler output list $compiler_classes"
+  expected_classes="$WORK_DIR/$module.expected-classes"
+  packaged_classes="$WORK_DIR/$module.packaged-classes"
+  grep '\.class$' "$compiler_classes" | sort > "$expected_classes"
+  jar tf "$binary_jar" | grep '\.class$' | sort > "$packaged_classes"
+  if ! diff -u "$expected_classes" "$packaged_classes" > "$WORK_DIR/$module.classes.diff"; then
+    fail "$binary_jar contains classes outside the current compile output; see $WORK_DIR/$module.classes.diff"
+  fi
 
   assert_entry_count "$binary_jar" \
     "io/github/huynhngochuyhoang/httpstarter/observability/HttpClientHealthIndicator.class" 0

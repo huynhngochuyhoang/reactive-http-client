@@ -446,17 +446,22 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("build-helper-maven-plugin");
         assertThat(workflow)
                 .doesNotContain("-Pboot4-spike")
+                .contains("mvn -B -ntp clean verify")
                 .contains("bash scripts/verify-generation-packaging.sh")
                 .contains("spring-boot: ['4.0.0', '4.1.0']");
         int publishPackagingGuard = publishWorkflow.indexOf("bash scripts/verify-generation-packaging.sh");
         int centralDeploy = publishWorkflow.indexOf("mvn -B -ntp -Prelease -DskipTests deploy");
-        assertThat(publishWorkflow).contains("mvn -B -ntp -Prelease -DskipTests verify");
+        assertThat(publishWorkflow)
+                .contains("mvn -B -ntp clean verify")
+                .contains("mvn -B -ntp clean -Prelease -DskipTests verify")
+                .contains("MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}");
         assertThat(publishPackagingGuard).isGreaterThanOrEqualTo(0).isLessThan(centralDeploy);
         assertThat(packagingGuard)
                 .contains("src/main/java")
                 .contains("-sources.jar")
                 .contains("-javadoc.jar")
-                .contains("contains orphan class")
+                .contains("createdFiles.lst")
+                .contains("contains classes outside the current compile output")
                 .contains("assert_entry_count \"$sources_jar\" \"$resource\" 1")
                 .contains("Boot3")
                 .contains("AutoConfiguration.imports")

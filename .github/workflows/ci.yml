@@ -26,7 +26,7 @@ jobs:
           cache: maven
 
       - name: Build and run tests
-        run: mvn -B -ntp verify
+        run: mvn -B -ntp clean verify
 
       - name: Verify generation-specific packaging
         run: bash scripts/verify-generation-packaging.sh
