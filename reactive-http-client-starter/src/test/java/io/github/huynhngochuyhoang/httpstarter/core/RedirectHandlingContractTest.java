@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
@@ -353,7 +352,7 @@ class RedirectHandlingContractTest {
                 "redirect-client",
                 context,
                 new NoopResilienceOperatorApplier(),
-                new ObjectMapper(),
+                TestJsonCodecs.jsonCodec(),
                 new ReactiveHttpClientProperties.ObservabilityConfig());
         return (RedirectClient) Proxy.newProxyInstance(
                 RedirectClient.class.getClassLoader(),
@@ -431,9 +430,9 @@ class RedirectHandlingContractTest {
         when(lifecycleProvider.orderedStream()).thenReturn(Stream.empty());
         when(context.getBeanProvider(ReactiveHttpClientLifecycleHook.class)).thenReturn(lifecycleProvider);
 
-        ObjectProvider<ObjectMapper> objectMapperProvider = mock(ObjectProvider.class);
-        when(objectMapperProvider.getIfAvailable()).thenReturn(new ObjectMapper());
-        when(context.getBeanProvider(ObjectMapper.class)).thenReturn(objectMapperProvider);
+        ObjectProvider<ReactiveHttpClientJsonCodec> jsonCodecProvider = mock(ObjectProvider.class);
+        when(jsonCodecProvider.getIfAvailable()).thenReturn(TestJsonCodecs.jsonCodec());
+        when(context.getBeanProvider(ReactiveHttpClientJsonCodec.class)).thenReturn(jsonCodecProvider);
 
         return context;
     }

@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ApiRef;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
@@ -485,7 +484,7 @@ class ReactiveHttpClientLifecycleHookTest {
                 "test-client",
                 appCtx,
                 resilienceOperatorApplier,
-                new ObjectMapper(),
+                TestJsonCodecs.jsonCodec(),
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );
     }

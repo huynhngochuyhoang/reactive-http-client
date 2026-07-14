@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.FormFile;
 import io.github.huynhngochuyhoang.httpstarter.annotation.LogHttpExchange;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
@@ -103,7 +102,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final org.springframework.beans.factory.ObjectProvider<HttpClientObserver> observerProvider;
     private final org.springframework.beans.factory.ObjectProvider<ReactiveHttpClientLifecycleHook> lifecycleHookProvider;
 
-    @Deprecated(since = "3.0.0", forRemoval = false)
     public ReactiveClientInvocationHandler(
             WebClient webClient,
             MethodMetadataCache metadataCache,
@@ -113,30 +111,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String clientName,
             ApplicationContext applicationContext,
             ResilienceOperatorApplier resilienceOperatorApplier,
-            ObjectMapper objectMapper,
+            ReactiveHttpClientJsonCodec jsonCodec,
             ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
         this(webClient, metadataCache, argumentResolver, errorDecoder, clientConfig, clientName, null,
-                applicationContext, resilienceOperatorApplier, objectMapper, observabilityConfig);
+                applicationContext, resilienceOperatorApplier, jsonCodec, observabilityConfig);
     }
 
-    @Deprecated(since = "3.0.0", forRemoval = false)
-    public ReactiveClientInvocationHandler(
-            WebClient webClient,
-            MethodMetadataCache metadataCache,
-            RequestArgumentResolver argumentResolver,
-            DefaultErrorDecoder errorDecoder,
-            ReactiveHttpClientProperties.ClientConfig clientConfig,
-            String clientName,
-            Class<?> clientInterface,
-            ApplicationContext applicationContext,
-            ResilienceOperatorApplier resilienceOperatorApplier,
-            ObjectMapper objectMapper,
-            ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
-        this(webClient, metadataCache, argumentResolver, errorDecoder, clientConfig, clientName,
-                clientInterface, applicationContext, resilienceOperatorApplier,
-                objectMapper == null ? null : new Jackson2ReactiveHttpClientJsonCodec(objectMapper),
-                observabilityConfig);
-    }
 
     public static ReactiveClientInvocationHandler create(
             WebClient webClient,
@@ -155,7 +135,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 jsonCodec, observabilityConfig);
     }
 
-    private ReactiveClientInvocationHandler(
+    public ReactiveClientInvocationHandler(
             WebClient webClient,
             MethodMetadataCache metadataCache,
             RequestArgumentResolver argumentResolver,

@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.HeaderParam;
 import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
@@ -204,7 +203,7 @@ class DiagnosticContextContractTest {
                 "test-client",
                 context,
                 new NoopResilienceOperatorApplier(),
-                new ObjectMapper(),
+                TestJsonCodecs.jsonCodec(),
                 observability);
     }
 

@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.exception.ProblemDetailHttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ProblemDetailRemoteServiceException;
 import org.springframework.http.MediaType;
@@ -19,12 +18,6 @@ public class ProblemDetailErrorResponseMapper implements ErrorResponseMapper {
 
     public ProblemDetailErrorResponseMapper(ReactiveHttpClientJsonCodec jsonCodec) {
         this.jsonCodec = Objects.requireNonNull(jsonCodec, "jsonCodec must not be null");
-    }
-
-    /** @deprecated Use {@link #ProblemDetailErrorResponseMapper(ReactiveHttpClientJsonCodec)}. */
-    @Deprecated(since = "3.0.0", forRemoval = false)
-    public ProblemDetailErrorResponseMapper(ObjectMapper objectMapper) {
-        this(new Jackson2ReactiveHttpClientJsonCodec(objectMapper));
     }
 
     @Override

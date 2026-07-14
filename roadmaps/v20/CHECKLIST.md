@@ -107,6 +107,7 @@ Evidence:
   -Prelease-smoke test` passed. Generated release evidence reports project
   `3.0.0` and API baseline `2.14.1`; README and quick-start snippets also use
   `3.0.0`.
+- Starter Javadoc generation passed with the stable codec SPI and Jackson 3 adapter.
 - `git diff --check` passed.
 
 ---
@@ -156,24 +157,42 @@ Evidence:
 
 ## Priority 4 - Finalize Jackson 3 and Codec Ownership
 
-### [ ] 4.1 Freeze the `3.x` JSON contract
+### [x] 4.1 Freeze the `3.x` JSON contract
 
-- [ ] Make `ReactiveHttpClientJsonCodec` the stable starter serialization boundary.
-- [ ] Audit every public Jackson 2 type inherited from `2.x`.
-- [ ] Remove, replace, or explicitly isolate deprecated Jackson 2 compatibility APIs.
-- [ ] Record each intentional removal or signature change in the migration ledger.
-- [ ] Verify default request, response, and Problem Detail paths use Jackson 3.
-- [ ] Verify OAuth2 token responses and sanitized error decoding use configured codecs.
-- [ ] Verify SigV4 signing bytes exactly match outbound JSON bytes.
+- [x] Make `ReactiveHttpClientJsonCodec` the stable starter serialization boundary.
+- [x] Audit every public Jackson 2 type inherited from `2.x`.
+- [x] Remove, replace, or explicitly isolate deprecated Jackson 2 compatibility APIs.
+- [x] Record each intentional removal or signature change in the migration ledger.
+- [x] Verify default request, response, and Problem Detail paths use Jackson 3.
+- [x] Verify OAuth2 token responses and sanitized error decoding use configured codecs.
+- [x] Verify SigV4 signing bytes exactly match outbound JSON bytes.
 
-### [ ] 4.2 Cover codec customization
+### [x] 4.2 Cover codec customization
 
-- [ ] Test application-provided Jackson 3 modules, naming strategies, and serializers.
-- [ ] Test strict body-signing validation with default and custom codecs.
-- [ ] Test starter and mock-helper serialization parity.
-- [ ] Test minimal classpaths without Jackson compatibility modules.
-- [ ] Update configuration metadata, native hints, and codec documentation.
-- [ ] Run focused codec tests, consumer fixtures, and `git diff --check`.
+- [x] Test application-provided Jackson 3 modules, naming strategies, and serializers.
+- [x] Test strict body-signing validation with default and custom codecs.
+- [x] Test starter and mock-helper serialization parity.
+- [x] Test minimal classpaths without Jackson compatibility modules.
+- [x] Update configuration metadata, native hints, and codec documentation.
+- [x] Run focused codec tests, consumer fixtures, and `git diff --check`.
+
+Evidence:
+
+- Removed the deprecated Jackson 2 codec adapter, mapper constructor, invocation-handler
+  constructors, and mock-helper `objectMapper(...)` method. The starter and test-helper
+  POMs no longer declare Jackson 2 databind; the migration and API ledgers classify each
+  removal as intentional at the `3.0.0` boundary.
+- `ReactiveHttpClientJsonCodec` is the documented stable byte-serialization SPI. The
+  default Jackson 3 adapter uses Boot's application mapper, and an application codec bean
+  backs off the default without requiring configuration metadata or reflection hints.
+- Focused tests passed for Jackson 2-hidden startup, Jackson 3 modules, naming strategies,
+  custom serializers, default and application codecs, Problem Detail mapping, configured
+  OAuth2 error decoding, strict SigV4 validation, exact signing and wire bytes, and mock parity.
+- The focused codec selection and the complete starter and test-helper test suites passed.
+- `git diff --check` passed.
+- Installed the `3.0.0` candidate and ran the independent Boot 4 consumer fixture. Its
+  filtered dependency tree contains no `com.fasterxml.jackson.core:jackson-databind`;
+  `tools.jackson.core:jackson-databind:3.0.2` remains the runtime mapper.
 
 ---
 

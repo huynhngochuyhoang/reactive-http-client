@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.HEAD;
 import io.github.huynhngochuyhoang.httpstarter.annotation.OPTIONS;
@@ -338,7 +337,7 @@ class ResponseEntitySupportTest {
                 "entity-client",
                 appCtx,
                 new NoopResilienceOperatorApplier(),
-                new ObjectMapper(),
+                TestJsonCodecs.jsonCodec(),
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );
     }

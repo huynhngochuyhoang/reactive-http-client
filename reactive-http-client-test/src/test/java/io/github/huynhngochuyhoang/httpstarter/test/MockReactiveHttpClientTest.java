@@ -1,7 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
@@ -17,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.test.StepVerifier;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -316,10 +316,11 @@ class MockReactiveHttpClientTest {
     @Test
     void authProviderReceivesSerializedJsonBytesForDtoBodies() {
         AtomicReference<Object> capturedAuthBody = new AtomicReference<>();
-        ObjectMapper applicationObjectMapper = new ObjectMapper()
-                .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+        JsonMapper applicationObjectMapper = JsonMapper.builder()
+                .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                .build();
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
-                .jsonCodec(new Jackson2ReactiveHttpClientJsonCodec(applicationObjectMapper))
+                .jsonCodec(new Jackson3ReactiveHttpClientJsonCodec(applicationObjectMapper))
                 .withAuthProvider(request -> {
                     capturedAuthBody.set(request.requestBody());
                     return Mono.just(AuthContext.empty());

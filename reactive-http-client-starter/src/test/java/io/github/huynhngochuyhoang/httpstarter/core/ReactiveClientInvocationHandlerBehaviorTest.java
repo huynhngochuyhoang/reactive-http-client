@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProvider;
@@ -57,7 +56,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 })
                 .build();
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", TestJsonCodecs.jsonCodec());
         StepVerifier.create(invokeGet(handler, "application/xml"))
                 .expectNext("ok")
                 .verifyComplete();
@@ -316,7 +315,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 })
                 .build();
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", TestJsonCodecs.jsonCodec());
         StepVerifier.create(invokePost(handler, "text/plain", "payload"))
                 .expectNext("ok")
                 .verifyComplete();
@@ -359,7 +358,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 })
                 .build();
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", TestJsonCodecs.jsonCodec());
         StepVerifier.create(invokePostJson(handler, "application/json", Map.of("id", 1)))
                 .expectNext("ok")
                 .verifyComplete();
@@ -382,7 +381,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 })
                 .build();
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", TestJsonCodecs.jsonCodec());
         StepVerifier.create(invokePost(handler, "text/plain", "payload"))
                 .expectNext("ok")
                 .verifyComplete();
@@ -404,7 +403,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 })
                 .build();
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", TestJsonCodecs.jsonCodec());
         byte[] payload = "binary-data".getBytes(StandardCharsets.UTF_8);
         StepVerifier.create(invokePostBytes(handler, "application/octet-stream", payload))
                 .expectNext("ok")
@@ -418,7 +417,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
         WebClient webClient = sigV4WebClient(captured);
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", TestJsonCodecs.jsonCodec());
         StepVerifier.create(invokePostJson(handler, "application/json", Map.of("id", 1)))
                 .expectNext("ok")
                 .verifyComplete();
@@ -431,7 +430,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
         WebClient webClient = sigV4WebClient(captured);
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", TestJsonCodecs.jsonCodec());
         StepVerifier.create(invokePost(handler, "text/plain", "payload"))
                 .expectNext("ok")
                 .verifyComplete();
@@ -444,7 +443,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
         WebClient webClient = sigV4WebClient(captured);
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", TestJsonCodecs.jsonCodec());
         StepVerifier.create(invokePost(handler, "text/plain;charset=ISO-8859-1", "café"))
                 .expectNext("ok")
                 .verifyComplete();
@@ -458,7 +457,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
         WebClient webClient = sigV4WebClient(captured);
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", TestJsonCodecs.jsonCodec());
         StepVerifier.create(invokePostBytes(handler, "application/octet-stream", "binary-data".getBytes(StandardCharsets.UTF_8)))
                 .expectNext("ok")
                 .verifyComplete();
@@ -471,7 +470,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
         WebClient webClient = sigV4WebClient(captured);
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", TestJsonCodecs.jsonCodec());
         StepVerifier.create(invokeGet(handler, null))
                 .expectNext("ok")
                 .verifyComplete();
@@ -489,7 +488,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 .exchangeFunction(request -> Mono.error(new AssertionError("request must not be sent")))
                 .build();
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "awsSigV4", TestJsonCodecs.jsonCodec());
 
         StepVerifier.create(invokePublisherBody(handler, body))
                 .expectErrorSatisfies(error -> {
@@ -515,7 +514,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 })
                 .build();
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", new ObjectMapper());
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", TestJsonCodecs.jsonCodec());
         StepVerifier.create(invokePostJson(handler, "application/problem+json", Map.of("type", "validation-error")))
                 .expectNext("ok")
                 .verifyComplete();
@@ -545,16 +544,16 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                         .body("ok")
                         .build()))
                 .build();
-        ObjectMapper objectMapper = mock(ObjectMapper.class);
-        when(objectMapper.writeValueAsBytes(any())).thenThrow(new IllegalStateException("must not serialize"));
+        ReactiveHttpClientJsonCodec jsonCodec = mock(ReactiveHttpClientJsonCodec.class);
+        when(jsonCodec.write(any())).thenThrow(new IllegalStateException("must not serialize"));
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, (String) null, objectMapper);
+        ReactiveClientInvocationHandler handler = createHandler(webClient, (String) null, jsonCodec);
 
         StepVerifier.create(invokePostJson(handler, "application/json", Map.of("id", 1)))
                 .expectNext("ok")
                 .verifyComplete();
 
-        verify(objectMapper, never()).writeValueAsBytes(any());
+        verify(jsonCodec, never()).write(any());
     }
 
     @Test
@@ -572,11 +571,11 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                             .build());
                 })
                 .build();
-        ObjectMapper objectMapper = mock(ObjectMapper.class);
-        when(objectMapper.writeValueAsBytes(any())).thenThrow(new IllegalStateException("must not serialize publisher"));
+        ReactiveHttpClientJsonCodec jsonCodec = mock(ReactiveHttpClientJsonCodec.class);
+        when(jsonCodec.write(any())).thenThrow(new IllegalStateException("must not serialize publisher"));
         Flux<String> body = Flux.just("one", "two");
 
-        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", objectMapper);
+        ReactiveClientInvocationHandler handler = createHandler(webClient, "authProvider", jsonCodec);
 
         StepVerifier.create(invokePublisherBody(handler, body))
                 .expectNext("ok")
@@ -584,7 +583,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
 
         assertSame(body, capturedBody.get());
         assertNull(capturedRawBody.get());
-        verify(objectMapper, never()).writeValueAsBytes(any());
+        verify(jsonCodec, never()).write(any());
     }
 
     @Test
@@ -823,7 +822,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
         ReactiveClientInvocationHandler handler = createHandler(
                 webClient,
                 new ReactiveHttpClientProperties.ClientConfig(),
-                new ObjectMapper(),
+                TestJsonCodecs.jsonCodec(),
                 clientInterface);
         return (T) Proxy.newProxyInstance(
                 clientInterface.getClassLoader(),
@@ -846,38 +845,38 @@ class ReactiveClientInvocationHandlerBehaviorTest {
 
     @SuppressWarnings("unchecked")
     private static ReactiveClientInvocationHandler createHandler(WebClient webClient) {
-        return createHandler(webClient, (String) null, new ObjectMapper());
+        return createHandler(webClient, (String) null, TestJsonCodecs.jsonCodec());
     }
 
     private static ReactiveClientInvocationHandler createHandler(
             WebClient webClient,
             ReactiveHttpClientProperties.ClientConfig config) {
-        return createHandler(webClient, config, new ObjectMapper());
+        return createHandler(webClient, config, TestJsonCodecs.jsonCodec());
     }
 
     @SuppressWarnings("unchecked")
     private static ReactiveClientInvocationHandler createHandler(
             WebClient webClient,
             String authProviderName,
-            ObjectMapper objectMapper) {
+            ReactiveHttpClientJsonCodec jsonCodec) {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setAuthProvider(authProviderName);
-        return createHandler(webClient, config, objectMapper);
+        return createHandler(webClient, config, jsonCodec);
     }
 
     @SuppressWarnings("unchecked")
     private static ReactiveClientInvocationHandler createHandler(
             WebClient webClient,
             ReactiveHttpClientProperties.ClientConfig config,
-            ObjectMapper objectMapper) {
-        return createHandler(webClient, config, objectMapper, null);
+            ReactiveHttpClientJsonCodec jsonCodec) {
+        return createHandler(webClient, config, jsonCodec, null);
     }
 
     @SuppressWarnings("unchecked")
     private static ReactiveClientInvocationHandler createHandler(
             WebClient webClient,
             ReactiveHttpClientProperties.ClientConfig config,
-            ObjectMapper objectMapper,
+            ReactiveHttpClientJsonCodec jsonCodec,
             Class<?> clientInterface) {
         ApplicationContext appCtx = mock(ApplicationContext.class);
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
@@ -894,7 +893,7 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 clientInterface,
                 appCtx,
                 new NoopResilienceOperatorApplier(),
-                objectMapper,
+                jsonCodec,
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );
     }

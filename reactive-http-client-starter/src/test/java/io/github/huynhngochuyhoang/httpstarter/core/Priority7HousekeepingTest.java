@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
@@ -177,7 +176,7 @@ class Priority7HousekeepingTest {
         ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                 webClient, new MethodMetadataCache(), new RequestArgumentResolver(),
                 failingDecoder, config, "test-client", ctx,
-                new NoopResilienceOperatorApplier(), new ObjectMapper(),
+                new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
                 new ReactiveHttpClientProperties.ObservabilityConfig());
 
         StepVerifier.create(invokeSimple(handler))
@@ -270,7 +269,7 @@ class Priority7HousekeepingTest {
         return new ReactiveClientInvocationHandler(
                 webClient, new MethodMetadataCache(), new RequestArgumentResolver(),
                 new DefaultErrorDecoder(), config, "test-client", ctx,
-                new NoopResilienceOperatorApplier(), new ObjectMapper(),
+                new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
                 new ReactiveHttpClientProperties.ObservabilityConfig());
     }
 

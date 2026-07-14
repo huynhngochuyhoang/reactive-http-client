@@ -2,7 +2,6 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
@@ -785,7 +784,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
 
         ReactiveHttpClientFactoryBean<StrictSigV4SupportedBodyClient> factoryBean =
-                buildFactoryBean(properties, StrictSigV4SupportedBodyClient.class, null, new ObjectMapper());
+                buildFactoryBean(properties, StrictSigV4SupportedBodyClient.class, null, TestJsonCodecs.jsonCodec());
         try {
             assertThat(factoryBean.getObject()).isNotNull();
         } finally {
@@ -799,7 +798,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
 
         ReactiveHttpClientFactoryBean<StrictSigV4StreamingBodyClient> factoryBean =
-                buildFactoryBean(properties, StrictSigV4StreamingBodyClient.class, null, new ObjectMapper());
+                buildFactoryBean(properties, StrictSigV4StreamingBodyClient.class, null, TestJsonCodecs.jsonCodec());
         try {
             assertThatThrownBy(factoryBean::getObject)
                     .isInstanceOf(IllegalStateException.class)
@@ -829,7 +828,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
 
         ReactiveHttpClientFactoryBean<StrictSigV4JavaStreamBodyClient> factoryBean =
-                buildFactoryBean(properties, StrictSigV4JavaStreamBodyClient.class, null, new ObjectMapper());
+                buildFactoryBean(properties, StrictSigV4JavaStreamBodyClient.class, null, TestJsonCodecs.jsonCodec());
         try {
             assertThatThrownBy(factoryBean::getObject)
                     .isInstanceOf(IllegalStateException.class)
@@ -855,7 +854,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
 
         ReactiveHttpClientFactoryBean<StrictSigV4MultipartBodyClient> factoryBean =
-                buildFactoryBean(properties, StrictSigV4MultipartBodyClient.class, null, new ObjectMapper());
+                buildFactoryBean(properties, StrictSigV4MultipartBodyClient.class, null, TestJsonCodecs.jsonCodec());
         try {
             assertThatThrownBy(factoryBean::getObject)
                     .isInstanceOf(IllegalStateException.class)
@@ -923,7 +922,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
         ReactiveHttpClientFactoryBean<StrictSigV4StreamingBodyClient> factoryBean =
                 buildFactoryBean(properties, StrictSigV4StreamingBodyClient.class, null,
-                        new ObjectMapper(), customFactory);
+                        TestJsonCodecs.jsonCodec(), customFactory);
         try {
             assertThat(factoryBean.getObject()).isNotNull();
         } finally {
@@ -937,7 +936,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
 
         ReactiveHttpClientFactoryBean<StrictSigV4ObjectBodyClient> factoryBean =
-                buildFactoryBean(properties, StrictSigV4ObjectBodyClient.class, null, new ObjectMapper());
+                buildFactoryBean(properties, StrictSigV4ObjectBodyClient.class, null, TestJsonCodecs.jsonCodec());
         try {
             assertThatThrownBy(factoryBean::getObject)
                     .isInstanceOf(IllegalStateException.class)
@@ -959,7 +958,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         properties.getClients().put("strict-body-signing-client", config);
 
         ReactiveHttpClientFactoryBean<StrictSigV4JsonBodyClient> factoryBean =
-                buildFactoryBean(properties, StrictSigV4JsonBodyClient.class, null, new ObjectMapper());
+                buildFactoryBean(properties, StrictSigV4JsonBodyClient.class, null, TestJsonCodecs.jsonCodec());
         try {
             assertThatThrownBy(factoryBean::getObject)
                     .isInstanceOf(IllegalStateException.class)
@@ -978,7 +977,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
         ReactiveHttpClientFactoryBean<StrictSigV4DynamicContentTypeJsonBodyClient> factoryBean =
                 buildFactoryBean(properties, StrictSigV4DynamicContentTypeJsonBodyClient.class, null,
-                        new ObjectMapper());
+                        TestJsonCodecs.jsonCodec());
         try {
             assertThatThrownBy(factoryBean::getObject)
                     .isInstanceOf(IllegalStateException.class)
@@ -1572,7 +1571,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
     @SuppressWarnings("unchecked")
     private <T> ReactiveHttpClientFactoryBean<T> buildFactoryBean(
-            ReactiveHttpClientProperties properties, Class<T> type, RetryRegistry retryRegistry, ObjectMapper objectMapper,
+            ReactiveHttpClientProperties properties, Class<T> type, RetryRegistry retryRegistry, ReactiveHttpClientJsonCodec jsonCodec,
             AuthProviderFactory... authProviderFactories) {
         ApplicationContext ctx = mock(ApplicationContext.class);
 
@@ -1621,13 +1620,8 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         AuthProvider namedAuthProvider = request -> Mono.just(AuthContext.empty());
         when(ctx.getBean("namedAuthProvider", AuthProvider.class)).thenReturn(namedAuthProvider);
 
-        ObjectProvider<ObjectMapper> objectMapperProvider = mock(ObjectProvider.class);
-        when(objectMapperProvider.getIfAvailable()).thenReturn(objectMapper);
-        when(ctx.getBeanProvider(ObjectMapper.class)).thenReturn(objectMapperProvider);
-
         ObjectProvider<ReactiveHttpClientJsonCodec> jsonCodecProvider = mock(ObjectProvider.class);
-        when(jsonCodecProvider.getIfAvailable()).thenReturn(
-                objectMapper == null ? null : new Jackson2ReactiveHttpClientJsonCodec(objectMapper));
+        when(jsonCodecProvider.getIfAvailable()).thenReturn(jsonCodec);
         when(ctx.getBeanProvider(ReactiveHttpClientJsonCodec.class)).thenReturn(jsonCodecProvider);
 
         ReactiveHttpClientFactoryBean<T> factoryBean = new ReactiveHttpClientFactoryBean<>();
