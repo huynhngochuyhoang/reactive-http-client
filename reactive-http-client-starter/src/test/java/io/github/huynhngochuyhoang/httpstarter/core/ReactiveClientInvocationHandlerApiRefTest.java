@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.junit.jupiter.api.Test;
@@ -147,7 +146,7 @@ class ReactiveClientInvocationHandlerApiRefTest {
                 clientName,
                 mock(ApplicationContext.class),
                 new NoopResilienceOperatorApplier(),
-                mock(ObjectMapper.class),
+                mock(ReactiveHttpClientJsonCodec.class),
                 new ReactiveHttpClientProperties.ObservabilityConfig()
         );
     }

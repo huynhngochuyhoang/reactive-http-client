@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.HeaderParam;
 import io.github.huynhngochuyhoang.httpstarter.annotation.IdempotencyKey;
 import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
@@ -408,7 +407,7 @@ class IdempotencyKeySupportTest {
                 "test-client",
                 appCtx,
                 resilienceOperatorApplier,
-                new ObjectMapper(),
+                TestJsonCodecs.jsonCodec(),
                 new ReactiveHttpClientProperties.ObservabilityConfig());
     }
 

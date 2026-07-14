@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.Body;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
@@ -157,7 +156,7 @@ class ExchangeLogSubscriptionAttemptCountTest {
                 "test-client",
                 context,
                 resilienceOperatorApplier,
-                new ObjectMapper(),
+                TestJsonCodecs.jsonCodec(),
                 new ReactiveHttpClientProperties.ObservabilityConfig());
     }
 

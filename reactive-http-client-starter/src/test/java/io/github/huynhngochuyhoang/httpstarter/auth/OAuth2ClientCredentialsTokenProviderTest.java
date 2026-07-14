@@ -1,18 +1,18 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.*;
-import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.JacksonJsonDecoder;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
 import org.springframework.web.reactive.function.client.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -327,11 +327,12 @@ class OAuth2ClientCredentialsTokenProviderTest {
 
     @Test
     void tokenEndpointFailureCauseUsesConfiguredDecodersWithoutBlocking() {
-        ObjectMapper mapper = new ObjectMapper()
-                .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+        JsonMapper mapper = JsonMapper.builder()
+                .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                .build();
         ExchangeStrategies strategies = ExchangeStrategies.builder()
                 .codecs(codecs -> codecs.defaultCodecs()
-                        .jackson2JsonDecoder(new Jackson2JsonDecoder(mapper)))
+                        .jacksonJsonDecoder(new JacksonJsonDecoder(mapper)))
                 .build();
         WebClient webClient = WebClient.builder()
                 .exchangeStrategies(strategies)

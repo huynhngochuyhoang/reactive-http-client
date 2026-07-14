@@ -52,13 +52,6 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Temporary Jackson 2 source-compatibility shim for objectMapper(...). -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <optional>true</optional>
-        </dependency>
-
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

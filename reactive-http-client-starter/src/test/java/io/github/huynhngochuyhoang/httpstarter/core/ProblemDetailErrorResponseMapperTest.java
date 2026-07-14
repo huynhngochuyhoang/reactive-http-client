@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.exception.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -18,7 +17,7 @@ class ProblemDetailErrorResponseMapperTest {
 
     private final DefaultErrorDecoder decoder = new DefaultErrorDecoder(
             "problem-client",
-            List.of(new ProblemDetailErrorResponseMapper(new ObjectMapper())));
+            List.of(new ProblemDetailErrorResponseMapper(TestJsonCodecs.jsonCodec())));
 
     @Test
     void mapsProblemJson4xxToProblemDetailHttpClientException() {
@@ -100,7 +99,7 @@ class ProblemDetailErrorResponseMapperTest {
                 "https://api.example.test/redirect",
                 null);
 
-        Optional<? extends Throwable> mapped = new ProblemDetailErrorResponseMapper(new ObjectMapper()).map(context);
+        Optional<? extends Throwable> mapped = new ProblemDetailErrorResponseMapper(TestJsonCodecs.jsonCodec()).map(context);
 
         assertThat(mapped).isEmpty();
     }

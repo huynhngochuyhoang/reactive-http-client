@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Default Spring Boot 4 reactor.** Moved the project to `3.0.0` with Spring Boot `4.0.0`, Resilience4j `2.4.0`, and published `2.14.1` as the cross-major compatibility baseline; promoted Boot 4/Jackson 3 adapters into normal sources and removed the non-publishing `boot4-spike` profile.
-- **Jackson 2 signature compatibility.** Kept Jackson 2 transitive while deprecated public constructors still expose its `ObjectMapper` type, allowing Jackson-3-safe constructor calls to compile without an extra consumer dependency.
+- **Jackson 3 codec ownership.** Made `ReactiveHttpClientJsonCodec` the stable serialization boundary, removed deprecated Jackson 2 adapters and mapper constructors at the `3.0.0` boundary, and removed Jackson 2 from the starter and test-helper dependency graphs while preserving configured-codec behavior for Problem Detail, OAuth2 errors, SigV4 signing, and mocks.
 - **Generation-specific release packaging.** Added a CI packaging guard that aligns normal Boot 4 sources with attached source and Javadoc artifacts, rejects stale Boot 3 or duplicate jar entries, and verifies auto-configuration, runtime-hint, and configuration-metadata resources are packaged once.
 
 ## [2.14.1] - 2026-07-13

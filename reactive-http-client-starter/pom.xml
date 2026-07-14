@@ -52,12 +52,6 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
-        <!-- Transitive while deprecated public constructors still expose Jackson 2 types. -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-
         <!-- Resilience4j – optional; bring your own in consuming app -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>

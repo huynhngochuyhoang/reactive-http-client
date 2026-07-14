@@ -32,8 +32,8 @@ documented core SPIs and helpers, test helpers, and OTel.
 
 | Module | Result | Reviewed changes |
 |---|---|---|
-| reactive-http-client-starter | Major | Removes `HttpClientHealthIndicator` and retains the Boot 4 `Boot4HttpClientHealthIndicator`; JSON codec migration APIs already shipped in 2.14.1. |
-| reactive-http-client-test | Compatible | No reviewed public helper removal from the 2.14.1 baseline. |
+| reactive-http-client-starter | Major | Replaces the Boot 3 health type and removes deprecated Jackson 2 adapters and mapper constructors. |
+| reactive-http-client-test | Major | Removes the deprecated Jackson 2 `objectMapper(...)` builder adapter. |
 | reactive-http-client-otel | Compatible | No reviewed public OTel API removal from the 2.14.1 baseline. |
 
 ## Break classification
@@ -46,14 +46,22 @@ moved health contracts from `org.springframework.boot.actuate.health` to
 return type. Direct type users migrate; bean overrides retain the
 `reactiveHttpClientHealthIndicator` name.
 
-### Retained migration APIs
+### Jackson 3 codec boundary
 
 - `ReactiveHttpClientJsonCodec` already exists in 2.14.1 and separates
   starter JSON ownership from Jackson.
 - `Jackson3ReactiveHttpClientJsonCodec` is the Boot 4 adapter.
-- `Jackson2ReactiveHttpClientJsonCodec` and mapper overloads are deprecated shims.
 - `MockReactiveHttpClient.Builder.jsonCodec(...)` already exists in 2.14.1 and
   provides helper parity.
+- `Jackson2ReactiveHttpClientJsonCodec` is removed.
+- `ProblemDetailErrorResponseMapper(ObjectMapper)` is replaced by its codec constructor.
+- Jackson 2 `ReactiveClientInvocationHandler` constructors are replaced by
+  otherwise equivalent codec constructors.
+- `MockReactiveHttpClient.Builder.objectMapper(...)` is removed; use
+  `jsonCodec(...)`.
+
+These removals are intentional at the `3.0.0` major boundary. The starter and
+test-helper published dependency graphs no longer require Jackson 2.
 
 ### Accidental or unrelated breaks
 

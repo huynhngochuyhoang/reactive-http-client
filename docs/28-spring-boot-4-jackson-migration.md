@@ -110,16 +110,29 @@ The Boot 4 adapter uses the application Jackson 3 mapper. Authenticated JSON
 uses one byte array for signing and the wire body. Problem Detail mapping uses
 the same codec.
 
-Replace these deprecated Jackson 2 migration shims:
+The `3.0.0` line removes these deprecated Jackson 2 migration shims:
 
+- `Jackson2ReactiveHttpClientJsonCodec`
 - ProblemDetailErrorResponseMapper(com.fasterxml.jackson.databind.ObjectMapper)
 - MockReactiveHttpClient.Builder.objectMapper(...)
 - ReactiveClientInvocationHandler constructors accepting Jackson 2
 
 Use the codec constructor, MockReactiveHttpClient.Builder.jsonCodec(...), and
-codec-based handler constructors. `Jackson2ReactiveHttpClientJsonCodec` remains for Boot 3 source migration. Jackson 2
-also remains a transitive dependency while these deprecated public signatures
-exist; removing that dependency requires removing or hiding those signatures.
+codec-based handler constructors. Applications that must retain the Jackson 2
+adapter or mapper overloads must remain on the `2.14.x` maintenance line while
+they migrate. The `3.x` starter and test helper do not depend on Jackson 2.
+
+`ReactiveHttpClientJsonCodec` is the stable starter serialization boundary.
+The default bean wraps Boot's application Jackson 3 `ObjectMapper`, so modules,
+naming strategies, and serializers apply to Problem Detail mapping and exact
+JSON bytes materialized for authentication. A custom codec bean replaces that
+default. Configure WebClient with equivalent codecs when signing requires the
+materialized JSON bytes to match the final wire representation.
+
+The codec is a bean contract, not a `reactive.http` property. It requires no
+configuration-metadata entry or reflection hint; Boot owns construction of its
+Jackson 3 mapper, and the starter constructs the adapter through normal bean
+methods.
 
 ## Configuration
 

@@ -244,7 +244,7 @@ the POM include set or lacks an explicit support status.
 | `io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache` | Replaceable metadata cache | `methodMetadataCache` bean replacement | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata*` | Metadata cache model | Public metadata returned by cache implementations | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper` | Problem Detail mapper | Built-in RFC 9457 mapper | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.core.*ReactiveHttpClientJsonCodec` | JSON codec SPI and generation adapters | Starter-owned JSON byte materialization and migration compatibility | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.*ReactiveHttpClientJsonCodec` | JSON codec SPI and Jackson 3 adapter | Starter-owned JSON byte materialization | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer` | WebClient builder customizer SPI | Per-client builder filters and codecs | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext` | Lifecycle hook context | Attempt/subscription metadata | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook` | Lifecycle hook SPI | Audit and side-effect callbacks | Supported |
@@ -259,9 +259,10 @@ the POM include set or lacks an explicit support status.
 | `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, `RecordedExchange`, `RecordedExchangeAssertions`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | `OpenTelemetryHttpClientObserver`, `OpenTelemetryContextWebFilter`, `OpenTelemetryContextExchangeFilter`, and `OpenTelemetryHttpClientAutoConfiguration` | Supported |
 
-`Jackson2ReactiveHttpClientJsonCodec` and mapper-based Jackson 2 overloads are
-deprecated migration shims for the future `3.x` line and are documented in the
-[Boot 4 migration guide](28-spring-boot-4-jackson-migration.md). No other
+The `3.0.0` migration removes `Jackson2ReactiveHttpClientJsonCodec` and the
+mapper-based Jackson 2 overloads documented in the
+[Boot 4 migration guide](28-spring-boot-4-jackson-migration.md). These are
+intentional cross-major changes from the `2.14.1` baseline. No other
 compatibility-covered type is reserved for removal. Any future deprecation must
 link to its migration note in the same change.
 

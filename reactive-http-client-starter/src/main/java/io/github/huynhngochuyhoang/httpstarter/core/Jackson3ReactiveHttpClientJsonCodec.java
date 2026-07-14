@@ -4,6 +4,12 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.Objects;
 
+/**
+ * Jackson 3 adapter for {@link ReactiveHttpClientJsonCodec}.
+ *
+ * <p>Pass the same application mapper configuration used by WebClient when
+ * authenticated JSON bodies must produce identical signing and wire bytes.</p>
+ */
 public final class Jackson3ReactiveHttpClientJsonCodec implements ReactiveHttpClientJsonCodec {
 
     private final ObjectMapper objectMapper;

@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
@@ -254,14 +253,6 @@ public final class MockReactiveHttpClient<T> {
         /** Uses the supplied client configuration when constructing the mock proxy. */
         public Builder<T> clientConfig(ReactiveHttpClientProperties.ClientConfig clientConfig) {
             this.clientConfig = clientConfig != null ? clientConfig : new ReactiveHttpClientProperties.ClientConfig();
-            return this;
-        }
-
-        /** @deprecated Use {@link #jsonCodec(ReactiveHttpClientJsonCodec)}. */
-        @Deprecated(since = "3.0.0", forRemoval = false)
-        public Builder<T> objectMapper(ObjectMapper objectMapper) {
-            this.jsonCodec = new Jackson2ReactiveHttpClientJsonCodec(
-                    Objects.requireNonNull(objectMapper, "objectMapper"));
             return this;
         }
 

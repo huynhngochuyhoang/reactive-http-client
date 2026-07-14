@@ -1,8 +1,8 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.IOException;
@@ -181,11 +181,12 @@ class DocumentationReleaseArtifactTest {
                 .contains("No reactive.http property was renamed for Boot 4")
                 .contains("Before, Boot 3.5 and starter 2.x")
                 .contains("After, Boot 4 and starter 3.x")
-                .contains("GraalVM Java 25");
+                .contains("GraalVM Java 25")
+                .contains("requires no\nconfiguration-metadata entry or reflection hint");
         assertThat(report)
                 .contains("published 2.14.1", "Frozen baseline surface")
                 .contains("Required by Boot 4")
-                .contains("Retained migration APIs")
+                .contains("Jackson 3 codec boundary")
                 .contains("Accidental or unrelated breaks")
                 .contains("None. There are no changes")
                 .contains("HttpClientHealthIndicator")
@@ -231,7 +232,7 @@ class DocumentationReleaseArtifactTest {
                 .as("api-compatibility japicmp includes")
                 .containsExactlyInAnyOrderElementsOf(documentedIncludes);
         assertThat(releaseDocs)
-                .contains("Jackson2ReactiveHttpClientJsonCodec` and mapper-based Jackson 2 overloads are")
+                .contains("The `3.0.0` migration removes `Jackson2ReactiveHttpClientJsonCodec`")
                 .contains("No other\ncompatibility-covered type is reserved for removal")
                 .contains("### Constructor and mutable model policy")
                 .contains("The `MethodMetadata` no-arg constructor")
@@ -420,6 +421,7 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
         String starterPom = Files.readString(root.resolve("reactive-http-client-starter/pom.xml"));
+        String testHelperPom = Files.readString(root.resolve("reactive-http-client-test/pom.xml"));
         String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
         String publishWorkflow = Files.readString(root.resolve(".github/workflows/publish-maven-central.yml"));
         String packagingGuard = Files.readString(root.resolve("scripts/verify-generation-packaging.sh"));
@@ -435,12 +437,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("<artifactId>spring-boot-webclient</artifactId>")
                 .contains("<artifactId>spring-boot-jackson</artifactId>")
                 .contains("<groupId>tools.jackson.core</groupId>");
-        int jackson2Dependency = starterPom.indexOf("<groupId>com.fasterxml.jackson.core</groupId>");
-        int jackson2DependencyEnd = starterPom.indexOf("</dependency>", jackson2Dependency);
-        assertThat(jackson2Dependency).isGreaterThanOrEqualTo(0);
-        assertThat(jackson2DependencyEnd).isGreaterThan(jackson2Dependency);
-        assertThat(starterPom.substring(jackson2Dependency, jackson2DependencyEnd))
-                .doesNotContain("<optional>true</optional>");
+        assertThat(starterPom).doesNotContain("<groupId>com.fasterxml.jackson.core</groupId>");
+        assertThat(testHelperPom).doesNotContain("<groupId>com.fasterxml.jackson.core</groupId>");
+        assertThat(root.resolve("reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/Jackson2ReactiveHttpClientJsonCodec.java"))
+                .doesNotExist();
         assertThat(starterPom)
                 .doesNotContain("spring-boot-starter-classic")
                 .doesNotContain("build-helper-maven-plugin");

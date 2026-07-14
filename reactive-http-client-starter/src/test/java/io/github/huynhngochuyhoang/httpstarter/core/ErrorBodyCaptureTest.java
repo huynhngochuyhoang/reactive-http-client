@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
 import io.netty.buffer.PooledByteBufAllocator;
 import org.junit.jupiter.api.Test;
@@ -104,7 +103,7 @@ class ErrorBodyCaptureTest {
             return Optional.empty();
         };
         DefaultErrorDecoder decoder = new DefaultErrorDecoder(
-                "test-client", List.of(capturingMapper, new ProblemDetailErrorResponseMapper(new ObjectMapper())));
+                "test-client", List.of(capturingMapper, new ProblemDetailErrorResponseMapper(TestJsonCodecs.jsonCodec())));
         String body = "{\"title\":\"Large problem\",\"detail\":\"" + "x".repeat(PROBLEM_DETAIL_CAP) + "\"}";
 
         StepVerifier.create(decoder.decode(response(HttpStatus.BAD_GATEWAY, MediaType.APPLICATION_PROBLEM_JSON, body)))

@@ -1,6 +1,5 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.LogHttpExchange;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
@@ -404,7 +403,7 @@ class HousekeepingTest {
         return new ReactiveClientInvocationHandler(
                 webClient, new MethodMetadataCache(), new RequestArgumentResolver(),
                 new DefaultErrorDecoder(), config, "test-client", ctx,
-                new NoopResilienceOperatorApplier(), new ObjectMapper(),
+                new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
                 new ReactiveHttpClientProperties.ObservabilityConfig());
     }
 
@@ -434,7 +433,7 @@ class HousekeepingTest {
         return new ReactiveClientInvocationHandler(
                 webClient, cache, new RequestArgumentResolver(),
                 new DefaultErrorDecoder(), config, "test-client", ctx,
-                new NoopResilienceOperatorApplier(), new ObjectMapper(),
+                new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
                 new ReactiveHttpClientProperties.ObservabilityConfig());
     }
 
