@@ -55,6 +55,37 @@ The Central-only settings file is optional when the configured Maven mirror
 already contains Boot 4. It changes repository resolution only; it does not
 select source sets or alter publishing.
 
+### Publishable module staging
+
+The published parent manages the starter, test-helper, and OTel coordinates, so
+module POM dependencies on another reactor artifact remain versionless. The parent
+also owns the license, developer, repository, issue-tracker, source/Javadoc, GPG,
+and Central Portal metadata. Central publishing defaults to manual approval; the
+release workflow is the final go decision and explicitly sets `autoPublish=true`.
+The benchmark module remains outside the default reactor and keeps deploy disabled.
+
+After a signed release-profile build, stage and consume the exact artifacts without
+uploading them:
+
+```bash
+mvn -s .mvn/maven-central-settings.xml clean -Prelease -DskipTests verify
+bash scripts/verify-generation-packaging.sh
+bash scripts/verify-publishable-artifacts.sh
+```
+
+The staging guard writes only target-local evidence under
+`target/release-evidence/v20-priority5/`. It generates effective POMs for the
+parent, three publishable modules, and benchmarks; deploys the parent, binary,
+source, and Javadoc artifacts to a clean file repository; verifies every GPG
+signature; writes SHA-256 checksums; and runs the independent Boot 4 consumer
+with an empty Maven local repository. The `_remote.repositories` markers must
+identify `v20-stage`, proving the consumer did not use reactor classes or a
+pre-existing local artifact.
+
+A credentialed `mvn -Prelease deploy` leaves a validated deployment awaiting
+manual approval in Central. Only the final publish workflow adds
+`-DautoPublish=true`.
+
 The immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`.
 Create a dedicated maintenance branch from that tag for security or critical
 correctness fixes; do not compile Boot 3 adapters into the `3.x` artifacts.

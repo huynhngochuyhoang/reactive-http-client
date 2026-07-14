@@ -450,7 +450,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("bash scripts/verify-generation-packaging.sh")
                 .contains("spring-boot: ['4.0.0', '4.1.0']");
         int publishPackagingGuard = publishWorkflow.indexOf("bash scripts/verify-generation-packaging.sh");
-        int centralDeploy = publishWorkflow.indexOf("mvn -B -ntp -Prelease -DskipTests deploy");
+        int centralDeploy = publishWorkflow.indexOf("mvn -B -ntp -Prelease -DskipTests -DautoPublish=true deploy");
         assertThat(publishWorkflow)
                 .contains("mvn -B -ntp clean verify")
                 .contains("mvn -B -ntp clean -Prelease -DskipTests verify")
@@ -472,6 +472,54 @@ class DocumentationReleaseArtifactTest {
         assertThat(root.resolve("reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/Boot3JsonCodecAutoConfiguration.java")).doesNotExist();
         assertThat(root.resolve("reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/Boot3WebClientCustomizers.java")).doesNotExist();
         assertThat(root.resolve("reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/observability/HttpClientHealthIndicator.java")).doesNotExist();
+    }
+
+    @Test
+    void publishableModulePomsAndStagedConsumerGuardStayReleaseReady() throws IOException {
+        Path root = projectRoot();
+        String parentPom = Files.readString(root.resolve("pom.xml"));
+        String starterPom = Files.readString(root.resolve("reactive-http-client-starter/pom.xml"));
+        String testPom = Files.readString(root.resolve("reactive-http-client-test/pom.xml"));
+        String otelPom = Files.readString(root.resolve("reactive-http-client-otel/pom.xml"));
+        String benchmarkPom = Files.readString(root.resolve("reactive-http-client-benchmarks/pom.xml"));
+        String stagingGuard = Files.readString(root.resolve("scripts/verify-publishable-artifacts.sh"));
+        String publishWorkflow = Files.readString(root.resolve(".github/workflows/publish-maven-central.yml"));
+
+        assertThat(parentPom)
+                .contains("<issueManagement>")
+                .contains("<system>GitHub Issues</system>")
+                .contains("<autoPublish>false</autoPublish>")
+                .contains("<artifactId>reactive-http-client-starter</artifactId>")
+                .contains("<artifactId>reactive-http-client-test</artifactId>")
+                .contains("<artifactId>reactive-http-client-otel</artifactId>")
+                .doesNotContain("<maven.deploy.skip>true</maven.deploy.skip>");
+        assertThat(starterPom)
+                .contains("<url>https://github.com/huynhngochuyhoang/reactive-http-client</url>")
+                .contains("scm:git:https://github.com/huynhngochuyhoang/reactive-http-client.git");
+        assertThat(testPom).contains("<url>https://github.com/huynhngochuyhoang/reactive-http-client</url>");
+        assertThat(otelPom).contains("<url>https://github.com/huynhngochuyhoang/reactive-http-client</url>");
+        assertThat(dependencyBlock(testPom, "reactive-http-client-starter"))
+                .doesNotContain("<version>");
+        assertThat(dependencyBlock(otelPom, "reactive-http-client-starter"))
+                .doesNotContain("<version>");
+        assertThat(benchmarkPom)
+                .contains("<artifactId>maven-deploy-plugin</artifactId>")
+                .contains("<skip>true</skip>");
+
+        assertThat(stagingGuard)
+                .contains("PUBLISHABLE_MODULES=(reactive-http-client-starter reactive-http-client-test reactive-http-client-otel)")
+                .contains("help:effective-pom")
+                .contains("maven-deploy-plugin:3.1.4:deploy-file")
+                .contains("assert_signed")
+                .contains("sha256sum")
+                .contains("consumer-repository")
+                .contains("_remote.repositories")
+                .contains("benchmark artifacts must not be staged");
+        int signedBuild = publishWorkflow.indexOf("mvn -B -ntp clean -Prelease -DskipTests verify");
+        int stagedConsumer = publishWorkflow.indexOf("bash scripts/verify-publishable-artifacts.sh");
+        int centralDeploy = publishWorkflow.indexOf("mvn -B -ntp -Prelease -DskipTests -DautoPublish=true deploy");
+        assertThat(signedBuild).isGreaterThanOrEqualTo(0).isLessThan(stagedConsumer);
+        assertThat(stagedConsumer).isLessThan(centralDeploy);
     }
 
     @Test

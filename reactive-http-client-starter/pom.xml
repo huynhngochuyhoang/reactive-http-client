@@ -13,6 +13,13 @@
     <artifactId>reactive-http-client-starter</artifactId>
     <name>reactive-http-client-starter</name>
     <description>Spring Boot starter for declarative reactive HTTP clients with resilience, observability, and per-client auth strategy</description>
+    <url>https://github.com/huynhngochuyhoang/reactive-http-client</url>
+
+    <scm>
+        <connection>scm:git:https://github.com/huynhngochuyhoang/reactive-http-client.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/huynhngochuyhoang/reactive-http-client.git</developerConnection>
+        <url>https://github.com/huynhngochuyhoang/reactive-http-client</url>
+    </scm>
 
     <dependencies>
         <!-- Spring Boot Autoconfigure (no starters, lean) -->

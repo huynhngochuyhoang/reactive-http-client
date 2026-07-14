@@ -43,6 +43,21 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>reactive-http-client-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>reactive-http-client-test</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>reactive-http-client-otel</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
@@ -81,6 +96,11 @@
         <url>https://github.com/huynhngochuyhoang/reactive-http-client</url>
     </scm>
 
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/huynhngochuyhoang/reactive-http-client/issues</url>
+    </issueManagement>
+
     <build>
         <pluginManagement>
             <plugins>
@@ -107,9 +127,6 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-deploy-plugin</artifactId>
                     <version>${maven-deploy-plugin.version}</version>
-                    <configuration>
-                        <skip>true</skip>
-                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.sonatype.central</groupId>
@@ -118,7 +135,7 @@
                     <extensions>true</extensions>
                     <configuration>
                         <publishingServerId>central</publishingServerId>
-                        <autoPublish>true</autoPublish>
+                        <autoPublish>false</autoPublish>
                     </configuration>
                 </plugin>
             </plugins>

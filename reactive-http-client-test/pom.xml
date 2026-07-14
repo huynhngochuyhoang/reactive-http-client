@@ -13,12 +13,18 @@
     <artifactId>reactive-http-client-test</artifactId>
     <name>reactive-http-client-test</name>
     <description>Test helpers for the reactive-http-client-starter: proxy builders, exchange recorders, and assertion helpers for @ReactiveHttpClient interfaces.</description>
+    <url>https://github.com/huynhngochuyhoang/reactive-http-client</url>
+
+    <scm>
+        <connection>scm:git:https://github.com/huynhngochuyhoang/reactive-http-client.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/huynhngochuyhoang/reactive-http-client.git</developerConnection>
+        <url>https://github.com/huynhngochuyhoang/reactive-http-client</url>
+    </scm>
 
     <dependencies>
         <dependency>
             <groupId>io.github.huynhngochuyhoang</groupId>
             <artifactId>reactive-http-client-starter</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- WebFlux (WebClient) -->
