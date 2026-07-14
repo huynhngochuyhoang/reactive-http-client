@@ -60,11 +60,14 @@ jobs:
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
+      - name: Verify staged publishable artifacts
+        run: bash scripts/verify-publishable-artifacts.sh
+
       - name: Verify generation-specific release packaging
         run: bash scripts/verify-generation-packaging.sh
 
       - name: Publish release to Maven Central (Sonatype Central Portal)
-        run: mvn -B -ntp -Prelease -DskipTests deploy
+        run: mvn -B -ntp -Prelease -DskipTests -DautoPublish=true deploy
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}

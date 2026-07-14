@@ -13,13 +13,19 @@
     <artifactId>reactive-http-client-otel</artifactId>
     <name>reactive-http-client-otel</name>
     <description>OpenTelemetry observer + auto-configuration for reactive-http-client-starter. Records each outbound HTTP exchange as a span using OTel semantic conventions.</description>
+    <url>https://github.com/huynhngochuyhoang/reactive-http-client</url>
+
+    <scm>
+        <connection>scm:git:https://github.com/huynhngochuyhoang/reactive-http-client.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/huynhngochuyhoang/reactive-http-client.git</developerConnection>
+        <url>https://github.com/huynhngochuyhoang/reactive-http-client</url>
+    </scm>
 
     <dependencies>
         <!-- Starter (compile) -->
         <dependency>
             <groupId>io.github.huynhngochuyhoang</groupId>
             <artifactId>reactive-http-client-starter</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Spring Boot autoconfiguration -->

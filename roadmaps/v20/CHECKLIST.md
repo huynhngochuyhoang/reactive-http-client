@@ -198,26 +198,58 @@ Evidence:
 
 ## Priority 5 - Produce Publishable Module POMs
 
-### [ ] 5.1 Audit release coordinates and dependency ownership
+### [x] 5.1 Audit release coordinates and dependency ownership
 
-- [ ] Generate effective POMs for the parent, starter, test-helper, OTel, and benchmarks.
-- [ ] Verify Boot 4 dependencies use focused modules and versionless reactor dependencies.
-- [ ] Verify Resilience4j, Actuator, Micrometer, OTel, and native integrations retain
+- [x] Generate effective POMs for the parent, starter, test-helper, OTel, and benchmarks.
+- [x] Verify Boot 4 dependencies use focused modules and versionless reactor dependencies.
+- [x] Verify Resilience4j, Actuator, Micrometer, OTel, and native integrations retain
       their intended optional scopes.
-- [ ] Verify licenses, developers, SCM, issue tracking, distribution management,
+- [x] Verify licenses, developers, SCM, issue tracking, distribution management,
       signing, and source/Javadoc attachment metadata.
-- [ ] Verify no generated POM references local paths, spike profiles, or unpublished
+- [x] Verify no generated POM references local paths, spike profiles, or unpublished
       compatibility artifacts.
 
-### [ ] 5.2 Stage the complete artifact set
+### [x] 5.2 Stage the complete artifact set
 
-- [ ] Produce a clean local staging repository for every publishable module.
-- [ ] Verify checksums and signatures for staged artifacts.
-- [ ] Build independent consumers against staged coordinates only.
-- [ ] Reject accidental resolution from reactor classes or pre-existing local snapshots.
-- [ ] Record staged dependency trees and effective POMs as target-only evidence.
-- [ ] Run Central publication validation without releasing until the final go decision.
-- [ ] Run `git diff --check`.
+- [x] Produce a clean local staging repository for every publishable module.
+- [x] Verify checksums and signatures for staged artifacts.
+- [x] Build independent consumers against staged coordinates only.
+- [x] Reject accidental resolution from reactor classes or pre-existing local snapshots.
+- [x] Record staged dependency trees and effective POMs as target-only evidence.
+- [x] Run Central publication validation without releasing until the final go decision.
+- [x] Run `git diff --check`.
+
+Evidence:
+
+- Generated target-only effective POMs for the parent, starter, test-helper,
+  OTel, and benchmark harness under
+  `target/release-evidence/v20-priority5/effective-poms/`. The three published
+  child POMs keep Boot 4/Spring dependencies versionless, inherit managed
+  reactor coordinates, and retain optional Resilience4j, health, Actuator, and
+  Micrometer boundaries; OTel API remains the companion module's required API.
+- Removed inherited deploy suppression from the publishable reactor while
+  retaining explicit deploy suppression on the benchmark module. Added
+  issue-tracker metadata and explicit child project/SCM URLs so effective POMs
+  do not invent invalid `.git/<module>` repository paths.
+- Central Portal publication now defaults to manual approval
+  (`autoPublish=false`). The release workflow explicitly opts into
+  `-DautoPublish=true` only at the final publish step and runs
+  `scripts/verify-publishable-artifacts.sh` before that step.
+- `mvn -q -s .mvn/maven-central-settings.xml -Prelease -DskipTests
+  -Dgpg.homedir=/tmp/reactive-http-client-v20-staging-gpg clean verify`
+  passed with an ephemeral staging key, proving source/Javadoc attachment and
+  signing without using release credentials.
+- `GNUPGHOME=/tmp/reactive-http-client-v20-staging-gpg bash
+  scripts/verify-publishable-artifacts.sh 3.0.0` passed. It staged the parent
+  plus all three binary/source/Javadoc module sets, verified 13 signatures,
+  generated SHA-256 checksums, excluded benchmarks, and produced target-only
+  staged artifact and dependency-tree evidence.
+- The independent Boot 4 fixture passed from an empty target-local Maven
+  repository. Its parent, starter, test-helper, and OTel
+  `_remote.repositories` markers all identify `v20-stage`, not the reactor
+  or the pre-existing local Maven repository.
+- `DocumentationReleaseArtifactTest`, shell syntax validation, and
+  `git diff --check` passed.
 
 ---
 
