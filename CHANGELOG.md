@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Jackson 3 codec ownership.** Made `ReactiveHttpClientJsonCodec` the stable serialization boundary, removed deprecated Jackson 2 adapters and mapper constructors at the `3.0.0` boundary, and removed Jackson 2 from the starter and test-helper dependency graphs while preserving configured-codec behavior for Problem Detail, OAuth2 errors, SigV4 signing, and mocks.
 - **Generation-specific release packaging.** Added a CI packaging guard that aligns normal Boot 4 sources with attached source and Javadoc artifacts, rejects stale Boot 3 or duplicate jar entries, and verifies auto-configuration, runtime-hint, and configuration-metadata resources are packaged once.
 - **Publishable module POMs.** Enabled deployment for the parent, starter, test-helper, and OTel artifacts; centralized sibling dependency versions; corrected inherited project, SCM, and issue metadata; made Central publication manual by default; and added signed local staging plus isolated-consumer validation before the final release deploy.
+- **Boot 4 runtime and native contracts.** Revalidated WebClient, Jackson, metrics, and health auto-configuration ordering; configuration metadata and optional integration back-off; and a resource-bounded GraalVM 25 executable covering inherited generic and configured `@ApiRef` endpoints, auth, Problem Detail, sanitized diagnostics, health, and Micrometer metrics.
 
 ## [2.14.1] - 2026-07-13
 
