@@ -33,6 +33,7 @@ jobs:
 
       - name: Record native toolchain
         run: |
+          set -o pipefail
           mkdir -p target/release-evidence/v20-priority6
           {
             java -version

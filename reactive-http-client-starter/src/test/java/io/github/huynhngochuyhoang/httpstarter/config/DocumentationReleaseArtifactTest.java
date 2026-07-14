@@ -510,6 +510,7 @@ class DocumentationReleaseArtifactTest {
                 "reactive.http.client.requests");
         assertThat(nativePom).contains("-J-Xmx6g", "-H:NumberOfThreads=4", "-H:+SharedArenaSupport");
         assertThat(nativeWorkflow).contains(
+                "set -o pipefail",
                 "target/release-evidence/v20-priority6/native-provenance.txt",
                 "native-smoke-provenance",
                 "actions/upload-artifact@v4");
