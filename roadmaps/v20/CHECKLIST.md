@@ -138,11 +138,11 @@ Evidence:
 - Boot 4 production and test code now use the normal module `src/main/java` and
   `src/test/java` roots only. The packaging guard rejects legacy `src/boot3` or
   `src/boot4` directories and Boot 3 WebClient package references in either tree.
-- Added `scripts/verify-generation-packaging.sh` and wired it after the normal CI
-  `verify`. It compares every attached source jar with the effective main Java
-  source set, inspects all starter, test-helper, and OTel binary/source/Javadoc
-  jars for duplicate or stale-generation entries, and verifies required starter
-  and OTel auto-configuration, metadata, and runtime-hint entries occur once.
+- Added `scripts/verify-generation-packaging.sh` after normal CI `verify` and in
+  the Maven Central publish job before `deploy`. It compares attached source jars with the effective main Java source set,
+  rejects binary classes whose `SourceFile` no longer exists, inspects all jars
+  for duplicate or stale-generation entries, and requires checked-in resources
+  in both binary and source jars alongside generated metadata and runtime hints.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter
   -Dtest=DocumentationReleaseArtifactTest test` passed.
 - `mvn -q -s .mvn/maven-central-settings.xml clean verify` passed with source

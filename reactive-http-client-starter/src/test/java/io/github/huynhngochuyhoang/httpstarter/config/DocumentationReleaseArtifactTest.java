@@ -421,6 +421,7 @@ class DocumentationReleaseArtifactTest {
         String pomXml = Files.readString(root.resolve("pom.xml"));
         String starterPom = Files.readString(root.resolve("reactive-http-client-starter/pom.xml"));
         String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
+        String publishWorkflow = Files.readString(root.resolve(".github/workflows/publish-maven-central.yml"));
         String packagingGuard = Files.readString(root.resolve("scripts/verify-generation-packaging.sh"));
         String settings = Files.readString(root.resolve(".mvn/maven-central-settings.xml"));
 
@@ -447,10 +448,16 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("-Pboot4-spike")
                 .contains("bash scripts/verify-generation-packaging.sh")
                 .contains("spring-boot: ['4.0.0', '4.1.0']");
+        int publishPackagingGuard = publishWorkflow.indexOf("bash scripts/verify-generation-packaging.sh");
+        int centralDeploy = publishWorkflow.indexOf("mvn -B -ntp -Prelease -DskipTests deploy");
+        assertThat(publishWorkflow).contains("mvn -B -ntp -Prelease -DskipTests verify");
+        assertThat(publishPackagingGuard).isGreaterThanOrEqualTo(0).isLessThan(centralDeploy);
         assertThat(packagingGuard)
                 .contains("src/main/java")
                 .contains("-sources.jar")
                 .contains("-javadoc.jar")
+                .contains("contains orphan class")
+                .contains("assert_entry_count \"$sources_jar\" \"$resource\" 1")
                 .contains("Boot3")
                 .contains("AutoConfiguration.imports")
                 .contains("ReactiveHttpClientRuntimeHints.class");

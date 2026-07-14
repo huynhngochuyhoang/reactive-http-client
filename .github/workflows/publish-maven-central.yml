@@ -55,6 +55,12 @@ jobs:
             exit 1
           fi
 
+      - name: Build release artifacts for packaging inspection
+        run: mvn -B -ntp -Prelease -DskipTests verify
+
+      - name: Verify generation-specific release packaging
+        run: bash scripts/verify-generation-packaging.sh
+
       - name: Publish release to Maven Central (Sonatype Central Portal)
         run: mvn -B -ntp -Prelease -DskipTests deploy
         env:

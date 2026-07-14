@@ -59,10 +59,27 @@ for module in "${MODULES[@]}"; do
     fail "$sources_jar does not match $module/src/main/java; see $WORK_DIR/$module.sources.diff"
   fi
 
+  while IFS= read -r class_entry; do
+    class_name="${class_entry%.class}"
+    class_name="${class_name//\//.}"
+    source_file="$(javap -classpath "$binary_jar" -verbose "$class_name" 2>/dev/null \
+      | sed -n 's/.*SourceFile: "\([^"]*\)"/\1/p' | head -n 1)"
+    [[ -n "$source_file" ]] || fail "unable to resolve SourceFile for $class_entry"
+    package_path="${class_entry%/*}"
+    source_entry="$package_path/$source_file"
+    if ! grep -Fxq "$source_entry" "$expected_sources"; then
+      fail "$binary_jar contains orphan class $class_entry without current source $source_entry"
+    fi
+  done < <(jar tf "$binary_jar" | grep '\.class$' | sort)
+
+  assert_entry_count "$binary_jar" \
+    "io/github/huynhngochuyhoang/httpstarter/observability/HttpClientHealthIndicator.class" 0
+
   resources_dir="$ROOT_DIR/$module/src/main/resources"
   if [[ -d "$resources_dir" ]]; then
     while IFS= read -r resource; do
       assert_entry_count "$binary_jar" "$resource" 1
+      assert_entry_count "$sources_jar" "$resource" 1
     done < <(find "$resources_dir" -type f -printf '%P\n' | sort)
   fi
 
