@@ -432,7 +432,14 @@ class DocumentationReleaseArtifactTest {
         assertThat(starterPom)
                 .contains("<artifactId>spring-boot-webclient</artifactId>")
                 .contains("<artifactId>spring-boot-jackson</artifactId>")
-                .contains("<groupId>tools.jackson.core</groupId>")
+                .contains("<groupId>tools.jackson.core</groupId>");
+        int jackson2Dependency = starterPom.indexOf("<groupId>com.fasterxml.jackson.core</groupId>");
+        int jackson2DependencyEnd = starterPom.indexOf("</dependency>", jackson2Dependency);
+        assertThat(jackson2Dependency).isGreaterThanOrEqualTo(0);
+        assertThat(jackson2DependencyEnd).isGreaterThan(jackson2Dependency);
+        assertThat(starterPom.substring(jackson2Dependency, jackson2DependencyEnd))
+                .doesNotContain("<optional>true</optional>");
+        assertThat(starterPom)
                 .doesNotContain("spring-boot-starter-classic")
                 .doesNotContain("build-helper-maven-plugin");
         assertThat(workflow)

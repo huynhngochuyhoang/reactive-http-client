@@ -117,8 +117,9 @@ Replace these deprecated Jackson 2 migration shims:
 - ReactiveClientInvocationHandler constructors accepting Jackson 2
 
 Use the codec constructor, MockReactiveHttpClient.Builder.jsonCodec(...), and
-codec-based handler constructors. Jackson2ReactiveHttpClientJsonCodec remains
-only for Boot 3 source migration.
+codec-based handler constructors. `Jackson2ReactiveHttpClientJsonCodec` remains for Boot 3 source migration. Jackson 2
+also remains a transitive dependency while these deprecated public signatures
+exist; removing that dependency requires removing or hiding those signatures.
 
 ## Configuration
 

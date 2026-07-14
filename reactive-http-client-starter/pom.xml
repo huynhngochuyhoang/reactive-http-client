@@ -52,11 +52,10 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
-        <!-- Deprecated Jackson 2 source-compatibility shim. -->
+        <!-- Transitive while deprecated public constructors still expose Jackson 2 types. -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <!-- Resilience4j – optional; bring your own in consuming app -->

@@ -5,6 +5,8 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
+import io.github.huynhngochuyhoang.httpstarter.core.Jackson3ReactiveHttpClientJsonCodec;
+import io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper;
 import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
@@ -24,9 +26,18 @@ import reactor.netty.http.server.HttpServer;
 
 import java.time.Duration;
 
+import tools.jackson.databind.ObjectMapper;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class Boot4ConsumerApplicationTest {
+    @Test
+    void jackson3SafeApiCompilesWithoutDirectJackson2Dependency() {
+        var jsonCodec = new Jackson3ReactiveHttpClientJsonCodec(new ObjectMapper());
+
+        assertThat(new ProblemDetailErrorResponseMapper(jsonCodec)).isNotNull();
+    }
+
     @Test
     void packagedConsumerRunsInheritedAndApiRefEndpointsWithOptionalIntegrations() {
         DisposableServer server = HttpServer.create().port(0)
