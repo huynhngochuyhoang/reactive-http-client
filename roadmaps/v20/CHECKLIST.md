@@ -288,23 +288,33 @@ Evidence:
 
 ## Priority 7 - Revalidate Consumers, Test Helpers, and Optional Integrations
 
-### [ ] 7.1 Test assembled Boot 4 consumers
+### [x] 7.1 Test assembled Boot 4 consumers
 
-- [ ] Build the independent Boot 4 consumer against staged artifacts.
-- [ ] Cover inherited generic and configured `@ApiRef` endpoints.
-- [ ] Cover repeated headers, redirects, bodiless responses, `ResponseEntity`, and streaming.
-- [ ] Cover timeout, Problem Detail, lifecycle, observer, diagnostics, and health behavior.
-- [ ] Verify consumers do not import reactor source directories or test classes.
+- [x] Build the independent Boot 4 consumer against staged artifacts.
+- [x] Cover inherited generic and configured `@ApiRef` endpoints.
+- [x] Cover repeated headers, redirects, bodiless responses, `ResponseEntity`, and streaming.
+- [x] Cover timeout, Problem Detail, lifecycle, observer, diagnostics, and health behavior.
+- [x] Verify consumers do not import reactor source directories or test classes.
 
-### [ ] 7.2 Test helper and optional feature parity
+### [x] 7.2 Test helper and optional feature parity
 
-- [ ] Verify mock client naming, URL resolution, final headers, retries, and idempotency.
-- [ ] Verify application codec injection and raw-body signing parity.
-- [ ] Verify constructor-injected custom exchange loggers in the isolated mock context.
-- [ ] Verify lifecycle ordering and terminal subscription-local state.
-- [ ] Test Resilience4j operators independently and with registries absent.
-- [ ] Test OAuth2, SigV4, OTel, Micrometer, and Actuator presence/absence boundaries.
-- [ ] Run starter, helper, OTel, and consumer test suites plus `git diff --check`.
+- [x] Verify mock client naming, URL resolution, final headers, retries, and idempotency.
+- [x] Verify application codec injection and raw-body signing parity.
+- [x] Verify constructor-injected custom exchange loggers in the isolated mock context.
+- [x] Verify lifecycle ordering and terminal subscription-local state.
+- [x] Test Resilience4j operators independently and with registries absent.
+- [x] Test OAuth2, SigV4, OTel, Micrometer, and Actuator presence/absence boundaries.
+- [x] Run starter, helper, OTel, and consumer test suites plus `git diff --check`.
+
+
+Evidence:
+
+- Expanded the independent Boot 4 consumer to exercise inherited generic and configured API-ref endpoints, repeated request headers, automatic redirects, unexpected bodies on bodiless methods, typed `ResponseEntity`, deferred `Flux<DataBuffer>` consumption, response timeout classification, and Problem Detail mapping against a real Reactor Netty loopback server.
+- The assembled application also verifies lifecycle success/error state, terminal observer status and error category, sanitized diagnostics, health details, Micrometer metrics, OTel activation, and strict retry startup. `DocumentationReleaseArtifactTest` now guards this fixture breadth and its CI wiring.
+- Ran the consumer with `target/release-evidence/v20-priority5/staged-consumer-settings.xml`; all tests passed while resolving the signed `3.0.0` artifacts from the isolated staging repository. Its generated classpath and Surefire reports contain no reactor source, `target/classes`, or `target/test-classes` paths.
+- Focused starter tests passed for Boot 4 auto-configuration, Resilience4j operators with and without registries, OAuth2, SigV4, Micrometer, Actuator, and release-documentation guards.
+- `Boot4MockReactiveHttpClientTest` and `MockReactiveHttpClientTest` passed for application codec and signing bytes, concrete client naming, final URL/headers, retry/idempotency stability, constructor-injected loggers, lifecycle ordering, and subscription-local terminal state.
+- The complete starter, test-helper, and OTel reactor test suites passed, including optional-classpath absence and presence coverage. `git diff --check` passed.
 
 ---
 

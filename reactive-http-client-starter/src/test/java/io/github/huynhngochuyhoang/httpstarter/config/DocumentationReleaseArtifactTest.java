@@ -98,6 +98,8 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String fixturePom = Files.readString(root.resolve(".github/boot4-consumer/pom.xml"));
         String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
+        String fixtureTest = Files.readString(root.resolve(
+                ".github/boot4-consumer/src/test/java/io/github/huynhngochuyhoang/httpstarter/boot4consumer/Boot4ConsumerApplicationTest.java"));
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
 
         assertThat(fixturePom)
@@ -115,6 +117,16 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Dtest=Boot4MockReactiveHttpClientTest")
                 .contains("-f .github/boot4-consumer/pom.xml")
                 .contains("-Dreactive-http-client.version=\"$PROJECT_VERSION\"");
+        assertThat(fixtureTest)
+                .contains("extends SharedOrders<OrderResponse>")
+                .contains("@ApiRef(\"configured\")")
+                .contains("repeatedHeaders(List.of(\"first\", \"second\"))")
+                .contains("follow-redirects=true")
+                .contains("Mono<ResponseEntity<Flux<DataBuffer>>> streaming()")
+                .contains("ProblemDetailHttpClientException.class")
+                .contains("ErrorCategory.TIMEOUT")
+                .contains("Boot4HttpClientHealthIndicator.class")
+                .contains("openTelemetryHttpClientObserver");
         assertThat(releaseDocs)
                 .contains("### Boot 4 assembled consumer fixture")
                 .contains("real inherited-generic and configured")
