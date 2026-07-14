@@ -68,7 +68,7 @@ class UserService {
 Requirements:
 
 - Java 21+
-- Spring Boot 3.5.x
+- Spring Boot 4.x
 - Maven 3.8+
 
 Add the starter:
@@ -77,7 +77,7 @@ Add the starter:
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-starter</artifactId>
-  <version>2.14.1</version>
+  <version>3.0.0</version>
 </dependency>
 ```
 
@@ -143,7 +143,7 @@ reactive:
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-test</artifactId>
-  <version>2.14.1</version>
+  <version>3.0.0</version>
   <scope>test</scope>
 </dependency>
 ```
@@ -172,7 +172,7 @@ class UserApiClientTest {
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-otel</artifactId>
-  <version>2.14.1</version>
+  <version>3.0.0</version>
 </dependency>
 ```
 
@@ -226,7 +226,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Production Support Bundles](docs/26-support-bundles.md) | Safe incident evidence examples |
 | [V16 to V17 Adoption Guide](docs/27-v16-to-v17-adoption.md) | Diagnostics-first strict validation rollout |
 | [Spring Boot 4 and Starter 3.x Migration](docs/28-spring-boot-4-jackson-migration.md) | Complete dependency, package, configuration, Jackson, Actuator, native, and test-helper migration |
-| [2.14.0 to 3.0.0 Candidate API Report](docs/api-report-2.14.0-to-3.0.0-candidate.md) | Reviewed cross-major public API diff |
+| [2.14.1 to 3.0.0 API Report](docs/api-report-2.14.1-to-3.0.0.md) | Reviewed cross-major public API diff |
 | [V19 3.0.0 Release Decision](docs/29-v19-release-decision.md) | Evidence-backed no-go decision and remaining release blockers |
 | [Configuration Properties](docs/configuration-properties.md) | Generated property reference |
 | [Examples](docs/examples/README.md) | Copy-paste snippets |

@@ -2,11 +2,10 @@
 
 ## Supported Spring Boot baseline
 
-The supported baseline is Java 21 with Spring Boot `3.5.0`. The default dependency
-management uses Spring Boot `3.5.16`, the latest published `3.5.x` patch verified
-on 2026-07-10. CI runs release smoke against both the minimum and default patch.
-Adding another Spring Boot minor line requires an explicit release-smoke matrix
-entry before it is documented as supported.
+The `3.x` line requires Java 21 and Spring Boot `4.0.0` or later. Default
+dependency management uses Spring Boot `4.0.0`; CI also exercises the current
+`4.1.0` line. The published `2.x` line remains the separate Spring Boot 3.5
+maintenance lane.
 
 ## Dependency baseline readiness
 
@@ -15,13 +14,13 @@ Current release-line dependency inputs:
 | Area | Source | Current policy |
 |---|---|---|
 | Java runtime/compiler | Root `java.version`, `maven.compiler.source`, and `maven.compiler.target` | `21` is the supported baseline. Raising it requires a minor release, release-smoke review, and native-smoke review. |
-| Spring Boot baseline | Root `spring-boot.version` | `3.5.0` is the minimum tested baseline and `3.5.16` is the default managed patch. Patch upgrades within `3.5.x` are compatibility-neutral when release smoke, AOT smoke, and generated documentation tests pass. A new Spring Boot minor line requires a minor release and an expanded release-smoke matrix. |
+| Spring Boot baseline | Root `spring-boot.version` | `4.0.0` is the minimum and default managed baseline. The current `4.1.0` line is an additional compatibility row. |
 | Spring WebFlux, Reactor Netty, Micrometer, and OpenTelemetry API | Spring Boot dependency management | Keep module POMs versionless for these artifacts. Review exact resolved versions from the effective POM or release evidence when `spring-boot.version` changes. |
-| Resilience4j | Root `resilience4j.version` plus `resilience4j-bom` | `2.2.0` remains the optional resilience baseline. Patch-compatible updates are acceptable with operator and diagnostics tests; a major or behavior-changing baseline update requires a minor release. |
+| Resilience4j | Root `resilience4j.version` plus `resilience4j-bom` | `2.4.0` is the optional Boot 4 resilience baseline. |
 | Test dependencies | Spring Boot dependency management plus explicit test-only pins | Test-only updates are compatibility-neutral when they do not change published test-helper APIs or release fixtures. Explicit pins such as the TLS fixture dependency stay local to tests. |
 | Benchmark harness | Root `jmh.version` and benchmark Maven profiles | Benchmark-only updates do not change runtime compatibility, but release-quality reports must record the project version, starter version, Spring Boot baseline, resolved WebFlux/Reactor Netty versions, dependency-management source, and benchmark commit. |
 
-Compatibility-neutral dependency maintenance includes Spring Boot `3.5.x` patch
+Compatibility-neutral dependency maintenance includes Spring Boot `4.x` patch
 updates, managed Spring WebFlux/Reactor Netty/Micrometer/OpenTelemetry patch
 movement inherited from that Boot line, Resilience4j patch-compatible updates,
 test-only dependency updates, and benchmark harness updates that keep report
@@ -35,6 +34,30 @@ the managed Spring Boot baseline for runtime behavior. Do not mix a baseline
 upgrade with unrelated feature work; make the baseline change visible in release
 evidence, generated configuration metadata, and benchmark metadata in the same
 change.
+
+### V20 default Spring Boot 4 reactor
+
+The default reactor now declares `3.0.0`, imports Spring Boot `4.0.0`, and
+uses published `2.14.1` as its cross-major compatibility baseline. Boot 4
+WebClient, health, Jackson 3, OTel, test-helper, and benchmark adapters live in
+normal source roots. The old `boot4-spike` profile, compiler exclusions,
+`maven.deploy.skip`, and `skipPublishing` controls are absent.
+
+Run the production generation without a profile:
+
+```bash
+mvn -s .mvn/maven-central-settings.xml verify
+mvn -s .mvn/maven-central-settings.xml \
+  -Dspring-boot.version=4.1.0 -Prelease-smoke test
+```
+
+The Central-only settings file is optional when the configured Maven mirror
+already contains Boot 4. It changes repository resolution only; it does not
+select source sets or alter publishing.
+
+The immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`.
+Create a dedicated maintenance branch from that tag for security or critical
+correctness fixes; do not compile Boot 3 adapters into the `3.x` artifacts.
 
 ### V18 dependency patch review (historical)
 
@@ -159,11 +182,11 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. While the project version remains `2.14.1`,
-the baseline stays on `2.14.0`:
+from the current reactor version. While the project version remains `3.0.0`,
+the cross-major baseline stays on published `2.14.1`:
 
 ```bash
-mvn -Papi-compatibility -DskipTests verify
+mvn -Papi-compatibility,major-api-report -DskipTests verify
 bash scripts/verify-api-compatibility-fixtures.sh
 ```
 
@@ -171,12 +194,13 @@ For module-scoped compatibility checks, the inherited baseline guard must still
 run before japicmp:
 
 ```bash
-mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests validate
-mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify
+mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests validate
+mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests verify
 ```
 
-The Maven profile produces japicmp reports under each module's
-`target/japicmp/` directory and fails for binary-incompatible changes. The
+The Maven profiles produce japicmp reports under each module's
+`target/japicmp/` directory. `api-compatibility` remains strict; adding
+`major-api-report` makes this intentional cross-major comparison report-only. The
 fixture script verifies that additive APIs pass while removals of a public
 constructor, nested fluent method, or public enum constant fail. The filtered
 comparison covers the documented extension
@@ -195,9 +219,9 @@ transport/TLS applicators, and generated release-test fixtures.
 ### Documented public surface map
 
 This source-controlled map is the release contract between the public docs and
-The published `2.14.0` form of this map is frozen as the baseline for the
-[3.0.0 candidate API report](api-report-2.14.0-to-3.0.0-candidate.md).
-the `api-compatibility` japicmp include filter.
+the `api-compatibility` japicmp include filter. The published `2.14.1` form is
+frozen as the baseline for the
+[3.0.0 API report](api-report-2.14.1-to-3.0.0.md).
 `DocumentationReleaseArtifactTest` fails when a mapped pattern is missing from
 the POM include set or lacks an explicit support status.
 
@@ -442,19 +466,19 @@ Supported Boot 4 native-image path:
 - Diagnostics snapshot version metadata from the packaged Maven
   `pom.properties` resource.
 
-The scheduled smoke installs the isolated Boot 4 reactor, compiles the fixture,
+The scheduled smoke installs the default Boot 4 reactor, compiles the fixture,
 and runs the generated executable:
 
 ```bash
-mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dmaven.javadoc.skip=true install
-mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -pl reactive-http-client-test -am \
   -Dtest=Boot4MockReactiveHttpClientTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
-mvn -B -ntp -s .mvn/boot4-spike-settings.xml \
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=2.14.1 native:compile
+  -Dreactive-http-client.version=3.0.0 native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
@@ -551,8 +575,8 @@ The CI release smoke job currently runs:
 
 | Java | Spring Boot | Command |
 |---|---|---|
-| 21 | 3.5.0 | `mvn -B -ntp -Prelease-smoke -Dspring-boot.version=3.5.0 test` |
-| 21 | 3.5.16 | `mvn -B -ntp -Prelease-smoke -Dspring-boot.version=3.5.16 test` |
+| 21 | 4.0.0 | `mvn -B -ntp -Prelease-smoke -Dspring-boot.version=4.0.0 test` |
+| 21 | 4.1.0 | `mvn -B -ntp -Prelease-smoke -Dspring-boot.version=4.1.0 test` |
 
 Expand the matrix before release when adding support for another Java or Spring
 Boot baseline. Core starter AOT/native smoke ownership is distinct from optional
@@ -568,29 +592,29 @@ application boundary.
 
 ```bash
 PROJECT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
-mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dmaven.javadoc.skip=true install
-mvn -B -ntp -s .mvn/boot4-spike-settings.xml -Pboot4-spike \
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -pl reactive-http-client-test -am \
   -Dtest=Boot4MockReactiveHttpClientTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
-mvn -B -ntp -s .mvn/boot4-spike-settings.xml \
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/boot4-consumer/pom.xml \
   -Dreactive-http-client.version="$PROJECT_VERSION" test
 ```
 
 The assembled application performs real inherited-generic and configured
 `@ApiRef` loopback calls and verifies strict retry startup, diagnostics,
-health, Micrometer, and OTel activation. The full `boot4-spike` reactor test
+health, Micrometer, and OTel activation. The full default reactor test
 run supplies detailed OAuth2, SigV4 raw-body signing, optional integration
 absence, redirect, streaming, bodiless, repeated-header, lifecycle, retry, and
-idempotency fixtures. The Boot 4 helper source set additionally verifies
+idempotency fixtures. The normal test-helper sources additionally verify
 Jackson 3 signing bytes and final outbound metadata through
 `MockReactiveHttpClient`.
 
-The normal reactor and release-smoke matrix remain on Boot 3.5 for maintenance
-`2.x`. Generation-specific helper codec factories are selected only for the
-isolated Boot 4 candidate; no dual-generation helper artifact is published.
+The normal reactor and release-smoke matrix use Boot 4. The Boot 3.5 `2.x` line
+is reconstructed only from its maintenance tag; no dual-generation helper
+artifact is published.
 
 ### V19 Jackson 3 codec ownership
 

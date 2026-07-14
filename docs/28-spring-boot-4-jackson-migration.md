@@ -1,13 +1,13 @@
 # Spring Boot 4 and Starter 3.x Migration
 
 This guide migrates published Spring Boot 3.5 starter 2.x applications to the
-future Spring Boot 4 starter 3.x line. Version 3.0.0 below is an example until
-published. Do not consume artifacts from the internal boot4-spike profile.
+Spring Boot 4 starter 3.x line. The current reactor version is `3.0.0`; use the
+latest published `3.x` version when consuming it from a release repository.
 
 Annotations, exception categories, lifecycle hooks, observers, retry and
 idempotency behavior, diagnostics sanitization, and reactive.http property names
 remain unchanged. Review the
-[2.14.0 to 3.0.0 Candidate API Report](api-report-2.14.0-to-3.0.0-candidate.md).
+[2.14.1 to 3.0.0 API Report](api-report-2.14.1-to-3.0.0.md).
 
 ## Maven dependencies
 
@@ -22,7 +22,7 @@ Boot 3.5 and starter 2.x:
 </parent>
 <properties>
   <java.version>21</java.version>
-  <reactive-http-client.version>2.14.0</reactive-http-client.version>
+  <reactive-http-client.version>2.14.1</reactive-http-client.version>
 </properties>
 <dependencies>
   <dependency>
@@ -117,8 +117,9 @@ Replace these deprecated Jackson 2 migration shims:
 - ReactiveClientInvocationHandler constructors accepting Jackson 2
 
 Use the codec constructor, MockReactiveHttpClient.Builder.jsonCodec(...), and
-codec-based handler constructors. Jackson2ReactiveHttpClientJsonCodec remains
-only for Boot 3 source migration.
+codec-based handler constructors. `Jackson2ReactiveHttpClientJsonCodec` remains for Boot 3 source migration. Jackson 2
+also remains a transitive dependency while these deprecated public signatures
+exist; removing that dependency requires removing or hiding those signatures.
 
 ## Configuration
 

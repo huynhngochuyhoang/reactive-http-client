@@ -1,10 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
-import io.github.huynhngochuyhoang.httpstarter.annotation.Body;
-import io.github.huynhngochuyhoang.httpstarter.annotation.HeaderParam;
-import io.github.huynhngochuyhoang.httpstarter.annotation.IdempotencyKey;
-import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
-import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.core.Jackson3ReactiveHttpClientJsonCodec;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext;

@@ -1,7 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
+import org.springframework.boot.webclient.WebClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -9,6 +9,6 @@ import org.springframework.context.annotation.Configuration;
 class BootWebClientCustomizersConfiguration {
     @Bean
     BootWebClientCustomizers bootWebClientCustomizers(ObjectProvider<WebClientCustomizer> customizers) {
-        return new Boot3WebClientCustomizers(customizers);
+        return new Boot4WebClientCustomizers(customizers);
     }
 }

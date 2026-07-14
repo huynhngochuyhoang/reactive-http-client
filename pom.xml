@@ -6,7 +6,7 @@
 
     <groupId>io.github.huynhngochuyhoang</groupId>
     <artifactId>reactive-http-client</artifactId>
-    <version>2.14.1</version>
+    <version>3.0.0</version>
     <packaging>pom</packaging>
 
     <name>reactive-http-client</name>
@@ -24,8 +24,8 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-boot.version>3.5.16</spring-boot.version>
-        <resilience4j.version>2.2.0</resilience4j.version>
+        <spring-boot.version>4.0.0</spring-boot.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
         <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.7.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
@@ -35,7 +35,7 @@
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
         <japicmp-maven-plugin.version>0.26.0</japicmp-maven-plugin.version>
         <jmh.version>1.37</jmh.version>
-        <api.compatibility.baseline.version>2.14.0</api.compatibility.baseline.version>
+        <api.compatibility.baseline.version>2.14.1</api.compatibility.baseline.version>
         <api.compatibility.break-on-binary-incompatible>true</api.compatibility.break-on-binary-incompatible>
         <api.compatibility.ignore-missing-classes>false</api.compatibility.ignore-missing-classes>
     </properties>
@@ -161,63 +161,6 @@
     </build>
 
     <profiles>
-        <profile>
-            <id>boot4-spike</id>
-            <properties>
-                <spring-boot.version>4.0.0</spring-boot.version>
-                <resilience4j.version>2.4.0</resilience4j.version>
-                <maven.deploy.skip>true</maven.deploy.skip>
-                <skipPublishing>true</skipPublishing>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <version>3.6.1</version>
-                        <executions>
-                            <execution>
-                                <id>add-boot4-sources</id>
-                                <phase>generate-sources</phase>
-                                <goals><goal>add-source</goal></goals>
-                                <configuration>
-                                    <sources><source>src/boot4/java</source></sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-boot4-test-sources</id>
-                                <phase>generate-test-sources</phase>
-                                <goals><goal>add-test-source</goal></goals>
-                                <configuration>
-                                    <sources><source>src/boot4-test/java</source></sources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-compiler-plugin</artifactId>
-                        <configuration>
-                            <excludes>
-                                <exclude>io/github/huynhngochuyhoang/httpstarter/config/Boot3WebClientCustomizers.java</exclude>
-                                <exclude>io/github/huynhngochuyhoang/httpstarter/config/BootWebClientCustomizersConfiguration.java</exclude>
-                                <exclude>io/github/huynhngochuyhoang/httpstarter/observability/HttpClientHealthIndicator.java</exclude>
-                                <exclude>io/github/huynhngochuyhoang/httpstarter/config/Boot3HealthIndicatorAutoConfiguration.java</exclude>
-                                <exclude>io/github/huynhngochuyhoang/httpstarter/config/Boot3JsonCodecAutoConfiguration.java</exclude>
-                                <exclude>io/github/huynhngochuyhoang/httpstarter/otel/Boot3OpenTelemetryWebClientCustomizerConfiguration.java</exclude>
-                                <exclude>io/github/huynhngochuyhoang/httpstarter/test/Boot3MockJsonCodecFactory.java</exclude>
-                                <exclude>io/github/huynhngochuyhoang/httpstarter/benchmarks/Boot3BenchmarkJsonCodecFactory.java</exclude>
-                            </excludes>
-                            <testExcludes>
-                                <testExclude>**/ReactiveHttpClientAutoConfigurationTest.java</testExclude>
-                                <testExclude>**/ReleaseCompatibilitySmokeTest.java</testExclude>
-                                <testExclude>**/HttpClientHealthIndicatorTest.java</testExclude>
-                            </testExcludes>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
         <profile>
             <id>release-smoke</id>
             <build>
