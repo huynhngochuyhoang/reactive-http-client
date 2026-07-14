@@ -421,6 +421,7 @@ class DocumentationReleaseArtifactTest {
         String pomXml = Files.readString(root.resolve("pom.xml"));
         String starterPom = Files.readString(root.resolve("reactive-http-client-starter/pom.xml"));
         String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
+        String packagingGuard = Files.readString(root.resolve("scripts/verify-generation-packaging.sh"));
         String settings = Files.readString(root.resolve(".mvn/maven-central-settings.xml"));
 
         assertThat(pomXml)
@@ -444,7 +445,15 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("build-helper-maven-plugin");
         assertThat(workflow)
                 .doesNotContain("-Pboot4-spike")
+                .contains("bash scripts/verify-generation-packaging.sh")
                 .contains("spring-boot: ['4.0.0', '4.1.0']");
+        assertThat(packagingGuard)
+                .contains("src/main/java")
+                .contains("-sources.jar")
+                .contains("-javadoc.jar")
+                .contains("Boot3")
+                .contains("AutoConfiguration.imports")
+                .contains("ReactiveHttpClientRuntimeHints.class");
         assertThat(settings)
                 .contains("<id>maven-central</id>")
                 .contains("<url>https://repo.maven.apache.org/maven2</url>");

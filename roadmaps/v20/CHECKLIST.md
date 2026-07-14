@@ -113,25 +113,43 @@ Evidence:
 
 ## Priority 3 - Make Generation-Specific Packaging Release-Ready
 
-### [ ] 3.1 Align compiled and attached source artifacts
+### [x] 3.1 Align compiled and attached source artifacts
 
-- [ ] Define one production source layout for the Boot 4 generation.
-- [ ] Remove obsolete profile-selected Boot 3 source roots from the `3.x` build.
-- [ ] Ensure test compilation uses the same generation selected for main sources.
-- [ ] Ensure source-jar generation contains only the effective `3.x` sources.
-- [ ] Ensure Javadoc generation scans only effective `3.x` public sources.
-- [ ] Fix the V19 attached-Javadoc failure without globally skipping Javadocs.
+- [x] Define one production source layout for the Boot 4 generation.
+- [x] Remove obsolete profile-selected Boot 3 source roots from the `3.x` build.
+- [x] Ensure test compilation uses the same generation selected for main sources.
+- [x] Ensure source-jar generation contains only the effective `3.x` sources.
+- [x] Ensure Javadoc generation scans only effective `3.x` public sources.
+- [x] Fix the V19 attached-Javadoc failure without globally skipping Javadocs.
 
-### [ ] 3.2 Audit packaged contents
+### [x] 3.2 Audit packaged contents
 
-- [ ] Run full `verify` with source and Javadoc attachment enabled.
-- [ ] Inspect starter, test-helper, and OTel binary jars.
-- [ ] Inspect source and Javadoc jars.
-- [ ] Reject duplicate auto-configuration entries and stale Boot 3 classes.
-- [ ] Verify service descriptors, runtime hints, configuration metadata, and
+- [x] Run full `verify` with source and Javadoc attachment enabled.
+- [x] Inspect starter, test-helper, and OTel binary jars.
+- [x] Inspect source and Javadoc jars.
+- [x] Reject duplicate auto-configuration entries and stale Boot 3 classes.
+- [x] Verify service descriptors, runtime hints, configuration metadata, and
       auto-configuration imports are present once.
-- [ ] Add packaging regressions for generation-specific contents.
-- [ ] Run `git diff --check`.
+- [x] Add packaging regressions for generation-specific contents.
+- [x] Run `git diff --check`.
+
+Evidence:
+
+- Boot 4 production and test code now use the normal module `src/main/java` and
+  `src/test/java` roots only. The packaging guard rejects legacy `src/boot3` or
+  `src/boot4` directories and Boot 3 WebClient package references in either tree.
+- Added `scripts/verify-generation-packaging.sh` and wired it after the normal CI
+  `verify`. It compares every attached source jar with the effective main Java
+  source set, inspects all starter, test-helper, and OTel binary/source/Javadoc
+  jars for duplicate or stale-generation entries, and verifies required starter
+  and OTel auto-configuration, metadata, and runtime-hint entries occur once.
+- `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter
+  -Dtest=DocumentationReleaseArtifactTest test` passed.
+- `mvn -q -s .mvn/maven-central-settings.xml clean verify` passed with source
+  and Javadoc attachment enabled for all three published modules.
+- `bash scripts/verify-generation-packaging.sh 3.0.0` passed against the clean
+  binary, source, and Javadoc artifacts.
+- `git diff --check` passed.
 
 ---
 

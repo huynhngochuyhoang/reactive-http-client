@@ -28,6 +28,9 @@ jobs:
       - name: Build and run tests
         run: mvn -B -ntp verify
 
+      - name: Verify generation-specific packaging
+        run: bash scripts/verify-generation-packaging.sh
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
