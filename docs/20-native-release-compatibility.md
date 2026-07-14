@@ -645,11 +645,13 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
 ```
 
 The assembled application performs real inherited-generic and configured
-`@ApiRef` loopback calls and verifies strict retry startup, diagnostics,
-health, Micrometer, and OTel activation. The full default reactor test
-run supplies detailed OAuth2, SigV4 raw-body signing, optional integration
-absence, redirect, streaming, bodiless, repeated-header, lifecycle, retry, and
-idempotency fixtures. The normal test-helper sources additionally verify
+`@ApiRef` loopback calls plus repeated headers, automatic redirects, unexpected
+bodies on bodiless methods, typed `ResponseEntity`, deferred streaming-body
+consumption, timeout classification, and Problem Detail mapping. The same
+application verifies lifecycle and observer terminal metadata, diagnostics,
+health, Micrometer, OTel, and strict retry startup. The full default reactor
+test run supplies detailed OAuth2, SigV4 raw-body signing, and optional
+integration absence fixtures. The normal test-helper sources additionally verify
 Jackson 3 signing bytes and final outbound metadata through
 `MockReactiveHttpClient`.
 

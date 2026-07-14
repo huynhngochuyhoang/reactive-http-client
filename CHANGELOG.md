@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Generation-specific release packaging.** Added a CI packaging guard that aligns normal Boot 4 sources with attached source and Javadoc artifacts, rejects stale Boot 3 or duplicate jar entries, and verifies auto-configuration, runtime-hint, and configuration-metadata resources are packaged once.
 - **Publishable module POMs.** Enabled deployment for the parent, starter, test-helper, and OTel artifacts; centralized sibling dependency versions; corrected inherited project, SCM, and issue metadata; made Central publication manual by default; and added signed local staging plus isolated-consumer validation before the final release deploy.
 - **Boot 4 runtime and native contracts.** Revalidated WebClient, Jackson, metrics, and health auto-configuration ordering; configuration metadata and optional integration back-off; and a resource-bounded GraalVM 25 executable covering inherited generic and configured `@ApiRef` endpoints, auth, Problem Detail, sanitized diagnostics, health, and Micrometer metrics.
+- **Boot 4 assembled-consumer and helper parity.** Expanded the independent artifact consumer across repeated headers, redirects, bodiless and streaming ownership, `ResponseEntity`, timeout and Problem Detail errors, lifecycle, observer, diagnostics, health, Micrometer, and OTel; revalidated mock naming, final metadata, retries, idempotency, codec/signing bytes, injected loggers, hook ordering, and optional integration back-off.
 
 ## [2.14.1] - 2026-07-13
 
