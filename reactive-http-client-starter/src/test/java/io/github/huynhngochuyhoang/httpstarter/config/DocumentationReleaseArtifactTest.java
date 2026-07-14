@@ -170,6 +170,7 @@ class DocumentationReleaseArtifactTest {
         String guide = Files.readString(root.resolve("docs/28-spring-boot-4-jackson-migration.md"));
         String report = Files.readString(root.resolve("docs/api-report-2.14.1-to-3.0.0.md"));
         String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
+        String deltaGuard = Files.readString(root.resolve("scripts/verify-major-api-delta.sh"));
 
         assertThat(pomXml)
                 .contains("<id>major-api-report</id>")
@@ -179,6 +180,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
         assertThat(workflow)
                 .contains("mvn -B -ntp -Papi-compatibility,major-api-report -DskipTests verify")
+                .contains("bash scripts/verify-major-api-delta.sh")
                 .doesNotContain("mvn -B -ntp -Papi-compatibility -DskipTests verify");
         assertThat(guide)
                 .contains("<version>3.5.16</version>")
@@ -199,12 +201,24 @@ class DocumentationReleaseArtifactTest {
                 .contains("published 2.14.1", "Frozen baseline surface")
                 .contains("Required by Boot 4")
                 .contains("Jackson 3 codec boundary")
+                .contains("The generated report contains exactly these reviewed incompatible members")
                 .contains("Accidental or unrelated breaks")
                 .contains("None. There are no changes")
                 .contains("HttpClientHealthIndicator")
                 .contains("Boot4HttpClientHealthIndicator")
                 .contains("-Papi-compatibility,major-api-report")
                 .doesNotContain("boot4-spike");
+        assertThat(deltaGuard)
+                .contains("PROJECT_VERSION\" == \"3.0.0")
+                .contains("BASELINE_VERSION\" == \"2.14.1")
+                .contains("API_COMPATIBILITY_BASELINE_REPOSITORY")
+                .contains("installed locally rather than resolved from a release repository")
+                .contains("Jackson2ReactiveHttpClientJsonCodec")
+                .contains("ProblemDetailErrorResponseMapper(com.fasterxml.jackson.databind.ObjectMapper)")
+                .contains("MockReactiveHttpClient$Builder<T> objectMapper")
+                .contains("HttpClientHealthIndicator.class")
+                .contains("Boot4HttpClientHealthIndicator.class")
+                .contains("Unreviewed cross-major API change detected");
     }
 
     @Test
@@ -263,6 +277,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("Keep implementation\ninternals excluded")
                 .contains("mvn -Papi-compatibility,major-api-report -DskipTests verify")
                 .contains("mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests verify")
+                .contains("bash scripts/verify-major-api-delta.sh")
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh");
     }
 

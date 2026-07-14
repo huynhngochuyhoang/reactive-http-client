@@ -320,23 +320,50 @@ Evidence:
 
 ## Priority 8 - Freeze and Audit the `3.0.0` Public Surface
 
-### [ ] 8.1 Classify the cross-major API delta
+### [x] 8.1 Classify the cross-major API delta
 
-- [ ] Resolve published `2.14.1` artifacts before running the comparison.
-- [ ] Run report-only japicmp from `2.14.1` to the staged `3.0.0` candidate.
-- [ ] Classify Boot 4, Framework 7, Actuator, and Jackson 3 breaks.
-- [ ] Identify and fix accidental removals unrelated to the major migration.
-- [ ] Audit documented extension points, nested builder APIs, constructors, enums,
+- [x] Resolve published `2.14.1` artifacts before running the comparison.
+- [x] Run report-only japicmp from `2.14.1` to the staged `3.0.0` candidate.
+- [x] Classify Boot 4, Framework 7, Actuator, and Jackson 3 breaks.
+- [x] Identify and fix accidental removals unrelated to the major migration.
+- [x] Audit documented extension points, nested builder APIs, constructors, enums,
       mutable models, and test-helper methods against compatibility filters.
-- [ ] Update the public-surface inventory and migration ledger.
+- [x] Update the public-surface inventory and migration ledger.
 
-### [ ] 8.2 Preserve baseline correctness
+### [x] 8.2 Preserve baseline correctness
 
-- [ ] Keep normal `2.x` compatibility checks on the published `2.x` baseline.
-- [ ] Do not configure a normal `3.x` baseline until `3.0.0` is published.
-- [ ] Keep the cross-major comparison report-only and explicitly labeled.
-- [ ] Verify root and module-scoped guards reject self-comparison.
-- [ ] Run compatibility fixtures and `git diff --check`.
+- [x] Keep normal `2.x` compatibility checks on the published `2.x` baseline.
+- [x] Do not configure a normal `3.x` baseline until `3.0.0` is published.
+- [x] Keep the cross-major comparison report-only and explicitly labeled.
+- [x] Verify root and module-scoped guards reject self-comparison.
+- [x] Run compatibility fixtures and `git diff --check`.
+
+Evidence:
+
+- Resolved starter, test-helper, and OTel `2.14.1` jars into a fresh target-local
+  Maven repository. Their remote markers identify the release repository and
+  their SHA-256 values are starter `97d8550d46fc555fce22cf0bb76b339851bc6fe00f2440ad859d1941f57470b4`,
+  test helper `4f1f5bfedacb3c35ed088e57eb2ba0771f8e11f37a2348a3a2c447edb2259daf`,
+  and OTel `32c3089e290310a3c498e6030146b2bf32ec8c3229157159d4b9755795b59be3`.
+- Root and starter-scoped report-only japicmp runs passed against that repository.
+  The reviewed major delta contains the Boot 3 health type replacement, removal
+  of the deprecated Jackson 2 codec and Problem Detail mapper constructor, and
+  removal of the mock-helper `objectMapper(...)` adapter. OTel has no
+  incompatible row and no unrelated removal remains.
+- Added `scripts/verify-major-api-delta.sh` to CI. It rejects locally installed
+  baseline artifacts, any generated incompatible row outside the reviewed set,
+  and a candidate jar that does not contain the expected Boot 4 health replacement.
+- Re-audited the source-controlled public-surface map and compatibility includes
+  across extension packages, diagnostics and contract snapshot nested APIs,
+  mutable metadata models, resilience enums, test helpers, and OTel. Corrected
+  the only accidental drift found: stale public Javadoc referencing the removed
+  Boot 3 health implementation.
+- The `3.0.0` baseline remains published `2.14.1` and report-only; the maintenance
+  tag retains its normal strict `2.14.0` baseline until `3.0.0` is published.
+  Root and module-scoped validation both rejected a forced `3.0.0` self-baseline.
+- The reviewed-delta guard, compatibility fixtures, shell syntax checks,
+  `DocumentationReleaseArtifactTest`, module-scoped compatibility run, and
+  `git diff --check` passed.
 
 ---
 

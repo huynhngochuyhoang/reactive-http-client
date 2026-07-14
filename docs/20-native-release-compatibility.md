@@ -218,8 +218,16 @@ the cross-major baseline stays on published `2.14.1`:
 
 ```bash
 mvn -Papi-compatibility,major-api-report -DskipTests verify
+bash scripts/verify-major-api-delta.sh
 bash scripts/verify-api-compatibility-fixtures.sh
 ```
+
+For release evidence, resolve the three `2.14.1` jars into a fresh target-local
+Maven repository, pass that repository through `-Dmaven.repo.local` to the
+japicmp build, and set `API_COMPATIBILITY_BASELINE_REPOSITORY` to the same path
+for the reviewed-delta guard. The guard rejects baseline jars whose Maven remote
+markers identify a local install. This prevents a stale or relabeled artifact in
+the normal local cache from understating the cross-major delta.
 
 For module-scoped compatibility checks, the inherited baseline guard must still
 run before japicmp:
@@ -232,6 +240,8 @@ mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -Dskip
 The Maven profiles produce japicmp reports under each module's
 `target/japicmp/` directory. `api-compatibility` remains strict; adding
 `major-api-report` makes this intentional cross-major comparison report-only. The
+reviewed-delta guard permits only the classified `3.0.0` removals and checks the
+health replacement directly in the baseline and candidate jars. The
 fixture script verifies that additive APIs pass while removals of a public
 constructor, nested fluent method, or public enum constant fail. The filtered
 comparison covers the documented extension
@@ -290,8 +300,9 @@ the POM include set or lacks an explicit support status.
 | `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, `RecordedExchange`, `RecordedExchangeAssertions`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | `OpenTelemetryHttpClientObserver`, `OpenTelemetryContextWebFilter`, `OpenTelemetryContextExchangeFilter`, and `OpenTelemetryHttpClientAutoConfiguration` | Supported |
 
-The `3.0.0` migration removes `Jackson2ReactiveHttpClientJsonCodec` and the
-mapper-based Jackson 2 overloads documented in the
+The `3.0.0` migration replaces `HttpClientHealthIndicator` with its Boot 4
+counterpart. The `3.0.0` migration removes `Jackson2ReactiveHttpClientJsonCodec`
+and the mapper-based Jackson 2 overloads documented in the
 [Boot 4 migration guide](28-spring-boot-4-jackson-migration.md). These are
 intentional cross-major changes from the `2.14.1` baseline. No other
 compatibility-covered type is reserved for removal. Any future deprecation must
@@ -347,6 +358,7 @@ nested types or builder stages are part of the contract. Keep implementation
 internals excluded unless a public doc explicitly presents them as replacement
 or extension surfaces. Run `mvn -Papi-compatibility -DskipTests verify`,
 `mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify`,
+`bash scripts/verify-major-api-delta.sh`,
 `bash scripts/verify-api-compatibility-fixtures.sh`, and
 `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
 before publishing release evidence.

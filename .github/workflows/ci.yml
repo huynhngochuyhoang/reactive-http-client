@@ -94,6 +94,9 @@ jobs:
       - name: Compare published APIs to 2.14.1
         run: mvn -B -ntp -Papi-compatibility,major-api-report -DskipTests verify
 
+      - name: Reject unreviewed major API changes
+        run: bash scripts/verify-major-api-delta.sh
+
       - name: Verify compatibility guard fixtures
         run: bash scripts/verify-api-compatibility-fixtures.sh
 
