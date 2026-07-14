@@ -23,7 +23,7 @@ jobs:
           cache: maven
 
       - name: Verify
-        run: mvn -B -ntp verify
+        run: mvn -B -ntp clean verify
 
   publish:
     needs: verify
@@ -54,6 +54,14 @@ jobs:
             echo "Refusing to publish SNAPSHOT version: $VERSION"
             exit 1
           fi
+
+      - name: Build release artifacts for packaging inspection
+        run: mvn -B -ntp clean -Prelease -DskipTests verify
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Verify generation-specific release packaging
+        run: bash scripts/verify-generation-packaging.sh
 
       - name: Publish release to Maven Central (Sonatype Central Portal)
         run: mvn -B -ntp -Prelease -DskipTests deploy
