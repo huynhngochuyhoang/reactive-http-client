@@ -94,6 +94,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkDocs)
                 .contains("-Dbenchmark.starter.version=3.0.0")
                 .contains("-Dbenchmark.commit=3.0.0")
+                .contains("test ! -e target/benchmark-baseline-repository-3.0.0")
+                .contains("-Dmaven.repo.local=target/benchmark-baseline-repository-3.0.0")
                 .contains("published-starter-3.0.0/release-jmh.md")
                 .contains("published-starter-3.0.0/release-jmh.json")
                 .doesNotContain("published-starter-2.14.1/release-jmh.json");
@@ -1275,7 +1277,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("benchmark-release")
                 .contains("-am verify");
         assertThat(benchmarkEvidence.path("publishedStarterCommand").asText())
+                .startsWith("test ! -e target/benchmark-baseline-repository-")
                 .contains("-Pbenchmarks,benchmark-release,benchmark-published-baseline")
+                .contains("-Dmaven.repo.local=target/benchmark-baseline-repository-"
+                        + pomProperty(pomXml, "api.compatibility.baseline.version"))
                 .contains("-Dbenchmark.starter.version=" + pomProperty(pomXml, "api.compatibility.baseline.version"))
                 .contains(" clean verify ")
                 .doesNotContain(" -am ");
@@ -2023,7 +2028,10 @@ class DocumentationReleaseArtifactTest {
         evidence.put("currentWorkspaceCommand",
                 "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)");
         evidence.put("publishedStarterCommand",
-                "mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version="
+                "test ! -e target/benchmark-baseline-repository-" + baselineVersion
+                        + " && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/benchmark-baseline-repository-"
+                        + baselineVersion
+                        + " -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version="
                         + baselineVersion + " -Dbenchmark.commit=" + baselineVersion);
         evidence.put("reportDirectory", "reactive-http-client-benchmarks/target/benchmark-reports/");
         evidence.put("smokeReport", "reactive-http-client-benchmarks/target/benchmark-reports/smoke-only-jmh.md");
