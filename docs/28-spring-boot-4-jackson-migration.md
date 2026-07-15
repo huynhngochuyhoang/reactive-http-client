@@ -92,9 +92,10 @@ resilience4j-spring-boot4 coordinates.
 | Starter JSON SPI | Mapper constructors | ReactiveHttpClientJsonCodec | Inject the codec into starter extension points. |
 | Focused Boot modules | Boot 3 autoconfigure and Actuator packages | spring-boot-webclient and spring-boot-health | Update only direct application dependencies and imports. |
 
-The health type replacement is the only reviewed binary and source
-incompatibility. Boot 4 moved the health API and changed the health method
-return type. No unrelated public removal is accepted.
+The health type replacement and the deprecated Jackson 2 shims listed below are
+the only reviewed binary and source incompatibilities. Boot 4 moved the health
+API and changed the health method return type. No unrelated public removal is
+accepted.
 
 ## Jackson 3 codec ownership
 

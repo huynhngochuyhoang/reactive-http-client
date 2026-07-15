@@ -6,8 +6,12 @@ The comparison is report-only because this is an intentional major-version
 boundary.
 
 ```bash
+API_BASELINE_REPOSITORY="$PWD/target/api-compatibility/published-2.14.1-repository"
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local="$API_BASELINE_REPOSITORY" \
   -Papi-compatibility,major-api-report -DskipTests verify
+API_COMPATIBILITY_BASELINE_REPOSITORY="$API_BASELINE_REPOSITORY" \
+  bash scripts/verify-major-api-delta.sh
 ```
 
 Detailed reports are under each module `target/japicmp` directory.
@@ -15,10 +19,15 @@ Detailed reports are under each module `target/japicmp` directory.
 generation-specific framework classes only for this explicit report. The normal
 `api-compatibility` profile remains strict.
 
-Because report-only mode ignores missing generation-specific framework classes,
-the generated summary can omit the health-type removal. The reviewed public
-surface map and source delta therefore classify that required replacement as a
-major starter change.
+The release build immediately runs `scripts/verify-major-api-delta.sh`. That
+guard compares the generated incompatible rows with the reviewed set below and
+separately verifies the Boot 3-to-Boot 4 health class replacement in the
+published baseline and candidate jars. A new removal therefore fails even
+though japicmp itself is in report-only mode.
+
+The comparison was run from a clean Maven repository whose remote marker and
+starter checksum identify the published `2.14.1` artifact. Its generated
+summary reports the health-type removal as well as the Jackson removals.
 
 ## Frozen baseline surface
 
@@ -35,6 +44,19 @@ documented core SPIs and helpers, test helpers, and OTel.
 | reactive-http-client-starter | Major | Replaces the Boot 3 health type and removes deprecated Jackson 2 adapters and mapper constructors. |
 | reactive-http-client-test | Major | Removes the deprecated Jackson 2 `objectMapper(...)` builder adapter. |
 | reactive-http-client-otel | Compatible | No reviewed public OTel API removal from the 2.14.1 baseline. |
+
+The generated report contains exactly these reviewed incompatible members:
+
+| Module | Removed contract | Replacement |
+|---|---|---|
+| starter | `Jackson2ReactiveHttpClientJsonCodec` | `Jackson3ReactiveHttpClientJsonCodec` through `ReactiveHttpClientJsonCodec` |
+| starter | `ProblemDetailErrorResponseMapper(ObjectMapper)` | `ProblemDetailErrorResponseMapper(ReactiveHttpClientJsonCodec)` |
+| starter | `HttpClientHealthIndicator` and its Boot 3 `health()` contract | `Boot4HttpClientHealthIndicator` and Boot 4 health contributor types |
+| test helper | `MockReactiveHttpClient.Builder.objectMapper(ObjectMapper)` | `MockReactiveHttpClient.Builder.jsonCodec(ReactiveHttpClientJsonCodec)` |
+
+The report contains no incompatible OTel row. The reviewed-delta guard also
+checks the health class replacement directly in both jars so report
+configuration cannot hide it.
 
 ## Break classification
 

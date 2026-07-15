@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Publishable module POMs.** Enabled deployment for the parent, starter, test-helper, and OTel artifacts; centralized sibling dependency versions; corrected inherited project, SCM, and issue metadata; made Central publication manual by default; and added signed local staging plus isolated-consumer validation before the final release deploy.
 - **Boot 4 runtime and native contracts.** Revalidated WebClient, Jackson, metrics, and health auto-configuration ordering; configuration metadata and optional integration back-off; and a resource-bounded GraalVM 25 executable covering inherited generic and configured `@ApiRef` endpoints, auth, Problem Detail, sanitized diagnostics, health, and Micrometer metrics.
 - **Boot 4 assembled-consumer and helper parity.** Expanded the independent artifact consumer across repeated headers, redirects, bodiless and streaming ownership, `ResponseEntity`, timeout and Problem Detail errors, lifecycle, observer, diagnostics, health, Micrometer, and OTel; revalidated mock naming, final metadata, retries, idempotency, codec/signing bytes, injected loggers, hook ordering, and optional integration back-off.
+- **Frozen `3.0.0` public surface.** Audited the report-only `2.14.1` cross-major API delta, classified the Boot 4 health replacement and deprecated Jackson 2 removals, and added a CI guard that rejects any unreviewed incompatible row while preserving self-baseline and compatibility-fixture checks.
 
 ## [2.14.1] - 2026-07-13
 

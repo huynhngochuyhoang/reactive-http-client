@@ -863,7 +863,7 @@ public class ReactiveHttpClientProperties {
 
     /**
      * Settings for
-     * {@link io.github.huynhngochuyhoang.httpstarter.observability.HttpClientHealthIndicator}.
+     * {@link io.github.huynhngochuyhoang.httpstarter.observability.Boot4HttpClientHealthIndicator}.
      *
      * <p>The indicator computes a per-client error ratio from probe-to-probe deltas
      * on the {@code reactive.http.client.requests} timer meters. A client reports DOWN when
