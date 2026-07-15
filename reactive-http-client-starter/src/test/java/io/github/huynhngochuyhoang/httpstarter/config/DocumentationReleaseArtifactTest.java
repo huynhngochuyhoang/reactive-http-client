@@ -198,6 +198,51 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void publishedBoot4ConsumerUsesFreshCentralArtifactsAndSeparateEvidence() throws IOException {
+        Path root = projectRoot();
+        String script = Files.readString(root.resolve("scripts/verify-published-consumer.sh"));
+        String workflow = Files.readString(root.resolve(".github/workflows/published-consumer-smoke.yml"));
+        String fixture = Files.readString(root.resolve(
+                ".github/boot4-consumer/src/test/java/io/github/huynhngochuyhoang/httpstarter/boot4consumer/Boot4ConsumerApplicationTest.java"));
+        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+
+        assertThat(script)
+                .contains("PUBLISHED_VERSION=\"${1:-}\"")
+                .contains("target/published-consumer-repository-$PUBLISHED_VERSION")
+                .contains("[[ ! -e \"$LOCAL_REPOSITORY\" ]]")
+                .contains(".mvn/maven-central-settings.xml")
+                .contains("_remote.repositories")
+                .contains("'>maven-central='")
+                .contains("help:effective-pom")
+                .contains("sha256sum")
+                .contains("dependency:build-classpath")
+                .contains("resolved reactor output directories")
+                .contains("v21-priority2/published-$PUBLISHED_VERSION");
+        assertThat(workflow)
+                .contains("workflow_dispatch:")
+                .contains("latest.published.version")
+                .contains("scripts/verify-published-consumer.sh \"$PUBLISHED_VERSION\"")
+                .contains("published-consumer-${{ env.PUBLISHED_VERSION }}")
+                .doesNotContain("install current");
+        assertThat(fixture)
+                .contains("Mono<OrderResponse> direct()")
+                .contains("extends SharedOrders<OrderResponse>")
+                .contains("@ApiRef(\"configured\")")
+                .contains("ProblemDetailHttpClientException.class")
+                .contains("ReactiveHttpClientDiagnosticsEndpoint.class")
+                .contains("Boot4HttpClientHealthIndicator.class")
+                .contains("MockReactiveHttpClient.forClient")
+                .contains("RecordedExchangeAssertions.assertThat")
+                .contains("propagatedTraceparent.get()).isEqualTo(TRACEPARENT)");
+        assertThat(releaseDocs)
+                .contains("### Published Boot 4 consumer baseline")
+                .contains("scripts/verify-published-consumer.sh 3.0.0")
+                .contains("published parent")
+                .contains("target/release-evidence/v21-priority2/published-3.0.0/")
+                .contains("current-reactor lane");
+    }
+
+    @Test
     void boot4BenchmarkBaselineStaysSameStackAndSmokeOnly() throws Exception {
         Path root = projectRoot();
         String benchmarkPom = Files.readString(root.resolve("reactive-http-client-benchmarks/pom.xml"));

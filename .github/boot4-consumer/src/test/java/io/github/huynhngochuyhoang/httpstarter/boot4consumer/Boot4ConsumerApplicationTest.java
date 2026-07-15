@@ -18,11 +18,18 @@ import io.github.huynhngochuyhoang.httpstarter.observability.Boot4HttpClientHeal
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
+import io.github.huynhngochuyhoang.httpstarter.test.MockReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.test.RecordedExchangeAssertions;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.ContextPropagators;
+import io.opentelemetry.context.propagation.TextMapGetter;
+import io.opentelemetry.context.propagation.TextMapPropagator;
+import io.opentelemetry.context.propagation.TextMapSetter;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.WebApplicationType;
@@ -32,6 +39,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -41,6 +49,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -49,6 +58,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class Boot4ConsumerApplicationTest {
+
+    private static final String TRACEPARENT = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
 
     private static final List<HttpClientObserverEvent> OBSERVED = new CopyOnWriteArrayList<>();
     private static final List<ReactiveHttpClientLifecycleContext> SUCCEEDED = new CopyOnWriteArrayList<>();
@@ -62,13 +73,34 @@ class Boot4ConsumerApplicationTest {
     }
 
     @Test
+    void publishedTestHelperRecordsInheritedRequests() {
+        MockReactiveHttpClient<OrdersClient> mock = MockReactiveHttpClient.forClient(OrdersClient.class)
+                .respondTo(HttpMethod.GET, "/orders/7",
+                        request -> MockReactiveHttpClient.json(200, "{\"code\":\"mocked\"}"))
+                .build();
+
+        assertThat(mock.proxy().get("7").block(Duration.ofSeconds(5)))
+                .isEqualTo(new OrderResponse("mocked"));
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasMethod(HttpMethod.GET)
+                .hasPath("/orders/7")
+                .hasStatusCode(200);
+    }
+
+    @Test
     void packagedConsumerCoversProtocolAndOptionalIntegrationContracts() {
         OBSERVED.clear();
         SUCCEEDED.clear();
         FAILED.clear();
         AtomicReference<List<String>> repeatedHeaders = new AtomicReference<>();
+        AtomicReference<String> propagatedTraceparent = new AtomicReference<>();
         DisposableServer server = HttpServer.create().port(0)
                 .route(routes -> routes
+                        .get("/direct", (request, response) -> {
+                            propagatedTraceparent.set(request.requestHeaders().get("traceparent"));
+                            return response.header("Content-Type", "application/json")
+                                    .sendString(Mono.just("{\"code\":\"direct\"}")).then();
+                        })
                         .get("/orders/42", (request, response) -> response
                                 .header("Content-Type", "application/json")
                                 .sendString(Mono.just("{\"code\":\"inherited\"}")).then())
@@ -114,6 +146,9 @@ class Boot4ConsumerApplicationTest {
                         "reactive.http.observability.diagnostics-endpoint.enabled=true")
                 .run()) {
             OrdersClient client = context.getBean(OrdersClient.class);
+            assertThat(client.direct().block(Duration.ofSeconds(5)))
+                    .isEqualTo(new OrderResponse("direct"));
+            assertThat(propagatedTraceparent.get()).isEqualTo(TRACEPARENT);
             assertThat(client.get("42").block(Duration.ofSeconds(5)))
                     .isEqualTo(new OrderResponse("inherited"));
             assertThat(client.configured("42").block(Duration.ofSeconds(5)))
@@ -188,6 +223,9 @@ class Boot4ConsumerApplicationTest {
 
     @ReactiveHttpClient(name = "orders")
     interface OrdersClient extends SharedOrders<OrderResponse> {
+        @GET("/direct")
+        Mono<OrderResponse> direct();
+
         @ApiRef("configured")
         Mono<OrderResponse> configured(@PathVar("id") String id);
 
@@ -225,7 +263,23 @@ class Boot4ConsumerApplicationTest {
 
         @Bean
         OpenTelemetry openTelemetry() {
-            return OpenTelemetry.noop();
+            TextMapPropagator propagator = new TextMapPropagator() {
+                @Override
+                public Collection<String> fields() {
+                    return List.of("traceparent");
+                }
+
+                @Override
+                public <C> void inject(Context context, C carrier, TextMapSetter<C> setter) {
+                    setter.set(carrier, "traceparent", TRACEPARENT);
+                }
+
+                @Override
+                public <C> Context extract(Context context, C carrier, TextMapGetter<C> getter) {
+                    return context;
+                }
+            };
+            return OpenTelemetry.propagating(ContextPropagators.create(propagator));
         }
 
         @Bean
