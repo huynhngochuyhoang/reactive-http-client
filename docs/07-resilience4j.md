@@ -36,8 +36,10 @@ Spring Boot 4 applications use the published Resilience4j `2.4.x` Boot 4 line:
 </dependency>
 ```
 
-Keep all Resilience4j modules on one BOM-managed version. The V19 Boot 4 build
-uses `2.4.0`; the Boot 3.5 maintenance build remains on `2.2.0`.
+Keep all Resilience4j modules on one BOM-managed version. The starter `3.x`
+Boot 4 reactor uses `2.4.0`; the Boot 3.5 `2.14.1` maintenance line remains on
+`2.2.0`. See the [3.x migration guide](28-spring-boot-4-jackson-migration.md)
+before changing generation-specific Resilience4j modules.
 
 ---
 

@@ -6,6 +6,10 @@
 - Spring Boot 4.x
 - Maven 3.8+
 
+This guide targets starter `3.x` on Spring Boot 4. Boot 3.5 applications should
+remain on starter `2.14.1` until they complete the
+[3.x migration](28-spring-boot-4-jackson-migration.md).
+
 ## Add the dependency
 
 ```xml

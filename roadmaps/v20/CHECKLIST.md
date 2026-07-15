@@ -465,26 +465,54 @@ Evidence:
 
 ## Priority 11 - Publish the `3.0.0` Migration and Operations Guide
 
-### [ ] 11.1 Complete the adoption path
+### [x] 11.1 Complete the adoption path
 
-- [ ] Document Maven coordinates and the Boot 4/JDK baseline.
-- [ ] Document package and dependency changes from focused Boot 4 modules.
-- [ ] Document Jackson 2 to Jackson 3 API and codec migration.
-- [ ] Document Actuator diagnostics/health and native-image changes.
-- [ ] Document test-helper and custom exchange-logger setup.
-- [ ] Include complete before/after configuration and code examples.
-- [ ] Include a minimal independent Boot 4 consumer that compiles against staged artifacts.
-- [ ] Explain when applications should remain on the `2.14.1` maintenance lane.
+- [x] Document Maven coordinates and the Boot 4/JDK baseline.
+- [x] Document package and dependency changes from focused Boot 4 modules.
+- [x] Document Jackson 2 to Jackson 3 API and codec migration.
+- [x] Document Actuator diagnostics/health and native-image changes.
+- [x] Document test-helper and custom exchange-logger setup.
+- [x] Include complete before/after configuration and code examples.
+- [x] Include a minimal independent Boot 4 consumer that compiles against staged artifacts.
+- [x] Explain when applications should remain on the `2.14.1` maintenance lane.
 
-### [ ] 11.2 Align all public release documentation
+### [x] 11.2 Align all public release documentation
 
-- [ ] Update README, quick start, annotation, auth, resilience, observability,
+- [x] Update README, quick start, annotation, auth, resilience, observability,
       support-bundle, benchmark, and compatibility guides.
-- [ ] Remove stale Boot 3 assumptions from `3.x` instructions without rewriting
+- [x] Remove stale Boot 3 assumptions from `3.x` instructions without rewriting
       historical release reports.
-- [ ] Ensure release notes distinguish migration evidence from performance claims.
-- [ ] Generate configuration reference and release-readiness artifacts.
-- [ ] Run code-snippet consumers, metadata tests, Markdown-link checks, and `git diff --check`.
+- [x] Ensure release notes distinguish migration evidence from performance claims.
+- [x] Generate configuration reference and release-readiness artifacts.
+- [x] Run code-snippet consumers, metadata tests, Markdown-link checks, and `git diff --check`.
+
+Evidence:
+
+- Expanded `docs/28-spring-boot-4-jackson-migration.md` with the Boot 4/JDK 21
+  coordinates, focused Boot package/module changes, Jackson 2-to-3 codec path,
+  complete before/after Java and YAML, Actuator diagnostics/health exposure,
+  GraalVM 25 native guidance, mock codec and constructor-injected logger setup,
+  independent consumer commands, staged-resolution behavior, and explicit
+  criteria for remaining on the `2.14.1` maintenance lane.
+- README, quick start, annotations, auth, Resilience4j, observability,
+  support-bundle, benchmark, and compatibility guides now point to the `3.x`
+  migration path. Current operational text names
+  `Boot4HttpClientHealthIndicator`, Boot 4 Resilience4j `2.4.0`, and the default
+  Boot 4 reactor; historical V19 release evidence remains unchanged.
+- Installed the assembled `3.0.0` reactor, then
+  `Boot4MockReactiveHttpClientTest` and the non-reactor
+  `.github/boot4-consumer` suite passed. Priority 5 already proved the same
+  consumer resolves parent, starter, test-helper, and OTel artifacts from an
+  empty target-local repository populated by the signed staging set.
+- `DocumentationReleaseArtifactTest` now guards all named public migration
+  links, current Boot 4 health/Resilience4j wording, complete operations setup,
+  and the staged-consumer workflow. It regenerated
+  `target/release-evidence/reactive-http-client-release-evidence.json` and the
+  benchmark evidence snippet; generated configuration and Markdown-link status
+  are `pass`.
+- `ReactiveHttpClientConfigurationMetadataTest`,
+  `DocumentationReleaseArtifactTest`, the helper and consumer fixtures, and
+  `git diff --check` passed.
 
 ---
 

@@ -320,6 +320,10 @@ mvn -s .mvn/maven-central-settings.xml \
   clean verify
 ```
 
+Use the [3.x migration guide](28-spring-boot-4-jackson-migration.md) to identify
+Boot 3-to-Boot 4 dependency and codec changes before interpreting cross-release
+movement. Cross-generation movement is migration context, not starter-only cost.
+
 This is a smoke-only harness check. It exercises raw `WebClient`, Spring HTTP
 Interface, and the starter against the same local server, Reactor Netty
 transport setup, Boot 4 BOM, and request/response validation. Boot 4 selects
