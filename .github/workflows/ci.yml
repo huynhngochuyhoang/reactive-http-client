@@ -92,7 +92,7 @@ jobs:
           cache: maven
 
       - name: Compare published APIs to 3.0.0
-        run: mvn -B -ntp -s .mvn/maven-central-settings.xml -Papi-compatibility -DskipTests verify
+        run: mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/api-compatibility-repository -Papi-compatibility -DskipTests verify
 
       - name: Verify compatibility guard fixtures
         run: bash scripts/verify-api-compatibility-fixtures.sh

@@ -229,7 +229,7 @@ Compare the paired JMH JSON reports with the target-only helper after both repor
 ```bash
 mvn -Pbenchmarks,benchmark-compare -pl reactive-http-client-benchmarks -am verify \
   -Dbenchmark.compare.current=reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json \
-  -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.14.1/release-jmh.json
+  -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.0.0/release-jmh.json
 ```
 
 The helper writes `reactive-http-client-benchmarks/target/benchmark-reports/benchmark-comparison.md` by default. The comparison includes each matching benchmark method and mode, current and baseline values, absolute and relative deltas, average time, p50, p95, p99, throughput, and allocation per operation when those metrics are present. Missing current or baseline rows are listed explicitly. V13 threshold crossings are marked as `review`, but the command exits successfully by default so normal CI does not become a benchmark gate. For local release review, add `-Dbenchmark.compare.fail-on-review=true` to return a non-zero exit when any row is marked `review`. Attach or paste the generated `benchmark-comparison.md` next to the promoted report link when release notes discuss current-vs-baseline movement.

@@ -532,7 +532,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=3.0.0 native:compile
+  -Dreactive-http-client.version=3.1.0 native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 

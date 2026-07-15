@@ -84,7 +84,9 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkDocs)
                 .contains("-Dbenchmark.starter.version=3.0.0")
                 .contains("-Dbenchmark.commit=3.0.0")
-                .contains("published-starter-3.0.0/release-jmh.md");
+                .contains("published-starter-3.0.0/release-jmh.md")
+                .contains("published-starter-3.0.0/release-jmh.json")
+                .doesNotContain("published-starter-2.14.1/release-jmh.json");
         assertThat(manifest.path("publishedBaselineArtifacts"))
                 .extracting(artifact -> artifact.path("resolutionCommand").asText())
                 .containsExactly(
@@ -181,7 +183,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("<api.compatibility.break-on-binary-incompatible>false</api.compatibility.break-on-binary-incompatible>")
                 .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
         assertThat(workflow)
-                .contains("mvn -B -ntp -s .mvn/maven-central-settings.xml -Papi-compatibility -DskipTests verify")
+                .contains("-Dmaven.repo.local=target/api-compatibility-repository")
+                .contains("-Papi-compatibility -DskipTests verify")
                 .doesNotContain("-Papi-compatibility,major-api-report")
                 .doesNotContain("bash scripts/verify-major-api-delta.sh");
         assertThat(guide)
@@ -585,7 +588,11 @@ class DocumentationReleaseArtifactTest {
                 "reactiveHttpClientDiagnosticsEndpoint",
                 "reactiveHttpClientHealthIndicator",
                 "reactive.http.client.requests");
-        assertThat(nativePom).contains("-J-Xmx6g", "-H:NumberOfThreads=4", "-H:+SharedArenaSupport");
+        assertThat(nativePom).contains(
+                "<reactive-http-client.version>3.1.0</reactive-http-client.version>",
+                "-J-Xmx6g",
+                "-H:NumberOfThreads=4",
+                "-H:+SharedArenaSupport");
         assertThat(nativeWorkflow).contains(
                 "set -o pipefail",
                 "target/release-evidence/v20-priority6/native-provenance.txt",
@@ -595,6 +602,7 @@ class DocumentationReleaseArtifactTest {
                 "configured inherited",
                 "@ApiRef",
                 "6 GiB",
+                "-Dreactive-http-client.version=3.1.0 native:compile",
                 "native-smoke-provenance");
     }
 
