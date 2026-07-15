@@ -1,8 +1,9 @@
 # Spring Boot 4 and Starter 3.x Migration
 
 This guide migrates published Spring Boot 3.5 starter 2.x applications to the
-Spring Boot 4 starter 3.x line. The current reactor version is `3.1.0`; use the
-latest published `3.x` version when consuming it from a release repository.
+Spring Boot 4 starter 3.x line. The current reactor version is
+`3.1.0-SNAPSHOT`; use published `3.0.0` when consuming it from a release
+repository.
 
 Annotations, exception categories, lifecycle hooks, observers, retry and
 idempotency behavior, diagnostics sanitization, and reactive.http property names

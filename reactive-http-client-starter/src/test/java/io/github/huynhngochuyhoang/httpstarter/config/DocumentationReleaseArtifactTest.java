@@ -37,11 +37,13 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void readmeAndQuickStartVersionsMatchProjectVersion() throws Exception {
-        String projectVersion = projectVersion(projectRoot().resolve("pom.xml"));
+    void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
+        Path root = projectRoot();
+        String pomXml = Files.readString(root.resolve("pom.xml"));
+        String publishedVersion = pomProperty(pomXml, "api.compatibility.baseline.version");
 
-        assertVersionSnippets(projectRoot().resolve("README.md"), projectVersion);
-        assertVersionSnippets(projectRoot().resolve("docs/01-quick-start.md"), projectVersion);
+        assertVersionSnippets(root.resolve("README.md"), publishedVersion);
+        assertVersionSnippets(root.resolve("docs/01-quick-start.md"), publishedVersion);
     }
 
     @Test
@@ -67,17 +69,25 @@ class DocumentationReleaseArtifactTest {
     void apiCompatibilityBaselineReleaseDocsStayAlignedWithPom() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
+        String readme = Files.readString(root.resolve("README.md"));
+        String quickStart = Files.readString(root.resolve("docs/01-quick-start.md"));
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
 
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0-SNAPSHOT");
         assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("3.0.0");
         assertThat(pomProperty(pomXml, "spring-boot.version")).isEqualTo("4.0.0");
         assertThat(pomProperty(pomXml, "resilience4j.version")).isEqualTo("2.4.0");
+        assertThat(readme)
+                .contains("<version>3.0.0</version>")
+                .doesNotContain("<version>3.1.0");
+        assertThat(quickStart)
+                .contains("<version>3.0.0</version>")
+                .doesNotContain("<version>3.1.0");
         assertThat(releaseDocs)
                 .contains("### V20 default Spring Boot 4 reactor")
-                .contains("default reactor now declares `3.1.0`")
+                .contains("default reactor now declares `3.1.0-SNAPSHOT`")
                 .contains("uses published `3.0.0` as its strict compatibility baseline")
                 .contains("mvn -s .mvn/maven-central-settings.xml verify")
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`");
@@ -325,8 +335,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(includeWorkflow)
                 .contains("Run the strict comparison")
                 .contains("mvn -s .mvn/maven-central-settings.xml \\\n"
+                        + "  -Dmaven.repo.local=target/api-compatibility-repository \\\n"
                         + "  -Papi-compatibility -DskipTests verify")
-                .contains("-pl reactive-http-client-starter \\\n"
+                .contains("-Dmaven.repo.local=target/api-compatibility-repository \\\n"
+                        + "  -pl reactive-http-client-starter \\\n"
                         + "  -Papi-compatibility -DskipTests verify")
                 .containsSubsequence(
                         "-Papi-compatibility -DskipTests verify",
@@ -380,7 +392,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`")
                 .contains("Create a dedicated maintenance branch from that tag")
                 .contains("do not compile Boot 3 adapters into the `3.x` artifacts");
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0-SNAPSHOT");
         assertThat(pomXml)
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .contains("<api.compatibility.baseline.version>3.0.0</api.compatibility.baseline.version>");
@@ -508,7 +520,7 @@ class DocumentationReleaseArtifactTest {
         String settings = Files.readString(root.resolve(".mvn/maven-central-settings.xml"));
 
         assertThat(pomXml)
-                .contains("<version>3.1.0</version>")
+                .contains("<version>3.1.0-SNAPSHOT</version>")
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .doesNotContain("<id>boot4-spike</id>")
                 .doesNotContain("<maven.deploy.skip>true</maven.deploy.skip>")
@@ -532,6 +544,7 @@ class DocumentationReleaseArtifactTest {
         int publishPackagingGuard = publishWorkflow.indexOf("bash scripts/verify-generation-packaging.sh");
         int centralDeploy = publishWorkflow.indexOf("mvn -B -ntp -Prelease -DskipTests -DautoPublish=true deploy");
         assertThat(publishWorkflow)
+                .contains("Refusing to publish SNAPSHOT version")
                 .contains("mvn -B -ntp clean verify")
                 .contains("mvn -B -ntp clean -Prelease -DskipTests verify")
                 .contains("MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}");
@@ -589,7 +602,7 @@ class DocumentationReleaseArtifactTest {
                 "reactiveHttpClientHealthIndicator",
                 "reactive.http.client.requests");
         assertThat(nativePom).contains(
-                "<reactive-http-client.version>3.1.0</reactive-http-client.version>",
+                "<reactive-http-client.version>3.1.0-SNAPSHOT</reactive-http-client.version>",
                 "-J-Xmx6g",
                 "-H:NumberOfThreads=4",
                 "-H:+SharedArenaSupport");
@@ -602,7 +615,7 @@ class DocumentationReleaseArtifactTest {
                 "configured inherited",
                 "@ApiRef",
                 "6 GiB",
-                "-Dreactive-http-client.version=3.1.0 native:compile",
+                "-Dreactive-http-client.version=3.1.0-SNAPSHOT native:compile",
                 "native-smoke-provenance");
     }
 
@@ -1154,6 +1167,9 @@ class DocumentationReleaseArtifactTest {
                 "target-only-evidence");
         assertThat(releasePrepItems.get("changelog-section").path("status").asText()).isEqualTo("current");
         String manifestProjectVersion = generated.path("projectVersion").asText();
+        String expectedConsumerVersion = manifestProjectVersion.endsWith("-SNAPSHOT")
+                ? generated.path("apiCompatibilityBaselineVersion").asText()
+                : manifestProjectVersion;
         String unreleasedCompareVersion = Files.readString(root.resolve("CHANGELOG.md"))
                 .contains("## [" + manifestProjectVersion + "] - ")
                 ? manifestProjectVersion
@@ -1162,7 +1178,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("v" + unreleasedCompareVersion + "...HEAD");
         assertThat(releasePrepItems.get("version-snippets").path("status").asText()).isEqualTo("current");
         assertThat(releasePrepItems.get("version-snippets").path("expectedVersion").asText())
-                .isEqualTo(generated.path("projectVersion").asText());
+                .isEqualTo(expectedConsumerVersion);
         assertThat(streamText(releasePrepItems.get("published-baseline-artifacts").path("commands")))
                 .containsExactly(
                         "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
@@ -1869,8 +1885,9 @@ class DocumentationReleaseArtifactTest {
                 + unreleasedCompareVersion + "...HEAD";
         boolean changelogCurrent = changelog.contains("## [Unreleased]")
                 && changelog.contains(expectedUnreleasedCompareLink);
-        boolean versionSnippetsCurrent = versionSnippetsMatch(root.resolve("README.md"), projectVersion)
-                && versionSnippetsMatch(root.resolve("docs/01-quick-start.md"), projectVersion);
+        String documentedConsumerVersion = projectVersion.endsWith("-SNAPSHOT") ? baselineVersion : projectVersion;
+        boolean versionSnippetsCurrent = versionSnippetsMatch(root.resolve("README.md"), documentedConsumerVersion)
+                && versionSnippetsMatch(root.resolve("docs/01-quick-start.md"), documentedConsumerVersion);
 
         List<String> publishedBaselineCommands = publishedBaselineArtifacts.stream()
                 .map(artifact -> artifact.get("resolutionCommand"))
@@ -1902,7 +1919,7 @@ class DocumentationReleaseArtifactTest {
         items.add(checklistItem("version-snippets", "README and quick-start version snippets",
                 versionSnippetsCurrent ? "current" : "stale", Map.of(
                         "paths", List.of("README.md", "docs/01-quick-start.md"),
-                        "expectedVersion", projectVersion)));
+                        "expectedVersion", documentedConsumerVersion)));
         items.add(checklistItem("published-baseline-artifacts", "Published baseline artifact resolution",
                 "pending", Map.of("commands", publishedBaselineCommands)));
         items.add(checklistItem("api-compatibility", "API compatibility evidence",

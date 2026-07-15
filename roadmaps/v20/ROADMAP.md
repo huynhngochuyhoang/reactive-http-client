@@ -18,7 +18,7 @@ generations.
 
 V20 completed with the public `3.0.0` release from commit
 `c61648587d471e809cadbf2822279840067ae8a1`. The next development line is
-`3.1.0`, with published `3.0.0` as its strict API and benchmark baseline.
+`3.1.0-SNAPSHOT`, with published `3.0.0` as its strict API and benchmark baseline.
 
 | Release lane | Framework baseline | Scope |
 |---|---|---|

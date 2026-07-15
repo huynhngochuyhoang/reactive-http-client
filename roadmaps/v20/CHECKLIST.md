@@ -589,7 +589,7 @@ Evidence:
   test-helper `754710c8723fdf6a173ad7174247cca591f99953b0e652d53f99a56413a482fc`,
   and OTel `08987a01688b3cedfddfbcfd7dcd9da49c074626d8214e21ede3bbcf6aa7c802`.
 - The changelog now dates `3.0.0`, the development reactor advances to
-  `3.1.0`, and strict API and benchmark baselines move to published `3.0.0`.
+  `3.1.0-SNAPSHOT`, and strict API and benchmark baselines move to published `3.0.0`.
   The frozen cross-major report remains historical evidence and normal CI no
   longer enables its report-only profile.
 

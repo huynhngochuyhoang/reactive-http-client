@@ -37,8 +37,8 @@ change.
 
 ### V20 default Spring Boot 4 reactor
 
-The default reactor now declares `3.1.0`, imports Spring Boot `4.0.0`, and
-uses published `3.0.0` as its strict compatibility baseline. Boot 4
+The default reactor now declares `3.1.0-SNAPSHOT`, imports Spring Boot `4.0.0`,
+and uses published `3.0.0` as its strict compatibility baseline. Boot 4
 WebClient, health, Jackson 3, OTel, test-helper, and benchmark adapters live in
 normal source roots. The old `boot4-spike` profile, compiler exclusions,
 `maven.deploy.skip`, and `skipPublishing` controls are absent.
@@ -213,11 +213,12 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `3.1.0` development line compares strictly
-against published `3.0.0`:
+from the current reactor version. The `3.1.0-SNAPSHOT` development line compares
+strictly against published `3.0.0`:
 
 ```bash
 mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/api-compatibility-repository \
   -Papi-compatibility -DskipTests verify
 bash scripts/verify-api-compatibility-fixtures.sh
 ```
@@ -233,8 +234,12 @@ For module-scoped compatibility checks, the inherited baseline guard must still
 run before japicmp:
 
 ```bash
-mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests validate
-mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify
+mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/api-compatibility-repository \
+  -pl reactive-http-client-starter -Papi-compatibility -DskipTests validate
+mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/api-compatibility-repository \
+  -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify
 ```
 
 The Maven profiles produce japicmp reports under each module's
@@ -360,8 +365,10 @@ documentation checks:
 
 ```bash
 mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/api-compatibility-repository \
   -Papi-compatibility -DskipTests verify
 mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/api-compatibility-repository \
   -pl reactive-http-client-starter \
   -Papi-compatibility -DskipTests verify
 bash scripts/verify-api-compatibility-fixtures.sh
@@ -532,7 +539,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=3.1.0 native:compile
+  -Dreactive-http-client.version=3.1.0-SNAPSHOT native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
