@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Snapshot-aware release evidence.** Separated the development reactor, latest published consumer, and explicit release-candidate versions in generated release evidence; deferred promotable performance artifact paths while the reactor is a snapshot; and required Maven Central publication to run from the matching release tag.
+- **Published consumer baseline.** Added a manually gated Boot 4 consumer run that resolves starter, test-helper, and OTel `3.0.0` artifacts from a fresh Maven Central-only repository and records remote markers, effective POMs, hashes, dependency provenance, and separate test results.
 
 ## [3.0.0] - 2026-07-15
 

@@ -693,6 +693,30 @@ The normal reactor and release-smoke matrix use Boot 4. The Boot 3.5 `2.x` line
 is reconstructed only from its maintenance tag; no dual-generation helper
 artifact is published.
 
+### Published Boot 4 consumer baseline
+
+The current-reactor fixture above and the published baseline are separate
+evidence lanes. From a clean checkout, resolve the latest published parent,
+starter, test helper, and OTel companion exclusively through Maven Central:
+
+```bash
+scripts/verify-published-consumer.sh 3.0.0
+```
+
+The command refuses an existing
+`target/published-consumer-repository-3.0.0` directory instead of reusing it.
+It runs the same Boot 4 application fixture against published `3.0.0`, verifies
+the Maven Central `_remote.repositories` marker for the parent and every project artifact,
+rejects reactor `target/classes` entries, and writes target-only dependency
+trees, classpaths, consumer/module effective POMs, published parent/module POM
+and jar SHA-256 values, test reports, and
+provenance under
+`target/release-evidence/v21-priority2/published-3.0.0/`.
+
+The manually dispatched `Published Consumer Smoke` workflow runs this command
+and uploads only the published-release evidence directory. The normal
+`Boot 4 Assembled Consumer` CI job remains the current-reactor lane.
+
 ### V20 Jackson 3 codec ownership
 
 `ReactiveHttpClientJsonCodec` is the serialization boundary for bytes owned by

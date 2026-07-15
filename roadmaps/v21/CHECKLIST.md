@@ -57,33 +57,46 @@ Evidence:
 
 ## Priority 2 - Published `3.0.0` Consumer Baseline
 
-### [ ] 2.1 Build an isolated published-artifact consumer
+### [x] 2.1 Build an isolated published-artifact consumer
 
-- [ ] Create or adapt a Boot 4 fixture that resolves starter `3.0.0` from Maven Central.
-- [ ] Resolve test-helper `3.0.0` from Maven Central.
-- [ ] Resolve OTel companion `3.0.0` from Maven Central.
-- [ ] Use a fresh target-local Maven repository that fails if it already exists.
-- [ ] Record `_remote.repositories` markers for every project artifact.
-- [ ] Record artifact SHA-256 values and effective POMs as target-only evidence.
-- [ ] Reject reactor output directories and locally installed project artifacts.
+- [x] Create or adapt a Boot 4 fixture that resolves starter `3.0.0` from Maven Central.
+- [x] Resolve test-helper `3.0.0` from Maven Central.
+- [x] Resolve OTel companion `3.0.0` from Maven Central.
+- [x] Use a fresh target-local Maven repository that fails if it already exists.
+- [x] Record `_remote.repositories` markers for every project artifact.
+- [x] Record artifact SHA-256 values and effective POMs as target-only evidence.
+- [x] Reject reactor output directories and locally installed project artifacts.
 
-### [ ] 2.2 Exercise the published consumer contract
+### [x] 2.2 Exercise the published consumer contract
 
-- [ ] Cover a direct declarative JSON endpoint.
-- [ ] Cover inherited generic response decoding.
-- [ ] Cover configured `@ApiRef` method and path resolution.
-- [ ] Cover Problem Detail error mapping.
-- [ ] Cover diagnostics and health with Actuator present.
-- [ ] Cover test-helper request assertions.
-- [ ] Cover OTel propagation with the companion module present.
-- [ ] Keep current-reactor and published-release consumer results in separate reports.
-- [ ] Add a CI or manually gated fixture command with explicit provenance.
-- [ ] Run the published consumer from a clean repository.
-- [ ] Run `git diff --check`.
+- [x] Cover a direct declarative JSON endpoint.
+- [x] Cover inherited generic response decoding.
+- [x] Cover configured `@ApiRef` method and path resolution.
+- [x] Cover Problem Detail error mapping.
+- [x] Cover diagnostics and health with Actuator present.
+- [x] Cover test-helper request assertions.
+- [x] Cover OTel propagation with the companion module present.
+- [x] Keep current-reactor and published-release consumer results in separate reports.
+- [x] Add a CI or manually gated fixture command with explicit provenance.
+- [x] Run the published consumer from a clean repository.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Passed `scripts/verify-published-consumer.sh 3.0.0` from an absent
+  `target/published-consumer-repository-3.0.0` repository.
+- The published parent POM plus all three published jars and module POMs contain
+  Maven Central remote markers; their SHA-256 values, consumer/module effective
+  POMs, dependency tree, isolated classpath,
+  provenance, and test report are under
+  `target/release-evidence/v21-priority2/published-3.0.0/`.
+- `Boot4ConsumerApplicationTest` passed 3 tests with 0 failures and 0 errors
+  against published `3.0.0` artifacts.
+- A second invocation was rejected because the isolated repository already
+  existed, proving the freshness guard does not silently reuse baseline state.
+- The manually dispatched `Published Consumer Smoke` workflow uploads published
+  evidence separately from current-reactor consumer reports.
+- Passed `git diff --check`.
 
 ---
 
