@@ -92,7 +92,7 @@ jobs:
           cache: maven
 
       - name: Compare published APIs to 2.14.1
-        run: mvn -B -ntp -Papi-compatibility,major-api-report -DskipTests verify
+        run: mvn -B -ntp -s .mvn/maven-central-settings.xml -Papi-compatibility,major-api-report -DskipTests verify
 
       - name: Reject unreviewed major API changes
         run: bash scripts/verify-major-api-delta.sh

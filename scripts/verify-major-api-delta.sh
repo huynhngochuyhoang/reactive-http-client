@@ -2,8 +2,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_VERSION="$(mvn -q -f "$ROOT_DIR/pom.xml" -DforceStdout help:evaluate -Dexpression=project.version)"
-BASELINE_VERSION="$(mvn -q -f "$ROOT_DIR/pom.xml" -DforceStdout help:evaluate -Dexpression=api.compatibility.baseline.version)"
+MAVEN_SETTINGS="${API_COMPATIBILITY_MAVEN_SETTINGS:-$ROOT_DIR/.mvn/maven-central-settings.xml}"
+[[ "$MAVEN_SETTINGS" = /* ]] || MAVEN_SETTINGS="$ROOT_DIR/$MAVEN_SETTINGS"
+MAVEN=(mvn -q -s "$MAVEN_SETTINGS" -f "$ROOT_DIR/pom.xml")
+if [[ -n "${API_COMPATIBILITY_BASELINE_REPOSITORY:-}" ]]; then
+  MAVEN+=("-Dmaven.repo.local=$API_COMPATIBILITY_BASELINE_REPOSITORY")
+fi
+PROJECT_VERSION="$("${MAVEN[@]}" -DforceStdout help:evaluate -Dexpression=project.version)"
+BASELINE_VERSION="$("${MAVEN[@]}" -DforceStdout help:evaluate -Dexpression=api.compatibility.baseline.version)"
 WORK_DIR="$ROOT_DIR/target/major-api-delta"
 
 [[ "$PROJECT_VERSION" == "3.0.0" ]] || {
@@ -28,7 +34,7 @@ for module in "${MODULES[@]}"; do
     echo "Missing $report; run the report-only api-compatibility build first" >&2
     exit 1
   }
-  sed -n -E "s;^[[:space:]]*((---|\\*\\*\\*)!.*)$;$module|\\1;p" "$report" >> "$ACTUAL"
+  sed -n -E "s;^[[:space:]]*((---|\\+\\+\\+|\\*\\*\\*)[!*].*)$;$module|\\1;p" "$report" >> "$ACTUAL"
 done
 
 cat > "$EXPECTED" <<'EOF'
@@ -51,7 +57,7 @@ if ! diff -u "$EXPECTED" "$ACTUAL"; then
   exit 1
 fi
 
-DEFAULT_LOCAL_REPOSITORY="$(mvn -q -f "$ROOT_DIR/pom.xml" -DforceStdout help:evaluate -Dexpression=settings.localRepository)"
+DEFAULT_LOCAL_REPOSITORY="$("${MAVEN[@]}" -DforceStdout help:evaluate -Dexpression=settings.localRepository)"
 BASELINE_REPOSITORY="${API_COMPATIBILITY_BASELINE_REPOSITORY:-$DEFAULT_LOCAL_REPOSITORY}"
 for module in "${MODULES[@]}"; do
   old_module_dir="$BASELINE_REPOSITORY/io/github/huynhngochuyhoang/$module/$BASELINE_VERSION"

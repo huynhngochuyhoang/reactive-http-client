@@ -179,7 +179,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("<api.compatibility.break-on-binary-incompatible>false</api.compatibility.break-on-binary-incompatible>")
                 .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
         assertThat(workflow)
-                .contains("mvn -B -ntp -Papi-compatibility,major-api-report -DskipTests verify")
+                .contains("mvn -B -ntp -s .mvn/maven-central-settings.xml -Papi-compatibility,major-api-report -DskipTests verify")
                 .contains("bash scripts/verify-major-api-delta.sh")
                 .doesNotContain("mvn -B -ntp -Papi-compatibility -DskipTests verify");
         assertThat(guide)
@@ -211,7 +211,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(deltaGuard)
                 .contains("PROJECT_VERSION\" == \"3.0.0")
                 .contains("BASELINE_VERSION\" == \"2.14.1")
+                .contains("API_COMPATIBILITY_MAVEN_SETTINGS")
+                .contains("mvn -q -s \"$MAVEN_SETTINGS\"")
                 .contains("API_COMPATIBILITY_BASELINE_REPOSITORY")
+                .contains("(---|\\\\+\\\\+\\\\+|\\\\*\\\\*\\\\*)[!*]")
                 .contains("installed locally rather than resolved from a release repository")
                 .contains("Jackson2ReactiveHttpClientJsonCodec")
                 .contains("ProblemDetailErrorResponseMapper(com.fasterxml.jackson.databind.ObjectMapper)")
@@ -275,7 +278,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("When documenting a new public helper")
                 .contains("Prefer the narrowest include\npattern")
                 .contains("Keep implementation\ninternals excluded")
-                .contains("mvn -Papi-compatibility,major-api-report -DskipTests verify")
+                .contains("mvn -s .mvn/maven-central-settings.xml \\\n"
+                        + "  -Papi-compatibility,major-api-report -DskipTests verify")
                 .contains("mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests verify")
                 .contains("bash scripts/verify-major-api-delta.sh")
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh");

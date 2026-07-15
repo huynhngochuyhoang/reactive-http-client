@@ -217,7 +217,8 @@ from the current reactor version. While the project version remains `3.0.0`,
 the cross-major baseline stays on published `2.14.1`:
 
 ```bash
-mvn -Papi-compatibility,major-api-report -DskipTests verify
+mvn -s .mvn/maven-central-settings.xml \
+  -Papi-compatibility,major-api-report -DskipTests verify
 bash scripts/verify-major-api-delta.sh
 bash scripts/verify-api-compatibility-fixtures.sh
 ```
@@ -225,9 +226,12 @@ bash scripts/verify-api-compatibility-fixtures.sh
 For release evidence, resolve the three `2.14.1` jars into a fresh target-local
 Maven repository, pass that repository through `-Dmaven.repo.local` to the
 japicmp build, and set `API_COMPATIBILITY_BASELINE_REPOSITORY` to the same path
-for the reviewed-delta guard. The guard rejects baseline jars whose Maven remote
-markers identify a local install. This prevents a stale or relabeled artifact in
-the normal local cache from understating the cross-major delta.
+for the reviewed-delta guard. Set `API_COMPATIBILITY_MAVEN_SETTINGS` when the
+report uses a settings file other than `.mvn/maven-central-settings.xml`. The
+guard uses those settings and that repository for every Maven model lookup and
+rejects baseline jars whose Maven remote markers identify a local install. This
+prevents a stale or relabeled artifact in the normal local cache from
+understating the cross-major delta.
 
 For module-scoped compatibility checks, the inherited baseline guard must still
 run before japicmp:
