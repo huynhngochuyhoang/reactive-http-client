@@ -23,6 +23,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -104,6 +106,7 @@ class Framework7TransportCorrectnessTest {
         String malformedWireRequest =
                 "POST /orders HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: invalid\r\n\r\n{}";
         List<CapturedDecoderRequest> routedRequests = new CopyOnWriteArrayList<>();
+        CountDownLatch routedRequestRecorded = new CountDownLatch(1);
         DisposableServer server = HttpServer.create()
                 .port(0)
                 .handle((request, response) -> {
@@ -112,6 +115,7 @@ class Framework7TransportCorrectnessTest {
                             request.method().name(),
                             request.uri(),
                             request.version().text())));
+                    routedRequestRecorded.countDown();
                     return response.sendString(Mono.just("application-handler")).then();
                 })
                 .bindNow();
@@ -125,6 +129,8 @@ class Framework7TransportCorrectnessTest {
             String statusLine = reader.readLine();
             assertThat(statusLine).contains("400");
             assertThat(malformedWireRequest).contains("POST /orders HTTP/1.1", "Content-Length: invalid");
+            assertThat(routedRequestRecorded.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(routedRequests).hasSize(1);
             assertThat(routedRequests).noneMatch(request -> request.method().equals("POST"));
             assertThat(routedRequests).allSatisfy(request -> {
                 assertThat(request.channelId()).isNotBlank();
