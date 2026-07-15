@@ -94,7 +94,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkDocs)
                 .contains("-Dbenchmark.starter.version=3.0.0")
                 .contains("-Dbenchmark.commit=3.0.0")
-                .contains("test ! -e target/benchmark-baseline-repository-3.0.0")
+                .contains("test ! -e target/benchmark-baseline-repository-3.0.0 && \\\n"
+                        + "mvn -s .mvn/maven-central-settings.xml")
                 .contains("-Dmaven.repo.local=target/benchmark-baseline-repository-3.0.0")
                 .contains("published-starter-3.0.0/release-jmh.md")
                 .contains("published-starter-3.0.0/release-jmh.json")

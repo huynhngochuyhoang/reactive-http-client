@@ -101,7 +101,7 @@ omitting `-am` so Maven resolves the published dependency instead of the current
 reactor module:
 
 ```bash
-test ! -e target/benchmark-baseline-repository-3.0.0
+test ! -e target/benchmark-baseline-repository-3.0.0 && \
 mvn -s .mvn/maven-central-settings.xml \
   -Dmaven.repo.local=target/benchmark-baseline-repository-3.0.0 \
   -Pbenchmarks,benchmark-release,benchmark-published-baseline \
