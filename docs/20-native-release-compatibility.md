@@ -360,12 +360,21 @@ pattern that covers the documented contract. Use a package include only when the
 whole package is documented as public, and use a trailing `*` when documented
 nested types or builder stages are part of the contract. Keep implementation
 internals excluded unless a public doc explicitly presents them as replacement
-or extension surfaces. Run `mvn -Papi-compatibility -DskipTests verify`,
-`mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify`,
-`bash scripts/verify-major-api-delta.sh`,
-`bash scripts/verify-api-compatibility-fixtures.sh`, and
-`mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
-before publishing release evidence.
+or extension surfaces. Run the report-only comparison before the reviewed-delta
+guard so its generated reports exist, then run the fixtures and documentation
+checks:
+
+```bash
+mvn -s .mvn/maven-central-settings.xml \
+  -Papi-compatibility,major-api-report -DskipTests verify
+mvn -s .mvn/maven-central-settings.xml \
+  -pl reactive-http-client-starter \
+  -Papi-compatibility,major-api-report -DskipTests verify
+bash scripts/verify-major-api-delta.sh
+bash scripts/verify-api-compatibility-fixtures.sh
+mvn -q -pl reactive-http-client-starter \
+  -Dtest=DocumentationReleaseArtifactTest test
+```
 
 The profile also fails during `validate` when
 `api.compatibility.baseline.version` equals the current reactor

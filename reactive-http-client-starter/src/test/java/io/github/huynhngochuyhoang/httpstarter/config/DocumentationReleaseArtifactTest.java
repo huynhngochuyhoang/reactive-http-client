@@ -229,6 +229,8 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        String includeWorkflow = markdownSection(releaseDocs, "### Compatibility include workflow",
+                "### Configuration metadata and native-hint ownership");
         List<PublicSurfaceRow> documentedRows = documentedPublicSurfaceRows(releaseDocs);
         List<String> documentedIncludes = documentedRows.stream()
                 .map(PublicSurfaceRow::includePattern)
@@ -277,12 +279,18 @@ class DocumentationReleaseArtifactTest {
                 .contains("`OpenTelemetryContextExchangeFilter`, and `OpenTelemetryHttpClientAutoConfiguration`")
                 .contains("When documenting a new public helper")
                 .contains("Prefer the narrowest include\npattern")
-                .contains("Keep implementation\ninternals excluded")
+                .contains("Keep implementation\ninternals excluded");
+        assertThat(includeWorkflow)
+                .contains("report-only comparison before the reviewed-delta\nguard")
                 .contains("mvn -s .mvn/maven-central-settings.xml \\\n"
                         + "  -Papi-compatibility,major-api-report -DskipTests verify")
-                .contains("mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests verify")
-                .contains("bash scripts/verify-major-api-delta.sh")
-                .contains("bash scripts/verify-api-compatibility-fixtures.sh");
+                .contains("-pl reactive-http-client-starter \\\n"
+                        + "  -Papi-compatibility,major-api-report -DskipTests verify")
+                .containsSubsequence(
+                        "-Papi-compatibility,major-api-report -DskipTests verify",
+                        "bash scripts/verify-major-api-delta.sh",
+                        "bash scripts/verify-api-compatibility-fixtures.sh",
+                        "-Dtest=DocumentationReleaseArtifactTest test");
     }
 
     @Test
