@@ -156,8 +156,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("tools.jackson.databind.ObjectMapper")
                 .doesNotContain("Jackson3ReactiveHttpClientJsonCodec");
         assertThat(benchmarkDocs)
-                .contains("### Spring Boot 4 migration baseline")
+                .contains("### Spring Boot 4 release baseline")
                 .contains("-Pbenchmarks,benchmark-smoke")
+                .contains("-Dbenchmark.commit=$(git rev-parse --short HEAD)")
+                .doesNotContain("-Dbenchmark.commit=$(git rev-parse --short HEAD)-dirty")
                 .doesNotContain("-Pboot4-spike,benchmarks")
                 .contains("Boot 3 versus Boot 4 movement is migration context")
                 .contains("Review thresholds remain manual signals");
