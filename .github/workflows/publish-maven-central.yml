@@ -47,11 +47,15 @@ jobs:
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
-      - name: Assert non-SNAPSHOT version
+      - name: Assert release tag matches project version
         run: |
           VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
           if [[ "$VERSION" == *-SNAPSHOT ]]; then
             echo "Refusing to publish SNAPSHOT version: $VERSION"
+            exit 1
+          fi
+          if [[ "$GITHUB_REF_TYPE" != "tag" || "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "Refusing to publish version $VERSION from ${GITHUB_REF_TYPE}:${GITHUB_REF_NAME}; expected tag v$VERSION"
             exit 1
           fi
 

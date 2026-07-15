@@ -40,10 +40,56 @@ class DocumentationReleaseArtifactTest {
     void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
-        String publishedVersion = pomProperty(pomXml, "api.compatibility.baseline.version");
+        String publishedVersion = pomProperty(pomXml, "latest.published.version");
 
         assertVersionSnippets(root.resolve("README.md"), publishedVersion);
         assertVersionSnippets(root.resolve("docs/01-quick-start.md"), publishedVersion);
+    }
+
+    @Test
+    void releaseVersionContractDistinguishesSnapshotCandidateAndPublishedStates() {
+        ReleaseVersionContract snapshot = releaseVersionContract(
+                "3.1.0-SNAPSHOT", "3.0.0", "## [Unreleased]\n");
+        assertThat(snapshot).isEqualTo(new ReleaseVersionContract(
+                "snapshot-development", "3.1.0-SNAPSHOT", "3.0.0", null, "3.0.0"));
+
+        ReleaseVersionContract candidate = releaseVersionContract(
+                "3.1.0", "3.0.0", "## [Unreleased]\n");
+        assertThat(candidate).isEqualTo(new ReleaseVersionContract(
+                "release-candidate", null, "3.0.0", "3.1.0", "3.1.0"));
+
+        ReleaseVersionContract published = releaseVersionContract(
+                "3.1.0", "3.1.0", "## [3.1.0] - 2026-07-15\n");
+        assertThat(published).isEqualTo(new ReleaseVersionContract(
+                "post-publication", null, "3.1.0", null, "3.1.0"));
+
+        assertThat(benchmarkEvidence("3.1.0-SNAPSHOT", "3.0.0", snapshot).get("promotedReport")).isNull();
+        assertThat(benchmarkEvidence("3.1.0", "3.0.0", candidate).get("promotedReport"))
+                .isEqualTo("docs/benchmark-report-3.1.0.md");
+        assertThat(benchmarkEvidence("3.1.0", "3.0.0", published).get("promotedReport"))
+                .isEqualTo("docs/benchmark-report-3.1.0.md");
+    }
+
+    @Test
+    void developmentReactorFixturesAndPublicationGuardStayVersionAligned() throws Exception {
+        Path root = projectRoot();
+        String reactorVersion = projectVersion(root.resolve("pom.xml"));
+        String publishWorkflow = Files.readString(root.resolve(".github/workflows/publish-maven-central.yml"));
+
+        assertThat(reactorVersion).endsWith("-SNAPSHOT");
+        assertThat(projectVersion(root.resolve("reactive-http-client-starter/pom.xml"))).isEqualTo(reactorVersion);
+        assertThat(projectVersion(root.resolve("reactive-http-client-test/pom.xml"))).isEqualTo(reactorVersion);
+        assertThat(projectVersion(root.resolve("reactive-http-client-otel/pom.xml"))).isEqualTo(reactorVersion);
+        assertThat(projectVersion(root.resolve("reactive-http-client-benchmarks/pom.xml"))).isEqualTo(reactorVersion);
+        assertThat(pomProperty(Files.readString(root.resolve(".github/native-smoke/pom.xml")),
+                "reactive-http-client.version")).isEqualTo(reactorVersion);
+        assertThat(pomProperty(Files.readString(root.resolve(".github/boot4-consumer/pom.xml")),
+                "reactive-http-client.version")).isEqualTo(reactorVersion);
+        assertThat(publishWorkflow)
+                .contains("Refusing to publish SNAPSHOT version")
+                .contains("$GITHUB_REF_TYPE\" != \"tag")
+                .contains("$GITHUB_REF_NAME\" != \"v$VERSION")
+                .contains("expected tag v$VERSION");
     }
 
     @Test
@@ -76,6 +122,7 @@ class DocumentationReleaseArtifactTest {
         JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
 
         assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0-SNAPSHOT");
+        assertThat(pomProperty(pomXml, "latest.published.version")).isEqualTo("3.0.0");
         assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("3.0.0");
         assertThat(pomProperty(pomXml, "spring-boot.version")).isEqualTo("4.0.0");
         assertThat(pomProperty(pomXml, "resilience4j.version")).isEqualTo("2.4.0");
@@ -1097,6 +1144,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(manifest.normalize()).startsWith(root.resolve("target"));
         assertThat(benchmarkEvidenceSnippet.normalize()).startsWith(root.resolve("target"));
         assertThat(generated.path("projectVersion").asText()).isEqualTo(projectVersion(root.resolve("pom.xml")));
+        assertThat(generated.path("releaseState").asText()).isEqualTo("snapshot-development");
+        assertThat(generated.path("developmentVersion").asText()).isEqualTo("3.1.0-SNAPSHOT");
+        assertThat(generated.path("latestPublishedConsumerVersion").asText()).isEqualTo("3.0.0");
+        assertThat(generated.path("plannedFinalVersion").isNull()).isTrue();
         assertThat(generated.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(pomProperty(pomXml, "api.compatibility.baseline.version"));
         assertThat(generated.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
@@ -1138,11 +1189,9 @@ class DocumentationReleaseArtifactTest {
                 .containsExactly("mvn -Papi-compatibility -DskipTests verify",
                         "mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify",
                         "bash scripts/verify-api-compatibility-fixtures.sh");
-        String expectedPromotedReport = "docs/benchmark-report-" + generated.path("projectVersion").asText() + ".md";
-        assertThat(readiness.path("promotedBenchmarkReport").path("path").asText())
-                .isEqualTo(expectedPromotedReport);
+        assertThat(readiness.path("promotedBenchmarkReport").path("path").isNull()).isTrue();
         assertThat(readiness.path("promotedBenchmarkReport").path("status").asText())
-                .isEqualTo(Files.exists(root.resolve(expectedPromotedReport)) ? "present" : "missing");
+                .isEqualTo("deferred-until-release-cut");
         assertThat(readiness.path("configurationReference").path("status").asText()).isEqualTo("current");
         assertThat(readiness.path("markdownLinks").path("status").asText()).isEqualTo("pass");
         assertThat(readiness.path("staleBenchmarkReportLinks").path("status").asText()).isEqualTo("pass");
@@ -1152,6 +1201,9 @@ class DocumentationReleaseArtifactTest {
 
         JsonNode releasePrepChecklist = generated.path("releasePrepChecklist");
         assertThat(releasePrepChecklist.path("status").asText()).isEqualTo("pending");
+        assertThat(releasePrepChecklist.path("releaseState").asText()).isEqualTo("snapshot-development");
+        assertThat(releasePrepChecklist.path("latestPublishedConsumerVersion").asText()).isEqualTo("3.0.0");
+        assertThat(releasePrepChecklist.path("plannedFinalVersion").isNull()).isTrue();
         assertThat(releasePrepChecklist.path("projectVersion").asText()).isEqualTo(generated.path("projectVersion").asText());
         assertThat(releasePrepChecklist.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
@@ -1198,10 +1250,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
                         generated.path("benchmarkEvidence").path("currentWorkspaceCommand").asText(),
                         generated.path("benchmarkEvidence").path("publishedStarterCommand").asText());
-        assertThat(releasePrepItems.get("promoted-benchmark-report").path("path").asText())
-                .isEqualTo(expectedPromotedReport);
+        assertThat(releasePrepItems.get("promoted-benchmark-report").path("path").isNull()).isTrue();
         assertThat(releasePrepItems.get("promoted-benchmark-report").path("status").asText())
-                .isEqualTo(Files.exists(root.resolve(expectedPromotedReport)) ? "present" : "missing");
+                .isEqualTo("deferred-until-release-cut");
         assertThat(releasePrepItems.get("generated-docs-and-links").path("status").asText()).isEqualTo("pass");
         assertThat(releasePrepItems.get("generated-docs-and-links").path("configurationReference").asText())
                 .isEqualTo("current");
@@ -1292,8 +1343,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkEvidence.path("publishedStarterReleaseReport").asText())
                 .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
                         + pomProperty(pomXml, "api.compatibility.baseline.version") + "/release-jmh.md");
-        assertThat(benchmarkEvidence.path("promotedReport").asText())
-                .isEqualTo("docs/benchmark-report-" + generated.path("projectVersion").asText() + ".md");
+        assertThat(benchmarkEvidence.path("promotableReportAvailable").asBoolean()).isFalse();
+        assertThat(benchmarkEvidence.path("promotedReport").isNull()).isTrue();
         assertThat(benchmarkEvidence.path("currentCandidateReport").asText())
                 .isEqualTo("reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
         assertThat(benchmarkEvidence.path("publishedBaselineReport").asText())
@@ -1359,15 +1410,14 @@ class DocumentationReleaseArtifactTest {
                         "public performance claims");
         assertThat(benchmarkEvidenceMarkdown)
                 .startsWith("Benchmark evidence:\n")
-                .contains("Promoted report: [Benchmark Report " + generated.path("projectVersion").asText()
-                        + "](docs/benchmark-report-" + generated.path("projectVersion").asText() + ".md)")
+                .contains("Promoted report: pending explicit release-cut version")
                 .contains("Current candidate command: `" + benchmarkEvidence.path("currentWorkspaceCommand").asText() + "`")
                 .contains("Published baseline command: `" + benchmarkEvidence.path("publishedStarterCommand").asText() + "`")
                 .contains("Current candidate report: `" + benchmarkEvidence.path("currentCandidateReport").asText() + "`")
                 .contains("Published baseline report: `" + benchmarkEvidence.path("publishedBaselineReport").asText() + "`")
                 .contains("Scenarios cited: `Get No Body`, `Get Path Query Header`, `Post Json`, `Response Entity`, `Client Error Small Body`, `Server Error Small Body`, `Problem Detail Small Body`")
-                .contains("Paste this block only after the promoted report exists")
-                .contains("starter `" + generated.path("projectVersion").asText() + "`")
+                .contains("Run the release-cut transition before promoting a report")
+                .doesNotContain("benchmark-report-3.1.0-SNAPSHOT.md")
                 .contains("published baseline `" + generated.path("apiCompatibilityBaselineVersion").asText() + "`")
                 .doesNotContain("smoke-only-jmh")
                 .doesNotContain("smokeReport");
@@ -1384,17 +1434,24 @@ class DocumentationReleaseArtifactTest {
         String projectVersion = manifest.path("projectVersion").asText();
         String baselineVersion = manifest.path("apiCompatibilityBaselineVersion").asText();
         String scenarios = inlineCodeList(evidence.path("releaseNoteScenarioNames"));
+        boolean promotableReportAvailable = evidence.path("promotableReportAvailable").asBoolean();
+        String promotedReportLine = promotableReportAvailable
+                ? "- Promoted report: [Benchmark Report " + manifest.path("plannedFinalVersion").asText()
+                        + "](" + evidence.path("promotedReport").asText() + ")\n"
+                : "- Promoted report: pending explicit release-cut version\n";
+        String note = promotableReportAvailable
+                ? "Paste this block only after the promoted report exists for starter `" + projectVersion + "`"
+                : "Run the release-cut transition before promoting a report for development version `"
+                        + projectVersion + "`";
 
         return "Benchmark evidence:\n"
-                + "- Promoted report: [Benchmark Report " + projectVersion + "]("
-                + evidence.path("promotedReport").asText() + ")\n"
+                + promotedReportLine
                 + "- Current candidate command: `" + evidence.path("currentWorkspaceCommand").asText() + "`\n"
                 + "- Published baseline command: `" + evidence.path("publishedStarterCommand").asText() + "`\n"
                 + "- Current candidate report: `" + evidence.path("currentCandidateReport").asText() + "`\n"
                 + "- Published baseline report: `" + evidence.path("publishedBaselineReport").asText() + "`\n"
                 + "- Scenarios cited: " + scenarios + "\n"
-                + "- Note: Paste this block only after the promoted report exists for starter `"
-                + projectVersion + "` and published baseline `" + baselineVersion + "`.\n";
+                + "- Note: " + note + " and published baseline `" + baselineVersion + "`.\n";
     }
 
     private static String inlineCodeList(JsonNode values) {
@@ -1788,15 +1845,22 @@ class DocumentationReleaseArtifactTest {
         String pomXml = Files.readString(pom);
         String projectVersion = projectVersion(pom);
         String baselineVersion = pomProperty(pomXml, "api.compatibility.baseline.version");
+        String latestPublishedVersion = pomProperty(pomXml, "latest.published.version");
+        ReleaseVersionContract versionContract = releaseVersionContract(
+                projectVersion, latestPublishedVersion, Files.readString(pom.getParent().resolve("CHANGELOG.md")));
         LinkedHashMap<String, Object> manifest = new LinkedHashMap<>();
         manifest.put("projectVersion", projectVersion);
+        manifest.put("releaseState", versionContract.releaseState());
+        manifest.put("developmentVersion", versionContract.developmentVersion());
+        manifest.put("latestPublishedConsumerVersion", versionContract.latestPublishedConsumerVersion());
+        manifest.put("plannedFinalVersion", versionContract.plannedFinalVersion());
         manifest.put("apiCompatibilityBaselineVersion", baselineVersion);
         manifest.put("apiCompatibilityBaselineMatchesProjectVersion", projectVersion.equals(baselineVersion));
         manifest.put("javaVersion", System.getProperty("java.version"));
         manifest.put("javaBaseline", pomProperty(pomXml, "java.version"));
         manifest.put("springBootBaseline", pomProperty(pomXml, "spring-boot.version"));
         manifest.put("dependencyBaselineReview", dependencyBaselineReview(pomXml));
-        Map<String, Object> benchmarkEvidence = benchmarkEvidence(projectVersion, baselineVersion);
+        Map<String, Object> benchmarkEvidence = benchmarkEvidence(projectVersion, baselineVersion, versionContract);
         List<Map<String, String>> publishedBaselineArtifacts = publishedBaselineArtifacts(baselineVersion);
         List<Map<String, String>> checks = List.of(
                 check("mvn test", "pass", "Generated by DocumentationReleaseArtifactTest during the current test run."),
@@ -1814,13 +1878,29 @@ class DocumentationReleaseArtifactTest {
         Map<String, Object> readiness = releaseReadiness(pom.getParent(), projectVersion, baselineVersion, benchmarkEvidence,
                 publishedBaselineArtifacts, checks);
         manifest.put("readiness", readiness);
-        manifest.put("releasePrepChecklist", releasePrepChecklist(pom.getParent(), projectVersion, baselineVersion, readiness,
-                benchmarkEvidence, publishedBaselineArtifacts, checks));
+        manifest.put("releasePrepChecklist", releasePrepChecklist(pom.getParent(), projectVersion, baselineVersion,
+                versionContract, readiness, benchmarkEvidence, publishedBaselineArtifacts, checks));
         manifest.put("benchmarkDependencyManagement", benchmarkDependencyManagement(pomXml));
         manifest.put("publishedBaselineArtifacts", publishedBaselineArtifacts);
         manifest.put("benchmarkEvidence", benchmarkEvidence);
         manifest.put("checks", checks);
         return manifest;
+    }
+
+    private static ReleaseVersionContract releaseVersionContract(String projectVersion,
+                                                                  String latestPublishedVersion,
+                                                                  String changelog) {
+        if (projectVersion.endsWith("-SNAPSHOT")) {
+            return new ReleaseVersionContract(
+                    "snapshot-development", projectVersion, latestPublishedVersion, null, latestPublishedVersion);
+        }
+        boolean published = changelog.contains("## [" + projectVersion + "] - ");
+        return new ReleaseVersionContract(
+                published ? "post-publication" : "release-candidate",
+                null,
+                latestPublishedVersion,
+                published ? null : projectVersion,
+                projectVersion);
     }
 
     private static Map<String, Object> releaseReadiness(Path root,
@@ -1861,8 +1941,9 @@ class DocumentationReleaseArtifactTest {
         readiness.put("manualReleaseEvidence", readinessManualStatus(pendingManualCommands));
         readiness.put("manualBenchmarkEvidence", readinessManualStatus(pendingBenchmarkCommands));
         readiness.put("manualCompatibilityEvidence", readinessManualStatus(pendingCompatibilityCommands));
-        readiness.put("promotedBenchmarkReport", readinessPathStatus(promotedReport,
-                Files.exists(root.resolve(promotedReport)) ? "present" : "missing"));
+        readiness.put("promotedBenchmarkReport", promotedReport == null
+                ? readinessPathStatus(null, "deferred-until-release-cut")
+                : readinessPathStatus(promotedReport, Files.exists(root.resolve(promotedReport)) ? "present" : "missing"));
         readiness.put("configurationReference", readinessPathStatus("docs/configuration-properties.md",
                 configurationReferenceCurrent ? "current" : "stale"));
         readiness.put("markdownLinks", readinessListStatus(brokenLinks.isEmpty() ? "pass" : "fail", "brokenLinks", brokenLinks));
@@ -1879,6 +1960,7 @@ class DocumentationReleaseArtifactTest {
     private static Map<String, Object> releasePrepChecklist(Path root,
                                                             String projectVersion,
                                                             String baselineVersion,
+                                                            ReleaseVersionContract versionContract,
                                                             Map<String, Object> readiness,
                                                             Map<String, Object> benchmarkEvidence,
                                                             List<Map<String, String>> publishedBaselineArtifacts,
@@ -1886,12 +1968,12 @@ class DocumentationReleaseArtifactTest {
         String changelog = Files.readString(root.resolve("CHANGELOG.md"));
         String unreleasedCompareVersion = changelog.contains("## [" + projectVersion + "] - ")
                 ? projectVersion
-                : baselineVersion;
+                : versionContract.latestPublishedConsumerVersion();
         String expectedUnreleasedCompareLink = "[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v"
                 + unreleasedCompareVersion + "...HEAD";
         boolean changelogCurrent = changelog.contains("## [Unreleased]")
                 && changelog.contains(expectedUnreleasedCompareLink);
-        String documentedConsumerVersion = projectVersion.endsWith("-SNAPSHOT") ? baselineVersion : projectVersion;
+        String documentedConsumerVersion = versionContract.documentedConsumerVersion();
         boolean versionSnippetsCurrent = versionSnippetsMatch(root.resolve("README.md"), documentedConsumerVersion)
                 && versionSnippetsMatch(root.resolve("docs/01-quick-start.md"), documentedConsumerVersion);
 
@@ -1935,8 +2017,10 @@ class DocumentationReleaseArtifactTest {
                         "commands", benchmarkCommands,
                         "currentCandidateReport", benchmarkEvidence.get("currentCandidateReport"),
                         "publishedBaselineReport", benchmarkEvidence.get("publishedBaselineReport"))));
+        LinkedHashMap<String, Object> promotedReportDetails = new LinkedHashMap<>();
+        promotedReportDetails.put("path", benchmarkEvidence.get("promotedReport"));
         items.add(checklistItem("promoted-benchmark-report", "Promoted benchmark report",
-                promotedReportStatus, Map.of("path", benchmarkEvidence.get("promotedReport"))));
+                promotedReportStatus, promotedReportDetails));
         items.add(checklistItem("generated-docs-and-links", "Generated docs and Markdown links",
                 generatedDocsAndLinksPass ? "pass" : "fail", Map.of(
                         "configurationReference", configurationReferenceStatus,
@@ -1951,6 +2035,10 @@ class DocumentationReleaseArtifactTest {
         LinkedHashMap<String, Object> checklist = new LinkedHashMap<>();
         checklist.put("status", "pending");
         checklist.put("projectVersion", projectVersion);
+        checklist.put("releaseState", versionContract.releaseState());
+        checklist.put("developmentVersion", versionContract.developmentVersion());
+        checklist.put("latestPublishedConsumerVersion", versionContract.latestPublishedConsumerVersion());
+        checklist.put("plannedFinalVersion", versionContract.plannedFinalVersion());
         checklist.put("apiCompatibilityBaselineVersion", baselineVersion);
         checklist.put("items", items);
         checklist.put("manualCommands", readinessPendingCommands(readiness, "manualReleaseEvidence"));
@@ -2023,7 +2111,9 @@ class DocumentationReleaseArtifactTest {
         return value;
     }
 
-    private static Map<String, Object> benchmarkEvidence(String projectVersion, String baselineVersion) {
+    private static Map<String, Object> benchmarkEvidence(String projectVersion,
+                                                         String baselineVersion,
+                                                         ReleaseVersionContract versionContract) {
         LinkedHashMap<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("manualOrProfileGated", true);
         evidence.put("currentWorkspaceCommand",
@@ -2039,7 +2129,14 @@ class DocumentationReleaseArtifactTest {
         evidence.put("releaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
         evidence.put("publishedStarterReleaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
                 + baselineVersion + "/release-jmh.md");
-        evidence.put("promotedReport", "docs/benchmark-report-" + projectVersion + ".md");
+        String promotableVersion = "snapshot-development".equals(versionContract.releaseState())
+                ? null
+                : projectVersion;
+        String promotedReport = promotableVersion == null
+                ? null
+                : "docs/benchmark-report-" + promotableVersion + ".md";
+        evidence.put("promotableReportAvailable", promotedReport != null);
+        evidence.put("promotedReport", promotedReport);
         evidence.put("currentCandidateReport", "reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
         evidence.put("publishedBaselineReport", "reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
                 + baselineVersion + "/release-jmh.md");
@@ -2106,6 +2203,14 @@ class DocumentationReleaseArtifactTest {
         pair.put("comparisonNote", "Compare starter " + projectVersion + " current-candidate report with starter "
                 + baselineVersion + " published-baseline report; do not reuse one report for both labels.");
         return pair;
+    }
+
+    private record ReleaseVersionContract(
+            String releaseState,
+            String developmentVersion,
+            String latestPublishedConsumerVersion,
+            String plannedFinalVersion,
+            String documentedConsumerVersion) {
     }
 
     private static Map<String, Object> dependencyBaselineReview(String pomXml) {
