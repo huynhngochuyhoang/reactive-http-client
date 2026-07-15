@@ -71,26 +71,26 @@ class DocumentationReleaseArtifactTest {
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
 
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.0.0");
-        assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("2.14.1");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0");
+        assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("3.0.0");
         assertThat(pomProperty(pomXml, "spring-boot.version")).isEqualTo("4.0.0");
         assertThat(pomProperty(pomXml, "resilience4j.version")).isEqualTo("2.4.0");
         assertThat(releaseDocs)
                 .contains("### V20 default Spring Boot 4 reactor")
-                .contains("default reactor now declares `3.0.0`")
-                .contains("uses published `2.14.1` as its cross-major compatibility baseline")
+                .contains("default reactor now declares `3.1.0`")
+                .contains("uses published `3.0.0` as its strict compatibility baseline")
                 .contains("mvn -s .mvn/maven-central-settings.xml verify")
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`");
         assertThat(benchmarkDocs)
-                .contains("-Dbenchmark.starter.version=2.14.1")
-                .contains("-Dbenchmark.commit=2.14.1")
-                .contains("published-starter-2.14.1/release-jmh.md");
+                .contains("-Dbenchmark.starter.version=3.0.0")
+                .contains("-Dbenchmark.commit=3.0.0")
+                .contains("published-starter-3.0.0/release-jmh.md");
         assertThat(manifest.path("publishedBaselineArtifacts"))
                 .extracting(artifact -> artifact.path("resolutionCommand").asText())
                 .containsExactly(
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:2.14.1",
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:2.14.1",
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:2.14.1");
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:3.0.0",
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:3.0.0",
+                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:3.0.0");
     }
 
     @Test
@@ -181,9 +181,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("<api.compatibility.break-on-binary-incompatible>false</api.compatibility.break-on-binary-incompatible>")
                 .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
         assertThat(workflow)
-                .contains("mvn -B -ntp -s .mvn/maven-central-settings.xml -Papi-compatibility,major-api-report -DskipTests verify")
-                .contains("bash scripts/verify-major-api-delta.sh")
-                .doesNotContain("mvn -B -ntp -Papi-compatibility -DskipTests verify");
+                .contains("mvn -B -ntp -s .mvn/maven-central-settings.xml -Papi-compatibility -DskipTests verify")
+                .doesNotContain("-Papi-compatibility,major-api-report")
+                .doesNotContain("bash scripts/verify-major-api-delta.sh");
         assertThat(guide)
                 .contains("<version>3.5.16</version>")
                 .contains("<reactive-http-client.version>2.14.1</reactive-http-client.version>")
@@ -320,14 +320,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("Prefer the narrowest include\npattern")
                 .contains("Keep implementation\ninternals excluded");
         assertThat(includeWorkflow)
-                .contains("report-only comparison before the reviewed-delta\nguard")
+                .contains("Run the strict comparison")
                 .contains("mvn -s .mvn/maven-central-settings.xml \\\n"
-                        + "  -Papi-compatibility,major-api-report -DskipTests verify")
+                        + "  -Papi-compatibility -DskipTests verify")
                 .contains("-pl reactive-http-client-starter \\\n"
-                        + "  -Papi-compatibility,major-api-report -DskipTests verify")
+                        + "  -Papi-compatibility -DskipTests verify")
                 .containsSubsequence(
-                        "-Papi-compatibility,major-api-report -DskipTests verify",
-                        "bash scripts/verify-major-api-delta.sh",
+                        "-Papi-compatibility -DskipTests verify",
                         "bash scripts/verify-api-compatibility-fixtures.sh",
                         "-Dtest=DocumentationReleaseArtifactTest test");
     }
@@ -378,10 +377,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`")
                 .contains("Create a dedicated maintenance branch from that tag")
                 .contains("do not compile Boot 3 adapters into the `3.x` artifacts");
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.0.0");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0");
         assertThat(pomXml)
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
-                .contains("<api.compatibility.baseline.version>2.14.1</api.compatibility.baseline.version>");
+                .contains("<api.compatibility.baseline.version>3.0.0</api.compatibility.baseline.version>");
     }
 
     @Test
@@ -506,7 +505,7 @@ class DocumentationReleaseArtifactTest {
         String settings = Files.readString(root.resolve(".mvn/maven-central-settings.xml"));
 
         assertThat(pomXml)
-                .contains("<version>3.0.0</version>")
+                .contains("<version>3.1.0</version>")
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .doesNotContain("<id>boot4-spike</id>")
                 .doesNotContain("<maven.deploy.skip>true</maven.deploy.skip>")
@@ -1085,7 +1084,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(readiness.path("generatedTestEvidence").path("status").asText()).isEqualTo("pass");
         assertThat(readiness.path("manualReleaseEvidence").path("status").asText()).isEqualTo("pending");
         List<String> pendingReleaseCommands = streamText(readiness.path("manualReleaseEvidence").path("pendingCommands"));
-        assertThat(pendingReleaseCommands).contains("mvn -Papi-compatibility,major-api-report -DskipTests verify");
+        assertThat(pendingReleaseCommands).contains("mvn -Papi-compatibility -DskipTests verify");
         assertThat(pendingReleaseCommands).contains(
                 "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
                         + pomProperty(pomXml, "api.compatibility.baseline.version"),
@@ -1112,8 +1111,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(readiness.path("manualCompatibilityEvidence").path("status").asText()).isEqualTo("pending");
         assertThat(readiness.path("manualCompatibilityEvidence").path("pendingCommands"))
                 .extracting(JsonNode::asText)
-                .containsExactly("mvn -Papi-compatibility,major-api-report -DskipTests verify",
-                        "mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests verify",
+                .containsExactly("mvn -Papi-compatibility -DskipTests verify",
+                        "mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify",
                         "bash scripts/verify-api-compatibility-fixtures.sh");
         String expectedPromotedReport = "docs/benchmark-report-" + generated.path("projectVersion").asText() + ".md";
         assertThat(readiness.path("promotedBenchmarkReport").path("path").asText())
@@ -1165,8 +1164,8 @@ class DocumentationReleaseArtifactTest {
                         "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
                                 + pomProperty(pomXml, "api.compatibility.baseline.version"));
         assertThat(streamText(releasePrepItems.get("api-compatibility").path("commands")))
-                .containsExactly("mvn -Papi-compatibility,major-api-report -DskipTests verify",
-                        "mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests verify",
+                .containsExactly("mvn -Papi-compatibility -DskipTests verify",
+                        "mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify",
                         "bash scripts/verify-api-compatibility-fixtures.sh");
         assertThat(streamText(releasePrepItems.get("benchmark-evidence").path("commands")))
                 .contains("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
@@ -1239,8 +1238,8 @@ class DocumentationReleaseArtifactTest {
                 .extracting(check -> check.path("command").asText())
                 .containsExactly(
                         "mvn test",
-                        "mvn -Papi-compatibility,major-api-report -DskipTests verify",
-                        "mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests verify",
+                        "mvn -Papi-compatibility -DskipTests verify",
+                        "mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify",
                         "bash scripts/verify-api-compatibility-fixtures.sh",
                         "git diff --check",
                         "mvn -Pbenchmarks -pl reactive-http-client-benchmarks -am package",
@@ -1771,8 +1770,8 @@ class DocumentationReleaseArtifactTest {
         List<Map<String, String>> publishedBaselineArtifacts = publishedBaselineArtifacts(baselineVersion);
         List<Map<String, String>> checks = List.of(
                 check("mvn test", "pass", "Generated by DocumentationReleaseArtifactTest during the current test run."),
-                check("mvn -Papi-compatibility,major-api-report -DskipTests verify", "pending", "Run before release."),
-                check("mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests verify", "pending",
+                check("mvn -Papi-compatibility -DskipTests verify", "pending", "Run before release."),
+                check("mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify", "pending",
                         "Run before release to exercise module-scoped compatibility guard."),
                 check("bash scripts/verify-api-compatibility-fixtures.sh", "pending", "Run before release."),
                 check("git diff --check", "pending", "Run before release."),

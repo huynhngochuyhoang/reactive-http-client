@@ -77,7 +77,7 @@ jobs:
 
 
   api-compatibility:
-    name: Public API Compatibility (baseline 2.14.1)
+    name: Public API Compatibility (baseline 3.0.0)
     runs-on: ubuntu-latest
 
     steps:
@@ -91,11 +91,8 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Compare published APIs to 2.14.1
-        run: mvn -B -ntp -s .mvn/maven-central-settings.xml -Papi-compatibility,major-api-report -DskipTests verify
-
-      - name: Reject unreviewed major API changes
-        run: bash scripts/verify-major-api-delta.sh
+      - name: Compare published APIs to 3.0.0
+        run: mvn -B -ntp -s .mvn/maven-central-settings.xml -Papi-compatibility -DskipTests verify
 
       - name: Verify compatibility guard fixtures
         run: bash scripts/verify-api-compatibility-fixtures.sh

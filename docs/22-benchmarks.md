@@ -101,17 +101,16 @@ omitting `-am` so Maven resolves the published dependency instead of the current
 reactor module:
 
 ```bash
-mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.14.1 -Dbenchmark.commit=2.14.1
+mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=3.0.0 -Dbenchmark.commit=3.0.0
 ```
 
 The example version must match the root `api.compatibility.baseline.version`
-(`2.14.1` for this release line). When that property changes for the next
+(`3.0.0` for this development line). When that property changes for the next
 development cycle, update this command and the `published-starter-<version>`
 report paths together.
-For the V20 major-line transition, this example uses `2.14.1` because the
-reactor now targets `3.0.0` and the published `2.14.1` maintenance artifacts
-resolve. Move both `benchmark.starter.version` and `published-starter-<version>` paths together
-again after the next release baseline changes.
+V20 used `2.14.1` for its cross-major evidence. After `3.0.0` publication, the
+normal benchmark baseline moves to `3.0.0`; the historical V20 report and
+commands remain in the V20 checklist.
 
 That command cleans the benchmark module before compiling, uses the current
 benchmark harness and current managed Spring Boot BOM, and excludes current-only
@@ -174,9 +173,9 @@ release notes:
 Benchmark evidence:
 - Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted
 - Current candidate command: `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`
-- Published baseline command: `mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.14.1 -Dbenchmark.commit=2.14.1`
+- Published baseline command: `mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=3.0.0 -Dbenchmark.commit=3.0.0`
 - Current candidate report: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
-- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.14.1/release-jmh.md`
+- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.0.0/release-jmh.md`
 - Scenarios cited: `Get No Body`, `Post Json`
 ```
 
@@ -338,7 +337,7 @@ starter, API baseline, and commit versions. Reports label their stack context
 and state that Boot 3 versus Boot 4 movement is migration context, not evidence
 of a pure starter optimization. Review thresholds remain manual signals.
 
-V20 does not promote this smoke report. The `3.0.0` Unreleased notes make no
+V20 did not promote this smoke report. The `3.0.0` release notes make no
 numerical performance movement claim, and a smoke run is not release-quality
 evidence even when its commit metadata is immutable. If `3.0.0` release notes
 later make a public performance claim, rerun the required rows with

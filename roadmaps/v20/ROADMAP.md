@@ -1,6 +1,6 @@
 # Reactive HTTP Client - Roadmap V20
 
-> **Status:** draft
+> **Status:** completed with the `3.0.0` release on 2026-07-15
 > **Target:** turn the validated Spring Boot 4 spike into a publishable `3.0.0`
 > release while preserving the Spring Boot 3.5-based `2.x` maintenance lane.
 
@@ -15,6 +15,10 @@ and generation-specific Javadoc packaging is not release-ready.
 V20 should resolve those release-engineering blockers. It should not add a new
 feature batch or publish one artifact that dynamically supports both Boot
 generations.
+
+V20 completed with the public `3.0.0` release from commit
+`c61648587d471e809cadbf2822279840067ae8a1`. The next development line is
+`3.1.0`, with published `3.0.0` as its strict API and benchmark baseline.
 
 | Release lane | Framework baseline | Scope |
 |---|---|---|
