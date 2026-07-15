@@ -306,19 +306,18 @@ evidence.
 
 ## Current Scope
 
-### Spring Boot 4 migration baseline
+### Spring Boot 4 release baseline
 
-V19 re-establishes the harness on one Boot 4 dependency stack before any
-cross-generation interpretation. Run the targeted smoke matrix with:
+V20 establishes the harness on the default publishable Boot 4 dependency stack.
+Run the complete smoke matrix from the current reactor with:
 
 ```bash
-BOOT4_SCENARIOS='.*(clientSideOverhead.*(GetNoBody|PostJson|ResponseEntity|ClientErrorSmallBody|ServerErrorSmallBody)|starterErrorMappingProblemDetailSmallBody|starterFeatureMicrometerObserverGetNoBody|diagnosticsDisabledGetNoBody|diagnosticsNoNetwork(OneObserver|MultipleObservers|OneLifecycleHook|MultipleLifecycleHooks)GetNoBody).*'
 mvn -s .mvn/maven-central-settings.xml \
   -Pbenchmarks,benchmark-smoke \
   -pl reactive-http-client-benchmarks -am \
   -DskipTests -Dmaven.javadoc.skip=true \
-  -Dbenchmark.commit=$(git rev-parse --short HEAD)-dirty \
-  -Dbenchmark.include="$BOOT4_SCENARIOS" verify
+  -Dbenchmark.commit=$(git rev-parse --short HEAD) \
+  clean verify
 ```
 
 This is a smoke-only harness check. It exercises raw `WebClient`, Spring HTTP
@@ -335,12 +334,12 @@ starter, API baseline, and commit versions. Reports label their stack context
 and state that Boot 3 versus Boot 4 movement is migration context, not evidence
 of a pure starter optimization. Review thresholds remain manual signals.
 
-V19 does not promote this smoke report. The Unreleased notes make no numerical
-performance movement claim, and a dirty smoke run is neither immutable nor
-release-quality evidence. If `3.0.0` release notes later make a public
-performance claim, rerun the required rows with `benchmark-release` from a clean
-commit, promote the sanitized versioned report into `docs/`, and cite only the
-same-stack scenarios that support the claim.
+V20 does not promote this smoke report. The `3.0.0` Unreleased notes make no
+numerical performance movement claim, and a smoke run is not release-quality
+evidence even when its commit metadata is immutable. If `3.0.0` release notes
+later make a public performance claim, rerun the required rows with
+`benchmark-release` from a clean commit, promote the sanitized versioned report
+into `docs/`, and cite only the same-stack scenarios that support the claim.
 
 The benchmark module currently includes:
 

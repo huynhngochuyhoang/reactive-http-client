@@ -418,25 +418,48 @@ Evidence:
 
 ## Priority 10 - Establish a Boot 4 Benchmark Baseline
 
-### [ ] 10.1 Rebuild the repeatable harness on final `3.x` artifacts
+### [x] 10.1 Rebuild the repeatable harness on final `3.x` artifacts
 
-- [ ] Run quick smoke to validate benchmark discovery and report generation.
-- [ ] Run same-stack loopback baselines for raw WebClient, Spring HTTP Interface,
+- [x] Run quick smoke to validate benchmark discovery and report generation.
+- [x] Run same-stack loopback baselines for raw WebClient, Spring HTTP Interface,
       and the starter only where each performs equivalent work.
-- [ ] Run no-network invocation and diagnostics audits under separate classifications.
-- [ ] Enable optional features one at a time and record the matched comparison policy.
-- [ ] Record exact starter, Boot, Framework, Reactor Netty, Netty, Jackson,
+- [x] Run no-network invocation and diagnostics audits under separate classifications.
+- [x] Enable optional features one at a time and record the matched comparison policy.
+- [x] Record exact starter, Boot, Framework, Reactor Netty, Netty, Jackson,
       Micrometer, OTel, JVM, OS, CPU, and commit metadata.
-- [ ] Verify all benchmark method prefixes map to an explicit report classification.
+- [x] Verify all benchmark method prefixes map to an explicit report classification.
 
-### [ ] 10.2 Decide whether to publish performance evidence
+### [x] 10.2 Decide whether to publish performance evidence
 
-- [ ] Review throughput, average time, percentiles, and allocation movement manually.
-- [ ] Treat Boot 3 versus Boot 4 movement as migration context, not abstraction overhead.
-- [ ] If release notes make numerical claims, rerun from a clean immutable commit.
-- [ ] Promote a versioned source-controlled report only for reproducible claims.
-- [ ] Otherwise record explicit report deferral and keep numerical claims out of public notes.
-- [ ] Run benchmark report tests, documentation guards, and `git diff --check`.
+- [x] Review throughput, average time, percentiles, and allocation movement manually.
+- [x] Treat Boot 3 versus Boot 4 movement as migration context, not abstraction overhead.
+- [x] If release notes make numerical claims, rerun from a clean immutable commit.
+- [x] Promote a versioned source-controlled report only for reproducible claims.
+- [x] Otherwise record explicit report deferral and keep numerical claims out of public notes.
+- [x] Run benchmark report tests, documentation guards, and `git diff --check`.
+
+Evidence:
+
+- The complete Boot 4 smoke profile passed from clean commit `57572f9` with 84
+  JMH rows covering throughput, average time, and sample-time percentiles. The
+  generated JSON, Markdown, environment properties, and redirected logger stay
+  under `reactive-http-client-benchmarks/target/` as smoke-only evidence.
+- Loopback rows covered equivalent raw WebClient, Spring HTTP Interface, and
+  starter request/response work. Problem Detail mapping remained starter-only;
+  exchange logging, Micrometer, retry, and circuit breaker were enabled one at
+  a time; invocation and diagnostics rows retained their no-network category.
+- Environment evidence recorded starter/project `3.0.0`, API baseline `2.14.1`,
+  Boot `4.0.0`, Framework/WebFlux `7.0.1`, Reactor Netty `1.3.0`, Netty
+  `4.2.7.Final`, Jackson `3.0.2`, Micrometer `1.16.0`, OTel `1.55.0`, Java
+  `21.0.8`, Linux/amd64, eight processors, and benchmark commit `57572f9`.
+- Manual review confirmed that smoke output contains the expected metric modes
+  but no allocation profiler data, as expected outside `benchmark-release`.
+  Boot 3 versus Boot 4 movement remains migration context. No numerical claim
+  is added for `3.0.0`, so no release-quality run or promoted report is required.
+- `BenchmarkMarkdownReportTest` reflects over every current `@Benchmark` method
+  and rejects unclassified prefixes, unknown comparison surfaces, and empty
+  scenario suffixes. Benchmark report tests, release-document guards, and
+  `git diff --check` passed.
 
 ---
 

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Boot 4 assembled-consumer and helper parity.** Expanded the independent artifact consumer across repeated headers, redirects, bodiless and streaming ownership, `ResponseEntity`, timeout and Problem Detail errors, lifecycle, observer, diagnostics, health, Micrometer, and OTel; revalidated mock naming, final metadata, retries, idempotency, codec/signing bytes, injected loggers, hook ordering, and optional integration back-off.
 - **Frozen `3.0.0` public surface.** Audited the report-only `2.14.1` cross-major API delta, classified the Boot 4 health replacement and deprecated Jackson 2 removals, and added a CI guard that rejects any unreviewed incompatible row while preserving self-baseline and compatibility-fixture checks.
 - **Transport regression evidence.** Carried POST-then-PUT HTTP/1.1 reuse into the real `3.0.0` starter proxy and single-connection pool, verified transport-generated framing and response ownership, and isolated Reactor Netty's synthetic `GET /bad-request HTTP/1.0` to deliberately malformed raw wire input rather than normal starter request construction.
+- **Boot 4 benchmark baseline.** Revalidated the complete same-stack smoke harness on the default `3.0.0` Boot 4 reactor, including equivalent raw WebClient, Spring HTTP Interface, and starter loopback work plus separately classified optional-feature and no-network rows. The smoke output remains target-only and no report is promoted.
 
 ## [2.14.1] - 2026-07-13
 
