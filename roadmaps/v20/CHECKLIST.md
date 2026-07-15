@@ -369,22 +369,50 @@ Evidence:
 
 ## Priority 9 - Close Transport and Protocol Regression Evidence
 
-### [ ] 9.1 Preserve transport ownership contracts
+### [x] 9.1 Preserve transport ownership contracts
 
-- [ ] Run POST-then-PUT HTTP/1.1 reuse against a real Reactor Netty server.
-- [ ] Verify both calls can reuse a pooled connection without parser desynchronization.
-- [ ] Reject application-supplied framing and authority headers at startup or request preparation.
-- [ ] Verify request body length/chunking is owned by the transport.
-- [ ] Re-run redirect, timeout, error-drain, bodiless, and streaming ownership tests.
+- [x] Run POST-then-PUT HTTP/1.1 reuse against a real Reactor Netty server.
+- [x] Verify both calls can reuse a pooled connection without parser desynchronization.
+- [x] Reject application-supplied framing and authority headers at startup or request preparation.
+- [x] Verify request body length/chunking is owned by the transport.
+- [x] Re-run redirect, timeout, error-drain, bodiless, and streaming ownership tests.
 
-### [ ] 9.2 Investigate malformed-request warnings with wire evidence
+### [x] 9.2 Investigate malformed-request warnings with wire evidence
 
-- [ ] Add a deterministic reproducer for `GET /bad-request HTTP/1.0` before changing code.
-- [ ] Capture client and server bytes, connection identifiers, and intermediary behavior.
-- [ ] Distinguish starter request construction from proxy, mesh, ingress, and TCP corruption.
-- [ ] Add a failing regression test before implementing any starter fix.
-- [ ] Record an external-cause diagnosis when starter behavior cannot reproduce the warning.
-- [ ] Run transport-focused tests and `git diff --check`.
+- [x] Add a deterministic reproducer for `GET /bad-request HTTP/1.0` before changing code.
+- [x] Capture client and server bytes, connection identifiers, and intermediary behavior.
+- [x] Distinguish starter request construction from proxy, mesh, ingress, and TCP corruption.
+- [x] Add a failing regression test before implementing any starter fix.
+- [x] Record an external-cause diagnosis when starter behavior cannot reproduce the warning.
+- [x] Run transport-focused tests and `git diff --check`.
+
+Evidence:
+
+- Replaced the raw success-only fixture with a real `ReactiveHttpClientFactoryBean`
+  proxy configured with a one-connection pool. A byte-array POST and subsequent
+  PUT reached a real Reactor Netty server on the same channel with exact body
+  boundaries, connector-generated `Content-Length` values of `2` and `6`, and
+  no `Transfer-Encoding`; the sequence produced no parser desynchronization.
+- Existing request-preparation regressions reject application-supplied
+  `Content-Length`, `Transfer-Encoding`, `Connection`, `Expect`, and `Host`,
+  including values added by customizer filters, while ordinary end-to-end
+  headers remain supported.
+- The deterministic raw-socket fixture sends a valid probe followed by exact
+  orphaned body bytes on the same server channel. With no starter, proxy, mesh,
+  or ingress in that direct path, Reactor Netty returns `400`; a pipeline capture
+  requires the initial-line decoder failure to be synthetic
+  `GET /bad-request HTTP/1.0` without assuming that failed requests are routed
+  to the application handler.
+- No starter production fix was implemented: the real starter regression would
+  fail on bad framing or leaked bytes, while only deliberately malformed wire
+  input reproduces the warning. For an environment-only occurrence, capture at
+  each proxy/mesh/ingress boundary to locate framing mutation, stale bytes, or a
+  non-HTTP peer before attributing the warning to the starter.
+- Focused tests passed for Framework 7 transport correctness, framing-header
+  rejection, redirects, request/read timeouts, cancellation, error-body drain,
+  bodiless connection reuse, `ResponseEntity`, deferred streaming ownership,
+  H2C, and TLS HTTP/2. `DocumentationReleaseArtifactTest` and
+  `git diff --check` passed.
 
 ---
 

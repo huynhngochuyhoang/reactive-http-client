@@ -37,6 +37,19 @@ and TLS mode, proxy/sidecar path, and the immediately preceding requests on that
 connection. A malformed or conflicting body length can leave bytes that are then
 parsed as another request; the first decoder failure is the useful cause.
 
+The starter regression fixture sends a byte-array POST followed by a PUT through
+the real starter proxy and a one-connection Reactor Netty pool. The server sees
+the exact bodies on one channel with transport-generated `Content-Length` and no
+application `Transfer-Encoding`; no parser desynchronization occurs. A separate
+raw-socket fixture sends a valid request and then injects orphaned body bytes on
+the same connection, with no starter, proxy, mesh, or ingress in the path.
+Reactor Netty answers `400` and represents the initial-line decoder failure as
+synthetic `GET /bad-request HTTP/1.0`; depending on Reactor Netty version, that
+failed message need not reach the application handler. Therefore, that warning
+alone does not identify the starter as its source. If normal starter traffic
+cannot reproduce it, capture bytes at each intermediary boundary and look for
+framing mutation, stale bytes, or a non-HTTP peer on the connection.
+
 ---
 
 ## HTTP proxy
