@@ -217,9 +217,13 @@ from the current reactor version. The `3.1.0-SNAPSHOT` development line compares
 strictly against published `3.0.0`:
 
 ```bash
+test ! -e target/published-baseline-repositories/api-root-3.0.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/api-compatibility-repository \
-  -Papi-compatibility -DskipTests verify
+  -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.0.0 \
+  -Papi-compatibility -DskipTests verify && \
+scripts/verify-published-baseline-provenance.sh api-root 3.0.0 \
+  target/release-evidence/published-baselines/api-root-3.0.0 \
+  reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
 bash scripts/verify-api-compatibility-fixtures.sh
 ```
 
@@ -228,18 +232,25 @@ Maven repository and pass that repository through `-Dmaven.repo.local` to the
 japicmp build. The frozen `scripts/verify-major-api-delta.sh` remains historical
 evidence for the reviewed `2.14.1` to `3.0.0` migration and is no longer part of
 normal minor-line CI. A fresh repository prevents a stale or locally installed
-artifact from understating the current delta.
+artifact from understating the current delta. Every published baseline lane uses
+`target/published-baseline-repositories/<lane>-<version>` and records Maven
+Central markers plus SHA-256 values under
+`target/release-evidence/published-baselines/`. Keep the absence check, Maven
+invocation, and `verify-published-baseline-provenance.sh` call in one `&&` chain.
+Run `bash scripts/verify-published-baseline-fixtures.sh` to prove that a seeded
+locally installed candidate is rejected while Central-marked artifacts pass.
 
 For module-scoped compatibility checks, the inherited baseline guard must still
 run before japicmp:
 
 ```bash
+test ! -e target/published-baseline-repositories/api-starter-3.0.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/api-compatibility-repository \
-  -pl reactive-http-client-starter -Papi-compatibility -DskipTests validate
-mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/api-compatibility-repository \
-  -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify
+  -Dmaven.repo.local=target/published-baseline-repositories/api-starter-3.0.0 \
+  -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify && \
+scripts/verify-published-baseline-provenance.sh api-starter 3.0.0 \
+  target/release-evidence/published-baselines/api-starter-3.0.0 \
+  reactive-http-client-starter
 ```
 
 The Maven profiles produce japicmp reports under each module's
@@ -364,13 +375,20 @@ or extension surfaces. Run the strict comparison, then run the fixtures and
 documentation checks:
 
 ```bash
+test ! -e target/published-baseline-repositories/api-root-3.0.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/api-compatibility-repository \
-  -Papi-compatibility -DskipTests verify
+  -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.0.0 \
+  -Papi-compatibility -DskipTests verify && \
+scripts/verify-published-baseline-provenance.sh api-root 3.0.0 \
+  target/release-evidence/published-baselines/api-root-3.0.0 \
+  reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
+test ! -e target/published-baseline-repositories/api-starter-3.0.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/api-compatibility-repository \
-  -pl reactive-http-client-starter \
-  -Papi-compatibility -DskipTests verify
+  -Dmaven.repo.local=target/published-baseline-repositories/api-starter-3.0.0 \
+  -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify && \
+scripts/verify-published-baseline-provenance.sh api-starter 3.0.0 \
+  target/release-evidence/published-baselines/api-starter-3.0.0 \
+  reactive-http-client-starter
 bash scripts/verify-api-compatibility-fixtures.sh
 mvn -q -pl reactive-http-client-starter \
   -Dtest=DocumentationReleaseArtifactTest test
@@ -704,7 +722,7 @@ scripts/verify-published-consumer.sh 3.0.0
 ```
 
 The command refuses an existing
-`target/published-consumer-repository-3.0.0` directory instead of reusing it.
+`target/published-baseline-repositories/consumer-3.0.0` directory instead of reusing it.
 It runs the same Boot 4 application fixture against published `3.0.0`, verifies
 the Maven Central `_remote.repositories` marker for the parent and every project artifact,
 rejects reactor `target/classes` entries, and writes target-only dependency

@@ -10,7 +10,7 @@ PUBLISHED_VERSION="${1:-}"
 
 GROUP_PATH="io/github/huynhngochuyhoang"
 MODULES=(reactive-http-client-starter reactive-http-client-test reactive-http-client-otel)
-LOCAL_REPOSITORY="$ROOT_DIR/target/published-consumer-repository-$PUBLISHED_VERSION"
+LOCAL_REPOSITORY="$ROOT_DIR/target/published-baseline-repositories/consumer-$PUBLISHED_VERSION"
 EVIDENCE_DIR="$ROOT_DIR/target/release-evidence/v21-priority2/published-$PUBLISHED_VERSION"
 EFFECTIVE_POMS="$EVIDENCE_DIR/effective-poms"
 REPORTS="$EVIDENCE_DIR/surefire-reports"
@@ -35,28 +35,21 @@ MAVEN=(mvn -q -s "$SETTINGS" -Dmaven.repo.local="$LOCAL_REPOSITORY"
 "${MAVEN[@]}" dependency:build-classpath -Dmdep.outputFile="$EVIDENCE_DIR/classpath.txt"
 
 parent_dir="$LOCAL_REPOSITORY/$GROUP_PATH/reactive-http-client/$PUBLISHED_VERSION"
-parent_marker="$parent_dir/_remote.repositories"
 parent_pom="$parent_dir/reactive-http-client-$PUBLISHED_VERSION.pom"
-[[ -f "$parent_marker" && -f "$parent_pom" ]] || fail "missing published parent POM or remote marker"
-grep -q '>maven-central=' "$parent_marker" || fail "parent POM was not resolved through the Maven Central mirror"
-mkdir -p "$EVIDENCE_DIR/remote-markers/reactive-http-client"
-cp "$parent_marker" "$EVIDENCE_DIR/remote-markers/reactive-http-client/"
-sha256sum "$parent_pom" >> "$EVIDENCE_DIR/project-artifact-sha256.txt"
+[[ -f "$parent_pom" ]] || fail "missing published parent POM"
 
 for module in "${MODULES[@]}"; do
   module_dir="$LOCAL_REPOSITORY/$GROUP_PATH/$module/$PUBLISHED_VERSION"
-  marker="$module_dir/_remote.repositories"
   jar="$module_dir/$module-$PUBLISHED_VERSION.jar"
   pom="$module_dir/$module-$PUBLISHED_VERSION.pom"
-  [[ -f "$marker" ]] || fail "missing remote marker for $module"
-  grep -q '>maven-central=' "$marker" || fail "$module was not resolved through the Maven Central mirror"
   [[ -f "$jar" && -f "$pom" ]] || fail "missing published jar or POM for $module"
   mvn -q -s "$SETTINGS" -Dmaven.repo.local="$LOCAL_REPOSITORY" -f "$pom" \
     help:effective-pom -Doutput="$EFFECTIVE_POMS/$module.xml"
-  mkdir -p "$EVIDENCE_DIR/remote-markers/$module"
-  cp "$marker" "$EVIDENCE_DIR/remote-markers/$module/"
-  sha256sum "$jar" "$pom" >> "$EVIDENCE_DIR/project-artifact-sha256.txt"
 done
+
+"$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
+  consumer "$PUBLISHED_VERSION" "$EVIDENCE_DIR/published-baseline-provenance" \
+  reactive-http-client "${MODULES[@]}"
 
 if grep -Eq "$ROOT_DIR/reactive-http-client-(starter|test|otel)/target/(test-)?classes" \
     "$EVIDENCE_DIR/classpath.txt" "$EVIDENCE_DIR/dependency-tree.txt"; then

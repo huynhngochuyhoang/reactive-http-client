@@ -84,7 +84,7 @@ Evidence:
 Evidence:
 
 - Passed `scripts/verify-published-consumer.sh 3.0.0` from an absent
-  `target/published-consumer-repository-3.0.0` repository.
+  `target/published-baseline-repositories/consumer-3.0.0` repository.
 - The published parent POM plus all three published jars and module POMs contain
   Maven Central remote markers; their SHA-256 values, consumer/module effective
   POMs, dependency tree, isolated classpath,
@@ -102,33 +102,39 @@ Evidence:
 
 ## Priority 3 - One Published-Baseline Provenance Contract
 
-### [ ] 3.1 Standardize isolated baseline resolution
+### [x] 3.1 Standardize isolated baseline resolution
 
-- [ ] Define one target-local repository naming convention for published baselines.
-- [ ] Require the repository path to be absent before each baseline run.
-- [ ] Chain every freshness guard directly to its Maven command with `&&`.
-- [ ] Use `.mvn/maven-central-settings.xml` for public baseline resolution.
-- [ ] Apply the convention to root API compatibility.
-- [ ] Apply the convention to module-scoped API compatibility.
-- [ ] Apply the convention to published-starter benchmark runs.
-- [ ] Apply the convention to generated release evidence commands.
-- [ ] Apply the convention to copyable release documentation.
+- [x] Define one target-local repository naming convention for published baselines.
+- [x] Require the repository path to be absent before each baseline run.
+- [x] Chain every freshness guard directly to its Maven command with `&&`.
+- [x] Use `.mvn/maven-central-settings.xml` for public baseline resolution.
+- [x] Apply the convention to root API compatibility.
+- [x] Apply the convention to module-scoped API compatibility.
+- [x] Apply the convention to published-starter benchmark runs.
+- [x] Apply the convention to generated release evidence commands.
+- [x] Apply the convention to copyable release documentation.
 
-### [ ] 3.2 Prove baseline provenance
+### [x] 3.2 Prove baseline provenance
 
-- [ ] Record public artifact checksums and Maven remote markers.
-- [ ] Reject a repository containing locally installed project artifacts.
-- [ ] Add a fixture that seeds a conflicting local candidate and proves it is not selected.
-- [ ] Keep current candidate artifacts out of the published-baseline repository.
-- [ ] Verify CI, generated manifest, and documentation commands remain identical in purpose.
-- [ ] Run strict root API compatibility against published `3.0.0`.
-- [ ] Run strict module-scoped API compatibility against published `3.0.0`.
-- [ ] Run API compatibility fixtures.
-- [ ] Run release-documentation tests and `git diff --check`.
+- [x] Record public artifact checksums and Maven remote markers.
+- [x] Reject a repository containing locally installed project artifacts.
+- [x] Add a fixture that seeds a conflicting local candidate and proves it is not selected.
+- [x] Keep current candidate artifacts out of the published-baseline repository.
+- [x] Verify CI, generated manifest, and documentation commands remain identical in purpose.
+- [x] Run strict root API compatibility against published `3.0.0`.
+- [x] Run strict module-scoped API compatibility against published `3.0.0`.
+- [x] Run API compatibility fixtures.
+- [x] Run release-documentation tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- All published lanes now use `target/published-baseline-repositories/<lane>-<version>` and chain the absent-path guard, Maven Central-only invocation, and shared provenance verifier with `&&`.
+- Passed strict root API compatibility against published `3.0.0`; Maven Central marker and SHA-256 evidence is under `target/release-evidence/published-baselines/api-root-3.0.0/`.
+- Passed strict module-scoped starter compatibility against published `3.0.0`; provenance evidence is under `target/release-evidence/published-baselines/api-starter-3.0.0/`.
+- Passed `bash scripts/verify-published-baseline-fixtures.sh`; locally installed same-version artifacts and a repository contaminated with `3.1.0-SNAPSHOT` were rejected.
+- Passed `bash scripts/verify-api-compatibility-fixtures.sh`.
+- Passed `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`.
+- Passed `git diff --check`.
 
 ---
 

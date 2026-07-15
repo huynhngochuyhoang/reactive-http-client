@@ -141,18 +141,18 @@ class DocumentationReleaseArtifactTest {
         assertThat(benchmarkDocs)
                 .contains("-Dbenchmark.starter.version=3.0.0")
                 .contains("-Dbenchmark.commit=3.0.0")
-                .contains("test ! -e target/benchmark-baseline-repository-3.0.0 && \\\n"
+                .contains("test ! -e target/published-baseline-repositories/benchmark-3.0.0 && \\\n"
                         + "mvn -s .mvn/maven-central-settings.xml")
-                .contains("-Dmaven.repo.local=target/benchmark-baseline-repository-3.0.0")
+                .contains("-Dmaven.repo.local=target/published-baseline-repositories/benchmark-3.0.0")
                 .contains("published-starter-3.0.0/release-jmh.md")
                 .contains("published-starter-3.0.0/release-jmh.json")
                 .doesNotContain("published-starter-2.14.1/release-jmh.json");
         assertThat(manifest.path("publishedBaselineArtifacts"))
-                .extracting(artifact -> artifact.path("resolutionCommand").asText())
-                .containsExactly(
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:3.0.0",
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:3.0.0",
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:3.0.0");
+                .allSatisfy(artifact -> assertThat(artifact.path("resolutionCommand").asText())
+                        .contains("test ! -e target/published-baseline-repositories/artifact-")
+                        .contains("-s .mvn/maven-central-settings.xml")
+                        .contains("dependency:get -Dartifact=io.github.huynhngochuyhoang:")
+                        .contains("verify-published-baseline-provenance.sh"));
     }
 
     @Test
@@ -201,6 +201,8 @@ class DocumentationReleaseArtifactTest {
     void publishedBoot4ConsumerUsesFreshCentralArtifactsAndSeparateEvidence() throws IOException {
         Path root = projectRoot();
         String script = Files.readString(root.resolve("scripts/verify-published-consumer.sh"));
+        String provenanceScript = Files.readString(root.resolve("scripts/verify-published-baseline-provenance.sh"));
+        String provenanceFixtures = Files.readString(root.resolve("scripts/verify-published-baseline-fixtures.sh"));
         String workflow = Files.readString(root.resolve(".github/workflows/published-consumer-smoke.yml"));
         String fixture = Files.readString(root.resolve(
                 ".github/boot4-consumer/src/test/java/io/github/huynhngochuyhoang/httpstarter/boot4consumer/Boot4ConsumerApplicationTest.java"));
@@ -208,16 +210,26 @@ class DocumentationReleaseArtifactTest {
 
         assertThat(script)
                 .contains("PUBLISHED_VERSION=\"${1:-}\"")
-                .contains("target/published-consumer-repository-$PUBLISHED_VERSION")
+                .contains("target/published-baseline-repositories/consumer-$PUBLISHED_VERSION")
                 .contains("[[ ! -e \"$LOCAL_REPOSITORY\" ]]")
                 .contains(".mvn/maven-central-settings.xml")
-                .contains("_remote.repositories")
-                .contains("'>maven-central='")
                 .contains("help:effective-pom")
-                .contains("sha256sum")
+                .contains("verify-published-baseline-provenance.sh")
                 .contains("dependency:build-classpath")
                 .contains("resolved reactor output directories")
                 .contains("v21-priority2/published-$PUBLISHED_VERSION");
+        assertThat(provenanceScript)
+                .contains("target/published-baseline-repositories/$LANE-$BASELINE_VERSION")
+                .contains("_remote.repositories")
+                .contains("maven-central=")
+                .contains("sha256sum")
+                .contains("candidate or unrelated project version")
+                .contains("evidence must remain under target/");
+        assertThat(provenanceFixtures)
+                .contains("fixture-local")
+                .contains("fixture-central")
+                .contains("3.1.0-SNAPSHOT")
+                .contains("conflicting local candidate unexpectedly passed");
         assertThat(workflow)
                 .contains("workflow_dispatch:")
                 .contains("latest.published.version")
@@ -288,8 +300,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("<api.compatibility.break-on-binary-incompatible>false</api.compatibility.break-on-binary-incompatible>")
                 .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
         assertThat(workflow)
-                .contains("-Dmaven.repo.local=target/api-compatibility-repository")
+                .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-root-3.0.0")
                 .contains("-Papi-compatibility -DskipTests verify")
+                .contains("bash scripts/verify-published-baseline-fixtures.sh")
                 .doesNotContain("-Papi-compatibility,major-api-report")
                 .doesNotContain("bash scripts/verify-major-api-delta.sh");
         assertThat(guide)
@@ -430,11 +443,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(includeWorkflow)
                 .contains("Run the strict comparison")
                 .contains("mvn -s .mvn/maven-central-settings.xml \\\n"
-                        + "  -Dmaven.repo.local=target/api-compatibility-repository \\\n"
+                        + "  -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.0.0 \\\n"
                         + "  -Papi-compatibility -DskipTests verify")
-                .contains("-Dmaven.repo.local=target/api-compatibility-repository \\\n"
-                        + "  -pl reactive-http-client-starter \\\n"
-                        + "  -Papi-compatibility -DskipTests verify")
+                .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-starter-3.0.0 \\\n"
+                        + "  -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify")
                 .containsSubsequence(
                         "-Papi-compatibility -DskipTests verify",
                         "bash scripts/verify-api-compatibility-fixtures.sh",
@@ -1204,14 +1216,16 @@ class DocumentationReleaseArtifactTest {
         assertThat(readiness.path("generatedTestEvidence").path("status").asText()).isEqualTo("pass");
         assertThat(readiness.path("manualReleaseEvidence").path("status").asText()).isEqualTo("pending");
         List<String> pendingReleaseCommands = streamText(readiness.path("manualReleaseEvidence").path("pendingCommands"));
-        assertThat(pendingReleaseCommands).contains("mvn -Papi-compatibility -DskipTests verify");
-        assertThat(pendingReleaseCommands).contains(
-                "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
-                        + pomProperty(pomXml, "api.compatibility.baseline.version"),
-                "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:"
-                        + pomProperty(pomXml, "api.compatibility.baseline.version"),
-                "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
-                        + pomProperty(pomXml, "api.compatibility.baseline.version"));
+        assertThat(pendingReleaseCommands)
+                .anySatisfy(command -> assertThat(command)
+                        .contains("api-root-" + pomProperty(pomXml, "api.compatibility.baseline.version"))
+                        .contains("verify-published-baseline-provenance.sh"));
+        assertThat(pendingReleaseCommands)
+                .filteredOn(command -> command.contains(" dependency:get -Dartifact="))
+                .hasSize(3)
+                .allSatisfy(command -> assertThat(command)
+                        .contains("test ! -e target/published-baseline-repositories/artifact-")
+                        .contains("verify-published-baseline-provenance.sh"));
         assertThat(pendingReleaseCommands)
                 .anySatisfy(command -> assertThat(command)
                         .contains("benchmark-release")
@@ -1231,9 +1245,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(readiness.path("manualCompatibilityEvidence").path("status").asText()).isEqualTo("pending");
         assertThat(readiness.path("manualCompatibilityEvidence").path("pendingCommands"))
                 .extracting(JsonNode::asText)
-                .containsExactly("mvn -Papi-compatibility -DskipTests verify",
-                        "mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify",
-                        "bash scripts/verify-api-compatibility-fixtures.sh");
+                .hasSize(4)
+                .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
+                .anySatisfy(command -> assertThat(command).contains("api-root-3.0.0"))
+                .anySatisfy(command -> assertThat(command).contains("api-starter-3.0.0"));
         assertThat(readiness.path("promotedBenchmarkReport").path("path").isNull()).isTrue();
         assertThat(readiness.path("promotedBenchmarkReport").path("status").asText())
                 .isEqualTo("deferred-until-release-cut");
@@ -1280,17 +1295,16 @@ class DocumentationReleaseArtifactTest {
         assertThat(releasePrepItems.get("version-snippets").path("expectedVersion").asText())
                 .isEqualTo(expectedConsumerVersion);
         assertThat(streamText(releasePrepItems.get("published-baseline-artifacts").path("commands")))
-                .containsExactly(
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-starter:"
-                                + pomProperty(pomXml, "api.compatibility.baseline.version"),
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-test:"
-                                + pomProperty(pomXml, "api.compatibility.baseline.version"),
-                        "mvn dependency:get -Dartifact=io.github.huynhngochuyhoang:reactive-http-client-otel:"
-                                + pomProperty(pomXml, "api.compatibility.baseline.version"));
+                .hasSize(3)
+                .allSatisfy(command -> assertThat(command)
+                        .contains("test ! -e target/published-baseline-repositories/artifact-")
+                        .contains(" dependency:get -Dartifact=io.github.huynhngochuyhoang:")
+                        .contains("verify-published-baseline-provenance.sh"));
         assertThat(streamText(releasePrepItems.get("api-compatibility").path("commands")))
-                .containsExactly("mvn -Papi-compatibility -DskipTests verify",
-                        "mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify",
-                        "bash scripts/verify-api-compatibility-fixtures.sh");
+                .hasSize(4)
+                .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
+                .anySatisfy(command -> assertThat(command).contains("api-root-3.0.0"))
+                .anySatisfy(command -> assertThat(command).contains("api-starter-3.0.0"));
         assertThat(streamText(releasePrepItems.get("benchmark-evidence").path("commands")))
                 .contains("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
                         generated.path("benchmarkEvidence").path("currentWorkspaceCommand").asText(),
@@ -1359,24 +1373,26 @@ class DocumentationReleaseArtifactTest {
                 .containsOnly("pending");
         assertThat(generated.path("checks"))
                 .extracting(check -> check.path("command").asText())
-                .containsExactly(
+                .hasSize(9)
+                .contains(
                         "mvn test",
-                        "mvn -Papi-compatibility -DskipTests verify",
-                        "mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify",
                         "bash scripts/verify-api-compatibility-fixtures.sh",
+                        "bash scripts/verify-published-baseline-fixtures.sh",
                         "git diff --check",
                         "mvn -Pbenchmarks -pl reactive-http-client-benchmarks -am package",
                         "mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
-                        "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)");
+                        "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)")
+                .anySatisfy(command -> assertThat(command).contains("api-root-3.0.0"))
+                .anySatisfy(command -> assertThat(command).contains("api-starter-3.0.0"));
         JsonNode benchmarkEvidence = generated.path("benchmarkEvidence");
         assertThat(benchmarkEvidence.path("manualOrProfileGated").asBoolean()).isTrue();
         assertThat(benchmarkEvidence.path("currentWorkspaceCommand").asText())
                 .contains("benchmark-release")
                 .contains("-am verify");
         assertThat(benchmarkEvidence.path("publishedStarterCommand").asText())
-                .startsWith("test ! -e target/benchmark-baseline-repository-")
+                .startsWith("test ! -e target/published-baseline-repositories/benchmark-")
                 .contains("-Pbenchmarks,benchmark-release,benchmark-published-baseline")
-                .contains("-Dmaven.repo.local=target/benchmark-baseline-repository-"
+                .contains("-Dmaven.repo.local=target/published-baseline-repositories/benchmark-"
                         + pomProperty(pomXml, "api.compatibility.baseline.version"))
                 .contains("-Dbenchmark.starter.version=" + pomProperty(pomXml, "api.compatibility.baseline.version"))
                 .contains(" clean verify ")
@@ -1909,10 +1925,12 @@ class DocumentationReleaseArtifactTest {
         List<Map<String, String>> publishedBaselineArtifacts = publishedBaselineArtifacts(baselineVersion);
         List<Map<String, String>> checks = List.of(
                 check("mvn test", "pass", "Generated by DocumentationReleaseArtifactTest during the current test run."),
-                check("mvn -Papi-compatibility -DskipTests verify", "pending", "Run before release."),
-                check("mvn -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify", "pending",
+                check(apiCompatibilityCommand("api-root", baselineVersion, null), "pending", "Run before release."),
+                check(apiCompatibilityCommand("api-starter", baselineVersion, "reactive-http-client-starter"), "pending",
                         "Run before release to exercise module-scoped compatibility guard."),
                 check("bash scripts/verify-api-compatibility-fixtures.sh", "pending", "Run before release."),
+                check("bash scripts/verify-published-baseline-fixtures.sh", "pending",
+                        "Run before release to reject local and candidate-contaminated baselines."),
                 check("git diff --check", "pending", "Run before release."),
                 check("mvn -Pbenchmarks -pl reactive-http-client-benchmarks -am package", "pending",
                         "Lightweight benchmark compile check; does not run JMH."),
@@ -1970,7 +1988,8 @@ class DocumentationReleaseArtifactTest {
                 .toList());
         List<String> pendingCompatibilityCommands = pendingManualCommands.stream()
                 .filter(command -> command.contains("api-compatibility")
-                        || command.contains("verify-api-compatibility-fixtures"))
+                        || command.contains("verify-api-compatibility-fixtures")
+                        || command.contains("verify-published-baseline-fixtures"))
                 .toList();
         boolean configurationReferenceCurrent = Files.readString(root.resolve("docs/configuration-properties.md"))
                 .equals(configurationReferenceMarkdown(configurationMetadata(root)));
@@ -2028,7 +2047,8 @@ class DocumentationReleaseArtifactTest {
         List<String> compatibilityCommands = checks.stream()
                 .map(check -> check.get("command"))
                 .filter(command -> command.contains("api-compatibility")
-                        || command.contains("verify-api-compatibility-fixtures"))
+                        || command.contains("verify-api-compatibility-fixtures")
+                        || command.contains("verify-published-baseline-fixtures"))
                 .toList();
         List<String> benchmarkCommands = new ArrayList<>(checks.stream()
                 .map(check -> check.get("command"))
@@ -2164,11 +2184,14 @@ class DocumentationReleaseArtifactTest {
         evidence.put("currentWorkspaceCommand",
                 "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)");
         evidence.put("publishedStarterCommand",
-                "test ! -e target/benchmark-baseline-repository-" + baselineVersion
-                        + " && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/benchmark-baseline-repository-"
-                        + baselineVersion
+                "test ! -e " + publishedBaselineRepository("benchmark", baselineVersion)
+                        + " && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local="
+                        + publishedBaselineRepository("benchmark", baselineVersion)
                         + " -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version="
-                        + baselineVersion + " -Dbenchmark.commit=" + baselineVersion);
+                        + baselineVersion + " -Dbenchmark.commit=" + baselineVersion
+                        + " && scripts/verify-published-baseline-provenance.sh benchmark " + baselineVersion
+                        + " target/release-evidence/published-baselines/benchmark-" + baselineVersion
+                        + " reactive-http-client-starter");
         evidence.put("reportDirectory", "reactive-http-client-benchmarks/target/benchmark-reports/");
         evidence.put("smokeReport", "reactive-http-client-benchmarks/target/benchmark-reports/smoke-only-jmh.md");
         evidence.put("releaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
@@ -2326,12 +2349,37 @@ class DocumentationReleaseArtifactTest {
 
     private static Map<String, String> baselineArtifact(String artifactId, String baselineVersion) {
         String gav = "io.github.huynhngochuyhoang:" + artifactId + ":" + baselineVersion;
+        String lane = "artifact-" + artifactId;
+        String repository = publishedBaselineRepository(lane, baselineVersion);
         LinkedHashMap<String, String> artifact = new LinkedHashMap<>();
         artifact.put("artifact", gav);
         artifact.put("status", "pending");
-        artifact.put("resolutionCommand", "mvn dependency:get -Dartifact=" + gav);
+        artifact.put("resolutionCommand", "test ! -e " + repository
+                + " && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=" + repository
+                + " dependency:get -Dartifact=" + gav
+                + " && scripts/verify-published-baseline-provenance.sh " + lane + " " + baselineVersion
+                + " target/release-evidence/published-baselines/" + lane + "-" + baselineVersion
+                + " " + artifactId);
         artifact.put("note", "Run before release; unresolved published artifacts are release blockers.");
         return artifact;
+    }
+
+    private static String apiCompatibilityCommand(String lane, String baselineVersion, String module) {
+        String repository = publishedBaselineRepository(lane, baselineVersion);
+        String modules = module == null
+                ? "reactive-http-client-starter reactive-http-client-test reactive-http-client-otel"
+                : module;
+        String projectSelection = module == null ? "" : " -pl " + module;
+        return "test ! -e " + repository
+                + " && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=" + repository
+                + projectSelection + " -Papi-compatibility -DskipTests verify"
+                + " && scripts/verify-published-baseline-provenance.sh " + lane + " " + baselineVersion
+                + " target/release-evidence/published-baselines/" + lane + "-" + baselineVersion
+                + " " + modules;
+    }
+
+    private static String publishedBaselineRepository(String lane, String baselineVersion) {
+        return "target/published-baseline-repositories/" + lane + "-" + baselineVersion;
     }
 
     private static Map<String, String> check(String command, String status, String note) {
