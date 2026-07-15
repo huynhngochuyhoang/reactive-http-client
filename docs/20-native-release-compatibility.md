@@ -37,8 +37,8 @@ change.
 
 ### V20 default Spring Boot 4 reactor
 
-The default reactor now declares `3.0.0`, imports Spring Boot `4.0.0`, and
-uses published `2.14.1` as its cross-major compatibility baseline. Boot 4
+The default reactor now declares `3.1.0-SNAPSHOT`, imports Spring Boot `4.0.0`,
+and uses published `3.0.0` as its strict compatibility baseline. Boot 4
 WebClient, health, Jackson 3, OTel, test-helper, and benchmark adapters live in
 normal source roots. The old `boot4-spike` profile, compiler exclusions,
 `maven.deploy.skip`, and `skipPublishing` controls are absent.
@@ -213,39 +213,39 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. While the project version remains `3.0.0`,
-the cross-major baseline stays on published `2.14.1`:
+from the current reactor version. The `3.1.0-SNAPSHOT` development line compares
+strictly against published `3.0.0`:
 
 ```bash
 mvn -s .mvn/maven-central-settings.xml \
-  -Papi-compatibility,major-api-report -DskipTests verify
-bash scripts/verify-major-api-delta.sh
+  -Dmaven.repo.local=target/api-compatibility-repository \
+  -Papi-compatibility -DskipTests verify
 bash scripts/verify-api-compatibility-fixtures.sh
 ```
 
-For release evidence, resolve the three `2.14.1` jars into a fresh target-local
-Maven repository, pass that repository through `-Dmaven.repo.local` to the
-japicmp build, and set `API_COMPATIBILITY_BASELINE_REPOSITORY` to the same path
-for the reviewed-delta guard. Set `API_COMPATIBILITY_MAVEN_SETTINGS` when the
-report uses a settings file other than `.mvn/maven-central-settings.xml`. The
-guard uses those settings and that repository for every Maven model lookup and
-rejects baseline jars whose Maven remote markers identify a local install. This
-prevents a stale or relabeled artifact in the normal local cache from
-understating the cross-major delta.
+For release evidence, resolve the three `3.0.0` jars into a fresh target-local
+Maven repository and pass that repository through `-Dmaven.repo.local` to the
+japicmp build. The frozen `scripts/verify-major-api-delta.sh` remains historical
+evidence for the reviewed `2.14.1` to `3.0.0` migration and is no longer part of
+normal minor-line CI. A fresh repository prevents a stale or locally installed
+artifact from understating the current delta.
 
 For module-scoped compatibility checks, the inherited baseline guard must still
 run before japicmp:
 
 ```bash
-mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests validate
-mvn -pl reactive-http-client-starter -Papi-compatibility,major-api-report -DskipTests verify
+mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/api-compatibility-repository \
+  -pl reactive-http-client-starter -Papi-compatibility -DskipTests validate
+mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/api-compatibility-repository \
+  -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify
 ```
 
 The Maven profiles produce japicmp reports under each module's
-`target/japicmp/` directory. `api-compatibility` remains strict; adding
-`major-api-report` makes this intentional cross-major comparison report-only. The
-reviewed-delta guard permits only the classified `3.0.0` removals and checks the
-health replacement directly in the baseline and candidate jars. The
+`target/japicmp/` directory. `api-compatibility` is strict for the current minor
+line. The source-controlled cross-major report and reviewed-delta guard retain
+the classified `3.0.0` removals as historical migration evidence. The
 fixture script verifies that additive APIs pass while removals of a public
 constructor, nested fluent method, or public enum constant fail. The filtered
 comparison covers the documented extension
@@ -360,17 +360,17 @@ pattern that covers the documented contract. Use a package include only when the
 whole package is documented as public, and use a trailing `*` when documented
 nested types or builder stages are part of the contract. Keep implementation
 internals excluded unless a public doc explicitly presents them as replacement
-or extension surfaces. Run the report-only comparison before the reviewed-delta
-guard so its generated reports exist, then run the fixtures and documentation
-checks:
+or extension surfaces. Run the strict comparison, then run the fixtures and
+documentation checks:
 
 ```bash
 mvn -s .mvn/maven-central-settings.xml \
-  -Papi-compatibility,major-api-report -DskipTests verify
+  -Dmaven.repo.local=target/api-compatibility-repository \
+  -Papi-compatibility -DskipTests verify
 mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/api-compatibility-repository \
   -pl reactive-http-client-starter \
-  -Papi-compatibility,major-api-report -DskipTests verify
-bash scripts/verify-major-api-delta.sh
+  -Papi-compatibility -DskipTests verify
 bash scripts/verify-api-compatibility-fixtures.sh
 mvn -q -pl reactive-http-client-starter \
   -Dtest=DocumentationReleaseArtifactTest test
@@ -539,7 +539,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=3.0.0 native:compile
+  -Dreactive-http-client.version=3.1.0-SNAPSHOT native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 

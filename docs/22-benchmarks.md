@@ -101,22 +101,27 @@ omitting `-am` so Maven resolves the published dependency instead of the current
 reactor module:
 
 ```bash
-mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.14.1 -Dbenchmark.commit=2.14.1
+test ! -e target/benchmark-baseline-repository-3.0.0 && \
+mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/benchmark-baseline-repository-3.0.0 \
+  -Pbenchmarks,benchmark-release,benchmark-published-baseline \
+  -pl reactive-http-client-benchmarks clean verify \
+  -Dbenchmark.starter.version=3.0.0 -Dbenchmark.commit=3.0.0
 ```
 
 The example version must match the root `api.compatibility.baseline.version`
-(`2.14.1` for this release line). When that property changes for the next
+(`3.0.0` for this development line). When that property changes for the next
 development cycle, update this command and the `published-starter-<version>`
 report paths together.
-For the V20 major-line transition, this example uses `2.14.1` because the
-reactor now targets `3.0.0` and the published `2.14.1` maintenance artifacts
-resolve. Move both `benchmark.starter.version` and `published-starter-<version>` paths together
-again after the next release baseline changes.
+V20 used `2.14.1` for its cross-major evidence. After `3.0.0` publication, the
+normal benchmark baseline moves to `3.0.0`; the historical V20 report and
+commands remain in the V20 checklist.
 
-That command cleans the benchmark module before compiling, uses the current
+The repository path must not exist before the run; select another empty
+target-local path when retaining earlier evidence. The command uses the current
 benchmark harness and current managed Spring Boot BOM, and excludes current-only
-diagnostics-provider benchmarks that cannot compile against the published baseline
-artifact. Its report is written under
+diagnostics-provider benchmarks that cannot compile against the published
+baseline artifact. Its report is written under
 `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-<version>/`
 so it does not overwrite the current-workspace release report.
 For an exact historical release environment, check out the release tag and run
@@ -174,9 +179,9 @@ release notes:
 Benchmark evidence:
 - Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted
 - Current candidate command: `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`
-- Published baseline command: `mvn -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=2.14.1 -Dbenchmark.commit=2.14.1`
+- Published baseline command: `test ! -e target/benchmark-baseline-repository-3.0.0 && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/benchmark-baseline-repository-3.0.0 -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=3.0.0 -Dbenchmark.commit=3.0.0`
 - Current candidate report: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
-- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.14.1/release-jmh.md`
+- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.0.0/release-jmh.md`
 - Scenarios cited: `Get No Body`, `Post Json`
 ```
 
@@ -230,7 +235,7 @@ Compare the paired JMH JSON reports with the target-only helper after both repor
 ```bash
 mvn -Pbenchmarks,benchmark-compare -pl reactive-http-client-benchmarks -am verify \
   -Dbenchmark.compare.current=reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json \
-  -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-2.14.1/release-jmh.json
+  -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.0.0/release-jmh.json
 ```
 
 The helper writes `reactive-http-client-benchmarks/target/benchmark-reports/benchmark-comparison.md` by default. The comparison includes each matching benchmark method and mode, current and baseline values, absolute and relative deltas, average time, p50, p95, p99, throughput, and allocation per operation when those metrics are present. Missing current or baseline rows are listed explicitly. V13 threshold crossings are marked as `review`, but the command exits successfully by default so normal CI does not become a benchmark gate. For local release review, add `-Dbenchmark.compare.fail-on-review=true` to return a non-zero exit when any row is marked `review`. Attach or paste the generated `benchmark-comparison.md` next to the promoted report link when release notes discuss current-vs-baseline movement.
@@ -338,7 +343,7 @@ starter, API baseline, and commit versions. Reports label their stack context
 and state that Boot 3 versus Boot 4 movement is migration context, not evidence
 of a pure starter optimization. Review thresholds remain manual signals.
 
-V20 does not promote this smoke report. The `3.0.0` Unreleased notes make no
+V20 did not promote this smoke report. The `3.0.0` release notes make no
 numerical performance movement claim, and a smoke run is not release-quality
 evidence even when its commit metadata is immutable. If `3.0.0` release notes
 later make a public performance claim, rerun the required rows with

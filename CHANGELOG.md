@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-07-15
+
 ### Changed
 
 - **Default Spring Boot 4 reactor.** Moved the project to `3.0.0` with Spring Boot `4.0.0`, Resilience4j `2.4.0`, and published `2.14.1` as the cross-major compatibility baseline; promoted Boot 4/Jackson 3 adapters into normal sources and removed the non-publishing `boot4-spike` profile.
@@ -1278,7 +1280,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.1...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.1...v3.0.0
 [2.14.1]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.0...v2.14.1
 [2.14.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.13.0...v2.14.0
 [2.13.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.12.0...v2.13.0

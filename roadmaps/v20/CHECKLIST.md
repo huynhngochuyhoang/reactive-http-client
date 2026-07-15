@@ -518,32 +518,80 @@ Evidence:
 
 ## Priority 12 - `3.0.0` Go/No-Go and Release Readiness
 
-### [ ] 12.1 Assemble clean candidate evidence
+### [x] 12.1 Assemble clean candidate evidence
 
-- [ ] Select and record the minimum and current supported Boot 4 matrix.
-- [ ] Verify Priorities 1-11 are complete or have explicit release blockers.
-- [ ] Run full default-reactor JVM tests from a clean candidate commit.
-- [ ] Run source/Javadoc packaging and inspect all artifacts.
-- [ ] Run staged independent consumers and test-helper fixtures.
-- [ ] Run optional-integration presence/absence suites.
-- [ ] Run AOT processing and the native executable smoke.
-- [ ] Run generated metadata, documentation, and Markdown-link validation.
-- [ ] Run the report-only `2.14.1` to `3.0.0` API comparison and compatibility fixtures.
-- [ ] Resolve every staged artifact from an isolated repository.
-- [ ] Promote or explicitly defer benchmark evidence based on public claims.
-- [ ] Generate one release-readiness snapshot with exact commands and provenance.
+- [x] Select and record the minimum and current supported Boot 4 matrix.
+- [x] Verify Priorities 1-11 are complete or have explicit release blockers.
+- [x] Run full default-reactor JVM tests from a clean candidate commit.
+- [x] Run source/Javadoc packaging and inspect all artifacts.
+- [x] Run staged independent consumers and test-helper fixtures.
+- [x] Run optional-integration presence/absence suites.
+- [x] Run AOT processing and the native executable smoke.
+- [x] Run generated metadata, documentation, and Markdown-link validation.
+- [x] Run the report-only `2.14.1` to `3.0.0` API comparison and compatibility fixtures.
+- [x] Resolve every staged artifact from an isolated repository.
+- [x] Promote or explicitly defer benchmark evidence based on public claims.
+- [x] Generate one release-readiness snapshot with exact commands and provenance.
 
-### [ ] 12.2 Record the release decision
+### [x] 12.2 Record the release decision
 
-- [ ] Confirm no mandatory blocker or unclassified compatibility break remains.
-- [ ] Confirm the candidate commit is clean, immutable, and matches every generated artifact.
-- [ ] Confirm the `2.x` maintenance path remains available.
-- [ ] For **go**, publish `3.0.0`, verify public artifact resolution, tag the exact
+- [x] Confirm no mandatory blocker or unclassified compatibility break remains.
+- [x] Confirm the candidate commit is clean, immutable, and matches every generated artifact.
+- [x] Confirm the `2.x` maintenance path remains available.
+- [x] For **go**, publish `3.0.0`, verify public artifact resolution, tag the exact
       source, date the changelog, and establish the new `3.x` compatibility baseline.
 - [ ] For **no-go**, publish nothing, record each blocker and its reproduction,
       and keep `2.x` maintenance unaffected.
-- [ ] Update `ROADMAP.md` status only after the decision evidence exists.
-- [ ] Run final release-document tests and `git diff --check`.
+- [x] Update `ROADMAP.md` status only after the decision evidence exists.
+- [x] Run final release-document tests and `git diff --check`.
+
+Evidence:
+
+- Candidate commit `c61648587d471e809cadbf2822279840067ae8a1` was clean before
+  verification. The supported JVM matrix is Java 21 with Boot `4.0.0` as the
+  minimum/current project baseline and Boot `4.1.0` as the forward-compatibility
+  row; both passed the complete 730 starter, 33 test-helper, and 38 OTel tests.
+- A clean default-reactor `verify` passed and produced binary, source, and
+  Javadoc artifacts. `verify-generation-packaging.sh` accepted their effective
+  source/class/resource contents with no Boot 3 or duplicate-entry leakage.
+- The initial API run correctly failed the reviewed-delta guard because the
+  default local Maven repository contained a locally installed, Boot-4-bearing
+  `2.14.1` starter. A fresh target-local repository resolved the published
+  starter, test-helper, and OTel checksums recorded in Priority 1. Root and
+  module-scoped report-only comparisons, the reviewed-delta guard, and API
+  compatibility fixtures then passed with no unclassified break.
+- A short-lived local GPG key signed the candidate. The staging guard verified
+  13 signatures, staged only the parent/starter/test-helper/OTel artifacts, and
+  passed the independent Boot 4 consumer from an empty repository whose remote
+  markers all identify `v20-stage`.
+- GraalVM `25.0.3` AOT/native verification passed in the pinned local container.
+  The 123.15 MiB executable built in 5m08s with 5.42 GiB peak RSS and passed the
+  real loopback success, auth, Problem Detail, diagnostics, health, and metrics
+  assertions.
+- Generated configuration and Markdown-link checks remain current/pass.
+  Benchmark report promotion is explicitly deferred because the `3.0.0`
+  changelog makes no numerical performance claim; the complete Boot 4 smoke
+  evidence remains recorded under Priority 10.
+- The consolidated target-only snapshot is
+  `target/release-evidence/v20-priority12/release-readiness.md`. It records the
+  exact commands, candidate/native/baseline checksums, matrix, provenance,
+  local-repository contamination finding, and completed public release
+  verification.
+- Before the external release, the candidate was technically ready but had not
+  yet been published, publicly resolved, tagged, or dated. The evidence below
+  records completion of those irreversible steps; no no-go decision was invented.
+- The go decision completed on `2026-07-15`. The public parent, starter,
+  test-helper, and OTel `3.0.0` artifacts resolved from Maven Central in a fresh
+  repository. Remote tag `v3.0.0` points to verified candidate commit
+  `c61648587d471e809cadbf2822279840067ae8a1`.
+- Published jar SHA-256 values are starter
+  `d4412505c5472eab247f796426c8ce34a2ce0fb3a54ad0470b00811bf11c6940`,
+  test-helper `754710c8723fdf6a173ad7174247cca591f99953b0e652d53f99a56413a482fc`,
+  and OTel `08987a01688b3cedfddfbcfd7dcd9da49c074626d8214e21ede3bbcf6aa7c802`.
+- The changelog now dates `3.0.0`, the development reactor advances to
+  `3.1.0-SNAPSHOT`, and strict API and benchmark baselines move to published `3.0.0`.
+  The frozen cross-major report remains historical evidence and normal CI no
+  longer enables its report-only profile.
 
 ## Completion Rule
 
