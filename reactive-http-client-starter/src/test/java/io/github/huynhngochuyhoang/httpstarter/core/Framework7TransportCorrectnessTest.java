@@ -5,11 +5,15 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
 import io.github.huynhngochuyhoang.httpstarter.annotation.PUT;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.codec.http.HttpRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
+import reactor.netty.NettyPipeline;
 import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.server.HttpServer;
@@ -102,20 +106,43 @@ class Framework7TransportCorrectnessTest {
     }
 
     @Test
-    void malformedContentLengthNeverReachesTheApplicationEndpoint() throws Exception {
-        String malformedWireRequest =
-                "POST /orders HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: invalid\r\n\r\n{}";
+    void orphanedBodyBytesProduceSyntheticBadRequestWithoutReachingTheApplicationEndpoint() throws Exception {
+        String malformedWireRequest = "orphaned-body-bytes\r\n\r\n";
+        List<CapturedDecoderRequest> decodedRequests = new CopyOnWriteArrayList<>();
         List<CapturedDecoderRequest> routedRequests = new CopyOnWriteArrayList<>();
-        CountDownLatch routedRequestRecorded = new CountDownLatch(1);
+        CountDownLatch captureInstalled = new CountDownLatch(1);
+        CountDownLatch decodedRequestRecorded = new CountDownLatch(1);
         DisposableServer server = HttpServer.create()
                 .port(0)
+                .doOnConnection(connection -> {
+                    connection.channel().pipeline().addBefore(
+                            NettyPipeline.HttpTrafficHandler,
+                            "malformedRequestCapture",
+                            new ChannelInboundHandlerAdapter() {
+                                @Override
+                                public void channelRead(ChannelHandlerContext context, Object message) {
+                                    if (message instanceof HttpRequest request && !request.decoderResult().isSuccess()) {
+                                        decodedRequests.add(new CapturedDecoderRequest(
+                                                connection.channel().id().asLongText(),
+                                                request.method().name(),
+                                                request.uri(),
+                                                request.protocolVersion().text()));
+                                        decodedRequestRecorded.countDown();
+                                    }
+                                    context.fireChannelRead(message);
+                                }
+                            });
+                    captureInstalled.countDown();
+                })
                 .handle((request, response) -> {
                     request.withConnection(connection -> routedRequests.add(new CapturedDecoderRequest(
                             connection.channel().id().asLongText(),
                             request.method().name(),
                             request.uri(),
                             request.version().text())));
-                    routedRequestRecorded.countDown();
+                    if (request.uri().equals("/probe")) {
+                        return response.status(204).send();
+                    }
                     return response.sendString(Mono.just("application-handler")).then();
                 })
                 .bindNow();
@@ -123,17 +150,27 @@ class Framework7TransportCorrectnessTest {
              BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.US_ASCII));
              BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII))) {
             socket.setSoTimeout(5000);
+            writer.write("GET /probe HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: keep-alive\r\n\r\n");
+            writer.flush();
+            assertThat(readStatusAndHeaders(reader)).contains("204");
+            assertThat(captureInstalled.await(5, TimeUnit.SECONDS)).isTrue();
+            routedRequests.clear();
+
             writer.write(malformedWireRequest);
             writer.flush();
 
-            String statusLine = reader.readLine();
+            String statusLine = readStatusAndHeaders(reader);
             assertThat(statusLine).contains("400");
-            assertThat(malformedWireRequest).contains("POST /orders HTTP/1.1", "Content-Length: invalid");
-            assertThat(routedRequestRecorded.await(5, TimeUnit.SECONDS)).isTrue();
-            assertThat(routedRequests).hasSize(1);
+            assertThat(malformedWireRequest).isEqualTo("orphaned-body-bytes\r\n\r\n");
+            assertThat(decodedRequestRecorded.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(decodedRequests).singleElement().satisfies(request -> {
+                assertThat(request.channelId()).isNotBlank();
+                assertThat(request.method()).isEqualTo("GET");
+                assertThat(request.uri()).isEqualTo("/bad-request");
+                assertThat(request.protocol()).isEqualTo("HTTP/1.0");
+            });
             assertThat(routedRequests).noneMatch(request -> request.method().equals("POST"));
             assertThat(routedRequests).allSatisfy(request -> {
-                assertThat(request.channelId()).isNotBlank();
                 assertThat(request.method()).isEqualTo("GET");
                 assertThat(request.uri()).isEqualTo("/bad-request");
                 assertThat(request.protocol()).isEqualTo("HTTP/1.0");
@@ -141,6 +178,15 @@ class Framework7TransportCorrectnessTest {
         } finally {
             server.disposeNow(Duration.ofSeconds(5));
         }
+    }
+
+    private static String readStatusAndHeaders(BufferedReader reader) throws Exception {
+        String statusLine = reader.readLine();
+        String line;
+        while ((line = reader.readLine()) != null && !line.isEmpty()) {
+            // Drain headers so the next read starts at the next response status line.
+        }
+        return statusLine;
     }
 
     @Test

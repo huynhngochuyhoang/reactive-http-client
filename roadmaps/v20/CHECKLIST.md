@@ -397,10 +397,12 @@ Evidence:
   `Content-Length`, `Transfer-Encoding`, `Connection`, `Expect`, and `Host`,
   including values added by customizer filters, while ordinary end-to-end
   headers remain supported.
-- The deterministic raw-socket fixture records the exact malformed client bytes
-  (`Content-Length: invalid`) and the server channel. With no starter, proxy,
-  mesh, or ingress in that direct path, Reactor Netty returns `400` and exposes
-  the failed decode to its handler as synthetic `GET /bad-request HTTP/1.0`.
+- The deterministic raw-socket fixture sends a valid probe followed by exact
+  orphaned body bytes on the same server channel. With no starter, proxy, mesh,
+  or ingress in that direct path, Reactor Netty returns `400`; a pipeline capture
+  requires the initial-line decoder failure to be synthetic
+  `GET /bad-request HTTP/1.0` without assuming that failed requests are routed
+  to the application handler.
 - No starter production fix was implemented: the real starter regression would
   fail on bad framing or leaked bytes, while only deliberately malformed wire
   input reproduces the warning. For an environment-only occurrence, capture at
