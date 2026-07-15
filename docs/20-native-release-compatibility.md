@@ -576,7 +576,9 @@ target/release-evidence/reactive-http-client-release-evidence.json
 ```
 
 The manifest includes a top-level readiness summary, a `releasePrepChecklist`
-summary, project version, API compatibility baseline version, whether that
+summary, project version, release state, development version, latest published
+consumer version, optional planned final version, API compatibility baseline
+version, whether that
 baseline equals the current reactor version, the Java runtime used by the test,
 the configured Java baseline, the Spring Boot baseline, release-check command
 names, published baseline artifacts, benchmark dependency-management metadata,
@@ -586,6 +588,13 @@ version under test, baseline library versions, review-trigger thresholds, and th
 conditions that require refreshed numbers. The `mvn test` entry is marked
 `pass` when this test generated the manifest; compatibility, fixture, diff-check,
 and benchmark entries remain `pending` until the release maintainer runs them.
+
+During snapshot development, `plannedFinalVersion` and the promotable report
+path are absent. The manifest keeps README and quick-start expectations on the
+latest published consumer version and reports benchmark promotion as deferred
+until an explicit release-cut transition removes the snapshot suffix.
+The root `latest.published.version` property owns public consumer snippets;
+`api.compatibility.baseline.version` remains an independent compatibility policy.
 
 The readiness summary reports generated-test evidence separately from manual
 release evidence. Generated documentation and link checks can be marked `pass`

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Snapshot-aware release evidence.** Separated the development reactor, latest published consumer, and explicit release-candidate versions in generated release evidence; deferred promotable performance artifact paths while the reactor is a snapshot; and required Maven Central publication to run from the matching release tag.
+
 ## [3.0.0] - 2026-07-15
 
 ### Changed
