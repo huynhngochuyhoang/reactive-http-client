@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Frozen `3.0.0` public surface.** Audited the report-only `2.14.1` cross-major API delta, classified the Boot 4 health replacement and deprecated Jackson 2 removals, and added a CI guard that rejects any unreviewed incompatible row while preserving self-baseline and compatibility-fixture checks.
 - **Transport regression evidence.** Carried POST-then-PUT HTTP/1.1 reuse into the real `3.0.0` starter proxy and single-connection pool, verified transport-generated framing and response ownership, and isolated Reactor Netty's synthetic `GET /bad-request HTTP/1.0` to deliberately malformed raw wire input rather than normal starter request construction.
 - **Boot 4 benchmark baseline.** Revalidated the complete same-stack smoke harness on the default `3.0.0` Boot 4 reactor, including equivalent raw WebClient, Spring HTTP Interface, and starter loopback work plus separately classified optional-feature and no-network rows. The smoke output remains target-only and no report is promoted.
+- **`3.0.0` migration and operations guide.** Completed the Boot 3.5/`2.14.1` to Boot 4/`3.0.0` adoption path with dependency, package, Jackson 3 codec, configuration, Actuator, native-image, test-helper, constructor-injected logger, staged-consumer, maintenance-lane, and production support guidance.
 
 ## [2.14.1] - 2026-07-13
 

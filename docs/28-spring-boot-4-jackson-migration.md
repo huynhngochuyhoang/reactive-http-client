@@ -9,6 +9,16 @@ idempotency behavior, diagnostics sanitization, and reactive.http property names
 remain unchanged. Review the
 [2.14.1 to 3.0.0 API Report](api-report-2.14.1-to-3.0.0.md).
 
+## Choose the release lane
+
+Upgrade to starter `3.x` only when the application can move to Spring Boot 4,
+Java 21, Jackson 3, and the Boot 4 Resilience4j integration. Stay on published
+starter `2.14.1` when the application must remain on Boot 3.5, still calls the
+deprecated Jackson 2 constructors or mock `objectMapper(...)` adapter, or cannot
+yet update custom Boot WebClient/health imports. The `2.x` lane is limited to
+security and critical correctness maintenance; new migration work belongs on
+`3.x`.
+
 ## Maven dependencies
 
 Boot 3.5 and starter 2.x:
@@ -96,6 +106,59 @@ The health type replacement and the deprecated Jackson 2 shims listed below are
 the only reviewed binary and source incompatibilities. Boot 4 moved the health
 API and changed the health method return type. No unrelated public removal is
 accepted.
+
+## Before and after application code
+
+The declarative client contract itself does not change:
+
+```java
+@ReactiveHttpClient(name = "orders")
+public interface OrdersClient {
+
+    @GET("/orders/{id}")
+    Mono<OrderResponse> get(@PathVar("id") String id);
+}
+```
+
+Boot 3.5 and starter 2.x commonly wired the deprecated mapper constructor and
+the old Boot customizer package:
+
+```java
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.boot.web.reactive.function.client.WebClientCustomizer;
+
+@Bean
+WebClientCustomizer clientCustomizer() {
+    return builder -> builder.defaultHeader("X-Application", "orders");
+}
+
+@Bean
+ProblemDetailErrorResponseMapper problemDetails(ObjectMapper objectMapper) {
+    return new ProblemDetailErrorResponseMapper(objectMapper);
+}
+```
+
+Boot 4 and starter 3.x use Jackson 3 plus the stable codec boundary:
+
+```java
+import org.springframework.boot.webclient.WebClientCustomizer;
+import tools.jackson.databind.ObjectMapper;
+
+@Bean
+WebClientCustomizer clientCustomizer() {
+    return builder -> builder.defaultHeader("X-Application", "orders");
+}
+
+@Bean
+ReactiveHttpClientJsonCodec reactiveHttpClientJsonCodec(ObjectMapper objectMapper) {
+    return new Jackson3ReactiveHttpClientJsonCodec(objectMapper);
+}
+
+@Bean
+ProblemDetailErrorResponseMapper problemDetails(ReactiveHttpClientJsonCodec jsonCodec) {
+    return new ProblemDetailErrorResponseMapper(jsonCodec);
+}
+```
 
 ## Jackson 3 codec ownership
 
@@ -191,11 +254,39 @@ reactive:
 
 ## Actuator, AOT, and native image
 
-The endpoint ID remains rhttpclients. Custom health code uses the Boot 4
-org.springframework.boot.health.contributor package. The V19 native baseline
-uses GraalVM Java 25 while source remains Java 21 and covers loopback HTTP,
-inherited generics, Problem Detail, auth, Micrometer, diagnostics, and health.
-See [Native Image and Release Compatibility](20-native-release-compatibility.md).
+The endpoint ID remains `rhttpclients`. Custom health code uses the Boot 4
+`org.springframework.boot.health.contributor` package; the built-in bean keeps
+the name `reactiveHttpClientHealthIndicator` and has type
+`Boot4HttpClientHealthIndicator`.
+
+```yaml
+reactive:
+  http:
+    observability:
+      health:
+        enabled: true
+      diagnostics-endpoint:
+        enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,rhttpclients
+  endpoint:
+    health:
+      show-details: when-authorized
+```
+
+Keep management endpoint authorization in application security policy. Health
+details and diagnostics are sanitized, but they still disclose client names and
+effective policy useful to an operator.
+
+The Boot 4 native baseline uses GraalVM Java 25 while source remains Java 21 and
+covers loopback HTTP, inherited generics, Problem Detail, auth, Micrometer,
+diagnostics, and health. Run the AOT/native fixture described in
+[Native Image and Release Compatibility](20-native-release-compatibility.md);
+do not reuse a Boot 3 native configuration for the `3.x` artifact.
 
 ## Test-helper migration
 
@@ -212,6 +303,58 @@ MockReactiveHttpClient<OrderClient> mock = MockReactiveHttpClient
         .build();
 ```
 
+`MockReactiveHttpClient` owns an isolated application context. When
+`@LogHttpExchange` selects a constructor-injected logger, register that exact
+configured instance with the mock instead of relying on a no-argument fallback:
+
+```java
+@LogHttpExchange(logger = AuditExchangeLogger.class)
+@ReactiveHttpClient(name = "orders")
+interface OrdersClient {
+    @GET("/orders/{id}")
+    Mono<OrderResponse> get(@PathVar("id") String id);
+}
+
+@Bean
+AuditExchangeLogger auditExchangeLogger(AuditSink sink) {
+    return new AuditExchangeLogger(sink);
+}
+
+AuditExchangeLogger logger = new AuditExchangeLogger(auditSink);
+MockReactiveHttpClient<OrdersClient> mock = MockReactiveHttpClient
+        .forClient(OrdersClient.class)
+        .withExchangeLogger(logger)
+        .respond(exchange -> MockReactiveHttpClient.json(200, "{\"code\":\"ok\"}"))
+        .build();
+```
+
+Production resolves the Spring bean by logger class. The mock resolves the
+instance registered through `withExchangeLogger(...)`; this supports loggers
+whose constructors require application collaborators.
+
+## Independent Boot 4 consumer
+
+`.github/boot4-consumer` is a non-reactor Boot 4 application fixture. It compiles
+and runs inherited generic and `@ApiRef` clients, Problem Detail, redirects,
+streaming ownership, timeout diagnostics, health, Micrometer, OTel, and strict
+retry against assembled starter artifacts. Run it against the current installed
+candidate with:
+
+```bash
+PROJECT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
+  -Dmaven.javadoc.skip=true install
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
+  -f .github/boot4-consumer/pom.xml \
+  -Dreactive-http-client.version="$PROJECT_VERSION" test
+```
+
+Release validation uses `scripts/verify-publishable-artifacts.sh` after signed
+artifacts are built. That script deploys the parent, starter, test helper, and
+OTel module to a target-local staging repository, runs this same consumer from
+an empty local repository, and rejects resolution from reactor class directories
+or a pre-existing Maven cache.
+
 ## Migration checklist
 
 1. Upgrade to Boot 4 and Java 21.
@@ -222,6 +365,8 @@ MockReactiveHttpClient<OrderClient> mock = MockReactiveHttpClient
 6. Run configuration, Problem Detail, auth, lifecycle, retry, streaming, and
    test-helper suites.
 7. Run AOT and native verification for native applications.
+8. Run the independent Boot 4 consumer and any application-specific custom
+   logger, diagnostics, health, and support-bundle checks.
 
 ## Transport header ownership
 

@@ -2,6 +2,11 @@
 
 The starter ships two observability back-ends: Micrometer (default) and OpenTelemetry (optional companion module). Both implement the `HttpClientObserver` extension point and can run together.
 
+Starter `3.x` uses Boot 4 Actuator health contributor packages while preserving
+the existing metric names, diagnostics endpoint ID, and configuration keys. See
+the [3.x migration guide](28-spring-boot-4-jackson-migration.md) for import and
+native-image changes.
+
 ---
 
 ## Micrometer metrics
@@ -81,7 +86,11 @@ reactive:
 
 ## Actuator health indicator
 
-When `spring-boot-starter-actuator` is on the classpath and a `MeterRegistry` bean is present, the starter auto-registers `HttpClientHealthIndicator`. It reads the `reactive.http.client.requests` timer and reports per-client error rates computed from probe-to-probe deltas.
+When `spring-boot-starter-actuator` is on the classpath and a `MeterRegistry`
+bean is present, starter `3.x` auto-registers `Boot4HttpClientHealthIndicator`.
+It reads the `reactive.http.client.requests` timer and reports per-client error
+rates computed from probe-to-probe deltas. The bean name remains
+`reactiveHttpClientHealthIndicator` across the migration.
 
 ```yaml
 reactive:
@@ -162,7 +171,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: rhttpclients
+        include: health,rhttpclients
+  endpoint:
+    health:
+      show-details: when-authorized
 ```
 
 The endpoint returns the same provider-backed JSON-safe fields as `ReactiveHttpClientDiagnosticsSnapshot`: project version, client count, endpoint count, inherited endpoint count, per-client policy summaries, and strict validation flags. Strict flags are true only when the corresponding validation path is active for the resolved client configuration. It does not expose concrete base URLs, auth secrets, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.

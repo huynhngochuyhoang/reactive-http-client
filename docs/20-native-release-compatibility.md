@@ -684,12 +684,12 @@ The normal reactor and release-smoke matrix use Boot 4. The Boot 3.5 `2.x` line
 is reconstructed only from its maintenance tag; no dual-generation helper
 artifact is published.
 
-### V19 Jackson 3 codec ownership
+### V20 Jackson 3 codec ownership
 
 `ReactiveHttpClientJsonCodec` is the serialization boundary for bytes owned by
-the starter. Boot 3 selects the deprecated Jackson 2 adapter; Boot 4 selects
+the starter. The default Boot 4 reactor selects
 `Jackson3ReactiveHttpClientJsonCodec` from the application Jackson 3 mapper.
-The effective Boot 4 POM marks Jackson 2 optional and owns Jackson 3 through
+The effective Boot 4 POM excludes Jackson 2 and owns Jackson 3 through
 `spring-boot-jackson` and `tools.jackson.core:jackson-databind`.
 
 Authenticated JSON is serialized once. The resulting `byte[]` is both the raw
@@ -700,10 +700,10 @@ application mapper. Boot 4 tests cover Jackson 2 absence, Problem Detail, naming
 strategy, Java time, unknown properties, and mock-helper byte parity. See the
 [Jackson migration guide](28-spring-boot-4-jackson-migration.md).
 
-### V19 optional integrations on Boot 4
+### V20 optional integrations on Boot 4
 
-The isolated Boot 4 profile manages Resilience4j `2.4.0`, including the
-published `resilience4j-spring-boot4` generation, while the Boot 3.5 maintenance
+The default Boot 4 reactor manages Resilience4j `2.4.0`, including the published
+`resilience4j-spring-boot4` generation, while the Boot 3.5 `2.14.1` maintenance
 line remains on `2.2.0`. Retry, circuit breaker, bulkhead, rate limiter, and
 tagged metrics tests pass with Spring Framework 7 and the Boot-managed Reactor
 line. A combined minimal-classpath test hides Resilience4j, Micrometer core,

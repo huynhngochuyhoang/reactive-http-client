@@ -198,6 +198,15 @@ class DocumentationReleaseArtifactTest {
                 .contains("Before, Boot 3.5 and starter 2.x")
                 .contains("After, Boot 4 and starter 3.x")
                 .contains("GraalVM Java 25")
+                .contains("## Choose the release lane")
+                .contains("must remain on Boot 3.5")
+                .contains("## Before and after application code")
+                .contains("org.springframework.boot.webclient.WebClientCustomizer")
+                .contains("include: health,rhttpclients")
+                .contains("show-details: when-authorized")
+                .contains(".withExchangeLogger(logger)")
+                .contains("## Independent Boot 4 consumer")
+                .contains("scripts/verify-publishable-artifacts.sh")
                 .contains("requires no\nconfiguration-metadata entry or reflection hint");
         assertThat(report)
                 .contains("published 2.14.1", "Frozen baseline surface")
@@ -224,6 +233,34 @@ class DocumentationReleaseArtifactTest {
                 .contains("HttpClientHealthIndicator.class")
                 .contains("Boot4HttpClientHealthIndicator.class")
                 .contains("Unreviewed cross-major API change detected");
+    }
+
+    @Test
+    void boot4PublicGuidesPointToMigrationAndCurrentOperationsContracts() throws IOException {
+        Path root = projectRoot();
+        for (String guide : List.of(
+                "README.md",
+                "docs/01-quick-start.md",
+                "docs/02-annotations.md",
+                "docs/06-auth-providers.md",
+                "docs/07-resilience4j.md",
+                "docs/08-observability.md",
+                "docs/20-native-release-compatibility.md",
+                "docs/22-benchmarks.md",
+                "docs/26-support-bundles.md")) {
+            assertThat(Files.readString(root.resolve(guide)))
+                    .as(guide)
+                    .contains("28-spring-boot-4-jackson-migration.md");
+        }
+
+        assertThat(Files.readString(root.resolve("docs/08-observability.md")))
+                .contains("Boot4HttpClientHealthIndicator")
+                .contains("include: health,rhttpclients")
+                .contains("show-details: when-authorized")
+                .doesNotContain("auto-registers `HttpClientHealthIndicator`");
+        assertThat(Files.readString(root.resolve("docs/07-resilience4j.md")))
+                .contains("starter `3.x`\nBoot 4 reactor uses `2.4.0`")
+                .doesNotContain("The V19 Boot 4 build");
     }
 
     @Test
