@@ -34,16 +34,13 @@ for artifact in "${ARTIFACTS[@]}"; do
   pom="$artifact_dir/$artifact-$BASELINE_VERSION.pom"
   jar="$artifact_dir/$artifact-$BASELINE_VERSION.jar"
 
-  [[ -f "$marker" ]] || fail "missing remote marker for $artifact:$BASELINE_VERSION"
-  if [[ -f "$pom" ]]; then
-    grep -Eq "^$artifact-$BASELINE_VERSION\\.pom>maven-central=$" "$marker" \
-      || fail "$artifact POM was not resolved from Maven Central"
-    sha256sum "$pom" >> "$CHECKSUMS"
-  fi
+  [[ -f "$marker" && -f "$pom" ]] \
+    || fail "missing published POM or remote marker for $artifact:$BASELINE_VERSION"
+  grep -Eq "^$artifact-$BASELINE_VERSION\\.pom>maven-central=$" "$marker" \
+    || fail "$artifact POM was not resolved from Maven Central"
+  sha256sum "$pom" >> "$CHECKSUMS"
 
-  if [[ "$artifact" == "reactive-http-client" ]]; then
-    [[ -f "$pom" ]] || fail "missing published parent POM for $artifact:$BASELINE_VERSION"
-  else
+  if [[ "$artifact" != "reactive-http-client" ]]; then
     [[ -f "$jar" ]] || fail "missing published jar for $artifact:$BASELINE_VERSION"
     grep -Eq "^$artifact-$BASELINE_VERSION\\.jar>maven-central=$" "$marker" \
       || fail "$artifact jar was not resolved from Maven Central"

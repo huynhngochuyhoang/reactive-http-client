@@ -8,7 +8,8 @@ ARTIFACT="reactive-http-client-starter"
 BASE="$ROOT_DIR/target/published-baseline-repositories"
 WORK="$ROOT_DIR/target/published-baseline-provenance-fixtures"
 
-rm -rf "$BASE/fixture-local-$VERSION" "$BASE/fixture-central-$VERSION" "$BASE/fixture-mixed-$VERSION" "$WORK"
+rm -rf "$BASE/fixture-local-$VERSION" "$BASE/fixture-central-$VERSION" \
+  "$BASE/fixture-missing-pom-$VERSION" "$BASE/fixture-mixed-$VERSION" "$WORK"
 
 seed_artifact() {
   local lane="$1"
@@ -35,6 +36,14 @@ seed_artifact fixture-central "maven-central="
   fixture-central "$VERSION" "$WORK/central" "$ARTIFACT"
 grep -q 'source=Maven Central' "$WORK/central/provenance.properties"
 test "$(wc -l < "$WORK/central/project-artifact-sha256.txt")" -eq 2
+
+seed_artifact fixture-missing-pom "maven-central="
+rm "$BASE/fixture-missing-pom-$VERSION/$GROUP_PATH/$ARTIFACT/$VERSION/$ARTIFACT-$VERSION.pom"
+if "$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
+    fixture-missing-pom "$VERSION" "$WORK/missing-pom" "$ARTIFACT"; then
+  echo "Central-marked JAR without its module POM unexpectedly passed" >&2
+  exit 1
+fi
 
 seed_artifact fixture-mixed "maven-central="
 candidate_dir="$BASE/fixture-mixed-$VERSION/$GROUP_PATH/$ARTIFACT/3.1.0-SNAPSHOT"

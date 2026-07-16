@@ -235,7 +235,9 @@ normal minor-line CI. A fresh repository prevents a stale or locally installed
 artifact from understating the current delta. Every published baseline lane uses
 `target/published-baseline-repositories/<lane>-<version>` and records Maven
 Central markers plus SHA-256 values under
-`target/release-evidence/published-baselines/`. Keep the absence check, Maven
+`target/release-evidence/published-baselines/`. Every module baseline must
+contain both its Maven Central-marked POM and JAR before provenance is accepted.
+Keep the absence check, Maven
 invocation, and `verify-published-baseline-provenance.sh` call in one `&&` chain.
 Run `bash scripts/verify-published-baseline-fixtures.sh` to prove that a seeded
 locally installed candidate is rejected while Central-marked artifacts pass.

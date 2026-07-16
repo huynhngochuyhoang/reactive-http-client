@@ -126,6 +126,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("3.0.0");
         assertThat(pomProperty(pomXml, "spring-boot.version")).isEqualTo("4.0.0");
         assertThat(pomProperty(pomXml, "resilience4j.version")).isEqualTo("2.4.0");
+        assertThat(pomXml)
+                .contains("<id>resolve-published-api-baseline-pom</id>")
+                .contains("${project.groupId}:${project.artifactId}:${api.compatibility.baseline.version}:pom")
+                .contains("<transitive>false</transitive>");
         assertThat(readme)
                 .contains("<version>3.0.0</version>")
                 .doesNotContain("<version>3.1.0");
@@ -223,11 +227,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("_remote.repositories")
                 .contains("maven-central=")
                 .contains("sha256sum")
+                .contains("missing published POM or remote marker")
                 .contains("candidate or unrelated project version")
                 .contains("evidence must remain under target/");
         assertThat(provenanceFixtures)
                 .contains("fixture-local")
                 .contains("fixture-central")
+                .contains("Central-marked JAR without its module POM unexpectedly passed")
                 .contains("3.1.0-SNAPSHOT")
                 .contains("conflicting local candidate unexpectedly passed");
         assertThat(workflow)
