@@ -91,7 +91,7 @@ the collection contract, so provider-only strict flags remain unknown.
 
 Snapshots fail explicitly instead of returning partial counts when they exceed
 256 clients, 10,000 aggregate endpoints, 512 characters in an exported text
-field, or 1 MiB of rendered JSON/Markdown. These limits bound support-output
+field, or 1 MiB of UTF-8 encoded JSON/Markdown. These limits bound support-output
 size and client/interface cardinality; `clientCount`, `endpointCount`, and
 `inheritedEndpointCount` therefore always describe every emitted client.
 

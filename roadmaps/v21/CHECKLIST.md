@@ -281,7 +281,7 @@ Evidence:
 - Diagnostics JSON, map, Markdown, and the opt-in `rhttpclients` endpoint now declare additive `schemaVersion=1`; existing v1 fields retain their names, types, and meanings within the `3.x` line.
 - `disabled` identifies policy that is not applied, `unavailable` identifies enabled resilience whose optional runtime operator is absent, provider-backed strict flags use true/false, and collection-backed provider-only flags remain null/unknown.
 - Snapshot rendering preserves overridden `clientSummaries()` behavior through class-based Spring proxies and never resolves lazy auth providers or creates missing resilience instances.
-- Rendering rejects partial or ambiguous output beyond 256 clients, 10,000 aggregate endpoints, 512 characters per exported text field, or 1 MiB of JSON/Markdown; count fields therefore describe every emitted client.
+- Rendering rejects partial or ambiguous output beyond 256 clients, 10,000 aggregate endpoints, 512 characters per exported text field, or 1 MiB of UTF-8 encoded JSON/Markdown; count fields therefore describe every emitted client.
 - Added `docs/fixtures/rhttpclients-schema-v1.json` as the exact sanitized schema fixture. Regression tests reject credentials, sensitive headers, bodies, concrete URLs, provider bean names, and common machine-local path prefixes.
 - `docs/21-diagnostic-contexts.md` now inventories schema fields, value semantics, limits, proxy behavior, and metadata ownership; `docs/26-support-bundles.md` links the schema contract while retaining explicit endpoint exposure and health-detail opt-in.
 - Passed focused diagnostics, effective-contract, endpoint, documentation, metadata, Markdown-link, and AOT tests; passed all 743 starter tests.

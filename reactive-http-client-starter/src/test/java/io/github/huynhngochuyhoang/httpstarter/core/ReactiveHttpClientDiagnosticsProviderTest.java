@@ -498,12 +498,32 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 Collections.nCopies(256, verbose)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("JSON diagnostics snapshot")
-                .hasMessageContaining("1048576 character limit");
+                .hasMessageContaining("1048576 byte limit");
         assertThatThrownBy(() -> ReactiveHttpClientDiagnosticsSnapshot.toMap(
                 Collections.nCopies(256, verbose)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("JSON diagnostics snapshot")
-                .hasMessageContaining("1048576 character limit");
+                .hasMessageContaining("1048576 byte limit");
+
+        String maximumMultibyteText = "界".repeat(512);
+        ReactiveHttpClientDiagnosticsProvider.ClientSummary multibyteVerbose =
+                new ReactiveHttpClientDiagnosticsProvider.ClientSummary(
+                        maximumMultibyteText, maximumMultibyteText, maximumMultibyteText,
+                        new ReactiveHttpClientDiagnosticsProvider.TimeoutSummary(maximumMultibyteText, 0),
+                        new ReactiveHttpClientDiagnosticsProvider.ResilienceSummary(
+                                false, maximumMultibyteText, maximumMultibyteText,
+                                maximumMultibyteText, maximumMultibyteText),
+                        maximumMultibyteText, false, 1, 0);
+        assertThatThrownBy(() -> ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                Collections.nCopies(128, multibyteVerbose)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("JSON diagnostics snapshot")
+                .hasMessageContaining("1048576 byte limit");
+        assertThatThrownBy(() -> ReactiveHttpClientDiagnosticsSnapshot.toMarkdown(
+                Collections.nCopies(128, multibyteVerbose)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Markdown diagnostics snapshot")
+                .hasMessageContaining("1048576 byte limit");
     }
 
     @Test

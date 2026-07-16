@@ -4,6 +4,7 @@ import org.springframework.util.ClassUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -24,7 +25,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     private static final int MAX_CLIENTS = 256;
     private static final int MAX_ENDPOINTS = 10_000;
     private static final int MAX_TEXT_LENGTH = 512;
-    private static final int MAX_RENDERED_CHARACTERS = 1_048_576;
+    private static final int MAX_RENDERED_BYTES = 1_048_576;
     private static final String POM_PROPERTIES =
             "META-INF/maven/io.github.huynhngochuyhoang/reactive-http-client-starter/pom.properties";
 
@@ -261,11 +262,12 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     }
 
     private static String boundedOutput(StringBuilder out, String format) {
-        if (out.length() > MAX_RENDERED_CHARACTERS) {
+        String rendered = out.toString();
+        if (rendered.getBytes(StandardCharsets.UTF_8).length > MAX_RENDERED_BYTES) {
             throw new IllegalArgumentException(format + " diagnostics snapshot exceeds the "
-                    + MAX_RENDERED_CHARACTERS + " character limit");
+                    + MAX_RENDERED_BYTES + " byte limit");
         }
-        return out.toString();
+        return rendered;
     }
 
     private record SnapshotClient(
