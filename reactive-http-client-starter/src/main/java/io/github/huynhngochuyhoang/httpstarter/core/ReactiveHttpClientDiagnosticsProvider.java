@@ -96,7 +96,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 ? clientConfig
                 : new ReactiveHttpClientProperties.ClientConfig();
         List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
-                clientInterface, clientName, resolvedConfig, metadataCache, resilienceOperatorApplier);
+                clientInterface, clientName, resolvedConfig, metadataCache, resilienceOperatorApplier, null, false);
         long inherited = contracts.stream()
                 .filter(EffectiveHttpClientContract::inherited)
                 .count();

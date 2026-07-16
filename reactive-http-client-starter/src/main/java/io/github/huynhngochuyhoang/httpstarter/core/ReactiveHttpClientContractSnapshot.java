@@ -130,8 +130,8 @@ public final class ReactiveHttpClientContractSnapshot {
                     .toList();
 
             StringBuilder markdown = new StringBuilder();
-            markdown.append("| Client | Interface | Declared By | Inherited | Method | Generic Bindings | Response Type | Body Type | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Timeout | Resilience | Redirect | Body |\n");
-            markdown.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+            markdown.append("| Client | Interface | Declared By | Inherited | Method | Generic Bindings | Response Type | Body Type | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Timeout | Resilience | Redirect | Auth | Body |\n");
+            markdown.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
             for (EffectiveHttpClientContract contract : contracts) {
                 markdown.append("| ")
                         .append(cell(contract.clientName())).append(" | ")
@@ -151,6 +151,7 @@ public final class ReactiveHttpClientContractSnapshot {
                         .append(cell(timeout(contract.timeout()))).append(" | ")
                         .append(cell(resilience(contract.resilience()))).append(" | ")
                         .append(cell(contract.redirectPolicy())).append(" | ")
+                        .append(cell(contract.authMode())).append(" | ")
                         .append(cell(contract.bodyRepeatability())).append(" |\n");
             }
             return markdown.toString();

@@ -18,6 +18,7 @@ record EffectiveHttpClientContract(
         TimeoutPolicy timeout,
         ResiliencePolicy resilience,
         String redirectPolicy,
+        String authMode,
         RequestBodyRepeatability bodyRepeatability
 ) {
 

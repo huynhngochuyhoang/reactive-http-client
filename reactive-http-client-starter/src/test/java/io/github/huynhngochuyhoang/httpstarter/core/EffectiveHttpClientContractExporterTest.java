@@ -11,6 +11,8 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class EffectiveHttpClientContractExporterTest {
 
@@ -43,7 +45,41 @@ class EffectiveHttpClientContractExporterTest {
         assertThat(contract.resilience()).isEqualTo(new EffectiveHttpClientContract.ResiliencePolicy(
                 "method-retry", "client-rate-limiter", "client-circuit-breaker", "client-bulkhead"));
         assertThat(contract.redirectPolicy()).isEqualTo("follow");
+        assertThat(contract.authMode()).isEqualTo("none");
         assertThat(contract.bodyRepeatability()).isEqualTo(RequestBodyRepeatability.REPEATABLE);
+    }
+
+    @Test
+    void requestPlanExportDiagnosticsAndSnapshotShareEffectivePolicy() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setBaseUrl("https://contract.example");
+        config.setFollowRedirects(true);
+        config.setAuthProvider("namedAuthProvider");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(Set.of("POST"));
+        config.getResilience().setRetry("client-retry");
+
+        MethodMetadata metadata = metadataCache.get(DirectClient.class.getMethod("create", String.class));
+        RequestPlan plan = RequestPlan.from(metadata, DirectClient.class);
+        EffectiveHttpClientContract contract = onlyContract(DirectClient.class, config);
+        ReactiveHttpClientDiagnosticsProvider.ClientSummary summary =
+                ReactiveHttpClientDiagnosticsProvider.clientSummary(
+                        DirectClient.class, "diagnostic-client", config, metadataCache, null);
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(DirectClient.class, "diagnostic-client", config)
+                .render();
+
+        assertThat(contract.httpMethod()).isEqualTo(plan.httpMethod());
+        assertThat(contract.pathTemplate()).isEqualTo(plan.pathTemplate());
+        assertThat(contract.responseType()).isEqualTo(EffectiveHttpClientContractExporter.typeName(plan.responseType()));
+        assertThat(contract.bodyType()).isEqualTo(EffectiveHttpClientContractExporter.typeName(plan.bodyType()));
+        assertThat(contract.authMode()).isEqualTo(summary.authMode()).isEqualTo("provider-bean");
+        assertThat(contract.redirectPolicy()).isEqualTo(summary.followRedirects() ? "follow" : "manual");
+        assertThat(contract.timeout().source()).isEqualTo(summary.timeout().source());
+        assertThat(contract.timeout().timeoutMs()).isEqualTo(summary.timeout().timeoutMs());
+        assertThat(snapshot)
+                .contains("| Auth |")
+                .contains("| follow | provider-bean | REPEATABLE |");
     }
 
     @Test
@@ -155,6 +191,31 @@ class EffectiveHttpClientContractExporterTest {
     }
 
     @Test
+    void exportsDeprecatedTimeoutWhenItIsTheOnlyConfiguredSource() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getResilience().setTimeoutMs(900);
+
+        EffectiveHttpClientContract contract = onlyContract(NoTimeoutClient.class, config);
+
+        assertThat(contract.timeout())
+                .isEqualTo(new EffectiveHttpClientContract.TimeoutPolicy("deprecated-resilience", 900));
+    }
+
+    @Test
+    void reportsConfiguredObjectAuthWithoutExportingCredentials() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType("oauth2-client-credentials");
+        auth.getOauth2ClientCredentials().setClientSecret("secret");
+        config.setAuth(auth);
+
+        EffectiveHttpClientContract contract = onlyContract(NoTimeoutClient.class, config);
+
+        assertThat(contract.authMode()).isEqualTo("oauth2-client-credentials");
+        assertThat(contract.toString()).doesNotContain("secret");
+    }
+
+    @Test
     void reportsRetryDisabledForNonRetryableMethods() {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilience = config.getResilience();
@@ -183,6 +244,27 @@ class EffectiveHttpClientContractExporterTest {
 
         assertThat(contract.resilience()).isEqualTo(new EffectiveHttpClientContract.ResiliencePolicy(
                 "disabled", "disabled", "disabled", "disabled"));
+    }
+
+    @Test
+    void failsExportWhenMethodLevelResilienceInstanceIsMissing() {
+        ResilienceOperatorApplier applier = mock(ResilienceOperatorApplier.class);
+        when(applier.isInstanceConfigured(ResilienceOperatorApplier.InstanceType.RETRY, "method-retry"))
+                .thenReturn(false);
+
+        ReactiveHttpClientProperties.ClientConfig config = enabledResilienceConfig();
+        assertThatThrownBy(() -> EffectiveHttpClientContractExporter.export(
+                DirectClient.class, "diagnostic-client", config, metadataCache, applier))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("undefined Resilience4j instance")
+                .hasMessageContaining("(\"method-retry\")")
+                .hasMessageContaining("DirectClient#create");
+        assertThatThrownBy(() -> ReactiveHttpClientContractSnapshot.markdown()
+                .client(DirectClient.class, "diagnostic-client", config)
+                .resilienceOperatorApplier(applier)
+                .render())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("undefined Resilience4j instance");
     }
 
     @Test
@@ -240,6 +322,12 @@ class EffectiveHttpClientContractExporterTest {
                 .hasMessageContaining("@ApiRef(\"item.lookup\")")
                 .hasMessageContaining("URI template variables [id]")
                 .hasMessageContaining("without matching @PathVar parameters");
+    }
+
+    private static ReactiveHttpClientProperties.ClientConfig enabledResilienceConfig() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getResilience().setEnabled(true);
+        return config;
     }
 
     private EffectiveHttpClientContract onlyContract(Class<?> clientInterface,
