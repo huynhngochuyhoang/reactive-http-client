@@ -10,7 +10,6 @@ import org.springframework.aot.generate.ClassNameGenerator;
 import org.springframework.aot.generate.DefaultGenerationContext;
 import org.springframework.aot.generate.InMemoryGeneratedFiles;
 import org.springframework.aot.hint.ExecutableHint;
-import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 import org.springframework.beans.factory.FactoryBean;
@@ -46,12 +45,10 @@ class ReactiveHttpClientAotSmokeTest {
                 .accepts(hints);
         assertThat(hints.reflection().getTypeHint(Body.class)).isNotNull();
         assertThat(hints.reflection().getTypeHint(MultipartBody.class)).isNotNull();
-        assertThat(hints.reflection().getTypeHint(Body.class).getMemberCategories())
-                .containsExactly(MemberCategory.INTROSPECT_DECLARED_METHODS);
-        assertThat(hints.reflection().getTypeHint(MultipartBody.class).getMemberCategories())
-                .containsExactly(MemberCategory.INTROSPECT_DECLARED_METHODS);
+        assertThat(hints.reflection().getTypeHint(Body.class).getMemberCategories()).isEmpty();
+        assertThat(hints.reflection().getTypeHint(MultipartBody.class).getMemberCategories()).isEmpty();
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClient.class).getMemberCategories())
-                .containsExactly(MemberCategory.INTROSPECT_DECLARED_METHODS);
+                .isEmpty();
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.class).getMemberCategories())
                 .isEmpty();
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.class).fields())
@@ -117,9 +114,6 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(generationContext.getRuntimeHints().reflection()
                 .getTypeHint(ChildSmokeClient.class).methods().map(ExecutableHint::getName))
                 .contains("parentPing");
-        assertThat(generationContext.getRuntimeHints().reflection()
-                .getTypeHint(ChildSmokeClient.class).getMemberCategories())
-                .contains(MemberCategory.INTROSPECT_PUBLIC_METHODS);
         context.close();
     }
 
@@ -158,9 +152,6 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(generationContext.getRuntimeHints().reflection()
                 .getTypeHint(InheritedAotSmokeClient.class).methods().map(ExecutableHint::getName))
                 .contains("inheritedPing");
-        assertThat(generationContext.getRuntimeHints().reflection()
-                .getTypeHint(InheritedAotSmokeClient.class).getMemberCategories())
-                .contains(MemberCategory.INTROSPECT_PUBLIC_METHODS);
         context.close();
     }
 

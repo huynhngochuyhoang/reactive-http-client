@@ -4,7 +4,6 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
 import org.springframework.aot.hint.ExecutableMode;
-import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
 
@@ -71,8 +70,6 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
     @Override
     public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
         for (Class<?> annotationType : ANNOTATION_TYPES) {
-            hints.reflection().registerType(annotationType,
-                    MemberCategory.INTROSPECT_DECLARED_METHODS);
             registerDeclaredMethods(hints, annotationType);
         }
         for (Class<?> configurationType : CONFIGURATION_TYPES) {
