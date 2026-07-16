@@ -200,11 +200,12 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     @Override
     public void destroy() {
         if (connectionProvider != null) {
-            connectionProvider.disposeLater()
-                    .subscribe(
-                            null,
-                            e -> log.warn("Error while disposing ConnectionProvider for client [{}]",
-                                    type != null ? type.getSimpleName() : "?", e));
+            try {
+                connectionProvider.disposeLater().block(Duration.ofSeconds(5));
+            } catch (RuntimeException e) {
+                log.warn("Error while disposing ConnectionProvider for client [{}]",
+                        type != null ? type.getSimpleName() : "?", e);
+            }
         }
     }
 

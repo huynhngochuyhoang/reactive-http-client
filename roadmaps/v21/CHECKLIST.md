@@ -175,66 +175,81 @@ Evidence:
 
 ## Priority 5 - Transport Resource-Ownership Stress Suite
 
-### [ ] 5.1 Add real pooled-transport stress fixtures
+### [x] 5.1 Add real pooled-transport stress fixtures
 
-- [ ] Use a real Reactor Netty server and a bounded client connection pool.
-- [ ] Cover POST followed by PUT on a reused HTTP/1.1 connection.
-- [ ] Cover mixed bodied and bodiless success responses.
-- [ ] Cover unexpected bodies for endpoints declared as `Void`.
-- [ ] Cover redirect-following enabled and disabled.
-- [ ] Cover response timeout before headers and after headers.
-- [ ] Cover cancellation before response body consumption.
-- [ ] Cover concurrent subscriptions to the same cold client publisher.
-- [ ] Assert request framing remains transport-owned.
+- [x] Use a real Reactor Netty server and a bounded client connection pool.
+- [x] Cover POST followed by PUT on a reused HTTP/1.1 connection.
+- [x] Cover mixed bodied and bodiless success responses.
+- [x] Cover unexpected bodies for endpoints declared as `Void`.
+- [x] Cover redirect-following enabled and disabled.
+- [x] Cover response timeout before headers and after headers.
+- [x] Cover cancellation before response body consumption.
+- [x] Cover concurrent subscriptions to the same cold client publisher.
+- [x] Assert request framing remains transport-owned.
 
-### [ ] 5.2 Verify drain, streaming, and retry ownership
+### [x] 5.2 Verify drain, streaming, and retry ownership
 
-- [ ] Verify cancellation and timeout paths release or drain starter-owned bodies.
-- [ ] Verify pooled connections remain reusable after bodiless and error responses.
-- [ ] Verify `ResponseEntity<Flux<DataBuffer>>` remains owned by the caller until consume or cancel.
-- [ ] Verify delayed streaming body subscription works against a real `WebClient` transport.
-- [ ] Verify discarded `DataBuffer` instances are released.
-- [ ] Verify retry does not silently make non-repeatable bodies repeatable.
-- [ ] Verify factory destruction completes connection-provider disposal deterministically.
-- [ ] Assert bounded connection, pending-acquire, and disposal state.
-- [ ] Run transport-focused tests repeatedly and run `git diff --check`.
+- [x] Verify cancellation and timeout paths release or drain starter-owned bodies.
+- [x] Verify pooled connections remain reusable after bodiless and error responses.
+- [x] Verify `ResponseEntity<Flux<DataBuffer>>` remains owned by the caller until consume or cancel.
+- [x] Verify delayed streaming body subscription works against a real `WebClient` transport.
+- [x] Verify discarded `DataBuffer` instances are released.
+- [x] Verify retry does not silently make non-repeatable bodies repeatable.
+- [x] Verify factory destruction completes connection-provider disposal deterministically.
+- [x] Assert bounded connection, pending-acquire, and disposal state.
+- [x] Run transport-focused tests repeatedly and run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added `TransportResourceOwnershipStressTest` around a real Reactor Netty server and production `ReactiveHttpClientFactoryBean` with `maxConnections=1` and a bounded pending-acquire timeout.
+- The real transport matrix keeps POST then PUT framing transport-owned, reuses one HTTP/1.1 channel across bodied, bodiless, unexpected-body, 5xx-drain, and probe calls, and rejects application-supplied `Content-Length` before exchange.
+- Redirect-disabled calls expose 302 while redirect-enabled calls reach the final 200 response on the bounded pool.
+- Before-header and between-chunk response timeouts, cancellation after headers but before the first body chunk, cancellation after one chunk, and subsequent probe calls complete without exhausting the pool.
+- Concurrent subscriptions to the same cold `Mono` queue behind the one-connection pool, complete independently on the reused channel, and never exceed one active server request.
+- Real `ResponseEntity<Flux<DataBuffer>>` envelopes remain consumable after delayed inner subscription; caller-consumed buffers are released explicitly and cancellation returns capacity for a probe call.
+- `ReactiveHttpClientFactoryBean.destroy()` now blocks for bounded connection-provider disposal, and the stress fixture verifies `isDisposed()` immediately after return.
+- Passed the grouped `Framework7TransportCorrectnessTest`, `ResponseEntitySupportTest`, `StreamingResponseTest`, `ErrorBodyCaptureTest`, and `ReactiveClientInvocationHandlerRetrySafetyTest` ownership regressions.
+- Passed `TransportResourceOwnershipStressTest` five consecutive times and `git diff --check`.
 
 ---
 
 ## Priority 6 - Effective Contract Parity
 
-### [ ] 6.1 Build one effective-contract fixture matrix
+### [x] 6.1 Build one effective-contract fixture matrix
 
-- [ ] Cover directly declared endpoints.
-- [ ] Cover inherited endpoints.
-- [ ] Cover nested generic bindings.
-- [ ] Cover configured `@ApiRef` endpoints.
-- [ ] Cover method, API-map, client, deprecated, and disabled timeout sources.
-- [ ] Cover retry, rate limiter, circuit breaker, and bulkhead availability.
-- [ ] Cover redirect and auth modes.
-- [ ] Cover request and response generic types.
-- [ ] Cover invalid method, path variable, API reference, and resilience configurations.
+- [x] Cover directly declared endpoints.
+- [x] Cover inherited endpoints.
+- [x] Cover nested generic bindings.
+- [x] Cover configured `@ApiRef` endpoints.
+- [x] Cover method, API-map, client, deprecated, and disabled timeout sources.
+- [x] Cover retry, rate limiter, circuit breaker, and bulkhead availability.
+- [x] Cover redirect and auth modes.
+- [x] Cover request and response generic types.
+- [x] Cover invalid method, path variable, API reference, and resilience configurations.
 
-### [ ] 6.2 Compare every contract surface
+### [x] 6.2 Compare every contract surface
 
-- [ ] Compare startup validation with `RequestPlan` resolution.
-- [ ] Compare runtime invocation with effective contract export.
-- [ ] Compare contract snapshot output with startup diagnostics.
-- [ ] Compare lifecycle and observer final metadata with the actual outbound request.
-- [ ] Compare `MockReactiveHttpClient` behavior with a real production proxy.
-- [ ] Preserve subscription-local headers, keys, attempt counts, and terminal state.
-- [ ] Ensure diagnostics do not instantiate lazy auth providers.
-- [ ] Ensure diagnostics do not create missing resilience instances.
-- [ ] Keep invalid contracts from being exported or snapshotted as placeholders.
-- [ ] Run focused parity tests, full starter tests, and `git diff --check`.
+- [x] Compare startup validation with `RequestPlan` resolution.
+- [x] Compare runtime invocation with effective contract export.
+- [x] Compare contract snapshot output with startup diagnostics.
+- [x] Compare lifecycle and observer final metadata with the actual outbound request.
+- [x] Compare `MockReactiveHttpClient` behavior with a real production proxy.
+- [x] Preserve subscription-local headers, keys, attempt counts, and terminal state.
+- [x] Ensure diagnostics do not instantiate lazy auth providers.
+- [x] Ensure diagnostics do not create missing resilience instances.
+- [x] Keep invalid contracts from being exported or snapshotted as placeholders.
+- [x] Run focused parity tests, full starter tests, and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- `EffectiveHttpClientContractExporterTest` is the shared matrix for direct, inherited, nested-generic, configured `@ApiRef`, request/response type, timeout-source, resilience-availability, redirect, and auth contracts.
+- Effective contracts now export the same sanitized auth mode used by startup diagnostics; deterministic Markdown snapshots include the `Auth` column without provider names or credentials.
+- Explicit exports and contract snapshots reject missing `@Retry`, `@RateLimiter`, `@CircuitBreaker`, and `@Bulkhead` instances through non-creating `isInstanceConfigured` checks when resilience is enabled.
+- Provider-backed support diagnostics intentionally use non-validating export so lazy diagnostics neither instantiate auth providers nor create or reject missing resilience registry entries before proxy startup.
+- Existing startup/runtime parity suites cover invalid verb and body metadata, path variables, API refs, effective timeout precedence, final outbound lifecycle/observer metadata, subscription-local idempotency and attempt state, and real redirect behavior.
+- `MockReactiveHttpClientTest` and `Boot4MockReactiveHttpClientTest` pass all 33 helper tests for production-aligned names, URLs, final headers, auth, retries, idempotency, hooks, and logger selection.
+- Added test-scope `spring-boot-actuator-autoconfigure` so the packaged Boot 4 auto-configuration application fixture has its complete split-module test classpath.
+- Passed 40 focused exporter/snapshot/diagnostics tests, all 742 starter tests, all 33 test-helper tests, and `git diff --check`.
 
 ---
 
