@@ -109,6 +109,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     private static Map<String, Object> toMapEntries(Collection<SnapshotClient> entries) {
         List<SnapshotClient> clients = sortedEntries(entries);
+        renderJsonEntries(clients);
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("schemaVersion", SCHEMA_VERSION);
         snapshot.put("projectVersion", projectVersion());
@@ -149,6 +150,10 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     private static String toJsonEntries(Collection<SnapshotClient> entries) {
         List<SnapshotClient> clients = sortedEntries(entries);
+        return renderJsonEntries(clients);
+    }
+
+    private static String renderJsonEntries(List<SnapshotClient> clients) {
         StringBuilder out = new StringBuilder(512 + clients.size() * 288);
         out.append("{\n");
         field(out, 1, "schemaVersion", SCHEMA_VERSION, true);

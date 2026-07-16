@@ -499,6 +499,11 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("JSON diagnostics snapshot")
                 .hasMessageContaining("1048576 character limit");
+        assertThatThrownBy(() -> ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                Collections.nCopies(256, verbose)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("JSON diagnostics snapshot")
+                .hasMessageContaining("1048576 character limit");
     }
 
     @Test
