@@ -90,6 +90,50 @@ The immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`.
 Create a dedicated maintenance branch from that tag for security or critical
 correctness fixes; do not compile Boot 3 adapters into the `3.x` artifacts.
 
+### Boot 3.5 maintenance-lane rehearsal
+
+`v2.14.1` at commit `f0a1989eb7d19c702c530301798dc34fa4d3819b`
+is the latest immutable `2.x` release tag. The maintenance lane has no
+permanently advancing branch: when a security or critical transport/correctness
+fix is approved, create `maintenance/2.14.x` from that tag, make only the
+required fix and regression test, and delete the branch after publishing the
+patch. This policy does not declare an end-of-life date for `2.x`.
+
+Reconstruct the release and its `2.14.0` API baseline from clean, isolated
+state with:
+
+```bash
+scripts/verify-maintenance-lane-fixtures.sh
+scripts/verify-maintenance-lane.sh v2.14.1 2.14.0
+```
+
+The verifier checks the local tag against `origin`, creates a detached
+worktree, resolves all dependencies and the published API predecessor through
+Maven Central into a fresh target-local repository, and runs the historical
+release plus strict compatibility profiles. It requires Boot 3.5 and Jackson 2
+in the dependency tree, rejects Boot 4/Jackson 3 implementation entries, and
+requires binary, source, and Javadoc artifacts for all three modules. Release
+effective POMs must retain GPG signing and Central Portal wiring. Actual signing
+and deployment remain credentialed manual release operations and are not
+performed by this rehearsal.
+
+Evidence is written only below
+`target/release-evidence/maintenance-2x-2.14.1/`: exact commands, local and
+remote tag commits, effective POMs, dependency trees, artifact entry lists,
+maintenance artifact hashes, and Maven Central markers plus hashes for the
+published `2.14.0` parent, starter, test-helper, and OTel baseline. The manual
+`Boot 3.5 Maintenance Lane` workflow runs the same contract from a checkout
+that includes tags.
+
+Apply a shared fix to `maintenance/2.14.x` first so the vulnerable published
+lane receives the smallest reviewable patch. After that patch is validated,
+forward-port the fix and equivalent regression test to `3.x`; adapt APIs only
+where Boot 4, Framework 7, or Jackson 3 ownership differs. Never merge the
+whole maintenance branch into `3.x`, and never backport unrelated `3.x`
+features. Normal `3.x` builds continue to run
+`scripts/verify-generation-packaging.sh`, which rejects Boot 3 source roots,
+classes, and attached artifacts.
+
 ### V18 dependency patch review (historical)
 
 The V18 review on `2026-07-10` compared the pinned Spring Boot `3.5.0` BOM with
