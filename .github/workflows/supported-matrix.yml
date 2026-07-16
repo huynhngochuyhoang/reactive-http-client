@@ -1,0 +1,32 @@
+name: Supported Dependency Matrix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Verify supported dependency matrix
+        run: scripts/verify-supported-matrix.sh
+
+      - name: Upload matrix evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supported-dependency-matrix
+          path: target/release-evidence/v21-priority9/
+          retention-days: 14

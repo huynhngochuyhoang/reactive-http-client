@@ -26,6 +26,47 @@ movement inherited from that Boot line, Resilience4j patch-compatible updates,
 test-only dependency updates, and benchmark harness updates that keep report
 metadata intact.
 
+### V21 resolved supported matrix
+
+The `2026-07-16` review retains Spring Boot `4.0.0` as the minimum/default row
+and `4.1.0` as the forward-compatibility row. Both rows were resolved from
+separate fresh Maven Central repositories and exercised under a complete Java
+21 JDK.
+
+| Managed dependency | Boot `4.0.0` minimum | Boot `4.1.0` forward |
+|---|---:|---:|
+| Spring Framework / WebFlux | `7.0.1` | `7.0.8` |
+| Reactor Netty HTTP | `1.3.0` | `1.3.6` |
+| Netty HTTP codec | `4.2.7.Final` | `4.2.15.Final` |
+| Jackson Databind | `3.0.2` | `3.1.4` |
+| Micrometer Core | `1.16.0` | `1.17.0` |
+| OpenTelemetry API | `1.55.0` | `1.62.0` |
+| JUnit Jupiter API | `6.0.1` | `6.0.3` |
+| Mockito Core | `5.20.0` | `5.23.0` |
+| Resilience4j | `2.4.0` | `2.4.0` |
+
+The minimum does not move: Boot 4.0, Framework 7, Jackson 3, and Java 21 remain
+the published `3.x` generation contract. Boot 4.1 is retained as a
+forward-compatibility row because its managed Framework, transport, JSON,
+observability, and test-library movement exercises the starter without forcing
+consumers to upgrade. No configuration or public API migration is required by
+this review.
+
+Run the full review with an active complete JDK 21:
+
+```bash
+scripts/verify-supported-matrix.sh
+```
+
+For each row the verifier uses a distinct temporary Maven repository, runs the
+full reactor, Spring AOT, optional-integration presence/back-off, transport
+tests, and the assembled external consumer. It then runs strict API
+compatibility against published `3.0.0` through the shared Central provenance
+guard. Effective POMs, dependency trees, resolved versions, Surefire reports,
+commands, and provenance are copied to
+`target/release-evidence/v21-priority9/`. The manual
+`Supported Dependency Matrix` workflow runs and uploads the same contract.
+
 Requires a minor release: raising the Java baseline, adding a new Spring Boot
 minor line, changing optional integrations into required runtime dependencies,
 changing the Resilience4j baseline in a way that affects operator behavior or

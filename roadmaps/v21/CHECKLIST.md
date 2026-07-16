@@ -342,31 +342,50 @@ Evidence:
 
 ## Priority 9 - Dependency and Supported-Matrix Review
 
-### [ ] 9.1 Resolve and record the supported matrix
+### [x] 9.1 Resolve and record the supported matrix
 
-- [ ] Re-evaluate the minimum supported Spring Boot 4 line when execution starts.
-- [ ] Re-evaluate the current forward-compatibility Spring Boot 4 line.
-- [ ] Resolve both rows from clean Maven repositories.
-- [ ] Record managed Spring Framework, WebFlux, Reactor Netty, Netty, Jackson,
+- [x] Re-evaluate the minimum supported Spring Boot 4 line when execution starts.
+- [x] Re-evaluate the current forward-compatibility Spring Boot 4 line.
+- [x] Resolve both rows from clean Maven repositories.
+- [x] Record managed Spring Framework, WebFlux, Reactor Netty, Netty, Jackson,
       Micrometer, OTel, Resilience4j, JUnit, and Mockito versions.
-- [ ] Keep Java 21 as the minimum unless a separate decision approves a change.
-- [ ] Document why each retained or changed baseline is supported.
+- [x] Keep Java 21 as the minimum unless a separate decision approves a change.
+- [x] Document why each retained or changed baseline is supported.
 
-### [ ] 9.2 Validate each matrix row
+### [x] 9.2 Validate each matrix row
 
-- [ ] Run full reactor tests.
-- [ ] Run generated configuration metadata and documentation tests.
-- [ ] Run the assembled current-reactor consumer.
-- [ ] Run optional-integration presence and absence tests.
-- [ ] Run AOT processing.
-- [ ] Run transport-focused tests.
-- [ ] Run strict API compatibility against published `3.0.0`.
-- [ ] Record dependency provenance in generated release evidence.
-- [ ] Run `git diff --check`.
+- [x] Run full reactor tests.
+- [x] Run generated configuration metadata and documentation tests.
+- [x] Run the assembled current-reactor consumer.
+- [x] Run optional-integration presence and absence tests.
+- [x] Run AOT processing.
+- [x] Run transport-focused tests.
+- [x] Run strict API compatibility against published `3.0.0`.
+- [x] Record dependency provenance in generated release evidence.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Retained Java 21 and Spring Boot `4.0.0` as the minimum/default contract;
+  retained Boot `4.1.0` as a forward-compatibility row without moving the
+  consumer baseline or requiring migration.
+- Boot `4.0.0` resolved Framework/WebFlux `7.0.1`, Reactor Netty `1.3.0`,
+  Netty `4.2.7.Final`, Jackson `3.0.2`, Micrometer `1.16.0`, OTel `1.55.0`,
+  JUnit `6.0.1`, and Mockito `5.20.0`.
+- Boot `4.1.0` resolved Framework/WebFlux `7.0.8`, Reactor Netty `1.3.6`,
+  Netty `4.2.15.Final`, Jackson `3.1.4`, Micrometer `1.17.0`, OTel `1.62.0`,
+  JUnit `6.0.3`, and Mockito `5.23.0`. Resilience4j remains independently
+  managed at `2.4.0` on both rows.
+- Both rows passed under Oracle JDK `21.0.8`: 743 starter, 33 test-helper, and
+  38 OTel tests plus all three assembled-consumer scenarios. These runs include
+  generated metadata/docs, optional presence/back-off, Spring AOT, and real
+  transport ownership coverage.
+- Strict japicmp passed against published `3.0.0`; Maven Central remote markers
+  and SHA-256 hashes were recorded by the shared provenance guard.
+- Effective POMs, dependency trees, resolved versions, commands, Surefire
+  reports, and provenance are under
+  `target/release-evidence/v21-priority9/`.
+- Passed `scripts/verify-supported-matrix.sh` and `git diff --check`.
 
 ---
 

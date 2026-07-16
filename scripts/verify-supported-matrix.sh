@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SETTINGS="$ROOT_DIR/.mvn/maven-central-settings.xml"
+JAVA_VERSION="$(java -version 2>&1 | head -n1)"
+JAVA_MAJOR="$(java -XshowSettings:properties -version 2>&1 \
+  | awk -F= '/java.specification.version/ { gsub(/[[:space:]]/, "", $2); print $2; exit }')"
+
+fail() {
+  echo "Supported-matrix verification failed: $*" >&2
+  exit 1
+}
+
+[[ "$JAVA_MAJOR" == "21" ]] \
+  || fail "Java 21 is required for the supported minimum; found $JAVA_VERSION"
+command -v javadoc >/dev/null \
+  || fail "a complete JDK 21 with the javadoc tool is required"
+
+PROJECT_VERSION="$(mvn -q -s "$SETTINGS" -DforceStdout help:evaluate -Dexpression=project.version)"
+BASELINE_VERSION="$(mvn -q -s "$SETTINGS" -DforceStdout help:evaluate -Dexpression=api.compatibility.baseline.version)"
+COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+ROWS=(4.0.0 4.1.0)
+MODULES=(reactive-http-client-starter reactive-http-client-test reactive-http-client-otel)
+FINAL_EVIDENCE_ROOT="$ROOT_DIR/target/release-evidence/v21-priority9"
+WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/reactive-http-client-matrix.XXXXXX")"
+EVIDENCE_ROOT="$WORK_ROOT/evidence"
+REPOSITORY_ROOT="$WORK_ROOT/repositories"
+
+[[ "$PROJECT_VERSION" == "3.1.0-SNAPSHOT" ]] \
+  || fail "expected current development version 3.1.0-SNAPSHOT, found $PROJECT_VERSION"
+[[ "$BASELINE_VERSION" == "3.0.0" ]] \
+  || fail "expected published API baseline 3.0.0, found $BASELINE_VERSION"
+[[ ! -e "$FINAL_EVIDENCE_ROOT" ]] \
+  || fail "fresh evidence directory required: $FINAL_EVIDENCE_ROOT"
+
+for boot_version in "${ROWS[@]}"; do
+  repository="$REPOSITORY_ROOT/boot-$boot_version"
+  evidence="$EVIDENCE_ROOT/boot-$boot_version"
+  [[ ! -e "$repository" ]] || fail "fresh repository required: $repository"
+  [[ ! -e "$evidence" ]] || fail "fresh evidence directory required: $evidence"
+  mkdir -p "$repository" "$evidence/effective-poms" "$evidence/surefire-reports"
+
+  maven=(mvn -B -ntp -s "$SETTINGS" "-Dmaven.repo.local=$repository"
+    "-Dspring-boot.version=$boot_version")
+
+  cat > "$evidence/commands.txt" <<EOF
+mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local=$repository -Dspring-boot.version=$boot_version clean install
+mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local=$repository -Dspring-boot.version=$boot_version -f .github/boot4-consumer/pom.xml -Dreactive-http-client.version=$PROJECT_VERSION clean test
+EOF
+
+  "${maven[@]}" -f "$ROOT_DIR/pom.xml" clean install
+  find "$ROOT_DIR" -path '*/target/surefire-reports/*.xml' \
+    -not -path '*/reactive-http-client-benchmarks/*' \
+    -not -path '*/.github/boot4-consumer/*' \
+    -exec cp {} "$evidence/surefire-reports/" \;
+
+  for module in "${MODULES[@]}"; do
+    "${maven[@]}" -f "$ROOT_DIR/$module/pom.xml" dependency:tree \
+      -DoutputFile="$evidence/dependency-tree-$module.txt"
+    "${maven[@]}" -f "$ROOT_DIR/$module/pom.xml" help:effective-pom \
+      -Doutput="$evidence/effective-poms/$module.xml"
+  done
+
+  "${maven[@]}" -f "$ROOT_DIR/.github/boot4-consumer/pom.xml" \
+    "-Dreactive-http-client.version=$PROJECT_VERSION" clean test
+  for report in "$ROOT_DIR/.github/boot4-consumer/target/surefire-reports/"*.xml; do
+    cp "$report" "$evidence/surefire-reports/consumer-$(basename "$report")"
+  done
+  "${maven[@]}" -f "$ROOT_DIR/.github/boot4-consumer/pom.xml" \
+    "-Dreactive-http-client.version=$PROJECT_VERSION" dependency:tree \
+    -DoutputFile="$evidence/dependency-tree-consumer.txt"
+  "${maven[@]}" -f "$ROOT_DIR/.github/boot4-consumer/pom.xml" \
+    "-Dreactive-http-client.version=$PROJECT_VERSION" help:effective-pom \
+    -Doutput="$evidence/effective-poms/consumer.xml"
+
+  tree="$evidence/dependency-tree-reactive-http-client-starter.txt"
+  otel_tree="$evidence/dependency-tree-reactive-http-client-otel.txt"
+  resolve_version() {
+    local source="$1"
+    local coordinate="$2"
+    local version
+    version="$(grep -m1 -E "(^|[[:space:]+\\|-])$coordinate:[^:]+:[^:]+:" "$source" \
+      | sed -E 's/^[[:space:]+\\|-]*//' | cut -d: -f4)"
+    [[ -n "$version" ]] || fail "could not resolve $coordinate for Boot $boot_version"
+    printf '%s' "$version"
+  }
+
+  resolved_boot="$(resolve_version "$tree" 'org.springframework.boot:spring-boot')"
+  [[ "$resolved_boot" == "$boot_version" ]] \
+    || fail "requested Boot $boot_version but resolved $resolved_boot"
+  {
+    echo "springBoot=$resolved_boot"
+    echo "springFramework=$(resolve_version "$tree" 'org.springframework:spring-core')"
+    echo "springWebFlux=$(resolve_version "$tree" 'org.springframework:spring-webflux')"
+    echo "reactorNetty=$(resolve_version "$tree" 'io.projectreactor.netty:reactor-netty-http')"
+    echo "netty=$(resolve_version "$tree" 'io.netty:netty-codec-http')"
+    echo "jackson=$(resolve_version "$tree" 'tools.jackson.core:jackson-databind')"
+    echo "micrometer=$(resolve_version "$tree" 'io.micrometer:micrometer-core')"
+    echo "openTelemetry=$(resolve_version "$otel_tree" 'io.opentelemetry:opentelemetry-api')"
+    echo "resilience4j=$(resolve_version "$tree" 'io.github.resilience4j:resilience4j-retry')"
+    echo "junit=$(resolve_version "$tree" 'org.junit.jupiter:junit-jupiter-api')"
+    echo "mockito=$(resolve_version "$tree" 'org.mockito:mockito-core')"
+  } > "$evidence/resolved-versions.properties"
+
+  {
+    echo "projectVersion=$PROJECT_VERSION"
+    echo "springBootVersion=$boot_version"
+    echo "javaVersion=$JAVA_VERSION"
+    echo "sourceCommit=$COMMIT"
+    [[ -z "$(git -C "$ROOT_DIR" status --porcelain)" ]] \
+      && echo "sourceState=clean" || echo "sourceState=dirty"
+    echo "repositoryMode=fresh-temporary"
+    echo "source=Maven Central"
+  } > "$evidence/provenance.properties"
+done
+
+api_repository="$ROOT_DIR/target/published-baseline-repositories/supported-matrix-api-$BASELINE_VERSION"
+api_evidence="$FINAL_EVIDENCE_ROOT/api-$BASELINE_VERSION"
+[[ ! -e "$api_repository" ]] || fail "fresh API repository required: $api_repository"
+[[ ! -e "$api_evidence" ]] || fail "fresh API evidence directory required: $api_evidence"
+mvn -B -ntp -s "$SETTINGS" "-Dmaven.repo.local=$api_repository" \
+  -Papi-compatibility -DskipTests verify
+"$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
+  supported-matrix-api "$BASELINE_VERSION" "$api_evidence" \
+  reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
+
+mkdir -p "$FINAL_EVIDENCE_ROOT"
+cp -R "$EVIDENCE_ROOT/." "$FINAL_EVIDENCE_ROOT/"
+rm -rf "$WORK_ROOT"
+
+echo "Supported matrix passed for Spring Boot ${ROWS[*]} with API baseline $BASELINE_VERSION."

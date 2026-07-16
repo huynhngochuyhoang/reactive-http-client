@@ -460,6 +460,38 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v21SupportedMatrixIsResolvedAndReproducible() throws IOException {
+        Path root = projectRoot();
+        String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        String consumerPom = Files.readString(root.resolve(".github/boot4-consumer/pom.xml"));
+        String verifier = Files.readString(root.resolve("scripts/verify-supported-matrix.sh"));
+        String workflow = Files.readString(root.resolve(".github/workflows/supported-matrix.yml"));
+
+        assertThat(releaseDocs)
+                .contains("### V21 resolved supported matrix")
+                .contains("| Spring Framework / WebFlux | `7.0.1` | `7.0.8` |")
+                .contains("| Reactor Netty HTTP | `1.3.0` | `1.3.6` |")
+                .contains("| Jackson Databind | `3.0.2` | `3.1.4` |")
+                .contains("The minimum does not move")
+                .contains("target/release-evidence/v21-priority9/");
+        assertThat(consumerPom)
+                .contains("<spring-boot.version>4.0.0</spring-boot.version>")
+                .contains("<artifactId>spring-boot-dependencies</artifactId>")
+                .contains("<version>${spring-boot.version}</version>");
+        assertThat(verifier)
+                .contains("ROWS=(4.0.0 4.1.0)")
+                .contains("Java 21 is required for the supported minimum")
+                .contains("clean install")
+                .contains(".github/boot4-consumer/pom.xml")
+                .contains("-Papi-compatibility -DskipTests verify")
+                .contains("verify-published-baseline-provenance.sh");
+        assertThat(workflow)
+                .contains("name: Supported Dependency Matrix")
+                .contains("scripts/verify-supported-matrix.sh")
+                .contains("target/release-evidence/v21-priority9/");
+    }
+
+    @Test
     void mockExchangeLoggerRegistrationIsDocumentedAndCompatibilityCovered() throws IOException {
         Path root = projectRoot();
         String exchangeLogging = Files.readString(root.resolve("docs/13-exchange-logging.md"));
