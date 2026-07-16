@@ -255,30 +255,39 @@ Evidence:
 
 ## Priority 7 - Diagnostics and Support-Bundle Schema Stability
 
-### [ ] 7.1 Define additive diagnostics schema rules
+### [x] 7.1 Define additive diagnostics schema rules
 
-- [ ] Inventory fields emitted by `rhttpclients` and diagnostics snapshot helpers.
-- [ ] Define semantics for enabled, disabled, unavailable, false, and unknown values.
-- [ ] Preserve custom diagnostics-provider overrides through Spring proxies.
-- [ ] Keep collection-backed snapshot overloads explicit about unavailable provider-only data.
-- [ ] Define size, client-count, endpoint-count, and cardinality limits.
-- [ ] Add a versioned sanitized fixture for schema regression review.
-- [ ] Reject accidental field removal or semantic reinterpretation in a minor release.
+- [x] Inventory fields emitted by `rhttpclients` and diagnostics snapshot helpers.
+- [x] Define semantics for enabled, disabled, unavailable, false, and unknown values.
+- [x] Preserve custom diagnostics-provider overrides through Spring proxies.
+- [x] Keep collection-backed snapshot overloads explicit about unavailable provider-only data.
+- [x] Define size, client-count, endpoint-count, and cardinality limits.
+- [x] Add a versioned sanitized fixture for schema regression review.
+- [x] Reject accidental field removal or semantic reinterpretation in a minor release.
 
-### [ ] 7.2 Re-audit support output safety and ownership
+### [x] 7.2 Re-audit support output safety and ownership
 
-- [ ] Verify no credentials, provider secrets, sensitive headers, or raw bodies are exported.
-- [ ] Verify no machine-local paths are exported into source-controlled support artifacts.
-- [ ] Verify client names, URLs, and configuration sources follow existing sanitization rules.
-- [ ] Align health, diagnostics, lifecycle, observer, and exchange-log metadata documentation.
-- [ ] Keep endpoint exposure and health details opt-in.
-- [ ] Re-run support-bundle fixture and native endpoint coverage.
-- [ ] Run documentation, metadata, Markdown-link, and API compatibility tests.
-- [ ] Run `git diff --check`.
+- [x] Verify no credentials, provider secrets, sensitive headers, or raw bodies are exported.
+- [x] Verify no machine-local paths are exported into source-controlled support artifacts.
+- [x] Verify client names, URLs, and configuration sources follow existing sanitization rules.
+- [x] Align health, diagnostics, lifecycle, observer, and exchange-log metadata documentation.
+- [x] Keep endpoint exposure and health details opt-in.
+- [x] Re-run support-bundle fixture and native endpoint coverage.
+- [x] Run documentation, metadata, Markdown-link, and API compatibility tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Diagnostics JSON, map, Markdown, and the opt-in `rhttpclients` endpoint now declare additive `schemaVersion=1`; existing v1 fields retain their names, types, and meanings within the `3.x` line.
+- `disabled` identifies policy that is not applied, `unavailable` identifies enabled resilience whose optional runtime operator is absent, provider-backed strict flags use true/false, and collection-backed provider-only flags remain null/unknown.
+- Snapshot rendering preserves overridden `clientSummaries()` behavior through class-based Spring proxies and never resolves lazy auth providers or creates missing resilience instances.
+- Rendering rejects partial or ambiguous output beyond 256 clients, 10,000 aggregate endpoints, 512 characters per exported text field, or 1 MiB of JSON/Markdown; count fields therefore describe every emitted client.
+- Added `docs/fixtures/rhttpclients-schema-v1.json` as the exact sanitized schema fixture. Regression tests reject credentials, sensitive headers, bodies, concrete URLs, provider bean names, and common machine-local path prefixes.
+- `docs/21-diagnostic-contexts.md` now inventories schema fields, value semantics, limits, proxy behavior, and metadata ownership; `docs/26-support-bundles.md` links the schema contract while retaining explicit endpoint exposure and health-detail opt-in.
+- Passed focused diagnostics, effective-contract, endpoint, documentation, metadata, Markdown-link, and AOT tests; passed all 743 starter tests.
+- Passed strict starter API compatibility against published `3.0.0` from `target/published-baseline-repositories/api-priority7-3.0.0`; Maven Central markers and hashes passed the shared provenance verifier, and API compatibility fixtures passed.
+- Rebuilt the GraalVM 25.0.3 native image in 4m07s under the documented 6 GiB/four-thread bounds; the executable passed real loopback calls plus diagnostics schema, sanitization, health, auth, Problem Detail, and Micrometer assertions.
+- Passed `git diff --check`.
 
 ---
 

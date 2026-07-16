@@ -137,6 +137,7 @@ class ReactiveHttpClientAutoConfigurationTest {
                             .diagnostics();
 
                     assertThat(snapshot)
+                            .containsEntry("schemaVersion", 1)
                             .containsEntry("clientCount", 1)
                             .containsEntry("endpointCount", 2)
                             .containsEntry("inheritedEndpointCount", 1)
@@ -203,6 +204,7 @@ class ReactiveHttpClientAutoConfigurationTest {
 
                     assertThat(snapshot).isEqualTo(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider));
                     assertThat(snapshot)
+                            .containsEntry("schemaVersion", 1)
                             .containsEntry("clientCount", 3)
                             .containsEntry("endpointCount", 3)
                             .containsEntry("inheritedEndpointCount", 2);

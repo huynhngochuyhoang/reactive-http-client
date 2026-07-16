@@ -26,10 +26,12 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ReactiveHttpClientDiagnosticsProviderTest {
 
@@ -65,7 +67,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         assertThat(summary.baseUrlSource()).isEqualTo("property");
         assertThat(summary.timeout()).isEqualTo(new ReactiveHttpClientDiagnosticsProvider.TimeoutSummary("client", 500));
         assertThat(summary.resilience().configured()).isTrue();
-        assertThat(summary.resilience().retry()).isEqualTo("disabled");
+        assertThat(summary.resilience().retry()).isEqualTo("unavailable");
         assertThat(summary.authMode()).isEqualTo("provider-bean");
         assertThat(summary.followRedirects()).isTrue();
         assertThat(summary.endpointCount()).isEqualTo(2);
@@ -173,6 +175,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         assertThat(markdown)
                 .startsWith("# Reactive HTTP Client Diagnostics Snapshot")
+                .contains("| Schema version | `1` |")
                 .contains("| Project version | `")
                 .contains("| Client count | `1` |")
                 .contains("| Endpoint count | `2` |")
@@ -180,9 +183,10 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("Strict retry validation")
                 .contains("Strict body-signing validation")
                 .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName() + "` | `property` | `client:500` |")
-                .contains("configured=true, retry=disabled")
+                .contains("configured=true, retry=unavailable")
                 .contains("| `provider-bean` | `true` | `2` | `1` |");
         assertThat(json)
+                .contains("\"schemaVersion\": 1")
                 .contains("\"projectVersion\":")
                 .contains("\"clientCount\": 1")
                 .contains("\"endpointCount\": 2")
@@ -205,7 +209,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
-    void rendersDeterministicSupportBundleDiagnosticsFixture() {
+    void rendersDeterministicSupportBundleDiagnosticsFixture() throws Exception {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         GenericBeanDefinition definition = new GenericBeanDefinition();
         definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
@@ -225,10 +229,12 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 beanFactory, properties, new MethodMetadataCache());
 
         String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(provider)
-                .replaceFirst("\"projectVersion\": \"[^\"]+\"", "\"projectVersion\": \"<project-version>\"");
+                .replaceFirst("\"projectVersion\": \"[^\"]+\"", "\"projectVersion\": \"<project-version>\"")
+                .replace(SupportBundleClient.class.getName(), "<client-interface>");
 
         assertThat(json).isEqualTo("""
                 {
+                  "schemaVersion": 1,
                   "projectVersion": "<project-version>",
                   "clientCount": 1,
                   "endpointCount": 2,
@@ -254,7 +260,13 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                     }
                   ]
                 }
-                """.formatted(SupportBundleClient.class.getName()));
+                """.formatted("<client-interface>"));
+        Path fixture = Path.of("..", "docs", "fixtures", "rhttpclients-schema-v1.json");
+        String fixtureJson = Files.readString(fixture);
+        assertThat(json).isEqualTo(fixtureJson);
+        assertThat(fixtureJson)
+                .doesNotContain("Bearer", "Authorization", "Cookie", "client-secret")
+                .doesNotContain("/home/", "/Users/", "/workspace/", "/tmp/", "C:\\Users\\");
         assertThat(json)
                 .doesNotContain("inventory-api.example.invalid")
                 .doesNotContain("internalSupportAuthProvider")
@@ -447,6 +459,46 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("\"clientName\": \"custom-client\"")
                 .contains("\"strictUnsafeRetryValidation\": null")
                 .doesNotContain("diagnostic-client");
+    }
+
+    @Test
+    void rejectsSnapshotsBeyondDocumentedCardinalityAndSizeLimits() {
+        ReactiveHttpClientDiagnosticsProvider.ClientSummary normal = summary("client", "Client");
+        assertThatThrownBy(() -> ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                Collections.nCopies(257, normal)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("256 client limit");
+
+        ReactiveHttpClientDiagnosticsProvider.ClientSummary tooManyEndpoints =
+                new ReactiveHttpClientDiagnosticsProvider.ClientSummary(
+                        "client", "Client", "property",
+                        new ReactiveHttpClientDiagnosticsProvider.TimeoutSummary("disabled", 0),
+                        new ReactiveHttpClientDiagnosticsProvider.ResilienceSummary(
+                                false, "disabled", "disabled", "disabled", "disabled"),
+                        "none", false, 10_001, 0);
+        assertThatThrownBy(() -> ReactiveHttpClientDiagnosticsSnapshot.toMap(List.of(tooManyEndpoints)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("10000 endpoint limit");
+
+        assertThatThrownBy(() -> ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                List.of(summary("x".repeat(513), "Client"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("clientName")
+                .hasMessageContaining("512 character limit");
+
+        String maximumText = "x".repeat(512);
+        ReactiveHttpClientDiagnosticsProvider.ClientSummary verbose =
+                new ReactiveHttpClientDiagnosticsProvider.ClientSummary(
+                        maximumText, maximumText, maximumText,
+                        new ReactiveHttpClientDiagnosticsProvider.TimeoutSummary(maximumText, 0),
+                        new ReactiveHttpClientDiagnosticsProvider.ResilienceSummary(
+                                false, maximumText, maximumText, maximumText, maximumText),
+                        maximumText, false, 1, 0);
+        assertThatThrownBy(() -> ReactiveHttpClientDiagnosticsSnapshot.toJson(
+                Collections.nCopies(256, verbose)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("JSON diagnostics snapshot")
+                .hasMessageContaining("1048576 character limit");
     }
 
     @Test

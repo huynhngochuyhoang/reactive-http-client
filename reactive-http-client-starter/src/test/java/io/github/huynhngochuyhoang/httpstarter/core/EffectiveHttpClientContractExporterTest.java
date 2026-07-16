@@ -229,7 +229,7 @@ class EffectiveHttpClientContractExporterTest {
     }
 
     @Test
-    void reportsResilienceDisabledWhenOperatorsAreUnavailable() {
+    void reportsResilienceUnavailableWhenOperatorsAreUnavailable() {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilience = config.getResilience();
         resilience.setEnabled(true);
@@ -243,7 +243,7 @@ class EffectiveHttpClientContractExporterTest {
                 new NoopResilienceOperatorApplier());
 
         assertThat(contract.resilience()).isEqualTo(new EffectiveHttpClientContract.ResiliencePolicy(
-                "disabled", "disabled", "disabled", "disabled"));
+                "unavailable", "unavailable", "unavailable", "unavailable"));
     }
 
     @Test

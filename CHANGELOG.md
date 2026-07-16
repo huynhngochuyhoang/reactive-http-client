@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Framework 7 AOT hints.** Replaced deprecated broad reflection categories with exact constructor and method registrations, preserved concrete inherited endpoint and marker-annotation metadata plus native configuration/diagnostics resources, and moved native provenance to a release-independent evidence path.
 - **Transport resource ownership.** Added a bounded single-connection stress suite for framing, mixed and unexpected bodies, errors, redirects, timeouts, cancellation, concurrent cold subscriptions, and delayed streaming ownership; factory shutdown now waits for connection-provider disposal.
 - **Effective contract parity.** Added sanitized auth mode to effective-contract and Markdown snapshot output, aligned request-plan, timeout, resilience, redirect, generic-type, diagnostics, and snapshot fixtures, and now rejects undefined method-level resilience instances from explicit exports without mutating support diagnostics.
+- **Diagnostics schema stability.** Versioned sanitized diagnostics and `rhttpclients` output as additive schema v1, distinguished disabled, unavailable, false, and unknown states, bounded support-output cardinality and size, and added a source-controlled regression fixture plus JVM and native endpoint coverage.
 
 ## [3.0.0] - 2026-07-15
 

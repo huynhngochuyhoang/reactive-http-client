@@ -14,10 +14,17 @@ import java.util.*;
  * carry those values; provider overloads render them from internal sanitized
  * entries. It intentionally
  * does not include base URL values, header values, proxy credentials, auth
- * provider bean names, request bodies, or response bodies.
+ * provider bean names, request bodies, or response bodies. Schema version 1 is
+ * additive within the 3.x line. Rendering rejects snapshots beyond the documented
+ * client, endpoint, text-field, and output-size limits instead of truncating them.
  */
 public final class ReactiveHttpClientDiagnosticsSnapshot {
 
+    private static final int SCHEMA_VERSION = 1;
+    private static final int MAX_CLIENTS = 256;
+    private static final int MAX_ENDPOINTS = 10_000;
+    private static final int MAX_TEXT_LENGTH = 512;
+    private static final int MAX_RENDERED_CHARACTERS = 1_048_576;
     private static final String POM_PROPERTIES =
             "META-INF/maven/io.github.huynhngochuyhoang/reactive-http-client-starter/pom.properties";
 
@@ -62,6 +69,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
         out.append("# Reactive HTTP Client Diagnostics Snapshot\n\n");
         out.append("| Field | Value |\n");
         out.append("|---|---|\n");
+        out.append("| Schema version | `").append(SCHEMA_VERSION).append("` |\n");
         out.append("| Project version | `").append(markdown(projectVersion())).append("` |\n");
         out.append("| Client count | `").append(clients.size()).append("` |\n");
         out.append("| Endpoint count | `").append(endpointCountEntries(clients)).append("` |\n");
@@ -82,7 +90,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             out.append("| `").append(client.endpointCount()).append("` ");
             out.append("| `").append(client.inheritedEndpointCount()).append("` |\n");
         }
-        return out.toString();
+        return boundedOutput(out, "Markdown");
     }
 
     public static String toJson(ReactiveHttpClientDiagnosticsProvider provider) {
@@ -102,6 +110,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     private static Map<String, Object> toMapEntries(Collection<SnapshotClient> entries) {
         List<SnapshotClient> clients = sortedEntries(entries);
         Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("schemaVersion", SCHEMA_VERSION);
         snapshot.put("projectVersion", projectVersion());
         snapshot.put("clientCount", clients.size());
         snapshot.put("endpointCount", endpointCountEntries(clients));
@@ -142,6 +151,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
         List<SnapshotClient> clients = sortedEntries(entries);
         StringBuilder out = new StringBuilder(512 + clients.size() * 288);
         out.append("{\n");
+        field(out, 1, "schemaVersion", SCHEMA_VERSION, true);
         field(out, 1, "projectVersion", projectVersion(), true);
         field(out, 1, "clientCount", clients.size(), true);
         field(out, 1, "endpointCount", endpointCountEntries(clients), true);
@@ -181,7 +191,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
         }
         out.append("]\n");
         out.append("}\n");
-        return out.toString();
+        return boundedOutput(out, "JSON");
     }
 
     private static SnapshotClient snapshotClient(ReactiveHttpClientDiagnosticsProvider.ClientSummary summary) {
@@ -196,10 +206,61 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     }
 
     private static List<SnapshotClient> sortedEntries(Collection<SnapshotClient> entries) {
-        return entries.stream()
+        Objects.requireNonNull(entries, "entries");
+        if (entries.size() > MAX_CLIENTS) {
+            throw new IllegalArgumentException("Diagnostics snapshot exceeds the " + MAX_CLIENTS + " client limit");
+        }
+        List<SnapshotClient> sorted = entries.stream()
+                .peek(ReactiveHttpClientDiagnosticsSnapshot::validateEntry)
                 .sorted(Comparator.comparing((SnapshotClient entry) -> entry.summary().clientName())
                         .thenComparing(entry -> entry.summary().clientInterface()))
                 .toList();
+        long endpoints = sorted.stream()
+                .map(SnapshotClient::summary)
+                .mapToLong(ReactiveHttpClientDiagnosticsProvider.ClientSummary::endpointCount)
+                .sum();
+        if (endpoints > MAX_ENDPOINTS) {
+            throw new IllegalArgumentException("Diagnostics snapshot exceeds the " + MAX_ENDPOINTS + " endpoint limit");
+        }
+        return sorted;
+    }
+
+    private static void validateEntry(SnapshotClient entry) {
+        Objects.requireNonNull(entry, "diagnostics snapshot entry");
+        ReactiveHttpClientDiagnosticsProvider.ClientSummary summary =
+                Objects.requireNonNull(entry.summary(), "diagnostics client summary");
+        boundedText("clientName", summary.clientName());
+        boundedText("clientInterface", summary.clientInterface());
+        boundedText("baseUrlSource", summary.baseUrlSource());
+        boundedText("timeoutSource", Objects.requireNonNull(summary.timeout(), "timeout").source());
+        ReactiveHttpClientDiagnosticsProvider.ResilienceSummary resilience =
+                Objects.requireNonNull(summary.resilience(), "resilience");
+        boundedText("retry", resilience.retry());
+        boundedText("rateLimiter", resilience.rateLimiter());
+        boundedText("circuitBreaker", resilience.circuitBreaker());
+        boundedText("bulkhead", resilience.bulkhead());
+        boundedText("authMode", summary.authMode());
+        if (summary.endpointCount() < 0 || summary.inheritedEndpointCount() < 0
+                || summary.inheritedEndpointCount() > summary.endpointCount()) {
+            throw new IllegalArgumentException("Diagnostics snapshot contains invalid endpoint counts for client "
+                    + summary.clientName());
+        }
+    }
+
+    private static void boundedText(String field, String value) {
+        Objects.requireNonNull(value, field);
+        if (value.length() > MAX_TEXT_LENGTH) {
+            throw new IllegalArgumentException("Diagnostics snapshot field " + field
+                    + " exceeds the " + MAX_TEXT_LENGTH + " character limit");
+        }
+    }
+
+    private static String boundedOutput(StringBuilder out, String format) {
+        if (out.length() > MAX_RENDERED_CHARACTERS) {
+            throw new IllegalArgumentException(format + " diagnostics snapshot exceeds the "
+                    + MAX_RENDERED_CHARACTERS + " character limit");
+        }
+        return out.toString();
     }
 
     private record SnapshotClient(
