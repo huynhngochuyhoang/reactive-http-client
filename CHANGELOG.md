@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Snapshot-aware release evidence.** Separated the development reactor, latest published consumer, and explicit release-candidate versions in generated release evidence; deferred promotable performance artifact paths while the reactor is a snapshot; and required Maven Central publication to run from the matching release tag.
 - **Published consumer baseline.** Added a manually gated Boot 4 consumer run that resolves starter, test-helper, and OTel `3.0.0` artifacts from a fresh Maven Central-only repository and records remote markers, effective POMs, hashes, dependency provenance, and separate test results.
 - **Published-baseline provenance.** Standardized API compatibility, benchmark, generated release, documentation, and consumer baseline resolution on fresh lane-specific Maven Central repositories; added shared remote-marker, checksum, and candidate-contamination verification.
+- **Framework 7 AOT hints.** Replaced deprecated broad reflection categories with exact constructor and method registrations, preserved concrete inherited endpoint and marker-annotation metadata plus native configuration/diagnostics resources, and moved native provenance to a release-independent evidence path.
 
 ## [3.0.0] - 2026-07-15
 
