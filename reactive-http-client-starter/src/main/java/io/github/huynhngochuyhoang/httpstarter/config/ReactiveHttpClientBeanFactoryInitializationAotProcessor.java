@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.config;
 
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import org.springframework.aot.hint.ExecutableMode;
+import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.TypeReference;
 import org.springframework.beans.PropertyValue;
 import org.springframework.beans.factory.FactoryBean;
@@ -32,6 +33,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 reflectionHints.registerMethod(method, ExecutableMode.INVOKE);
             }
             reflectionHints.registerType(clientInterface, typeHint -> {
+                typeHint.withMembers(MemberCategory.INTROSPECT_PUBLIC_METHODS);
                 for (var method : clientInterface.getMethods()) {
                     typeHint.withMethod(method.getName(),
                             TypeReference.listOf(method.getParameterTypes()), ExecutableMode.INVOKE);

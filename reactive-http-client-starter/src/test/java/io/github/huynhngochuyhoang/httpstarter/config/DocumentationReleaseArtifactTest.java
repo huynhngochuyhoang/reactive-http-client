@@ -709,15 +709,17 @@ class DocumentationReleaseArtifactTest {
                 "POM_PROPERTIES_RESOURCE");
         assertThat(runtimeHints)
                 .contains("registerConstructor(constructor, ExecutableMode.INVOKE)",
-                        "registerMethod(method, ExecutableMode.INVOKE)")
+                        "registerMethod(method, ExecutableMode.INVOKE)",
+                        "MemberCategory.INTROSPECT_DECLARED_METHODS")
                 .contains("registerType(type, typeHint -> {})")
-                .doesNotContain("MemberCategory", "ExecutableMode.INTROSPECT");
+                .doesNotContain("ExecutableMode.INTROSPECT");
         assertThat(clientAotProcessor)
                 .contains("clientInterface.getMethods()",
-                        "registerMethod(method, ExecutableMode.INVOKE)")
+                        "registerMethod(method, ExecutableMode.INVOKE)",
+                        "MemberCategory.INTROSPECT_PUBLIC_METHODS")
                 .contains("typeHint.withMethod(method.getName()",
                         "TypeReference.listOf(method.getParameterTypes())")
-                .doesNotContain("MemberCategory", "ExecutableMode.INTROSPECT");
+                .doesNotContain("ExecutableMode.INTROSPECT");
         assertThat(nativeClient).contains(
                 "extends NativeSmokeOperations<NativeOrderResponse>",
                 "@ApiRef(\"native-problem\")");
