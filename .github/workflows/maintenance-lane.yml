@@ -1,0 +1,37 @@
+name: Boot 3.5 Maintenance Lane
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with release tags
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Verify maintenance-lane guards
+        run: scripts/verify-maintenance-lane-fixtures.sh
+
+      - name: Reconstruct published 2.x release
+        run: scripts/verify-maintenance-lane.sh v2.14.1 2.14.0
+
+      - name: Upload maintenance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-lane-2.14.1
+          path: target/release-evidence/maintenance-2x-2.14.1/
+          retention-days: 7

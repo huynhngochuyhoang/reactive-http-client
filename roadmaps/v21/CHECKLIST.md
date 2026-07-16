@@ -293,28 +293,50 @@ Evidence:
 
 ## Priority 8 - `2.x` Maintenance-Lane Reproducibility
 
-### [ ] 8.1 Reconstruct the latest Boot 3.5 release lane
+### [x] 8.1 Reconstruct the latest Boot 3.5 release lane
 
-- [ ] Identify the immutable latest `2.x` release tag and maintenance branch policy.
-- [ ] Build the latest `2.x` release from a clean detached worktree.
-- [ ] Resolve its published API baseline from an isolated repository.
-- [ ] Verify its dependency tree remains on Boot 3.5 and Jackson 2.
-- [ ] Verify its artifacts contain no Boot 4 or Jackson 3 implementation classes.
-- [ ] Record commands, effective POMs, checksums, and dependency evidence target-only.
+- [x] Identify the immutable latest `2.x` release tag and maintenance branch policy.
+- [x] Build the latest `2.x` release from a clean detached worktree.
+- [x] Resolve its published API baseline from an isolated repository.
+- [x] Verify its dependency tree remains on Boot 3.5 and Jackson 2.
+- [x] Verify its artifacts contain no Boot 4 or Jackson 3 implementation classes.
+- [x] Record commands, effective POMs, checksums, and dependency evidence target-only.
 
-### [ ] 8.2 Rehearse a critical-fix release
+### [x] 8.2 Rehearse a critical-fix release
 
-- [ ] Document how a security or critical transport fix is applied to the `2.x` lane.
-- [ ] Define forward-port ordering from `2.x` to `3.x` where code is shared.
-- [ ] Verify `2.x` API compatibility against its correct published predecessor.
-- [ ] Verify source, Javadoc, signing, and Central staging remain possible.
-- [ ] Confirm normal `3.x` builds never compile Boot 3 adapters.
-- [ ] Update maintenance documentation without inventing an EOL date.
-- [ ] Run maintenance-lane checks and `git diff --check`.
+- [x] Document how a security or critical transport fix is applied to the `2.x` lane.
+- [x] Define forward-port ordering from `2.x` to `3.x` where code is shared.
+- [x] Verify `2.x` API compatibility against its correct published predecessor.
+- [x] Verify source, Javadoc, signing, and Central staging remain possible.
+- [x] Confirm normal `3.x` builds never compile Boot 3 adapters.
+- [x] Update maintenance documentation without inventing an EOL date.
+- [x] Run maintenance-lane checks and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- `v2.14.1` is the immutable latest `2.x` release tag at commit
+  `f0a1989eb7d19c702c530301798dc34fa4d3819b`; maintenance branches are created
+  from that tag only for approved security, critical correctness, or transport
+  fixes and removed after release. No `2.x` EOL date is declared.
+- `scripts/verify-maintenance-lane.sh` rebuilt that tag from a clean detached
+  worktree and passed 716 starter, 32 test-helper, and 38 OTel tests.
+- The reconstructed dependency trees retain Spring Boot `3.5.16` and Jackson
+  Databind `2.21.4`; binary and source artifacts contain no Boot 4 or Jackson 3
+  implementation classes.
+- Strict japicmp checks passed against published `2.14.0`, resolved through a
+  dedicated Maven Central-only repository. Parent and module POM/JAR remote
+  markers and SHA-256 checksums were verified by the shared provenance guard.
+- The rehearsal produced binary, source, and Javadoc artifacts for every module
+  and verified release-profile GPG signing plus Central publishing-extension
+  wiring. Credentialed signing and deployment remain manual release actions.
+- Current `3.x` tests passed with 743 starter, 33 test-helper, and 38 OTel tests;
+  focused source and artifact checks found no Boot 3 adapters.
+- Target-only commands, effective POMs, dependency trees, artifact inventories,
+  checksums, and provenance are under
+  `target/release-evidence/maintenance-2x-2.14.1/`.
+- Passed `bash scripts/verify-maintenance-lane-fixtures.sh`,
+  `bash scripts/verify-maintenance-lane.sh v2.14.1 2.14.0`, and
+  `git diff --check`.
 
 ---
 
