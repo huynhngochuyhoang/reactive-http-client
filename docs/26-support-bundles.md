@@ -113,11 +113,13 @@ class SupportBundleExporter {
 }
 ```
 
-Provider-backed snapshots include project version, total client count, total endpoint count,
+Provider-backed snapshots include schema version, project version, total client count, total endpoint count,
 total inherited endpoint count, per-client policy summaries, and strict validation
 flags. Summary-only collection snapshots mark strict validation flags as unknown.
 They do not include concrete base URLs, header values, proxy credentials, auth-provider bean
-names, request bodies, or response bodies.
+names, request bodies, or response bodies. Schema v1 is additive within the `3.x` line;
+the versioned sanitized [fixture](fixtures/rhttpclients-schema-v1.json), value semantics,
+and output limits are defined in [Diagnostic Context Contracts](21-diagnostic-contexts.md#diagnostics-schema-v1).
 
 If Actuator is available and the endpoint is explicitly enabled, the same
 sanitized data can be read from the `rhttpclients` endpoint:

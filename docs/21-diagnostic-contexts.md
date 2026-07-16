@@ -58,12 +58,42 @@ String markdown = ReactiveHttpClientDiagnosticsSnapshot.toMarkdown(diagnostics);
 String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(diagnostics);
 ```
 
-Provider-backed snapshots render project version, total client count, total endpoint
+Provider-backed snapshots render schema version, project version, total client count, total endpoint
 count, total inherited endpoint count, strict validation flags, and one row/object
 per client. Summary-only collection overloads render strict validation flags as
 unknown because `ClientSummary` does not carry those provider-only values. The
 helper sorts clients by name and interface for stable output. The helper is explicit: calling
 it does not register an Actuator endpoint, controller, log line, or file writer.
+
+### Diagnostics schema v1
+
+JSON, map, and Markdown snapshots declare schema version `1`. Within the `3.x`
+line, schema changes are additive: existing fields keep their names, types, and
+meaning; a field is not removed, retyped, or reinterpreted in a minor release.
+Consumers must ignore fields they do not recognize. The sanitized
+[source-controlled v1 fixture](fixtures/rhttpclients-schema-v1.json) is the
+regression-review baseline.
+
+Value semantics are explicit:
+
+| Value | Meaning |
+|---|---|
+| `true` | The boolean policy or strict-validation path is active and was resolved by the provider-backed snapshot. |
+| `false` | The provider-backed snapshot proved that policy or strict-validation path inactive. |
+| `null` / `unknown` | Provider-only data is unavailable to a collection-backed JSON/map or Markdown snapshot; it is not equivalent to `false`. |
+| `disabled` | The timeout or resilience operator is not applied by effective client/method policy. A disabled timeout is `timeoutSource=disabled` and `timeoutMs=0`. |
+| `unavailable` | Resilience is enabled for the effective contract, but the optional operator adapter/registry is unavailable at runtime. |
+| `missing` | No annotation or property supplies the required base URL source; concrete URL values are never exported. |
+
+Provider-backed rendering continues to honor an overridden `clientSummaries()`
+method, including through class-based Spring proxies. Such custom summaries use
+the collection contract, so provider-only strict flags remain unknown.
+
+Snapshots fail explicitly instead of returning partial counts when they exceed
+256 clients, 10,000 aggregate endpoints, 512 characters in an exported text
+field, or 1 MiB of UTF-8 encoded JSON/Markdown. These limits bound support-output
+size and client/interface cardinality; `clientCount`, `endpointCount`, and
+`inheritedEndpointCount` therefore always describe every emitted client.
 
 ## Opt-in Actuator diagnostics endpoint
 
@@ -86,8 +116,8 @@ management:
         include: rhttpclients
 ```
 
-The endpoint id is `rhttpclients`. A read operation returns JSON with
-`projectVersion`, `clientCount`, `endpointCount`, `inheritedEndpointCount`, and
+The endpoint id is `rhttpclients`. A read operation returns diagnostics schema v1 JSON with
+`schemaVersion`, `projectVersion`, `clientCount`, `endpointCount`, `inheritedEndpointCount`, and
 one `clients` entry per registered client. Each client entry includes client
 name, interface, base URL source, timeout source/value, resilience summary, auth
 mode, redirect-following flag, strict unsafe-retry and strict body-signing

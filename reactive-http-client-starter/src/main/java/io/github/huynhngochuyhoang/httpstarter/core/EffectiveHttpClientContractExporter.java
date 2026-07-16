@@ -251,7 +251,7 @@ final class EffectiveHttpClientContractExporter {
                                            String methodLevel,
                                            String clientLevel) {
         if (resilienceOperatorApplier != null && !resilienceOperatorApplier.isOperatorAvailable(type)) {
-            return "disabled";
+            return "unavailable";
         }
         return resolve(methodLevel, clientLevel);
     }

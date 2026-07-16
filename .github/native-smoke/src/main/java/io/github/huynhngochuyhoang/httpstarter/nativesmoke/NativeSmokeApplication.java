@@ -65,6 +65,8 @@ public class NativeSmokeApplication {
             Map<String, Object> diagnostics = context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class).diagnostics();
             String snapshot = ReactiveHttpClientDiagnosticsSnapshot.toJson(
                     context.getBean(ReactiveHttpClientDiagnosticsProvider.class));
+            require(((Number) diagnostics.get("schemaVersion")).intValue() == 1,
+                    "diagnostics schema version was not preserved");
             require(((Number) diagnostics.get("clientCount")).intValue() == 1,
                     "diagnostics did not include the native client");
             require(!snapshot.contains(AUTH_TOKEN) && !snapshot.contains("127.0.0.1"),
