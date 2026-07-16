@@ -3,9 +3,11 @@ package io.github.huynhngochuyhoang.httpstarter.config;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
-import org.springframework.aot.hint.MemberCategory;
+import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
+
+import java.lang.reflect.Modifier;
 
 /**
  * Runtime hints for the starter's annotation and configuration-property model.
@@ -68,22 +70,29 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
     @Override
     public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
         for (Class<?> annotationType : ANNOTATION_TYPES) {
-            hints.reflection().registerType(annotationType, MemberCategory.INTROSPECT_DECLARED_METHODS);
+            registerDeclaredMethods(hints, annotationType);
         }
         for (Class<?> configurationType : CONFIGURATION_TYPES) {
-            hints.reflection().registerType(configurationType,
-                    MemberCategory.INTROSPECT_DECLARED_CONSTRUCTORS,
-                    MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
-                    MemberCategory.INTROSPECT_PUBLIC_METHODS,
-                    MemberCategory.INVOKE_PUBLIC_METHODS,
-                    MemberCategory.DECLARED_FIELDS);
+            registerPublicMembers(hints, configurationType);
         }
-        hints.reflection().registerType(ReactiveHttpClientFactoryBean.class,
-                MemberCategory.INTROSPECT_DECLARED_CONSTRUCTORS,
-                MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
-                MemberCategory.INTROSPECT_PUBLIC_METHODS,
-                MemberCategory.INVOKE_PUBLIC_METHODS,
-                MemberCategory.DECLARED_FIELDS);
+        registerPublicMembers(hints, ReactiveHttpClientFactoryBean.class);
         hints.resources().registerPattern(POM_PROPERTIES_RESOURCE);
+    }
+
+    private static void registerPublicMembers(RuntimeHints hints, Class<?> type) {
+        for (var constructor : type.getDeclaredConstructors()) {
+            if (Modifier.isPublic(constructor.getModifiers())) {
+                hints.reflection().registerConstructor(constructor, ExecutableMode.INVOKE);
+            }
+        }
+        registerDeclaredMethods(hints, type);
+    }
+
+    private static void registerDeclaredMethods(RuntimeHints hints, Class<?> type) {
+        for (var method : type.getDeclaredMethods()) {
+            if (Modifier.isPublic(method.getModifiers())) {
+                hints.reflection().registerMethod(method, ExecutableMode.INVOKE);
+            }
+        }
     }
 }

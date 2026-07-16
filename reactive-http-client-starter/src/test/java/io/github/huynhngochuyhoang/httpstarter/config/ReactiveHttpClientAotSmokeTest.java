@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.aot.generate.ClassNameGenerator;
 import org.springframework.aot.generate.DefaultGenerationContext;
 import org.springframework.aot.generate.InMemoryGeneratedFiles;
-import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 import org.springframework.beans.factory.FactoryBean;
@@ -25,6 +24,7 @@ import org.springframework.context.aot.ApplicationContextAotGenerator;
 import org.springframework.javapoet.ClassName;
 import reactor.core.publisher.Mono;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,25 +32,34 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReactiveHttpClientAotSmokeTest {
 
     @Test
-    void runtimeHintsCoverAnnotationsAndConfigurationProperties() {
+    void runtimeHintsCoverAnnotationsAndConfigurationProperties() throws Exception {
         RuntimeHints hints = new RuntimeHints();
 
         new ReactiveHttpClientRuntimeHints().registerHints(hints, getClass().getClassLoader());
 
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(ReactiveHttpClient.class, "name")))
+                .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(GET.class, "value")))
+                .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(HEAD.class, "value")))
+                .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(OPTIONS.class, "value")))
+                .accepts(hints);
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClient.class).getMemberCategories())
-                .contains(MemberCategory.INTROSPECT_DECLARED_METHODS);
-        assertThat(hints.reflection().getTypeHint(GET.class).getMemberCategories())
-                .contains(MemberCategory.INTROSPECT_DECLARED_METHODS);
-        assertThat(hints.reflection().getTypeHint(HEAD.class).getMemberCategories())
-                .contains(MemberCategory.INTROSPECT_DECLARED_METHODS);
-        assertThat(hints.reflection().getTypeHint(OPTIONS.class).getMemberCategories())
-                .contains(MemberCategory.INTROSPECT_DECLARED_METHODS);
+                .isEmpty();
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.class).getMemberCategories())
-                .contains(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS, MemberCategory.INVOKE_PUBLIC_METHODS);
-        assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.ClientConfig.class).getMemberCategories())
-                .contains(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS, MemberCategory.INVOKE_PUBLIC_METHODS);
-        assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.DiagnosticsEndpointConfig.class).getMemberCategories())
-                .contains(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS, MemberCategory.INVOKE_PUBLIC_METHODS);
+                .isEmpty();
+        assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.class).fields())
+                .isEmpty();
+        assertThat(RuntimeHintsPredicates.reflection().onConstructorInvocation(
+                ReactiveHttpClientProperties.class.getDeclaredConstructor()))
+                .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                ReactiveHttpClientProperties.ClientConfig.class.getMethod("setBaseUrl", String.class)))
+                .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                ReactiveHttpClientProperties.DiagnosticsEndpointConfig.class.getMethod("setEnabled", boolean.class)))
+                .accepts(hints);
         assertThat(ReactiveHttpClientProperties.class.getDeclaredClasses())
                 .filteredOn(type -> Modifier.isPublic(type.getModifiers()))
                 .allSatisfy(type -> assertThat(hints.reflection().getTypeHint(type))
@@ -76,8 +85,8 @@ class ReactiveHttpClientAotSmokeTest {
 
         assertThat(RuntimeHintsPredicates.proxies().forInterfaces(AotSmokeClient.class))
                 .accepts(generationContext.getRuntimeHints());
-        assertThat(generationContext.getRuntimeHints().reflection().getTypeHint(AotSmokeClient.class).getMemberCategories())
-                .contains(MemberCategory.INTROSPECT_PUBLIC_METHODS);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(AotSmokeClient.class, "ping")))
+                .accepts(generationContext.getRuntimeHints());
         context.close();
     }
 
@@ -97,8 +106,9 @@ class ReactiveHttpClientAotSmokeTest {
 
         assertThat(RuntimeHintsPredicates.proxies().forInterfaces(ChildSmokeClient.class))
                 .accepts(generationContext.getRuntimeHints());
-        assertThat(generationContext.getRuntimeHints().reflection().getTypeHint(ChildSmokeClient.class).getMemberCategories())
-                .contains(MemberCategory.INTROSPECT_PUBLIC_METHODS);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                method(ParentSmokeOperations.class, "parentPing")))
+                .accepts(generationContext.getRuntimeHints());
         context.close();
     }
 
@@ -131,10 +141,18 @@ class ReactiveHttpClientAotSmokeTest {
                 .accepts(generationContext.getRuntimeHints());
         assertThat(RuntimeHintsPredicates.proxies().forInterfaces(InheritedAotSmokeClient.class))
                 .accepts(generationContext.getRuntimeHints());
-        assertThat(generationContext.getRuntimeHints().reflection()
-                .getTypeHint(InheritedAotSmokeClient.class).getMemberCategories())
-                .contains(MemberCategory.INTROSPECT_PUBLIC_METHODS);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                method(InheritedAotSmokeClient.class, "inheritedPing")))
+                .accepts(generationContext.getRuntimeHints());
         context.close();
+    }
+
+    private static Method method(Class<?> type, String name) {
+        try {
+            return type.getMethod(name);
+        } catch (NoSuchMethodException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     private DefaultGenerationContext newGenerationContext() {

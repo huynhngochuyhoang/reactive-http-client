@@ -526,6 +526,9 @@ The starter registers Spring runtime hints for its annotation model, configurati
 properties, and scanned `@ReactiveHttpClient` interfaces. During AOT processing,
 each registered reactive client factory contributes a JDK proxy hint for the
 client interface and reflection metadata for its annotated methods.
+Framework 7 executable hints are registered per constructor or method with no
+broad deprecated member-category registrations; inherited public endpoint
+methods are registered from the concrete client contract.
 
 Supported Boot 4 native-image path:
 
@@ -566,7 +569,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
 The workflow uploads `native-smoke-provenance` containing the exact Java and
 native-image toolchains, source commit, starter and Boot versions, and complete
 fixture dependency list. Local generated evidence remains target-only under
-`target/release-evidence/v20-priority6/`.
+`target/release-evidence/native-smoke/`.
 
 Netty 4.2 uses shared Foreign Function and Memory API arenas. The GraalVM 25
 fixture therefore enables `-H:+SharedArenaSupport`; removing that build option

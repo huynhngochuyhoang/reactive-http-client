@@ -688,6 +688,8 @@ class DocumentationReleaseArtifactTest {
                 "reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/ReactiveHttpClientAutoConfiguration.java"));
         String runtimeHints = Files.readString(root.resolve(
                 "reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/ReactiveHttpClientRuntimeHints.java"));
+        String clientAotProcessor = Files.readString(root.resolve(
+                "reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/ReactiveHttpClientBeanFactoryInitializationAotProcessor.java"));
         String nativeClient = Files.readString(root.resolve(
                 ".github/native-smoke/src/main/java/io/github/huynhngochuyhoang/httpstarter/nativesmoke/NativeSmokeClient.java"));
         String nativeApplication = Files.readString(root.resolve(
@@ -705,6 +707,14 @@ class DocumentationReleaseArtifactTest {
                 "ReactiveHttpClientProperties.DiagnosticsEndpointConfig.class",
                 "ReactiveHttpClientProperties.HealthConfig.class",
                 "POM_PROPERTIES_RESOURCE");
+        assertThat(runtimeHints)
+                .contains("registerConstructor(constructor, ExecutableMode.INVOKE)",
+                        "registerMethod(method, ExecutableMode.INVOKE)")
+                .doesNotContain("MemberCategory", "ExecutableMode.INTROSPECT");
+        assertThat(clientAotProcessor)
+                .contains("clientInterface.getMethods()",
+                        "registerMethod(method, ExecutableMode.INVOKE)")
+                .doesNotContain("MemberCategory", "ExecutableMode.INTROSPECT");
         assertThat(nativeClient).contains(
                 "extends NativeSmokeOperations<NativeOrderResponse>",
                 "@ApiRef(\"native-problem\")");
@@ -721,7 +731,7 @@ class DocumentationReleaseArtifactTest {
                 "-H:+SharedArenaSupport");
         assertThat(nativeWorkflow).contains(
                 "set -o pipefail",
-                "target/release-evidence/v20-priority6/native-provenance.txt",
+                "target/release-evidence/native-smoke/native-provenance.txt",
                 "native-smoke-provenance",
                 "actions/upload-artifact@v4");
         assertThat(releaseDocs).contains(

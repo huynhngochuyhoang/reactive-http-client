@@ -1,7 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
-import org.springframework.aot.hint.MemberCategory;
+import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.beans.PropertyValue;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
@@ -26,8 +26,9 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         }
         return (generationContext, beanFactoryInitializationCode) -> clientInterfaces.forEach(clientInterface -> {
             generationContext.getRuntimeHints().proxies().registerJdkProxy(clientInterface);
-            generationContext.getRuntimeHints().reflection().registerType(clientInterface,
-                    MemberCategory.INTROSPECT_PUBLIC_METHODS);
+            for (var method : clientInterface.getMethods()) {
+                generationContext.getRuntimeHints().reflection().registerMethod(method, ExecutableMode.INVOKE);
+            }
         });
     }
 
