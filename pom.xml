@@ -239,6 +239,24 @@
                         </executions>
                     </plugin>
                     <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.8.1</version>
+                        <executions>
+                            <execution>
+                                <id>resolve-published-api-baseline-pom</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>get</goal>
+                                </goals>
+                                <configuration>
+                                    <artifact>${project.groupId}:${project.artifactId}:${api.compatibility.baseline.version}:pom</artifact>
+                                    <transitive>false</transitive>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
                         <groupId>com.github.siom79.japicmp</groupId>
                         <artifactId>japicmp-maven-plugin</artifactId>
                         <version>${japicmp-maven-plugin.version}</version>

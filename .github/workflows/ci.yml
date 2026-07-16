@@ -92,7 +92,17 @@ jobs:
           cache: maven
 
       - name: Compare published APIs to 3.0.0
-        run: mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/api-compatibility-repository -Papi-compatibility -DskipTests verify
+        run: |
+          test ! -e target/published-baseline-repositories/api-root-3.0.0 && \
+          mvn -B -ntp -s .mvn/maven-central-settings.xml \
+            -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.0.0 \
+            -Papi-compatibility -DskipTests verify && \
+          scripts/verify-published-baseline-provenance.sh api-root 3.0.0 \
+            target/release-evidence/published-baselines/api-root-3.0.0 \
+            reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
+
+      - name: Verify published baseline provenance fixtures
+        run: bash scripts/verify-published-baseline-fixtures.sh
 
       - name: Verify compatibility guard fixtures
         run: bash scripts/verify-api-compatibility-fixtures.sh
@@ -102,7 +112,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: api-compatibility-reports
-          path: "**/target/japicmp/*"
+          path: |
+            **/target/japicmp/*
+            target/release-evidence/published-baselines/api-root-3.0.0/
           retention-days: 7
 
   release-smoke:
