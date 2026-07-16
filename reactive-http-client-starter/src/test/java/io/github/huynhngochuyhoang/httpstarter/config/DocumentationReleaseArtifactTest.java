@@ -710,10 +710,13 @@ class DocumentationReleaseArtifactTest {
         assertThat(runtimeHints)
                 .contains("registerConstructor(constructor, ExecutableMode.INVOKE)",
                         "registerMethod(method, ExecutableMode.INVOKE)")
+                .contains("registerType(type, typeHint -> {})")
                 .doesNotContain("MemberCategory", "ExecutableMode.INTROSPECT");
         assertThat(clientAotProcessor)
                 .contains("clientInterface.getMethods()",
                         "registerMethod(method, ExecutableMode.INVOKE)")
+                .contains("typeHint.withMethod(method.getName()",
+                        "TypeReference.listOf(method.getParameterTypes())")
                 .doesNotContain("MemberCategory", "ExecutableMode.INTROSPECT");
         assertThat(nativeClient).contains(
                 "extends NativeSmokeOperations<NativeOrderResponse>",

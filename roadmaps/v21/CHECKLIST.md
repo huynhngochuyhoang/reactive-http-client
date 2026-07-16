@@ -151,14 +151,14 @@ Evidence:
 - [x] Add focused runtime-hint assertions for the replacement registrations.
 - [x] Compile production AOT code without the known removal warnings.
 
-### [x] 4.2 Revalidate AOT and native behavior
+### [ ] 4.2 Revalidate AOT and native behavior
 
-- [x] Run Spring AOT processing for direct, inherited generic, and `@ApiRef` clients.
-- [x] Build the native fixture with the documented GraalVM baseline.
-- [x] Run real loopback success, auth, and Problem Detail calls.
-- [x] Verify diagnostics endpoint, health, and Micrometer behavior.
+- [ ] Run Spring AOT processing for direct, inherited generic, and `@ApiRef` clients.
+- [ ] Build the native fixture with the documented GraalVM baseline.
+- [ ] Run real loopback success, auth, and Problem Detail calls.
+- [ ] Verify diagnostics endpoint, health, and Micrometer behavior.
 - [x] Replace V20-specific native evidence paths with release-independent paths.
-- [x] Record project version, commit, Boot version, dependency list, Java, and
+- [ ] Record project version, commit, Boot version, dependency list, Java, and
       native-image versions.
 - [x] Run native-hint documentation tests and `git diff --check`.
 
@@ -167,11 +167,8 @@ Evidence:
 - Replaced deprecated `MemberCategory` and `ExecutableMode.INTROSPECT` usage with exact `ExecutableMode.INVOKE` constructor and method registrations; client AOT hints enumerate the concrete interface public-method contract, including inherited methods.
 - Focused runtime-hint assertions verify annotation methods, configuration constructors and setters, inherited endpoint methods, JDK proxies, the diagnostics POM resource, and the absence of broad type member categories.
 - Passed clean `ReactiveHttpClientAotSmokeTest` and `DocumentationReleaseArtifactTest`; production AOT sources compile without the Framework 7 removal warnings targeted by this priority.
-- Passed Spring Boot `process-aot` for the native fixture and ran its packaged JVM application, covering inherited generic and configured `@ApiRef` calls, auth, Problem Detail, diagnostics, health, and Micrometer against a real loopback server.
-- Passed the full `reactive-http-client-starter` test suite.
 - Native provenance now uses `target/release-evidence/native-smoke/native-provenance.txt` and records Java, native-image, commit, project version, Boot version, and the dependency list when the scheduled/manual native workflow runs.
-- Passed GraalVM Native Image 25.0.3 compilation in 4m47s with the documented 6 GiB/four-thread bounds; the generated executable completed every real loopback assertion for inherited generic and configured `@ApiRef` calls, auth, Problem Detail, diagnostics sanitization, health, and Micrometer.
-- Recorded target-only provenance under `target/release-evidence/native-smoke/native-provenance.txt`: GraalVM Java/native-image 25.0.3, Boot 4.0.0, starter `3.1.0-SNAPSHOT`, source `91b9188f933cf73a26c28aed3b6df419065965da-dirty`, and the complete fixture dependency list.
+- The earlier dirty native run is not release evidence for these follow-up hint fixes. Commit the reviewed tree, then rerun Spring AOT and the GraalVM fixture from that clean commit before checking the remaining 4.2 items.
 
 ---
 

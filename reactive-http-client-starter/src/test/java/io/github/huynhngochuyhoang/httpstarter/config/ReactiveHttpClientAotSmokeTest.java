@@ -1,9 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
-import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
-import io.github.huynhngochuyhoang.httpstarter.annotation.HEAD;
-import io.github.huynhngochuyhoang.httpstarter.annotation.OPTIONS;
-import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.AotSmokeClient;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.InheritedAotSmokeClient;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
@@ -12,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.aot.generate.ClassNameGenerator;
 import org.springframework.aot.generate.DefaultGenerationContext;
 import org.springframework.aot.generate.InMemoryGeneratedFiles;
+import org.springframework.aot.hint.ExecutableHint;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 import org.springframework.beans.factory.FactoryBean;
@@ -45,6 +43,10 @@ class ReactiveHttpClientAotSmokeTest {
                 .accepts(hints);
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(OPTIONS.class, "value")))
                 .accepts(hints);
+        assertThat(hints.reflection().getTypeHint(Body.class)).isNotNull();
+        assertThat(hints.reflection().getTypeHint(MultipartBody.class)).isNotNull();
+        assertThat(hints.reflection().getTypeHint(Body.class).getMemberCategories()).isEmpty();
+        assertThat(hints.reflection().getTypeHint(MultipartBody.class).getMemberCategories()).isEmpty();
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClient.class).getMemberCategories())
                 .isEmpty();
         assertThat(hints.reflection().getTypeHint(ReactiveHttpClientProperties.class).getMemberCategories())
@@ -109,6 +111,9 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 method(ParentSmokeOperations.class, "parentPing")))
                 .accepts(generationContext.getRuntimeHints());
+        assertThat(generationContext.getRuntimeHints().reflection()
+                .getTypeHint(ChildSmokeClient.class).methods().map(ExecutableHint::getName))
+                .contains("parentPing");
         context.close();
     }
 
@@ -144,6 +149,9 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 method(InheritedAotSmokeClient.class, "inheritedPing")))
                 .accepts(generationContext.getRuntimeHints());
+        assertThat(generationContext.getRuntimeHints().reflection()
+                .getTypeHint(InheritedAotSmokeClient.class).methods().map(ExecutableHint::getName))
+                .contains("inheritedPing");
         context.close();
     }
 

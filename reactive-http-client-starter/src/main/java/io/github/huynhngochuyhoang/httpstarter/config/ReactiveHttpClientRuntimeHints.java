@@ -89,6 +89,7 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
     }
 
     private static void registerDeclaredMethods(RuntimeHints hints, Class<?> type) {
+        hints.reflection().registerType(type, typeHint -> {});
         for (var method : type.getDeclaredMethods()) {
             if (Modifier.isPublic(method.getModifiers())) {
                 hints.reflection().registerMethod(method, ExecutableMode.INVOKE);
