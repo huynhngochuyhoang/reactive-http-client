@@ -380,8 +380,12 @@ Evidence:
   38 OTel tests plus all three assembled-consumer scenarios. These runs include
   generated metadata/docs, optional presence/back-off, Spring AOT, and real
   transport ownership coverage.
-- Strict japicmp passed against published `3.0.0`; Maven Central remote markers
-  and SHA-256 hashes were recorded by the shared provenance guard.
+- Strict japicmp passed against published `3.0.0` on both the Boot `4.0.0` and
+  `4.1.0` managed classpaths; each row uses separate Maven Central provenance,
+  remote-marker, and SHA-256 evidence.
+- Failure-safe exit handling copies completed and partial row Surefire,
+  consumer, japicmp, dependency, and provenance evidence into the workflow
+  upload path while preserving the failing command's exit status.
 - Effective POMs, dependency trees, resolved versions, commands, Surefire
   reports, and provenance are under
   `target/release-evidence/v21-priority9/`.

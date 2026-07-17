@@ -60,10 +60,12 @@ scripts/verify-supported-matrix.sh
 
 For each row the verifier uses a distinct temporary Maven repository, runs the
 full reactor, Spring AOT, optional-integration presence/back-off, transport
-tests, and the assembled external consumer. It then runs strict API
-compatibility against published `3.0.0` through the shared Central provenance
-guard. Effective POMs, dependency trees, resolved versions, Surefire reports,
-commands, and provenance are copied to
+tests, and the assembled external consumer. Each row then runs strict API
+compatibility against published `3.0.0` with that row's Boot-managed classpath
+and a separate repository through the shared Central provenance guard. An exit
+trap copies completed and partial row reports to the upload path before
+preserving any failure status. Effective POMs, dependency trees, resolved
+versions, Surefire and japicmp reports, commands, and provenance are copied to
 `target/release-evidence/v21-priority9/`. The manual
 `Supported Dependency Matrix` workflow runs and uploads the same contract.
 

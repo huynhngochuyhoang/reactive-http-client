@@ -483,8 +483,17 @@ class DocumentationReleaseArtifactTest {
                 .contains("Java 21 is required for the supported minimum")
                 .contains("clean install")
                 .contains(".github/boot4-consumer/pom.xml")
+                .contains("-Dspring-boot.version=$boot_version\" -Papi-compatibility")
                 .contains("-Papi-compatibility -DskipTests verify")
-                .contains("verify-published-baseline-provenance.sh");
+                .contains("verify-published-baseline-provenance.sh")
+                .contains("trap preserve_evidence EXIT")
+                .contains("Partial matrix evidence preserved under");
+        int rowLoop = verifier.indexOf("for boot_version in");
+        int rowApiCompatibility = verifier.indexOf(
+                "mvn -B -ntp -s \"$SETTINGS\" \"-Dmaven.repo.local=$api_repository\"");
+        int rowLoopEnd = verifier.lastIndexOf("\ndone\n");
+        assertThat(rowLoop).isGreaterThanOrEqualTo(0).isLessThan(rowApiCompatibility);
+        assertThat(rowLoopEnd).isGreaterThan(rowApiCompatibility);
         assertThat(workflow)
                 .contains("name: Supported Dependency Matrix")
                 .contains("scripts/verify-supported-matrix.sh")

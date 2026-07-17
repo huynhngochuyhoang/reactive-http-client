@@ -34,12 +34,68 @@ REPOSITORY_ROOT="$WORK_ROOT/repositories"
 [[ ! -e "$FINAL_EVIDENCE_ROOT" ]] \
   || fail "fresh evidence directory required: $FINAL_EVIDENCE_ROOT"
 
+CURRENT_EVIDENCE=""
+CURRENT_API_STAGING=""
+CURRENT_ROW_MARKER=""
+CONSUMER_STARTED=false
+
+collect_current_evidence() {
+  [[ -n "$CURRENT_EVIDENCE" && -d "$CURRENT_EVIDENCE" ]] || return
+  mkdir -p "$CURRENT_EVIDENCE/surefire-reports"
+  find "$ROOT_DIR" -path '*/target/surefire-reports/*.xml' \
+    -not -path '*/reactive-http-client-benchmarks/*' \
+    -not -path '*/.github/boot4-consumer/*' \
+    -newer "$CURRENT_ROW_MARKER" \
+    -exec cp {} "$CURRENT_EVIDENCE/surefire-reports/" \;
+  if [[ "$CONSUMER_STARTED" == true ]]; then
+    for report in "$ROOT_DIR/.github/boot4-consumer/target/surefire-reports/"*.xml; do
+      [[ -f "$report" ]] || continue
+      [[ "$report" -nt "$CURRENT_ROW_MARKER" ]] || continue
+      cp "$report" "$CURRENT_EVIDENCE/surefire-reports/consumer-$(basename "$report")"
+    done
+  fi
+  for module in "${MODULES[@]}"; do
+    if [[ -d "$ROOT_DIR/$module/target/japicmp" ]]; then
+      mkdir -p "$CURRENT_EVIDENCE/api-compatibility/japicmp/$module"
+      find "$ROOT_DIR/$module/target/japicmp" -type f -newer "$CURRENT_ROW_MARKER" \
+        -exec cp {} "$CURRENT_EVIDENCE/api-compatibility/japicmp/$module/" \;
+    fi
+  done
+  if [[ -n "$CURRENT_API_STAGING" && -d "$CURRENT_API_STAGING" ]]; then
+    mkdir -p "$CURRENT_EVIDENCE/api-compatibility/published-baseline"
+    cp -R "$CURRENT_API_STAGING/." \
+      "$CURRENT_EVIDENCE/api-compatibility/published-baseline/"
+  fi
+}
+
+preserve_evidence() {
+  local status=$?
+  trap - EXIT
+  collect_current_evidence
+  mkdir -p "$FINAL_EVIDENCE_ROOT"
+  if [[ -d "$EVIDENCE_ROOT" ]]; then
+    cp -R "$EVIDENCE_ROOT/." "$FINAL_EVIDENCE_ROOT/"
+  fi
+  if [[ $status -eq 0 ]]; then
+    rm -rf "$WORK_ROOT"
+  else
+    echo "Partial matrix evidence preserved under $FINAL_EVIDENCE_ROOT" >&2
+  fi
+  exit "$status"
+}
+trap preserve_evidence EXIT
+
 for boot_version in "${ROWS[@]}"; do
   repository="$REPOSITORY_ROOT/boot-$boot_version"
   evidence="$EVIDENCE_ROOT/boot-$boot_version"
   [[ ! -e "$repository" ]] || fail "fresh repository required: $repository"
   [[ ! -e "$evidence" ]] || fail "fresh evidence directory required: $evidence"
   mkdir -p "$repository" "$evidence/effective-poms" "$evidence/surefire-reports"
+  CURRENT_EVIDENCE="$evidence"
+  CURRENT_API_STAGING=""
+  CURRENT_ROW_MARKER="$evidence/row-start.marker"
+  CONSUMER_STARTED=false
+  touch "$CURRENT_ROW_MARKER"
 
   maven=(mvn -B -ntp -s "$SETTINGS" "-Dmaven.repo.local=$repository"
     "-Dspring-boot.version=$boot_version")
@@ -47,13 +103,11 @@ for boot_version in "${ROWS[@]}"; do
   cat > "$evidence/commands.txt" <<EOF
 mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local=$repository -Dspring-boot.version=$boot_version clean install
 mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local=$repository -Dspring-boot.version=$boot_version -f .github/boot4-consumer/pom.xml -Dreactive-http-client.version=$PROJECT_VERSION clean test
+mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/published-baseline-repositories/supported-matrix-api-boot-${boot_version//./-}-$BASELINE_VERSION -Dspring-boot.version=$boot_version -Papi-compatibility -DskipTests verify
 EOF
 
   "${maven[@]}" -f "$ROOT_DIR/pom.xml" clean install
-  find "$ROOT_DIR" -path '*/target/surefire-reports/*.xml' \
-    -not -path '*/reactive-http-client-benchmarks/*' \
-    -not -path '*/.github/boot4-consumer/*' \
-    -exec cp {} "$evidence/surefire-reports/" \;
+  collect_current_evidence
 
   for module in "${MODULES[@]}"; do
     "${maven[@]}" -f "$ROOT_DIR/$module/pom.xml" dependency:tree \
@@ -62,6 +116,7 @@ EOF
       -Doutput="$evidence/effective-poms/$module.xml"
   done
 
+  CONSUMER_STARTED=true
   "${maven[@]}" -f "$ROOT_DIR/.github/boot4-consumer/pom.xml" \
     "-Dreactive-http-client.version=$PROJECT_VERSION" clean test
   for report in "$ROOT_DIR/.github/boot4-consumer/target/surefire-reports/"*.xml; do
@@ -113,20 +168,20 @@ EOF
     echo "repositoryMode=fresh-temporary"
     echo "source=Maven Central"
   } > "$evidence/provenance.properties"
+
+  boot_slug="${boot_version//./-}"
+  api_lane="supported-matrix-api-boot-$boot_slug"
+  api_repository="$ROOT_DIR/target/published-baseline-repositories/$api_lane-$BASELINE_VERSION"
+  CURRENT_API_STAGING="$ROOT_DIR/target/release-evidence/$api_lane-$BASELINE_VERSION"
+  [[ ! -e "$api_repository" ]] || fail "fresh API repository required: $api_repository"
+  [[ ! -e "$CURRENT_API_STAGING" ]] \
+    || fail "fresh API evidence directory required: $CURRENT_API_STAGING"
+  mvn -B -ntp -s "$SETTINGS" "-Dmaven.repo.local=$api_repository" \
+    "-Dspring-boot.version=$boot_version" -Papi-compatibility -DskipTests verify
+  "$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
+    "$api_lane" "$BASELINE_VERSION" "$CURRENT_API_STAGING" \
+    reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
+  collect_current_evidence
 done
-
-api_repository="$ROOT_DIR/target/published-baseline-repositories/supported-matrix-api-$BASELINE_VERSION"
-api_evidence="$FINAL_EVIDENCE_ROOT/api-$BASELINE_VERSION"
-[[ ! -e "$api_repository" ]] || fail "fresh API repository required: $api_repository"
-[[ ! -e "$api_evidence" ]] || fail "fresh API evidence directory required: $api_evidence"
-mvn -B -ntp -s "$SETTINGS" "-Dmaven.repo.local=$api_repository" \
-  -Papi-compatibility -DskipTests verify
-"$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
-  supported-matrix-api "$BASELINE_VERSION" "$api_evidence" \
-  reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
-
-mkdir -p "$FINAL_EVIDENCE_ROOT"
-cp -R "$EVIDENCE_ROOT/." "$FINAL_EVIDENCE_ROOT/"
-rm -rf "$WORK_ROOT"
 
 echo "Supported matrix passed for Spring Boot ${ROWS[*]} with API baseline $BASELINE_VERSION."
