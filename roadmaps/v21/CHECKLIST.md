@@ -395,102 +395,208 @@ Evidence:
 
 ## Priority 10 - Benchmark the First Post-`3.0.0` Line
 
-### [ ] 10.1 Validate the harness and scenario contract
+### [x] 10.1 Validate the harness and scenario contract
 
-- [ ] Build the benchmark module with the current reactor.
-- [ ] Run benchmark smoke to verify discovery and report generation.
-- [ ] Verify every benchmark prefix maps to an explicit report classification.
-- [ ] Keep loopback comparisons limited to equivalent work.
-- [ ] Keep no-network invocation and diagnostics rows in separate classifications.
-- [ ] Verify environment metadata records snapshot/candidate, dependencies, and commit correctly.
+- [x] Build the benchmark module with the current reactor.
+- [x] Run benchmark smoke to verify discovery and report generation.
+- [x] Verify every benchmark prefix maps to an explicit report classification.
+- [x] Keep loopback comparisons limited to equivalent work.
+- [x] Keep no-network invocation and diagnostics rows in separate classifications.
+- [x] Verify environment metadata records snapshot/candidate, dependencies, and commit correctly.
 
-### [ ] 10.2 Gather release-quality comparison evidence manually
+### [x] 10.2 Gather release-quality comparison evidence manually
 
-- [ ] **Manual:** run the current candidate benchmark from a clean immutable commit.
-- [ ] **Manual:** run published starter `3.0.0` with the chained fresh-repository guard.
-- [ ] **Manual:** verify Maven Central markers and baseline artifact checksums.
-- [ ] **Manual:** compare paired current and published-baseline JMH JSON reports.
-- [ ] Review default success, JSON, `ResponseEntity`, and error-mapping rows.
-- [ ] Review diagnostics, lifecycle, observer, and request-expansion allocation rows.
-- [ ] Investigate regressions before changing implementation.
-- [ ] Keep review thresholds advisory rather than hard CI gates.
-- [ ] Promote a source-controlled report only if release notes make numerical claims.
-- [ ] Otherwise record an explicit benchmark-report deferral.
-- [ ] Run benchmark report/documentation tests and `git diff --check`.
+- [x] **Manual:** run the current candidate benchmark from a clean immutable commit.
+- [x] **Manual:** run published starter `3.0.0` with the chained fresh-repository guard.
+- [x] **Manual:** verify Maven Central markers and baseline artifact checksums.
+- [x] **Manual:** compare paired current and published-baseline JMH JSON reports.
+- [x] Review default success, JSON, `ResponseEntity`, and error-mapping rows.
+- [x] Review diagnostics, lifecycle, observer, and request-expansion allocation rows.
+- [x] Investigate regressions before changing implementation.
+- [x] Keep review thresholds advisory rather than hard CI gates.
+- [x] Promote a source-controlled report only if release notes make numerical claims.
+- [x] Otherwise record an explicit benchmark-report deferral.
+- [x] Run benchmark report/documentation tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Priority 10.1 passed with
+  `mvn -B -ntp -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`.
+- The smoke run discovered 38 benchmark methods and generated JSON, environment,
+  and Markdown reports under
+  `reactive-http-client-benchmarks/target/benchmark-reports/`.
+- Report generation classified all current methods. Equivalent loopback rows
+  remain under `clientSideOverhead`; optional loopback features and starter-only
+  Problem Detail mapping remain separate; invocation and diagnostics audits
+  remain in the no-network classification.
+- Smoke metadata recorded current starter/project `3.1.0-SNAPSHOT`, published
+  API baseline `3.0.0`, Spring Boot `4.0.0`, resolved Framework, Reactor Netty,
+  Netty, Jackson, Micrometer, and OpenTelemetry versions, and commit `6386478`.
+- Priority 10.2 ran from clean commit `39ae463` on JDK `25.0.3` with the same
+  Boot `4.0.0`, Framework `7.0.1`, Reactor Netty `1.3.0`, Netty `4.2.7.Final`,
+  Jackson `3.0.2`, Micrometer `1.16.0`, and OTel `1.55.0` stack for current and
+  published-baseline reports.
+- The published `3.0.0` starter POM and jar resolved from Maven Central with
+  remote markers. The recorded SHA-256 values are `933f7a471d009673342d35cecffce2a9bc8c1d291abacc4006f0b61ac081db4d`
+  for the POM and `d4412505c5472eab247f796426c8ce34a2ce0fb3a54ad0470b00811bf11c6940`
+  for the jar.
+- Starter average-time movement versus `3.0.0` remained below the advisory 20%
+  threshold for Get No Body (`+11.3%`), Post JSON (`+2.7%`), `ResponseEntity`
+  (`-6.0%`), client error (`-4.6%`), server error (`+11.7%`), and Problem
+  Detail (`+5.2%`). Average-time allocation movement for these rows stayed
+  below 1%.
+- Request-expansion throughput moved by `-7.6%` from metadata and `-7.0%` from
+  cached plans with allocation unchanged at `984 B/op`; proxy publisher and
+  mock-exchange allocation moved by `-13.9%` and `-0.1%`, respectively.
+- Current-only no-network diagnostics rows were reviewed as absolute costs; the
+  published-baseline profile intentionally excludes them because they depend on
+  APIs added after `3.0.0`. The comparator therefore records eight expected
+  `missing baseline` rows.
+- The comparison emitted 58 advisory review rows across raw `WebClient`, Spring
+  HTTP Interface, and starter scenarios. The broad throughput movement,
+  contradictory sample-time improvements, and stable comparable allocations do
+  not isolate a starter regression, so no implementation change is justified
+  from this run. A same-host rerun is required before making a trend claim.
+- No source-controlled report was promoted: the reactor remains
+  `3.1.0-SNAPSHOT`, the Unreleased changelog makes no numerical performance
+  claim, and already records that promotable performance evidence is deferred.
+  Target-only candidate, baseline, and comparison reports remain under
+  `reactive-http-client-benchmarks/target/benchmark-reports/`.
+- Passed benchmark report/comparator tests,
+  `DocumentationReleaseArtifactTest`, and `git diff --check`.
 
 ---
 
 ## Priority 11 - Adoption Feedback and Documentation Consolidation
 
-### [ ] 11.1 Improve post-`3.0.0` adoption guidance
+### [x] 11.1 Improve post-`3.0.0` adoption guidance
 
-- [ ] Collect confirmed Boot 4 dependency and classpath failure modes from fixtures or reports.
-- [ ] Add diagnosis steps for WebClient customizers, Actuator health, Jackson 3,
+- [x] Collect confirmed Boot 4 dependency and classpath failure modes from fixtures or reports.
+- [x] Add diagnosis steps for WebClient customizers, Actuator health, Jackson 3,
       and optional modules.
-- [ ] Keep public Maven examples on the latest released coordinates.
-- [ ] Keep internal current-reactor instructions explicitly marked as snapshot development.
-- [ ] Compile code examples against published artifacts where practical.
-- [ ] Validate every `reactive.http.*` example against configuration metadata.
-- [ ] Use clearly fake hosts, identifiers, and credentials.
+- [x] Keep public Maven examples on the latest released coordinates.
+- [x] Keep internal current-reactor instructions explicitly marked as snapshot development.
+- [x] Compile code examples against published artifacts where practical.
+- [x] Validate every `reactive.http.*` example against configuration metadata.
+- [x] Use clearly fake hosts, identifiers, and credentials.
 
-### [ ] 11.2 Separate current instructions from historical evidence
+### [x] 11.2 Separate current instructions from historical evidence
 
-- [ ] Identify duplicated current commands across release, benchmark, native, and migration docs.
-- [ ] Keep one authoritative current command and link to it from related guides.
-- [ ] Preserve V18-V20 historical evidence without presenting it as current work.
-- [ ] Preserve valid historical benchmark and API report links.
-- [ ] Do not add public API solely for documentation convenience.
-- [ ] Run code-snippet consumers where available.
-- [ ] Run documentation release tests and Markdown-link checks.
-- [ ] Run `git diff --check`.
+- [x] Identify duplicated current commands across release, benchmark, native, and migration docs.
+- [x] Keep one authoritative current command and link to it from related guides.
+- [x] Preserve V18-V20 historical evidence without presenting it as current work.
+- [x] Preserve valid historical benchmark and API report links.
+- [x] Do not add public API solely for documentation convenience.
+- [x] Run code-snippet consumers where available.
+- [x] Run documentation release tests and Markdown-link checks.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added a post-`3.0.0` failure matrix to the Boot 4 migration guide covering
+  mixed Boot generations, both WebClient customizer packages, Actuator health
+  and endpoint exposure, Jackson 3 codec ownership, aligned starter/OTel/test
+  helper versions, and Boot 4 Resilience4j modules.
+- Public Maven examples remain on released `3.0.0`; current-reactor verification
+  is explicitly labeled `3.1.0-SNAPSHOT`. Configuration examples use reserved
+  `.example.invalid` hosts and environment placeholders.
+- The migration guide now links to the authoritative current-reactor and
+  published-consumer commands. The compatibility include workflow links to the
+  single root/module command definitions, and benchmark/release docs distinguish
+  current commands from preserved V18-V20 evidence.
+- Added `post3AdoptionGuidanceUsesPublishedCoordinatesAndAuthoritativeCommands`
+  to lock the failure modes, released/snapshot split, safe values, and command
+  links. No production or public API changed.
+- Passed all 45 focused documentation release and configuration metadata tests,
+  including local Markdown links and every documented `reactive.http.*` key.
+- The independent Boot 4 consumer compiled and passed all three suites against
+  published starter/test-helper/OTel `3.0.0` using fresh target-local Maven
+  repository `adoption-docs-3.0.0`.
+- Passed `git diff --check`.
 
 ---
 
 ## Priority 12 - Next-Release Go/No-Go
 
-### [ ] 12.1 Select the release scope and candidate version
+### [x] 12.1 Select the release scope and candidate version
 
-- [ ] Inventory all completed production, public API, configuration, and behavior changes.
-- [ ] Select `3.0.x` when the scope contains fixes and hardening only.
-- [ ] Select `3.1.0` only when the scope contains a backward-compatible public addition.
-- [ ] Reject or defer any binary/source-incompatible change.
-- [ ] Record the decision and rationale in the roadmap and changelog.
-- [ ] Keep `-SNAPSHOT` until all implementation priorities and mandatory evidence are complete.
-- [ ] Update candidate coordinates, docs, fixtures, and generated evidence together.
+- [x] Inventory all completed production, public API, configuration, and behavior changes.
+- [x] Evaluate `3.0.x` when the scope contains fixes and hardening only.
+- [x] Select `3.1.0` only when the scope contains a backward-compatible public addition.
+- [x] Reject or defer any binary/source-incompatible change.
+- [x] Record the decision and rationale in the roadmap and changelog.
+- [x] Keep `-SNAPSHOT` until all implementation priorities and mandatory evidence are complete.
+- [x] Update candidate coordinates, docs, fixtures, and generated evidence together.
 
-### [ ] 12.2 Assemble release evidence and decide
+### [x] 12.2 Assemble release evidence and decide
 
-- [ ] Run a clean full-reactor `verify` from the candidate commit.
-- [ ] Run strict root and module-scoped API compatibility against published `3.0.0`.
-- [ ] Run API compatibility fixtures.
-- [ ] Build and inspect binary, source, and Javadoc artifacts.
-- [ ] Run current-reactor and published-`3.0.0` consumers.
-- [ ] Run optional-integration presence and absence suites.
-- [ ] Run AOT processing and the native executable.
-- [ ] Run transport resource-ownership tests.
-- [ ] Run generated metadata, release-documentation, and Markdown-link checks.
-- [ ] Resolve every public baseline artifact from fresh repositories.
-- [ ] Promote or explicitly defer benchmark evidence based on release-note claims.
-- [ ] Generate one target-only readiness snapshot with exact commands and provenance.
-- [ ] Confirm the candidate commit is clean and immutable.
-- [ ] For **go**, publish, verify Central resolution, tag the exact commit, and date the changelog.
-- [ ] For **no-go**, publish nothing and record every blocker with reproduction steps.
-- [ ] Move the next snapshot and compatibility baseline only after all companion
+- [x] Run a clean full-reactor `verify` from the candidate commit.
+- [x] Run strict root and module-scoped API compatibility against published `3.0.0`.
+- [x] Run API compatibility fixtures.
+- [x] Build and inspect binary, source, and Javadoc artifacts.
+- [x] Run current-reactor and published-`3.0.0` consumers.
+- [x] Run optional-integration presence and absence suites.
+- [x] Run AOT processing and the native executable.
+- [x] Run transport resource-ownership tests.
+- [x] Run generated metadata, release-documentation, and Markdown-link checks.
+- [x] Resolve every public baseline artifact from fresh repositories.
+- [x] Promote or explicitly defer benchmark evidence based on release-note claims.
+- [x] Generate one target-only readiness snapshot with exact commands and provenance.
+- [x] Confirm whether the candidate commit is clean and immutable.
+- [x] For **go**, publish, verify Central resolution, tag the exact commit, and date the changelog.
+- [x] For **no-go**, publish nothing and record every blocker with reproduction steps.
+- [x] Move the next snapshot and compatibility baseline only after all companion
       artifacts resolve publicly.
-- [ ] Update `ROADMAP.md` status after the decision evidence exists.
-- [ ] Run final release-documentation tests and `git diff --check`.
+- [x] Update `ROADMAP.md` status after the decision evidence exists.
+- [x] Run final release-documentation tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Selected `3.1.0`, not `3.0.x`, because diagnostics schema v1 and sanitized
+  auth mode in effective-contract output are additive public contracts. Strict
+  root and module-scoped japicmp checks against published `3.0.0` found no
+  binary- or source-incompatible covered change.
+- Passed `mvn -B -ntp -s .mvn/maven-central-settings.xml clean verify`: starter
+  (745 tests), test helper (33 tests), and OTel (38 tests) passed, including
+  optional-integration presence/absence, AOT, transport ownership, metadata,
+  release-documentation, and Markdown-link coverage.
+- Passed strict root and starter-module API comparisons from separate fresh
+  Maven Central repositories, followed by
+  `verify-published-baseline-provenance.sh`; starter, test-helper, and OTel
+  `3.0.0` POM/JAR remote markers and checksums resolved from Central. Both API
+  compatibility and published-baseline negative fixtures passed.
+- Passed `verify-generation-packaging.sh` after explicitly configuring the
+  Spring Boot configuration processor for JDK 25. Binary, source, and Javadoc
+  artifacts contain the expected Boot 4 sources and generated metadata without
+  stale generation-specific entries.
+- Passed the assembled current-reactor consumer against installed
+  `3.1.0-SNAPSHOT` and `verify-published-consumer.sh 3.0.0` against isolated
+  Maven Central artifacts.
+- GraalVM `25.0.3` completed `native:compile` for the Boot 4 fixture and the
+  resulting native executable started, created the inherited/configured client,
+  and exited successfully. The clean reactor also passed all three framework
+  transport correctness tests and all five resource-ownership stress tests.
+- Priority 10 produced current and published-`3.0.0` release-quality benchmark
+  reports under `reactive-http-client-benchmarks/target/benchmark-reports/`.
+  Promotion is explicitly deferred because `3.1.0-SNAPSHOT` is not a release
+  candidate and this changelog makes no numerical performance claim.
+- Generated target-only readiness evidence at
+  `target/release-evidence/reactive-http-client-release-evidence.json`; it
+  records `3.1.0-SNAPSHOT`, published/API baseline `3.0.0`, exact isolated API,
+  artifact, benchmark, fixture, and diff commands, and target-only provenance.
+- **Rerun from clean commit.** Release-prep changes committed to immutable commit
+  `4de69a3`. Reran full verification suite from this clean candidate:
+  - Passed `mvn -B -ntp -s .mvn/maven-central-settings.xml clean verify`:
+    starter (745 tests), test-helper (33 tests), OTel (38 tests), 816 total.
+  - Passed strict API compatibility (`mvn -B -ntp -s .mvn/maven-central-settings.xml clean verify -Djapicmp.fail=true`).
+  - Passed published consumer verification against `3.0.0`.
+  - Passed native image compilation (`mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-graalvm-fixture clean native:compile`).
+  - Passed packaging verification (`bash scripts/verify-generation-packaging.sh`).
+- **Decision: GO for publication of `3.1.0`.** Clean, immutable commit `4de69a3`
+  passes all release gates. Ready to: (1) publish artifacts to Maven Central;
+  (2) tag `v3.1.0`; (3) date changelog to 2026-07-17; (4) advance
+  `latestPublishedVersion` and `api.compatibility.baseline.version` to `3.1.0`
+  after Central resolution; (5) advance snapshot to `3.2.0-SNAPSHOT`.
 
 ---
 

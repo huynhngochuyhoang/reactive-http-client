@@ -92,6 +92,35 @@ Resilience4j users must move all modules to its Boot 4 line. See
 [Resilience4j Integration](07-resilience4j.md) for the 2.4.x BOM and
 resilience4j-spring-boot4 coordinates.
 
+## Diagnose adoption failures
+
+Start with the resolved runtime classpath, not only the declared dependency:
+
+```bash
+mvn -q dependency:tree \
+  '-Dincludes=io.github.huynhngochuyhoang:*,org.springframework.boot:*,tools.jackson.core:*,com.fasterxml.jackson.core:*,io.github.resilience4j:*'
+```
+
+All starter modules must use one released version. A Boot 4 application must
+resolve starter `3.0.0`, Boot 4 modules, Jackson 3, and Boot 4 Resilience4j
+modules. Do not combine starter `2.x` and `3.x`, or override individual Spring
+Framework/Jackson artifacts outside Boot dependency management.
+
+| Symptom | Confirm | Correction |
+|---|---|---|
+| `TypeNotPresentException` or `ClassNotFoundException` for `org.springframework.boot.webclient.WebClientCustomizer` | The application is running Boot 3 or has a mixed Boot 3/4 classpath while loading starter 3.x. | Use starter `2.14.1` with Boot 3.5, or upgrade the complete application dependency graph to Boot 4 before using starter `3.0.0`. |
+| A customizer using `org.springframework.boot.web.reactive.function.client.WebClientCustomizer` no longer compiles | That is the Boot 3 customizer package. | Import `org.springframework.boot.webclient.WebClientCustomizer`, or use the starter-owned `ReactiveHttpClientCustomizer` when customization is client-specific. |
+| `reactiveHttpClientHealthIndicator` or `/actuator/rhttpclients` is absent | Check that Actuator is present, `reactive.http.observability.health.enabled` or `reactive.http.observability.diagnostics-endpoint.enabled` is true, and the endpoint is exposed. | Add the Boot 4 Actuator starter, use `org.springframework.boot.health.contributor` in custom health code, and expose `health,rhttpclients`. Do not add Boot 3 Actuator packages manually. |
+| `com.fasterxml.jackson.databind.ObjectMapper` is missing, or JSON signing/Problem Detail mapping has no codec | Starter 3.x uses Jackson 3 and does not ship the removed Jackson 2 adapter. | Move application modules to `tools.jackson.*`. Let Boot create the Jackson 3 mapper and default starter codec, or provide one `ReactiveHttpClientJsonCodec` bean backed by the application mapper. |
+| OTel propagation, mock helpers, or their auto-configuration is missing | Compare the starter, `reactive-http-client-otel`, and `reactive-http-client-test` versions in the tree. | Keep all three on `3.0.0`; keep the test helper test-scoped. The OTel companion remains optional and must not be copied from the `2.x` lane. |
+| Retry operators are unavailable or Boot fails while creating Resilience4j beans | Check for Boot 3 `resilience4j-spring-boot3` or mixed Resilience4j versions. | Use the `2.4.x` BOM and `resilience4j-spring-boot4`; add only the operator modules required by the configured policies. |
+
+If the tree is correct but startup still fails, capture the condition evaluation
+report and a sanitized support bundle using
+[Production Support Bundles](26-support-bundles.md). Do not add an old Boot or
+Jackson artifact merely to satisfy one missing class; that masks the generation
+mismatch.
+
 ## Package and module changes
 
 | Contract | Boot 3.5 / 2.x | Boot 4 / 3.x | Action |
@@ -212,7 +241,7 @@ reactive:
   http:
     clients:
       orders:
-        base-url: https://orders.example.test
+        base-url: https://orders-api.example.invalid
         request-timeout-ms: 3000
         resilience:
           enabled: true
@@ -220,7 +249,7 @@ reactive:
         auth:
           type: oauth2-client-credentials
           oauth2-client-credentials:
-            token-uri: https://identity.example.test/oauth/token
+            token-uri: https://identity.example.invalid/oauth/token
             client-id: ${ORDERS_CLIENT_ID}
             client-secret: ${ORDERS_CLIENT_SECRET}
     observability:
@@ -236,7 +265,7 @@ reactive:
   http:
     clients:
       orders:
-        base-url: https://orders.example.test
+        base-url: https://orders-api.example.invalid
         request-timeout-ms: 3000
         resilience:
           enabled: true
@@ -244,7 +273,7 @@ reactive:
         auth:
           type: oauth2-client-credentials
           oauth2-client-credentials:
-            token-uri: https://identity.example.test/oauth/token
+            token-uri: https://identity.example.invalid/oauth/token
             client-id: ${ORDERS_CLIENT_ID}
             client-secret: ${ORDERS_CLIENT_SECRET}
     observability:
@@ -333,28 +362,18 @@ Production resolves the Spring bean by logger class. The mock resolves the
 instance registered through `withExchangeLogger(...)`; this supports loggers
 whose constructors require application collaborators.
 
-## Independent Boot 4 consumer
+## Verify the migration
 
-`.github/boot4-consumer` is a non-reactor Boot 4 application fixture. It compiles
-and runs inherited generic and `@ApiRef` clients, Problem Detail, redirects,
-streaming ownership, timeout diagnostics, health, Micrometer, OTel, and strict
-retry against assembled starter artifacts. Run it against the current installed
-candidate with:
-
-```bash
-PROJECT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
-mvn -B -ntp -s .mvn/maven-central-settings.xml \
-  -Dmaven.javadoc.skip=true install
-mvn -B -ntp -s .mvn/maven-central-settings.xml \
-  -f .github/boot4-consumer/pom.xml \
-  -Dreactive-http-client.version="$PROJECT_VERSION" test
-```
-
-Release validation uses `scripts/verify-publishable-artifacts.sh` after signed
-artifacts are built. That script deploys the parent, starter, test helper, and
-OTel module to a target-local staging repository, runs this same consumer from
-an empty local repository, and rejects resolution from reactor class directories
-or a pre-existing Maven cache.
+The non-reactor Boot 4 consumer compiles and runs representative migration code,
+including inherited generic and `@ApiRef` clients, Problem Detail, redirects,
+streaming ownership, timeout diagnostics, health, Micrometer, OTel, strict
+retry, and mock helpers. Use the authoritative commands in
+[Boot 4 assembled consumer fixture](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)
+for snapshot-development changes. To verify released public coordinates from a
+fresh Maven Central repository, use
+[Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline).
+The latter is the adoption check for starter `3.0.0`; it does not consume
+reactor classes or `3.1.0-SNAPSHOT` artifacts.
 
 ## Migration checklist
 

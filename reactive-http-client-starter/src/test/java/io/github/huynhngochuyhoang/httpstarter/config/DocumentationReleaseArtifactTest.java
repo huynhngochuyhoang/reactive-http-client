@@ -56,17 +56,21 @@ class DocumentationReleaseArtifactTest {
         ReleaseVersionContract candidate = releaseVersionContract(
                 "3.1.0", "3.0.0", "## [Unreleased]\n");
         assertThat(candidate).isEqualTo(new ReleaseVersionContract(
-                "release-candidate", null, "3.0.0", "3.1.0", "3.1.0"));
+                "release-candidate", null, "3.0.0", "3.1.0", "3.0.0"));
 
         ReleaseVersionContract published = releaseVersionContract(
                 "3.1.0", "3.1.0", "## [3.1.0] - 2026-07-15\n");
         assertThat(published).isEqualTo(new ReleaseVersionContract(
                 "post-publication", null, "3.1.0", null, "3.1.0"));
 
-        assertThat(benchmarkEvidence("3.1.0-SNAPSHOT", "3.0.0", snapshot).get("promotedReport")).isNull();
-        assertThat(benchmarkEvidence("3.1.0", "3.0.0", candidate).get("promotedReport"))
+        assertThat(benchmarkEvidence("3.1.0-SNAPSHOT", "3.0.0", snapshot, false).get("promotedReport")).isNull();
+        // A non-snapshot release without the report on disk stays deferred/pending.
+        assertThat(benchmarkEvidence("3.1.0", "3.0.0", candidate, false).get("promotedReport")).isNull();
+        assertThat(benchmarkEvidence("3.1.0", "3.0.0", published, false).get("promotedReport")).isNull();
+        // Once a release-quality report is promoted to docs/, the manifest surfaces it.
+        assertThat(benchmarkEvidence("3.1.0", "3.0.0", candidate, true).get("promotedReport"))
                 .isEqualTo("docs/benchmark-report-3.1.0.md");
-        assertThat(benchmarkEvidence("3.1.0", "3.0.0", published).get("promotedReport"))
+        assertThat(benchmarkEvidence("3.1.0", "3.0.0", published, true).get("promotedReport"))
                 .isEqualTo("docs/benchmark-report-3.1.0.md");
     }
 
@@ -76,7 +80,7 @@ class DocumentationReleaseArtifactTest {
         String reactorVersion = projectVersion(root.resolve("pom.xml"));
         String publishWorkflow = Files.readString(root.resolve(".github/workflows/publish-maven-central.yml"));
 
-        assertThat(reactorVersion).endsWith("-SNAPSHOT");
+        assertThat(reactorVersion).isEqualTo("3.1.0");
         assertThat(projectVersion(root.resolve("reactive-http-client-starter/pom.xml"))).isEqualTo(reactorVersion);
         assertThat(projectVersion(root.resolve("reactive-http-client-test/pom.xml"))).isEqualTo(reactorVersion);
         assertThat(projectVersion(root.resolve("reactive-http-client-otel/pom.xml"))).isEqualTo(reactorVersion);
@@ -121,7 +125,7 @@ class DocumentationReleaseArtifactTest {
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
 
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0-SNAPSHOT");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0");
         assertThat(pomProperty(pomXml, "latest.published.version")).isEqualTo("3.0.0");
         assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("3.0.0");
         assertThat(pomProperty(pomXml, "spring-boot.version")).isEqualTo("4.0.0");
@@ -138,7 +142,7 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("<version>3.1.0");
         assertThat(releaseDocs)
                 .contains("### V20 default Spring Boot 4 reactor")
-                .contains("default reactor now declares `3.1.0-SNAPSHOT`")
+                .contains("default reactor now declares `3.1.0`")
                 .contains("uses published `3.0.0` as its strict compatibility baseline")
                 .contains("mvn -s .mvn/maven-central-settings.xml verify")
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`");
@@ -199,6 +203,39 @@ class DocumentationReleaseArtifactTest {
                 .contains("OAuth2, SigV4 raw-body signing")
                 .contains("no dual-generation")
                 .contains("no dual-generation helper");
+    }
+
+    @Test
+    void post3AdoptionGuidanceUsesPublishedCoordinatesAndAuthoritativeCommands() throws IOException {
+        Path root = projectRoot();
+        String migration = Files.readString(root.resolve("docs/28-spring-boot-4-jackson-migration.md"));
+        String release = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        String benchmarks = Files.readString(root.resolve("docs/22-benchmarks.md"));
+
+        assertThat(migration)
+                .contains("## Diagnose adoption failures")
+                .contains("org.springframework.boot.webclient.WebClientCustomizer")
+                .contains("org.springframework.boot.web." + "reactive.function.client.WebClientCustomizer")
+                .contains("org.springframework.boot.health.contributor")
+                .contains("tools.jackson.*")
+                .contains("resilience4j-spring-boot4")
+                .contains("reactive-http-client-otel")
+                .contains("reactive-http-client-test")
+                .contains("[Boot 4 assembled consumer fixture](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)")
+                .contains("[Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline)")
+                .contains("starter `3.0.0`")
+                .contains("`3.1.0-SNAPSHOT` artifacts")
+                .contains("orders-api.example.invalid")
+                .contains("identity.example.invalid")
+                .doesNotContain("orders.example.test")
+                .doesNotContain("identity.example.test")
+                .doesNotContain("PROJECT_VERSION=$(mvn");
+        assertThat(release)
+                .contains("Sections labeled V18, V19, or V20 preserve release-era")
+                .contains("[Public API compatibility](#public-api-compatibility)");
+        assertThat(benchmarks)
+                .contains("The commands in [Commands](#commands) are authoritative")
+                .contains("scope sections preserve V12-V20 evidence");
     }
 
     @Test
@@ -332,8 +369,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("include: health,rhttpclients")
                 .contains("show-details: when-authorized")
                 .contains(".withExchangeLogger(logger)")
-                .contains("## Independent Boot 4 consumer")
-                .contains("scripts/verify-publishable-artifacts.sh")
+                .contains("## Verify the migration")
+                .contains("[Boot 4 assembled consumer fixture](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)")
+                .contains("[Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline)")
                 .contains("requires no\nconfiguration-metadata entry or reflection hint");
         assertThat(report)
                 .contains("published 2.14.1", "Frozen baseline surface")
@@ -447,16 +485,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("Prefer the narrowest include\npattern")
                 .contains("Keep implementation\ninternals excluded");
         assertThat(includeWorkflow)
-                .contains("Run the strict comparison")
-                .contains("mvn -s .mvn/maven-central-settings.xml \\\n"
-                        + "  -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.0.0 \\\n"
-                        + "  -Papi-compatibility -DskipTests verify")
-                .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-starter-3.0.0 \\\n"
-                        + "  -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify")
+                .contains("authoritative root and module-scoped commands")
+                .contains("[Public API compatibility](#public-api-compatibility)")
                 .containsSubsequence(
-                        "-Papi-compatibility -DskipTests verify",
                         "bash scripts/verify-api-compatibility-fixtures.sh",
-                        "-Dtest=DocumentationReleaseArtifactTest test");
+                        "-Dtest=DocumentationReleaseArtifactTest test")
+                .doesNotContain("target/published-baseline-repositories/api-root-3.0.0")
+                .doesNotContain("target/published-baseline-repositories/api-starter-3.0.0");
     }
 
     @Test
@@ -546,7 +581,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`")
                 .contains("Create a dedicated maintenance branch from that tag")
                 .contains("do not compile Boot 3 adapters into the `3.x` artifacts");
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0-SNAPSHOT");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0");
         assertThat(pomXml)
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .contains("<api.compatibility.baseline.version>3.0.0</api.compatibility.baseline.version>");
@@ -674,7 +709,7 @@ class DocumentationReleaseArtifactTest {
         String settings = Files.readString(root.resolve(".mvn/maven-central-settings.xml"));
 
         assertThat(pomXml)
-                .contains("<version>3.1.0-SNAPSHOT</version>")
+                .contains("<version>3.1.0</version>")
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .doesNotContain("<id>boot4-spike</id>")
                 .doesNotContain("<maven.deploy.skip>true</maven.deploy.skip>")
@@ -769,7 +804,7 @@ class DocumentationReleaseArtifactTest {
                 "reactiveHttpClientHealthIndicator",
                 "reactive.http.client.requests");
         assertThat(nativePom).contains(
-                "<reactive-http-client.version>3.1.0-SNAPSHOT</reactive-http-client.version>",
+                "<reactive-http-client.version>3.1.0</reactive-http-client.version>",
                 "-J-Xmx6g",
                 "-H:NumberOfThreads=4",
                 "-H:+SharedArenaSupport");
@@ -782,7 +817,7 @@ class DocumentationReleaseArtifactTest {
                 "configured inherited",
                 "@ApiRef",
                 "6 GiB",
-                "-Dreactive-http-client.version=3.1.0-SNAPSHOT native:compile",
+                "-Dreactive-http-client.version=3.1.0 native:compile",
                 "native-smoke-provenance");
     }
 
@@ -1261,10 +1296,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(manifest.normalize()).startsWith(root.resolve("target"));
         assertThat(benchmarkEvidenceSnippet.normalize()).startsWith(root.resolve("target"));
         assertThat(generated.path("projectVersion").asText()).isEqualTo(projectVersion(root.resolve("pom.xml")));
-        assertThat(generated.path("releaseState").asText()).isEqualTo("snapshot-development");
-        assertThat(generated.path("developmentVersion").asText()).isEqualTo("3.1.0-SNAPSHOT");
+        assertThat(generated.path("releaseState").asText()).isEqualTo("release-candidate");
+        assertThat(generated.path("developmentVersion").isNull()).isTrue();
         assertThat(generated.path("latestPublishedConsumerVersion").asText()).isEqualTo("3.0.0");
-        assertThat(generated.path("plannedFinalVersion").isNull()).isTrue();
+        assertThat(generated.path("plannedFinalVersion").asText()).isEqualTo("3.1.0");
         assertThat(generated.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(pomProperty(pomXml, "api.compatibility.baseline.version"));
         assertThat(generated.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
@@ -1321,9 +1356,9 @@ class DocumentationReleaseArtifactTest {
 
         JsonNode releasePrepChecklist = generated.path("releasePrepChecklist");
         assertThat(releasePrepChecklist.path("status").asText()).isEqualTo("pending");
-        assertThat(releasePrepChecklist.path("releaseState").asText()).isEqualTo("snapshot-development");
+        assertThat(releasePrepChecklist.path("releaseState").asText()).isEqualTo("release-candidate");
         assertThat(releasePrepChecklist.path("latestPublishedConsumerVersion").asText()).isEqualTo("3.0.0");
-        assertThat(releasePrepChecklist.path("plannedFinalVersion").isNull()).isTrue();
+        assertThat(releasePrepChecklist.path("plannedFinalVersion").asText()).isEqualTo("3.1.0");
         assertThat(releasePrepChecklist.path("projectVersion").asText()).isEqualTo(generated.path("projectVersion").asText());
         assertThat(releasePrepChecklist.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
@@ -1342,9 +1377,9 @@ class DocumentationReleaseArtifactTest {
                 "target-only-evidence");
         assertThat(releasePrepItems.get("changelog-section").path("status").asText()).isEqualTo("current");
         String manifestProjectVersion = generated.path("projectVersion").asText();
-        String expectedConsumerVersion = manifestProjectVersion.endsWith("-SNAPSHOT")
-                ? generated.path("apiCompatibilityBaselineVersion").asText()
-                : manifestProjectVersion;
+        // Public snippets always document the latest published consumer version, even for a
+        // release candidate that is not yet resolvable from Maven Central.
+        String expectedConsumerVersion = generated.path("latestPublishedConsumerVersion").asText();
         String unreleasedCompareVersion = Files.readString(root.resolve("CHANGELOG.md"))
                 .contains("## [" + manifestProjectVersion + "] - ")
                 ? manifestProjectVersion
@@ -1981,7 +2016,8 @@ class DocumentationReleaseArtifactTest {
         manifest.put("javaBaseline", pomProperty(pomXml, "java.version"));
         manifest.put("springBootBaseline", pomProperty(pomXml, "spring-boot.version"));
         manifest.put("dependencyBaselineReview", dependencyBaselineReview(pomXml));
-        Map<String, Object> benchmarkEvidence = benchmarkEvidence(projectVersion, baselineVersion, versionContract);
+        Map<String, Object> benchmarkEvidence = benchmarkEvidence(projectVersion, baselineVersion, versionContract,
+                Files.exists(pom.getParent().resolve("docs/benchmark-report-" + projectVersion + ".md")));
         List<Map<String, String>> publishedBaselineArtifacts = publishedBaselineArtifacts(baselineVersion);
         List<Map<String, String>> checks = List.of(
                 check("mvn test", "pass", "Generated by DocumentationReleaseArtifactTest during the current test run."),
@@ -2018,12 +2054,14 @@ class DocumentationReleaseArtifactTest {
                     "snapshot-development", projectVersion, latestPublishedVersion, null, latestPublishedVersion);
         }
         boolean published = changelog.contains("## [" + projectVersion + "] - ");
+        // Public README/quick-start snippets always track the latest published release, so a
+        // release candidate that is not yet on Maven Central keeps documenting the prior version.
         return new ReleaseVersionContract(
                 published ? "post-publication" : "release-candidate",
                 null,
                 latestPublishedVersion,
                 published ? null : projectVersion,
-                projectVersion);
+                latestPublishedVersion);
     }
 
     private static Map<String, Object> releaseReadiness(Path root,
@@ -2238,7 +2276,8 @@ class DocumentationReleaseArtifactTest {
 
     private static Map<String, Object> benchmarkEvidence(String projectVersion,
                                                          String baselineVersion,
-                                                         ReleaseVersionContract versionContract) {
+                                                         ReleaseVersionContract versionContract,
+                                                         boolean promotedReportExists) {
         LinkedHashMap<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("manualOrProfileGated", true);
         evidence.put("currentWorkspaceCommand",
@@ -2257,12 +2296,13 @@ class DocumentationReleaseArtifactTest {
         evidence.put("releaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
         evidence.put("publishedStarterReleaseReport", "reactive-http-client-benchmarks/target/benchmark-reports/published-starter-"
                 + baselineVersion + "/release-jmh.md");
-        String promotableVersion = "snapshot-development".equals(versionContract.releaseState())
-                ? null
-                : projectVersion;
-        String promotedReport = promotableVersion == null
-                ? null
-                : "docs/benchmark-report-" + promotableVersion + ".md";
+        // Promotion is gated on the report actually existing so a non-snapshot release
+        // that intentionally defers benchmark evidence stays honestly "pending".
+        boolean promotable = !"snapshot-development".equals(versionContract.releaseState())
+                && promotedReportExists;
+        String promotedReport = promotable
+                ? "docs/benchmark-report-" + projectVersion + ".md"
+                : null;
         evidence.put("promotableReportAvailable", promotedReport != null);
         evidence.put("promotedReport", promotedReport);
         evidence.put("currentCandidateReport", "reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md");
