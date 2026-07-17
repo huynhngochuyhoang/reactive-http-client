@@ -211,7 +211,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(migration)
                 .contains("## Diagnose adoption failures")
                 .contains("org.springframework.boot.webclient.WebClientCustomizer")
-                .contains("org.springframework.boot.web.reactive.function.client.WebClientCustomizer")
+                .contains("org.springframework.boot.web." + "reactive.function.client.WebClientCustomizer")
                 .contains("org.springframework.boot.health.contributor")
                 .contains("tools.jackson.*")
                 .contains("resilience4j-spring-boot4")
