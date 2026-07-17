@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-17
+
 ### Changed
 
 - **Snapshot-aware release evidence.** Separated the development reactor, latest published consumer, and explicit release-candidate versions in generated release evidence; deferred promotable performance artifact paths while the reactor is a snapshot; and required Maven Central publication to run from the matching release tag.
@@ -21,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Boot 3.5 maintenance reproducibility.** Added a detached-worktree rehearsal for immutable `v2.14.1` that verifies the published `2.14.0` API predecessor from an isolated Maven Central repository, Boot 3.5/Jackson 2 dependency and artifact ownership, release-profile packaging, target-only provenance, and the critical-fix forward-port policy.
 - **Supported dependency matrix.** Retained Java 21 and Spring Boot `4.0.0` as the minimum, added full-reactor and assembled-consumer verification for the Boot `4.1.0` forward row, and now records managed Framework, transport, Jackson, Micrometer, OTel, Resilience4j, JUnit, and Mockito versions from fresh repositories.
 - **JDK 25 release metadata packaging.** Configured the Spring Boot configuration processor explicitly so clean release builds continue to package generated configuration metadata when annotation processors are no longer discovered implicitly.
-- **V21 release decision.** Selected `3.1.0` because the diagnostics schema and effective-contract output are backward-compatible public additions. Full reactor, compatibility, packaging, consumer, transport, AOT/native, documentation, and published-baseline gates pass, but publication remains no-go until these release-prep changes are committed and the evidence is rerun from that clean immutable candidate; the reactor therefore remains `3.1.0-SNAPSHOT` and benchmark promotion stays deferred.
 
 ## [3.0.0] - 2026-07-15
 
