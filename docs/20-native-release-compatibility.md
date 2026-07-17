@@ -1,6 +1,6 @@
 # Native Image and Release Compatibility
 
-Sections without a version label describe the current `3.1.0-SNAPSHOT`
+Sections without a version label describe the current `3.1.0`
 development reactor. Sections labeled V18, V19, or V20 preserve release-era
 evidence and are not current commands. Use the command in the first applicable
 current section; historical sections remain for provenance only.
@@ -85,7 +85,7 @@ change.
 
 ### V20 default Spring Boot 4 reactor
 
-The default reactor now declares `3.1.0-SNAPSHOT`, imports Spring Boot `4.0.0`,
+The default reactor now declares `3.1.0`, imports Spring Boot `4.0.0`,
 and uses published `3.0.0` as its strict compatibility baseline. Boot 4
 WebClient, health, Jackson 3, OTel, test-helper, and benchmark adapters live in
 normal source roots. The old `boot4-spike` profile, compiler exclusions,
@@ -305,7 +305,7 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `3.1.0-SNAPSHOT` development line compares
+from the current reactor version. The `3.1.0` development line compares
 strictly against published `3.0.0`:
 
 ```bash
@@ -641,7 +641,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=3.1.0-SNAPSHOT native:compile
+  -Dreactive-http-client.version=3.1.0 native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
