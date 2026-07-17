@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Effective contract parity.** Added sanitized auth mode to effective-contract and Markdown snapshot output, aligned request-plan, timeout, resilience, redirect, generic-type, diagnostics, and snapshot fixtures, and now rejects undefined method-level resilience instances from explicit exports without mutating support diagnostics.
 - **Diagnostics schema stability.** Versioned sanitized diagnostics and `rhttpclients` output as additive schema v1, distinguished disabled, unavailable, false, and unknown states, bounded support-output cardinality and size, and added a source-controlled regression fixture plus JVM and native endpoint coverage.
 - **Boot 3.5 maintenance reproducibility.** Added a detached-worktree rehearsal for immutable `v2.14.1` that verifies the published `2.14.0` API predecessor from an isolated Maven Central repository, Boot 3.5/Jackson 2 dependency and artifact ownership, release-profile packaging, target-only provenance, and the critical-fix forward-port policy.
+- **Supported dependency matrix.** Retained Java 21 and Spring Boot `4.0.0` as the minimum, added full-reactor and assembled-consumer verification for the Boot `4.1.0` forward row, and now records managed Framework, transport, Jackson, Micrometer, OTel, Resilience4j, JUnit, and Mockito versions from fresh repositories.
 
 ## [3.0.0] - 2026-07-15
 
