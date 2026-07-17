@@ -1,6 +1,6 @@
 # Reactive HTTP Client - Roadmap V21
 
-> **Status:** completed - `3.1.0` selected and GO for publication
+> **Status:** completed - `3.1.0` published to Maven Central; development on `3.2.0-SNAPSHOT`
 > **Target:** stabilize the first Spring Boot 4 release line, prove consumption
 > of published `3.0.0` artifacts, and prepare the next patch or minor release
 > without weakening API, native-image, or benchmark provenance.
@@ -45,12 +45,16 @@ Public README and quick-start coordinates must remain on the latest published
 release until the next release resolves from Maven Central.
 
 V21 selected `3.1.0` because diagnostics schema v1 and effective-contract auth
-mode are backward-compatible public additions. The clean immutable candidate
-(commit `4de69a3`) passes all release gates: 816 unit tests, strict API
-compatibility, published consumer smoke tests, native image compilation, and
-packaging verification. GO for publication; tag `v3.1.0`, date the changelog to
-2026-07-17, advance baselines to `3.1.0`, and step the development snapshot to
-`3.2.0-SNAPSHOT` after Central artifact resolution.
+mode are backward-compatible public additions. The `3.1.0` release candidate was
+merged as PR #200 to immutable commit `f614c5b`, tagged `v3.1.0`, and passed all release gates
+(816 unit tests, strict API compatibility vs published `3.0.0`, published
+consumer smoke tests, native image compilation and startup, and packaging
+verification). `3.1.0` was published to and resolves from Maven Central. The
+post-publication transition is complete: the changelog is dated `3.1.0`, public
+README/quick-start snippets and the strict API/benchmark baseline now track
+`3.1.0`, and development continues on `3.2.0-SNAPSHOT` (re-verified: full reactor
+`verify`, japicmp vs the new `3.1.0` baseline, packaging, and the `3.1.0`
+published consumer all pass).
 
 ## Goals
 

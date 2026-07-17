@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-17
+
 ### Changed
 
 - **Snapshot-aware release evidence.** Separated the development reactor, latest published consumer, and explicit release-candidate versions in generated release evidence; deferred promotable performance artifact paths while the reactor is a snapshot; and required Maven Central publication to run from the matching release tag.
@@ -21,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Boot 3.5 maintenance reproducibility.** Added a detached-worktree rehearsal for immutable `v2.14.1` that verifies the published `2.14.0` API predecessor from an isolated Maven Central repository, Boot 3.5/Jackson 2 dependency and artifact ownership, release-profile packaging, target-only provenance, and the critical-fix forward-port policy.
 - **Supported dependency matrix.** Retained Java 21 and Spring Boot `4.0.0` as the minimum, added full-reactor and assembled-consumer verification for the Boot `4.1.0` forward row, and now records managed Framework, transport, Jackson, Micrometer, OTel, Resilience4j, JUnit, and Mockito versions from fresh repositories.
 - **JDK 25 release metadata packaging.** Configured the Spring Boot configuration processor explicitly so clean release builds continue to package generated configuration metadata when annotation processors are no longer discovered implicitly.
-- **V21 release decision.** Selected `3.1.0` because the diagnostics schema and effective-contract output are backward-compatible public additions. The reactor is cut to the `3.1.0` release candidate; full reactor, compatibility, packaging, consumer, transport, AOT/native, documentation, and published-baseline gates pass. Public README and quick-start snippets stay on published `3.0.0` until `3.1.0` resolves from Maven Central, and benchmark promotion stays deferred because this release makes no numerical performance claim.
+- **V21 release decision.** Selected `3.1.0` because the diagnostics schema and effective-contract output are backward-compatible public additions. All release gates passed (full reactor, strict API compatibility, packaging, consumer, transport, AOT/native, documentation, published-baseline), and `3.1.0` was published to and resolves from Maven Central. Benchmark promotion stays deferred because this release makes no numerical performance claim.
 
 ## [3.0.0] - 2026-07-15
 
@@ -1294,7 +1296,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.1...v3.0.0
 [2.14.1]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.0...v2.14.1
 [2.14.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.13.0...v2.14.0

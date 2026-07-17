@@ -6,7 +6,7 @@
 
     <groupId>io.github.huynhngochuyhoang</groupId>
     <artifactId>reactive-http-client</artifactId>
-    <version>3.1.0</version>
+    <version>3.2.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>reactive-http-client</name>
@@ -35,8 +35,8 @@
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
         <japicmp-maven-plugin.version>0.26.0</japicmp-maven-plugin.version>
         <jmh.version>1.37</jmh.version>
-        <latest.published.version>3.0.0</latest.published.version>
-        <api.compatibility.baseline.version>3.0.0</api.compatibility.baseline.version>
+        <latest.published.version>3.1.0</latest.published.version>
+        <api.compatibility.baseline.version>3.1.0</api.compatibility.baseline.version>
         <api.compatibility.break-on-binary-incompatible>true</api.compatibility.break-on-binary-incompatible>
         <api.compatibility.ignore-missing-classes>false</api.compatibility.ignore-missing-classes>
     </properties>

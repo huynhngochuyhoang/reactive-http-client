@@ -1,7 +1,7 @@
 # Benchmarks
 
 The commands in [Commands](#commands) are authoritative for the current
-`3.1.0-SNAPSHOT` development reactor and published `3.0.0` baseline. Versioned
+`3.2.0-SNAPSHOT` development reactor and published `3.1.0` baseline. Versioned
 scope sections preserve V12-V20 evidence and are historical unless explicitly
 identified as current.
 
@@ -106,23 +106,23 @@ omitting `-am` so Maven resolves the published dependency instead of the current
 reactor module:
 
 ```bash
-test ! -e target/published-baseline-repositories/benchmark-3.0.0 && \
+test ! -e target/published-baseline-repositories/benchmark-3.1.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-3.0.0 \
+  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-3.1.0 \
   -Pbenchmarks,benchmark-release,benchmark-published-baseline \
   -pl reactive-http-client-benchmarks clean verify \
-  -Dbenchmark.starter.version=3.0.0 -Dbenchmark.commit=3.0.0 && \
-scripts/verify-published-baseline-provenance.sh benchmark 3.0.0 \
-  target/release-evidence/published-baselines/benchmark-3.0.0 \
+  -Dbenchmark.starter.version=3.1.0 -Dbenchmark.commit=3.1.0 && \
+scripts/verify-published-baseline-provenance.sh benchmark 3.1.0 \
+  target/release-evidence/published-baselines/benchmark-3.1.0 \
   reactive-http-client-starter
 ```
 
 The example version must match the root `api.compatibility.baseline.version`
-(`3.0.0` for this development line). When that property changes for the next
+(`3.1.0` for this development line). When that property changes for the next
 development cycle, update this command and the `published-starter-<version>`
 report paths together.
-V20 used `2.14.1` for its cross-major evidence. After `3.0.0` publication, the
-normal benchmark baseline moves to `3.0.0`; the historical V20 report and
+V20 used `2.14.1` for its cross-major evidence. After `3.1.0` publication, the
+normal benchmark baseline moves to `3.1.0`; the historical V20 report and
 commands remain in the V20 checklist.
 
 The repository path must not exist before the run. The shared provenance verifier
@@ -190,9 +190,9 @@ release notes:
 Benchmark evidence:
 - Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted
 - Current candidate command: `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`
-- Published baseline command: `test ! -e target/published-baseline-repositories/benchmark-3.0.0 && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/published-baseline-repositories/benchmark-3.0.0 -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=3.0.0 -Dbenchmark.commit=3.0.0 && scripts/verify-published-baseline-provenance.sh benchmark 3.0.0 target/release-evidence/published-baselines/benchmark-3.0.0 reactive-http-client-starter`
+- Published baseline command: `test ! -e target/published-baseline-repositories/benchmark-3.1.0 && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/published-baseline-repositories/benchmark-3.1.0 -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=3.1.0 -Dbenchmark.commit=3.1.0 && scripts/verify-published-baseline-provenance.sh benchmark 3.1.0 target/release-evidence/published-baselines/benchmark-3.1.0 reactive-http-client-starter`
 - Current candidate report: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
-- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.0.0/release-jmh.md`
+- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.1.0/release-jmh.md`
 - Scenarios cited: `Get No Body`, `Post Json`
 ```
 
@@ -246,7 +246,7 @@ Compare the paired JMH JSON reports with the target-only helper after both repor
 ```bash
 mvn -Pbenchmarks,benchmark-compare -pl reactive-http-client-benchmarks -am verify \
   -Dbenchmark.compare.current=reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json \
-  -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.0.0/release-jmh.json
+  -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.1.0/release-jmh.json
 ```
 
 The helper writes `reactive-http-client-benchmarks/target/benchmark-reports/benchmark-comparison.md` by default. The comparison includes each matching benchmark method and mode, current and baseline values, absolute and relative deltas, average time, p50, p95, p99, throughput, and allocation per operation when those metrics are present. Missing current or baseline rows are listed explicitly. V13 threshold crossings are marked as `review`, but the command exits successfully by default so normal CI does not become a benchmark gate. For local release review, add `-Dbenchmark.compare.fail-on-review=true` to return a non-zero exit when any row is marked `review`. Attach or paste the generated `benchmark-comparison.md` next to the promoted report link when release notes discuss current-vs-baseline movement.
