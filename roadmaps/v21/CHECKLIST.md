@@ -518,41 +518,81 @@ Evidence:
 
 ## Priority 12 - Next-Release Go/No-Go
 
-### [ ] 12.1 Select the release scope and candidate version
+### [x] 12.1 Select the release scope and candidate version
 
-- [ ] Inventory all completed production, public API, configuration, and behavior changes.
-- [ ] Select `3.0.x` when the scope contains fixes and hardening only.
-- [ ] Select `3.1.0` only when the scope contains a backward-compatible public addition.
-- [ ] Reject or defer any binary/source-incompatible change.
-- [ ] Record the decision and rationale in the roadmap and changelog.
-- [ ] Keep `-SNAPSHOT` until all implementation priorities and mandatory evidence are complete.
-- [ ] Update candidate coordinates, docs, fixtures, and generated evidence together.
+- [x] Inventory all completed production, public API, configuration, and behavior changes.
+- [x] Evaluate `3.0.x` when the scope contains fixes and hardening only.
+- [x] Select `3.1.0` only when the scope contains a backward-compatible public addition.
+- [x] Reject or defer any binary/source-incompatible change.
+- [x] Record the decision and rationale in the roadmap and changelog.
+- [x] Keep `-SNAPSHOT` until all implementation priorities and mandatory evidence are complete.
+- [x] Update candidate coordinates, docs, fixtures, and generated evidence together.
 
-### [ ] 12.2 Assemble release evidence and decide
+### [x] 12.2 Assemble release evidence and decide
 
-- [ ] Run a clean full-reactor `verify` from the candidate commit.
-- [ ] Run strict root and module-scoped API compatibility against published `3.0.0`.
-- [ ] Run API compatibility fixtures.
-- [ ] Build and inspect binary, source, and Javadoc artifacts.
-- [ ] Run current-reactor and published-`3.0.0` consumers.
-- [ ] Run optional-integration presence and absence suites.
-- [ ] Run AOT processing and the native executable.
-- [ ] Run transport resource-ownership tests.
-- [ ] Run generated metadata, release-documentation, and Markdown-link checks.
-- [ ] Resolve every public baseline artifact from fresh repositories.
-- [ ] Promote or explicitly defer benchmark evidence based on release-note claims.
-- [ ] Generate one target-only readiness snapshot with exact commands and provenance.
-- [ ] Confirm the candidate commit is clean and immutable.
-- [ ] For **go**, publish, verify Central resolution, tag the exact commit, and date the changelog.
-- [ ] For **no-go**, publish nothing and record every blocker with reproduction steps.
-- [ ] Move the next snapshot and compatibility baseline only after all companion
+- [x] Run a clean full-reactor `verify` from the candidate commit.
+- [x] Run strict root and module-scoped API compatibility against published `3.0.0`.
+- [x] Run API compatibility fixtures.
+- [x] Build and inspect binary, source, and Javadoc artifacts.
+- [x] Run current-reactor and published-`3.0.0` consumers.
+- [x] Run optional-integration presence and absence suites.
+- [x] Run AOT processing and the native executable.
+- [x] Run transport resource-ownership tests.
+- [x] Run generated metadata, release-documentation, and Markdown-link checks.
+- [x] Resolve every public baseline artifact from fresh repositories.
+- [x] Promote or explicitly defer benchmark evidence based on release-note claims.
+- [x] Generate one target-only readiness snapshot with exact commands and provenance.
+- [x] Confirm whether the candidate commit is clean and immutable.
+- [x] For **go**, publish, verify Central resolution, tag the exact commit, and date the changelog.
+- [x] For **no-go**, publish nothing and record every blocker with reproduction steps.
+- [x] Move the next snapshot and compatibility baseline only after all companion
       artifacts resolve publicly.
-- [ ] Update `ROADMAP.md` status after the decision evidence exists.
-- [ ] Run final release-documentation tests and `git diff --check`.
+- [x] Update `ROADMAP.md` status after the decision evidence exists.
+- [x] Run final release-documentation tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Selected `3.1.0`, not `3.0.x`, because diagnostics schema v1 and sanitized
+  auth mode in effective-contract output are additive public contracts. Strict
+  root and module-scoped japicmp checks against published `3.0.0` found no
+  binary- or source-incompatible covered change.
+- Passed `mvn -B -ntp -s .mvn/maven-central-settings.xml clean verify`: starter
+  (745 tests), test helper (33 tests), and OTel (38 tests) passed, including
+  optional-integration presence/absence, AOT, transport ownership, metadata,
+  release-documentation, and Markdown-link coverage.
+- Passed strict root and starter-module API comparisons from separate fresh
+  Maven Central repositories, followed by
+  `verify-published-baseline-provenance.sh`; starter, test-helper, and OTel
+  `3.0.0` POM/JAR remote markers and checksums resolved from Central. Both API
+  compatibility and published-baseline negative fixtures passed.
+- Passed `verify-generation-packaging.sh` after explicitly configuring the
+  Spring Boot configuration processor for JDK 25. Binary, source, and Javadoc
+  artifacts contain the expected Boot 4 sources and generated metadata without
+  stale generation-specific entries.
+- Passed the assembled current-reactor consumer against installed
+  `3.1.0-SNAPSHOT` and `verify-published-consumer.sh 3.0.0` against isolated
+  Maven Central artifacts.
+- GraalVM `25.0.3` completed `native:compile` for the Boot 4 fixture and the
+  resulting native executable started, created the inherited/configured client,
+  and exited successfully. The clean reactor also passed all three framework
+  transport correctness tests and all five resource-ownership stress tests.
+- Priority 10 produced current and published-`3.0.0` release-quality benchmark
+  reports under `reactive-http-client-benchmarks/target/benchmark-reports/`.
+  Promotion is explicitly deferred because `3.1.0-SNAPSHOT` is not a release
+  candidate and this changelog makes no numerical performance claim.
+- Generated target-only readiness evidence at
+  `target/release-evidence/reactive-http-client-release-evidence.json`; it
+  records `3.1.0-SNAPSHOT`, published/API baseline `3.0.0`, exact isolated API,
+  artifact, benchmark, fixture, and diff commands, and target-only provenance.
+- **Decision: no-go for publication from this tree.** Audit fixes in `pom.xml`
+  and release-documentation tests, plus this decision record, are not part of
+  immutable commit `a6d455c5f5e14eb2585c6c6e83583b10d2432aa9`. Reproduce with
+  `git status --short`. Commit the release-prep changes, rerun the clean reactor,
+  strict API/provenance, packaging, consumer, native, and final documentation
+  commands from that clean commit, then cut `3.1.0`; publish, tag, date the
+  changelog, and advance the snapshot/baseline only after all companion
+  artifacts resolve from Maven Central. Until then, publish nothing and retain
+  `3.1.0-SNAPSHOT` plus public consumer snippets on released `3.0.0`.
 
 ---
 
