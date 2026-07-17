@@ -202,6 +202,39 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void post3AdoptionGuidanceUsesPublishedCoordinatesAndAuthoritativeCommands() throws IOException {
+        Path root = projectRoot();
+        String migration = Files.readString(root.resolve("docs/28-spring-boot-4-jackson-migration.md"));
+        String release = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        String benchmarks = Files.readString(root.resolve("docs/22-benchmarks.md"));
+
+        assertThat(migration)
+                .contains("## Diagnose adoption failures")
+                .contains("org.springframework.boot.webclient.WebClientCustomizer")
+                .contains("org.springframework.boot.web.reactive.function.client.WebClientCustomizer")
+                .contains("org.springframework.boot.health.contributor")
+                .contains("tools.jackson.*")
+                .contains("resilience4j-spring-boot4")
+                .contains("reactive-http-client-otel")
+                .contains("reactive-http-client-test")
+                .contains("[Boot 4 assembled consumer fixture](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)")
+                .contains("[Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline)")
+                .contains("starter `3.0.0`")
+                .contains("`3.1.0-SNAPSHOT` artifacts")
+                .contains("orders-api.example.invalid")
+                .contains("identity.example.invalid")
+                .doesNotContain("orders.example.test")
+                .doesNotContain("identity.example.test")
+                .doesNotContain("PROJECT_VERSION=$(mvn");
+        assertThat(release)
+                .contains("Sections labeled V18, V19, or V20 preserve release-era")
+                .contains("[Public API compatibility](#public-api-compatibility)");
+        assertThat(benchmarks)
+                .contains("The commands in [Commands](#commands) are authoritative")
+                .contains("scope sections preserve V12-V20 evidence");
+    }
+
+    @Test
     void publishedBoot4ConsumerUsesFreshCentralArtifactsAndSeparateEvidence() throws IOException {
         Path root = projectRoot();
         String script = Files.readString(root.resolve("scripts/verify-published-consumer.sh"));
@@ -332,8 +365,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("include: health,rhttpclients")
                 .contains("show-details: when-authorized")
                 .contains(".withExchangeLogger(logger)")
-                .contains("## Independent Boot 4 consumer")
-                .contains("scripts/verify-publishable-artifacts.sh")
+                .contains("## Verify the migration")
+                .contains("[Boot 4 assembled consumer fixture](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)")
+                .contains("[Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline)")
                 .contains("requires no\nconfiguration-metadata entry or reflection hint");
         assertThat(report)
                 .contains("published 2.14.1", "Frozen baseline surface")
@@ -447,16 +481,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("Prefer the narrowest include\npattern")
                 .contains("Keep implementation\ninternals excluded");
         assertThat(includeWorkflow)
-                .contains("Run the strict comparison")
-                .contains("mvn -s .mvn/maven-central-settings.xml \\\n"
-                        + "  -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.0.0 \\\n"
-                        + "  -Papi-compatibility -DskipTests verify")
-                .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-starter-3.0.0 \\\n"
-                        + "  -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify")
+                .contains("authoritative root and module-scoped commands")
+                .contains("[Public API compatibility](#public-api-compatibility)")
                 .containsSubsequence(
-                        "-Papi-compatibility -DskipTests verify",
                         "bash scripts/verify-api-compatibility-fixtures.sh",
-                        "-Dtest=DocumentationReleaseArtifactTest test");
+                        "-Dtest=DocumentationReleaseArtifactTest test")
+                .doesNotContain("target/published-baseline-repositories/api-root-3.0.0")
+                .doesNotContain("target/published-baseline-repositories/api-starter-3.0.0");
     }
 
     @Test

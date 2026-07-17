@@ -1,5 +1,10 @@
 # Benchmarks
 
+The commands in [Commands](#commands) are authoritative for the current
+`3.1.0-SNAPSHOT` development reactor and published `3.0.0` baseline. Versioned
+scope sections preserve V12-V20 evidence and are historical unless explicitly
+identified as current.
+
 The benchmark harness compares the starter with raw `WebClient` and Spring HTTP
 Interface clients under equivalent local conditions. It is intentionally outside
 the default reactor so normal unit tests and release smoke tests stay fast.

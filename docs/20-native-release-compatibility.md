@@ -1,5 +1,10 @@
 # Native Image and Release Compatibility
 
+Sections without a version label describe the current `3.1.0-SNAPSHOT`
+development reactor. Sections labeled V18, V19, or V20 preserve release-era
+evidence and are not current commands. Use the command in the first applicable
+current section; historical sections remain for provenance only.
+
 ## Supported Spring Boot baseline
 
 The `3.x` line requires Java 21 and Spring Boot `4.0.0` or later. Default
@@ -460,24 +465,11 @@ pattern that covers the documented contract. Use a package include only when the
 whole package is documented as public, and use a trailing `*` when documented
 nested types or builder stages are part of the contract. Keep implementation
 internals excluded unless a public doc explicitly presents them as replacement
-or extension surfaces. Run the strict comparison, then run the fixtures and
+or extension surfaces. Run the authoritative root and module-scoped commands in
+[Public API compatibility](#public-api-compatibility), then run the fixtures and
 documentation checks:
 
 ```bash
-test ! -e target/published-baseline-repositories/api-root-3.0.0 && \
-mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.0.0 \
-  -Papi-compatibility -DskipTests verify && \
-scripts/verify-published-baseline-provenance.sh api-root 3.0.0 \
-  target/release-evidence/published-baselines/api-root-3.0.0 \
-  reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
-test ! -e target/published-baseline-repositories/api-starter-3.0.0 && \
-mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/api-starter-3.0.0 \
-  -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify && \
-scripts/verify-published-baseline-provenance.sh api-starter 3.0.0 \
-  target/release-evidence/published-baselines/api-starter-3.0.0 \
-  reactive-http-client-starter
 bash scripts/verify-api-compatibility-fixtures.sh
 mvn -q -pl reactive-http-client-starter \
   -Dtest=DocumentationReleaseArtifactTest test
