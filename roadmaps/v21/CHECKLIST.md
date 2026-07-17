@@ -395,14 +395,14 @@ Evidence:
 
 ## Priority 10 - Benchmark the First Post-`3.0.0` Line
 
-### [ ] 10.1 Validate the harness and scenario contract
+### [x] 10.1 Validate the harness and scenario contract
 
-- [ ] Build the benchmark module with the current reactor.
-- [ ] Run benchmark smoke to verify discovery and report generation.
-- [ ] Verify every benchmark prefix maps to an explicit report classification.
-- [ ] Keep loopback comparisons limited to equivalent work.
-- [ ] Keep no-network invocation and diagnostics rows in separate classifications.
-- [ ] Verify environment metadata records snapshot/candidate, dependencies, and commit correctly.
+- [x] Build the benchmark module with the current reactor.
+- [x] Run benchmark smoke to verify discovery and report generation.
+- [x] Verify every benchmark prefix maps to an explicit report classification.
+- [x] Keep loopback comparisons limited to equivalent work.
+- [x] Keep no-network invocation and diagnostics rows in separate classifications.
+- [x] Verify environment metadata records snapshot/candidate, dependencies, and commit correctly.
 
 ### [ ] 10.2 Gather release-quality comparison evidence manually
 
@@ -420,7 +420,21 @@ Evidence:
 
 Evidence:
 
-- Pending.
+- Priority 10.1 passed with
+  `mvn -B -ntp -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`.
+- The smoke run discovered 38 benchmark methods and generated JSON, environment,
+  and Markdown reports under
+  `reactive-http-client-benchmarks/target/benchmark-reports/`.
+- Report generation classified all current methods. Equivalent loopback rows
+  remain under `clientSideOverhead`; optional loopback features and starter-only
+  Problem Detail mapping remain separate; invocation and diagnostics audits
+  remain in the no-network classification.
+- Smoke metadata recorded current starter/project `3.1.0-SNAPSHOT`, published
+  API baseline `3.0.0`, Spring Boot `4.0.0`, resolved Framework, Reactor Netty,
+  Netty, Jackson, Micrometer, and OpenTelemetry versions, and commit `6386478`.
+- Priority 10.2 remains pending manual release-quality candidate, published
+  baseline, provenance, and comparison runs. Smoke numbers are not publication
+  evidence.
 
 ---
 
