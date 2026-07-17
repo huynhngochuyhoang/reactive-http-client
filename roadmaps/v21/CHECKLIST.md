@@ -7,9 +7,11 @@ priority. Target-only evidence belongs under `target/release-evidence/`; do not
 commit generated evidence as release proof unless the roadmap explicitly calls
 for a promoted source-controlled artifact.
 
-The release version is intentionally undecided. Keep `3.1.0-SNAPSHOT` during
-development. Priority 12 selects a `3.0.x` patch for fixes-only scope or `3.1.0`
-when the completed work contains a backward-compatible public addition.
+**Closed.** Priority 12 selected `3.1.0` (a backward-compatible public addition,
+not a `3.0.x` patch), which was published to Maven Central. Development now
+continues on `3.2.0-SNAPSHOT` with published `3.1.0` as the strict API/benchmark
+baseline and public-snippet version. The notes below preserve the decision-time
+context in which the reactor was `3.1.0-SNAPSHOT`.
 
 ---
 
@@ -584,19 +586,39 @@ Evidence:
   `target/release-evidence/reactive-http-client-release-evidence.json`; it
   records `3.1.0-SNAPSHOT`, published/API baseline `3.0.0`, exact isolated API,
   artifact, benchmark, fixture, and diff commands, and target-only provenance.
-- **Rerun from clean commit.** Release-prep changes committed to immutable commit
-  `4de69a3`. Reran full verification suite from this clean candidate:
-  - Passed `mvn -B -ntp -s .mvn/maven-central-settings.xml clean verify`:
-    starter (745 tests), test-helper (33 tests), OTel (38 tests), 816 total.
-  - Passed strict API compatibility (`mvn -B -ntp -s .mvn/maven-central-settings.xml clean verify -Djapicmp.fail=true`).
-  - Passed published consumer verification against `3.0.0`.
-  - Passed native image compilation (`mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-graalvm-fixture clean native:compile`).
-  - Passed packaging verification (`bash scripts/verify-generation-packaging.sh`).
-- **Decision: GO for publication of `3.1.0`.** Clean, immutable commit `4de69a3`
-  passes all release gates. Ready to: (1) publish artifacts to Maven Central;
-  (2) tag `v3.1.0`; (3) date changelog to 2026-07-17; (4) advance
-  `latestPublishedVersion` and `api.compatibility.baseline.version` to `3.1.0`
-  after Central resolution; (5) advance snapshot to `3.2.0-SNAPSHOT`.
+- **Decision: GO — executed.** Cut the `3.1.0` release candidate (all release-prep
+  and the JDK 25 metadata packaging fix committed first), merged as PR #200 to
+  immutable commit `f614c5b`, and tagged `v3.1.0` at that commit (remote tag
+  `v3.1.0` → `f614c5b`); the tagged `project.version=3.1.0` matched the
+  publish-guard (non-`SNAPSHOT`, tag `v$VERSION`).
+  The release-cut moved the release-state machine to `release-candidate`; every
+  gate passed at `3.1.0`: full reactor `verify` (816 tests), strict root+module
+  japicmp vs published `3.0.0`, `verify-published-consumer.sh 3.0.0`,
+  `verify-generation-packaging.sh`, and GraalVM `25.0.3` native image compile
+  plus executable startup.
+- **Published to Maven Central and verified resolution.** `3.1.0` was published
+  and now resolves from Maven Central into a fresh isolated repository with
+  `_remote.repositories` Central markers. Recorded artifact SHA-256 values:
+  starter `ba3862137f7cb64037a3950bfb4bb618a69090ff35aad32a49d020b6712ed29a`,
+  test-helper `bab64484cbf9adb2ca3cfd0ff258a57e8c704340e9bd9ca911b92f291122cd35`,
+  OTel `2f07896260a89fb0439841db9adb288199b3a1201ea63dd4206f573ff9a33183`.
+  `verify-published-consumer.sh 3.1.0` passed the Boot 4 consumer against the
+  published `3.1.0` artifacts with provenance verification.
+- **Post-publication transition applied** (companion artifacts resolve publicly).
+  Dated the changelog `## [3.1.0] - 2026-07-17` and opened a fresh `Unreleased`;
+  advanced public README/quick-start snippets to `3.1.0`; moved
+  `latest.published.version` and `api.compatibility.baseline.version` to `3.1.0`;
+  and opened development on `3.2.0-SNAPSHOT` (reactor, modules, and native/consumer
+  fixtures). The release-state machine returned to `snapshot-development`.
+- **Re-verified at the post-publication state.** Passed
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml clean verify` (816 tests) on
+  `3.2.0-SNAPSHOT`; passed strict `-Papi-compatibility` japicmp against the new
+  published `3.1.0` baseline resolved fresh from Maven Central; passed
+  `verify-generation-packaging.sh` and `verify-published-consumer.sh 3.1.0`.
+- **V21 complete.** Priorities 1-11 are checked and Priority 12 records an
+  evidence-backed **go** decision that was executed and published. Public
+  consumer snippets and the strict API/benchmark baseline now track published
+  `3.1.0`; development continues on `3.2.0-SNAPSHOT`.
 
 ---
 

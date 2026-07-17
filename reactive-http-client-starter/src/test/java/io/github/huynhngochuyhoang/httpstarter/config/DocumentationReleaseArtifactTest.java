@@ -80,7 +80,7 @@ class DocumentationReleaseArtifactTest {
         String reactorVersion = projectVersion(root.resolve("pom.xml"));
         String publishWorkflow = Files.readString(root.resolve(".github/workflows/publish-maven-central.yml"));
 
-        assertThat(reactorVersion).isEqualTo("3.1.0");
+        assertThat(reactorVersion).endsWith("-SNAPSHOT");
         assertThat(projectVersion(root.resolve("reactive-http-client-starter/pom.xml"))).isEqualTo(reactorVersion);
         assertThat(projectVersion(root.resolve("reactive-http-client-test/pom.xml"))).isEqualTo(reactorVersion);
         assertThat(projectVersion(root.resolve("reactive-http-client-otel/pom.xml"))).isEqualTo(reactorVersion);
@@ -125,9 +125,9 @@ class DocumentationReleaseArtifactTest {
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
 
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0");
-        assertThat(pomProperty(pomXml, "latest.published.version")).isEqualTo("3.0.0");
-        assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("3.0.0");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.2.0-SNAPSHOT");
+        assertThat(pomProperty(pomXml, "latest.published.version")).isEqualTo("3.1.0");
+        assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("3.1.0");
         assertThat(pomProperty(pomXml, "spring-boot.version")).isEqualTo("4.0.0");
         assertThat(pomProperty(pomXml, "resilience4j.version")).isEqualTo("2.4.0");
         assertThat(pomXml)
@@ -135,25 +135,25 @@ class DocumentationReleaseArtifactTest {
                 .contains("${project.groupId}:${project.artifactId}:${api.compatibility.baseline.version}:pom")
                 .contains("<transitive>false</transitive>");
         assertThat(readme)
-                .contains("<version>3.0.0</version>")
-                .doesNotContain("<version>3.1.0");
+                .contains("<version>3.1.0</version>")
+                .doesNotContain("<version>3.2.0");
         assertThat(quickStart)
-                .contains("<version>3.0.0</version>")
-                .doesNotContain("<version>3.1.0");
+                .contains("<version>3.1.0</version>")
+                .doesNotContain("<version>3.2.0");
         assertThat(releaseDocs)
                 .contains("### V20 default Spring Boot 4 reactor")
-                .contains("default reactor now declares `3.1.0`")
-                .contains("uses published `3.0.0` as its strict compatibility baseline")
+                .contains("default reactor now declares `3.2.0-SNAPSHOT`")
+                .contains("uses published `3.1.0` as its strict compatibility baseline")
                 .contains("mvn -s .mvn/maven-central-settings.xml verify")
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`");
         assertThat(benchmarkDocs)
-                .contains("-Dbenchmark.starter.version=3.0.0")
-                .contains("-Dbenchmark.commit=3.0.0")
-                .contains("test ! -e target/published-baseline-repositories/benchmark-3.0.0 && \\\n"
+                .contains("-Dbenchmark.starter.version=3.1.0")
+                .contains("-Dbenchmark.commit=3.1.0")
+                .contains("test ! -e target/published-baseline-repositories/benchmark-3.1.0 && \\\n"
                         + "mvn -s .mvn/maven-central-settings.xml")
-                .contains("-Dmaven.repo.local=target/published-baseline-repositories/benchmark-3.0.0")
-                .contains("published-starter-3.0.0/release-jmh.md")
-                .contains("published-starter-3.0.0/release-jmh.json")
+                .contains("-Dmaven.repo.local=target/published-baseline-repositories/benchmark-3.1.0")
+                .contains("published-starter-3.1.0/release-jmh.md")
+                .contains("published-starter-3.1.0/release-jmh.json")
                 .doesNotContain("published-starter-2.14.1/release-jmh.json");
         assertThat(manifest.path("publishedBaselineArtifacts"))
                 .allSatisfy(artifact -> assertThat(artifact.path("resolutionCommand").asText())
@@ -343,7 +343,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("<api.compatibility.break-on-binary-incompatible>false</api.compatibility.break-on-binary-incompatible>")
                 .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
         assertThat(workflow)
-                .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-root-3.0.0")
+                .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-root-3.1.0")
                 .contains("-Papi-compatibility -DskipTests verify")
                 .contains("bash scripts/verify-published-baseline-fixtures.sh")
                 .doesNotContain("-Papi-compatibility,major-api-report")
@@ -490,8 +490,8 @@ class DocumentationReleaseArtifactTest {
                 .containsSubsequence(
                         "bash scripts/verify-api-compatibility-fixtures.sh",
                         "-Dtest=DocumentationReleaseArtifactTest test")
-                .doesNotContain("target/published-baseline-repositories/api-root-3.0.0")
-                .doesNotContain("target/published-baseline-repositories/api-starter-3.0.0");
+                .doesNotContain("target/published-baseline-repositories/api-root-3.1.0")
+                .doesNotContain("target/published-baseline-repositories/api-starter-3.1.0");
     }
 
     @Test
@@ -581,10 +581,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`")
                 .contains("Create a dedicated maintenance branch from that tag")
                 .contains("do not compile Boot 3 adapters into the `3.x` artifacts");
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.1.0");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("3.2.0-SNAPSHOT");
         assertThat(pomXml)
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
-                .contains("<api.compatibility.baseline.version>3.0.0</api.compatibility.baseline.version>");
+                .contains("<api.compatibility.baseline.version>3.1.0</api.compatibility.baseline.version>");
     }
 
     @Test
@@ -709,7 +709,7 @@ class DocumentationReleaseArtifactTest {
         String settings = Files.readString(root.resolve(".mvn/maven-central-settings.xml"));
 
         assertThat(pomXml)
-                .contains("<version>3.1.0</version>")
+                .contains("<version>3.2.0-SNAPSHOT</version>")
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .doesNotContain("<id>boot4-spike</id>")
                 .doesNotContain("<maven.deploy.skip>true</maven.deploy.skip>")
@@ -804,7 +804,7 @@ class DocumentationReleaseArtifactTest {
                 "reactiveHttpClientHealthIndicator",
                 "reactive.http.client.requests");
         assertThat(nativePom).contains(
-                "<reactive-http-client.version>3.1.0</reactive-http-client.version>",
+                "<reactive-http-client.version>3.2.0-SNAPSHOT</reactive-http-client.version>",
                 "-J-Xmx6g",
                 "-H:NumberOfThreads=4",
                 "-H:+SharedArenaSupport");
@@ -817,7 +817,7 @@ class DocumentationReleaseArtifactTest {
                 "configured inherited",
                 "@ApiRef",
                 "6 GiB",
-                "-Dreactive-http-client.version=3.1.0 native:compile",
+                "-Dreactive-http-client.version=3.2.0-SNAPSHOT native:compile",
                 "native-smoke-provenance");
     }
 
@@ -1296,10 +1296,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(manifest.normalize()).startsWith(root.resolve("target"));
         assertThat(benchmarkEvidenceSnippet.normalize()).startsWith(root.resolve("target"));
         assertThat(generated.path("projectVersion").asText()).isEqualTo(projectVersion(root.resolve("pom.xml")));
-        assertThat(generated.path("releaseState").asText()).isEqualTo("release-candidate");
-        assertThat(generated.path("developmentVersion").isNull()).isTrue();
-        assertThat(generated.path("latestPublishedConsumerVersion").asText()).isEqualTo("3.0.0");
-        assertThat(generated.path("plannedFinalVersion").asText()).isEqualTo("3.1.0");
+        assertThat(generated.path("releaseState").asText()).isEqualTo("snapshot-development");
+        assertThat(generated.path("developmentVersion").asText()).isEqualTo("3.2.0-SNAPSHOT");
+        assertThat(generated.path("latestPublishedConsumerVersion").asText()).isEqualTo("3.1.0");
+        assertThat(generated.path("plannedFinalVersion").isNull()).isTrue();
         assertThat(generated.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(pomProperty(pomXml, "api.compatibility.baseline.version"));
         assertThat(generated.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
@@ -1342,8 +1342,8 @@ class DocumentationReleaseArtifactTest {
                 .extracting(JsonNode::asText)
                 .hasSize(4)
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
-                .anySatisfy(command -> assertThat(command).contains("api-root-3.0.0"))
-                .anySatisfy(command -> assertThat(command).contains("api-starter-3.0.0"));
+                .anySatisfy(command -> assertThat(command).contains("api-root-3.1.0"))
+                .anySatisfy(command -> assertThat(command).contains("api-starter-3.1.0"));
         assertThat(readiness.path("promotedBenchmarkReport").path("path").isNull()).isTrue();
         assertThat(readiness.path("promotedBenchmarkReport").path("status").asText())
                 .isEqualTo("deferred-until-release-cut");
@@ -1356,9 +1356,9 @@ class DocumentationReleaseArtifactTest {
 
         JsonNode releasePrepChecklist = generated.path("releasePrepChecklist");
         assertThat(releasePrepChecklist.path("status").asText()).isEqualTo("pending");
-        assertThat(releasePrepChecklist.path("releaseState").asText()).isEqualTo("release-candidate");
-        assertThat(releasePrepChecklist.path("latestPublishedConsumerVersion").asText()).isEqualTo("3.0.0");
-        assertThat(releasePrepChecklist.path("plannedFinalVersion").asText()).isEqualTo("3.1.0");
+        assertThat(releasePrepChecklist.path("releaseState").asText()).isEqualTo("snapshot-development");
+        assertThat(releasePrepChecklist.path("latestPublishedConsumerVersion").asText()).isEqualTo("3.1.0");
+        assertThat(releasePrepChecklist.path("plannedFinalVersion").isNull()).isTrue();
         assertThat(releasePrepChecklist.path("projectVersion").asText()).isEqualTo(generated.path("projectVersion").asText());
         assertThat(releasePrepChecklist.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
@@ -1398,8 +1398,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(streamText(releasePrepItems.get("api-compatibility").path("commands")))
                 .hasSize(4)
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
-                .anySatisfy(command -> assertThat(command).contains("api-root-3.0.0"))
-                .anySatisfy(command -> assertThat(command).contains("api-starter-3.0.0"));
+                .anySatisfy(command -> assertThat(command).contains("api-root-3.1.0"))
+                .anySatisfy(command -> assertThat(command).contains("api-starter-3.1.0"));
         assertThat(streamText(releasePrepItems.get("benchmark-evidence").path("commands")))
                 .contains("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
                         generated.path("benchmarkEvidence").path("currentWorkspaceCommand").asText(),
@@ -1477,8 +1477,8 @@ class DocumentationReleaseArtifactTest {
                         "mvn -Pbenchmarks -pl reactive-http-client-benchmarks -am package",
                         "mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
                         "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)")
-                .anySatisfy(command -> assertThat(command).contains("api-root-3.0.0"))
-                .anySatisfy(command -> assertThat(command).contains("api-starter-3.0.0"));
+                .anySatisfy(command -> assertThat(command).contains("api-root-3.1.0"))
+                .anySatisfy(command -> assertThat(command).contains("api-starter-3.1.0"));
         JsonNode benchmarkEvidence = generated.path("benchmarkEvidence");
         assertThat(benchmarkEvidence.path("manualOrProfileGated").asBoolean()).isTrue();
         assertThat(benchmarkEvidence.path("currentWorkspaceCommand").asText())
