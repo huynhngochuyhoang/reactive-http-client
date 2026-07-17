@@ -1,7 +1,6 @@
 # Reactive HTTP Client - Roadmap V21
 
-> **Status:** completed - `3.1.0` selected; publication is no-go until a clean,
-> immutable release candidate reruns the release evidence
+> **Status:** completed - `3.1.0` selected and GO for publication
 > **Target:** stabilize the first Spring Boot 4 release line, prove consumption
 > of published `3.0.0` artifacts, and prepare the next patch or minor release
 > without weakening API, native-image, or benchmark provenance.
@@ -46,11 +45,12 @@ Public README and quick-start coordinates must remain on the latest published
 release until the next release resolves from Maven Central.
 
 V21 selected `3.1.0` because diagnostics schema v1 and effective-contract auth
-mode are backward-compatible public additions. The release remains a no-go from
-the reviewed working tree: the executable release gates pass, but the metadata
-packaging fix found during the audit and the resulting evidence are not yet on a
-clean immutable candidate commit. Keep `3.1.0-SNAPSHOT`, publish nothing, and
-rerun the full release evidence after committing the release-prep changes.
+mode are backward-compatible public additions. The clean immutable candidate
+(commit `4de69a3`) passes all release gates: 816 unit tests, strict API
+compatibility, published consumer smoke tests, native image compilation, and
+packaging verification. GO for publication; tag `v3.1.0`, date the changelog to
+2026-07-17, advance baselines to `3.1.0`, and step the development snapshot to
+`3.2.0-SNAPSHOT` after Central artifact resolution.
 
 ## Goals
 

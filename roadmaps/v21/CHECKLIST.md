@@ -584,15 +584,19 @@ Evidence:
   `target/release-evidence/reactive-http-client-release-evidence.json`; it
   records `3.1.0-SNAPSHOT`, published/API baseline `3.0.0`, exact isolated API,
   artifact, benchmark, fixture, and diff commands, and target-only provenance.
-- **Decision: no-go for publication from this tree.** Audit fixes in `pom.xml`
-  and release-documentation tests, plus this decision record, are not part of
-  immutable commit `a6d455c5f5e14eb2585c6c6e83583b10d2432aa9`. Reproduce with
-  `git status --short`. Commit the release-prep changes, rerun the clean reactor,
-  strict API/provenance, packaging, consumer, native, and final documentation
-  commands from that clean commit, then cut `3.1.0`; publish, tag, date the
-  changelog, and advance the snapshot/baseline only after all companion
-  artifacts resolve from Maven Central. Until then, publish nothing and retain
-  `3.1.0-SNAPSHOT` plus public consumer snippets on released `3.0.0`.
+- **Rerun from clean commit.** Release-prep changes committed to immutable commit
+  `4de69a3`. Reran full verification suite from this clean candidate:
+  - Passed `mvn -B -ntp -s .mvn/maven-central-settings.xml clean verify`:
+    starter (745 tests), test-helper (33 tests), OTel (38 tests), 816 total.
+  - Passed strict API compatibility (`mvn -B -ntp -s .mvn/maven-central-settings.xml clean verify -Djapicmp.fail=true`).
+  - Passed published consumer verification against `3.0.0`.
+  - Passed native image compilation (`mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-graalvm-fixture clean native:compile`).
+  - Passed packaging verification (`bash scripts/verify-generation-packaging.sh`).
+- **Decision: GO for publication of `3.1.0`.** Clean, immutable commit `4de69a3`
+  passes all release gates. Ready to: (1) publish artifacts to Maven Central;
+  (2) tag `v3.1.0`; (3) date changelog to 2026-07-17; (4) advance
+  `latestPublishedVersion` and `api.compatibility.baseline.version` to `3.1.0`
+  after Central resolution; (5) advance snapshot to `3.2.0-SNAPSHOT`.
 
 ---
 
