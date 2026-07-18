@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Complete published-baseline provenance.** Added one fresh-repository Maven Central check for the published parent plus starter, test-helper, and OTel POM, binary, source, and Javadoc artifacts; generated readiness evidence now uses that complete bundle, and current migration/consumer guidance consistently tracks published `3.1.0`.
+
 ## [3.1.0] - 2026-07-17
 
 ### Changed

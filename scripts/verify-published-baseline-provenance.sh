@@ -6,6 +6,11 @@ LANE="${1:-}"
 BASELINE_VERSION="${2:-}"
 EVIDENCE_DIR="${3:-}"
 shift $(( $# >= 3 ? 3 : $# ))
+REQUIRE_RELEASE_ARTIFACTS=false
+if [[ "${1:-}" == "--release-artifacts" ]]; then
+  REQUIRE_RELEASE_ARTIFACTS=true
+  shift
+fi
 ARTIFACTS=("$@")
 
 fail() {
@@ -18,6 +23,13 @@ fail() {
 [[ -n "$EVIDENCE_DIR" ]] || fail "evidence directory is required"
 [[ "$EVIDENCE_DIR" = /* ]] || EVIDENCE_DIR="$ROOT_DIR/$EVIDENCE_DIR"
 [[ ${#ARTIFACTS[@]} -gt 0 ]] || fail "at least one project artifact is required"
+
+if [[ "$REQUIRE_RELEASE_ARTIFACTS" == true ]]; then
+  for required in reactive-http-client reactive-http-client-starter reactive-http-client-test reactive-http-client-otel; do
+    [[ " ${ARTIFACTS[*]} " == *" $required "* ]] \
+      || fail "release artifacts must include $required"
+  done
+fi
 
 REPOSITORY="$ROOT_DIR/target/published-baseline-repositories/$LANE-$BASELINE_VERSION"
 GROUP_PATH="io/github/huynhngochuyhoang"
@@ -45,6 +57,17 @@ for artifact in "${ARTIFACTS[@]}"; do
     grep -Eq "^$artifact-$BASELINE_VERSION\\.jar>maven-central=$" "$marker" \
       || fail "$artifact jar was not resolved from Maven Central"
     sha256sum "$jar" >> "$CHECKSUMS"
+
+    if [[ "$REQUIRE_RELEASE_ARTIFACTS" == true ]]; then
+      for classifier in sources javadoc; do
+        attachment="$artifact_dir/$artifact-$BASELINE_VERSION-$classifier.jar"
+        [[ -f "$attachment" ]] \
+          || fail "missing published $classifier jar for $artifact:$BASELINE_VERSION"
+        grep -Eq "^$artifact-$BASELINE_VERSION-$classifier\\.jar>maven-central=$" "$marker" \
+          || fail "$artifact $classifier jar was not resolved from Maven Central"
+        sha256sum "$attachment" >> "$CHECKSUMS"
+      done
+    fi
   fi
 
   mkdir -p "$EVIDENCE_DIR/remote-markers/$artifact"
@@ -62,6 +85,7 @@ done < <(find "$REPOSITORY/$GROUP_PATH" -mindepth 2 -maxdepth 2 -type d 2>/dev/n
   echo "repository=$REPOSITORY"
   echo "settings=.mvn/maven-central-settings.xml"
   echo "source=Maven Central"
+  echo "releaseArtifacts=$REQUIRE_RELEASE_ARTIFACTS"
   printf 'artifacts=%s\n' "${ARTIFACTS[*]}"
 } > "$EVIDENCE_DIR/provenance.properties"
 

@@ -157,10 +157,7 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("published-starter-2.14.1/release-jmh.json");
         assertThat(manifest.path("publishedBaselineArtifacts"))
                 .allSatisfy(artifact -> assertThat(artifact.path("resolutionCommand").asText())
-                        .contains("test ! -e target/published-baseline-repositories/artifact-")
-                        .contains("-s .mvn/maven-central-settings.xml")
-                        .contains("dependency:get -Dartifact=io.github.huynhngochuyhoang:")
-                        .contains("verify-published-baseline-provenance.sh"));
+                        .isEqualTo("scripts/verify-published-release-artifacts.sh 3.1.0"));
     }
 
     @Test
@@ -223,8 +220,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("reactive-http-client-test")
                 .contains("[Boot 4 assembled consumer fixture](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)")
                 .contains("[Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline)")
-                .contains("starter `3.0.0`")
-                .contains("`3.1.0-SNAPSHOT` artifacts")
+                .contains("starter `3.1.0`")
+                .contains("`3.2.0-SNAPSHOT` artifacts")
                 .contains("orders-api.example.invalid")
                 .contains("identity.example.invalid")
                 .doesNotContain("orders.example.test")
@@ -243,6 +240,7 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String script = Files.readString(root.resolve("scripts/verify-published-consumer.sh"));
         String provenanceScript = Files.readString(root.resolve("scripts/verify-published-baseline-provenance.sh"));
+        String releaseArtifactsScript = Files.readString(root.resolve("scripts/verify-published-release-artifacts.sh"));
         String provenanceFixtures = Files.readString(root.resolve("scripts/verify-published-baseline-fixtures.sh"));
         String workflow = Files.readString(root.resolve(".github/workflows/published-consumer-smoke.yml"));
         String fixture = Files.readString(root.resolve(
@@ -258,26 +256,44 @@ class DocumentationReleaseArtifactTest {
                 .contains("verify-published-baseline-provenance.sh")
                 .contains("dependency:build-classpath")
                 .contains("resolved reactor output directories")
-                .contains("v21-priority2/published-$PUBLISHED_VERSION");
+                .contains("published-consumer/published-$PUBLISHED_VERSION");
         assertThat(provenanceScript)
                 .contains("target/published-baseline-repositories/$LANE-$BASELINE_VERSION")
                 .contains("_remote.repositories")
                 .contains("maven-central=")
                 .contains("sha256sum")
                 .contains("missing published POM or remote marker")
+                .contains("--release-artifacts")
+                .contains("missing published $classifier jar")
                 .contains("candidate or unrelated project version")
                 .contains("evidence must remain under target/");
+        assertThat(releaseArtifactsScript)
+                .contains("PUBLISHED_VERSION=\"${1:-}\"")
+                .contains("LANE=\"release-artifacts\"")
+                .contains("$LANE-$PUBLISHED_VERSION")
+                .contains(".mvn/maven-central-settings.xml")
+                .contains("reactive-http-client:$PUBLISHED_VERSION:pom")
+                .contains("$module:$PUBLISHED_VERSION:pom")
+                .contains("$PUBLISHED_VERSION:jar:sources")
+                .contains("$PUBLISHED_VERSION:jar:javadoc")
+                .contains("-Dtransitive=false")
+                .contains("--release-artifacts");
         assertThat(provenanceFixtures)
                 .contains("fixture-local")
                 .contains("fixture-central")
                 .contains("Central-marked JAR without its module POM unexpectedly passed")
+                .contains("Release bundle without a sources jar unexpectedly passed")
+                .contains("Release bundle without a Javadoc jar unexpectedly passed")
                 .contains("3.1.0-SNAPSHOT")
                 .contains("conflicting local candidate unexpectedly passed");
         assertThat(workflow)
                 .contains("workflow_dispatch:")
                 .contains("latest.published.version")
+                .contains("scripts/verify-published-release-artifacts.sh \"$PUBLISHED_VERSION\"")
                 .contains("scripts/verify-published-consumer.sh \"$PUBLISHED_VERSION\"")
                 .contains("published-consumer-${{ env.PUBLISHED_VERSION }}")
+                .contains("published-consumer/published-${{ env.PUBLISHED_VERSION }}")
+                .contains("published-baselines/release-artifacts-${{ env.PUBLISHED_VERSION }}")
                 .doesNotContain("install current");
         assertThat(fixture)
                 .contains("Mono<OrderResponse> direct()")
@@ -291,9 +307,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("propagatedTraceparent.get()).isEqualTo(TRACEPARENT)");
         assertThat(releaseDocs)
                 .contains("### Published Boot 4 consumer baseline")
-                .contains("scripts/verify-published-consumer.sh 3.0.0")
+                .contains("scripts/verify-published-release-artifacts.sh 3.1.0")
+                .contains("scripts/verify-published-consumer.sh 3.1.0")
                 .contains("published parent")
-                .contains("target/release-evidence/v21-priority2/published-3.0.0/")
+                .contains("source and Javadoc jars")
+                .contains("target/release-evidence/published-consumer/published-3.1.0/")
+                .contains("target/release-evidence/published-baselines/release-artifacts-3.1.0/")
+                .doesNotContain("scripts/verify-published-consumer.sh 3.0.0")
                 .contains("current-reactor lane");
     }
 
@@ -353,7 +373,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("<reactive-http-client.version>2.14.1</reactive-http-client.version>")
                 .contains("[2.14.1 to 3.0.0 API Report](api-report-2.14.1-to-3.0.0.md)")
                 .contains("<version>4.0.0</version>")
-                .contains("<reactive-http-client.version>3.0.0</reactive-http-client.version>")
+                .contains("<reactive-http-client.version>3.1.0</reactive-http-client.version>")
                 .contains("org.springframework.boot.webclient.WebClientCustomizer")
                 .contains("org.springframework.boot.health.contributor")
                 .contains("tools.jackson.databind.ObjectMapper")
@@ -1316,11 +1336,8 @@ class DocumentationReleaseArtifactTest {
                         .contains("api-root-" + pomProperty(pomXml, "api.compatibility.baseline.version"))
                         .contains("verify-published-baseline-provenance.sh"));
         assertThat(pendingReleaseCommands)
-                .filteredOn(command -> command.contains(" dependency:get -Dartifact="))
-                .hasSize(3)
-                .allSatisfy(command -> assertThat(command)
-                        .contains("test ! -e target/published-baseline-repositories/artifact-")
-                        .contains("verify-published-baseline-provenance.sh"));
+                .filteredOn(command -> command.contains("verify-published-release-artifacts.sh"))
+                .containsExactly("scripts/verify-published-release-artifacts.sh 3.1.0");
         assertThat(pendingReleaseCommands)
                 .anySatisfy(command -> assertThat(command)
                         .contains("benchmark-release")
@@ -1390,11 +1407,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(releasePrepItems.get("version-snippets").path("expectedVersion").asText())
                 .isEqualTo(expectedConsumerVersion);
         assertThat(streamText(releasePrepItems.get("published-baseline-artifacts").path("commands")))
-                .hasSize(3)
-                .allSatisfy(command -> assertThat(command)
-                        .contains("test ! -e target/published-baseline-repositories/artifact-")
-                        .contains(" dependency:get -Dartifact=io.github.huynhngochuyhoang:")
-                        .contains("verify-published-baseline-provenance.sh"));
+                .containsExactly("scripts/verify-published-release-artifacts.sh 3.1.0");
         assertThat(streamText(releasePrepItems.get("api-compatibility").path("commands")))
                 .hasSize(4)
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
@@ -2079,6 +2092,7 @@ class DocumentationReleaseArtifactTest {
         publishedBaselineArtifacts.stream()
                 .filter(artifact -> "pending".equals(artifact.get("status")))
                 .map(artifact -> artifact.get("resolutionCommand"))
+                .distinct()
                 .forEach(pendingManualCommands::add);
         pendingManualCommands.add((String) benchmarkEvidence.get("publishedStarterCommand"));
         List<String> pendingBenchmarkCommands = new ArrayList<>(pendingManualCommands.stream()
@@ -2141,6 +2155,7 @@ class DocumentationReleaseArtifactTest {
 
         List<String> publishedBaselineCommands = publishedBaselineArtifacts.stream()
                 .map(artifact -> artifact.get("resolutionCommand"))
+                .distinct()
                 .toList();
         List<String> compatibilityCommands = checks.stream()
                 .map(check -> check.get("command"))
@@ -2449,17 +2464,10 @@ class DocumentationReleaseArtifactTest {
 
     private static Map<String, String> baselineArtifact(String artifactId, String baselineVersion) {
         String gav = "io.github.huynhngochuyhoang:" + artifactId + ":" + baselineVersion;
-        String lane = "artifact-" + artifactId;
-        String repository = publishedBaselineRepository(lane, baselineVersion);
         LinkedHashMap<String, String> artifact = new LinkedHashMap<>();
         artifact.put("artifact", gav);
         artifact.put("status", "pending");
-        artifact.put("resolutionCommand", "test ! -e " + repository
-                + " && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=" + repository
-                + " dependency:get -Dartifact=" + gav
-                + " && scripts/verify-published-baseline-provenance.sh " + lane + " " + baselineVersion
-                + " target/release-evidence/published-baselines/" + lane + "-" + baselineVersion
-                + " " + artifactId);
+        artifact.put("resolutionCommand", "scripts/verify-published-release-artifacts.sh " + baselineVersion);
         artifact.put("note", "Run before release; unresolved published artifacts are release blockers.");
         return artifact;
     }

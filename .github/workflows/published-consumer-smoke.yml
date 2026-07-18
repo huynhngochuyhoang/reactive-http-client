@@ -26,12 +26,16 @@ jobs:
         run: echo "PUBLISHED_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=latest.published.version)" >> "$GITHUB_ENV"
 
       - name: Verify published artifacts from Maven Central
-        run: scripts/verify-published-consumer.sh "$PUBLISHED_VERSION"
+        run: |
+          scripts/verify-published-release-artifacts.sh "$PUBLISHED_VERSION"
+          scripts/verify-published-consumer.sh "$PUBLISHED_VERSION"
 
       - name: Upload published consumer evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: published-consumer-${{ env.PUBLISHED_VERSION }}
-          path: target/release-evidence/v21-priority2/published-${{ env.PUBLISHED_VERSION }}/
+          path: |
+            target/release-evidence/published-consumer/published-${{ env.PUBLISHED_VERSION }}/
+            target/release-evidence/published-baselines/release-artifacts-${{ env.PUBLISHED_VERSION }}/
           retention-days: 14
