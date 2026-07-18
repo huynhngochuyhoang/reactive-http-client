@@ -19,7 +19,36 @@ reactive:
 
 This keeps the starter-managed Reactor Netty connector, so global and per-client settings for connection pool, timeouts, compression, proxy, TLS/mTLS, logging, auth, and observability continue to apply.
 
-### Transport-owned request headers
+For an `https://` base URL, the starter selects TLS HTTP/2 and negotiates H2
+through ALPN. For an `http://` base URL, it selects clear-text H2C. The
+downstream must support the selected mode; this option does not silently fall
+back to HTTP/1.1. With the option omitted or `false`, HTTP/1.1 remains the
+default. Unary values, `ResponseEntity<T>`, direct streaming bodies, and
+`ResponseEntity<Flux<DataBuffer>>` use the same protocol selection. Each HTTP/2
+stream retains independent cancellation and error ownership while sharing the
+configured connection pool.
+
+## Response compression
+
+`compression-enabled` is opt-in per client. When enabled, Reactor Netty adds
+`Accept-Encoding: gzip` and incrementally decompresses gzip responses before
+Spring codecs, error mapping, or caller-owned response publishers consume them.
+Identity responses continue to work. This option does not compress request
+bodies and does not add request `Content-Encoding`.
+
+Do not add `Accept-Encoding` through default headers, `@HeaderParam`, header
+maps, inbound forwarding, or a customizer when compression is enabled. The
+starter rejects that ambiguous combination before exchange because negotiation
+and decompression belong to the connector. With compression disabled, no
+negotiation or automatic decompression is installed; an application that adds
+`Accept-Encoding` then owns the resulting encoded representation.
+
+Unary JSON, errors, `ResponseEntity`, direct streams, and streaming envelopes
+are decompressed consistently. Streaming bodies are not aggregated to measure
+their decoded size. See [Observability](08-observability.md) for byte-counter
+semantics.
+
+## Transport-owned request headers
 
 The starter rejects application-supplied `Content-Length`, `Transfer-Encoding`,
 `Connection`, `Expect`, and `Host` headers. This applies consistently to default

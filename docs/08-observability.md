@@ -38,13 +38,21 @@ Tags: `client.name`, `api.name`, `http.method`, `uri`.
 
 ### `reactive.http.client.requests.request.size` (DistributionSummary)
 
-Serialized request body bytes. Recorded only for cheaply measurable types: `byte[]`, `String`, or `null` (`0`). POJO bodies are not measured to avoid double-serialization cost.
+Application request body bytes before transport content coding. Recorded only
+for cheaply measurable types: `byte[]`, `String`, or `null` (`0`). POJO bodies
+are not measured to avoid double-serialization cost. The starter's
+`compression-enabled` option does not compress request bodies.
 
 Tags: `client.name`, `api.name`, `http.method`, `uri`.
 
 ### `reactive.http.client.requests.response.size` (DistributionSummary)
 
-Response body bytes as advertised by `Content-Length`. Chunked responses and those without the header are skipped.
+Response representation bytes advertised by `Content-Length` after transport
+processing. Chunked responses and those without the header are skipped. Reactor
+Netty removes the compressed representation length during automatic gzip
+decompression, so those responses report unknown and are skipped rather than
+being mislabeled as decoded bytes. Streaming bodies are never consumed to
+calculate this metric.
 
 Tags: `client.name`, `api.name`, `http.method`, `uri`.
 
@@ -271,8 +279,14 @@ reactive:
 | `rhttp.client.name` | Logical client name |
 | `rhttp.api.name` | `@ApiName` value, `@ApiRef` value, or method name |
 | `rhttp.attempt.count` | Total attempts (>1 = retried) |
-| `rhttp.request.bytes` | Request body bytes (when measurable) |
-| `rhttp.response.bytes` | Response body bytes (from `Content-Length`) |
+| `rhttp.request.bytes` | Application request body bytes before transport content coding, when measurable |
+| `rhttp.response.bytes` | Post-transport advertised representation bytes from `Content-Length`; absent for automatically decompressed or chunked responses |
+
+`HttpClientObserverEvent` is the only reporting contract with byte counters.
+`ReactiveHttpClientLifecycleContext` has neither response headers nor byte
+fields. `HttpExchangeLogContext` exposes post-transport response headers but no
+byte counter. Lifecycle hooks and exchange loggers must not consume streaming
+bodies to infer encoded or decoded sizes.
 
 Errors set `StatusCode.ERROR` and call `recordException(...)` so the exception event appears in the span.
 

@@ -324,7 +324,7 @@
     {
       "name": "reactive.http.clients.[name].compression-enabled",
       "type": "java.lang.Boolean",
-      "description": "Enable HTTP response compression (Accept-Encoding: gzip). Default: false.",
+      "description": "Enable Reactor Netty response compression negotiation and decompression (Accept-Encoding: gzip). Request bodies are not compressed. Default: false.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
       "defaultValue": false
     },

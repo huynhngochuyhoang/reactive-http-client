@@ -56,8 +56,10 @@ The upstream status code and headers are forwarded to the caller without bufferi
 - For `Mono<ResponseEntity<Flux<DataBuffer>>>`, lifecycle hooks, observers, and
   exchange logs finish when the response envelope is emitted. They do not prove
   that the inner body was subscribed, fully consumed, or released. Response-size
-  diagnostics still use `Content-Length` when available. See [Production Support Bundles](26-support-bundles.md)
-  for safe streaming incident evidence.
+  diagnostics use the post-transport `Content-Length` when available and never
+  aggregate the stream; automatically decompressed and chunked responses report
+  unknown. See [Production Support Bundles](26-support-bundles.md) for safe
+  streaming incident evidence.
 
 ---
 

@@ -218,16 +218,19 @@ public final class HttpClientObserverEvent {
     public int getAttemptCount() { return attemptCount; }
 
     /**
-     * Size of the serialised request body in bytes, or {@link #UNKNOWN_SIZE} when the
-     * starter could not measure it cheaply (i.e. body is a non-{@code byte[]}/{@code String}
-     * object whose serialized form isn't materialised synchronously on the invocation path).
+     * Size of the application request body before transport content coding, or
+     * {@link #UNKNOWN_SIZE} when the starter could not measure it cheaply (i.e. body is a
+     * non-{@code byte[]}/{@code String} object whose serialized form isn't materialised
+     * synchronously on the invocation path). The built-in response-compression option does
+     * not compress request bodies.
      */
     public long getRequestBytes() { return requestBytes; }
 
     /**
-     * Size of the response body in bytes as advertised by the server via
-     * {@code Content-Length}. {@link #UNKNOWN_SIZE} when the header was absent (e.g.
-     * chunked transfer encoding or no body).
+     * Response representation size advertised by {@code Content-Length} after transport
+     * processing. {@link #UNKNOWN_SIZE} when the header is absent, including chunked
+     * responses and responses whose compressed length was removed during automatic
+     * decompression. The starter never consumes a streaming body to calculate this value.
      */
     public long getResponseBytes() { return responseBytes; }
 

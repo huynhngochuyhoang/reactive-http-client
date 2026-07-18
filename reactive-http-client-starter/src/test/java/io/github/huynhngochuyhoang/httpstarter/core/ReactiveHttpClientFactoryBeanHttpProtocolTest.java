@@ -126,4 +126,40 @@ class ReactiveHttpClientFactoryBeanHttpProtocolTest {
 
         assertThat(response).isNotNull();
     }
+
+    @Test
+    void rejectsApplicationAcceptEncodingWhenTransportCompressionIsEnabled() {
+        WebClient client = WebClient.builder()
+                .filter(ReactiveHttpClientFactoryBean.outboundFramingHeaderFilter(true))
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK).build()))
+                .build();
+
+        StepVerifier.create(client.get().uri("http://example.test/resource")
+                        .header("Accept-Encoding", "gzip")
+                        .exchangeToMono(Mono::just))
+                .expectErrorSatisfies(error -> assertThat(error)
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("Accept-Encoding")
+                        .hasMessageContaining("compression-enabled=true")
+                        .hasMessageContaining("owned by the configured transport"))
+                .verify();
+    }
+
+    @Test
+    void allowsApplicationAcceptEncodingWhenTransportCompressionIsDisabled() {
+        WebClient client = WebClient.builder()
+                .filter(ReactiveHttpClientFactoryBean.outboundFramingHeaderFilter(false))
+                .exchangeFunction(request -> {
+                    assertThat(request.headers().getFirst("Accept-Encoding")).isEqualTo("br");
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+                })
+                .build();
+
+        ClientResponse response = client.get().uri("http://example.test/resource")
+                .header("Accept-Encoding", "br")
+                .exchangeToMono(Mono::just)
+                .block(java.time.Duration.ofSeconds(1));
+
+        assertThat(response).isNotNull();
+    }
 }

@@ -31,12 +31,14 @@ import java.util.concurrent.TimeUnit;
  *   </tr>
  *   <tr>
  *     <td>{@code <metricName>.request.size}</td>
- *     <td>DistributionSummary (request body bytes; only recorded when measurable — byte[]/String/null bodies)</td>
+ *     <td>DistributionSummary (application request body bytes before transport content coding;
+ *         only recorded when measurable - byte[]/String/null bodies)</td>
  *     <td>client.name, api.name, http.method, uri</td>
  *   </tr>
  *   <tr>
  *     <td>{@code <metricName>.response.size}</td>
- *     <td>DistributionSummary (response body bytes from {@code Content-Length}; skipped for chunked responses)</td>
+ *     <td>DistributionSummary (post-transport advertised response bytes from {@code Content-Length};
+ *         skipped for chunked and automatically decompressed responses)</td>
  *     <td>client.name, api.name, http.method, uri</td>
  *   </tr>
  *   <tr>

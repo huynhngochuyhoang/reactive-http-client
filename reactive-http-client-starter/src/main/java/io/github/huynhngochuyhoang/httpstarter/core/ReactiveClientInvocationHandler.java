@@ -1597,8 +1597,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     /**
-     * Best-effort request body size measurement. Returns the byte count for
-     * {@code byte[]} and {@code String} bodies, {@code 0} for {@code null}, and
+     * Best-effort application request body size before transport content coding. Returns
+     * the byte count for {@code byte[]} and {@code String} bodies, {@code 0} for {@code null}, and
      * {@link HttpClientObserverEvent#UNKNOWN_SIZE} for arbitrary objects whose
      * serialised form isn't materialised synchronously on the invocation path.
      */
@@ -1616,10 +1616,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     /**
-     * Extracts the {@code Content-Length} header value from the captured response
-     * headers. Returns {@link HttpClientObserverEvent#UNKNOWN_SIZE} if the header is
-     * absent (e.g. chunked transfer encoding, empty body, network failure before
-     * response).
+     * Extracts the post-transport {@code Content-Length} header from the captured response
+     * headers. Returns {@link HttpClientObserverEvent#UNKNOWN_SIZE} if the header is absent,
+     * including chunked responses, network failures, and compressed responses whose encoded
+     * length was removed by Reactor Netty during decompression. Streaming bodies are never
+     * consumed to calculate this value.
      */
     private static long extractContentLengthBytes(Map<String, List<String>> responseHeaders) {
         if (responseHeaders == null || responseHeaders.isEmpty()) {
