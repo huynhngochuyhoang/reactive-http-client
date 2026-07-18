@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Complete published-baseline provenance.** Added one fresh-repository Maven Central check for the published parent plus starter, test-helper, and OTel POM, binary, source, and Javadoc artifacts; generated readiness evidence now uses that complete bundle, and current migration/consumer guidance consistently tracks published `3.1.0`.
 - **Real HTTP/2 contract evidence.** Added starter-proxy integration coverage for TLS H2/ALPN, clear-text H2C, unchanged HTTP/1.1 defaults, unary and streaming response shapes, bounded concurrent streams, cancellation, reset, timeout, mapped errors, TLS protocol/cipher composition, and provider shutdown.
 - **Compression and content-encoding correctness.** Defined `compression-enabled` as response negotiation and incremental decompression only, added real gzip/identity/empty/error/envelope/streaming coverage, rejected application `Accept-Encoding` while connector compression is active, and aligned observer byte metrics with post-transport advertised lengths without consuming streams.
+- **Pool saturation and acquisition diagnostics.** Added deterministic one-connection fixtures for queued success, acquire timeout, queued cancellation, idle/lifetime background eviction, and shutdown with active/pending work; introduced optional bounded `POOL_ACQUIRE` attribution while preserving `ErrorCategory`, and aligned metrics, OTel, health, support snapshots, and troubleshooting guidance.
 
 ## [3.1.0] - 2026-07-17
 

@@ -123,9 +123,12 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     private PoolSummary poolSummary(ReactiveHttpClientProperties.ClientConfig clientConfig) {
         boolean clientOverride = clientConfig != null && clientConfig.getPool() != null;
+        ReactiveHttpClientProperties.NetworkConfig network = properties.getNetwork() != null
+                ? properties.getNetwork()
+                : new ReactiveHttpClientProperties.NetworkConfig();
         ReactiveHttpClientProperties.ConnectionPoolConfig pool = clientOverride
                 ? clientConfig.getPool()
-                : properties.getNetwork().getConnectionPool();
+                : network.getConnectionPool();
         if (pool == null) {
             pool = new ReactiveHttpClientProperties.ConnectionPoolConfig();
         }

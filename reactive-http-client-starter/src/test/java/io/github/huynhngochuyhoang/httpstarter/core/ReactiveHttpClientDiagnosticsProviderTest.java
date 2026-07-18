@@ -167,6 +167,31 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsUseDefaultPoolWhenNetworkConfigurationIsNull() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setNetwork(null);
+        properties.setClients(Map.of("diagnostic-client", new ReactiveHttpClientProperties.ClientConfig()));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>)
+                ReactiveHttpClientDiagnosticsSnapshot.toMap(provider).get("clients");
+
+        assertThat(clients).singleElement().satisfies(client -> assertThat(client)
+                .containsEntry("poolSource", "global")
+                .containsEntry("poolMaxConnections", 200)
+                .containsEntry("poolPendingAcquireTimeoutMs", 5000L)
+                .containsEntry("poolMetricsEnabled", false));
+    }
+
+    @Test
     void rendersSanitizedDiagnosticsSnapshot() {
         ReactiveHttpClientDiagnosticsProvider provider = sensitiveDiagnosticsProvider();
 
