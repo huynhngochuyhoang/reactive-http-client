@@ -298,7 +298,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                             .doOnComplete(() -> notifyLifecycleSuccess(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), state.requestUrl.get(),
                                     state.responseStatus.get(), state.attemptCount.get()))
                             .doOnError(state.terminalError::set)
-                            .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), state.requestUrl.get(),
+                            .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), finalRequestUrl(state),
                                     state.responseStatus.get(), error, state.attemptCount.get()))
                             .doOnTerminate(() -> {
                                 if (reported.compareAndSet(false, true))
@@ -345,7 +345,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                     state.responseStatus.get(), state.attemptCount.get());
                         })
                         .doOnError(state.terminalError::set)
-                        .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), state.requestUrl.get(),
+                        .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), finalRequestUrl(state),
                                 state.responseStatus.get(), error, state.attemptCount.get()))
                         .doOnTerminate(() -> {
                             if (reported.compareAndSet(false, true))
@@ -1355,6 +1355,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             throw new IllegalStateException(
                     "Cannot instantiate HttpExchangeLogger: " + loggerClass.getName(), e);
         }
+    }
+
+    private URI finalRequestUrl(SubscriptionState state) {
+        FinalRequestObservation observation = state.finalRequestObservation.get();
+        return observation != null ? observation.url() : state.requestUrl.get();
     }
 
     private void reportExchange(

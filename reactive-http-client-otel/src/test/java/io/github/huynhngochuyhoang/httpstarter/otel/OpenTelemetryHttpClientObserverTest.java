@@ -22,6 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -224,7 +225,9 @@ class OpenTelemetryHttpClientObserverTest {
     void recordsProvenPoolAcquireFailureStage() {
         observer.record(new HttpClientObserverEvent(
                 "user-service", "user.get", "GET", "/users/{id}",
-                null, 75L, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null));
+                null, 75L, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null,
+                1, HttpClientObserverEvent.UNKNOWN_SIZE, HttpClientObserverEvent.UNKNOWN_SIZE,
+                null, null, "http://user-service/users/1", Map.of()));
 
         SpanData span = onlySpan();
         assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_FAILURE_STAGE))

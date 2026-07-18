@@ -47,7 +47,7 @@ public record HttpExchangeLogContext(
 ) {
     /** Proven transport failure stage, or {@code null} when it cannot be attributed safely. */
     public HttpClientFailureStage failureStage() {
-        return HttpClientFailureStage.from(error, responseStatus);
+        return HttpClientFailureStage.from(error, responseStatus, requestUrl != null);
     }
 
     public HttpExchangeLogContext(

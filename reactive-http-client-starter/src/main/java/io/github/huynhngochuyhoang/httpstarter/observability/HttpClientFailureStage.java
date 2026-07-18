@@ -42,16 +42,34 @@ public enum HttpClientFailureStage {
     }
 
     /**
-     * Resolves a stage from concrete transport exceptions and optional observed status.
-     * A Netty read timeout is attributed to response headers or body only when status
-     * presence proves whether headers were received. Generic timeout exceptions remain
-     * unclassified.
+     * Resolves a stage from concrete transport exceptions and observed status.
+     * A status proves response-body processing; without status or explicit dispatch
+     * evidence, a Netty read timeout remains unclassified. Generic timeout exceptions
+     * also remain unclassified.
      *
      * @param error terminal outbound error
      * @param statusCode observed HTTP status, or {@code null} before response headers
      * @return proven failure stage, otherwise {@code null}
      */
     public static HttpClientFailureStage from(Throwable error, Integer statusCode) {
+        return from(error, statusCode, statusCode != null);
+    }
+
+    /**
+     * Resolves a stage using explicit evidence that the primary request passed
+     * pre-dispatch filters. This prevents nested transport exceptions from auth or
+     * other filters from being attributed to the business exchange.
+     *
+     * @param error terminal outbound error
+     * @param statusCode observed HTTP status, or {@code null} before response headers
+     * @param requestDispatched whether final outbound request observation ran
+     * @return proven failure stage, otherwise {@code null}
+     */
+    public static HttpClientFailureStage from(
+            Throwable error, Integer statusCode, boolean requestDispatched) {
+        if (!requestDispatched && statusCode == null) {
+            return null;
+        }
         return resolve(error, statusCode, true);
     }
 

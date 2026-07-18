@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.LogHttpExchange;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.annotation.TimeoutMs;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategories;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
@@ -46,10 +47,15 @@ class ReactiveHttpClientTimeoutTerminalStateContractTest {
         assertThat(HttpClientFailureStage.from(WriteTimeoutException.INSTANCE))
                 .isEqualTo(HttpClientFailureStage.REQUEST_WRITE);
         assertThat(HttpClientFailureStage.from(ReadTimeoutException.INSTANCE)).isNull();
-        assertThat(HttpClientFailureStage.from(ReadTimeoutException.INSTANCE, null))
+        assertThat(HttpClientFailureStage.from(ReadTimeoutException.INSTANCE, null)).isNull();
+        assertThat(HttpClientFailureStage.from(ReadTimeoutException.INSTANCE, null, true))
                 .isEqualTo(HttpClientFailureStage.RESPONSE_HEADERS);
         assertThat(HttpClientFailureStage.from(ReadTimeoutException.INSTANCE, 200))
                 .isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
+        Throwable authTimeout = new AuthProviderException("auth-client", ReadTimeoutException.INSTANCE);
+        assertThat(HttpClientFailureStage.from(authTimeout, null, false)).isNull();
+        assertThat(HttpClientFailureStage.from(authTimeout, null, true))
+                .isEqualTo(HttpClientFailureStage.RESPONSE_HEADERS);
         assertThat(HttpClientFailureStage.from(new java.util.concurrent.TimeoutException())).isNull();
         assertThat(ErrorCategories.from(WriteTimeoutException.INSTANCE)).isEqualTo(ErrorCategory.TIMEOUT);
         assertThat(ErrorCategories.from(new ConnectTimeoutException("connect")))

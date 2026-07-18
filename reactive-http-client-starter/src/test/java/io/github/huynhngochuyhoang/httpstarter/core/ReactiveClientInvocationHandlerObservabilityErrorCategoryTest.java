@@ -81,11 +81,12 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
     }
 
     @Test
-    void shouldObserveAuthProviderErrorCategoryWhenAuthProviderFails() {
-        AuthProvider authProvider = request -> Mono.error(new IllegalStateException("auth provider down"));
+    void shouldKeepNestedAuthTimeoutUnattributedBeforeDispatch() {
+        AuthProvider authProvider = request -> Mono.error(ReadTimeoutException.INSTANCE);
         WebClient webClient = WebClient.builder()
                 .baseUrl("http://test.local")
                 .filter(new OutboundAuthFilter("test-client", authProvider))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
                 .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK).build()))
                 .build();
 
@@ -98,7 +99,10 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
 
         HttpClientObserverEvent event = observed.get();
         assertNotNull(event);
-        assertEquals(ErrorCategory.AUTH_PROVIDER_ERROR, event.getErrorCategory());
+        assertEquals(ErrorCategory.TIMEOUT, event.getErrorCategory());
+        assertNull(event.getFailureStage());
+        assertNull(event.getRequestUrl());
+        assertTrue(event.getRequestHeaders().isEmpty());
     }
 
     @Test

@@ -13,6 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.Arrays;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -516,7 +517,9 @@ class MicrometerHttpClientObserverTest {
 
         observer.record(new HttpClientObserverEvent(
                 "user-service", "user.get", "GET", "/users/{id}",
-                null, 75, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null));
+                null, 75, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null,
+                1, HttpClientObserverEvent.UNKNOWN_SIZE, HttpClientObserverEvent.UNKNOWN_SIZE,
+                null, null, "http://user-service/users/1", Map.of()));
 
         Timer timer = meterRegistry.find("reactive.http.client.requests")
                 .tag("failure.stage", HttpClientFailureStage.POOL_ACQUIRE.name())

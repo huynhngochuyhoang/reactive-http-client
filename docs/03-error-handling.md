@@ -98,10 +98,11 @@ presets omit bodies; only the `bodies` preset logs request/response payloads.
 `ErrorCategory` remains the coarse compatibility contract. Terminal diagnostics also
 expose an optional `HttpClientFailureStage`. Concrete Netty or Reactor Pool failures
 can prove `CONNECT`, `POOL_ACQUIRE`, `REQUEST_WRITE`, `RESPONSE_HEADERS`, or
-`RESPONSE_BODY`. Read timeouts are split only from observed response status: no
-status means headers were not received, while an observed status proves body
-consumption had started. Generic timeout exceptions keep the stage unset; no phase
-is inferred from exception messages.
+`RESPONSE_BODY`. Read timeouts are split only after final outbound request observation proves
+the business exchange passed pre-dispatch filters: no status then means headers
+were not received, while an observed status proves body consumption had started.
+A nested auth or other pre-dispatch timeout keeps the stage unset. Generic timeout
+exceptions keep the stage unset; no phase is inferred from exception messages.
 
 Published mapping contract:
 
