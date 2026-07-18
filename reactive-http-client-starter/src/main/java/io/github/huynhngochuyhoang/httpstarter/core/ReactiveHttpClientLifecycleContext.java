@@ -58,7 +58,7 @@ public record ReactiveHttpClientLifecycleContext(
 
     /** Proven transport failure stage, or {@code null} when it cannot be attributed safely. */
     public HttpClientFailureStage failureStage() {
-        return HttpClientFailureStage.from(error);
+        return HttpClientFailureStage.from(error, statusCode);
     }
 
     private static Map<String, List<Object>> copyQueryParams(Map<String, List<Object>> source) {

@@ -9,22 +9,54 @@ package io.github.huynhngochuyhoang.httpstarter.observability;
  * for general error handling.
  */
 public enum HttpClientFailureStage {
+    /** Failure while establishing a connection to the remote endpoint. */
+    CONNECT,
     /** Failure while waiting for a connection from the Reactor Netty pool. */
-    POOL_ACQUIRE;
+    POOL_ACQUIRE,
+    /** Failure while writing the outbound request. */
+    REQUEST_WRITE,
+    /** Failure while waiting for response headers. */
+    RESPONSE_HEADERS,
+    /** Failure while consuming a response body after headers were observed. */
+    RESPONSE_BODY;
 
     private static final int MAX_CAUSE_DEPTH = 16;
     private static final String POOL_ACQUIRE_TIMEOUT = "reactor.pool.PoolAcquireTimeoutException";
     private static final String POOL_ACQUIRE_PENDING_LIMIT = "reactor.pool.PoolAcquirePendingLimitException";
     private static final String POOL_SHUTDOWN = "reactor.pool.PoolShutdownException";
     private static final String SHADED_POOL_PREFIX = "reactor.netty.internal.shaded.reactor.pool.";
+    private static final String CONNECT_TIMEOUT = "io.netty.channel.ConnectTimeoutException";
+    private static final String WRITE_TIMEOUT = "io.netty.handler.timeout.WriteTimeoutException";
+    private static final String READ_TIMEOUT = "io.netty.handler.timeout.ReadTimeoutException";
 
     /**
-     * Resolves a stage from concrete Reactor Pool exceptions without inspecting messages.
+     * Resolves a stage from a concrete failure without response-state inference.
+     * Read timeouts remain unclassified because this overload cannot prove whether
+     * response headers were observed.
      *
      * @param error terminal outbound error
-     * @return {@link #POOL_ACQUIRE} when proven, otherwise {@code null}
+     * @return proven connection, pool-acquire, or request-write stage; otherwise {@code null}
      */
     public static HttpClientFailureStage from(Throwable error) {
+        return resolve(error, null, false);
+    }
+
+    /**
+     * Resolves a stage from concrete transport exceptions and optional observed status.
+     * A Netty read timeout is attributed to response headers or body only when status
+     * presence proves whether headers were received. Generic timeout exceptions remain
+     * unclassified.
+     *
+     * @param error terminal outbound error
+     * @param statusCode observed HTTP status, or {@code null} before response headers
+     * @return proven failure stage, otherwise {@code null}
+     */
+    public static HttpClientFailureStage from(Throwable error, Integer statusCode) {
+        return resolve(error, statusCode, true);
+    }
+
+    private static HttpClientFailureStage resolve(
+            Throwable error, Integer statusCode, boolean responseStateKnown) {
         Throwable current = error;
         int depth = 0;
         while (current != null && depth < MAX_CAUSE_DEPTH) {
@@ -37,6 +69,17 @@ public enum HttpClientFailureStage {
                             || className.endsWith("PoolAcquirePendingLimitException")
                             || className.endsWith("PoolShutdownException")))) {
                 return POOL_ACQUIRE;
+            }
+            if (CONNECT_TIMEOUT.equals(className)) {
+                return CONNECT;
+            }
+            if (WRITE_TIMEOUT.equals(className)) {
+                return REQUEST_WRITE;
+            }
+            if (READ_TIMEOUT.equals(className)) {
+                return responseStateKnown
+                        ? (statusCode != null ? RESPONSE_BODY : RESPONSE_HEADERS)
+                        : null;
             }
             Throwable cause = current.getCause();
             current = cause != current ? cause : null;

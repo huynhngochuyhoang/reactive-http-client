@@ -7,6 +7,7 @@ import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverE
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.netty.handler.timeout.ReadTimeoutException;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
@@ -229,6 +230,17 @@ class OpenTelemetryHttpClientObserverTest {
         assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_FAILURE_STAGE))
                 .isEqualTo("POOL_ACQUIRE");
         assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_SERVER_ADDRESS)).isNull();
+    }
+
+    @Test
+    void recordsResponseBodyFailureStageFromObservedStatus() {
+        observer.record(new HttpClientObserverEvent(
+                "user-service", "user.get", "GET", "/users/{id}",
+                200, 75L, ReadTimeoutException.INSTANCE, ErrorCategory.TIMEOUT, null, null));
+
+        SpanData span = onlySpan();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_FAILURE_STAGE))
+                .isEqualTo("RESPONSE_BODY");
     }
 
     private static Throwable poolAcquireTimeout() {

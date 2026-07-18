@@ -312,4 +312,4 @@ To disable the binding for a specific registry, declare your own `MeterBinder` b
 
 ## Deprecated timeout alias
 
-`reactive.http.clients.<name>.resilience.timeout-ms` is retained as a deprecated alias for `request-timeout-ms` for one compatibility cycle. Prefer the client-level property in new config. If both are present, `request-timeout-ms` wins.
+`reactive.http.clients.<name>.resilience.timeout-ms` is retained as a deprecated alias for `request-timeout-ms` for one compatibility cycle. It configures the same native Reactor Netty response timeout; it is not a Resilience4j `TimeLimiter`. Prefer the client-level property in new config. If both are present, `request-timeout-ms` wins.

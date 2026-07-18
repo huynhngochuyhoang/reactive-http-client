@@ -6,7 +6,9 @@ import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.*;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
+import io.netty.handler.timeout.ReadTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -798,6 +800,39 @@ class MockReactiveHttpClientTest {
                 .verifyComplete();
 
         assertThat(lifecycleEvents).containsExactly("first:start", "second:start");
+    }
+
+    @Test
+    void bodyErrorModelsStableTimeoutTerminalSemanticsWithoutNetworkTiming() {
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        AtomicReference<ReactiveHttpClientLifecycleContext> lifecycleError = new AtomicReference<>();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .withObserver(observed::add)
+                .withLifecycleHook(new ReactiveHttpClientLifecycleHook() {
+                    @Override
+                    public void onError(ReactiveHttpClientLifecycleContext context) {
+                        lifecycleError.set(context);
+                    }
+                })
+                .respondTo(HttpMethod.GET, "/users/42", ex -> MockReactiveHttpClient.bodyError(
+                        200, Map.of("X-Timeout-Phase", List.of("body")), ReadTimeoutException.INSTANCE))
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectError(ReadTimeoutException.class)
+                .verify();
+
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasStatusCode(200);
+        assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getStatusCode()).isEqualTo(200);
+            assertThat(event.getErrorCategory()).isEqualTo(ErrorCategory.TIMEOUT);
+            assertThat(event.getFailureStage()).isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
+            assertThat(event.getAttemptCount()).isEqualTo(1);
+        });
+        assertThat(lifecycleError.get().statusCode()).isEqualTo(200);
+        assertThat(lifecycleError.get().failureStage()).isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
+        assertThat(lifecycleError.get().attemptNumber()).isEqualTo(1);
     }
 
     @Test

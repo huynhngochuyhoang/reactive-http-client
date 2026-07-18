@@ -144,6 +144,18 @@ public final class MockReactiveHttpClient<T> {
                 .build();
     }
 
+    /**
+     * Produces a response whose body terminates with the supplied error after response
+     * status and headers are available. This models stable terminal semantics only; it
+     * does not emulate transport timing, socket timeouts, or connection-pool behavior.
+     */
+    public static ClientResponse bodyError(
+            int status, java.util.Map<String, List<String>> headers, Throwable error) {
+        return responseBuilder(status, headers)
+                .body(Flux.error(Objects.requireNonNull(error, "error")))
+                .build();
+    }
+
     /** Convenience factory producing a response with custom headers and a raw text body. */
     public static ClientResponse response(int status, java.util.Map<String, List<String>> headers, String body) {
         return responseBuilder(status, headers)

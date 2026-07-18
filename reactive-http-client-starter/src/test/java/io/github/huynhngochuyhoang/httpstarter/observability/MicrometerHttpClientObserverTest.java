@@ -7,6 +7,7 @@ import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.distribution.CountAtBucket;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.netty.handler.timeout.ReadTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -523,6 +524,22 @@ class MicrometerHttpClientObserverTest {
         assertNotNull(timer);
         assertNull(timer.getId().getTag("server.address"));
         assertNull(timer.getId().getTag("server.port"));
+    }
+
+    @Test
+    void recordsResponseBodyFailureStageFromObservedStatus() {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(
+                meterRegistry, new ReactiveHttpClientProperties.ObservabilityConfig());
+
+        observer.record(new HttpClientObserverEvent(
+                "user-service", "user.get", "GET", "/users/{id}",
+                200, 75, ReadTimeoutException.INSTANCE, ErrorCategory.TIMEOUT, null, null));
+
+        Timer timer = meterRegistry.find("reactive.http.client.requests")
+                .tag("failure.stage", HttpClientFailureStage.RESPONSE_BODY.name())
+                .timer();
+        assertNotNull(timer);
     }
 
     private static Throwable poolAcquireTimeout() {

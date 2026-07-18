@@ -85,7 +85,7 @@ presets omit bodies; only the `bodies` preset logs request/response payloads.
 | `RATE_LIMITED` | HTTP 429 response |
 | `CLIENT_ERROR` | Other 4xx response |
 | `SERVER_ERROR` | 5xx response |
-| `TIMEOUT` | `TimeoutException` or `ReadTimeoutException` |
+| `TIMEOUT` | `TimeoutException`, `ReadTimeoutException`, or `WriteTimeoutException` |
 | `CONNECT_ERROR` | `ConnectException` — TCP connection refused / timed out |
 | `UNKNOWN_HOST` | `UnknownHostException` — DNS resolution failed |
 | `AUTH_PROVIDER_ERROR` | `AuthProviderException` — token fetch / signing failed |
@@ -96,10 +96,12 @@ presets omit bodies; only the `bodies` preset logs request/response payloads.
 | `UNKNOWN` | Any other uncategorized error |
 
 `ErrorCategory` remains the coarse compatibility contract. Terminal diagnostics also
-expose an optional `HttpClientFailureStage`: `POOL_ACQUIRE` is reported only when
-a concrete Reactor Pool acquire-timeout, pending-limit, or shutdown exception proves
-that the call failed while waiting for a pooled connection. Generic timeouts and
-other failures keep the stage unset; no phase is inferred from exception messages.
+expose an optional `HttpClientFailureStage`. Concrete Netty or Reactor Pool failures
+can prove `CONNECT`, `POOL_ACQUIRE`, `REQUEST_WRITE`, `RESPONSE_HEADERS`, or
+`RESPONSE_BODY`. Read timeouts are split only from observed response status: no
+status means headers were not received, while an observed status proves body
+consumption had started. Generic timeout exceptions keep the stage unset; no phase
+is inferred from exception messages.
 
 Published mapping contract:
 
