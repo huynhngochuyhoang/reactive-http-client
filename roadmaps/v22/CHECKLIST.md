@@ -237,9 +237,11 @@ Evidence:
 
 - Added bounded exact attribution for connect, pool-acquire, request-write,
   response-header, and response-body failures. Response-header attribution requires
-  final-attempt request-dispatch evidence, so nested auth and other pre-dispatch
-  timeouts
-  remain unattributed. Generic timeout exceptions remain unattributed, cancellation remains `CANCELLED`, and existing error categories
+  final-attempt request-dispatch evidence, including hidden 401 auth refreshes,
+  so nested auth and other pre-dispatch read timeouts remain unattributed. Generic
+  timeout exceptions remain unattributed, while concrete
+  connect, pool-acquire, and request-write failures remain attributable without URL
+  evidence, cancellation remains `CANCELLED`, and existing error categories
   remain compatible.
 - Added a real loopback transport fixture for pre-header, unary-body, direct-stream,
   streaming-envelope, disabled method timeout, inherited client timeout, and

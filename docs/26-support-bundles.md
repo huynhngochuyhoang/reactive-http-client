@@ -379,7 +379,7 @@ Minimal safe bundle:
 - Health details for the affected client and the same time window.
 
 `RESPONSE_HEADERS` proves final request dispatch but has no status or response
-headers. A nested auth or other pre-dispatch timeout leaves the stage unset.
+headers. A nested auth or other pre-dispatch read timeout leaves the stage unset.
 `RESPONSE_BODY` preserves
 the observed status, and exchange logs can retain response headers; lifecycle hooks
 and observer events do not expose response-header maps. `CONNECT`, `POOL_ACQUIRE`,

@@ -57,8 +57,8 @@ public enum HttpClientFailureStage {
 
     /**
      * Resolves a stage using explicit evidence that the primary request passed
-     * pre-dispatch filters. This prevents nested transport exceptions from auth or
-     * other filters from being attributed to the business exchange.
+     * pre-dispatch filters. Dispatch evidence disambiguates only read timeouts;
+     * concrete connect, pool-acquire, and request-write stages remain attributable.
      *
      * @param error terminal outbound error
      * @param statusCode observed HTTP status, or {@code null} before response headers
@@ -67,10 +67,7 @@ public enum HttpClientFailureStage {
      */
     public static HttpClientFailureStage from(
             Throwable error, Integer statusCode, boolean requestDispatched) {
-        if (!requestDispatched && statusCode == null) {
-            return null;
-        }
-        return resolve(error, statusCode, true);
+        return resolve(error, statusCode, requestDispatched || statusCode != null);
     }
 
     private static HttpClientFailureStage resolve(

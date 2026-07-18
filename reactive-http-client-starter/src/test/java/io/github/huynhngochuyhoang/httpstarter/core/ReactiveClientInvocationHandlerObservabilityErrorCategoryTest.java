@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
@@ -102,6 +103,54 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         HttpClientObserverEvent event = observed.get();
         assertNotNull(event);
         assertEquals(ErrorCategory.TIMEOUT, event.getErrorCategory());
+        assertNull(event.getFailureStage());
+        assertNull(event.getRequestUrl());
+        assertTrue(event.getRequestHeaders().isEmpty());
+    }
+
+    @Test
+    void unauthorizedAuthRefreshFailureClearsHiddenRequestDispatchEvidence() {
+        AtomicInteger authAttempts = new AtomicInteger();
+        AtomicInteger exchanges = new AtomicInteger();
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest request) {
+                return authAttempts.incrementAndGet() == 1
+                        ? Mono.just(AuthContext.empty())
+                        : Mono.error(ReadTimeoutException.INSTANCE);
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                return Mono.empty();
+            }
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(new OutboundAuthFilter("test-client", authProvider))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> {
+                    exchanges.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.UNAUTHORIZED)
+                            .body("refresh")
+                            .build());
+                })
+                .build();
+
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        ReactiveClientInvocationHandler handler = createHandler(
+                webClient, 5000, observed::set, "serializationAuthProvider");
+
+        StepVerifier.create(invoke(handler))
+                .expectError(AuthProviderException.class)
+                .verify();
+
+        HttpClientObserverEvent event = observed.get();
+        assertNotNull(event);
+        assertEquals(2, authAttempts.get());
+        assertEquals(1, exchanges.get());
+        assertEquals(1, event.getAttemptCount());
+        assertNull(event.getStatusCode());
         assertNull(event.getFailureStage());
         assertNull(event.getRequestUrl());
         assertTrue(event.getRequestHeaders().isEmpty());

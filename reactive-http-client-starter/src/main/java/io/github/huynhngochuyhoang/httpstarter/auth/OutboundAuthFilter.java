@@ -1,11 +1,11 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
-import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
@@ -56,12 +56,20 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
 
         return response.releaseBody()
                 .onErrorResume(error -> Mono.empty())
+                .then(Mono.fromRunnable(() -> resetRequestObservation(originalRequest)))
                 .then(invalidatable.invalidate()
                         .onErrorMap(error -> error instanceof AuthProviderException
                                 ? error
                                 : new AuthProviderException(clientName, error)))
                 .then(resolveAuthorizedRequest(originalRequest, authRequest))
                 .flatMap(next::exchange);
+    }
+
+    private void resetRequestObservation(ClientRequest request) {
+        request.attribute(AuthRequest.REQUEST_OBSERVATION_RESET_ATTRIBUTE)
+                .filter(Runnable.class::isInstance)
+                .map(Runnable.class::cast)
+                .ifPresent(Runnable::run);
     }
 
     private ClientRequest applyAuth(ClientRequest original, AuthContext authContext) {

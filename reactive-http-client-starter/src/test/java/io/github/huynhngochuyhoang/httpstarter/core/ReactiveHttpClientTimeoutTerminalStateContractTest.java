@@ -44,7 +44,12 @@ class ReactiveHttpClientTimeoutTerminalStateContractTest {
     void concreteTimeoutExceptionsExposeOnlyProvenBoundedStages() {
         assertThat(HttpClientFailureStage.from(new ConnectTimeoutException("connect")))
                 .isEqualTo(HttpClientFailureStage.CONNECT);
+        assertThat(HttpClientFailureStage.from(
+                new ConnectTimeoutException("connect"), null, false))
+                .isEqualTo(HttpClientFailureStage.CONNECT);
         assertThat(HttpClientFailureStage.from(WriteTimeoutException.INSTANCE))
+                .isEqualTo(HttpClientFailureStage.REQUEST_WRITE);
+        assertThat(HttpClientFailureStage.from(WriteTimeoutException.INSTANCE, null, false))
                 .isEqualTo(HttpClientFailureStage.REQUEST_WRITE);
         assertThat(HttpClientFailureStage.from(ReadTimeoutException.INSTANCE)).isNull();
         assertThat(HttpClientFailureStage.from(ReadTimeoutException.INSTANCE, null)).isNull();

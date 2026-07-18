@@ -518,6 +518,18 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (finalRequestObservation != null) {
             requestHeadersSpec = requestHeadersSpec.attribute(FINAL_REQUEST_OBSERVATION_ATTRIBUTE, finalRequestObservation);
         }
+        if (requestUrl != null || finalRequestObservation != null) {
+            requestHeadersSpec = requestHeadersSpec.attribute(
+                    AuthRequest.REQUEST_OBSERVATION_RESET_ATTRIBUTE,
+                    (Runnable) () -> {
+                        if (requestUrl != null) {
+                            requestUrl.set(null);
+                        }
+                        if (finalRequestObservation != null) {
+                            finalRequestObservation.set(null);
+                        }
+                    });
+        }
         return configureNativeRequest(requestHeadersSpec, timeoutMs, shouldApplyResponseTimeout, requestUrl);
     }
 
