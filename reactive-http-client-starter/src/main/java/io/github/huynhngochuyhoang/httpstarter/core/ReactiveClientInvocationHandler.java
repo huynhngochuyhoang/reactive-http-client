@@ -411,6 +411,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             state.preparedResolved.set(preparedResolved);
             int attempt = state.attemptCount.incrementAndGet();
             state.start.compareAndSet(0L, System.currentTimeMillis());
+            state.requestUrl.set(null);
+            state.finalRequestObservation.set(null);
             state.responseStatus.set(null);
             state.responseHeaders.set(Map.of());
             state.terminalError.set(null);

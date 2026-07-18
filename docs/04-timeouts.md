@@ -43,8 +43,9 @@ the same parent method and still use different client-level timeout policies.
 | `RESPONSE_HEADERS` | Netty read timeout after final request dispatch but before status was observed | No HTTP status or response headers |
 | `RESPONSE_BODY` | Netty read timeout after status was observed | Status is retained; exchange logs also retain response headers |
 
-A nested auth or other pre-dispatch timeout does not belong to the primary
-exchange and leaves the stage unset. A generic `TimeoutException` also does not
+Dispatch evidence is reset for every retry, so terminal attribution describes the
+final attempt. A nested auth or other pre-dispatch timeout does not belong to the
+primary exchange and leaves the stage unset. A generic `TimeoutException` also does not
 prove a transport phase. Cancellation is reported as `ErrorCategory.CANCELLED`,
 not as a timeout.
 Connect timeout retains the existing `CONNECT_ERROR` category; read, write, and
