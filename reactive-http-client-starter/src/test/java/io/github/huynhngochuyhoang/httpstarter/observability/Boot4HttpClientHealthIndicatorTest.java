@@ -184,6 +184,24 @@ class Boot4HttpClientHealthIndicatorTest {
                 .containsEntry("reason", "ERROR_RATE_ABOVE_THRESHOLD");
     }
 
+    @Test
+    void exposesPoolAcquireFailureCountWithoutRemoteAddressDetails() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(registry, config);
+        observer.record(new HttpClientObserverEvent(
+                "saturated-client", "op", "GET", "/p",
+                null, 75L, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null));
+
+        Health health = indicator(registry, config).health();
+
+        assertThat(clientDetails(health, "saturated-client"))
+                .containsEntry("poolAcquireFailureCount", 1L);
+        assertThat(health.getDetails().toString())
+                .doesNotContain("server.address")
+                .doesNotContain("127.0.0.1");
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -215,6 +233,18 @@ class Boot4HttpClientHealthIndicatorTest {
                     clientName, "op", "GET", "/p",
                     500, 1L, new RuntimeException("boom"), ErrorCategory.SERVER_ERROR, null, null,
                     1, HttpClientObserverEvent.UNKNOWN_SIZE, HttpClientObserverEvent.UNKNOWN_SIZE));
+        }
+    }
+
+    private static Throwable poolAcquireTimeout() {
+        try {
+            Class<?> type = Class.forName(
+                    "reactor.netty.internal.shaded.reactor.pool.PoolAcquireTimeoutException");
+            return (Throwable) type.getConstructor(java.time.Duration.class)
+                    .newInstance(java.time.Duration.ofMillis(75));
+        }
+        catch (ReflectiveOperationException ex) {
+            throw new AssertionError(ex);
         }
     }
 

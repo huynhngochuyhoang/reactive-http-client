@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  *   <tr>
  *     <td>{@code <metricName>} (default: {@code reactive.http.client.requests})</td>
  *     <td>Timer (also exposes count + sum)</td>
- *     <td>client.name, api.name, http.method, uri, http.status_code, outcome, exception, error.category;
+ *     <td>client.name, api.name, http.method, uri, http.status_code, outcome, exception, error.category, failure.stage;
  *         optionally server.address and server.port</td>
  *   </tr>
  *   <tr>
@@ -173,12 +173,16 @@ public class MicrometerHttpClientObserver implements HttpClientObserver {
         String errorCategory = event.getErrorCategory() != null
                 ? event.getErrorCategory().name()
                 : "none";
+        String failureStage = event.getFailureStage() != null
+                ? event.getFailureStage().name()
+                : "none";
 
         return commonTags.and(
                 "http.status_code", statusCode,
                 "outcome", outcome,
                 "exception", exception,
-                "error.category", errorCategory
+                "error.category", errorCategory,
+                "failure.stage", failureStage
         );
     }
 

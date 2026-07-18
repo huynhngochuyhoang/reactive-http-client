@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 
 import java.net.URI;
 import java.util.List;
@@ -44,6 +45,11 @@ public record HttpExchangeLogContext(
         Throwable error,
         ReactiveHttpClientProperties.LogPreset logPreset
 ) {
+    /** Proven transport failure stage, or {@code null} when it cannot be attributed safely. */
+    public HttpClientFailureStage failureStage() {
+        return HttpClientFailureStage.from(error);
+    }
+
     public HttpExchangeLogContext(
             String clientName,
             String httpMethod,

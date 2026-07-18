@@ -83,7 +83,8 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return new ClientSnapshotEntry(
                 summary,
                 strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceOperatorApplier),
-                strictBodySigningValidation(clientConfig));
+                strictBodySigningValidation(clientConfig),
+                poolSummary(clientConfig));
     }
 
     static ClientSummary clientSummary(Class<?> clientInterface,
@@ -118,6 +119,21 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 resolvedConfig.isFollowRedirects(),
                 contracts.size(),
                 Math.toIntExact(inherited));
+    }
+
+    private PoolSummary poolSummary(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        boolean clientOverride = clientConfig != null && clientConfig.getPool() != null;
+        ReactiveHttpClientProperties.ConnectionPoolConfig pool = clientOverride
+                ? clientConfig.getPool()
+                : properties.getNetwork().getConnectionPool();
+        if (pool == null) {
+            pool = new ReactiveHttpClientProperties.ConnectionPoolConfig();
+        }
+        return new PoolSummary(
+                clientOverride ? "client" : "global",
+                pool.getMaxConnections(),
+                pool.getPendingAcquireTimeoutMs(),
+                pool.isMetricsEnabled());
     }
 
     private Class<?> clientInterface(String beanName) {
@@ -292,7 +308,16 @@ public class ReactiveHttpClientDiagnosticsProvider {
     record ClientSnapshotEntry(
             ClientSummary summary,
             boolean strictUnsafeRetryValidation,
-            boolean strictBodySigningValidation
+            boolean strictBodySigningValidation,
+            PoolSummary pool
+    ) {
+    }
+
+    record PoolSummary(
+            String source,
+            int maxConnections,
+            long pendingAcquireTimeoutMs,
+            boolean metricsEnabled
     ) {
     }
 

@@ -219,6 +219,30 @@ class OpenTelemetryHttpClientObserverTest {
                 .isBetween(1499L, 1501L);
     }
 
+    @Test
+    void recordsProvenPoolAcquireFailureStage() {
+        observer.record(new HttpClientObserverEvent(
+                "user-service", "user.get", "GET", "/users/{id}",
+                null, 75L, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null));
+
+        SpanData span = onlySpan();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_FAILURE_STAGE))
+                .isEqualTo("POOL_ACQUIRE");
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_SERVER_ADDRESS)).isNull();
+    }
+
+    private static Throwable poolAcquireTimeout() {
+        try {
+            Class<?> type = Class.forName(
+                    "reactor.netty.internal.shaded.reactor.pool.PoolAcquireTimeoutException");
+            return (Throwable) type.getConstructor(java.time.Duration.class)
+                    .newInstance(java.time.Duration.ofMillis(75));
+        }
+        catch (ReflectiveOperationException ex) {
+            throw new AssertionError(ex);
+        }
+    }
+
     private SpanData onlySpan() {
         List<SpanData> spans = exporter.getFinishedSpanItems();
         assertThat(spans).hasSize(1);

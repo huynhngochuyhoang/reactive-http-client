@@ -201,6 +201,12 @@ public final class HttpClientObserverEvent {
     /** High-level error category when available; {@code null} for successful calls. */
     public ErrorCategory getErrorCategory() { return errorCategory; }
 
+    /**
+     * Proven transport failure stage, or {@code null} when the runtime cannot safely
+     * attribute the failure. This does not replace {@link #getErrorCategory()}.
+     */
+    public HttpClientFailureStage getFailureStage() { return HttpClientFailureStage.from(error); }
+
     /** The serialised request body (may be {@code null} for GET/DELETE). */
     public Object getRequestBody() { return requestBody; }
 
@@ -263,6 +269,7 @@ public final class HttpClientObserverEvent {
                 ", serverPort=" + serverPort +
                 ", error=" + (error != null ? error.getClass().getSimpleName() : "none") +
                 ", errorCategory=" + (errorCategory != null ? errorCategory.name() : "none") +
+                ", failureStage=" + (getFailureStage() != null ? getFailureStage().name() : "none") +
                 '}';
     }
 }

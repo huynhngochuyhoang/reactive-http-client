@@ -506,4 +506,34 @@ class MicrometerHttpClientObserverTest {
         assertNotNull(mainTimer, "main timer must still carry high-cardinality tags when histogram is enabled");
         assertEquals(1, mainTimer.count());
     }
+
+    @Test
+    void recordsOnlyProvenPoolAcquireFailureStageWithoutServerTags() {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(
+                meterRegistry, new ReactiveHttpClientProperties.ObservabilityConfig());
+
+        observer.record(new HttpClientObserverEvent(
+                "user-service", "user.get", "GET", "/users/{id}",
+                null, 75, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null));
+
+        Timer timer = meterRegistry.find("reactive.http.client.requests")
+                .tag("failure.stage", HttpClientFailureStage.POOL_ACQUIRE.name())
+                .timer();
+        assertNotNull(timer);
+        assertNull(timer.getId().getTag("server.address"));
+        assertNull(timer.getId().getTag("server.port"));
+    }
+
+    private static Throwable poolAcquireTimeout() {
+        try {
+            Class<?> type = Class.forName(
+                    "reactor.netty.internal.shaded.reactor.pool.PoolAcquireTimeoutException");
+            return (Throwable) type.getConstructor(java.time.Duration.class)
+                    .newInstance(java.time.Duration.ofMillis(75));
+        }
+        catch (ReflectiveOperationException ex) {
+            throw new AssertionError(ex);
+        }
+    }
 }

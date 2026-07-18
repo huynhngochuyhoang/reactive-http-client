@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
 
     private static final String ERROR_CATEGORY_NONE = "none";
+    private static final String POOL_ACQUIRE_STAGE = HttpClientFailureStage.POOL_ACQUIRE.name();
 
     private final MeterRegistry meterRegistry;
     private final ReactiveHttpClientProperties.ObservabilityConfig observability;
@@ -63,11 +64,15 @@ public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
 
             long deltaTotal = current.total - previous.total;
             long deltaErrors = current.errors - previous.errors;
+            long deltaPoolAcquireFailures = current.poolAcquireFailures - previous.poolAcquireFailures;
             if (deltaTotal < 0 || deltaErrors < 0) {
                 // Counters should only increase; a registry restart can reset them.
                 // Treat as an inconclusive probe rather than reporting DOWN.
                 deltaTotal = current.total;
                 deltaErrors = current.errors;
+            }
+            if (deltaPoolAcquireFailures < 0) {
+                deltaPoolAcquireFailures = current.poolAcquireFailures;
             }
 
             Map<String, Object> perClient = new LinkedHashMap<>();
@@ -75,6 +80,7 @@ public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
             perClient.put("errors", deltaErrors);
             perClient.put("sampleCount", deltaTotal);
             perClient.put("errorCount", deltaErrors);
+            perClient.put("poolAcquireFailureCount", deltaPoolAcquireFailures);
             perClient.put("minSamples", config.getMinSamples());
             perClient.put("errorRateThreshold", config.getErrorRateThreshold());
 
@@ -119,11 +125,15 @@ public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
                 continue;
             }
             String errorCategory = timer.getId().getTag("error.category");
+            String failureStage = timer.getId().getTag("failure.stage");
             long count = timer.count();
             ClientCounts counts = snapshot.computeIfAbsent(clientName, n -> new ClientCounts());
             counts.total += count;
             if (errorCategory != null && !ERROR_CATEGORY_NONE.equals(errorCategory)) {
                 counts.errors += count;
+            }
+            if (POOL_ACQUIRE_STAGE.equals(failureStage)) {
+                counts.poolAcquireFailures += count;
             }
         }
         return snapshot;
@@ -133,5 +143,6 @@ public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
         static final ClientCounts ZERO = new ClientCounts();
         long total = 0L;
         long errors = 0L;
+        long poolAcquireFailures = 0L;
     }
 }
