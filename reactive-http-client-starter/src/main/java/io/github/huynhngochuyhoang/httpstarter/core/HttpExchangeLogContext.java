@@ -20,6 +20,11 @@ import java.util.Map;
  *
  * <p>{@code subscriptionAttemptCount} counts subscriptions within the logical
  * client call. It does not guarantee that each attempt sent an HTTP request.
+ *
+ * <p>This context does not expose request/response byte counters. Response headers are
+ * captured after transport processing, so automatic decompression can remove encoded
+ * {@code Content-Encoding} and {@code Content-Length} headers. Loggers must not consume a
+ * streaming response body to infer a size.
  */
 public record HttpExchangeLogContext(
         String clientName,

@@ -312,12 +312,16 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     customizer.customize(finalConfigured);
                 });
 
-        finalConfigured.filter(outboundFramingHeaderFilter());
+        finalConfigured.filter(outboundFramingHeaderFilter(config.isCompressionEnabled()));
         finalConfigured.filter(ReactiveClientInvocationHandler.finalRequestObservationFilter());
         return configured.build();
     }
 
     static ExchangeFilterFunction outboundFramingHeaderFilter() {
+        return outboundFramingHeaderFilter(false);
+    }
+
+    static ExchangeFilterFunction outboundFramingHeaderFilter(boolean compressionEnabled) {
         return (request, next) -> {
             for (Map.Entry<String, List<String>> header : request.headers().headerSet()) {
                 String headerName = header.getKey();
@@ -325,6 +329,12 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     return reactor.core.publisher.Mono.error(new IllegalArgumentException(
                             "Application-supplied outbound header '" + headerName + "' is not supported; "
                                     + "HTTP framing and authority headers are owned by the configured transport"));
+                }
+                if (compressionEnabled && HttpHeaders.ACCEPT_ENCODING.equalsIgnoreCase(headerName)) {
+                    return reactor.core.publisher.Mono.error(new IllegalArgumentException(
+                            "Application-supplied outbound header '" + headerName + "' is not supported when "
+                                    + "compression-enabled=true; response compression negotiation and "
+                                    + "decompression are owned by the configured transport"));
                 }
             }
             return next.exchange(request);

@@ -69,50 +69,101 @@ Evidence:
 
 ## Priority 2 - Real HTTP/2 and H2C Contract
 
-### [ ] 2.1 Prove negotiated protocol behavior
+### [x] 2.1 Prove negotiated protocol behavior
 
-- [ ] Add real TLS H2/ALPN and clear-text H2C servers.
-- [ ] Invoke both servers through normal starter proxies.
-- [ ] Prove HTTP/1.1 remains the default when HTTP/2 is disabled.
-- [ ] Cover unary JSON and `ResponseEntity<T>`.
-- [ ] Cover direct and envelope streaming responses.
+- [x] Add real TLS H2/ALPN and clear-text H2C servers.
+- [x] Invoke both servers through normal starter proxies.
+- [x] Prove HTTP/1.1 remains the default when HTTP/2 is disabled.
+- [x] Cover unary JSON and `ResponseEntity<T>`.
+- [x] Cover direct and envelope streaming responses.
 
-### [ ] 2.2 Prove HTTP/2 resource ownership
+### [x] 2.2 Prove HTTP/2 resource ownership
 
-- [ ] Exercise concurrent streams over a bounded connection provider.
-- [ ] Cover cancellation, reset, timeout, and 4xx/5xx mapping.
-- [ ] Verify stream completion does not dispose unrelated concurrent streams.
-- [ ] Verify factory shutdown releases the provider.
-- [ ] Verify TLS protocol/cipher configuration composes with H2.
-- [ ] Run focused transport tests and `git diff --check`.
+- [x] Exercise concurrent streams over a bounded connection provider.
+- [x] Cover cancellation, reset, timeout, and 4xx/5xx mapping.
+- [x] Verify stream completion does not dispose unrelated concurrent streams.
+- [x] Verify factory shutdown releases the provider.
+- [x] Verify TLS protocol/cipher configuration composes with H2.
+- [x] Run focused transport tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added `ReactiveHttpClientHttp2ContractTest`, which starts real Reactor Netty
+  TLS H2/ALPN, H2C, and dual HTTP/1.1/H2C servers and invokes each through a
+  normal `ReactiveHttpClientFactoryBean` proxy.
+- Both HTTP/2 modes decode unary JSON and `ResponseEntity<Payload>`, transfer
+  direct `Flux<DataBuffer>` and delayed-consumption
+  `ResponseEntity<Flux<DataBuffer>>` bodies, and report `HTTP/2.0` at the
+  server. The disabled client reports `HTTP/1.1`.
+- A one-connection provider carries concurrent H2 streams. Cancelling one
+  stream and an explicit `RST_STREAM(CANCEL)` leave a concurrent slow stream
+  and later probe usable on the same transport channel.
+- Method timeout plus 422 and 503 responses release their streams and preserve
+  `HttpClientException`/`RemoteServiceException` mapping. Factory destruction
+  waits until the H2 connection provider reports disposed.
+- The TLS fixture negotiates H2 with configured `TLSv1.3` and
+  `TLS_AES_128_GCM_SHA256`, proving custom TLS protocol/cipher settings compose
+  with ALPN selection.
+- Documented H2 versus H2C selection, unchanged HTTP/1.1 default, supported
+  response shapes, and per-stream ownership in `docs/12-proxy-tls.md`.
+- Passed `mvn -q -pl reactive-http-client-starter
+  -Dtest=ReactiveHttpClientHttp2ContractTest,ReactiveHttpClientFactoryBeanHttpProtocolTest,TlsIntegrationTest,Framework7TransportCorrectnessTest,TransportResourceOwnershipStressTest,DocumentationReleaseArtifactTest
+  test`: 59 tests, zero failures or errors. The complete
+  `mvn -q -pl reactive-http-client-starter test` run also passed 751 tests, and
+  `git diff --check` passed.
 
 ---
 
 ## Priority 3 - Compression and Content-Encoding Correctness
 
-### [ ] 3.1 Define and test the compression contract
+### [x] 3.1 Define and test the compression contract
 
-- [ ] Document request negotiation versus response decompression.
-- [ ] Cover gzip, identity fallback, empty responses, JSON, and errors.
-- [ ] Cover `ResponseEntity` and streaming response ownership.
-- [ ] Prove compression remains opt-in.
-- [ ] Reject contradictory transport-owned compression headers where appropriate.
+- [x] Document request negotiation versus response decompression.
+- [x] Cover gzip, identity fallback, empty responses, JSON, and errors.
+- [x] Cover `ResponseEntity` and streaming response ownership.
+- [x] Prove compression remains opt-in.
+- [x] Reject contradictory transport-owned compression headers where appropriate.
 
-### [ ] 3.2 Align diagnostics with encoded data
+### [x] 3.2 Align diagnostics with encoded data
 
-- [ ] Define whether request/response byte values are encoded, decoded, advertised, or unknown.
-- [ ] Align lifecycle, observer, exchange-log, and documentation wording.
-- [ ] Avoid aggregating streaming bodies for size reporting.
-- [ ] Add real-wire and diagnostic parity tests.
-- [ ] Run focused tests and `git diff --check`.
+- [x] Define whether request/response byte values are encoded, decoded, advertised, or unknown.
+- [x] Align lifecycle, observer, exchange-log, and documentation wording.
+- [x] Avoid aggregating streaming bodies for size reporting.
+- [x] Add real-wire and diagnostic parity tests.
+- [x] Run focused tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added `ReactiveHttpClientCompressionContractTest` with a real Reactor Netty
+  server that sends gzip and identity representations in delayed wire chunks.
+  Normal starter proxies prove opt-in `Accept-Encoding`, automatic JSON and
+  error-body decompression, identity fallback, 204 handling, `ResponseEntity`,
+  direct `Flux<DataBuffer>`, delayed streaming-envelope consumption, and
+  cancellation followed by a healthy pooled call.
+- `compression-enabled` remains response-only: the real server receives an
+  unencoded request body with no request `Content-Encoding`, while observer
+  request bytes report the measurable application payload before transport
+  content coding.
+- The final transport-ownership filter now rejects application-supplied
+  `Accept-Encoding` when connector compression is enabled. A real default-header
+  fixture proves rejection occurs before the server receives a request; the
+  disabled mode preserves application ownership of explicitly encoded
+  negotiation.
+- Defined observer response bytes as post-transport advertised
+  `Content-Length`, not a consumed-body count. Identity responses retain the
+  advertised value; Reactor Netty removes gzip representation length and
+  encoding headers after decompression, so compressed and chunked streams
+  report `UNKNOWN_SIZE` without aggregation.
+- Clarified that `HttpClientObserverEvent` owns byte counters,
+  `ReactiveHttpClientLifecycleContext` has none, and `HttpExchangeLogContext`
+  exposes post-transport headers but no size counter. Updated Micrometer, OTel,
+  streaming, configuration metadata, and transport documentation consistently.
+- Passed 163 focused tests across compression, transport headers, streaming,
+  `ResponseEntity`, error decoding, Micrometer, OTel, configuration metadata,
+  and release documentation. The OTel lane used
+  `.mvn/maven-central-settings.xml` after the configured private mirror failed
+  DNS resolution. The complete starter suite also passed 758 tests, and
+  `git diff --check` passed.
 
 ---
 

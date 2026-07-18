@@ -5,6 +5,8 @@ import java.util.*;
 
 /**
  * Immutable call state passed to {@link ReactiveHttpClientLifecycleHook} methods.
+ * This context intentionally has no response-header or byte-size fields; lifecycle hooks
+ * must not consume request or response publishers to infer encoded or decoded sizes.
  */
 public record ReactiveHttpClientLifecycleContext(
         String clientName,

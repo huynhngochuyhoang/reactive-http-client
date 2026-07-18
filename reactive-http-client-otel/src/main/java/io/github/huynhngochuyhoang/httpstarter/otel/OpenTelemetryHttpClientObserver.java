@@ -44,7 +44,10 @@ import java.util.concurrent.TimeUnit;
  *   <li>{@code rhttp.client.name} — logical name of the {@code @ReactiveHttpClient}</li>
  *   <li>{@code rhttp.api.name} — {@code @ApiName} value, {@code @ApiRef} value, or method name</li>
  *   <li>{@code rhttp.attempt.count} — total subscription attempts (>1 = retried)</li>
- *   <li>{@code rhttp.request.bytes} / {@code rhttp.response.bytes} — when measurable</li>
+ *   <li>{@code rhttp.request.bytes} - application request bytes before transport content coding,
+ *       when measurable</li>
+ *   <li>{@code rhttp.response.bytes} - post-transport advertised {@code Content-Length};
+ *       absent for automatically decompressed or chunked responses</li>
  * </ul>
  */
 public class OpenTelemetryHttpClientObserver implements HttpClientObserver {
