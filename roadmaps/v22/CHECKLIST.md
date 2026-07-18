@@ -169,26 +169,50 @@ Evidence:
 
 ## Priority 4 - Pool Saturation and Acquisition Diagnostics
 
-### [ ] 4.1 Add bounded pool-saturation fixtures
+### [x] 4.1 Add bounded pool-saturation fixtures
 
-- [ ] Cover queued acquire success and timeout with a one-connection pool.
-- [ ] Cover cancellation while queued.
-- [ ] Cover idle/lifetime eviction and background eviction.
-- [ ] Cover shutdown with active and pending work.
-- [ ] Assert no pending waiter or connection leak remains.
+- [x] Cover queued acquire success and timeout with a one-connection pool.
+- [x] Cover cancellation while queued.
+- [x] Cover idle/lifetime eviction and background eviction.
+- [x] Cover shutdown with active and pending work.
+- [x] Assert no pending waiter or connection leak remains.
 
-### [ ] 4.2 Improve safe saturation diagnostics
+### [x] 4.2 Improve safe saturation diagnostics
 
-- [ ] Preserve existing `ErrorCategory` behavior.
-- [ ] Add a failure-stage signal only when the runtime can prove it.
-- [ ] Keep any new value bounded and optional.
-- [ ] Align lifecycle, observer, exchange-log, health, diagnostics, and docs.
-- [ ] Keep server address opt-in.
-- [ ] Run compatibility and focused tests.
+- [x] Preserve existing `ErrorCategory` behavior.
+- [x] Add a failure-stage signal only when the runtime can prove it.
+- [x] Keep any new value bounded and optional.
+- [x] Align lifecycle, observer, exchange-log, health, diagnostics, and docs.
+- [x] Keep server address opt-in.
+- [x] Run compatibility and focused tests.
 
 Evidence:
 
-- Pending.
+- Added `ReactiveHttpClientPoolSaturationContractTest` with a real Reactor Netty
+  server and a starter-created one-connection provider. Deterministic request gates
+  prove queued acquire success, timeout before dispatch, queued cancellation, idle
+  and lifetime background eviction, and shutdown with active plus pending work.
+- Cancellation never reaches the server or consumes the next released connection;
+  subsequent probes succeed, eviction creates a fresh channel, and shutdown leaves
+  the provider disposed with both active and pending publishers terminated.
+- Added additive `HttpClientFailureStage.POOL_ACQUIRE`, resolved only from exact
+  Reactor Pool and Reactor Netty shaded acquire-timeout, pending-limit, or shutdown
+  exception types. Generic failures remain unset and acquire timeout keeps the
+  established `ErrorCategory.TIMEOUT` behavior.
+- Exposed the derived optional stage through observer, lifecycle, and exchange-log
+  contexts without changing their constructors. Micrometer adds bounded
+  `failure.stage`, OTel adds `rhttp.failure.stage`, and server address remains under
+  the existing disabled-by-default opt-in.
+- Health details now report probe-window `poolAcquireFailureCount`. Provider-backed
+  diagnostics and schema-v1 fixtures add sanitized pool source, max connections,
+  pending acquire timeout, and metrics policy; collection-backed snapshots report
+  those provider-only values as unknown.
+- Updated error handling, pool troubleshooting, observability, diagnostic-context,
+  support-bundle, and changelog documentation.
+- Passed the complete starter test suite, focused OTel observer tests, strict API
+  compatibility against published `3.1.0` from a fresh Central-only repository, and
+  `git diff --check`. The configured private mirror failed DNS for the first OTel
+  attempt, so that lane used `.mvn/maven-central-settings.xml`.
 
 ---
 

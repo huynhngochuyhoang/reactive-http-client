@@ -95,6 +95,12 @@ presets omit bodies; only the `bodies` preset logs request/response payloads.
 | `CANCELLED` | Reactive subscription cancelled before completion |
 | `UNKNOWN` | Any other uncategorized error |
 
+`ErrorCategory` remains the coarse compatibility contract. Terminal diagnostics also
+expose an optional `HttpClientFailureStage`: `POOL_ACQUIRE` is reported only when
+a concrete Reactor Pool acquire-timeout, pending-limit, or shutdown exception proves
+that the call failed while waiting for a pooled connection. Generic timeouts and
+other failures keep the stage unset; no phase is inferred from exception messages.
+
 Published mapping contract:
 
 | Input | Category |

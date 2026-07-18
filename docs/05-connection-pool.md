@@ -76,6 +76,26 @@ When `metrics-enabled: true`, the `ConnectionProvider` publishes four Reactor Ne
 
 All gauges carry a `name` tag of the form `reactive-http-client-<clientName>`.
 
+## Diagnosing saturation
+
+With `max-connections: 1`, additional calls wait in the pending queue until the
+active response releases its connection. A queued call either acquires the released
+connection, is cancelled and removed from the queue, or fails after
+`pending-acquire-timeout-ms`. Proven acquire failures retain the existing
+`ErrorCategory.TIMEOUT` mapping and add the bounded optional stage
+`POOL_ACQUIRE`; generic timeouts remain stage-unknown.
+
+Use `pending.connections` together with `active.connections` and the per-call
+`failure.stage` metric tag. The health detail `poolAcquireFailureCount` reports the
+probe-window count, while provider-backed diagnostics expose only sanitized pool
+source, maximum connections, pending timeout, and metrics-enabled policy. These
+surfaces do not expose a remote address; observer and OTel server-address fields
+remain controlled by `include-server-address` (default `false`).
+
+Idle and lifetime limits are enforced on acquire, and `evict-in-background-ms`
+adds proactive sweeps. Factory shutdown disposes the provider and terminates active
+and queued work; callers must still handle cancellation or shutdown errors.
+
 Enabling these gauges adds a small per-request overhead (internal Reactor Netty instrumentation). Leave disabled in latency-sensitive paths unless pool visibility is required.
 
 See [08-observability.md](08-observability.md) for the full observability reference.

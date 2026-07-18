@@ -75,13 +75,14 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
         out.append("| Client count | `").append(clients.size()).append("` |\n");
         out.append("| Endpoint count | `").append(endpointCountEntries(clients)).append("` |\n");
         out.append("| Inherited endpoint count | `").append(inheritedEndpointCountEntries(clients)).append("` |\n\n");
-        out.append("| Client | Interface | Base URL source | Timeout | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |\n");
-        out.append("|---|---|---|---|---|---|---|---|---|---|---|\n");
+        out.append("| Client | Interface | Base URL source | Pool | Timeout | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |\n");
+        out.append("|---|---|---|---|---|---|---|---|---|---|---|---|\n");
         for (SnapshotClient entry : clients) {
             ReactiveHttpClientDiagnosticsProvider.ClientSummary client = entry.summary();
             out.append("| `").append(markdown(client.clientName())).append("` ");
             out.append("| `").append(markdown(client.clientInterface())).append("` ");
             out.append("| `").append(markdown(client.baseUrlSource())).append("` ");
+            out.append("| `").append(markdown(pool(entry.pool()))).append("` ");
             out.append("| `").append(markdown(timeout(client.timeout()))).append("` ");
             out.append("| `").append(markdown(resilience(client.resilience()))).append("` ");
             out.append("| `").append(strictFlag(entry.strictUnsafeRetryValidation())).append("` ");
@@ -124,6 +125,10 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             clientMap.put("clientName", client.clientName());
             clientMap.put("clientInterface", client.clientInterface());
             clientMap.put("baseUrlSource", client.baseUrlSource());
+            clientMap.put("poolSource", poolSource(entry.pool()));
+            clientMap.put("poolMaxConnections", poolMaxConnections(entry.pool()));
+            clientMap.put("poolPendingAcquireTimeoutMs", poolPendingAcquireTimeoutMs(entry.pool()));
+            clientMap.put("poolMetricsEnabled", poolMetricsEnabled(entry.pool()));
             clientMap.put("timeoutSource", client.timeout().source());
             clientMap.put("timeoutMs", client.timeout().timeoutMs());
             clientMap.put("resilienceConfigured", client.resilience().configured());
@@ -173,6 +178,10 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             field(out, 3, "clientName", client.clientName(), true);
             field(out, 3, "clientInterface", client.clientInterface(), true);
             field(out, 3, "baseUrlSource", client.baseUrlSource(), true);
+            field(out, 3, "poolSource", poolSource(entry.pool()), true);
+            nullableField(out, 3, "poolMaxConnections", poolMaxConnections(entry.pool()), true);
+            nullableField(out, 3, "poolPendingAcquireTimeoutMs", poolPendingAcquireTimeoutMs(entry.pool()), true);
+            field(out, 3, "poolMetricsEnabled", poolMetricsEnabled(entry.pool()), true);
             field(out, 3, "timeoutSource", client.timeout().source(), true);
             field(out, 3, "timeoutMs", client.timeout().timeoutMs(), true);
             field(out, 3, "resilienceConfigured", client.resilience().configured(), true);
@@ -201,14 +210,15 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     }
 
     private static SnapshotClient snapshotClient(ReactiveHttpClientDiagnosticsProvider.ClientSummary summary) {
-        return new SnapshotClient(summary, null, null);
+        return new SnapshotClient(summary, null, null, null);
     }
 
     private static SnapshotClient snapshotClient(ReactiveHttpClientDiagnosticsProvider.ClientSnapshotEntry entry) {
         return new SnapshotClient(
                 entry.summary(),
                 entry.strictUnsafeRetryValidation(),
-                entry.strictBodySigningValidation());
+                entry.strictBodySigningValidation(),
+                entry.pool());
     }
 
     private static List<SnapshotClient> sortedEntries(Collection<SnapshotClient> entries) {
@@ -273,7 +283,8 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     private record SnapshotClient(
             ReactiveHttpClientDiagnosticsProvider.ClientSummary summary,
             Boolean strictUnsafeRetryValidation,
-            Boolean strictBodySigningValidation
+            Boolean strictBodySigningValidation,
+            ReactiveHttpClientDiagnosticsProvider.PoolSummary pool
     ) {
     }
 
@@ -289,6 +300,31 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
                 .map(SnapshotClient::summary)
                 .mapToInt(ReactiveHttpClientDiagnosticsProvider.ClientSummary::inheritedEndpointCount)
                 .sum();
+    }
+
+    private static String pool(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
+        if (pool == null) {
+            return "unknown";
+        }
+        return pool.source() + ":maxConnections=" + pool.maxConnections()
+                + ", pendingAcquireTimeoutMs=" + pool.pendingAcquireTimeoutMs()
+                + ", metrics=" + pool.metricsEnabled();
+    }
+
+    private static String poolSource(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
+        return pool != null ? pool.source() : "unknown";
+    }
+
+    private static Integer poolMaxConnections(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
+        return pool != null ? pool.maxConnections() : null;
+    }
+
+    private static Long poolPendingAcquireTimeoutMs(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
+        return pool != null ? pool.pendingAcquireTimeoutMs() : null;
+    }
+
+    private static Boolean poolMetricsEnabled(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
+        return pool != null ? pool.metricsEnabled() : null;
     }
 
     private static String timeout(ReactiveHttpClientDiagnosticsProvider.TimeoutSummary timeout) {
@@ -364,6 +400,15 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             out.append(',');
         }
         out.append('\n');
+    }
+
+    private static void nullableField(StringBuilder out, int indent, String name, Number value, boolean comma) {
+        indent(out, indent).append("\"").append(json(name)).append("\": ");
+        out.append(value != null ? value.toString() : "null");
+        if (comma) {
+            out.append(",");
+        }
+        out.append("\n");
     }
 
     private static void field(StringBuilder out, int indent, String name, Boolean value, boolean comma) {

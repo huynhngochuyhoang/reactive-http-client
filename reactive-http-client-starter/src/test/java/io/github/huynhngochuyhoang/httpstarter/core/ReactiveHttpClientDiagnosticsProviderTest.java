@@ -167,6 +167,31 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsUseDefaultPoolWhenNetworkConfigurationIsNull() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setNetwork(null);
+        properties.setClients(Map.of("diagnostic-client", new ReactiveHttpClientProperties.ClientConfig()));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>)
+                ReactiveHttpClientDiagnosticsSnapshot.toMap(provider).get("clients");
+
+        assertThat(clients).singleElement().satisfies(client -> assertThat(client)
+                .containsEntry("poolSource", "global")
+                .containsEntry("poolMaxConnections", 200)
+                .containsEntry("poolPendingAcquireTimeoutMs", 5000L)
+                .containsEntry("poolMetricsEnabled", false));
+    }
+
+    @Test
     void rendersSanitizedDiagnosticsSnapshot() {
         ReactiveHttpClientDiagnosticsProvider provider = sensitiveDiagnosticsProvider();
 
@@ -182,7 +207,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("| Inherited endpoint count | `1` |")
                 .contains("Strict retry validation")
                 .contains("Strict body-signing validation")
-                .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName() + "` | `property` | `client:500` |")
+                .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName() + "` | `property` | `global:maxConnections=200, pendingAcquireTimeoutMs=5000, metrics=false` | `client:500` |")
                 .contains("configured=true, retry=unavailable")
                 .contains("| `provider-bean` | `true` | `2` | `1` |");
         assertThat(json)
@@ -244,6 +269,10 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                       "clientName": "support-inventory",
                       "clientInterface": "%s",
                       "baseUrlSource": "property",
+                      "poolSource": "global",
+                      "poolMaxConnections": 200,
+                      "poolPendingAcquireTimeoutMs": 5000,
+                      "poolMetricsEnabled": false,
                       "timeoutSource": "client",
                       "timeoutMs": 750,
                       "resilienceConfigured": false,
@@ -422,7 +451,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(List.of(summary));
         Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(List.of(summary));
 
-        assertThat(markdown).contains("| `summary-client` | `com.example.SummaryClient` | `property` | `disabled:0` | `configured=false, retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled` | `unknown` | `unknown` |");
+        assertThat(markdown).contains("| `summary-client` | `com.example.SummaryClient` | `property` | `unknown` | `disabled:0` | `configured=false, retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled` | `unknown` | `unknown` |");
         assertThat(json)
                 .contains("\"strictUnsafeRetryValidation\": null")
                 .contains("\"strictBodySigningValidation\": null")

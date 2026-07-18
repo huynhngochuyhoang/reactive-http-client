@@ -1,5 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
+
 import java.net.URI;
 import java.util.*;
 
@@ -52,6 +54,11 @@ public record ReactiveHttpClientLifecycleContext(
                 statusCode,
                 error,
                 attemptNumber);
+    }
+
+    /** Proven transport failure stage, or {@code null} when it cannot be attributed safely. */
+    public HttpClientFailureStage failureStage() {
+        return HttpClientFailureStage.from(error);
     }
 
     private static Map<String, List<Object>> copyQueryParams(Map<String, List<Object>> source) {

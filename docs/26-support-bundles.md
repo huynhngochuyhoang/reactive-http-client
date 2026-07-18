@@ -114,8 +114,8 @@ class SupportBundleExporter {
 ```
 
 Provider-backed snapshots include schema version, project version, total client count, total endpoint count,
-total inherited endpoint count, per-client policy summaries, and strict validation
-flags. Summary-only collection snapshots mark strict validation flags as unknown.
+total inherited endpoint count, per-client policy summaries including effective pool policy, and strict validation
+flags. Summary-only collection snapshots mark pool policy and strict validation flags as unknown.
 They do not include concrete base URLs, header values, proxy credentials, auth-provider bean
 names, request bodies, or response bodies. Schema v1 is additive within the `3.x` line;
 the versioned sanitized [fixture](fixtures/rhttpclients-schema-v1.json), value semantics,
@@ -348,6 +348,23 @@ Minimal safe bundle:
 Attempt counts are subscription attempts, not proof that each attempt reached the
 network. Do not collect idempotency-key values by default; record only whether a
 key was present and which source provided it.
+
+## Pool Saturation Incidents
+
+Minimal safe bundle:
+
+- Provider-backed diagnostics snapshot showing pool source, maximum connections,
+  pending-acquire timeout, and whether pool metrics are enabled.
+- `reactor.netty.connection.provider.active.connections`, `.idle.connections`,
+  `.total.connections`, and `.pending.connections` for the affected client.
+- Request timer samples grouped by `failure.stage`; `POOL_ACQUIRE` is bounded
+  proof of a Reactor Pool acquisition failure, while an absent stage is unknown.
+- Health details including `poolAcquireFailureCount` for the same probe window.
+- Metadata-only exchange logs or lifecycle/observer output with category and stage.
+
+Do not add concrete upstream addresses to the bundle by default. The stage and
+pool policy are sufficient for saturation triage; enable server-address reporting
+only under the existing opt-in and sanitize it before sharing.
 
 ## Timeout Incidents
 

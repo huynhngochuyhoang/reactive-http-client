@@ -16,6 +16,7 @@ available.
 | Error body | No dedicated error-body field. `responseBody()` is the decoded success body and is `null` for error responses | No dedicated error-body field. `getResponseBody()` is the optionally retained decoded success body and is `null` for error responses | No | Bounded `responseBody()` plus `responseBodyTruncated()` and `retainedResponseBodyBytes()` |
 | Duration | `durationMs()` for the logical call | `getDurationMs()` for the logical call | No | No |
 | Subscription-attempt count | Terminal `subscriptionAttemptCount()` for the logical call | Terminal `getAttemptCount()` for the logical call | `attemptNumber()` identifies the current callback attempt; terminal callbacks receive the final attempt number | No |
+| Proven failure stage | `failureStage()` | `getFailureStage()` | `failureStage()` | No |
 
 Subscription-attempt values count reactive subscriptions, not guaranteed HTTP
 network sends. Request-body serialization can fail after an attempt starts but
@@ -42,12 +43,13 @@ redaction policy.
 ## Health, diagnostics, and exchange logs
 
 The Actuator health indicator is a status signal derived from Micrometer request timers. It reports bounded per-client sample counts, error counts, error rates, thresholds, and reasons for the latest health-probe window. It does not describe configured endpoints or per-call payload metadata.
+Pool-acquire failures add a bounded `poolAcquireFailureCount` for the same probe window.
 
 Use exchange logging for per-call request/response metadata, and use the diagnostics provider when support output needs configured-client summaries.
 
 ## Runtime diagnostics provider
 
-Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, timeout summary, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
+Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, timeout summary, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
 
 Use `ReactiveHttpClientDiagnosticsSnapshot` when a support bundle, startup log,
 or local custom endpoint needs deterministic Markdown or JSON output from those
@@ -60,7 +62,7 @@ String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(diagnostics);
 
 Provider-backed snapshots render schema version, project version, total client count, total endpoint
 count, total inherited endpoint count, strict validation flags, and one row/object
-per client. Summary-only collection overloads render strict validation flags as
+per client. Summary-only collection overloads render strict validation flags and effective pool policy as
 unknown because `ClientSummary` does not carry those provider-only values. The
 helper sorts clients by name and interface for stable output. The helper is explicit: calling
 it does not register an Actuator endpoint, controller, log line, or file writer.
@@ -119,7 +121,7 @@ management:
 The endpoint id is `rhttpclients`. A read operation returns diagnostics schema v1 JSON with
 `schemaVersion`, `projectVersion`, `clientCount`, `endpointCount`, `inheritedEndpointCount`, and
 one `clients` entry per registered client. Each client entry includes client
-name, interface, base URL source, timeout source/value, resilience summary, auth
+name, interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, timeout source/value, resilience summary, auth
 mode, redirect-following flag, strict unsafe-retry and strict body-signing
 validation flags, endpoint count, and inherited endpoint count. Strict flags are
 true only when the corresponding validation path is active for the resolved

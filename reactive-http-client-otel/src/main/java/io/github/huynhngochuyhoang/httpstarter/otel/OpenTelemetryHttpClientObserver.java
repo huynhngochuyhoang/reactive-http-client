@@ -48,6 +48,8 @@ import java.util.concurrent.TimeUnit;
  *       when measurable</li>
  *   <li>{@code rhttp.response.bytes} - post-transport advertised {@code Content-Length};
  *       absent for automatically decompressed or chunked responses</li>
+ *   <li>{ rhttp.failure.stage} - { POOL_ACQUIRE} only when Reactor Pool
+ *       provides conclusive acquisition-failure evidence</li>
  * </ul>
  */
 public class OpenTelemetryHttpClientObserver implements HttpClientObserver {
@@ -67,6 +69,7 @@ public class OpenTelemetryHttpClientObserver implements HttpClientObserver {
     static final AttributeKey<Long> ATTR_ATTEMPT_COUNT = AttributeKey.longKey("rhttp.attempt.count");
     static final AttributeKey<Long> ATTR_REQUEST_BYTES = AttributeKey.longKey("rhttp.request.bytes");
     static final AttributeKey<Long> ATTR_RESPONSE_BYTES = AttributeKey.longKey("rhttp.response.bytes");
+    static final AttributeKey<String> ATTR_FAILURE_STAGE = AttributeKey.stringKey("rhttp.failure.stage");
 
     private final Tracer tracer;
     private final ReactiveHttpClientProperties.ObservabilityConfig config;
@@ -113,6 +116,9 @@ public class OpenTelemetryHttpClientObserver implements HttpClientObserver {
             }
             if (event.getResponseBytes() >= 0) {
                 builder.setAttribute(ATTR_RESPONSE_BYTES, event.getResponseBytes());
+            }
+            if (event.getFailureStage() != null) {
+                builder.setAttribute(ATTR_FAILURE_STAGE, event.getFailureStage().name());
             }
 
             String errorType = resolveErrorType(event);
