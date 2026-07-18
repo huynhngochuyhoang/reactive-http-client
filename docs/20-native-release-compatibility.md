@@ -802,21 +802,27 @@ evidence lanes. From a clean checkout, resolve the latest published parent,
 starter, test helper, and OTel companion exclusively through Maven Central:
 
 ```bash
-scripts/verify-published-consumer.sh 3.0.0
+scripts/verify-published-release-artifacts.sh 3.1.0
+scripts/verify-published-consumer.sh 3.1.0
 ```
 
-The command refuses an existing
-`target/published-baseline-repositories/consumer-3.0.0` directory instead of reusing it.
-It runs the same Boot 4 application fixture against published `3.0.0`, verifies
+The consumer command refuses an existing
+`target/published-baseline-repositories/consumer-3.1.0` directory instead of reusing it.
+It runs the same Boot 4 application fixture against published `3.1.0`, verifies
 the Maven Central `_remote.repositories` marker for the parent and every project artifact,
 rejects reactor `target/classes` entries, and writes target-only dependency
 trees, classpaths, consumer/module effective POMs, published parent/module POM
 and jar SHA-256 values, test reports, and
 provenance under
-`target/release-evidence/v21-priority2/published-3.0.0/`.
+`target/release-evidence/published-consumer/published-3.1.0/`.
 
-The manually dispatched `Published Consumer Smoke` workflow runs this command
-and uploads only the published-release evidence directory. The normal
+The release-artifact command uses its own fresh repository and additionally
+requires the starter, test-helper, and OTel source and Javadoc jars. Its
+target-only Central markers, checksums, and provenance are written under
+`target/release-evidence/published-baselines/release-artifacts-3.1.0/`.
+
+The manually dispatched `Published Consumer Smoke` workflow runs both commands
+and uploads only their published-release evidence directories. The normal
 `Boot 4 Assembled Consumer` CI job remains the current-reactor lane.
 
 ### V20 Jackson 3 codec ownership
