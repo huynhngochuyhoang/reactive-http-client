@@ -324,7 +324,9 @@ Minimal safe bundle:
 - Sanitized auth configuration with `client-id`, `client-secret`, tokens, and
   authorization headers replaced.
 - `AuthProviderException` class name, message, client name, and cause type.
-- Token endpoint HTTP status and sanitized response-body snippet when present.
+- Token endpoint HTTP status, safe headers such as `Retry-After`, and sanitized
+  response-body snippet when present. Do not collect the token request metadata
+  or credential-bearing response headers from the exception cause.
 - Metadata-only exchange logs for the downstream API call that failed after auth.
 
 Do not include raw token endpoint request bodies, raw token responses, bearer

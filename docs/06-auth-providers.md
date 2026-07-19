@@ -123,16 +123,25 @@ credentials.
 The token provider maps `expires_in` to an `AccessToken` expiry timestamp after
 subtracting `expiry-leeway-ms`. `RefreshingBearerAuthProvider` caches the token,
 deduplicates concurrent refreshes, and refreshes before the cached token enters
-its refresh window. If a downstream API returns `401` and the auth provider is
-invalidatable, the outbound auth filter invalidates the cached bearer token and
-retries the request once with a fresh token.
+its refresh window. Cancelling one waiter does not cancel the shared refresh or
+poison the resulting cache, and refresh failures retain each waiter's logical
+downstream client name. If a downstream API returns `401` and the auth provider
+is invalidatable, the outbound auth filter invalidates the cached bearer token
+and retries the request exactly once with a fresh token. A second `401` is
+returned to the normal error-decoding path without another refresh loop.
 
 Token endpoint failures are reported as `AuthProviderException`. HTTP 4xx/5xx
-responses include the status and a bounded, redacted response-body snippet.
-Malformed token JSON and missing `access_token` responses use fixed diagnostic
-messages. Client secrets, access tokens, and refresh tokens are not included in
-exception messages. See [Production Support Bundles](26-support-bundles.md) for
-safe OAuth2/auth incident evidence.
+responses include the status and a bounded, redacted response-body snippet. The
+sanitized HTTP cause retains the status, safe headers such as `Retry-After`, the
+full sanitized body for typed decoding, and the configured WebClient codecs; it
+removes token-request metadata and redacts credential-bearing response headers.
+Malformed, empty, and missing-`access_token` 2xx responses use fixed diagnostics
+without chaining raw decoder text. WebClient `defaultStatusHandler` exceptions
+continue to take precedence and remain owned by that custom handler. Client
+secrets, access tokens, refresh tokens, cookies, and Basic credentials are not
+included in built-in failure messages or sanitized causes. See
+[Production Support Bundles](26-support-bundles.md) for safe OAuth2/auth incident
+evidence.
 
 For manual bean wiring, compose `OAuth2ClientCredentialsTokenProvider` with `RefreshingBearerAuthProvider`:
 

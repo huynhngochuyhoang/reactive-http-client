@@ -102,6 +102,7 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
 
         HttpClientObserverEvent event = observed.get();
         assertNotNull(event);
+        assertEquals("test-client", event.getClientName());
         assertEquals(ErrorCategory.TIMEOUT, event.getErrorCategory());
         assertNull(event.getFailureStage());
         assertNull(event.getRequestUrl());

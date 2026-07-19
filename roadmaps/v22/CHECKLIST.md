@@ -319,25 +319,45 @@ Evidence:
 
 ## Priority 7 - OAuth2 Refresh and Token-Service Reliability
 
-### [ ] 7.1 Revalidate concurrent refresh state
+### [x] 7.1 Revalidate concurrent refresh state
 
-- [ ] Deduplicate concurrent refreshes.
-- [ ] Prevent one cancelled waiter from cancelling shared refresh work.
-- [ ] Cover expiry leeway, absent expiry, invalidation, repeated 401, failure, and recovery.
-- [ ] Preserve the logical downstream client name.
+- [x] Deduplicate concurrent refreshes.
+- [x] Prevent one cancelled waiter from cancelling shared refresh work.
+- [x] Cover expiry leeway, absent expiry, invalidation, repeated 401, failure, and recovery.
+- [x] Preserve the logical downstream client name.
 
-### [ ] 7.2 Revalidate safe token failures
+### [x] 7.2 Revalidate safe token failures
 
-- [ ] Cover empty/malformed/oversized 2xx and 4xx/5xx bodies.
-- [ ] Cover encoded, nested, escaped, and non-UTF-8 secret-bearing payloads.
-- [ ] Preserve safe status, headers, typed decoding, and configured codecs.
-- [ ] Preserve custom WebClient status-handler behavior.
-- [ ] Verify no credentials appear in messages, causes, request metadata, or snapshots.
-- [ ] Run focused auth tests and `git diff --check`.
+- [x] Cover empty/malformed/oversized 2xx and 4xx/5xx bodies.
+- [x] Cover encoded, nested, escaped, and non-UTF-8 secret-bearing payloads.
+- [x] Preserve safe status, headers, typed decoding, and configured codecs.
+- [x] Preserve custom WebClient status-handler behavior.
+- [x] Verify no credentials appear in messages, causes, request metadata, or snapshots.
+- [x] Run focused auth tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- `RefreshingBearerAuthProviderTest` proves one shared token fetch for concurrent
+  callers, cancellation isolation, expiry-window and non-expiring reuse,
+  invalidation epochs, deterministic failure cooldown and recovery, and distinct
+  logical client names for every waiter on a shared refresh failure.
+- `OutboundAuthFilterTest` proves a downstream `401` releases its body,
+  invalidates once, retries once with fresh auth, and returns a repeated `401`
+  without entering another refresh loop.
+- `OAuth2ClientCredentialsTokenProviderTest` covers empty, malformed, large, and
+  missing-token 2xx responses plus bounded 4xx and 5xx diagnostics. Existing and
+  expanded fixtures cover form, JSON, nested JSON, escaped Unicode, percent
+  encoding, Latin-1, Basic credentials, and whitespace-bearing secrets.
+- Sanitized `WebClientResponseException` causes retain status-specific types,
+  safe headers such as `Retry-After`, full sanitized bodies, typed decoding,
+  configured codecs, UTF-8/content-length consistency, and no token-request
+  metadata. Credential-bearing response headers are redacted.
+- Default WebClient status handlers retain precedence. Observer and lifecycle
+  fixtures report the logical downstream client without final request metadata
+  or authorization headers when auth fails before dispatch; diagnostics snapshot
+  fixtures remain free of auth values and credentials.
+- Passed focused auth, factory, observer, lifecycle, and diagnostics tests, the
+  complete starter module suite, documentation checks, and `git diff --check`.
 
 ---
 

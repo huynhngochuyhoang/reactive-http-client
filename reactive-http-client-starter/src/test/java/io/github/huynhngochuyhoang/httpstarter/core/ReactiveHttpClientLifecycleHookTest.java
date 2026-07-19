@@ -4,7 +4,10 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.ApiRef;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
 import io.github.huynhngochuyhoang.httpstarter.annotation.QueryParam;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
@@ -37,8 +40,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -94,6 +96,38 @@ class ReactiveHttpClientLifecycleHookTest {
         assertEquals("get", context.apiName());
         assertEquals(400, context.statusCode());
         assertInstanceOf(HttpClientException.class, context.error());
+    }
+
+    @Test
+    void authFailureLifecycleContextUsesLogicalClientWithoutCredentials() throws Throwable {
+        List<ReactiveHttpClientLifecycleContext> errors = new ArrayList<>();
+        ReactiveHttpClientLifecycleHook hook = new ReactiveHttpClientLifecycleHook() {
+            @Override
+            public void onError(ReactiveHttpClientLifecycleContext context) {
+                errors.add(context);
+            }
+        };
+        AuthProvider authProvider = request -> Mono.error(new AuthProviderException(
+                request.clientName(), "OAuth2 token endpoint returned HTTP 401"));
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(new OutboundAuthFilter("test-client", authProvider))
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK).build()))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, List.of(hook),
+                new NoopResilienceOperatorApplier(), defaultConfig());
+
+        StepVerifier.create(invokeGet(handler, "42"))
+                .expectError(AuthProviderException.class)
+                .verify();
+
+        assertEquals(1, errors.size());
+        ReactiveHttpClientLifecycleContext context = errors.get(0);
+        assertEquals("test-client", context.clientName());
+        assertEquals("test-client", assertInstanceOf(
+                AuthProviderException.class, context.error()).getClientName());
+        assertEquals(Map.of(), context.headers());
+        assertNull(context.requestUrl());
     }
 
     @Test
