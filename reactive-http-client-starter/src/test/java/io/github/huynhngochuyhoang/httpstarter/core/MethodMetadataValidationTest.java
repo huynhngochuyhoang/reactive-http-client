@@ -6,8 +6,11 @@ import org.springframework.http.ResponseEntity;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.InputStream;
+import java.io.Reader;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
+import java.nio.channels.ReadableByteChannel;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -237,6 +240,23 @@ class MethodMetadataValidationTest {
     }
 
     @Test
+    void shouldClassifyUncertainAndStreamBodyDeclarationsAsApplicationOwned() throws Exception {
+        MethodMetadataCache cache = new MethodMetadataCache();
+
+        for (String methodName : List.of("objectBody", "inputStreamBody", "readerBody", "channelBody")) {
+            Method method = java.util.Arrays.stream(BodyOwnershipClient.class.getMethods())
+                    .filter(candidate -> candidate.getName().equals(methodName))
+                    .findFirst()
+                    .orElseThrow();
+            assertEquals(RequestBodyRepeatability.APPLICATION_OWNED,
+                    RequestPlan.from(cache.get(method), BodyOwnershipClient.class).bodyRepeatability());
+        }
+        Method generic = GenericBodyClient.class.getMethod("genericBody", Object.class);
+        assertEquals(RequestBodyRepeatability.APPLICATION_OWNED,
+                RequestPlan.from(cache.get(generic), GenericBodyClient.class).bodyRepeatability());
+    }
+
+    @Test
     void shouldResolveInheritedGenericEndpointTypesForConcreteClient() throws Exception {
         MethodMetadataCache cache = new MethodMetadataCache();
         Method busGet = BusApiOperators.class.getMethod("getOrder", String.class);
@@ -303,6 +323,25 @@ class MethodMetadataValidationTest {
         @CircuitBreaker("options-cb")
         @LogHttpExchange(logger = OverrideTestExchangeLogger.class)
         Mono<String> options();
+    }
+
+    interface BodyOwnershipClient {
+        @POST("/object")
+        Mono<String> objectBody(@Body Object body);
+
+        @POST("/input-stream")
+        Mono<String> inputStreamBody(@Body InputStream body);
+
+        @POST("/reader")
+        Mono<String> readerBody(@Body Reader body);
+
+        @POST("/channel")
+        Mono<String> channelBody(@Body ReadableByteChannel body);
+    }
+
+    interface GenericBodyClient<T> {
+        @POST("/generic")
+        Mono<String> genericBody(@Body T body);
     }
 
     interface RequestPlanClient {

@@ -20,6 +20,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -164,6 +166,27 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
         assertThat(output.getOut())
                 .contains("Retry configured for reactive HTTP client [test-client]")
                 .contains("RetrySafetyClient#uploadResource")
+                .contains("with application-owned request body [default]");
+    }
+
+    @Test
+    void retryEnabledUncertainDeclaredBodiesWarnAboutApplicationOwnership(CapturedOutput output) {
+        ReactiveClientInvocationHandler objectHandler = createHandler(
+                flakyThenOk(new AtomicInteger()), true, Set.of("POST"));
+        ReactiveClientInvocationHandler streamHandler = createHandler(
+                flakyThenOk(new AtomicInteger()), true, Set.of("POST"));
+
+        StepVerifier.create(invoke(objectHandler, "uploadObject", Map.of("name", "alice")))
+                .expectNext("ok")
+                .verifyComplete();
+        StepVerifier.create(invoke(streamHandler, "uploadInputStream",
+                        new ByteArrayInputStream("payload".getBytes(StandardCharsets.UTF_8))))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(output.getOut())
+                .contains("RetrySafetyClient#uploadObject(java.lang.Object)")
+                .contains("RetrySafetyClient#uploadInputStream(java.io.InputStream)")
                 .contains("with application-owned request body [default]");
     }
 
@@ -352,6 +375,8 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
                 case "createJson" -> RetrySafetyClient.class.getMethod(methodName, Map.class);
                 case "uploadPublisher" -> RetrySafetyClient.class.getMethod(methodName, Flux.class);
                 case "uploadResource" -> RetrySafetyClient.class.getMethod(methodName, Resource.class);
+                case "uploadObject" -> RetrySafetyClient.class.getMethod(methodName, Object.class);
+                case "uploadInputStream" -> RetrySafetyClient.class.getMethod(methodName, InputStream.class);
                 default -> RetrySafetyClient.class.getMethod(methodName);
             };
             return (Mono<String>) handler.invoke(null, method, args);
@@ -383,6 +408,12 @@ class ReactiveClientInvocationHandlerRetrySafetyTest {
 
         @POST("/publisher")
         Mono<String> uploadPublisher(@Body Flux<org.springframework.core.io.buffer.DataBuffer> body);
+
+        @POST("/object")
+        Mono<String> uploadObject(@Body Object body);
+
+        @POST("/input-stream")
+        Mono<String> uploadInputStream(@Body InputStream body);
 
         @PUT("/replace")
         Mono<String> replaceIdempotently();

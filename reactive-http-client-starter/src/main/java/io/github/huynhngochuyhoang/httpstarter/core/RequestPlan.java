@@ -8,10 +8,13 @@ import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.InputStream;
+import java.io.Reader;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.nio.channels.ReadableByteChannel;
 import java.util.*;
 
 /**
@@ -135,10 +138,18 @@ record RequestPlan(
         if (Publisher.class.isAssignableFrom(rawType) || DataBuffer.class.isAssignableFrom(rawType)) {
             return RequestBodyRepeatability.NON_REPEATABLE;
         }
-        if (Resource.class.isAssignableFrom(rawType)) {
+        if (Resource.class.isAssignableFrom(rawType)
+                || Object.class.equals(rawType)
+                || isApplicationOwnedStreamBody(rawType)) {
             return RequestBodyRepeatability.APPLICATION_OWNED;
         }
         return RequestBodyRepeatability.REPEATABLE;
+    }
+
+    static boolean isApplicationOwnedStreamBody(Class<?> rawType) {
+        return InputStream.class.isAssignableFrom(rawType)
+                || Reader.class.isAssignableFrom(rawType)
+                || ReadableByteChannel.class.isAssignableFrom(rawType);
     }
 
     private static RequestBodyRepeatability multipartRepeatability(MethodMetadata meta,

@@ -28,12 +28,9 @@ import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 
-import java.io.InputStream;
-import java.io.Reader;
 import java.lang.reflect.*;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.channels.ReadableByteChannel;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -940,7 +937,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             return BodySigningContract.unsupported("resource(" + typeName + ")",
                     "Resource bodies are application-owned streams and do not expose stable raw bytes");
         }
-        if (isApplicationOwnedStreamBody(rawType)) {
+        if (RequestPlan.isApplicationOwnedStreamBody(rawType)) {
             return BodySigningContract.unsupported("stream(" + typeName + ")",
                     "Stream body types are application-owned and do not expose stable raw bytes");
         }
@@ -978,12 +975,6 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         }
         return BodySigningContract.unsupported("json(" + typeName + ")",
                 "configured default Content-Type [" + defaultContentType + "] is not JSON-compatible");
-    }
-
-    private static boolean isApplicationOwnedStreamBody(Class<?> rawType) {
-        return InputStream.class.isAssignableFrom(rawType)
-                || Reader.class.isAssignableFrom(rawType)
-                || ReadableByteChannel.class.isAssignableFrom(rawType);
     }
 
     private static boolean hasDynamicContentTypeHeader(RequestPlan plan) {

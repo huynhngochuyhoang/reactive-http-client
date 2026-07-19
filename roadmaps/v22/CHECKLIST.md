@@ -308,7 +308,9 @@ Evidence:
   cancellation behavior.
 - Published one repeatability matrix across streaming, resilience, multipart,
   auth, redirect, and mock-helper documentation and recorded the contract in
-  the changelog.
+  the changelog. `Object`, unresolved generic, `InputStream`, `Reader`, and
+  `ReadableByteChannel` declarations now export and warn as `APPLICATION_OWNED`;
+  strict built-in signing reuses the same stream-shape classifier.
 - Passed focused starter and test-helper ownership, response-buffer, retry,
   redirect, auth/signing, multipart, diagnostics, and documentation tests; the
   complete module suites and `git diff --check` also passed.
