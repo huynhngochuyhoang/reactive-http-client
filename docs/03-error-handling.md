@@ -161,10 +161,17 @@ userApiClient.getUser(id)
 ```java
 userApiClient.getUser(id)
     .onErrorResume(AuthProviderException.class, ex -> {
-        log.warn("Auth failed for {}: {}", ex.getClientName(), ex.getCause().getMessage());
+        log.warn("Auth failed for {} (cause type: {})",
+                ex.getClientName(),
+                ex.getCause() != null ? ex.getCause().getClass().getSimpleName() : "none");
         return Mono.error(ex);
     });
 ```
+
+The built-in OAuth2 provider supplies sanitized HTTP status, safe headers, and a
+sanitized response body through its cause. Do not log arbitrary cause messages
+from custom `AuthProvider` implementations unless that provider defines an
+equivalent sanitization contract.
 
 ---
 

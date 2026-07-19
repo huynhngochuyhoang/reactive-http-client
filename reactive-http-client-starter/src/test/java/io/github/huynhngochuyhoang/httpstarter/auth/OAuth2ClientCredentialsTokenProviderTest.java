@@ -134,6 +134,29 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void oversizedSuccessfulTokenResponseStillParsesToken() {
+        AtomicReference<MockClientHttpRequest> captured = captureMock();
+        String body = "{\"access_token\":\"large-token\",\"padding\":\""
+                + "x".repeat(8192) + "\"}";
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> materializeAndRespond(request, captured, body))
+                .build();
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("client-secret")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .assertNext(token -> {
+                    assertThat(token.tokenValue()).isEqualTo("large-token");
+                    assertThat(token.expiresAt()).isNull();
+                })
+                .verifyComplete();
+    }
+
+    @Test
     void scopeAndAudienceAreForwardedAsFormFields() {
         AtomicReference<MockClientHttpRequest> captured = captureMock();
         WebClient webClient = WebClient.builder()
@@ -257,6 +280,10 @@ class OAuth2ClientCredentialsTokenProviderTest {
                             .request(sourceRequest)
                             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                             .header(HttpHeaders.RETRY_AFTER, "5")
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer leaked-response-token")
+                            .header(HttpHeaders.SET_COOKIE, "session=leaked-session")
+                            .header("X-Token-Debug", "leaked-header-token")
+                            .header("X-Debug", "client_secret=client-secret")
                             .body("{\"access_token\":\"leaked-access\"}")
                             .build());
                 })
@@ -279,6 +306,14 @@ class OAuth2ClientCredentialsTokenProviderTest {
                     assertThat(basicAuthorization.get()).startsWith("Basic ");
                     assertThat(cause.getRequest()).isNull();
                     assertThat(cause.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("5");
+                    assertThat(cause.getHeaders().getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("<redacted>");
+                    assertThat(cause.getHeaders().getFirst(HttpHeaders.SET_COOKIE)).isEqualTo("<redacted>");
+                    assertThat(cause.getHeaders().getFirst("X-Token-Debug")).isEqualTo("<redacted>");
+                    assertThat(cause.getHeaders().getFirst("X-Debug"))
+                            .isEqualTo("client_secret=<redacted>");
+                    assertThat(cause.getHeaders().toString())
+                            .doesNotContain("leaked-response-token", "leaked-session",
+                                    "leaked-header-token", "client-secret");
                     assertThat(cause.getResponseBodyAsString())
                             .contains("access_token", "<redacted>")
                             .doesNotContain("leaked-access");

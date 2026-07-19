@@ -206,6 +206,46 @@ class OutboundAuthFilterTest {
     }
 
     @Test
+    void shouldReturnSecondUnauthorizedWithoutAnotherRefresh() {
+        AtomicInteger tokenCalls = new AtomicInteger();
+        AtomicInteger invalidateCalls = new AtomicInteger();
+        AtomicInteger exchanges = new AtomicInteger();
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(AuthRequest request) {
+                return Mono.just(AuthContext.builder()
+                        .header("Authorization", "Bearer token-" + tokenCalls.incrementAndGet())
+                        .build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                invalidateCalls.incrementAndGet();
+                return Mono.empty();
+            }
+        };
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+        ClientRequest request = ClientRequest.create(
+                HttpMethod.GET, URI.create("https://api.test.local/users")).build();
+
+        Mono<Integer> responseStatus = filter.filter(request, req -> {
+                    exchanges.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.UNAUTHORIZED)
+                            .body("unauthorized")
+                            .build());
+                })
+                .flatMap(response -> response.releaseBody()
+                        .thenReturn(response.statusCode().value()));
+
+        StepVerifier.create(responseStatus)
+                .expectNext(HttpStatus.UNAUTHORIZED.value())
+                .verifyComplete();
+        assertEquals(2, tokenCalls.get());
+        assertEquals(1, invalidateCalls.get());
+        assertEquals(2, exchanges.get());
+    }
+
+    @Test
     void shouldEncodeAuthQueryParamsWithReservedCharacters() {
         AuthProvider authProvider = request -> Mono.just(AuthContext.builder()
                 .queryParam("sig", "a+b&c=d/e ?")

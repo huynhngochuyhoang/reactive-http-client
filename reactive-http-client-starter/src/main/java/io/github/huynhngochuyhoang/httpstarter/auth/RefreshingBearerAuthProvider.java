@@ -98,14 +98,12 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
             Throwable cause = lastRefreshFailure != null
                     ? lastRefreshFailure
                     : new IllegalStateException("token refresh in cooldown");
-            return Mono.error(cause instanceof AuthProviderException
-                    ? cause
-                    : new AuthProviderException(clientName, cause));
+            return Mono.error(authProviderException(clientName, cause));
         }
 
         Mono<CachedAccessToken> currentRefresh = inFlightRefresh;
         if (currentRefresh != null) {
-            return currentRefresh.map(CachedAccessToken::tokenValue);
+            return tokenValueForClient(currentRefresh, clientName);
         }
 
         synchronized (this) {
@@ -115,19 +113,15 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
                 return Mono.just(snapshot.tokenValue());
             }
             if (inFlightRefresh != null) {
-                return inFlightRefresh.map(CachedAccessToken::tokenValue);
+                return tokenValueForClient(inFlightRefresh, clientName);
             }
 
             AtomicReference<Mono<CachedAccessToken>> refreshRef = new AtomicReference<>();
             long refreshEpoch = invalidationEpoch;
             Mono<CachedAccessToken> refreshMono = Mono.defer(accessTokenProvider::fetchToken)
-                    .switchIfEmpty(Mono.error(new AuthProviderException(
-                            clientName,
-                            new IllegalStateException("AccessTokenProvider returned empty token"))))
-                    .map(token -> validateAndNormalize(clientName, token))
-                    .onErrorMap(error -> error instanceof AuthProviderException
-                            ? error
-                            : authProviderException(clientName, error))
+                    .switchIfEmpty(Mono.error(new IllegalStateException(
+                            "AccessTokenProvider returned empty token")))
+                    .map(this::validateAndNormalize)
                     .doOnNext(token -> {
                         synchronized (this) {
                             if (refreshEpoch == invalidationEpoch) {
@@ -150,11 +144,22 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
             refreshRef.set(refreshMono);
 
             inFlightRefresh = refreshMono;
-            return refreshMono.map(CachedAccessToken::tokenValue);
+            return tokenValueForClient(refreshMono, clientName);
         }
     }
 
+    private Mono<String> tokenValueForClient(Mono<CachedAccessToken> refresh, String clientName) {
+        return refresh.map(CachedAccessToken::tokenValue)
+                .onErrorMap(error -> authProviderException(clientName, error));
+    }
+
     private AuthProviderException authProviderException(String clientName, Throwable cause) {
+        if (cause instanceof AuthProviderException authError) {
+            if (clientName.equals(authError.getClientName())) {
+                return authError;
+            }
+            return new AuthProviderException(clientName, authError.getMessage(), authError.getCause());
+        }
         if (cause instanceof SanitizedAuthProviderFailure sanitizedFailure) {
             return new AuthProviderException(
                     clientName,
@@ -164,12 +169,10 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
         return new AuthProviderException(clientName, cause);
     }
 
-    private CachedAccessToken validateAndNormalize(String clientName, AccessToken token) {
+    private CachedAccessToken validateAndNormalize(AccessToken token) {
         Instant now = clock.instant();
         if (token.expiresAt() != null && !token.expiresAt().isAfter(now)) {
-            throw new AuthProviderException(
-                    clientName,
-                    new IllegalStateException("Access token from AccessTokenProvider is already expired"));
+            throw new IllegalStateException("Access token from AccessTokenProvider is already expired");
         }
         return new CachedAccessToken(token.tokenValue(), token.expiresAt());
     }

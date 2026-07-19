@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
+import io.github.huynhngochuyhoang.httpstarter.core.SensitiveHeaders;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.codec.CodecException;
@@ -23,10 +24,7 @@ import reactor.core.publisher.Mono;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
@@ -219,7 +217,13 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
                 ? sanitizedBody.getBytes(StandardCharsets.UTF_8)
                 : new byte[0];
         HttpHeaders sanitizedHeaders = new HttpHeaders();
-        sanitizedHeaders.addAll(source.getHeaders());
+        source.getHeaders().forEach((name, values) -> {
+            if (isSensitiveTokenHeader(name)) {
+                sanitizedHeaders.set(name, "<redacted>");
+            } else {
+                values.forEach(value -> sanitizedHeaders.add(name, sanitizedBody(value)));
+            }
+        });
         MediaType contentType = sanitizedHeaders.getContentType();
         if (contentType != null) {
             sanitizedHeaders.setContentType(new MediaType(contentType, StandardCharsets.UTF_8));
@@ -237,6 +241,14 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         ExchangeStrategies strategies = exchangeStrategies.get();
         sanitized.setBodyDecodeFunction(targetType -> decodeSanitizedBody(sanitized, targetType, strategies));
         return sanitized;
+    }
+
+    private static boolean isSensitiveTokenHeader(String name) {
+        String normalized = name.toLowerCase(Locale.ROOT).replace('-', '_');
+        return SensitiveHeaders.isSensitive(name)
+                || normalized.contains("token")
+                || normalized.contains("secret")
+                || normalized.contains("credential");
     }
 
     private String sanitizedBody(String responseBody) {
