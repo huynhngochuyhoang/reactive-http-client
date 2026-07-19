@@ -324,6 +324,35 @@ class OAuth2ClientCredentialsTokenProviderTest {
     }
 
     @Test
+    void tokenEndpointFailurePreservesStructuredContentTypeWhenSecretMatchesSubtype() {
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.BAD_REQUEST)
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .body("{\"error\":\"invalid_client\"}")
+                        .build()))
+                .build();
+        OAuth2ClientCredentialsTokenProvider provider =
+                OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                        .tokenUri("https://auth.example.com/oauth/token")
+                        .clientId("client")
+                        .clientSecret("json")
+                        .clientName("diagnostic-client")
+                        .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(error.getCause()).isInstanceOf(WebClientResponseException.class);
+                    WebClientResponseException cause = (WebClientResponseException) error.getCause();
+                    assertThat(cause.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(cause.getHeaders().getContentType())
+                            .isEqualTo(new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8));
+                    assertThat(cause.getResponseBodyAsString()).contains("invalid_client");
+                })
+                .verify();
+    }
+
+    @Test
     void sanitizedFailureUpdatesResponseCharsetToUtf8() {
         String responseBody = "{\"error\":\"invalid_client\",\"error_description\":\"é\","
                 + "\"access_token\":\"leaked-access\"}";
