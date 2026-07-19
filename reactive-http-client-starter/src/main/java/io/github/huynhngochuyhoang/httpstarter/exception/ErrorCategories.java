@@ -43,7 +43,9 @@ public final class ErrorCategories {
      * optional HTTP status code.
      *
      * <p>The status code is useful for decode failures where the original HTTP
-     * response was successful but the response body could not be decoded.
+     * response was successful but the response body could not be decoded. Cause
+     * traversal examines at most 16 nodes from outermost to innermost, and the
+     * nearest proven category wins before status-only fallback.
      *
      * @param error thrown error, usually from a reactive client call
      * @param statusCode HTTP status code when available
@@ -51,46 +53,65 @@ public final class ErrorCategories {
      * errors, or {@code null} when both inputs are {@code null}
      */
     public static ErrorCategory from(Throwable error, Integer statusCode) {
-        if (error instanceof HttpClientException httpClientException) {
-            return httpClientException.getErrorCategory();
-        }
-        if (error instanceof RemoteServiceException remoteServiceException) {
-            return remoteServiceException.getErrorCategory();
-        }
-        if (contains(error, TimeoutException.class)
-                || contains(error, ReadTimeoutException.class)
-                || contains(error, WriteTimeoutException.class)
-                || contains(error, PrematureCloseException.class)) {
-            return ErrorCategory.TIMEOUT;
-        }
-        if (contains(error, CancellationException.class)) {
-            return ErrorCategory.CANCELLED;
-        }
-        if (contains(error, AuthProviderException.class)) {
-            return ErrorCategory.AUTH_PROVIDER_ERROR;
-        }
-        if (contains(error, SSLException.class)) {
-            return ErrorCategory.TLS_ERROR;
-        }
-        if (containsClassName(error, CIRCUIT_BREAKER_NOT_PERMITTED)
-                || containsClassName(error, BULKHEAD_FULL)
-                || containsClassName(error, RATE_LIMITER_NOT_PERMITTED)) {
-            return ErrorCategory.RESILIENCE_ERROR;
-        }
-        if (contains(error, UnknownHostException.class)) {
-            return ErrorCategory.UNKNOWN_HOST;
-        }
-        if (contains(error, ConnectException.class)) {
-            return ErrorCategory.CONNECT_ERROR;
-        }
-        if (isResponseDecodeError(statusCode, error)) {
-            return ErrorCategory.RESPONSE_DECODE_ERROR;
+        ErrorCategory causeCategory = fromCauseChain(error, statusCode);
+        if (causeCategory != null) {
+            return causeCategory;
         }
         ErrorCategory statusCategory = fromStatusCode(statusCode);
         if (statusCategory != null) {
             return statusCategory;
         }
         return error != null ? ErrorCategory.UNKNOWN : null;
+    }
+
+    private static ErrorCategory fromCauseChain(Throwable error, Integer statusCode) {
+        Throwable current = error;
+        int depth = 0;
+        while (current != null && depth < MAX_CAUSE_DEPTH) {
+            if (current instanceof HttpClientException httpClientException) {
+                return httpClientException.getErrorCategory();
+            }
+            if (current instanceof RemoteServiceException remoteServiceException) {
+                return remoteServiceException.getErrorCategory();
+            }
+            if (current instanceof AuthProviderException) {
+                return ErrorCategory.AUTH_PROVIDER_ERROR;
+            }
+            if (current instanceof CancellationException) {
+                return ErrorCategory.CANCELLED;
+            }
+            if (current instanceof SSLException) {
+                return ErrorCategory.TLS_ERROR;
+            }
+            if (isResilienceFailure(current)) {
+                return ErrorCategory.RESILIENCE_ERROR;
+            }
+            if (current instanceof UnknownHostException) {
+                return ErrorCategory.UNKNOWN_HOST;
+            }
+            if (current instanceof ConnectException) {
+                return ErrorCategory.CONNECT_ERROR;
+            }
+            if (current instanceof TimeoutException
+                    || current instanceof ReadTimeoutException
+                    || current instanceof WriteTimeoutException
+                    || current instanceof PrematureCloseException) {
+                return ErrorCategory.TIMEOUT;
+            }
+            if (isResponseDecodeError(statusCode, current)) {
+                return ErrorCategory.RESPONSE_DECODE_ERROR;
+            }
+            current = nextCause(current);
+            depth++;
+        }
+        return null;
+    }
+
+    private static boolean isResilienceFailure(Throwable error) {
+        String className = error.getClass().getName();
+        return CIRCUIT_BREAKER_NOT_PERMITTED.equals(className)
+                || BULKHEAD_FULL.equals(className)
+                || RATE_LIMITER_NOT_PERMITTED.equals(className);
     }
 
     /**
@@ -123,36 +144,7 @@ public final class ErrorCategories {
     }
 
     private static boolean isResponseDecodeError(Integer statusCode, Throwable error) {
-        if (statusCode == null || statusCode >= 400) {
-            return false;
-        }
-        return contains(error, DecodingException.class);
-    }
-
-    private static boolean contains(Throwable error, Class<? extends Throwable> type) {
-        Throwable current = error;
-        int depth = 0;
-        while (current != null && depth < MAX_CAUSE_DEPTH) {
-            if (type.isInstance(current)) {
-                return true;
-            }
-            current = nextCause(current);
-            depth++;
-        }
-        return false;
-    }
-
-    private static boolean containsClassName(Throwable error, String className) {
-        Throwable current = error;
-        int depth = 0;
-        while (current != null && depth < MAX_CAUSE_DEPTH) {
-            if (current.getClass().getName().equals(className)) {
-                return true;
-            }
-            current = nextCause(current);
-            depth++;
-        }
-        return false;
+        return statusCode != null && statusCode < 400 && error instanceof DecodingException;
     }
 
     private static Throwable nextCause(Throwable error) {

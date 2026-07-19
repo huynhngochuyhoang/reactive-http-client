@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
+import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategories;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
@@ -7,9 +8,8 @@ import org.assertj.core.api.AbstractThrowableAssert;
 import reactor.core.publisher.Mono;
 
 /**
- * Fluent assertion helpers tailored for the error-category contract produced by
- * {@link io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder}. Bridges
- * AssertJ's {@code AbstractThrowableAssert} with the library's
+ * Fluent assertion helpers tailored for the published error-category contract.
+ * It bridges AssertJ's {@code AbstractThrowableAssert} with the library's
  * {@link ErrorCategory} so tests can write:
  *
  * <pre>{@code
@@ -54,8 +54,7 @@ public final class ErrorCategoryAssertions {
             super(actual, ErrorAssert.class);
         }
 
-        /** Asserts that the error is an {@link HttpClientException} or {@link RemoteServiceException}
-         *  whose {@code errorCategory} equals {@code expected}. */
+        /** Asserts that the error resolves to the expected published error category. */
         public ErrorAssert hasErrorCategory(ErrorCategory expected) {
             isNotNull();
             ErrorCategory actualCategory = extractCategory(actual);
@@ -78,11 +77,7 @@ public final class ErrorCategoryAssertions {
         }
 
         private static ErrorCategory extractCategory(Throwable t) {
-            if (t instanceof HttpClientException http) return http.getErrorCategory();
-            if (t instanceof RemoteServiceException remote) return remote.getErrorCategory();
-            throw new AssertionError(
-                    "expected HttpClientException or RemoteServiceException carrying errorCategory, but was "
-                            + t.getClass().getName());
+            return ErrorCategories.from(t);
         }
 
         private static int extractStatusCode(Throwable t) {

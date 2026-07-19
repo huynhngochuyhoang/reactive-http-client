@@ -19,7 +19,9 @@ available.
 | Proven failure stage | `failureStage()` | `getFailureStage()` | `failureStage()` | No |
 
 Subscription-attempt values count reactive subscriptions, not guaranteed HTTP
-network sends. Request-body serialization can fail after an attempt starts but
+network sends. After retry exhaustion, terminal contexts retain the final emitted
+throwable and final subscription-attempt count; earlier attempt failures are not
+reported as the logical call terminal cause. Request-body serialization can fail after an attempt starts but
 before dispatch. Terminal cancellation is represented by a `CancellationException`
 and `ErrorCategory.CANCELLED`; it is not a timeout phase. `CONNECT`, `POOL_ACQUIRE`,
 `REQUEST_WRITE`, `RESPONSE_HEADERS`, and `RESPONSE_BODY` are reported only from

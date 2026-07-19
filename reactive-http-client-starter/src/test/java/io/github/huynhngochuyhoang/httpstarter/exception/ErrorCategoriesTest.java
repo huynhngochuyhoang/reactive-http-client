@@ -16,8 +16,8 @@ import javax.net.ssl.SSLHandshakeException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
-import java.nio.charset.StandardCharsets;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
@@ -63,6 +63,27 @@ class ErrorCategoriesTest {
     }
 
     @Test
+    void preservesNearestActionableCategoryThroughWrappers() {
+        AuthProviderException authTimeout = new AuthProviderException(
+                "payments-client", ReadTimeoutException.INSTANCE);
+
+        assertThat(ErrorCategories.from(new RuntimeException("retry exhausted", authTimeout)))
+                .isEqualTo(ErrorCategory.AUTH_PROVIDER_ERROR);
+        assertThat(ErrorCategories.from(new RuntimeException(
+                "retry exhausted", new HttpClientException(429, "rate limited"))))
+                .isEqualTo(ErrorCategory.RATE_LIMITED);
+    }
+
+    @Test
+    void stopsCauseTraversalAtPublishedBound() {
+        Throwable withinBound = wrapped(new UnknownHostException("missing.local"), 15);
+        Throwable beyondBound = wrapped(new UnknownHostException("missing.local"), 16);
+
+        assertThat(ErrorCategories.from(withinBound)).isEqualTo(ErrorCategory.UNKNOWN_HOST);
+        assertThat(ErrorCategories.from(beyondBound)).isEqualTo(ErrorCategory.UNKNOWN);
+    }
+
+    @Test
     void doesNotLinkOptionalResilience4jClassesDirectly() throws IOException {
         String classFile = ErrorCategories.class.getSimpleName() + ".class";
         try (InputStream input = ErrorCategories.class.getResourceAsStream(classFile)) {
@@ -70,6 +91,14 @@ class ErrorCategoriesTest {
             assertThat(new String(input.readAllBytes(), StandardCharsets.ISO_8859_1))
                     .doesNotContain("io/github/resilience4j");
         }
+    }
+
+    private static Throwable wrapped(Throwable cause, int layers) {
+        Throwable current = cause;
+        for (int i = 0; i < layers; i++) {
+            current = new RuntimeException("layer " + i, current);
+        }
+        return current;
     }
 
     private static Stream<Object[]> categoryCases() {
