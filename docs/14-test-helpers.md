@@ -1,5 +1,4 @@
 # Test Helpers (`reactive-http-client-test`)
-
 The starter ships a companion artifact for unit-testing `@ReactiveHttpClient` interfaces without standing up a real HTTP server.
 
 ---
@@ -46,6 +45,34 @@ RecordedExchangeAssertions.assertThat(recorded)
         .hasStatusCode(200);
 ```
 
+### Terminal failure semantics
+
+Use `bodyError(...)` when a unit test needs to assert stable behavior after response
+status and headers exist, such as timeout category, `RESPONSE_BODY` failure stage,
+attempt count, or lifecycle/observer callbacks:
+
+```java
+List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+MockReactiveHttpClient<UserService> mock = MockReactiveHttpClient.forClient(UserService.class)
+        .withObserver(observed::add)
+        .respondTo(HttpMethod.GET, "/users/42", exchange ->
+                MockReactiveHttpClient.bodyError(
+                        200,
+                        Map.of("X-Timeout-Phase", List.of("body")),
+                        ReadTimeoutException.INSTANCE))
+        .build();
+
+StepVerifier.create(mock.proxy().getUser(42))
+        .expectError(ReadTimeoutException.class)
+        .verify();
+
+assertThat(observed.getFirst().getErrorCategory()).isEqualTo(ErrorCategory.TIMEOUT);
+assertThat(observed.getFirst().getFailureStage()).isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
+```
+
+This helper creates an in-process `ClientResponse` body failure. It does not emulate
+DNS, connection, pool acquisition, request writes, socket timing, or enforcement of
+`@TimeoutMs`/`request-timeout-ms`. Use a real server and transport for those tests.
 
 ### Inherited endpoint contracts
 

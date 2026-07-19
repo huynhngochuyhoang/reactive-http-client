@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -191,7 +193,9 @@ class Boot4HttpClientHealthIndicatorTest {
         MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(registry, config);
         observer.record(new HttpClientObserverEvent(
                 "saturated-client", "op", "GET", "/p",
-                null, 75L, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null));
+                null, 75L, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null,
+                1, HttpClientObserverEvent.UNKNOWN_SIZE, HttpClientObserverEvent.UNKNOWN_SIZE,
+                null, null, "http://saturated-client/p", Map.of()));
 
         Health health = indicator(registry, config).health();
 

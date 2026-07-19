@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.exception;
 
 import io.netty.handler.timeout.ReadTimeoutException;
+import io.netty.handler.timeout.WriteTimeoutException;
 import org.springframework.core.codec.DecodingException;
 import reactor.netty.http.client.PrematureCloseException;
 
@@ -58,6 +59,7 @@ public final class ErrorCategories {
         }
         if (contains(error, TimeoutException.class)
                 || contains(error, ReadTimeoutException.class)
+                || contains(error, WriteTimeoutException.class)
                 || contains(error, PrematureCloseException.class)) {
             return ErrorCategory.TIMEOUT;
         }

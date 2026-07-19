@@ -7,6 +7,7 @@ import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverE
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.netty.handler.timeout.ReadTimeoutException;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
@@ -21,6 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -223,12 +225,25 @@ class OpenTelemetryHttpClientObserverTest {
     void recordsProvenPoolAcquireFailureStage() {
         observer.record(new HttpClientObserverEvent(
                 "user-service", "user.get", "GET", "/users/{id}",
-                null, 75L, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null));
+                null, 75L, poolAcquireTimeout(), ErrorCategory.TIMEOUT, null, null,
+                1, HttpClientObserverEvent.UNKNOWN_SIZE, HttpClientObserverEvent.UNKNOWN_SIZE,
+                null, null, "http://user-service/users/1", Map.of()));
 
         SpanData span = onlySpan();
         assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_FAILURE_STAGE))
                 .isEqualTo("POOL_ACQUIRE");
         assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_SERVER_ADDRESS)).isNull();
+    }
+
+    @Test
+    void recordsResponseBodyFailureStageFromObservedStatus() {
+        observer.record(new HttpClientObserverEvent(
+                "user-service", "user.get", "GET", "/users/{id}",
+                200, 75L, ReadTimeoutException.INSTANCE, ErrorCategory.TIMEOUT, null, null));
+
+        SpanData span = onlySpan();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_FAILURE_STAGE))
+                .isEqualTo("RESPONSE_BODY");
     }
 
     private static Throwable poolAcquireTimeout() {

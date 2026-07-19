@@ -298,7 +298,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                             .doOnComplete(() -> notifyLifecycleSuccess(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), state.requestUrl.get(),
                                     state.responseStatus.get(), state.attemptCount.get()))
                             .doOnError(state.terminalError::set)
-                            .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), state.requestUrl.get(),
+                            .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), finalRequestUrl(state),
                                     state.responseStatus.get(), error, state.attemptCount.get()))
                             .doOnTerminate(() -> {
                                 if (reported.compareAndSet(false, true))
@@ -345,7 +345,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                     state.responseStatus.get(), state.attemptCount.get());
                         })
                         .doOnError(state.terminalError::set)
-                        .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), state.requestUrl.get(),
+                        .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), finalRequestUrl(state),
                                 state.responseStatus.get(), error, state.attemptCount.get()))
                         .doOnTerminate(() -> {
                             if (reported.compareAndSet(false, true))
@@ -411,6 +411,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             state.preparedResolved.set(preparedResolved);
             int attempt = state.attemptCount.incrementAndGet();
             state.start.compareAndSet(0L, System.currentTimeMillis());
+            state.requestUrl.set(null);
+            state.finalRequestObservation.set(null);
             state.responseStatus.set(null);
             state.responseHeaders.set(Map.of());
             state.terminalError.set(null);
@@ -515,6 +517,18 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
         if (finalRequestObservation != null) {
             requestHeadersSpec = requestHeadersSpec.attribute(FINAL_REQUEST_OBSERVATION_ATTRIBUTE, finalRequestObservation);
+        }
+        if (requestUrl != null || finalRequestObservation != null) {
+            requestHeadersSpec = requestHeadersSpec.attribute(
+                    AuthRequest.REQUEST_OBSERVATION_RESET_ATTRIBUTE,
+                    (Runnable) () -> {
+                        if (requestUrl != null) {
+                            requestUrl.set(null);
+                        }
+                        if (finalRequestObservation != null) {
+                            finalRequestObservation.set(null);
+                        }
+                    });
         }
         return configureNativeRequest(requestHeadersSpec, timeoutMs, shouldApplyResponseTimeout, requestUrl);
     }
@@ -1355,6 +1369,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             throw new IllegalStateException(
                     "Cannot instantiate HttpExchangeLogger: " + loggerClass.getName(), e);
         }
+    }
+
+    private URI finalRequestUrl(SubscriptionState state) {
+        FinalRequestObservation observation = state.finalRequestObservation.get();
+        return observation != null ? observation.url() : state.requestUrl.get();
     }
 
     private void reportExchange(

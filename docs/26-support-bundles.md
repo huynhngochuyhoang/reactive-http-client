@@ -374,12 +374,21 @@ Minimal safe bundle:
 - The method annotation or API-map entry when it overrides client timeout.
 - Network timeout settings: connect, read safety net, and write safety net.
 - Metadata-only exchange log or observer event with duration, status when
-  available, exception type, and subscription-attempt count.
+  available, exception type, subscription-attempt count, error category, and
+  optional proven failure stage.
 - Health details for the affected client and the same time window.
 
-For timeout after response headers, exchange logs can retain response headers;
-lifecycle hooks and observer events do not expose response-header maps. Redact
-headers before sharing them.
+`RESPONSE_HEADERS` proves final request dispatch but has no status or response
+headers. A nested auth or other pre-dispatch read timeout leaves the stage unset.
+`RESPONSE_BODY` preserves
+the observed status, and exchange logs can retain response headers; lifecycle hooks
+and observer events do not expose response-header maps. `CONNECT`, `POOL_ACQUIRE`,
+and `REQUEST_WRITE` identify their concrete pre-response boundaries. A missing stage
+is unknown, not proof of a specific phase. Redact headers before sharing them.
+
+For `Mono<ResponseEntity<Flux<DataBuffer>>>`, capture the envelope terminal record
+and any later inner-stream error separately; the latter does not retroactively turn
+the successful envelope record into a failed logical call.
 
 ## Streaming Ownership Issues
 

@@ -18,6 +18,9 @@ public record AuthRequest(String clientName, ClientRequest request, Object reque
      * Internal request attribute key used to pass serialized raw bytes for auth signing.
      */
     public static final String REQUEST_RAW_BODY_ATTRIBUTE = "reactive-http-client.auth.request-raw-body";
+    /** Internal request attribute used to reset final-request observation before auth retry. */
+    public static final String REQUEST_OBSERVATION_RESET_ATTRIBUTE =
+            "reactive-http-client.auth.request-observation-reset";
 
     public AuthRequest {
         Objects.requireNonNull(request, "request must not be null");

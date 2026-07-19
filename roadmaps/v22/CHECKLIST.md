@@ -218,24 +218,53 @@ Evidence:
 
 ## Priority 5 - Timeout Phase and Terminal-State Parity
 
-### [ ] 5.1 Exercise each timeout boundary
+### [x] 5.1 Exercise each timeout boundary
 
-- [ ] Cover connect, pool acquire, request write, response headers, unary body, and stream body.
-- [ ] Cover method/client timeout and Resilience4j timeout behavior.
-- [ ] Preserve `0 = disabled` and existing precedence.
-- [ ] Use real transport where timing ownership matters.
+- [x] Cover connect, pool acquire, request write, response headers, unary body, and stream body.
+- [x] Cover method/client timeout and Resilience4j timeout behavior.
+- [x] Preserve `0 = disabled` and existing precedence.
+- [x] Use real transport where timing ownership matters.
 
-### [ ] 5.2 Align terminal reporting
+### [x] 5.2 Align terminal reporting
 
-- [ ] Compare status, headers, attempts, duration, final request metadata, category, and cancellation.
-- [ ] Keep streaming-envelope timing separate from inner-body consumption.
-- [ ] Ensure mock helpers assert semantics without pretending to emulate network timing.
-- [ ] Update timeout and diagnostic-context docs.
-- [ ] Run focused tests and `git diff --check`.
+- [x] Compare status, headers, attempts, duration, final request metadata, category, and cancellation.
+- [x] Keep streaming-envelope timing separate from inner-body consumption.
+- [x] Ensure mock helpers assert semantics without pretending to emulate network timing.
+- [x] Update timeout and diagnostic-context docs.
+- [x] Run focused tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added bounded exact attribution for connect, pool-acquire, request-write,
+  response-header, and response-body failures. Response-header attribution requires
+  final-attempt request-dispatch evidence, including hidden 401 auth refreshes,
+  so nested auth and other pre-dispatch read timeouts remain unattributed. Generic
+  timeout exceptions remain unattributed, while concrete
+  connect, pool-acquire, and request-write failures remain attributable without URL
+  evidence, cancellation remains `CANCELLED`, and existing error categories
+  remain compatible.
+- Added a real loopback transport fixture for pre-header, unary-body, direct-stream,
+  streaming-envelope, disabled method timeout, inherited client timeout, and
+  cancellation behavior. Deterministic Netty exception fixtures cover connect and
+  write attribution without relying on flaky unreachable-network timing; the
+  Priority 4 one-connection fixture remains the pool-acquire timing proof.
+- Verified method, API, client, and deprecated resilience timeout precedence and
+  preserved `0 = disabled`. The deprecated resilience timeout remains Reactor
+  Netty response-timeout configuration, not a Resilience4j `TimeLimiter`.
+- Terminal assertions compare status, response headers, attempt count, duration,
+  final request URL/headers, error category, failure stage, and cancellation across
+  lifecycle hooks, exchange logging, and observers. A streaming envelope reports
+  outer success once; a later inner-body timeout does not rewrite that terminal
+  record.
+- Added `MockReactiveHttpClient.bodyError(...)` for stable terminal failure
+  assertions, with documentation that it does not emulate DNS, connection, pool,
+  request-write, or socket timing.
+- Updated timeout, error handling, resilience, observability, test-helper,
+  diagnostic-context, and support-bundle documentation plus the changelog.
+- Passed focused timeout, pool, precedence, lifecycle, Micrometer, mock-helper, and
+  OTel tests; the complete starter and test-helper suites; strict API compatibility
+  against published `3.1.0` from an isolated Central-only repository; and
+  `git diff --check`.
 
 ---
 

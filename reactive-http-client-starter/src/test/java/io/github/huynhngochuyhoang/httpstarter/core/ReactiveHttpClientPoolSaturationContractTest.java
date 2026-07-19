@@ -66,6 +66,8 @@ class ReactiveHttpClientPoolSaturationContractTest {
 
             assertThat(failure).isNotNull();
             assertThat(HttpClientFailureStage.from(failure)).isEqualTo(HttpClientFailureStage.POOL_ACQUIRE);
+            assertThat(HttpClientFailureStage.from(failure, null, false))
+                    .isEqualTo(HttpClientFailureStage.POOL_ACQUIRE);
             assertThat(HttpClientFailureStage.from(new java.util.concurrent.TimeoutException())).isNull();
             assertThat(fixture.recording().events).singleElement().satisfies(event -> {
                 assertThat(event.getErrorCategory()).isEqualTo(ErrorCategory.TIMEOUT);

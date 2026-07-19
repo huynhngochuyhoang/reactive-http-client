@@ -48,8 +48,8 @@ import java.util.concurrent.TimeUnit;
  *       when measurable</li>
  *   <li>{@code rhttp.response.bytes} - post-transport advertised {@code Content-Length};
  *       absent for automatically decompressed or chunked responses</li>
- *   <li>{ rhttp.failure.stage} - { POOL_ACQUIRE} only when Reactor Pool
- *       provides conclusive acquisition-failure evidence</li>
+ *   <li>{@code rhttp.failure.stage} - concrete connection, pool, write, or response
+ *       phase only when terminal evidence proves it</li>
  * </ul>
  */
 public class OpenTelemetryHttpClientObserver implements HttpClientObserver {

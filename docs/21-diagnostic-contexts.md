@@ -20,9 +20,16 @@ available.
 
 Subscription-attempt values count reactive subscriptions, not guaranteed HTTP
 network sends. Request-body serialization can fail after an attempt starts but
-before dispatch.
+before dispatch. Terminal cancellation is represented by a `CancellationException`
+and `ErrorCategory.CANCELLED`; it is not a timeout phase. `CONNECT`, `POOL_ACQUIRE`,
+`REQUEST_WRITE`, `RESPONSE_HEADERS`, and `RESPONSE_BODY` are reported only from
+concrete transport evidence for the final outbound request of the current attempt.
+Per-attempt evidence is reset on resilience retry and hidden 401 auth refresh;
+nested auth and other pre-dispatch read timeouts, plus generic timeouts, remain
+stage-unknown. Concrete connect, pool-acquire, and write exceptions do not require
+URL evidence.
 
-For `Mono<ResponseEntity<Flux<DataBuffer>>>`, terminal lifecycle, observer, and exchange-log records describe response-envelope completion. They do not indicate that the inner streamed body was subscribed or fully consumed. Direct `Flux<DataBuffer>` methods report terminal state when the stream itself completes, errors, or is cancelled.
+For `Mono<ResponseEntity<Flux<DataBuffer>>>`, terminal lifecycle, observer, and exchange-log records describe response-envelope completion. They do not indicate that the inner streamed body was subscribed or fully consumed. A later inner-body timeout or cancellation does not rewrite the already reported successful envelope terminal record. Direct `Flux<DataBuffer>` methods report terminal state when the stream itself completes, errors, or is cancelled.
 
 ## Header handling
 

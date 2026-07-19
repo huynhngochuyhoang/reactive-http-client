@@ -205,7 +205,9 @@ public final class HttpClientObserverEvent {
      * Proven transport failure stage, or {@code null} when the runtime cannot safely
      * attribute the failure. This does not replace {@link #getErrorCategory()}.
      */
-    public HttpClientFailureStage getFailureStage() { return HttpClientFailureStage.from(error); }
+    public HttpClientFailureStage getFailureStage() {
+        return HttpClientFailureStage.from(error, statusCode, requestUrl != null);
+    }
 
     /** The serialised request body (may be {@code null} for GET/DELETE). */
     public Object getRequestBody() { return requestBody; }

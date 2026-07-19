@@ -26,7 +26,7 @@ End-to-end duration from first attempt to final completion (after all retries).
 | `outcome` | `SUCCESS`, `REDIRECTION`, `CLIENT_ERROR`, `SERVER_ERROR`, `UNKNOWN` |
 | `exception` | Simple class name of the thrown exception, or `none` |
 | `error.category` | `ErrorCategory` value — see [03-error-handling.md](03-error-handling.md) |
-| `failure.stage` | `POOL_ACQUIRE` only for proven Reactor Pool acquisition failures; `none` otherwise |
+| `failure.stage` | Proven `CONNECT`, `POOL_ACQUIRE`, `REQUEST_WRITE`, `RESPONSE_HEADERS`, or `RESPONSE_BODY`; `none` when unknown |
 | `uri` | Path template (e.g. `/users/{id}`) when opted in, otherwise `NONE`; enable with `include-url-path: true` |
 | `server.address` | Resolved upstream host; opt in with `include-server-address: true` |
 | `server.port` | Resolved upstream port; opt in with `include-server-address: true` |
@@ -282,7 +282,7 @@ reactive:
 | `rhttp.attempt.count` | Total attempts (>1 = retried) |
 | `rhttp.request.bytes` | Application request body bytes before transport content coding, when measurable |
 | `rhttp.response.bytes` | Post-transport advertised representation bytes from `Content-Length`; absent for automatically decompressed or chunked responses |
-| `rhttp.failure.stage` | `POOL_ACQUIRE` only for proven Reactor Pool acquisition failures |
+| `rhttp.failure.stage` | Proven `CONNECT`, `POOL_ACQUIRE`, `REQUEST_WRITE`, `RESPONSE_HEADERS`, or `RESPONSE_BODY`; absent when unknown |
 
 `HttpClientObserverEvent` is the only reporting contract with byte counters.
 `ReactiveHttpClientLifecycleContext` has neither response headers nor byte
