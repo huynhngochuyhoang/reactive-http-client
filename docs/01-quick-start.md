@@ -306,7 +306,7 @@ reactive:
 | Observability | [08-observability.md](08-observability.md) |
 | Correlation ID | [09-correlation-id.md](09-correlation-id.md) |
 | Multipart uploads | [10-multipart.md](10-multipart.md) |
-| Streaming responses | [11-streaming.md](11-streaming.md) |
+| Streaming requests and responses | [11-streaming.md](11-streaming.md) |
 | Proxy & TLS/mTLS | [12-proxy-tls.md](12-proxy-tls.md) |
 | Exchange logging | [13-exchange-logging.md](13-exchange-logging.md) |
 | Test helpers | [14-test-helpers.md](14-test-helpers.md) |

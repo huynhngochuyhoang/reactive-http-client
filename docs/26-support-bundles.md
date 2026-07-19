@@ -434,6 +434,6 @@ files as public evidence.
 - [Outbound Auth Providers](06-auth-providers.md)
 - [Resilience4j Integration](07-resilience4j.md)
 - [Timeouts](04-timeouts.md)
-- [Streaming Responses](11-streaming.md)
+- [Streaming Requests and Responses](11-streaming.md)
 - [Benchmarks](22-benchmarks.md)
 - [Performance Troubleshooting](25-performance-troubleshooting.md)

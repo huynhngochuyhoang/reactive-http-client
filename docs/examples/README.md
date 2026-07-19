@@ -118,7 +118,7 @@ interface DownloadClient {
 }
 ```
 
-See [Streaming Responses](../11-streaming.md).
+See [Streaming Requests and Responses](../11-streaming.md).
 
 ## Test Helper Without A Live Server
 

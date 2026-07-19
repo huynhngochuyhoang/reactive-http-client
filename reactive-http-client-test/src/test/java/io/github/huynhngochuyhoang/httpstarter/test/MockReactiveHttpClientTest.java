@@ -12,8 +12,11 @@ import io.netty.handler.timeout.ReadTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.test.StepVerifier;
@@ -57,6 +60,9 @@ class MockReactiveHttpClientTest {
         @POST("/events")
         Mono<String> sendEvent(@Body String body);
 
+        @POST("/uploads")
+        Mono<String> upload(@Body Flux<DataBuffer> body);
+
         @POST("/payments")
         @IdempotencyKey
         Mono<String> createPayment(@Body String json);
@@ -86,6 +92,31 @@ class MockReactiveHttpClientTest {
     }
 
     record SignedRequest(String orderId, int amount) {}
+
+    @Test
+    void publisherUploadIsColdAndMaterializedOncePerMockRetryAttempt() {
+        AtomicInteger subscriptions = new AtomicInteger();
+        AtomicInteger attempts = new AtomicInteger();
+        DefaultDataBufferFactory buffers = new DefaultDataBufferFactory();
+        Flux<DataBuffer> body = Flux.defer(() -> {
+            subscriptions.incrementAndGet();
+            return Flux.just(buffers.wrap("payload".getBytes(StandardCharsets.UTF_8)));
+        });
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .retry(2, "POST")
+                .respondTo(HttpMethod.POST, "/uploads", exchange -> attempts.incrementAndGet() == 1
+                        ? MockReactiveHttpClient.text(503, "retry")
+                        : MockReactiveHttpClient.text(200, exchange.bodyAsString()))
+                .build();
+
+        Mono<String> response = mock.proxy().upload(body);
+
+        assertThat(subscriptions).hasValue(0);
+        assertThat(response.block()).isEqualTo("payload");
+        assertThat(subscriptions).hasValue(2);
+        assertThat(mock.exchanges()).hasSize(2)
+                .allSatisfy(exchange -> assertThat(exchange.bodyAsString()).isEqualTo("payload"));
+    }
 
     interface SharedCatalogOperations {
         @GET("/catalog/{id}")
