@@ -40,7 +40,7 @@ Reactor Netty removes sensitive redirect headers such as `Authorization`,
 transport policy. Request bodies can be replayed by the transport for redirect
 requests only when the body can be sent again. Use extra care with `POST`,
 `PATCH`, and streaming uploads: non-repeatable bodies may not be safe to follow
-automatically. Reactor Netty preserves the method and body for repeatable `301`,
+automatically. A body-preserving redirect creates another transport request and therefore another publisher-body subscription; the application owns replayability under the [request-body decision matrix](11-streaming.md#request-body-repeatability-matrix). Reactor Netty preserves the method and body for repeatable `301`,
 `302`, `307`, and `308` requests; `303` switches to a bodiless `GET`. When the
 transport stops after an excessive redirect chain, the remaining 3xx response is
 surfaced to the proxy. Starter observer and exchange-log request URL fields

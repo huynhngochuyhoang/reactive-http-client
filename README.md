@@ -213,7 +213,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Observability](docs/08-observability.md) | Micrometer and OpenTelemetry |
 | [Correlation ID](docs/09-correlation-id.md) | Header propagation |
 | [Multipart Uploads](docs/10-multipart.md) | Multipart and form-data |
-| [Streaming Responses](docs/11-streaming.md) | Streaming response bodies |
+| [Streaming Requests and Responses](docs/11-streaming.md) | Publisher uploads and streaming response bodies |
 | [Proxy & TLS / mTLS](docs/12-proxy-tls.md) | Proxy and custom TLS |
 | [Exchange Logging](docs/13-exchange-logging.md) | Request/response logging |
 | [Test Helpers](docs/14-test-helpers.md) | Mock clients and assertions |

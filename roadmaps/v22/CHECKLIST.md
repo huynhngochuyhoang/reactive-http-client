@@ -270,25 +270,50 @@ Evidence:
 
 ## Priority 6 - Streaming Backpressure and Upload Ownership
 
-### [ ] 6.1 Prove publisher request-body ownership
+### [x] 6.1 Prove publisher request-body ownership
 
-- [ ] Keep invocation cold until subscription.
-- [ ] Prove one request-body subscription per actual transport attempt.
-- [ ] Cover cancellation before and during upload.
-- [ ] Cover retry, redirect, auth, and serialization boundaries.
-- [ ] Reject unsupported non-repeatable combinations before sending.
+- [x] Keep invocation cold until subscription.
+- [x] Prove one request-body subscription per actual transport attempt.
+- [x] Cover cancellation before and during upload.
+- [x] Cover retry, redirect, auth, and serialization boundaries.
+- [x] Reject unsupported non-repeatable combinations before sending.
 
-### [ ] 6.2 Prove response-buffer ownership
+### [x] 6.2 Prove response-buffer ownership
 
-- [ ] Cover direct and envelope `Flux<DataBuffer>`.
-- [ ] Release discarded buffers exactly once.
-- [ ] Preserve caller ownership after handoff.
-- [ ] Align repeatability decisions across runtime, strict validation, diagnostics, docs, and mocks.
-- [ ] Run leak-sensitive tests and `git diff --check`.
+- [x] Cover direct and envelope `Flux<DataBuffer>`.
+- [x] Release discarded buffers exactly once.
+- [x] Preserve caller ownership after handoff.
+- [x] Align repeatability decisions across runtime, strict validation, diagnostics, docs, and mocks.
+- [x] Run leak-sensitive tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added `StreamingUploadOwnershipTest` with a real Reactor Netty server and a
+  one-connection starter pool. It proves invocation remains cold, transport
+  demand is bounded, queued cancellation never subscribes the body, and
+  in-flight cancellation stops the producer while leaving the client usable.
+- Retry, body-preserving `307`, and the built-in one-time `401` auth refresh
+  each subscribe a replayable publisher exactly once per actual request. DTO
+  publishers remain on the configured WebClient JSON encoder path without a
+  hidden subscription or starter aggregation.
+- A reusable multipart `Resource` is opened and closed once per retry attempt.
+  Existing strict and runtime SigV4 tests prove unsupported publisher and
+  multipart signing fails before transport or publisher subscription.
+- Revalidated direct and envelope pooled `DataBuffer` tests: emitted buffers
+  remain allocated until caller release, while cancellation releases queued
+  discarded buffers without a second release.
+- Added mock-helper coverage showing publisher bodies remain cold and are
+  materialized once per recorded retry attempt. Documentation now distinguishes
+  this in-process materialization from real pool, socket-demand, redirect, and
+  cancellation behavior.
+- Published one repeatability matrix across streaming, resilience, multipart,
+  auth, redirect, and mock-helper documentation and recorded the contract in
+  the changelog. `Object`, unresolved generic, `InputStream`, `Reader`, and
+  `ReadableByteChannel` declarations now export and warn as `APPLICATION_OWNED`;
+  strict built-in signing reuses the same stream-shape classifier.
+- Passed focused starter and test-helper ownership, response-buffer, retry,
+  redirect, auth/signing, multipart, diagnostics, and documentation tests; the
+  complete module suites and `git diff --check` also passed.
 
 ---
 

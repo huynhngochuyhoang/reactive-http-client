@@ -1,4 +1,32 @@
-# Streaming Responses
+# Streaming Requests and Responses
+
+## Publisher request bodies
+
+A method may accept a `Publisher` body such as `Flux<DataBuffer>` or `Flux<MyDto>`. Calling the Java method only creates a cold client publisher: the starter does not subscribe to the request body until that client publisher is subscribed and the transport is ready to write it. Transport demand controls body demand, and cancellation before connection acquisition leaves the body unsubscribed. Cancellation during a write is propagated to the body publisher.
+
+```java
+@POST("/objects/{key}")
+Mono<Void> upload(@PathVar("key") String key,
+                  @Body Flux<DataBuffer> body);
+```
+
+Each actual transport request gets one body subscription. A retry, a body-preserving redirect, or the built-in one-time 401 auth refresh creates another transport request and therefore another subscription. The supplied publisher must create fresh content on every subscription when any of those features can replay the request. The starter never caches or aggregates an unbounded publisher to make it repeatable.
+
+`Flux<DataBuffer>` and `Flux<byte[]>` default to `application/octet-stream`; DTO publishers default to JSON and remain encoded by the configured WebClient codecs. Custom auth providers receive the publisher as request metadata but must not subscribe to it. Built-in AWS SigV4 rejects publisher bodies before transport because it cannot prove the payload hash without consuming the stream.
+
+### Request-body repeatability matrix
+
+| Body shape | Classification | Replay ownership |
+|---|---|---|
+| No body, `byte[]`, `String`, concrete JSON DTO, multipart `byte[]`, `FileAttachment` | Repeatable | Starter/WebClient can write the same materialized value again. |
+| `Publisher` or `DataBuffer` | Non-repeatable | Application must supply a cold, replayable publisher for retry, redirect, or 401 refresh. |
+| `Resource`, multipart `Resource`, Java stream, `Object`, or erased generic | Application-owned | Application must prove reopen/encoding behavior; strict built-in SigV4 rejects shapes whose bytes are not startup-provable. |
+
+Runtime retry diagnostics, startup method diagnostics, effective-contract snapshots, strict built-in SigV4 validation, and `MockReactiveHttpClient` use this same classification. Retry and redirect preserve compatibility and do not reject application-owned replay; built-in body signing is rejected before sending when raw bytes cannot be proven. Mock requests materialize a publisher only when its in-process exchange runs and once per mock retry attempt, but the helper does not emulate socket demand, pool acquisition, or transport cancellation.
+
+---
+
+## Streaming responses
 
 Methods that declare `Flux<DataBuffer>` or `Mono<ResponseEntity<Flux<DataBuffer>>>` as their return type bypass the in-memory codec entirely. Payloads of any size are streamed without risk of a `DataBufferLimitException`, regardless of the `codec-max-in-memory-size-mb` setting. Streaming bodies are pass-through; the starter does not aggregate or inspect them.
 

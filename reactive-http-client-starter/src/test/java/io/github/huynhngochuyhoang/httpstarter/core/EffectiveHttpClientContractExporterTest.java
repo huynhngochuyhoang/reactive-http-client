@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -80,6 +81,22 @@ class EffectiveHttpClientContractExporterTest {
         assertThat(snapshot)
                 .contains("| Auth |")
                 .contains("| follow | provider-bean | REPEATABLE |");
+    }
+
+    @Test
+    void exportsApplicationOwnedForUncertainBodyDeclarations() {
+        List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
+                UncertainBodyClient.class, "diagnostic-client",
+                new ReactiveHttpClientProperties.ClientConfig(), metadataCache);
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(UncertainBodyClient.class, "diagnostic-client",
+                        new ReactiveHttpClientProperties.ClientConfig())
+                .render();
+
+        assertThat(contracts).hasSize(2)
+                .allSatisfy(contract -> assertThat(contract.bodyRepeatability())
+                        .isEqualTo(RequestBodyRepeatability.APPLICATION_OWNED));
+        assertThat(snapshot).contains("java.lang.Object", "java.io.InputStream", "APPLICATION_OWNED");
     }
 
     @Test
@@ -351,6 +368,14 @@ class EffectiveHttpClientContractExporterTest {
         @TimeoutMs(250)
         @Retry("method-retry")
         Mono<String> create(@Body String body);
+    }
+
+    interface UncertainBodyClient {
+        @POST("/object")
+        Mono<String> objectBody(@Body Object body);
+
+        @POST("/stream")
+        Mono<String> streamBody(@Body InputStream body);
     }
 
     interface ParentClient {

@@ -386,7 +386,7 @@ RecordedExchangeAssertions.assertThat(mock.exchanges().get(1))
         .hasIdempotencyKey(mock.exchanges().get(0).idempotencyKey());
 ```
 
-The mock retry helper is intentionally small: it retries matching methods inside tests and records each outbound attempt. Production retry semantics still come from your application Resilience4j configuration.
+The mock retry helper is intentionally small: it retries matching methods inside tests and records each outbound attempt. A publisher request body remains cold until the mock exchange runs and is materialized once for each recorded retry attempt. The source must therefore be replayable, matching the runtime [request-body repeatability matrix](11-streaming.md#request-body-repeatability-matrix). The helper aggregates the body only to expose `RecordedExchange.bodyAsString()`; it does not emulate socket demand, connection-pool queues, transport cancellation, redirects, or network write ownership. Production retry semantics still come from your application Resilience4j configuration.
 
 ## Observer and lifecycle assertions
 

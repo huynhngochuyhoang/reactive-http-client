@@ -161,7 +161,9 @@ or streaming request bodies to make a retry possible.
 
 When retry is enabled for a method with a non-repeatable or application-owned
 body, the starter logs a warning once per client method. Existing retry behavior
-is preserved for compatibility.
+is preserved for compatibility. Every actual retry request subscribes to a publisher
+body again; the application must provide a cold, replayable source. See the shared
+[streaming request-body decision matrix](11-streaming.md#request-body-repeatability-matrix).
 
 Retries create multiple subscription attempts inside one logical client call.
 Lifecycle hooks expose subscription-attempt boundaries. Observers and exchange
