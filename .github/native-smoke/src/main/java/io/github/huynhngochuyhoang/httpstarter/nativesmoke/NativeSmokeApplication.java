@@ -21,7 +21,9 @@ import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 @SpringBootApplication
@@ -62,14 +64,66 @@ public class NativeSmokeApplication {
                     "opt-in diagnostics endpoint was not registered");
             require(context.containsBean("reactiveHttpClientHealthIndicator"),
                     "Micrometer health indicator was not registered");
+            ReactiveHttpClientDiagnosticsProvider diagnosticsProvider =
+                    context.getBean(ReactiveHttpClientDiagnosticsProvider.class);
             Map<String, Object> diagnostics = context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class).diagnostics();
-            String snapshot = ReactiveHttpClientDiagnosticsSnapshot.toJson(
-                    context.getBean(ReactiveHttpClientDiagnosticsProvider.class));
-            require(((Number) diagnostics.get("schemaVersion")).intValue() == 1,
+            Map<String, Object> directSnapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(diagnosticsProvider);
+            Map<String, Object> collectionSnapshot =
+                    ReactiveHttpClientDiagnosticsSnapshot.toMap(diagnosticsProvider.clientSummaries());
+            String snapshot = ReactiveHttpClientDiagnosticsSnapshot.toJson(diagnosticsProvider);
+            String markdown = ReactiveHttpClientDiagnosticsSnapshot.toMarkdown(diagnosticsProvider.clientSummaries());
+            Set<String> rootFields = Set.of(
+                    "schemaVersion", "projectVersion", "clientCount", "endpointCount",
+                    "inheritedEndpointCount", "clients");
+            Set<String> clientFields = Set.of(
+                    "clientName", "clientInterface", "baseUrlSource", "poolSource",
+                    "poolMaxConnections", "poolPendingAcquireTimeoutMs", "poolMetricsEnabled",
+                    "timeoutSource", "timeoutMs", "resilienceConfigured", "retry", "rateLimiter",
+                    "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
+                    "strictBodySigningValidation", "authMode", "followRedirects", "endpointCount",
+                    "inheritedEndpointCount");
+
+            require(diagnostics.equals(directSnapshot),
+                    "Actuator and direct diagnostics snapshots diverged");
+            require(diagnostics.keySet().equals(rootFields) && collectionSnapshot.keySet().equals(rootFields),
+                    "diagnostics root schema fields changed");
+            require(diagnostics.get("schemaVersion") instanceof Integer version && version == 1,
                     "diagnostics schema version was not preserved");
-            require(((Number) diagnostics.get("clientCount")).intValue() == 1,
+            require(diagnostics.get("projectVersion") instanceof String,
+                    "diagnostics project version type changed");
+            require(diagnostics.get("clientCount") instanceof Integer count && count == 1,
                     "diagnostics did not include the native client");
-            require(!snapshot.contains(AUTH_TOKEN) && !snapshot.contains("127.0.0.1"),
+            require(diagnostics.get("endpointCount") instanceof Integer
+                            && diagnostics.get("inheritedEndpointCount") instanceof Integer,
+                    "diagnostics aggregate count types changed");
+            require(diagnostics.get("clients") instanceof List<?> clients && clients.size() == 1
+                            && clients.get(0) instanceof Map<?, ?>,
+                    "diagnostics client collection shape changed");
+            Map<?, ?> providerClient = (Map<?, ?>) ((List<?>) diagnostics.get("clients")).get(0);
+            Map<?, ?> collectionClient = (Map<?, ?>) ((List<?>) collectionSnapshot.get("clients")).get(0);
+            require(providerClient.keySet().equals(clientFields) && collectionClient.keySet().equals(clientFields),
+                    "diagnostics client schema fields changed");
+            require(providerClient.get("poolMaxConnections") instanceof Integer
+                            && providerClient.get("poolPendingAcquireTimeoutMs") instanceof Long
+                            && providerClient.get("poolMetricsEnabled") instanceof Boolean
+                            && providerClient.get("timeoutMs") instanceof Long
+                            && providerClient.get("followRedirects") instanceof Boolean,
+                    "provider diagnostics field types changed");
+            require("unknown".equals(collectionClient.get("poolSource"))
+                            && collectionClient.get("poolMaxConnections") == null
+                            && collectionClient.get("poolPendingAcquireTimeoutMs") == null
+                            && collectionClient.get("poolMetricsEnabled") == null
+                            && collectionClient.get("strictUnsafeRetryValidation") == null
+                            && collectionClient.get("strictBodySigningValidation") == null,
+                    "collection diagnostics unknown states changed");
+            require(markdown.contains("| Schema version | `1` |")
+                            && markdown.contains("| `unknown` | `unknown` |"),
+                    "Markdown diagnostics schema semantics changed");
+            String supportOutput = snapshot + markdown + diagnostics;
+            require(!supportOutput.contains(AUTH_TOKEN) && !supportOutput.contains("127.0.0.1")
+                            && !supportOutput.contains("Authorization")
+                            && !supportOutput.contains("requestBody")
+                            && !supportOutput.contains("responseBody"),
                     "diagnostics snapshot exposed sensitive transport data");
 
             MeterRegistry meterRegistry = context.getBean(MeterRegistry.class);

@@ -21,6 +21,7 @@ import org.springframework.cglib.proxy.MethodInterceptor;
 import org.springframework.core.Ordered;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -29,11 +30,23 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ReactiveHttpClientDiagnosticsProviderTest {
+
+    private static final Set<String> ROOT_SCHEMA_FIELDS = Set.of(
+            "schemaVersion", "projectVersion", "clientCount", "endpointCount",
+            "inheritedEndpointCount", "clients");
+    private static final Set<String> CLIENT_SCHEMA_FIELDS = Set.of(
+            "clientName", "clientInterface", "baseUrlSource", "poolSource",
+            "poolMaxConnections", "poolPendingAcquireTimeoutMs", "poolMetricsEnabled",
+            "timeoutSource", "timeoutMs", "resilienceConfigured", "retry", "rateLimiter",
+            "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
+            "strictBodySigningValidation", "authMode", "followRedirects", "endpointCount",
+            "inheritedEndpointCount");
 
     @Test
     void reportsSanitizedSummariesForRegisteredClients() {
@@ -303,6 +316,53 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .doesNotContain("raw-cookie")
                 .doesNotContain("Authorization")
                 .doesNotContain("Cookie");
+    }
+
+    @Test
+    void keepsProviderCollectionJsonAndMarkdownOnSchemaV1() throws Exception {
+        ReactiveHttpClientDiagnosticsProvider provider = sensitiveDiagnosticsProvider();
+        Map<String, Object> providerMap = ReactiveHttpClientDiagnosticsSnapshot.toMap(provider);
+        Map<String, Object> collectionMap = ReactiveHttpClientDiagnosticsSnapshot.toMap(provider.clientSummaries());
+        ObjectMapper mapper = new ObjectMapper();
+        String providerJson = mapper.readTree(
+                ReactiveHttpClientDiagnosticsSnapshot.toJson(provider)).toString();
+        String providerMapJson = mapper.valueToTree(providerMap).toString();
+
+        assertThat(providerJson).isEqualTo(providerMapJson);
+        assertThat(providerMap.keySet()).containsExactlyInAnyOrderElementsOf(ROOT_SCHEMA_FIELDS);
+        assertThat(collectionMap.keySet()).containsExactlyInAnyOrderElementsOf(ROOT_SCHEMA_FIELDS);
+
+        Map<String, Object> providerClient = firstClient(providerMap);
+        Map<String, Object> collectionClient = firstClient(collectionMap);
+        assertThat(providerClient.keySet()).containsExactlyInAnyOrderElementsOf(CLIENT_SCHEMA_FIELDS);
+        assertThat(collectionClient.keySet()).containsExactlyInAnyOrderElementsOf(CLIENT_SCHEMA_FIELDS);
+        assertThat(providerClient)
+                .containsEntry("poolSource", "global")
+                .containsEntry("poolMaxConnections", 200)
+                .containsEntry("poolPendingAcquireTimeoutMs", 5000L)
+                .containsEntry("poolMetricsEnabled", false)
+                .containsEntry("strictUnsafeRetryValidation", false)
+                .containsEntry("strictBodySigningValidation", false);
+        assertThat(collectionClient)
+                .containsEntry("poolSource", "unknown")
+                .containsEntry("poolMaxConnections", null)
+                .containsEntry("poolPendingAcquireTimeoutMs", null)
+                .containsEntry("poolMetricsEnabled", null)
+                .containsEntry("strictUnsafeRetryValidation", null)
+                .containsEntry("strictBodySigningValidation", null)
+                .containsEntry("timeoutMs", 500L)
+                .containsEntry("followRedirects", true);
+
+        String markdown = ReactiveHttpClientDiagnosticsSnapshot.toMarkdown(provider.clientSummaries());
+        assertThat(markdown)
+                .contains("| Schema version | `1` |")
+                .contains("| Client count | `1` |")
+                .contains("| Endpoint count | `2` |")
+                .contains("| Inherited endpoint count | `1` |")
+                .contains("| Client | Interface | Base URL source | Pool | Timeout | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |")
+                .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName()
+                        + "` | `property` | `unknown` | `client:500` |")
+                .contains("| `unknown` | `unknown` | `provider-bean` | `true` | `2` | `1` |");
     }
 
     @Test
@@ -585,6 +645,11 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         finally {
             Thread.currentThread().setContextClassLoader(previous);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> firstClient(Map<String, Object> snapshot) {
+        return ((List<Map<String, Object>>) snapshot.get("clients")).get(0);
     }
 
     private static ReactiveHttpClientDiagnosticsProvider classBasedProxy(ReactiveHttpClientDiagnosticsProvider target) {
