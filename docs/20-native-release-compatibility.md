@@ -768,16 +768,7 @@ Boot 4 POM, so missing dependencies or auto-configuration imports fail at the
 application boundary.
 
 ```bash
-PROJECT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
-mvn -B -ntp -s .mvn/maven-central-settings.xml \
-  -Dmaven.javadoc.skip=true install
-mvn -B -ntp -s .mvn/maven-central-settings.xml \
-  -pl reactive-http-client-test -am \
-  -Dtest=Boot4MockReactiveHttpClientTest \
-  -Dsurefire.failIfNoSpecifiedTests=false test
-mvn -B -ntp -s .mvn/maven-central-settings.xml \
-  -f .github/boot4-consumer/pom.xml \
-  -Dreactive-http-client.version="$PROJECT_VERSION" test
+scripts/verify-current-consumer.sh
 ```
 
 The assembled application performs real inherited-generic and configured
@@ -790,6 +781,19 @@ test run supplies detailed OAuth2, SigV4 raw-body signing, and optional
 integration absence fixtures. The normal test-helper sources additionally verify
 Jackson 3 signing bytes and final outbound metadata through
 `MockReactiveHttpClient`.
+
+The verifier installs the current reactor into a fresh target-local repository,
+runs the complete mock parity classes, then runs the assembled consumer against
+the installed jars. It rejects reactor `target/classes` leakage and records
+separate mock and real-server test reports, the consumer classpath, dependency
+tree, effective POM, artifact hashes, commit state, and provenance under
+`target/release-evidence/current-consumer/current-3.2.0-SNAPSHOT/`.
+
+The mock evidence is limited to starter-owned auth, retry, lifecycle, observer,
+exchange-logging, inherited-generic, repeated-header, JSON-codec, and final-request
+metadata behavior. Protocol negotiation, TLS, compression wire bytes, pool timing,
+and connection reuse remain real-transport claims and are not inferred from the
+in-process helper.
 
 The normal reactor and release-smoke matrix use Boot 4. The Boot 3.5 `2.x` line
 is reconstructed only from its maintenance tag; no dual-generation helper

@@ -450,24 +450,52 @@ Evidence:
 
 ## Priority 10 - Mock and Consumer Parity
 
-### [ ] 10.1 Revalidate mock-owned behavior
+### [x] 10.1 Revalidate mock-owned behavior
 
-- [ ] Cover auth, retry, lifecycle, observers, exchange logging, inherited generics, and repeated headers.
-- [ ] Preserve final request metadata.
-- [ ] Preserve constructor-injected loggers and application JSON codecs.
-- [ ] Do not fake protocol negotiation, TLS, compression wire bytes, pool timing, or connection reuse.
+- [x] Cover auth, retry, lifecycle, observers, exchange logging, inherited generics, and repeated headers.
+- [x] Preserve final request metadata.
+- [x] Preserve constructor-injected loggers and application JSON codecs.
+- [x] Do not fake protocol negotiation, TLS, compression wire bytes, pool timing, or connection reuse.
 
-### [ ] 10.2 Revalidate assembled consumers
+### [x] 10.2 Revalidate assembled consumers
 
-- [ ] Cover transport-owned behavior with real servers.
-- [ ] Run current-reactor and published-`3.1.0` consumers separately.
-- [ ] Use fresh repositories and reject reactor leakage.
-- [ ] Record separate target-only reports and provenance.
-- [ ] Run focused tests and `git diff --check`.
+- [x] Cover transport-owned behavior with real servers.
+- [x] Run current-reactor and published-`3.1.0` consumers separately.
+- [x] Use fresh repositories and reject reactor leakage.
+- [x] Record separate target-only reports and provenance.
+- [x] Run focused tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Kept production mock behavior unchanged. The 33 `MockReactiveHttpClientTest`
+  cases plus the Boot 4 codec parity case cover auth and one-time `401` refresh,
+  retry/idempotency, ordered lifecycle hooks, one terminal observer event, final
+  URL/status/header metadata, annotation-selected constructor-injected exchange
+  loggers, application Jackson 3 codec bytes, inherited generic DTOs, and repeated
+  request/response headers.
+- Documented the ownership boundary in `docs/14-test-helpers.md`: the in-process
+  helper proves starter-owned request/response behavior but does not claim protocol
+  negotiation, TLS, compression wire bytes, pool timing, or connection reuse.
+- Added `scripts/verify-current-consumer.sh` and wired the CI assembled-consumer
+  job to it. The verifier cleans module outputs, installs `3.2.0-SNAPSHOT` into a
+  fresh target-local repository, runs both mock parity classes, then runs the
+  independent Boot 4 consumer against those installed jars.
+- The assembled consumer uses a real Reactor Netty server for inherited-generic and
+  configured `@ApiRef` endpoints, repeated headers, redirects, bodiless draining,
+  delayed streaming ownership, timeout attribution, Problem Detail mapping, and
+  lifecycle/observer terminal metadata. All 3 tests passed in both consumer lanes.
+- The current lane rejected reactor `target/classes` leakage and recorded 34 mock
+  tests, 3 consumer tests, classpath, dependency tree, effective POM, current
+  artifact hashes, commit state, and provenance under
+  `target/release-evidence/current-consumer/current-3.2.0-SNAPSHOT/`.
+- `scripts/verify-published-consumer.sh 3.1.0` passed separately against an absent
+  Maven Central-only repository, verified remote markers and hashes for the
+  published parent, starter, test helper, and OTel artifacts, rejected reactor
+  leakage, and wrote its reports under
+  `target/release-evidence/published-consumer/published-3.1.0/`.
+- Passed the focused mock parity tests and `DocumentationReleaseArtifactTest`;
+  the verifier script passed `bash -n`, and final documentation tests and
+  `git diff --check` passed.
 
 ---
 

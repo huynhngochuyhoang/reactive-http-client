@@ -20,6 +20,18 @@ The starter ships a companion artifact for unit-testing `@ReactiveHttpClient` in
 
 `MockReactiveHttpClient` builds a real proxy backed by an in-process `ExchangeFunction`, records every outbound exchange, and serves canned responses based on registered matchers.
 
+### Ownership boundary
+
+Use the mock for starter-owned behavior: argument expansion, auth filters, application
+JSON codec bytes, retries, lifecycle hooks, observers, exchange logging, inherited
+generic response types, repeated headers, and final resolved request metadata.
+
+The mock does not negotiate an HTTP protocol or TLS, compress wire bytes, acquire a
+pooled connection, measure pool timing, or prove connection reuse. Those behaviors
+belong to a real client connector and server. Use the assembled-consumer and transport
+fixtures described in [Native and release compatibility](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)
+when a test depends on transport ownership.
+
 ### Basic setup
 
 ```java
