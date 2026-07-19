@@ -141,11 +141,30 @@ class ReactiveHttpClientAutoConfigurationTest {
                             .containsEntry("clientCount", 1)
                             .containsEntry("endpointCount", 2)
                             .containsEntry("inheritedEndpointCount", 1)
-                            .containsKey("projectVersion");
+                            .containsKey("projectVersion")
+                            .containsOnlyKeys("schemaVersion", "projectVersion", "clientCount",
+                                    "endpointCount", "inheritedEndpointCount", "clients");
+                    assertThat(snapshot.get("schemaVersion")).isInstanceOf(Integer.class);
+                    assertThat(snapshot.get("projectVersion")).isInstanceOf(String.class);
+                    assertThat(snapshot.get("clientCount")).isInstanceOf(Integer.class);
+                    assertThat(snapshot.get("endpointCount")).isInstanceOf(Integer.class);
+                    assertThat(snapshot.get("inheritedEndpointCount")).isInstanceOf(Integer.class);
                     assertThat(snapshot.get("clients")).isInstanceOf(List.class);
                     @SuppressWarnings("unchecked")
                     List<Map<String, Object>> clients = (List<Map<String, Object>>) snapshot.get("clients");
                     assertThat(clients).hasSize(1);
+                    assertThat(clients.get(0))
+                            .containsOnlyKeys("clientName", "clientInterface", "baseUrlSource",
+                                    "poolSource", "poolMaxConnections", "poolPendingAcquireTimeoutMs",
+                                    "poolMetricsEnabled", "timeoutSource", "timeoutMs",
+                                    "resilienceConfigured", "retry", "rateLimiter", "circuitBreaker",
+                                    "bulkhead", "strictUnsafeRetryValidation",
+                                    "strictBodySigningValidation", "authMode", "followRedirects",
+                                    "endpointCount", "inheritedEndpointCount");
+                    assertThat(clients.get(0).get("poolMaxConnections")).isInstanceOf(Integer.class);
+                    assertThat(clients.get(0).get("poolPendingAcquireTimeoutMs")).isInstanceOf(Long.class);
+                    assertThat(clients.get(0).get("timeoutMs")).isInstanceOf(Long.class);
+                    assertThat(clients.get(0).get("followRedirects")).isInstanceOf(Boolean.class);
                     assertThat(clients.get(0))
                             .containsEntry("clientName", "diagnostic-client")
                             .containsEntry("clientInterface", DiagnosticEndpointClient.class.getName())

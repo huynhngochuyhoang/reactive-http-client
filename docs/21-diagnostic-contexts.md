@@ -96,13 +96,31 @@ Value semantics are explicit:
 | `unavailable` | Resilience is enabled for the effective contract, but the optional operator adapter/registry is unavailable at runtime. |
 | `missing` | No annotation or property supplies the required base URL source; concrete URL values are never exported. |
 
+The v1 root field set is `schemaVersion`, `projectVersion`, `clientCount`,
+`endpointCount`, `inheritedEndpointCount`, and `clients`. Client entries retain
+the reviewed field names and JSON value kinds in the source-controlled fixture.
+Provider and collection map output, rendered JSON, Markdown, and the Actuator
+endpoint use the same logical fields; collection-only pool and strict-validation
+facts remain `null` in map/JSON and `unknown` in Markdown. The fixture and JVM
+and native checks reject removal, rename, type drift, or accidental secret-bearing
+fields.
+
+Request-scoped transport facts introduced in V22, including negotiated protocol,
+content encoding, failure stage, error category, request/response headers, and
+payload sizes, are intentionally not copied into this configured-client schema.
+They belong to observer, lifecycle, or exchange-log records. Adding them here
+without a stable configured value would collapse unknown and per-request states;
+such fields are deferred until a future schema can define accurate semantics.
+
 Provider-backed rendering continues to honor an overridden `clientSummaries()`
 method, including through class-based Spring proxies. Such custom summaries use
 the collection contract, so provider-only strict flags remain unknown.
 
 Snapshots fail explicitly instead of returning partial counts when they exceed
 256 clients, 10,000 aggregate endpoints, 512 characters in an exported text
-field, or 1 MiB of UTF-8 encoded JSON/Markdown. These limits bound support-output
+field, or 1 MiB of UTF-8 encoded JSON/Markdown. Map and Actuator output are
+measured through the same JSON renderer before they are returned, so they cannot
+bypass the UTF-8 byte limit. These limits bound support-output
 size and client/interface cardinality; `clientCount`, `endpointCount`, and
 `inheritedEndpointCount` therefore always describe every emitted client.
 

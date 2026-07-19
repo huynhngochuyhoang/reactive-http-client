@@ -407,23 +407,44 @@ Evidence:
 
 ## Priority 9 - Diagnostics Schema V1 Evolution
 
-### [ ] 9.1 Preserve schema equivalence
+### [x] 9.1 Preserve schema equivalence
 
-- [ ] Compare provider, collection snapshot, JSON, Markdown, Actuator, and native output.
-- [ ] Keep additions nullable and backward-compatible.
-- [ ] Preserve distinct unknown, unavailable, disabled, false, and zero states.
-- [ ] Reject removals, renames, and type changes in the source-controlled fixture.
+- [x] Compare provider, collection snapshot, JSON, Markdown, Actuator, and native output.
+- [x] Keep additions nullable and backward-compatible.
+- [x] Preserve distinct unknown, unavailable, disabled, false, and zero states.
+- [x] Reject removals, renames, and type changes in the source-controlled fixture.
 
-### [ ] 9.2 Preserve support-output safety
+### [x] 9.2 Preserve support-output safety
 
-- [ ] Enforce client, endpoint, field, and UTF-8 byte limits on map and rendered forms.
-- [ ] Reject secret-bearing and unbounded fields.
-- [ ] Keep concrete URLs, headers, auth identifiers, payloads, and proxy credentials out.
-- [ ] Run JVM/native schema fixtures and `git diff --check`.
+- [x] Enforce client, endpoint, field, and UTF-8 byte limits on map and rendered forms.
+- [x] Reject secret-bearing and unbounded fields.
+- [x] Keep concrete URLs, headers, auth identifiers, payloads, and proxy credentials out.
+- [x] Run JVM/native schema fixtures and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Kept schema v1 unchanged. Request-scoped protocol, content-encoding, failure-stage,
+  error-category, header, and payload-size facts remain in per-call diagnostics instead
+  of being misrepresented as configured-client snapshot state. Future additions must
+  remain nullable/additive or move to a later schema version.
+- Added structural JVM coverage that compares provider map output with rendered JSON,
+  freezes root and client key sets, proves provider and collection snapshots retain the
+  same shape, and preserves provider `false` values separately from collection `null`/
+  Markdown `unknown`. Existing fixture cases continue to cover `unavailable`,
+  `disabled`, and numeric zero.
+- Strengthened the opt-in Actuator test to require the exact v1 root/client fields and
+  Java value types. The exact source-controlled JSON fixture remains the reviewed gate
+  for removals, renames, type drift, ordering, and secret-bearing additions.
+- Retained the shared 256-client, 10,000-endpoint, 512-character field, and 1 MiB UTF-8
+  rendered-output limits. Map and Actuator paths still validate through the JSON
+  renderer before returning, and sanitization checks continue to reject concrete URLs,
+  headers, provider names, payloads, credentials, and machine-local paths.
+- Expanded the GraalVM 25 fixture to compare the Actuator endpoint with direct provider
+  output, validate map/collection field sets and types, preserve nullable unknown states,
+  verify Markdown semantics, and reject sensitive values. The native image compiled and
+  its executable completed successfully against `3.2.0-SNAPSHOT`.
+- Passed the focused diagnostics, auto-configuration, Boot 4, fixture, and documentation
+  tests plus the complete starter suite and `git diff --check`.
 
 ---
 
