@@ -162,7 +162,8 @@ class RefreshingBearerAuthProviderTest {
                 provider.getAuth(sampleRequest("payments-client")).materialize();
 
         StepVerifier.create(Mono.zip(orders, payments))
-                .then(() -> sink.tryEmitError(new IllegalStateException("token service unavailable")))
+                .then(() -> sink.tryEmitError(new io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException(
+                        "orders-client", new IllegalStateException("token service unavailable"))))
                 .assertNext(signals -> {
                     io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException ordersError =
                             assertInstanceOf(
@@ -173,7 +174,9 @@ class RefreshingBearerAuthProviderTest {
                                     io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException.class,
                                     signals.getT2().getThrowable());
                     assertEquals("orders-client", ordersError.getClientName());
+                    assertEquals("Auth provider failed for client 'orders-client'", ordersError.getMessage());
                     assertEquals("payments-client", paymentsError.getClientName());
+                    assertEquals("Auth provider failed for client 'payments-client'", paymentsError.getMessage());
                 })
                 .verifyComplete();
 

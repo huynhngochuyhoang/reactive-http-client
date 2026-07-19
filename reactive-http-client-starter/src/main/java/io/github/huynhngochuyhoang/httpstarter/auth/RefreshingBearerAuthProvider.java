@@ -158,6 +158,9 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
             if (clientName.equals(authError.getClientName())) {
                 return authError;
             }
+            if (genericAuthFailureMessage(authError.getClientName()).equals(authError.getMessage())) {
+                return new AuthProviderException(clientName, authError.getCause());
+            }
             return new AuthProviderException(clientName, authError.getMessage(), authError.getCause());
         }
         if (cause instanceof SanitizedAuthProviderFailure sanitizedFailure) {
@@ -167,6 +170,10 @@ public final class RefreshingBearerAuthProvider implements InvalidatableAuthProv
                     sanitizedFailure.sanitizedAuthCause());
         }
         return new AuthProviderException(clientName, cause);
+    }
+
+    private String genericAuthFailureMessage(String clientName) {
+        return "Auth provider failed for client '" + clientName + "'";
     }
 
     private CachedAccessToken validateAndNormalize(AccessToken token) {
