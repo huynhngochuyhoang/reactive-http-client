@@ -121,6 +121,13 @@ Published mapping contract:
 | `ConnectException` | `CONNECT_ERROR` |
 | Other throwable | `UNKNOWN` |
 
+`ErrorCategories.from(...)` examines at most 16 throwable nodes from outermost to
+innermost. The nearest proven category wins: an `AuthProviderException` that
+wraps a token-service timeout remains `AUTH_PROVIDER_ERROR`, and a retry wrapper
+that retains a terminal HTTP exception retains its 4xx, 429, or 5xx category. The
+separately observed HTTP status is used only when the bounded cause chain contains
+no more specific category.
+
 ---
 
 ## Reacting to errors in calling code

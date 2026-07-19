@@ -103,7 +103,7 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         HttpClientObserverEvent event = observed.get();
         assertNotNull(event);
         assertEquals("test-client", event.getClientName());
-        assertEquals(ErrorCategory.TIMEOUT, event.getErrorCategory());
+        assertEquals(ErrorCategory.AUTH_PROVIDER_ERROR, event.getErrorCategory());
         assertNull(event.getFailureStage());
         assertNull(event.getRequestUrl());
         assertTrue(event.getRequestHeaders().isEmpty());
@@ -184,8 +184,9 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         ReactiveClientInvocationHandler handler = createHandler(
                 webClient, 5000, observed::set, "serializationAuthProvider", retryOnce);
 
+        AtomicReference<Throwable> terminalError = new AtomicReference<>();
         StepVerifier.create(invoke(handler))
-                .expectError(AuthProviderException.class)
+                .expectErrorSatisfies(terminalError::set)
                 .verify();
 
         HttpClientObserverEvent event = observed.get();
@@ -193,6 +194,8 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         assertEquals(2, authAttempts.get());
         assertEquals(1, exchanges.get());
         assertEquals(2, event.getAttemptCount());
+        assertSame(terminalError.get(), event.getError());
+        assertEquals(ErrorCategory.AUTH_PROVIDER_ERROR, event.getErrorCategory());
         assertNull(event.getFailureStage());
         assertNull(event.getRequestUrl());
         assertTrue(event.getRequestHeaders().isEmpty());

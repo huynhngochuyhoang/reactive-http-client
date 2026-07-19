@@ -363,24 +363,45 @@ Evidence:
 
 ## Priority 8 - Failure Attribution Contract
 
-### [ ] 8.1 Audit the existing taxonomy
+### [x] 8.1 Audit the existing taxonomy
 
-- [ ] Cover DNS, connect, TLS, timeout, cancellation, decode, auth, resilience, 4xx, 429, 5xx, and unknown.
-- [ ] Keep cause traversal bounded.
-- [ ] Preserve the most actionable proven category.
-- [ ] Preserve retry terminal cause and subscription-attempt semantics.
+- [x] Cover DNS, connect, TLS, timeout, cancellation, decode, auth, resilience, 4xx, 429, 5xx, and unknown.
+- [x] Keep cause traversal bounded.
+- [x] Preserve the most actionable proven category.
+- [x] Preserve retry terminal cause and subscription-attempt semantics.
 
-### [ ] 8.2 Guard additive public changes
+### [x] 8.2 Guard additive public changes
 
-- [ ] Add no public category or accessor without a demonstrated consumer need.
-- [ ] Include any addition in japicmp and compatibility fixtures.
-- [ ] Align test-helper assertions and public docs.
-- [ ] Run strict root/module API checks and focused tests.
-- [ ] Run `git diff --check`.
+- [x] Add no public category or accessor without a demonstrated consumer need.
+- [x] Include any addition in japicmp and compatibility fixtures.
+- [x] Align test-helper assertions and public docs.
+- [x] Run strict root/module API checks and focused tests.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- `ErrorCategories` now resolves one outer-to-inner cause path with the existing
+  16-node bound. Explicit starter HTTP and auth exceptions retained through retry
+  wrappers win before less-specific nested transport causes; status-only fallback
+  remains unchanged when the bounded chain has no proven category.
+- `ErrorCategoriesTest` covers the published DNS, connect, TLS, timeout,
+  cancellation, decode, auth, Resilience4j, 4xx, 429, 5xx, and unknown matrix,
+  plus the exact traversal boundary, wrapped 429, and auth-over-timeout precedence.
+- `ReactiveClientInvocationHandlerObservabilityErrorCategoryTest` proves retry
+  exhaustion reports the exact final throwable, two subscription attempts, the
+  final auth category, and no stale dispatch/failure-stage evidence.
+- `ErrorCategoryAssertions.hasErrorCategory(...)` now delegates to the same
+  public `ErrorCategories` resolver for HTTP, auth, transport, cancellation,
+  decode, resilience, and unknown failures; `hasStatusCode(...)` remains
+  limited to HTTP exceptions carrying a status.
+- No public enum value, field, accessor, or signature was added, so the existing
+  japicmp include set and compatibility fixtures required no update. Error handling,
+  diagnostic-context, test-helper, and changelog wording use the same category and
+  subscription-attempt contract.
+- Passed focused failure-attribution and mock-helper tests, complete starter and
+  test-helper module suites, strict root and module-scoped API comparisons against
+  published `3.1.0` from isolated Maven repositories, documentation guards, and
+  `git diff --check`.
 
 ---
 

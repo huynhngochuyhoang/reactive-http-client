@@ -24,6 +24,7 @@ import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -919,6 +920,18 @@ class MockReactiveHttpClientTest {
                 .hasStatusCode(404);
 
         assertThat(mock.exchanges()).hasSize(1);
+    }
+
+    @Test
+    void errorCategoryAssertionUsesPublishedResolverForNonHttpFailures() {
+        ErrorCategoryAssertions.assertThatFails(
+                        Mono.error(new RuntimeException(new UnknownHostException("missing.local"))))
+                .hasErrorCategory(ErrorCategory.UNKNOWN_HOST);
+
+        ErrorCategoryAssertions.assertThatFails(Mono.error(new RuntimeException(
+                        new io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException(
+                                "payments-client", new IllegalStateException("token unavailable")))))
+                .hasErrorCategory(ErrorCategory.AUTH_PROVIDER_ERROR);
     }
 
     @Test
