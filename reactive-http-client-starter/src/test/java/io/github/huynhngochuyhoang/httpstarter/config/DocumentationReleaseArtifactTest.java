@@ -189,6 +189,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("[[ ! -e \"$LOCAL_REPOSITORY\" ]]")
                 .contains("-Dtest=MockReactiveHttpClientTest,Boot4MockReactiveHttpClientTest")
                 .contains("-f \"$FIXTURE_POM\"")
+                .contains("trap preserve_reports EXIT")
+                .contains("exit \"$status\"")
                 .contains("dependency:build-classpath")
                 .contains("assembled consumer resolved reactor output directories")
                 .contains("project-artifact-sha256.txt")
@@ -209,6 +211,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("real inherited-generic and configured")
                 .contains("OAuth2, SigV4 raw-body signing")
                 .contains("Protocol negotiation, TLS, compression wire bytes, pool timing")
+                .contains("including when either test stage fails")
                 .contains("no dual-generation")
                 .contains("no dual-generation helper");
         assertThat(testHelperDocs)

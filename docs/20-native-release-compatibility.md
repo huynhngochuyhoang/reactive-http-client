@@ -787,7 +787,9 @@ runs the complete mock parity classes, then runs the assembled consumer against
 the installed jars. It rejects reactor `target/classes` leakage and records
 separate mock and real-server test reports, the consumer classpath, dependency
 tree, effective POM, artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-3.2.0-SNAPSHOT/`.
+`target/release-evidence/current-consumer/current-3.2.0-SNAPSHOT/`. An `EXIT`
+trap copies every available Surefire XML report before preserving the original
+verifier status, including when either test stage fails.
 
 The mock evidence is limited to starter-owned auth, retry, lifecycle, observer,
 exchange-logging, inherited-generic, repeated-header, JSON-codec, and final-request

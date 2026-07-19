@@ -479,7 +479,9 @@ Evidence:
 - Added `scripts/verify-current-consumer.sh` and wired the CI assembled-consumer
   job to it. The verifier cleans module outputs, installs `3.2.0-SNAPSHOT` into a
   fresh target-local repository, runs both mock parity classes, then runs the
-  independent Boot 4 consumer against those installed jars.
+  independent Boot 4 consumer against those installed jars. An `EXIT` trap copies
+  every available Surefire XML report into the uploaded evidence directories while
+  preserving the original verifier exit code when either test stage fails.
 - The assembled consumer uses a real Reactor Netty server for inherited-generic and
   configured `@ApiRef` endpoints, repeated headers, redirects, bodiless draining,
   delayed streaming ownership, timeout attribution, Problem Detail mapping, and

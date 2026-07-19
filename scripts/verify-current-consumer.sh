@@ -21,16 +21,28 @@ fail() {
 [[ ! -e "$EVIDENCE_DIR" ]] || fail "fresh evidence directory required; remove $EVIDENCE_DIR"
 mkdir -p "$LOCAL_REPOSITORY" "$EVIDENCE_DIR/effective-poms" "$MOCK_REPORTS" "$CONSUMER_REPORTS"
 
+preserve_reports() {
+  local status=$?
+  trap - EXIT
+  set +e
+  for report in "$ROOT_DIR/reactive-http-client-test/target/surefire-reports/"*.xml; do
+    [[ -f "$report" ]] && cp "$report" "$MOCK_REPORTS/"
+  done
+  for report in "$ROOT_DIR/.github/boot4-consumer/target/surefire-reports/"*.xml; do
+    [[ -f "$report" ]] && cp "$report" "$CONSUMER_REPORTS/"
+  done
+  exit "$status"
+}
+trap preserve_reports EXIT
+
 MAVEN=(mvn -B -ntp -s "$SETTINGS" -Dmaven.repo.local="$LOCAL_REPOSITORY")
 
 "${MAVEN[@]}" -f "$ROOT_DIR/pom.xml" -pl reactive-http-client-starter,reactive-http-client-test,reactive-http-client-otel clean
 "${MAVEN[@]}" -f "$ROOT_DIR/pom.xml" -DskipTests -Dmaven.javadoc.skip=true install
 "${MAVEN[@]}" -f "$ROOT_DIR/reactive-http-client-test/pom.xml" \
   -Dtest=MockReactiveHttpClientTest,Boot4MockReactiveHttpClientTest clean test
-cp "$ROOT_DIR/reactive-http-client-test/target/surefire-reports/"*.xml "$MOCK_REPORTS/"
 
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" clean test
-cp "$ROOT_DIR/.github/boot4-consumer/target/surefire-reports/"*.xml "$CONSUMER_REPORTS/"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
   help:effective-pom -Doutput="$EVIDENCE_DIR/effective-poms/boot4-current-consumer.xml"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
