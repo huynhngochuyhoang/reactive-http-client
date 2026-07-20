@@ -62,6 +62,24 @@ Compile the benchmark module without running benchmarks:
 mvn -Pbenchmarks -pl reactive-http-client-benchmarks -am package
 ```
 
+Discover benchmark methods and enforce naming, classification, no-network, and
+three-surface comparison completeness without recording measurements:
+
+```bash
+mvn -Pbenchmarks,benchmark-discovery -pl reactive-http-client-benchmarks -am clean verify
+```
+
+Run the same current harness against published `3.1.0` on the managed Boot stack
+to prove the baseline-compatible scenario set still compiles and is discoverable:
+
+```bash
+mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-discovery-3.1.0 \
+  -Pbenchmarks,benchmark-discovery,benchmark-published-baseline \
+  -pl reactive-http-client-benchmarks clean verify \
+  -Dbenchmark.starter.version=3.1.0
+```
+
 Run the quick harness smoke benchmark:
 
 ```bash
@@ -417,6 +435,10 @@ different scenario shapes:
 Report generation fails for an unknown prefix, an unknown
 `clientSideOverhead` surface, or an empty scenario suffix. Add the classification
 contract and its report test in the same change as any new benchmark method.
+Discovery also fails unless every `clientSideOverhead` scenario has exactly one
+raw `WebClient`, Spring HTTP Interface, and starter method. Loopback-only prefixes
+are rejected on no-network benchmark classes, so diagnostics rows cannot drift
+into transport comparison tables.
 The V18 scope review added no benchmark rows and promoted no report because it
 introduced no public performance claim or changed request path.
 

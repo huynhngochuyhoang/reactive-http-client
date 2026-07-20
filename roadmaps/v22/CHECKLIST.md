@@ -553,12 +553,12 @@ Evidence:
 
 ## Priority 12 - Benchmark and Allocation Re-Audit
 
-### [ ] 12.1 Preserve harness fairness
+### [x] 12.1 Preserve harness fairness
 
-- [ ] Run discovery and smoke profiles.
-- [ ] Keep current and published-`3.1.0` stacks equivalent.
-- [ ] Keep no-network diagnostics separate from loopback scenarios.
-- [ ] Add no scenario without an equivalent comparison contract.
+- [x] Run discovery and smoke profiles.
+- [x] Keep current and published-`3.1.0` stacks equivalent.
+- [x] Keep no-network diagnostics separate from loopback scenarios.
+- [x] Add no scenario without an equivalent comparison contract.
 
 ### [ ] 12.2 Gather release-quality evidence
 
@@ -571,7 +571,20 @@ Evidence:
 
 Evidence:
 
-- Pending.
+- Added a `benchmark-discovery` profile and a fail-fast internal fairness
+  contract that runs before JMH discovery, smoke, or release execution.
+- The contract requires exactly one raw `WebClient`, Spring HTTP Interface, and
+  starter method for every `clientSideOverhead` scenario. It rejects loopback
+  classifications on no-network benchmark classes and delegates every method to
+  the report naming classifier.
+- Current-reactor and published-`3.1.0` discovery use the same benchmark source,
+  managed Boot stack, connector setup, codec limit, loopback server, and request/
+  response validation. The published profile excludes only current-only
+  diagnostics-provider source and keeps its rows outside loopback comparisons.
+- Focused classification/fairness tests, current and published-baseline
+  discovery, the current smoke profile, report generation, documentation checks,
+  and `git diff --check` passed. Release-quality measurements remain scoped to
+  12.2.
 
 ---
 
