@@ -35,10 +35,12 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p target/release-evidence/native-smoke
+          test -z "$(git status --porcelain)"
           {
             java -version
             native-image --version
             echo "commit=$(git rev-parse HEAD)"
+            echo "sourceState=clean"
             echo "starter=$PROJECT_VERSION"
             echo "boot=$(mvn -q -f .github/native-smoke/pom.xml -DforceStdout help:evaluate -Dexpression=project.parent.version)"
             mvn -B -ntp -f .github/native-smoke/pom.xml -Dreactive-http-client.version="$PROJECT_VERSION" dependency:list
@@ -48,9 +50,16 @@ jobs:
         run: mvn -B -ntp -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version="$PROJECT_VERSION" native:compile
 
       - name: Run minimal native image
-        run: .github/native-smoke/target/reactive-http-client-native-smoke
+        run: |
+          set -o pipefail
+          .github/native-smoke/target/reactive-http-client-native-smoke
+          {
+            sha256sum .github/native-smoke/target/reactive-http-client-native-smoke
+            echo "executableStatus=passed"
+          } | tee -a target/release-evidence/native-smoke/native-provenance.txt
 
       - name: Upload native provenance
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: native-smoke-provenance

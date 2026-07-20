@@ -22,7 +22,7 @@ BASELINE_VERSION="$(mvn -q -s "$SETTINGS" -DforceStdout help:evaluate -Dexpressi
 COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
 ROWS=(4.0.0 4.1.0)
 MODULES=(reactive-http-client-starter reactive-http-client-test reactive-http-client-otel)
-FINAL_EVIDENCE_ROOT="$ROOT_DIR/target/release-evidence/v21-priority9"
+FINAL_EVIDENCE_ROOT="$ROOT_DIR/target/release-evidence/v22-priority11"
 WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/reactive-http-client-matrix.XXXXXX")"
 EVIDENCE_ROOT="$WORK_ROOT/evidence"
 REPOSITORY_ROOT="$WORK_ROOT/repositories"
@@ -108,6 +108,24 @@ EOF
 
   "${maven[@]}" -f "$ROOT_DIR/pom.xml" clean install
   collect_current_evidence
+
+  require_test_case() {
+    local test_case="$1"
+    grep -R -Fq "name=\"$test_case\"" "$evidence/surefire-reports" \
+      || fail "optional-integration contract $test_case did not run for Boot $boot_version"
+  }
+  optional_integration_tests=(
+    starterContextLoadsWhenMicrometerMissing
+    resilience4jBindersSkippedWhenRegistryBeansMissing
+    diagnosticsEndpointSkippedWhenActuatorEndpointClassesMissing
+    autoConfigurationBacksOffWithoutOpenTelemetryBean
+    autoConfigurationBacksOffWithoutOpenTelemetryApi
+  )
+  for test_case in "${optional_integration_tests[@]}"; do
+    require_test_case "$test_case"
+  done
+  printf '%s=passed\n' "${optional_integration_tests[@]}" \
+    > "$evidence/optional-integration-contracts.properties"
 
   for module in "${MODULES[@]}"; do
     "${maven[@]}" -f "$ROOT_DIR/$module/pom.xml" dependency:tree \

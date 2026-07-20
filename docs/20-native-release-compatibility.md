@@ -31,9 +31,9 @@ movement inherited from that Boot line, Resilience4j patch-compatible updates,
 test-only dependency updates, and benchmark harness updates that keep report
 metadata intact.
 
-### V21 resolved supported matrix
+### V22 resolved supported matrix
 
-The `2026-07-16` review retains Spring Boot `4.0.0` as the minimum/default row
+The `2026-07-20` review retains Spring Boot `4.0.0` as the minimum/default row
 and `4.1.0` as the forward-compatibility row. Both rows were resolved from
 separate fresh Maven Central repositories and exercised under a complete Java
 21 JDK.
@@ -70,8 +70,9 @@ compatibility against published `3.1.0` with that row's Boot-managed classpath
 and a separate repository through the shared Central provenance guard. An exit
 trap copies completed and partial row reports to the upload path before
 preserving any failure status. Effective POMs, dependency trees, resolved
-versions, Surefire and japicmp reports, commands, and provenance are copied to
-`target/release-evidence/v21-priority9/`. The manual
+versions, explicit optional-integration back-off results, Surefire and japicmp
+reports, commands, and provenance are copied to
+`target/release-evidence/v22-priority11/`. The manual
 `Supported Dependency Matrix` workflow runs and uploads the same contract.
 
 Requires a minor release: raising the Java baseline, adding a new Spring Boot
@@ -623,6 +624,8 @@ Supported Boot 4 native-image path:
 - Starter configuration properties under `reactive.http.*`.
 - Problem Detail error mapping, a named auth provider, and Micrometer-backed
   client metrics.
+- Opt-in gzip negotiation and transparent JSON response decompression over the
+  real loopback transport.
 - The optional `rhttpclients` Actuator endpoint and reactive health indicator.
 - Diagnostics snapshot version metadata from the packaged Maven
   `pom.properties` resource.
@@ -645,9 +648,10 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
-The workflow uploads `native-smoke-provenance` containing the exact Java and
-native-image toolchains, source commit, starter and Boot versions, and complete
-fixture dependency list. Local generated evidence remains target-only under
+The workflow refuses a dirty source tree and uploads `native-smoke-provenance`
+containing the exact Java and native-image toolchains, immutable source commit,
+starter and Boot versions, complete fixture dependency list, executable SHA-256,
+and successful execution marker. Local generated evidence remains target-only under
 `target/release-evidence/native-smoke/`.
 
 Netty 4.2 uses shared Foreign Function and Memory API arenas. The GraalVM 25

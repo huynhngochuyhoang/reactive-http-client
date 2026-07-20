@@ -20,11 +20,14 @@ import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.GZIPOutputStream;
 
 @SpringBootApplication
 @EnableReactiveHttpClients(basePackageClasses = NativeSmokeClient.class)
@@ -35,12 +38,14 @@ public class NativeSmokeApplication {
 
     public static void main(String[] args) {
         AtomicReference<String> observedAuth = new AtomicReference<>();
-        DisposableServer server = loopbackServer(observedAuth);
+        AtomicReference<String> observedAcceptEncoding = new AtomicReference<>();
+        DisposableServer server = loopbackServer(observedAuth, observedAcceptEncoding);
         SpringApplication application = new SpringApplication(NativeSmokeApplication.class);
         application.setWebApplicationType(WebApplicationType.NONE);
         application.setDefaultProperties(Map.of(
                 "reactive.http.clients.native-smoke.base-url", "http://127.0.0.1:" + server.port(),
                 "reactive.http.clients.native-smoke.auth-provider", "nativeAuthProvider",
+                "reactive.http.clients.native-smoke.compression-enabled", "true",
                 "reactive.http.clients.native-smoke.apis.native-problem.method", "GET",
                 "reactive.http.clients.native-smoke.apis.native-problem.path", "/api/problem",
                 "reactive.http.observability.diagnostics-endpoint.enabled", "true"));
@@ -50,6 +55,13 @@ public class NativeSmokeApplication {
             require(order != null && "ok".equals(order.code()) && "native".equals(order.message()),
                     "inherited generic response decoding failed");
             require(AUTH_TOKEN.equals(observedAuth.get()), "auth provider header did not reach loopback server");
+
+            NativeOrderResponse compressedOrder = client.getCompressedOrder().block(Duration.ofSeconds(5));
+            require(compressedOrder != null && "ok".equals(compressedOrder.code())
+                            && "compressed".equals(compressedOrder.message()),
+                    "gzip response decoding failed");
+            require(observedAcceptEncoding.get() != null && observedAcceptEncoding.get().contains("gzip"),
+                    "compression negotiation header did not reach loopback server");
 
             try {
                 client.getProblem().block(Duration.ofSeconds(5));
@@ -144,7 +156,8 @@ public class NativeSmokeApplication {
         return new ProblemDetailErrorResponseMapper(codec);
     }
 
-    private static DisposableServer loopbackServer(AtomicReference<String> observedAuth) {
+    private static DisposableServer loopbackServer(
+            AtomicReference<String> observedAuth, AtomicReference<String> observedAcceptEncoding) {
         return HttpServer.create()
                 .port(0)
                 .route(routes -> routes
@@ -154,11 +167,31 @@ public class NativeSmokeApplication {
                                     .sendString(Mono.just("{\"code\":\"ok\",\"message\":\"native\"}"))
                                     .then();
                         })
+                        .get("/api/compressed-order", (request, response) -> {
+                            observedAcceptEncoding.set(request.requestHeaders().get("Accept-Encoding"));
+                            return response.header("Content-Type", "application/json")
+                                    .header("Content-Encoding", "gzip")
+                                    .sendByteArray(Mono.just(gzip(
+                                            "{\"code\":\"ok\",\"message\":\"compressed\"}")))
+                                    .then();
+                        })
                         .get("/api/problem", (request, response) -> response.status(502)
                                 .header("Content-Type", "application/problem+json")
                                 .sendString(Mono.just("{\"status\":502,\"title\":\"native problem\",\"detail\":\"smoke\"}"))
                                 .then()))
                 .bindNow(Duration.ofSeconds(5));
+    }
+
+    private static byte[] gzip(String value) {
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzip = new GZIPOutputStream(output)) {
+                gzip.write(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            return output.toByteArray();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to create native compression fixture", ex);
+        }
     }
 
     private static void require(boolean condition, String message) {

@@ -14,6 +14,9 @@ interface NativeSmokeOperations<T> {
     @GET("/api/order")
     Mono<T> getOrder();
 
+    @GET("/api/compressed-order")
+    Mono<T> getCompressedOrder();
+
     @ApiRef("native-problem")
     Mono<T> getProblem();
 }

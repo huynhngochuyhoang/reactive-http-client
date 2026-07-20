@@ -504,25 +504,50 @@ Evidence:
 
 ## Priority 11 - Dependency, AOT, and Native Matrix
 
-### [ ] 11.1 Revalidate supported dependencies
+### [x] 11.1 Revalidate supported dependencies
 
-- [ ] Run minimum and forward Boot 4 rows.
-- [ ] Record Framework, Reactor Netty, Netty, Jackson, Micrometer, OTel, and Resilience4j versions.
-- [ ] Keep Java 21 as the compilation baseline.
-- [ ] Verify optional integrations back off when absent.
+- [x] Run minimum and forward Boot 4 rows.
+- [x] Record Framework, Reactor Netty, Netty, Jackson, Micrometer, OTel, and Resilience4j versions.
+- [x] Keep Java 21 as the compilation baseline.
+- [x] Verify optional integrations back off when absent.
 
 ### [ ] 11.2 Revalidate AOT/native behavior
 
-- [ ] Preserve inherited client and annotation reflection metadata.
-- [ ] Avoid deprecated Framework 7 hint categories.
-- [ ] Add at least one V22 contract to the native fixture.
-- [ ] Compile and execute with GraalVM 25.
+- [x] Preserve inherited client and annotation reflection metadata.
+- [x] Avoid deprecated Framework 7 hint categories.
+- [x] Add at least one V22 contract to the native fixture.
+- [x] Compile and execute with GraalVM 25.
 - [ ] Record clean immutable target-only provenance.
-- [ ] Run `git diff --check`.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- `scripts/verify-supported-matrix.sh` passed the full reactor, assembled Boot 4
+  consumer, and strict published-`3.1.0` API comparison for Boot `4.0.0` and
+  `4.1.0` under Corretto `21.0.11`, using a distinct fresh Maven Central
+  repository for each row.
+- Target-only evidence under `target/release-evidence/v22-priority11/` records
+  Framework/WebFlux `7.0.1`/`7.0.8`, Reactor Netty `1.3.0`/`1.3.6`, Netty
+  `4.2.7.Final`/`4.2.15.Final`, Jackson `3.0.2`/`3.1.4`, Micrometer
+  `1.16.0`/`1.17.0`, OTel `1.55.0`/`1.62.0`, and Resilience4j `2.4.0` for
+  the minimum/forward rows.
+- The verifier now fails unless each row executes the absent-Micrometer,
+  absent-Resilience4j-registry, absent-Actuator, absent-OTel-bean, and
+  absent-OTel-API back-off contracts; both generated
+  `optional-integration-contracts.properties` files report every contract as
+  passed.
+- `ReactiveHttpClientAotSmokeTest` and the generated release guard passed,
+  preserving inherited method, marker-annotation, configuration, proxy, and
+  resource hints without `MemberCategory` or introspection executable modes.
+- The native fixture now negotiates gzip and decodes a manually compressed JSON
+  response over its real loopback transport. GraalVM `25.0.3` completed AOT,
+  built the image from a clean fixture target, and the executable passed all
+  inherited generic, configured `@ApiRef`, auth, Problem Detail, diagnostics,
+  health, Micrometer, and compression assertions.
+- The native workflow now rejects dirty source, records the immutable commit,
+  appends the executable SHA-256 and pass marker, and uploads provenance even
+  when a later step fails. A clean-commit rerun remains required before closing
+  11.2. `git diff --check` also passed.
 
 ---
 
