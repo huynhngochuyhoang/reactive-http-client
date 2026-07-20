@@ -242,6 +242,10 @@ final class BenchmarkMarkdownReport {
         markdown.append("- Do not promote smoke-only reports.\n");
     }
 
+    static void validateClassification(String benchmarkName) {
+        classification(benchmarkName);
+    }
+
     private static Classification classification(String benchmarkName) {
         if (benchmarkName.startsWith("clientSideOverhead")) {
             String remainder = benchmarkName.substring("clientSideOverhead".length());

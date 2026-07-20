@@ -553,48 +553,114 @@ Evidence:
 
 ## Priority 12 - Benchmark and Allocation Re-Audit
 
-### [ ] 12.1 Preserve harness fairness
+### [x] 12.1 Preserve harness fairness
 
-- [ ] Run discovery and smoke profiles.
-- [ ] Keep current and published-`3.1.0` stacks equivalent.
-- [ ] Keep no-network diagnostics separate from loopback scenarios.
-- [ ] Add no scenario without an equivalent comparison contract.
+- [x] Run discovery and smoke profiles.
+- [x] Keep current and published-`3.1.0` stacks equivalent.
+- [x] Keep no-network diagnostics separate from loopback scenarios.
+- [x] Add no scenario without an equivalent comparison contract.
 
-### [ ] 12.2 Gather release-quality evidence
+### [x] 12.2 Gather release-quality evidence
 
-- [ ] Run current and published-baseline release profiles from clean inputs.
-- [ ] Compare success, JSON, `ResponseEntity`, error, diagnostics, lifecycle, observer, and argument expansion.
-- [ ] Investigate material movement before changing production code.
-- [ ] Record accepted noise and optimization decisions.
-- [ ] Promote a report only for supported numerical release claims.
-- [ ] Run report tests and `git diff --check`.
+- [x] Run current and published-baseline release profiles from clean inputs.
+- [x] Compare success, JSON, `ResponseEntity`, error, diagnostics, lifecycle, observer, and argument expansion.
+- [x] Investigate material movement before changing production code.
+- [x] Record accepted noise and optimization decisions.
+- [x] Promote a report only for supported numerical release claims.
+- [x] Run report tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added a `benchmark-discovery` profile and a fail-fast internal fairness
+  contract that runs before JMH discovery, smoke, or release execution.
+- The contract requires exactly one raw `WebClient`, Spring HTTP Interface, and
+  starter method for every `clientSideOverhead` scenario. It rejects loopback
+  classifications on no-network benchmark classes and delegates every method to
+  the report naming classifier.
+- Current-reactor and published-`3.1.0` discovery use the same benchmark source,
+  managed Boot stack, connector setup, codec limit, loopback server, and request/
+  response validation. The published profile excludes only current-only
+  diagnostics-provider source and keeps its rows outside loopback comparisons.
+- Focused classification/fairness tests, current and published-baseline
+  discovery, the current smoke profile, report generation, documentation checks,
+  and `git diff --check` passed. Release-quality measurements remain scoped to
+  12.2.
+- Release-quality current and published-`3.1.0` runs completed from clean inputs
+  on the same managed Boot 4 stack. The current report records commit `90bfdc7`;
+  the baseline report records starter `3.1.0`, and Central provenance records its
+  POM and JAR SHA-256 values.
+- Generated the target-only paired comparison at
+  `target/release-evidence/v22-priority12/current-vs-published-3.1.0.md`.
+  Core starter loopback allocations remained within approximately `-1.4%` to
+  `+1.3%`; optional feature allocations remained within `-2.2%` to `+1.1%`;
+  Problem Detail allocation changed by less than `0.4%`; and both argument
+  expansion paths remained exactly `984 B/op`.
+- Timing review rows moved across raw `WebClient`, Spring HTTP Interface, and
+  starter methods. JSON was internally contradictory: starter throughput was
+  about `20.1%` lower while average time was about `26.6%` lower. Together with
+  stable allocations, this was classified as run-level timing noise rather than
+  evidence for a production-path change.
+- The no-network diagnostics audit kept feature costs explicit against the
+  disabled path (`220,601 ops/s`, `11,160 B/op`): one/multiple lifecycle hooks
+  measured `162,778`/`157,728 ops/s`, one/multiple observers measured
+  `158,876`/`151,802 ops/s`, metadata logging measured `99,268 ops/s`, and the
+  Micrometer observer measured `137,616 ops/s`. These current-only rows are not
+  presented as published-`3.1.0` comparisons.
+- `proxyInvocationCreatesPublisher` allocated `184 B/op` less than the published
+  baseline, but the current production delta contains no intentional publisher-
+  creation optimization and the comparator did not trigger its allocation review
+  threshold. The change is retained as non-actionable evidence pending repetition
+  in a future release audit.
+- No production optimization was made and no report was promoted: the data does
+  not support a stable public numerical claim. Benchmark report/comparator tests,
+  release-documentation checks, and `git diff --check` passed.
 
 ---
 
 ## Priority 13 - Documentation and Operations Consolidation
 
-### [ ] 13.1 Update current operational guidance
+### [x] 13.1 Update current operational guidance
 
-- [ ] Cover protocol, compression, pool, timeout, streaming, OAuth2, and failure diagnosis.
-- [ ] Update sanitized support-bundle recipes.
-- [ ] Keep configuration examples metadata-valid and clearly fake.
-- [ ] Keep public coordinates on the latest published release.
+- [x] Cover protocol, compression, pool, timeout, streaming, OAuth2, and failure diagnosis.
+- [x] Update sanitized support-bundle recipes.
+- [x] Keep configuration examples metadata-valid and clearly fake.
+- [x] Keep public coordinates on the latest published release.
 
-### [ ] 13.2 Guard generated and historical documentation
+### [x] 13.2 Guard generated and historical documentation
 
-- [ ] Separate current commands from historical evidence.
-- [ ] Reject stale active baselines without rewriting release history.
-- [ ] Run generated configuration/reference checks.
-- [ ] Run local Markdown-link and release-note evidence checks.
-- [ ] Run `git diff --check`.
+- [x] Separate current commands from historical evidence.
+- [x] Reject stale active baselines without rewriting release history.
+- [x] Run generated configuration/reference checks.
+- [x] Run local Markdown-link and release-note evidence checks.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added `docs/30-operations-troubleshooting.md` as the current first-response
+  index. Its bounded triage matrix covers HTTP/1.1, H2/H2C and malformed
+  framing, gzip negotiation/decompression, pool saturation, proven timeout
+  phases, publisher and `DataBuffer` ownership, OAuth2 refresh, and the
+  distinction between `ErrorCategory` and optional `failure.stage`.
+- Expanded the production checklist and support-bundle guide with compression
+  ownership, protocol/compression incident evidence, and standalone failure-
+  attribution capture. Recipes retain metadata-only defaults, fake/reserved
+  hosts or explicit placeholders, and prohibit payload and credential capture.
+- The operations guide scopes consumer instructions to published `3.1.0` and
+  explicitly separates active instructions from immutable versioned benchmark,
+  API, migration-decision, and changelog evidence. A focused documentation test
+  derives that expected published version from `latest.published.version`, so a
+  future baseline transition must update active guidance without rewriting
+  historical artifacts.
+- Added the operations guide to README navigation and the support-bundle related
+  guides, and recorded the documentation consolidation under Unreleased.
+- Passed
+  `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest,ReactiveHttpClientConfigurationMetadataTest test`:
+  46 tests, zero failures or errors. This validates generated configuration-
+  reference equality, every documented `reactive.http.*` property and YAML/
+  properties example against metadata, safe support-bundle placeholders, local
+  Markdown links/anchors, current version scope, and release-note benchmark
+  evidence rules.
+- `git diff --check` passed.
 
 ---
 

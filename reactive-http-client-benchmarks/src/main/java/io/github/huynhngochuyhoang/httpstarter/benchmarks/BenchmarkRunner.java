@@ -21,6 +21,7 @@ public final class BenchmarkRunner {
     }
 
     public static void main(String[] args) throws Exception {
+        BenchmarkFairnessContract.validateDiscoveredBenchmarks();
         writeEnvironmentMetadata(args);
         Main.main(args);
         BenchmarkMarkdownReport.writeIfResultFilePresent(args);

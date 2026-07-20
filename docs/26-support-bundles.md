@@ -6,8 +6,8 @@ goal is a small, support-safe bundle that explains the client configuration and
 runtime symptoms without collecting raw request bodies, response bodies, tokens,
 secrets, or customer data by default.
 
-The commands and endpoint names on this page target starter `3.x` on Boot 4.
-Boot 3.5 applications remain on `2.14.1`; use the
+The commands and endpoint names on this page target published starter `3.1.0`
+on Boot 4. Boot 3.5 applications remain on `2.14.1`; use the
 [3.x migration guide](28-spring-boot-4-jackson-migration.md) before applying the
 Boot 4 health type or native-image instructions.
 
@@ -351,6 +351,29 @@ Attempt counts are subscription attempts, not proof that each attempt reached th
 network. Do not collect idempotency-key values by default; record only whether a
 key was present and which source provided it.
 
+## Protocol and Compression Incidents
+
+Minimal safe bundle:
+
+- Diagnostics snapshot showing `http2Enabled` and `compressionEnabled` for the
+  affected client.
+- Downstream-observed protocol (`HTTP/1.1`, H2, or H2C), TLS/ALPN mode, and the
+  proxy, ingress, or service-mesh hops in the path.
+- The complete first Reactor Netty decoder exception and channel context for a
+  malformed-request warning; do not report only the synthetic
+  `GET /bad-request HTTP/1.0` placeholder.
+- Presence or absence of request `Accept-Encoding` and post-transport response
+  `Content-Encoding`/`Content-Length`, with values sanitized when needed.
+- Exception type and whether JSON, an error body, `ResponseEntity`, a direct
+  stream, or a streaming envelope was being decoded.
+
+Do not include request or response payloads by default. Automatic gzip
+decompression can remove encoded representation headers, so an unknown response
+size is expected and is not evidence of a missing body. When compression is
+enabled, application-provided `Accept-Encoding` is a configuration conflict.
+Record only header presence unless an approved incident procedure requires a
+sanitized value.
+
 ## Pool Saturation Incidents
 
 Minimal safe bundle:
@@ -391,6 +414,26 @@ is unknown, not proof of a specific phase. Redact headers before sharing them.
 For `Mono<ResponseEntity<Flux<DataBuffer>>>`, capture the envelope terminal record
 and any later inner-stream error separately; the latter does not retroactively turn
 the successful envelope record into a failed logical call.
+
+## Failure Attribution Incidents
+
+Minimal safe bundle:
+
+- Outermost exception class and sanitized message plus the ordered cause-class
+  chain; omit raw body or credential-bearing cause text.
+- `ErrorCategory`, optional `failure.stage`, status when available,
+  cancellation state, and final subscription-attempt count from the same
+  logical call.
+- Final request URL and headers only when already enabled by policy and safely
+  sanitized; otherwise record the client and API name.
+- Which surface produced each field: lifecycle hook, observer, exchange log,
+  health, or configured-client diagnostics.
+
+`ErrorCategory` and `failure.stage` answer different questions. A missing stage
+is unknown. Do not infer a response phase from a nested auth timeout, elapsed
+duration, an earlier retry's URL, or a generic timeout exception. Exchange logs
+may retain response headers; lifecycle and observer records do not expose a
+response-header map.
 
 ## Streaming Ownership Issues
 
@@ -439,3 +482,4 @@ files as public evidence.
 - [Streaming Requests and Responses](11-streaming.md)
 - [Benchmarks](22-benchmarks.md)
 - [Performance Troubleshooting](25-performance-troubleshooting.md)
+- [Operations Troubleshooting](30-operations-troubleshooting.md)

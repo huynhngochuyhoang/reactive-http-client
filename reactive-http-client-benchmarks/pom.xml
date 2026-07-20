@@ -169,6 +169,36 @@
 
     <profiles>
         <profile>
+            <id>benchmark-discovery</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <executions>
+                            <execution>
+                                <id>run-benchmark-discovery</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <arguments>
+                                        <argument>-jar</argument>
+                                        <argument>${project.build.directory}/benchmarks.jar</argument>
+                                        <argument>${benchmark.include}</argument>
+                                        <argument>-l</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
             <id>benchmark-smoke</id>
             <build>
                 <plugins>

@@ -130,6 +130,35 @@ class BenchmarkMarkdownReportTest {
     }
 
     @Test
+    void discoveredBenchmarksSatisfyTheFairnessContract() {
+        BenchmarkFairnessContract.validateDiscoveredBenchmarks();
+    }
+
+    @Test
+    void rejectsIncompleteClientSideComparisonScenarios() {
+        assertThatThrownBy(() -> BenchmarkFairnessContract.validate(java.util.List.of(
+                new BenchmarkFairnessContract.BenchmarkMethod(
+                        LoopbackClientComparisonBenchmark.class.getName(),
+                        "clientSideOverheadRawWebClientNewScenario"),
+                new BenchmarkFairnessContract.BenchmarkMethod(
+                        LoopbackClientComparisonBenchmark.class.getName(),
+                        "clientSideOverheadStarterNewScenario"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("NewScenario")
+                .hasMessageContaining("SpringHttpExchange");
+    }
+
+    @Test
+    void rejectsLoopbackClassificationsOnNoNetworkBenchmarks() {
+        assertThatThrownBy(() -> BenchmarkFairnessContract.validate(java.util.List.of(
+                new BenchmarkFairnessContract.BenchmarkMethod(
+                        StarterInvocationBenchmark.class.getName(),
+                        "starterFeatureNoNetworkScenario"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("mixes loopback and no-network classification");
+    }
+
+    @Test
     void rejectsUnclassifiedBenchmarkPrefixes() {
         assertThatThrownBy(() -> renderReport(result(
                 "io.github.huynhngochuyhoang.httpstarter.benchmarks.NewBenchmark.unclassifiedScenario",
