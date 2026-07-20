@@ -619,24 +619,48 @@ Evidence:
 
 ## Priority 13 - Documentation and Operations Consolidation
 
-### [ ] 13.1 Update current operational guidance
+### [x] 13.1 Update current operational guidance
 
-- [ ] Cover protocol, compression, pool, timeout, streaming, OAuth2, and failure diagnosis.
-- [ ] Update sanitized support-bundle recipes.
-- [ ] Keep configuration examples metadata-valid and clearly fake.
-- [ ] Keep public coordinates on the latest published release.
+- [x] Cover protocol, compression, pool, timeout, streaming, OAuth2, and failure diagnosis.
+- [x] Update sanitized support-bundle recipes.
+- [x] Keep configuration examples metadata-valid and clearly fake.
+- [x] Keep public coordinates on the latest published release.
 
-### [ ] 13.2 Guard generated and historical documentation
+### [x] 13.2 Guard generated and historical documentation
 
-- [ ] Separate current commands from historical evidence.
-- [ ] Reject stale active baselines without rewriting release history.
-- [ ] Run generated configuration/reference checks.
-- [ ] Run local Markdown-link and release-note evidence checks.
-- [ ] Run `git diff --check`.
+- [x] Separate current commands from historical evidence.
+- [x] Reject stale active baselines without rewriting release history.
+- [x] Run generated configuration/reference checks.
+- [x] Run local Markdown-link and release-note evidence checks.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added `docs/30-operations-troubleshooting.md` as the current first-response
+  index. Its bounded triage matrix covers HTTP/1.1, H2/H2C and malformed
+  framing, gzip negotiation/decompression, pool saturation, proven timeout
+  phases, publisher and `DataBuffer` ownership, OAuth2 refresh, and the
+  distinction between `ErrorCategory` and optional `failure.stage`.
+- Expanded the production checklist and support-bundle guide with compression
+  ownership, protocol/compression incident evidence, and standalone failure-
+  attribution capture. Recipes retain metadata-only defaults, fake/reserved
+  hosts or explicit placeholders, and prohibit payload and credential capture.
+- The operations guide scopes consumer instructions to published `3.1.0` and
+  explicitly separates active instructions from immutable versioned benchmark,
+  API, migration-decision, and changelog evidence. A focused documentation test
+  derives that expected published version from `latest.published.version`, so a
+  future baseline transition must update active guidance without rewriting
+  historical artifacts.
+- Added the operations guide to README navigation and the support-bundle related
+  guides, and recorded the documentation consolidation under Unreleased.
+- Passed
+  `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest,ReactiveHttpClientConfigurationMetadataTest test`:
+  46 tests, zero failures or errors. This validates generated configuration-
+  reference equality, every documented `reactive.http.*` property and YAML/
+  properties example against metadata, safe support-bundle placeholders, local
+  Markdown links/anchors, current version scope, and release-note benchmark
+  evidence rules.
+- `git diff --check` passed.
 
 ---
 
