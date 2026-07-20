@@ -190,6 +190,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Dtest=MockReactiveHttpClientTest,Boot4MockReactiveHttpClientTest")
                 .contains("-f \"$FIXTURE_POM\"")
                 .contains("trap preserve_reports EXIT")
+                .contains("REPORT_START_MARKER=\"$EVIDENCE_DIR/report-start.marker\"")
+                .contains("\"$report\" -nt \"$REPORT_START_MARKER\"")
                 .contains("exit \"$status\"")
                 .contains("dependency:build-classpath")
                 .contains("assembled consumer resolved reactor output directories")

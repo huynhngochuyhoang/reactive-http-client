@@ -788,8 +788,8 @@ the installed jars. It rejects reactor `target/classes` leakage and records
 separate mock and real-server test reports, the consumer classpath, dependency
 tree, effective POM, artifact hashes, commit state, and provenance under
 `target/release-evidence/current-consumer/current-3.2.0-SNAPSHOT/`. An `EXIT`
-trap copies every available Surefire XML report before preserving the original
-verifier status, including when either test stage fails.
+trap copies only Surefire XML reports created during the current invocation before
+preserving the original verifier status, including when either test stage fails.
 
 The mock evidence is limited to starter-owned auth, retry, lifecycle, observer,
 exchange-logging, inherited-generic, repeated-header, JSON-codec, and final-request

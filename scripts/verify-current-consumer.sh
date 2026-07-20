@@ -20,16 +20,20 @@ fail() {
 [[ ! -e "$LOCAL_REPOSITORY" ]] || fail "fresh repository required; remove $LOCAL_REPOSITORY"
 [[ ! -e "$EVIDENCE_DIR" ]] || fail "fresh evidence directory required; remove $EVIDENCE_DIR"
 mkdir -p "$LOCAL_REPOSITORY" "$EVIDENCE_DIR/effective-poms" "$MOCK_REPORTS" "$CONSUMER_REPORTS"
+REPORT_START_MARKER="$EVIDENCE_DIR/report-start.marker"
+touch "$REPORT_START_MARKER"
 
 preserve_reports() {
   local status=$?
   trap - EXIT
   set +e
   for report in "$ROOT_DIR/reactive-http-client-test/target/surefire-reports/"*.xml; do
-    [[ -f "$report" ]] && cp "$report" "$MOCK_REPORTS/"
+    [[ -f "$report" && "$report" -nt "$REPORT_START_MARKER" ]] \
+      && cp "$report" "$MOCK_REPORTS/"
   done
   for report in "$ROOT_DIR/.github/boot4-consumer/target/surefire-reports/"*.xml; do
-    [[ -f "$report" ]] && cp "$report" "$CONSUMER_REPORTS/"
+    [[ -f "$report" && "$report" -nt "$REPORT_START_MARKER" ]] \
+      && cp "$report" "$CONSUMER_REPORTS/"
   done
   exit "$status"
 }
