@@ -214,7 +214,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Correlation ID](docs/09-correlation-id.md) | Header propagation |
 | [Multipart Uploads](docs/10-multipart.md) | Multipart and form-data |
 | [Streaming Requests and Responses](docs/11-streaming.md) | Publisher uploads and streaming response bodies |
-| [Proxy & TLS / mTLS](docs/12-proxy-tls.md) | Proxy and custom TLS |
+| [HTTP/2, Compression, Proxy & TLS / mTLS](docs/12-proxy-tls.md) | Protocol, response compression, proxy, and custom TLS |
 | [Exchange Logging](docs/13-exchange-logging.md) | Request/response logging |
 | [Test Helpers](docs/14-test-helpers.md) | Mock clients and assertions |
 | [Per-Client Customizer](docs/15-customizer.md) | Custom WebClient filters |
@@ -228,6 +228,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Benchmark Report 2.12.0](docs/benchmark-report-2.12.0.md) | Promoted release-quality benchmark report |
 | [Performance Summary](docs/23-performance-summary.md) | Interpreting benchmark data |
 | [Production Support Bundles](docs/26-support-bundles.md) | Safe incident evidence examples |
+| [Operations Troubleshooting](docs/30-operations-troubleshooting.md) | Protocol, pool, timeout, streaming, OAuth2, and failure triage |
 | [V16 to V17 Adoption Guide](docs/27-v16-to-v17-adoption.md) | Diagnostics-first strict validation rollout |
 | [Spring Boot 4 and Starter 3.x Migration](docs/28-spring-boot-4-jackson-migration.md) | Dependency/classpath diagnosis plus package, Jackson, Actuator, native, and test-helper migration |
 | [2.14.1 to 3.0.0 API Report](docs/api-report-2.14.1-to-3.0.0.md) | Reviewed cross-major public API diff |

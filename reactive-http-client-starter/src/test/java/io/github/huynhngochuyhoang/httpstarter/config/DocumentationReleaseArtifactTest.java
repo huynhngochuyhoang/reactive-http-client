@@ -47,6 +47,53 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v22OperationsGuidanceIsCompleteDiscoverableAndVersionScoped() throws Exception {
+        Path root = projectRoot();
+        String pomXml = Files.readString(root.resolve("pom.xml"));
+        String publishedVersion = pomProperty(pomXml, "latest.published.version");
+        String projectVersion = projectVersion(root.resolve("pom.xml"));
+        String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
+        String currentScope = markdownSection(operations, "## Current release scope", "## First response");
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String productionChecklist = Files.readString(root.resolve("docs/16-production-checklist.md"));
+        String readme = Files.readString(root.resolve("README.md"));
+
+        assertThat(currentScope)
+                .contains("published starter `" + publishedVersion + "`")
+                .contains("Historical benchmark reports, API reports, migration decisions, and changelog")
+                .contains("Do not update their\nversions")
+                .doesNotContain("`" + projectVersion + "`");
+        assertThat(operations)
+                .contains("## Protocol and framing")
+                .contains("## Compression")
+                .contains("## Pool saturation")
+                .contains("## Timeout phases")
+                .contains("## Streaming ownership")
+                .contains("## OAuth2 refresh")
+                .contains("## Failure attribution")
+                .contains("A missing status or failure stage means\n   unknown")
+                .contains("GET /bad-request HTTP/1.0")
+                .contains("POOL_ACQUIRE")
+                .contains("Nested auth and other pre-dispatch read timeouts stay unattributed")
+                .contains("Each real retry, body-preserving redirect, or one-time 401 refresh")
+                .contains("Shared refresh is single-flight")
+                .contains("Provider diagnostics\ndescribe configured clients");
+        assertThat(supportBundles)
+                .contains("published starter `" + publishedVersion + "`")
+                .contains("## Protocol and Compression Incidents")
+                .contains("## Failure Attribution Incidents")
+                .contains("do not report only the synthetic")
+                .contains("Do not include request or response payloads by default")
+                .contains("A missing stage\nis unknown")
+                .contains("[Operations Troubleshooting](30-operations-troubleshooting.md)");
+        assertThat(productionChecklist)
+                .contains("Leave `compression-enabled: false`")
+                .contains("[Operations Troubleshooting](30-operations-troubleshooting.md)");
+        assertThat(readme)
+                .contains("[Operations Troubleshooting](docs/30-operations-troubleshooting.md)");
+    }
+
+    @Test
     void releaseVersionContractDistinguishesSnapshotCandidateAndPublishedStates() {
         ReleaseVersionContract snapshot = releaseVersionContract(
                 "3.1.0-SNAPSHOT", "3.0.0", "## [Unreleased]\n");

@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mock and consumer parity.** Added a fresh-repository current-reactor verifier that records separate mock and real-server consumer evidence, rejects reactor classpath leakage, and documents the boundary between starter-owned mock behavior and protocol, TLS, compression, pool, and connection-reuse claims that require a real transport.
 - **Dependency, AOT, and native matrix.** Revalidated the full reactor, assembled consumer, optional-integration back-off, resolved dependency versions, and strict API compatibility on Spring Boot `4.0.0` and `4.1.0` under Java 21; expanded the GraalVM 25 native fixture with real gzip negotiation/decompression and clean-commit executable provenance guards.
 - **Benchmark fairness contract.** Added a discovery profile and fail-fast validation that keeps no-network diagnostics separate and requires every comparable loopback scenario to provide exactly one raw `WebClient`, Spring HTTP Interface, and starter row before smoke or release measurements run.
+- **Operations documentation consolidation.** Added one current-release incident triage index for protocol, compression, pool, timeout, streaming, OAuth2, and failure attribution; expanded sanitized support-bundle evidence recipes; and kept active consumer guidance separate from immutable historical release evidence.
 
 ## [3.1.0] - 2026-07-17
 

@@ -34,6 +34,9 @@ reactive:
 - Configure proxy and TLS globally when most clients share the same network path.
 - Use per-client proxy/TLS blocks when one downstream has different routing or trust material.
 - Never use `tls.insecure-trust-all: true` outside local development.
+- Leave `compression-enabled: false` unless response compression is required.
+- When compression is enabled, do not add `Accept-Encoding` in application
+  headers; Reactor Netty owns negotiation and incremental decompression.
 
 ## Auth and request defaults
 
@@ -77,6 +80,8 @@ reactive:
 ## Logging and testing
 
 - Use [Production Support Bundles](26-support-bundles.md) when collecting safe incident evidence.
+- Start incident diagnosis with [Operations Troubleshooting](30-operations-troubleshooting.md)
+  and treat a missing failure stage as unknown.
 - Keep exchange body logging disabled unless a production incident requires it.
 - Keep `log-preset: metadata-only` by default; use `headers` or `bodies` only for targeted investigations.
 - Redact sensitive headers in inbound snapshots and exchange logs.
