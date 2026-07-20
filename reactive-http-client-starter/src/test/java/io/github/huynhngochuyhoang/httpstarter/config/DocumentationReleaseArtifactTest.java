@@ -165,6 +165,8 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String fixturePom = Files.readString(root.resolve(".github/boot4-consumer/pom.xml"));
         String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
+        String currentConsumerScript = Files.readString(root.resolve("scripts/verify-current-consumer.sh"));
+        String testHelperDocs = Files.readString(root.resolve("docs/14-test-helpers.md"));
         String fixtureTest = Files.readString(root.resolve(
                 ".github/boot4-consumer/src/test/java/io/github/huynhngochuyhoang/httpstarter/boot4consumer/Boot4ConsumerApplicationTest.java"));
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
@@ -180,10 +182,21 @@ class DocumentationReleaseArtifactTest {
                 .contains("<artifactId>spring-boot-starter-actuator</artifactId>");
         assertThat(workflow)
                 .contains("boot4-consumer:")
-                .contains("-Dmaven.javadoc.skip=true install")
-                .contains("-Dtest=Boot4MockReactiveHttpClientTest")
-                .contains("-f .github/boot4-consumer/pom.xml")
-                .contains("-Dreactive-http-client.version=\"$PROJECT_VERSION\"");
+                .contains("scripts/verify-current-consumer.sh")
+                .contains("target/release-evidence/current-consumer/");
+        assertThat(currentConsumerScript)
+                .contains("target/current-reactor-repositories/consumer-$PROJECT_VERSION")
+                .contains("[[ ! -e \"$LOCAL_REPOSITORY\" ]]")
+                .contains("-Dtest=MockReactiveHttpClientTest,Boot4MockReactiveHttpClientTest")
+                .contains("-f \"$FIXTURE_POM\"")
+                .contains("trap preserve_reports EXIT")
+                .contains("REPORT_START_MARKER=\"$EVIDENCE_DIR/report-start.marker\"")
+                .contains("\"$report\" -nt \"$REPORT_START_MARKER\"")
+                .contains("exit \"$status\"")
+                .contains("dependency:build-classpath")
+                .contains("assembled consumer resolved reactor output directories")
+                .contains("project-artifact-sha256.txt")
+                .contains("provenance.properties");
         assertThat(fixtureTest)
                 .contains("extends SharedOrders<OrderResponse>")
                 .contains("@ApiRef(\"configured\")")
@@ -196,10 +209,17 @@ class DocumentationReleaseArtifactTest {
                 .contains("openTelemetryHttpClientObserver");
         assertThat(releaseDocs)
                 .contains("### Boot 4 assembled consumer fixture")
+                .contains("scripts/verify-current-consumer.sh")
                 .contains("real inherited-generic and configured")
                 .contains("OAuth2, SigV4 raw-body signing")
+                .contains("Protocol negotiation, TLS, compression wire bytes, pool timing")
+                .contains("including when either test stage fails")
                 .contains("no dual-generation")
                 .contains("no dual-generation helper");
+        assertThat(testHelperDocs)
+                .contains("### Ownership boundary")
+                .contains("final resolved request metadata")
+                .contains("does not negotiate an HTTP protocol or TLS");
     }
 
     @Test
