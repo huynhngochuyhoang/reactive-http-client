@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Failure attribution parity.** Made error-category extraction one bounded outer-to-inner cause walk, preserved wrapped HTTP and auth categories through retry infrastructure, retained final retry cause and subscription-attempt semantics, and aligned test-helper assertions with runtime diagnostics without adding public categories or accessors.
 - **Diagnostics schema v1 evolution.** Froze provider, collection, JSON, Markdown, Actuator, and native output on the reviewed additive v1 field set; preserved nullable unknown states and JSON value kinds; enforced the existing cardinality, field, and UTF-8 byte limits on every path; and deferred request-scoped transport facts that cannot be represented accurately as configured-client state.
 - **Mock and consumer parity.** Added a fresh-repository current-reactor verifier that records separate mock and real-server consumer evidence, rejects reactor classpath leakage, and documents the boundary between starter-owned mock behavior and protocol, TLS, compression, pool, and connection-reuse claims that require a real transport.
+- **Dependency, AOT, and native matrix.** Revalidated the full reactor, assembled consumer, optional-integration back-off, resolved dependency versions, and strict API compatibility on Spring Boot `4.0.0` and `4.1.0` under Java 21; expanded the GraalVM 25 native fixture with real gzip negotiation/decompression and clean-commit executable provenance guards.
 
 ## [3.1.0] - 2026-07-17
 
