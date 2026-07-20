@@ -560,14 +560,14 @@ Evidence:
 - [x] Keep no-network diagnostics separate from loopback scenarios.
 - [x] Add no scenario without an equivalent comparison contract.
 
-### [ ] 12.2 Gather release-quality evidence
+### [x] 12.2 Gather release-quality evidence
 
-- [ ] Run current and published-baseline release profiles from clean inputs.
-- [ ] Compare success, JSON, `ResponseEntity`, error, diagnostics, lifecycle, observer, and argument expansion.
-- [ ] Investigate material movement before changing production code.
-- [ ] Record accepted noise and optimization decisions.
-- [ ] Promote a report only for supported numerical release claims.
-- [ ] Run report tests and `git diff --check`.
+- [x] Run current and published-baseline release profiles from clean inputs.
+- [x] Compare success, JSON, `ResponseEntity`, error, diagnostics, lifecycle, observer, and argument expansion.
+- [x] Investigate material movement before changing production code.
+- [x] Record accepted noise and optimization decisions.
+- [x] Promote a report only for supported numerical release claims.
+- [x] Run report tests and `git diff --check`.
 
 Evidence:
 
@@ -585,6 +585,35 @@ Evidence:
   discovery, the current smoke profile, report generation, documentation checks,
   and `git diff --check` passed. Release-quality measurements remain scoped to
   12.2.
+- Release-quality current and published-`3.1.0` runs completed from clean inputs
+  on the same managed Boot 4 stack. The current report records commit `90bfdc7`;
+  the baseline report records starter `3.1.0`, and Central provenance records its
+  POM and JAR SHA-256 values.
+- Generated the target-only paired comparison at
+  `target/release-evidence/v22-priority12/current-vs-published-3.1.0.md`.
+  Core starter loopback allocations remained within approximately `-1.4%` to
+  `+1.3%`; optional feature allocations remained within `-2.2%` to `+1.1%`;
+  Problem Detail allocation changed by less than `0.4%`; and both argument
+  expansion paths remained exactly `984 B/op`.
+- Timing review rows moved across raw `WebClient`, Spring HTTP Interface, and
+  starter methods. JSON was internally contradictory: starter throughput was
+  about `20.1%` lower while average time was about `26.6%` lower. Together with
+  stable allocations, this was classified as run-level timing noise rather than
+  evidence for a production-path change.
+- The no-network diagnostics audit kept feature costs explicit against the
+  disabled path (`220,601 ops/s`, `11,160 B/op`): one/multiple lifecycle hooks
+  measured `162,778`/`157,728 ops/s`, one/multiple observers measured
+  `158,876`/`151,802 ops/s`, metadata logging measured `99,268 ops/s`, and the
+  Micrometer observer measured `137,616 ops/s`. These current-only rows are not
+  presented as published-`3.1.0` comparisons.
+- `proxyInvocationCreatesPublisher` allocated `184 B/op` less than the published
+  baseline, but the current production delta contains no intentional publisher-
+  creation optimization and the comparator did not trigger its allocation review
+  threshold. The change is retained as non-actionable evidence pending repetition
+  in a future release audit.
+- No production optimization was made and no report was promoted: the data does
+  not support a stable public numerical claim. Benchmark report/comparator tests,
+  release-documentation checks, and `git diff --check` passed.
 
 ---
 
