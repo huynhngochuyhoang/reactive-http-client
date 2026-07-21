@@ -270,6 +270,7 @@ class ReactiveHttpClientLifecycleHookTest {
         assertEquals(List.of("hook:error:0:null:BulkheadFullException"), events);
         assertEquals(1, observed.size());
         assertEquals(ErrorCategory.RESILIENCE_ERROR, observed.get(0).getErrorCategory());
+        assertEquals(0, observed.get(0).getAttemptCount());
     }
 
     @Test

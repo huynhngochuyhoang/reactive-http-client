@@ -11,7 +11,9 @@ WORK="$ROOT_DIR/target/published-baseline-provenance-fixtures"
 rm -rf "$BASE/fixture-local-$VERSION" "$BASE/fixture-central-$VERSION" \
   "$BASE/fixture-missing-pom-$VERSION" "$BASE/fixture-mixed-$VERSION" \
   "$BASE/fixture-release-$VERSION" "$BASE/fixture-release-missing-sources-$VERSION" \
-  "$BASE/fixture-release-missing-javadoc-$VERSION" "$WORK"
+  "$BASE/fixture-release-missing-javadoc-$VERSION" \
+  "$BASE/fixture-release-mixed-pom-$VERSION" \
+  "$BASE/fixture-release-mixed-jar-$VERSION" "$WORK"
 
 seed_artifact() {
   local lane="$1"
@@ -61,15 +63,22 @@ seed_release_bundle() {
   local lane="$1"
   local parent_dir="$BASE/$lane-$VERSION/$GROUP_PATH/reactive-http-client/$VERSION"
   mkdir -p "$parent_dir"
-  printf '<project/>\n' > "$parent_dir/reactive-http-client-$VERSION.pom"
+  printf '<project><version>%s</version></project>\n' "$VERSION" \
+    > "$parent_dir/reactive-http-client-$VERSION.pom"
   printf 'reactive-http-client-%s.pom>maven-central=\n' "$VERSION" \
     > "$parent_dir/_remote.repositories"
 
   for module in reactive-http-client-starter reactive-http-client-test reactive-http-client-otel; do
     local dir="$BASE/$lane-$VERSION/$GROUP_PATH/$module/$VERSION"
+    local metadata="$WORK/jar-metadata/$lane/$module/META-INF/maven/io.github.huynhngochuyhoang/$module"
     mkdir -p "$dir"
-    printf '<project/>\n' > "$dir/$module-$VERSION.pom"
-    printf 'fixture jar\n' > "$dir/$module-$VERSION.jar"
+    printf '<project><parent><version>%s</version></parent></project>\n' "$VERSION" \
+      > "$dir/$module-$VERSION.pom"
+    mkdir -p "$metadata"
+    printf 'artifactId=%s\ngroupId=io.github.huynhngochuyhoang\nversion=%s\n' \
+      "$module" "$VERSION" > "$metadata/pom.properties"
+    jar --create --file "$dir/$module-$VERSION.jar" \
+      -C "$WORK/jar-metadata/$lane/$module" META-INF
     printf 'fixture sources\n' > "$dir/$module-$VERSION-sources.jar"
     printf 'fixture javadoc\n' > "$dir/$module-$VERSION-javadoc.jar"
     {
@@ -102,6 +111,29 @@ if "$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
     fixture-release-missing-javadoc "$VERSION" "$WORK/release-missing-javadoc" \
     --release-artifacts "${release_artifacts[@]}"; then
   echo "Release bundle without a Javadoc jar unexpectedly passed" >&2
+  exit 1
+fi
+
+seed_release_bundle fixture-release-mixed-pom
+printf '<project><parent><version>other</version></parent></project>\n' \
+  > "$BASE/fixture-release-mixed-pom-$VERSION/$GROUP_PATH/reactive-http-client-test/$VERSION/reactive-http-client-test-$VERSION.pom"
+if "$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
+    fixture-release-mixed-pom "$VERSION" "$WORK/release-mixed-pom" \
+    --release-artifacts "${release_artifacts[@]}"; then
+  echo "Release bundle with a mismatched module POM version unexpectedly passed" >&2
+  exit 1
+fi
+
+seed_release_bundle fixture-release-mixed-jar
+mixed_jar_dir="$BASE/fixture-release-mixed-jar-$VERSION/$GROUP_PATH/reactive-http-client-test/$VERSION"
+mixed_metadata="$WORK/jar-metadata/fixture-release-mixed-jar/reactive-http-client-test/META-INF/maven/io.github.huynhngochuyhoang/reactive-http-client-test"
+sed -i 's/^version=.*/version=other/' "$mixed_metadata/pom.properties"
+jar --create --file "$mixed_jar_dir/reactive-http-client-test-$VERSION.jar" \
+  -C "$WORK/jar-metadata/fixture-release-mixed-jar/reactive-http-client-test" META-INF
+if "$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
+    fixture-release-mixed-jar "$VERSION" "$WORK/release-mixed-jar" \
+    --release-artifacts "${release_artifacts[@]}"; then
+  echo "Release bundle with a mismatched binary version unexpectedly passed" >&2
   exit 1
 fi
 

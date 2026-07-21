@@ -40,6 +40,24 @@ GROUP_PATH="io/github/huynhngochuyhoang"
 mkdir -p "$EVIDENCE_DIR/remote-markers"
 CHECKSUMS="$EVIDENCE_DIR/project-artifact-sha256.txt"
 
+declared_pom_version() {
+  local pom="$1"
+  local compact
+  local version
+  compact="$(tr -d '[:space:]' < "$pom")"
+  version="${compact#*<version>}"
+  [[ "$version" != "$compact" ]] || return 1
+  printf '%s\n' "${version%%</version>*}"
+}
+
+embedded_jar_version() {
+  local artifact="$1"
+  local jar="$2"
+  unzip -p "$jar" \
+    "META-INF/maven/io.github.huynhngochuyhoang/$artifact/pom.properties" \
+    | sed -n 's/^version=//p'
+}
+
 for artifact in "${ARTIFACTS[@]}"; do
   artifact_dir="$REPOSITORY/$GROUP_PATH/$artifact/$BASELINE_VERSION"
   marker="$artifact_dir/_remote.repositories"
@@ -52,6 +70,11 @@ for artifact in "${ARTIFACTS[@]}"; do
     || fail "$artifact POM was not resolved from Maven Central"
   sha256sum "$pom" >> "$CHECKSUMS"
 
+  if [[ "$REQUIRE_RELEASE_ARTIFACTS" == true ]]; then
+    [[ "$(declared_pom_version "$pom")" == "$BASELINE_VERSION" ]] \
+      || fail "$artifact POM declares a project version other than $BASELINE_VERSION"
+  fi
+
   if [[ "$artifact" != "reactive-http-client" ]]; then
     [[ -f "$jar" ]] || fail "missing published jar for $artifact:$BASELINE_VERSION"
     grep -Eq "^$artifact-$BASELINE_VERSION\\.jar>maven-central=$" "$marker" \
@@ -59,6 +82,8 @@ for artifact in "${ARTIFACTS[@]}"; do
     sha256sum "$jar" >> "$CHECKSUMS"
 
     if [[ "$REQUIRE_RELEASE_ARTIFACTS" == true ]]; then
+      [[ "$(embedded_jar_version "$artifact" "$jar")" == "$BASELINE_VERSION" ]] \
+        || fail "$artifact jar embeds a Maven version other than $BASELINE_VERSION"
       for classifier in sources javadoc; do
         attachment="$artifact_dir/$artifact-$BASELINE_VERSION-$classifier.jar"
         [[ -f "$attachment" ]] \
