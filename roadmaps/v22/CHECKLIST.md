@@ -666,21 +666,47 @@ Evidence:
 
 ## Priority 14 - V22 Release Go/No-Go
 
-### [ ] 14.1 Select release scope and version
+### [x] 14.1 Select release scope and version
 
-- [ ] Inventory production, API, configuration, and behavior changes.
-- [ ] Select `3.1.x` for fixes/hardening only.
-- [ ] Select `3.2.0` only for backward-compatible public additions.
-- [ ] Reject or defer incompatible changes.
-- [ ] Keep snapshot/public/baseline coordinates separated until release.
+- [x] Inventory production, API, configuration, and behavior changes.
+- [x] Select `3.1.x` for fixes/hardening only.
+- [x] Select `3.2.0` only for backward-compatible public additions.
+- [x] Reject or defer incompatible changes.
+- [x] Keep snapshot/public/baseline coordinates separated until release.
+
+Decision:
+
+- Select **`3.2.0`** for the V22 release candidate. A `3.1.x` patch is rejected
+  because the release adds backward-compatible public contracts rather than
+  containing fixes and hardening only.
+- The public API delta adds `HttpClientFailureStage`, bounded failure-stage
+  accessors on observer, lifecycle, and exchange-log contexts, and
+  `MockReactiveHttpClient.bodyError(...)`. Diagnostics schema v1 also adds
+  nullable provider-backed pool-policy fields while preserving collection-
+  backed unknown values.
+- Configuration and behavior changes are additive or hardening: connector-owned
+  response compression semantics, real H2/H2C evidence, pool-acquire and timeout
+  attribution, streaming replay/ownership alignment, OAuth2 refresh isolation,
+  diagnostics bounds, current-consumer verification, and benchmark fairness.
+- Completed V22 strict root/module compatibility checks against published
+  `3.1.0` report no incompatible public change. The available test-helper
+  japicmp report classifies `bodyError(...)` as a new method; OTel has no public
+  signature removal. Any incompatible result discovered by the final 14.2 rerun
+  blocks release and must be reverted or deferred.
+- Keep the reactor and current consumer/native fixtures on `3.2.0` for the
+  release candidate.
+  Keep `latest.published.version`, public dependency snippets, API compatibility,
+  and benchmark baselines on published `3.1.0` until `3.2.0` is published and
+  every companion artifact resolves from Maven Central. Tag creation,
+  publication, and baseline transition remain part of 14.2.
 
 ### [ ] 14.2 Assemble immutable release evidence
 
-- [ ] Run clean full reactor and strict root/module API checks.
+- [x] Run clean full reactor and strict root/module API checks.
 - [ ] Run packaging, current/published consumers, optional integrations, transport, AOT/native, metadata, and docs.
-- [ ] Resolve the complete published baseline from a fresh Central repository.
-- [ ] Promote or defer benchmark evidence according to claims.
-- [ ] Record one target-only readiness snapshot.
+- [x] Resolve the complete published baseline from a fresh Central repository.
+- [x] Promote or defer benchmark evidence according to claims.
+- [x] Record one target-only readiness snapshot.
 - [ ] For go, publish/tag/date/verify one exact commit and version.
 - [ ] For no-go, publish nothing and record blockers plus reproduction commands.
 - [ ] Move the next snapshot and baseline only after all companion artifacts resolve publicly.
@@ -688,7 +714,42 @@ Evidence:
 
 Evidence:
 
-- Pending.
+- Prepared the reactor, starter, test helper, OTel companion, benchmark module,
+  current-consumer fixture, and native fixture as the final `3.2.0` release
+  candidate. `latest.published.version`, public dependency snippets, strict API
+  compatibility, and benchmark baselines remain on published `3.1.0`.
+- Added the dated `3.2.0` changelog section and comparison links. The generated
+  release contract identifies this state as `release-candidate`, with
+  `plannedFinalVersion=3.2.0`, rather than treating the dated but not yet
+  published candidate as the latest published release.
+- `mvn -B -ntp clean verify` passed: 796 starter, 36 test-helper, and 40 OTel
+  tests, with fresh binary, source, and Javadoc artifacts. Generation packaging
+  verification also passed for all `3.2.0` artifacts.
+- Strict root and module-scoped japicmp checks passed against published `3.1.0`
+  from separate fresh Maven Central repositories. The API compatibility and
+  published-baseline negative fixtures also passed.
+- The complete published `3.1.0` parent, starter, test-helper, and OTel POM,
+  binary, source, and Javadoc bundle resolved from a fresh Central-only
+  repository with remote markers and SHA-256 provenance.
+- Current-reactor mock and assembled Boot 4 consumer verification passed against
+  target-local `3.2.0` artifacts. The independent published-consumer lane passed
+  against Central-only `3.1.0`, with reactor leakage rejected in both lanes.
+- The Boot `4.1.0` release-smoke row passed all 796 starter, 36 test-helper, and
+  40 OTel tests. This complements the clean default Boot `4.0.0` reactor run and
+  covers optional integrations, transport, AOT, metadata, and documentation.
+- Benchmark report promotion is deferred: the `3.2.0` changelog makes no
+  numerical latency, throughput, allocation, or overhead claim. V22 benchmark
+  fairness, smoke, current-candidate, and published-`3.1.0` audits remain
+  recorded under Priority 12.
+- Generated target-only readiness evidence is available at
+  `target/release-evidence/reactive-http-client-release-evidence.json`; it
+  reports current generated docs, no broken Markdown links, no stale benchmark
+  links, and the intentionally pending manual publication work.
+- Final immutable native provenance cannot be recorded before the release-prep
+  changes are committed because the native workflow rejects dirty source. After
+  that clean commit, rerun the native smoke against `3.2.0`; publication remains
+  blocked if it fails. Tag/Central publication, public artifact resolution, and
+  the post-release `3.3.0-SNAPSHOT`/`3.2.0` baseline transition remain open.
 
 ---
 

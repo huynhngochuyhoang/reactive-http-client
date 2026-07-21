@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-07-21
+
 ### Changed
 
 - **Complete published-baseline provenance.** Added one fresh-repository Maven Central check for the published parent plus starter, test-helper, and OTel POM, binary, source, and Javadoc artifacts; generated readiness evidence now uses that complete bundle, and current migration/consumer guidance consistently tracks published `3.1.0`.
@@ -1312,7 +1314,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.1...v3.0.0
 [2.14.1]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.0...v2.14.1
