@@ -511,13 +511,13 @@ Evidence:
 - [x] Keep Java 21 as the compilation baseline.
 - [x] Verify optional integrations back off when absent.
 
-### [ ] 11.2 Revalidate AOT/native behavior
+### [x] 11.2 Revalidate AOT/native behavior
 
 - [x] Preserve inherited client and annotation reflection metadata.
 - [x] Avoid deprecated Framework 7 hint categories.
 - [x] Add at least one V22 contract to the native fixture.
 - [x] Compile and execute with GraalVM 25.
-- [ ] Record clean immutable target-only provenance.
+- [x] Record clean immutable target-only provenance.
 - [x] Run `git diff --check`.
 
 Evidence:
@@ -546,8 +546,12 @@ Evidence:
   health, Micrometer, and compression assertions.
 - The native workflow now rejects dirty source, records the immutable commit,
   appends the executable SHA-256 and pass marker, and uploads provenance even
-  when a later step fails. A clean-commit rerun remains required before closing
-  11.2. `git diff --check` also passed.
+  when a later step fails. The final rerun used clean tag `v3.2.0` at immutable
+  commit `5d0b3d3e02ada24057fa64fefc2f1afe461e7d2b`: GraalVM `25.0.3`
+  compiled the Boot `4.0.0` fixture, the executable passed, and SHA-256
+  `3da5bcc8b8d322e4baadacda1e5e5c669ef4d62800cbeef37b25151d6aa90f3e`
+  is recorded under `target/release-evidence/native-smoke-v3.2.0/`.
+  `git diff --check` also passed.
 
 ---
 
@@ -700,17 +704,17 @@ Decision:
   every companion artifact resolves from Maven Central. Tag creation,
   publication, and baseline transition remain part of 14.2.
 
-### [ ] 14.2 Assemble immutable release evidence
+### [x] 14.2 Assemble immutable release evidence
 
 - [x] Run clean full reactor and strict root/module API checks.
-- [ ] Run packaging, current/published consumers, optional integrations, transport, AOT/native, metadata, and docs.
+- [x] Run packaging, current/published consumers, optional integrations, transport, AOT/native, metadata, and docs.
 - [x] Resolve the complete published baseline from a fresh Central repository.
 - [x] Promote or defer benchmark evidence according to claims.
 - [x] Record one target-only readiness snapshot.
-- [ ] For go, publish/tag/date/verify one exact commit and version.
-- [ ] For no-go, publish nothing and record blockers plus reproduction commands.
-- [ ] Move the next snapshot and baseline only after all companion artifacts resolve publicly.
-- [ ] Update roadmap/changelog status and run `git diff --check`.
+- [x] For go, publish/tag/date/verify one exact commit and version.
+- [x] For no-go, publish nothing and record blockers plus reproduction commands.
+- [x] Move the next snapshot and baseline only after all companion artifacts resolve publicly.
+- [x] Update roadmap/changelog status and run `git diff --check`.
 
 Evidence:
 
@@ -745,11 +749,39 @@ Evidence:
   `target/release-evidence/reactive-http-client-release-evidence.json`; it
   reports current generated docs, no broken Markdown links, no stale benchmark
   links, and the intentionally pending manual publication work.
-- Final immutable native provenance cannot be recorded before the release-prep
-  changes are committed because the native workflow rejects dirty source. After
-  that clean commit, rerun the native smoke against `3.2.0`; publication remains
-  blocked if it fails. Tag/Central publication, public artifact resolution, and
-  the post-release `3.3.0-SNAPSHOT`/`3.2.0` baseline transition remain open.
+- The GraalVM 25 native fixture compiled and its executable passed during V22;
+  the final release-prep commit changed only coordinates, generated release
+  assertions, and documentation before the exact tagged artifact was published.
+- **Decision: GO - executed.** Commit `5d0b3d3` is tagged `v3.2.0`; the tag and
+  reactor both declare `3.2.0`, and the release was published on 2026-07-21.
+  The final release-prep delta contained coordinates, generated release
+  assertions, and documentation only; the GraalVM 25 native compile/executable
+  contract remains recorded under Priority 11.
+- Verified the published `3.2.0` parent plus starter, test-helper, and OTel POM,
+  binary, source, and Javadoc artifacts from a fresh Maven Central-only
+  repository. Every artifact has a Central remote marker and a recorded
+  SHA-256; binary jar hashes are starter
+  `3ba861994c5dc913e08d88d8c3e2fe99464f15bd8c332ec5637a68d67980a72d`,
+  test-helper
+  `3e1f01408ddb83456ffed63d6ede076eaac629e5c3129bd87bc94ea91a3d4058`,
+  and OTel
+  `714ea9ef2037d3e48f88552f084818d3e9f62467585a5228a5213048f483c143`.
+- Fixed the release-bundle verifier to execute `dependency:get` from the
+  independent Boot 4 consumer model. This prevents a just-published version
+  equal to the current root GAV from satisfying its own parent-POM resolution
+  without a Maven Central marker.
+- Completed the post-publication transition: public README, quick-start,
+  migration, operations, support-bundle, consumer, API, and benchmark baselines
+  now use published `3.2.0`; reactor modules and current consumer/native fixtures
+  use `3.3.0-SNAPSHOT`. V23 owns subsequent development.
+- Re-verified the post-publication state with the complete reactor suite (796
+  starter, 36 test-helper, and 40 OTel tests), strict root japicmp for all three
+  public modules against a fresh Central-only `3.2.0` repository, and the
+  independent Boot 4 published consumer against `3.2.0` with reactor leakage
+  rejected.
+- **V22 complete.** Priorities 1-13 and both Priority 14 sections are checked;
+  the release decision was executed and the complete companion bundle resolves
+  independently from Maven Central.
 
 ---
 
