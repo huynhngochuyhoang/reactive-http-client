@@ -118,8 +118,8 @@ observability, resilience wrapping, transport, or client-builder behavior, refre
 the current-workspace release benchmark before making current-release performance
 claims.
 
-A published-baseline report generated with `benchmark.starter.version=3.1.0`
-measures the published `3.1.0` artifact, not the current workspace. When
+A published-baseline report generated with `benchmark.starter.version=3.2.0`
+measures the published `3.2.0` artifact, not the current workspace. When
 comparing a current candidate to that baseline, keep the reports separate and
 name both versions. Do not reuse the `2.12.0` report as evidence for a different
 starter version.
@@ -128,7 +128,7 @@ Current-vs-baseline comparisons should use the paired report paths from the
 release evidence manifest: the current candidate report under
 `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md` and
 the published baseline report under
-`reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.1.0/release-jmh.md`.
+`reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.2.0/release-jmh.md`.
 Resolve the published baseline artifacts before promoting a comparison, and cite
 only a source-controlled promoted report from public release notes.
 

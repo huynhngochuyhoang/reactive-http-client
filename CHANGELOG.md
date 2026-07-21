@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Open the post-`3.2.0` development line.** Verified the complete `3.2.0` parent, starter, test-helper, and OTel release bundle from Maven Central; moved public examples plus API, consumer, and benchmark baselines to `3.2.0`; advanced reactor-only coordinates to `3.3.0-SNAPSHOT`; and made published-release verification resolve from a neutral consumer model so the current reactor cannot satisfy its own parent POM.
+
 ## [3.2.0] - 2026-07-21
 
 ### Changed

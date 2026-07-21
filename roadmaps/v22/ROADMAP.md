@@ -1,6 +1,7 @@
 # Reactive HTTP Client - Roadmap V22
 
-> **Status:** draft
+> **Status:** completed - `3.2.0` published to Maven Central; development on
+> `3.3.0-SNAPSHOT`
 > **Theme:** wire-level reliability and actionable failure diagnostics after
 > the first two Spring Boot 4 releases
 > **Development line:** `3.2.0-SNAPSHOT`

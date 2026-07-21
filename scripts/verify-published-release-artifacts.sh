@@ -24,7 +24,8 @@ fail() {
 [[ ! -e "$EVIDENCE_DIR" ]] || fail "fresh evidence directory required; remove $EVIDENCE_DIR"
 mkdir -p "$REPOSITORY"
 
-MAVEN=(mvn -B -ntp -s "$SETTINGS" -Dmaven.repo.local="$REPOSITORY")
+MAVEN=(mvn -B -ntp -s "$SETTINGS" -f "$ROOT_DIR/.github/boot4-consumer/pom.xml"
+  -Dmaven.repo.local="$REPOSITORY")
 "${MAVEN[@]}" dependency:get \
   -Dartifact="$GROUP_ID:reactive-http-client:$PUBLISHED_VERSION:pom" -Dtransitive=false
 
