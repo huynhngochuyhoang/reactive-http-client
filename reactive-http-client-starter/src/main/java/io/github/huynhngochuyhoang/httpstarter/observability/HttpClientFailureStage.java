@@ -1,6 +1,11 @@
 package io.github.huynhngochuyhoang.httpstarter.observability;
 
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
+
+import javax.net.ssl.SSLException;
+import java.net.ConnectException;
+import java.net.UnknownHostException;
 
 /**
  * Bounded stage of an outbound failure when the runtime provides conclusive evidence.
@@ -11,8 +16,14 @@ import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutExcep
  * for general error handling.
  */
 public enum HttpClientFailureStage {
+    /** Failure while resolving the remote endpoint name. */
+    DNS_RESOLUTION,
+    /** Failure while connecting to or establishing a tunnel through a proxy. */
+    PROXY_CONNECT,
     /** Failure while establishing a connection to the remote endpoint. */
     CONNECT,
+    /** Failure while negotiating TLS, including certificate validation. */
+    TLS_HANDSHAKE,
     /** Failure while waiting for a connection from the Reactor Netty pool. */
     POOL_ACQUIRE,
     /** Failure while writing the outbound request. */
@@ -28,6 +39,9 @@ public enum HttpClientFailureStage {
     private static final String POOL_SHUTDOWN = "reactor.pool.PoolShutdownException";
     private static final String SHADED_POOL_PREFIX = "reactor.netty.internal.shaded.reactor.pool.";
     private static final String CONNECT_TIMEOUT = "io.netty.channel.ConnectTimeoutException";
+    private static final String PROXY_CONNECT_EXCEPTION = "io.netty.handler.proxy.ProxyConnectException";
+    private static final String WEB_CLIENT_REQUEST_EXCEPTION =
+            "org.springframework.web.reactive.function.client.WebClientRequestException";
     private static final String WRITE_TIMEOUT = "io.netty.handler.timeout.WriteTimeoutException";
     private static final String READ_TIMEOUT = "io.netty.handler.timeout.ReadTimeoutException";
 
@@ -37,7 +51,7 @@ public enum HttpClientFailureStage {
      * response headers were observed.
      *
      * @param error terminal outbound error
-     * @return proven connection, pool-acquire, or request-write stage; otherwise {@code null}
+     * @return proven DNS, proxy, TLS, connection, pool-acquire, or request-write stage; otherwise {@code null}
      */
     public static HttpClientFailureStage from(Throwable error) {
         return resolve(error, null, false);
@@ -59,8 +73,10 @@ public enum HttpClientFailureStage {
 
     /**
      * Resolves a stage using explicit evidence that the primary request passed
-     * pre-dispatch filters. Dispatch evidence disambiguates only read timeouts;
-     * concrete connect, pool-acquire, and request-write stages remain attributable.
+     * pre-dispatch filters. Dispatch evidence disambiguates read timeouts and arbitrary
+     * outer wrappers; direct concrete pre-response failures and WebClient transport
+     * failures remain attributable.
+     * Auth-provider failures are never promoted into business-request transport stages.
      *
      * @param error terminal outbound error
      * @param statusCode observed HTTP status, or {@code null} before response headers
@@ -76,35 +92,69 @@ public enum HttpClientFailureStage {
             Throwable error, Integer statusCode, boolean responseStateKnown) {
         Throwable current = error;
         int depth = 0;
+        boolean transportBoundarySeen = false;
+        HttpClientFailureStage deferredStage = null;
         while (current != null && depth < MAX_CAUSE_DEPTH) {
             if (current instanceof LogicalCallTimeoutException logicalCallTimeout) {
                 return logicalCallTimeout.getFailureStage();
             }
+            if (current instanceof AuthProviderException) {
+                return null;
+            }
             String className = current.getClass().getName();
-            if (POOL_ACQUIRE_TIMEOUT.equals(className)
+            if (isType(current, WEB_CLIENT_REQUEST_EXCEPTION)) {
+                transportBoundarySeen = true;
+            }
+            boolean concreteFailureEligible = depth == 0 || transportBoundarySeen || responseStateKnown;
+            if (concreteFailureEligible && current instanceof UnknownHostException) {
+                return DNS_RESOLUTION;
+            }
+            if (concreteFailureEligible && isType(current, PROXY_CONNECT_EXCEPTION)) {
+                return PROXY_CONNECT;
+            }
+            if (concreteFailureEligible && current instanceof SSLException) {
+                // HTTPS proxy tunnel rejection can be wrapped by an outer SSL failure.
+                deferredStage = TLS_HANDSHAKE;
+            }
+            if (concreteFailureEligible && (CONNECT_TIMEOUT.equals(className)
+                    || current instanceof ConnectException)) {
+                return CONNECT;
+            }
+            if (concreteFailureEligible && (POOL_ACQUIRE_TIMEOUT.equals(className)
                     || POOL_ACQUIRE_PENDING_LIMIT.equals(className)
                     || POOL_SHUTDOWN.equals(className)
                     || (className.startsWith(SHADED_POOL_PREFIX)
                             && (className.endsWith("PoolAcquireTimeoutException")
                             || className.endsWith("PoolAcquirePendingLimitException")
-                            || className.endsWith("PoolShutdownException")))) {
+                            || className.endsWith("PoolShutdownException"))))) {
                 return POOL_ACQUIRE;
             }
-            if (CONNECT_TIMEOUT.equals(className)) {
-                return CONNECT;
-            }
-            if (WRITE_TIMEOUT.equals(className)) {
+            if (concreteFailureEligible && WRITE_TIMEOUT.equals(className)) {
                 return REQUEST_WRITE;
             }
-            if (READ_TIMEOUT.equals(className)) {
+            if (concreteFailureEligible && READ_TIMEOUT.equals(className)) {
                 return responseStateKnown
                         ? (statusCode != null ? RESPONSE_BODY : RESPONSE_HEADERS)
                         : null;
+            }
+            if (depth == 0 && !responseStateKnown && !transportBoundarySeen) {
+                return deferredStage;
             }
             Throwable cause = current.getCause();
             current = cause != current ? cause : null;
             depth++;
         }
-        return null;
+        return deferredStage;
+    }
+
+    private static boolean isType(Throwable error, String typeName) {
+        Class<?> type = error.getClass();
+        while (type != null) {
+            if (typeName.equals(type.getName())) {
+                return true;
+            }
+            type = type.getSuperclass();
+        }
+        return false;
     }
 }

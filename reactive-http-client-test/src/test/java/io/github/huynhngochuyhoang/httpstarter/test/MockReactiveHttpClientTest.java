@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.*;
+import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategories;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
@@ -886,6 +887,36 @@ class MockReactiveHttpClientTest {
         assertThat(lifecycleError.get().statusCode()).isEqualTo(200);
         assertThat(lifecycleError.get().failureStage()).isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
         assertThat(lifecycleError.get().attemptNumber()).isEqualTo(1);
+    }
+
+    @Test
+    void connectorFailureModelsBoundedPreResponseStageWithoutTransportTiming() {
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        AtomicReference<ReactiveHttpClientLifecycleContext> lifecycleError = new AtomicReference<>();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .withObserver(observed::add)
+                .withLifecycleHook(new ReactiveHttpClientLifecycleHook() {
+                    @Override
+                    public void onError(ReactiveHttpClientLifecycleContext context) {
+                        lifecycleError.set(context);
+                    }
+                })
+                .respondTo(HttpMethod.GET, "/users/42", exchange -> {
+                    throw new RuntimeException(new UnknownHostException("missing.invalid"));
+                })
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectErrorMatches(error -> ErrorCategories.from(error) == ErrorCategory.UNKNOWN_HOST)
+                .verify();
+
+        assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getErrorCategory()).isEqualTo(ErrorCategory.UNKNOWN_HOST);
+            assertThat(event.getFailureStage()).isEqualTo(HttpClientFailureStage.DNS_RESOLUTION);
+            assertThat(event.getStatusCode()).isNull();
+        });
+        assertThat(lifecycleError.get().failureStage()).isEqualTo(HttpClientFailureStage.DNS_RESOLUTION);
+        assertThat(lifecycleError.get().statusCode()).isNull();
     }
 
     @Test

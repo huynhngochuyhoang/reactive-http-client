@@ -49,13 +49,14 @@ network sends. After retry exhaustion, terminal contexts retain the final emitte
 throwable and final subscription-attempt count; earlier attempt failures are not
 reported as the logical call terminal cause. Request-body serialization can fail after an attempt starts but
 before dispatch. Terminal cancellation is represented by a `CancellationException`
-and `ErrorCategory.CANCELLED`; it is not a timeout phase. `CONNECT`, `POOL_ACQUIRE`,
-`REQUEST_WRITE`, `RESPONSE_HEADERS`, and `RESPONSE_BODY` are reported only from
+and `ErrorCategory.CANCELLED`; it is not a timeout phase. `DNS_RESOLUTION`,
+`PROXY_CONNECT`, `CONNECT`, `TLS_HANDSHAKE`, `POOL_ACQUIRE`, `REQUEST_WRITE`,
+`RESPONSE_HEADERS`, and `RESPONSE_BODY` are reported only from
 concrete transport evidence for the final outbound request of the current attempt.
 Per-attempt evidence is reset on resilience retry and hidden 401 auth refresh;
-nested auth and other pre-dispatch read timeouts, plus generic timeouts, remain
-stage-unknown. Concrete connect, pool-acquire, and write exceptions do not require
-URL evidence.
+auth-provider failures are a hard boundary, and arbitrary custom-filter wrappers
+without final-request dispatch evidence remain stage-unknown. Direct concrete DNS,
+proxy, connect, TLS, pool-acquire, and write exceptions do not require URL evidence.
 
 An enabled `logical-call-timeout-ms` wraps the full caller subscription and does
 not reset for resilience retries, redirects, or hidden auth refresh. Its

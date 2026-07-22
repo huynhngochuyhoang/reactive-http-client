@@ -211,21 +211,49 @@ Evidence:
 
 ## Priority 5 - DNS, Proxy, TLS, and Connect Failure Attribution
 
-### [ ] 5.1 Add deterministic pre-response fixtures
+### [x] 5.1 Add deterministic pre-response fixtures
 
-- [ ] Cover DNS resolution, proxy connection/tunnel, TLS handshake, connect timeout,
+- [x] Cover DNS resolution, proxy connection/tunnel, TLS handshake, connect timeout,
       and certificate failures where local fixtures can prove ownership.
-- [ ] Preserve concrete pre-response stages without requiring response URL/status evidence.
-- [ ] Prevent nested auth-provider and custom-filter errors from being promoted into
+- [x] Preserve concrete pre-response stages without requiring response URL/status evidence.
+- [x] Prevent nested auth-provider and custom-filter errors from being promoted into
       business-request transport stages.
-- [ ] Keep `ErrorCategory` backward compatible.
+- [x] Keep `ErrorCategory` backward compatible.
 
-### [ ] 5.2 Align bounded failure evidence
+### [x] 5.2 Align bounded failure evidence
 
-- [ ] Expose only additive low-cardinality stage values.
-- [ ] Align lifecycle, observer, exchange-log, health, diagnostics, and mock behavior.
-- [ ] Add sanitized operations reproduction guidance for every supported stage.
-- [ ] Run focused real-transport and compatibility tests.
+- [x] Expose only additive low-cardinality stage values.
+- [x] Align lifecycle, observer, exchange-log, health, diagnostics, and mock behavior.
+- [x] Add sanitized operations reproduction guidance for every supported stage.
+- [x] Run focused real-transport and compatibility tests.
+
+Evidence:
+
+- Added the bounded `DNS_RESOLUTION`, `PROXY_CONNECT`, and `TLS_HANDSHAKE` values;
+  expanded `CONNECT` to cover direct connection refusal while retaining existing
+  connect-timeout behavior. The eight-value stage set remains low-cardinality.
+- Reserved `.invalid` DNS with a bounded resolver query, a closed loopback port, a
+  local proxy returning `407` to `CONNECT`, a plaintext peer on an HTTPS port, and
+  an untrusted loopback certificate prove DNS, connect, proxy-tunnel, TLS-handshake,
+  and certificate attribution. Synthetic Netty connect-timeout coverage remains.
+- `WebClientRequestException` is the recognized wrapped transport boundary. Direct
+  concrete failures remain attributable without URL or status evidence; auth-provider
+  exceptions are a hard boundary, and arbitrary nested custom-filter failures require
+  final-request dispatch evidence before their cause chain is considered.
+- `ErrorCategory` is unchanged. In particular, DNS remains `UNKNOWN_HOST`, direct
+  connect remains `CONNECT_ERROR`, TLS remains `TLS_ERROR`, and HTTPS proxy failures
+  retain the category selected from their existing outer exception chain.
+- Production starter coverage proves observer, lifecycle, and exchange-log parity.
+  Micrometer and OTel export only enum names, health counts the failures without new
+  per-stage fields, configured-client diagnostics remain request-agnostic, and the mock
+  helper reproduces terminal stage semantics without claiming transport timing.
+- Error, timeout, observability, diagnostic-context, support-bundle, and operations
+  guidance now use the same stage set and include sanitized `EXAMPLE_` reproduction
+  procedures for every supported stage.
+- Focused real-transport, timeout compatibility, Micrometer, OTel, health, mock,
+  generated-documentation, and release-documentation tests passed. The complete
+  starter, test-helper, and OTel suites passed. Strict starter japicmp against
+  published `3.2.0` passed, and `git diff --check` passed.
 
 ---
 

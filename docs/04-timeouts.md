@@ -77,20 +77,24 @@ owns the inner body and its later consumption is not subject to this budget.
 
 | Stage | Proven evidence | Status/headers |
 |---|---|---|
-| `CONNECT` | Netty connect timeout | No HTTP status or response headers |
+| `DNS_RESOLUTION` | `UnknownHostException` from the business-request transport | No HTTP status or response headers |
+| `PROXY_CONNECT` | Netty proxy connection or tunnel failure | No downstream HTTP status or response headers |
+| `CONNECT` | Connection refusal or Netty connect timeout | No HTTP status or response headers |
+| `TLS_HANDSHAKE` | `SSLException` during handshake or certificate validation | No HTTP status or response headers |
 | `POOL_ACQUIRE` | Reactor Pool acquire timeout, pending limit, or shutdown while waiting | No HTTP status or response headers |
 | `REQUEST_WRITE` | Netty write timeout | No response status or headers |
 | `RESPONSE_HEADERS` | Netty read timeout after final request dispatch but before status was observed | No HTTP status or response headers |
 | `RESPONSE_BODY` | Netty read timeout after status was observed | Status is retained; exchange logs also retain response headers |
 
 Dispatch evidence is reset for every resilience retry and hidden 401 auth refresh,
-so terminal attribution describes the final attempt. A nested auth or other
-pre-dispatch read timeout does not belong to the primary exchange and leaves the
-stage unset. Concrete connect, pool-acquire, and write failures remain attributable
-without URL evidence. A generic `TimeoutException` also does not prove a transport phase. Cancellation is reported as `ErrorCategory.CANCELLED`,
+so terminal attribution describes the final attempt. Direct concrete DNS, proxy, connect, TLS, pool-acquire, and write failures remain
+attributable without URL evidence. Auth-provider failures are a hard boundary; arbitrary
+pre-dispatch filter wrappers remain unknown unless final-request dispatch was observed. A generic `TimeoutException` also does not prove a transport phase. Cancellation is reported as `ErrorCategory.CANCELLED`,
 not as a timeout.
-Connect timeout retains the existing `CONNECT_ERROR` category; read, write, and
-pool-acquire timeouts retain `TIMEOUT`.
+DNS retains `UNKNOWN_HOST`, TLS retains `TLS_ERROR`, and connect failures retain
+`CONNECT_ERROR`. Proxy failures preserve the category selected from the existing outer
+exception chain, which can be `CONNECT_ERROR` or `TLS_ERROR` for an HTTPS tunnel. Read,
+write, and pool-acquire timeouts retain `TIMEOUT`.
 
 Timeouts after headers, including failures while decoding a `Mono<T>` body or
 consuming a direct streaming `Flux<T>` body, preserve the observed status in

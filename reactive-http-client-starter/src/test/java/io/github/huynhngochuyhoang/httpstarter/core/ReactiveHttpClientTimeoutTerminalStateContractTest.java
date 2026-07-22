@@ -12,20 +12,28 @@ import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureSt
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.netty.channel.ConnectTimeoutException;
+import io.netty.handler.proxy.ProxyConnectException;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
+import javax.net.ssl.SSLHandshakeException;
+import java.net.ConnectException;
+import java.net.URI;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -59,8 +67,7 @@ class ReactiveHttpClientTimeoutTerminalStateContractTest {
                 .isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
         Throwable authTimeout = new AuthProviderException("auth-client", ReadTimeoutException.INSTANCE);
         assertThat(HttpClientFailureStage.from(authTimeout, null, false)).isNull();
-        assertThat(HttpClientFailureStage.from(authTimeout, null, true))
-                .isEqualTo(HttpClientFailureStage.RESPONSE_HEADERS);
+        assertThat(HttpClientFailureStage.from(authTimeout, null, true)).isNull();
         assertThat(HttpClientFailureStage.from(new java.util.concurrent.TimeoutException())).isNull();
         assertThat(ErrorCategories.from(WriteTimeoutException.INSTANCE)).isEqualTo(ErrorCategory.TIMEOUT);
         assertThat(ErrorCategories.from(new ConnectTimeoutException("connect")))
@@ -70,7 +77,68 @@ class ReactiveHttpClientTimeoutTerminalStateContractTest {
         for (int i = 0; i < 16; i++) {
             beyondBound = new RuntimeException(beyondBound);
         }
-        assertThat(HttpClientFailureStage.from(beyondBound)).isNull();
+        assertThat(HttpClientFailureStage.from(beyondBound, null, true)).isNull();
+    }
+
+    @Test
+    void preResponseFailuresExposeBoundedStagesWithoutChangingErrorCategories() {
+        assertThat(HttpClientFailureStage.values()).containsExactly(
+                HttpClientFailureStage.DNS_RESOLUTION,
+                HttpClientFailureStage.PROXY_CONNECT,
+                HttpClientFailureStage.CONNECT,
+                HttpClientFailureStage.TLS_HANDSHAKE,
+                HttpClientFailureStage.POOL_ACQUIRE,
+                HttpClientFailureStage.REQUEST_WRITE,
+                HttpClientFailureStage.RESPONSE_HEADERS,
+                HttpClientFailureStage.RESPONSE_BODY);
+        assertPreResponseFailure(
+                new UnknownHostException("missing.invalid"),
+                HttpClientFailureStage.DNS_RESOLUTION,
+                ErrorCategory.UNKNOWN_HOST);
+        assertPreResponseFailure(
+                new ProxyConnectException("proxy tunnel rejected"),
+                HttpClientFailureStage.PROXY_CONNECT,
+                ErrorCategory.CONNECT_ERROR);
+        assertPreResponseFailure(
+                new ConnectException("connection refused"),
+                HttpClientFailureStage.CONNECT,
+                ErrorCategory.CONNECT_ERROR);
+        assertPreResponseFailure(
+                new SSLHandshakeException("certificate rejected"),
+                HttpClientFailureStage.TLS_HANDSHAKE,
+                ErrorCategory.TLS_ERROR);
+    }
+
+    @Test
+    void transportWrappersAreTraversedButAuthAndPreDispatchFilterWrappersAreNotPromoted() {
+        Throwable dnsFailure = new WebClientRequestException(
+                new UnknownHostException("missing.invalid"),
+                HttpMethod.GET,
+                URI.create("http://missing.invalid/orders"),
+                HttpHeaders.EMPTY);
+
+        assertThat(HttpClientFailureStage.from(dnsFailure, null, false))
+                .isEqualTo(HttpClientFailureStage.DNS_RESOLUTION);
+        assertThat(HttpClientFailureStage.from(
+                new RuntimeException("custom nested client", dnsFailure), null, false))
+                .isNull();
+        assertThat(HttpClientFailureStage.from(new RuntimeException("retry", dnsFailure), null, true))
+                .isEqualTo(HttpClientFailureStage.DNS_RESOLUTION);
+        assertThat(HttpClientFailureStage.from(
+                new RuntimeException("custom filter", new ConnectException("nested")), null, false))
+                .isNull();
+        assertThat(HttpClientFailureStage.from(
+                new AuthProviderException("orders", dnsFailure), null, true))
+                .isNull();
+    }
+
+    private static void assertPreResponseFailure(
+            Throwable error,
+            HttpClientFailureStage expectedStage,
+            ErrorCategory expectedCategory) {
+        assertThat(HttpClientFailureStage.from(error)).isEqualTo(expectedStage);
+        assertThat(HttpClientFailureStage.from(error, null, false)).isEqualTo(expectedStage);
+        assertThat(ErrorCategories.from(error)).isEqualTo(expectedCategory);
     }
 
     @Test

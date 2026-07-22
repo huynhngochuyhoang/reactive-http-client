@@ -394,6 +394,25 @@ Do not add concrete upstream addresses to the bundle by default. The stage and
 pool policy are sufficient for saturation triage; enable server-address reporting
 only under the existing opt-in and sanitize it before sharing.
 
+## DNS, Proxy, Connect, and TLS Incidents
+
+Minimal safe bundle:
+
+- Metadata-only terminal observer, lifecycle, or exchange-log evidence with the outermost
+  exception class, bounded cause-class chain, compatible `ErrorCategory`, and optional
+  `DNS_RESOLUTION`, `PROXY_CONNECT`, `CONNECT`, or `TLS_HANDSHAKE` stage.
+- Sanitized effective proxy/TLS mode and timeout source; omit proxy credentials, trust-store
+  and key-store contents, private keys, concrete internal addresses, and unapproved names.
+- The matching approved resolver, proxy, connect, or TLS reproduction from
+  [Operations Troubleshooting](30-operations-troubleshooting.md#pre-response-transport-failures).
+- Health sample/error counts for the same client and time window. Health intentionally has
+  no new per-stage counters; request timer tags carry the bounded stage.
+
+An `AuthProviderException` is a hard boundary even when its token-service cause is DNS,
+proxy, connect, or TLS related. Arbitrary custom-filter wrappers before final request
+observation are also stage-unknown. Do not attribute those failures to the downstream
+business request.
+
 ## Timeout Incidents
 
 Minimal safe bundle:
@@ -410,7 +429,7 @@ Minimal safe bundle:
 headers. A nested auth or other pre-dispatch read timeout leaves the stage unset.
 `RESPONSE_BODY` preserves
 the observed status, and exchange logs can retain response headers; lifecycle hooks
-and observer events do not expose response-header maps. `CONNECT`, `POOL_ACQUIRE`,
+and observer events do not expose response-header maps. `DNS_RESOLUTION`, `PROXY_CONNECT`, `CONNECT`, `TLS_HANDSHAKE`, `POOL_ACQUIRE`,
 and `REQUEST_WRITE` identify their concrete pre-response boundaries. A missing stage
 is unknown, not proof of a specific phase. Redact headers before sharing them.
 
