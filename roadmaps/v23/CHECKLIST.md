@@ -141,7 +141,8 @@ Evidence:
   proven final-attempt stage. An observed status proves `RESPONSE_BODY`; expiry
   before status remains unknown because URL/request creation does not distinguish
   pool queueing from a dispatched request waiting for headers. Prior-attempt state
-  is cleared between retries and hidden auth replay.
+  is cleared between retries and hidden auth replay, and compare-and-set cleanup
+  prevents a late prior-attempt `doFinally` from clearing the active retry.
 - Real-clock contracts cover auth expiry before dispatch, retry backoff, hidden
   `401` refresh, a saturated one-connection pool, redirect handling, unary response
   consumption, an active direct stream, and delayed caller-owned envelope body
@@ -152,7 +153,7 @@ Evidence:
   diagnostics expose the separate budget, diagnostics schema v1 adds
   `logicalCallTimeoutMs`, and `MockReactiveHttpClient.logicalCallTimeout(...)`
   applies the production operator without claiming transport-phase simulation.
-- `LogicalCallTimeoutBudgetContractTest` passed all 10 cases. The focused metadata,
+- `LogicalCallTimeoutBudgetContractTest` passed all 11 cases. The focused metadata,
   generated documentation, diagnostics, factory, contract snapshot, exporter, and
   mock-helper tests passed. `mvn -q -pl reactive-http-client-test -am test` passed
   the complete starter and test-helper suites, and `git diff --check` passed.

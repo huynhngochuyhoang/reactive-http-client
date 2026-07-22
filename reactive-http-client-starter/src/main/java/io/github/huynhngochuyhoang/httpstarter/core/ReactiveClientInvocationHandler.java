@@ -421,7 +421,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             int attempt = state.attemptCount.incrementAndGet();
             state.start.compareAndSet(0L, System.currentTimeMillis());
             state.resetAttemptEvidence();
-            state.attemptInProgress.set(true);
+            state.activeAttemptNumber.set(attempt);
             notifyLifecycleAttempt(lifecycleHooks, plan, effectiveApi, preparedResolved, state.requestUrl.get(), null, null, attempt);
             if (exchangeLogger == null && state.firstAttempt.compareAndSet(true, false)) {
                 logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.start.get());
@@ -439,7 +439,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     shouldApplyResponseTimeout,
                     state.requestUrl,
                     state.finalRequestObservation,
-                    state::resetAttemptEvidence));
+                    state::resetAttemptEvidence))
+                    .doOnError(ignored -> state.activeAttemptNumber.compareAndSet(attempt, 0))
+                    .doOnCancel(() -> state.activeAttemptNumber.compareAndSet(attempt, 0));
         });
     }
 
@@ -540,15 +542,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Function<ClientResponse, Publisher<T>> successResponseHandler) {
         return Flux.deferContextual(context -> {
             SubscriptionState state = subscriptionState(context);
-            return requestHeadersSpecMono.flatMapMany(requestHeadersSpec -> requestHeadersSpec.exchangeToFlux(clientResponse -> {
-                state.responseStatus.set(clientResponse.statusCode());
-                state.responseHeaders.set(copyHeaders(clientResponse));
+            AtomicInteger attempt = new AtomicInteger();
+            return requestHeadersSpecMono.flatMapMany(requestHeadersSpec -> {
+                attempt.set(state.activeAttemptNumber.get());
+                return requestHeadersSpec.exchangeToFlux(clientResponse -> {
+                    state.responseStatus.set(clientResponse.statusCode());
+                    state.responseHeaders.set(copyHeaders(clientResponse));
 
-                if (clientResponse.statusCode().isError()) {
-                    return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
-                }
-                return Flux.from(successResponseHandler.apply(clientResponse));
-            })).doFinally(ignored -> state.attemptInProgress.set(false));
+                    if (clientResponse.statusCode().isError()) {
+                        return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
+                    }
+                    return Flux.from(successResponseHandler.apply(clientResponse));
+                });
+            }).doFinally(ignored -> state.activeAttemptNumber.compareAndSet(attempt.get(), 0));
         });
     }
 
@@ -570,19 +576,22 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono) {
         return Mono.deferContextual(context -> {
             SubscriptionState state = subscriptionState(context);
-            return requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.retrieve()
-                    .onStatus(HttpStatusCode::isError, response -> {
-                        state.responseStatus.set(response.statusCode());
-                        state.responseHeaders.set(copyHeaders(response));
-                        return decodeErrorResponse(response);
-                    })
-                    .toEntityFlux(DataBuffer.class)
-                    .map(this::withDiscardRelease)
-                    .doOnNext(entity -> {
-                        state.responseStatus.set(entity.getStatusCode());
-                        state.responseHeaders.set(copyHeaders(entity.getHeaders()));
-                    }))
-                    .doFinally(ignored -> state.attemptInProgress.set(false));
+            AtomicInteger attempt = new AtomicInteger();
+            return requestHeadersSpecMono.flatMap(requestHeadersSpec -> {
+                attempt.set(state.activeAttemptNumber.get());
+                return requestHeadersSpec.retrieve()
+                        .onStatus(HttpStatusCode::isError, response -> {
+                            state.responseStatus.set(response.statusCode());
+                            state.responseHeaders.set(copyHeaders(response));
+                            return decodeErrorResponse(response);
+                        })
+                        .toEntityFlux(DataBuffer.class)
+                        .map(this::withDiscardRelease)
+                        .doOnNext(entity -> {
+                            state.responseStatus.set(entity.getStatusCode());
+                            state.responseHeaders.set(copyHeaders(entity.getHeaders()));
+                        });
+            }).doFinally(ignored -> state.activeAttemptNumber.compareAndSet(attempt.get(), 0));
         });
     }
 
@@ -802,7 +811,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     private LogicalCallTimeoutException logicalCallTimeout(SubscriptionState state, long timeoutMs) {
         HttpClientFailureStage failureStage = null;
-        if (state.attemptInProgress.get()) {
+        int activeAttempt = state.activeAttemptNumber.get();
+        if (activeAttempt > 0 && activeAttempt == state.attemptCount.get()) {
             if (state.responseStatus.get() != null) {
                 failureStage = HttpClientFailureStage.RESPONSE_BODY;
             }
@@ -1859,7 +1869,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         private final AtomicReference<HttpStatusCode> responseStatus = new AtomicReference<>();
         private final AtomicReference<Map<String, List<String>>> responseHeaders = new AtomicReference<>(Map.of());
         private final AtomicReference<Throwable> terminalError = new AtomicReference<>();
-        private final AtomicBoolean attemptInProgress = new AtomicBoolean();
+        private final AtomicInteger activeAttemptNumber = new AtomicInteger();
 
         private SubscriptionState(RequestArgumentResolver.ResolvedArgs resolved) {
             this.preparedResolved = new AtomicReference<>(resolved);

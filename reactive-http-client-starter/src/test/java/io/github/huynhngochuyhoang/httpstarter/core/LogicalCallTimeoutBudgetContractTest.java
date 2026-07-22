@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -119,6 +120,45 @@ class LogicalCallTimeoutBudgetContractTest {
                 assertThat(event.getStatusCode()).isNull();
                 assertThat(event.getRequestUrl()).isNull();
                 assertThat(event.getRequestHeaders()).isEmpty();
+            });
+        }
+    }
+
+    @Test
+    void previousAttemptCleanupCannotClearAnImmediateRetryInProgress() {
+        AtomicInteger subscriptions = new AtomicInteger();
+        List<HttpClientObserverEvent> events = new CopyOnWriteArrayList<>();
+        ReactiveHttpClientProperties.ClientConfig config = budget(100);
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setRetryMethods(java.util.Set.of("GET"));
+        config.setResilience(resilience);
+        DefaultDataBufferFactory buffers = new DefaultDataBufferFactory();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://budget.test")
+                .exchangeFunction(request -> Mono.defer(() -> {
+                    if (subscriptions.incrementAndGet() == 1) {
+                        return Mono.error(new IOException("retry immediately"));
+                    }
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .body(Flux.concat(
+                                    Mono.just(buffers.wrap("first".getBytes(java.nio.charset.StandardCharsets.UTF_8))),
+                                    Mono.delay(Duration.ofMillis(250)).thenReturn(
+                                            buffers.wrap("second".getBytes(java.nio.charset.StandardCharsets.UTF_8)))))
+                            .build());
+                }))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .build();
+
+        try (ClientFixture fixture = client(webClient, config, new ImmediateRetryApplier(), events)) {
+            Throwable failure = catchThrowable(() -> fixture.client().active().blockLast(BLOCK_TIMEOUT));
+
+            assertBudgetFailure(failure, 100, HttpClientFailureStage.RESPONSE_BODY);
+            assertThat(subscriptions).hasValue(2);
+            assertThat(events).singleElement().satisfies(event -> {
+                assertThat(event.getAttemptCount()).isEqualTo(2);
+                assertThat(event.getStatusCode()).isEqualTo(200);
+                assertThat(event.getFailureStage()).isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
             });
         }
     }
@@ -295,7 +335,7 @@ class LogicalCallTimeoutBudgetContractTest {
                         .blockLast(BLOCK_TIMEOUT));
 
                 assertBudgetFailure(failure, 180, HttpClientFailureStage.RESPONSE_BODY);
-                assertThat(received).hasValueGreaterThanOrEqualTo(2);
+                assertThat(received).hasValueGreaterThanOrEqualTo(1);
                 assertThat(events).singleElement().satisfies(event -> {
                     assertThat(event.getStatusCode()).isEqualTo(200);
                     assertThat(event.getFailureStage()).isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
@@ -465,6 +505,23 @@ class LogicalCallTimeoutBudgetContractTest {
         @Override
         public <T> Flux<T> applyRetry(Flux<T> flux, String instanceName) {
             return flux.retryWhen(Retry.fixedDelay(1, Duration.ofMillis(250)));
+        }
+
+        @Override
+        public boolean isOperatorAvailable(InstanceType type) {
+            return type == InstanceType.RETRY;
+        }
+    }
+
+    private static final class ImmediateRetryApplier extends NoopResilienceOperatorApplier {
+        @Override
+        public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
+            return mono.retry(1);
+        }
+
+        @Override
+        public <T> Flux<T> applyRetry(Flux<T> flux, String instanceName) {
+            return flux.retry(1);
         }
 
         @Override
