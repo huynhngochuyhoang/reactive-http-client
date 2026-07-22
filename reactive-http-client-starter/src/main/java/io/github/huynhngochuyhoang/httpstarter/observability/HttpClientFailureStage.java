@@ -106,21 +106,23 @@ public enum HttpClientFailureStage {
                 transportBoundarySeen = true;
             }
             boolean concreteFailureEligible = depth == 0 || transportBoundarySeen || responseStateKnown;
-            if (concreteFailureEligible && current instanceof UnknownHostException) {
+            boolean preResponseFailureEligible = statusCode == null && concreteFailureEligible;
+            if (preResponseFailureEligible && current instanceof UnknownHostException) {
                 return DNS_RESOLUTION;
             }
-            if (concreteFailureEligible && isType(current, PROXY_CONNECT_EXCEPTION)) {
+            if (preResponseFailureEligible && isType(current, PROXY_CONNECT_EXCEPTION)) {
                 return PROXY_CONNECT;
             }
-            if (concreteFailureEligible && current instanceof SSLException) {
+            if (preResponseFailureEligible && current instanceof SSLException) {
                 // HTTPS proxy tunnel rejection can be wrapped by an outer SSL failure.
                 deferredStage = TLS_HANDSHAKE;
+                transportBoundarySeen = true;
             }
-            if (concreteFailureEligible && (CONNECT_TIMEOUT.equals(className)
+            if (preResponseFailureEligible && (CONNECT_TIMEOUT.equals(className)
                     || current instanceof ConnectException)) {
                 return CONNECT;
             }
-            if (concreteFailureEligible && (POOL_ACQUIRE_TIMEOUT.equals(className)
+            if (preResponseFailureEligible && (POOL_ACQUIRE_TIMEOUT.equals(className)
                     || POOL_ACQUIRE_PENDING_LIMIT.equals(className)
                     || POOL_SHUTDOWN.equals(className)
                     || (className.startsWith(SHADED_POOL_PREFIX)
@@ -129,7 +131,7 @@ public enum HttpClientFailureStage {
                             || className.endsWith("PoolShutdownException"))))) {
                 return POOL_ACQUIRE;
             }
-            if (concreteFailureEligible && WRITE_TIMEOUT.equals(className)) {
+            if (preResponseFailureEligible && WRITE_TIMEOUT.equals(className)) {
                 return REQUEST_WRITE;
             }
             if (concreteFailureEligible && READ_TIMEOUT.equals(className)) {

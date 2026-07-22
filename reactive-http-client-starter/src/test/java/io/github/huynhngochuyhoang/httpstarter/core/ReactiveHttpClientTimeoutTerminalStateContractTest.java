@@ -30,6 +30,7 @@ import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLHandshakeException;
 import java.net.ConnectException;
 import java.net.URI;
@@ -107,6 +108,24 @@ class ReactiveHttpClientTimeoutTerminalStateContractTest {
                 new SSLHandshakeException("certificate rejected"),
                 HttpClientFailureStage.TLS_HANDSHAKE,
                 ErrorCategory.TLS_ERROR);
+    }
+
+    @Test
+    void recordedStatusPreventsPreResponseAttribution() {
+        assertThat(HttpClientFailureStage.from(new UnknownHostException("late DNS"), 200, true)).isNull();
+        assertThat(HttpClientFailureStage.from(new ProxyConnectException("late proxy"), 200, true)).isNull();
+        assertThat(HttpClientFailureStage.from(new ConnectException("late connect"), 200, true)).isNull();
+        assertThat(HttpClientFailureStage.from(new SSLException("late TLS"), 200, true)).isNull();
+        assertThat(HttpClientFailureStage.from(WriteTimeoutException.INSTANCE, 200, true)).isNull();
+    }
+
+    @Test
+    void outerSslFailureYieldsToNestedProxyConnectFailureBeforeResponse() {
+        SSLException tlsWrapper = new SSLException(
+                "TLS tunnel setup failed", new ProxyConnectException("proxy rejected CONNECT"));
+
+        assertThat(HttpClientFailureStage.from(tlsWrapper, null, false))
+                .isEqualTo(HttpClientFailureStage.PROXY_CONNECT);
     }
 
     @Test
