@@ -16,7 +16,7 @@ reactive:
         max-idle-time-ms: 30000         # evict connections idle > 30 s (0 = off)
         max-life-time-ms: 300000        # recycle connections older than 5 min (0 = unlimited)
         evict-in-background-ms: 60000   # background sweep interval (0 = off)
-        metrics-enabled: false          # expose reactor.netty.connection.provider.* gauges
+        metrics-enabled: false          # expose reactive.http.client.connection.pool.* gauges
 ```
 
 | Property | Default | Description |
@@ -26,7 +26,7 @@ reactive:
 | `max-idle-time-ms` | `0` (off) | Evict connections that have been idle longer than this |
 | `max-life-time-ms` | `0` (unlimited) | Recycle connections older than this regardless of activity |
 | `evict-in-background-ms` | `0` (off) | Interval for background eviction sweeps |
-| `metrics-enabled` | `false` | Publish Reactor Netty pool gauges to the `MeterRegistry` |
+| `metrics-enabled` | `false` | Publish address-free starter aggregate pool gauges to the `MeterRegistry` |
 
 ---
 
@@ -79,20 +79,21 @@ metadata or infer it from `max-connections`; provider-backed diagnostics report
 
 ## Connection-pool metrics
 
-When `metrics-enabled: true`, the starter publishes address-free Reactor Netty
+When `metrics-enabled: true`, the starter publishes address-free starter aggregate
 pool gauges to the global `MeterRegistry`. Every gauge has exactly one bounded
 `name=reactive-http-client-<clientName>-<interface>` tag; remote addresses are
 not tags.
 
-Common gauges are `total.connections` and `idle.connections`. Protocol-specific
+Common gauges are `reactive.http.client.connection.pool.total.connections` and
+`reactive.http.client.connection.pool.idle.connections`. Protocol-specific
 capacity gauges are:
 
 | Protocol | Gauge | Description |
 |---|---|---|
-| HTTP/1.1 | `reactor.netty.connection.provider.active.connections` | Physical connections serving an exchange |
-| HTTP/1.1 | `reactor.netty.connection.provider.pending.connections` | Calls waiting for physical connection capacity |
-| HTTP/2 | `reactor.netty.connection.provider.active.streams` | Active streams on pooled H2 connections |
-| HTTP/2 | `reactor.netty.connection.provider.pending.streams` | Calls waiting for peer-advertised stream capacity |
+| HTTP/1.1 | `reactive.http.client.connection.pool.active.connections` | Physical connections serving an exchange |
+| HTTP/1.1 | `reactive.http.client.connection.pool.pending.connections` | Calls waiting for physical connection capacity |
+| HTTP/2 | `reactive.http.client.connection.pool.active.streams` | Active streams on pooled H2 connections |
+| HTTP/2 | `reactive.http.client.connection.pool.pending.streams` | Calls waiting for peer-advertised stream capacity |
 
 The public H2 pool view does not prove how active streams are distributed across
 physical connections, so the starter does not publish `active.connections` for H2.

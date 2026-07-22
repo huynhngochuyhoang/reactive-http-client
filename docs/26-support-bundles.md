@@ -381,7 +381,7 @@ Minimal safe bundle:
 - Provider-backed diagnostics snapshot showing configured protocol, capacity basis,
   pool source, maximum physical connections, pending-acquire timeout, and whether
   pool metrics are enabled. A null H2 stream limit is expected.
-- `reactor.netty.connection.provider.idle.connections` and `.total.connections`
+- `reactive.http.client.connection.pool.idle.connections` and `.total.connections`
   for the affected client. Add `.active.connections` and `.pending.connections`
   for HTTP/1.1 or `.active.streams` and `.pending.streams` for HTTP/2.
 - Request timer samples grouped by `failure.stage`; `POOL_ACQUIRE` is bounded

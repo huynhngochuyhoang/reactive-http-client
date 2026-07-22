@@ -16,12 +16,12 @@ import java.util.function.ToDoubleFunction;
 
 final class ProtocolAwareConnectionPoolMeterRegistrar implements ConnectionProvider.MeterRegistrar {
 
-    static final String TOTAL_CONNECTIONS = "reactor.netty.connection.provider.total.connections";
-    static final String ACTIVE_CONNECTIONS = "reactor.netty.connection.provider.active.connections";
-    static final String IDLE_CONNECTIONS = "reactor.netty.connection.provider.idle.connections";
-    static final String PENDING_CONNECTIONS = "reactor.netty.connection.provider.pending.connections";
-    static final String ACTIVE_STREAMS = "reactor.netty.connection.provider.active.streams";
-    static final String PENDING_STREAMS = "reactor.netty.connection.provider.pending.streams";
+    static final String TOTAL_CONNECTIONS = "reactive.http.client.connection.pool.total.connections";
+    static final String ACTIVE_CONNECTIONS = "reactive.http.client.connection.pool.active.connections";
+    static final String IDLE_CONNECTIONS = "reactive.http.client.connection.pool.idle.connections";
+    static final String PENDING_CONNECTIONS = "reactive.http.client.connection.pool.pending.connections";
+    static final String ACTIVE_STREAMS = "reactive.http.client.connection.pool.active.streams";
+    static final String PENDING_STREAMS = "reactive.http.client.connection.pool.pending.streams";
 
     private final String poolName;
     private final boolean http2;

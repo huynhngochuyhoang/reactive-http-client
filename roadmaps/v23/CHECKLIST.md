@@ -183,7 +183,9 @@ Evidence:
   advertises one concurrent stream. HTTP/1.1 queues additional connection demand,
   while H2 multiplexing uses one transport and queues the second stream until peer
   capacity is released.
-- Pool metrics now use one factory-owned registrar per client. Common
+- Pool metrics now use one factory-owned registrar per client and the starter-owned
+  `reactive.http.client.connection.pool.*` namespace, avoiding incompatible tag sets
+  when Reactor Netty built-in meters coexist. Common
   `total.connections` and `idle.connections` gauges carry only the bounded pool
   name; HTTP/1.1 adds active/pending connection gauges, while HTTP/2 adds
   `active.streams` and `pending.streams`. Remote addresses are deliberately

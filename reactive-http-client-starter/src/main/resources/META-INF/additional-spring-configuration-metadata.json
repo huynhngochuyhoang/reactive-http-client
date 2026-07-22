@@ -204,7 +204,7 @@
     {
       "name": "reactive.http.network.connection-pool.metrics-enabled",
       "type": "java.lang.Boolean",
-      "description": "When true, publishes Reactor Netty pool gauges (reactor.netty.connection.provider.*) to the MeterRegistry. Requires micrometer-core. Default: false.",
+      "description": "When true, publishes address-free starter aggregate pool gauges (reactive.http.client.connection.pool.*) to the MeterRegistry. Requires micrometer-core. Default: false.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig",
       "defaultValue": false
     },
@@ -596,7 +596,7 @@
     {
       "name": "reactive.http.clients.[name].pool.metrics-enabled",
       "type": "java.lang.Boolean",
-      "description": "Per-client pool metrics override. When true, publishes Reactor Netty pool gauges to the MeterRegistry.",
+      "description": "Per-client pool metrics override. When true, publishes address-free starter aggregate pool gauges to the MeterRegistry.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ConnectionPoolConfig"
     },
     {

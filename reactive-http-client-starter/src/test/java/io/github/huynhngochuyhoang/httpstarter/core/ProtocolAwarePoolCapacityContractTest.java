@@ -7,6 +7,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.netty.channel.Channel;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +36,41 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 class ProtocolAwarePoolCapacityContractTest {
 
     private static final Duration CALL_TIMEOUT = Duration.ofSeconds(5);
+
+    @Test
+    void aggregateMetersDoNotReuseReactorNettyMeterFamilies() throws Exception {
+        String reactorMeterName = "reactor.netty.connection.provider.total.connections";
+        try (CapacityServer server = CapacityServer.http11();
+             MeterFixture meters = new MeterFixture()) {
+            AtomicInteger reactorValue = new AtomicInteger(1);
+            meters.registry.gauge(reactorMeterName, Tags.of(
+                    "id", "reactor-provider-id",
+                    "name", "reactor-provider",
+                    "remote.address", "127.0.0.1:8080"), reactorValue);
+
+            try (ClientFixture fixture = ClientFixture.create(server, false, 2_000, true)) {
+                assertThat(fixture.client().probe().block(CALL_TIMEOUT)).isEqualTo("probe");
+                meters.awaitGauge(ProtocolAwareConnectionPoolMeterRegistrar.TOTAL_CONNECTIONS,
+                        fixture.poolName(), 1);
+
+                assertThat(List.of(
+                        ProtocolAwareConnectionPoolMeterRegistrar.TOTAL_CONNECTIONS,
+                        ProtocolAwareConnectionPoolMeterRegistrar.ACTIVE_CONNECTIONS,
+                        ProtocolAwareConnectionPoolMeterRegistrar.IDLE_CONNECTIONS,
+                        ProtocolAwareConnectionPoolMeterRegistrar.PENDING_CONNECTIONS,
+                        ProtocolAwareConnectionPoolMeterRegistrar.ACTIVE_STREAMS,
+                        ProtocolAwareConnectionPoolMeterRegistrar.PENDING_STREAMS))
+                        .allSatisfy(name -> assertThat(name)
+                                .startsWith("reactive.http.client.connection.pool.")
+                                .doesNotStartWith("reactor.netty.connection.provider."));
+                assertThat(meters.registry.find(reactorMeterName)
+                        .tags("id", "reactor-provider-id",
+                                "name", "reactor-provider",
+                                "remote.address", "127.0.0.1:8080")
+                        .gauge()).isNotNull();
+            }
+        }
+    }
 
     @Test
     void http11MetricsReportConnectionPressureWithoutAddressTags() throws Exception {

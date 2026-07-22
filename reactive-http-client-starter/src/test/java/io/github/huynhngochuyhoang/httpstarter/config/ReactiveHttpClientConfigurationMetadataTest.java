@@ -22,7 +22,8 @@ class ReactiveHttpClientConfigurationMetadataTest {
             "reactive\\.http\\.[A-Za-z0-9_.<>\\[\\]{}*-]+(?:\\[[^]\\s`)]*])?(?:\\.[A-Za-z0-9_.<>\\[\\]{}*-]+)*");
     private static final Set<String> CONFIGURATION_EXAMPLE_LANGUAGES = Set.of("properties", "yaml", "yml");
     private static final Set<String> METRIC_NAME_PREFIXES = Set.of(
-            "reactive.http.client.requests");
+            "reactive.http.client.requests",
+            "reactive.http.client.connection.pool");
 
     @Test
     void documentsImportantConfigurationProperties() throws IOException {
