@@ -37,6 +37,7 @@ historical evidence.
 | Unexpected HTTP/1.1, H2, or H2C behavior; malformed-request warning | Client `http2-enabled` policy, downstream-observed protocol, complete decoder warning, ALPN/TLS mode, intermediary path | [Protocol diagnosis](#protocol-and-framing) |
 | Gzip decode failure, unexpected encoded body, or response size unknown | Client `compression-enabled` policy, presence of negotiation/content-encoding headers, post-transport response headers, exception type | [Compression diagnosis](#compression) |
 | Pending requests, acquire timeout, or connection churn | Effective pool policy, active/idle/total/pending gauges, `POOL_ACQUIRE`, health `poolAcquireFailureCount` | [Pool saturation](#pool-saturation) |
+| DNS, proxy, connect, TLS, or certificate failure before status | Concrete exception chain, optional failure stage, sanitized resolver/proxy/TLS evidence | [Pre-response failures](#pre-response-transport-failures) |
 | Timeout before or after status | Concrete exception, final status, final-attempt dispatch evidence, optional failure stage | [Timeout phases](#timeout-phases) |
 | Upload stalls, cancellation, leaked buffers, or incomplete stream | Declared body/return shape, subscription and cancellation boundary, consumer release/forwarding path | [Streaming ownership](#streaming-ownership) |
 | OAuth2 refresh storm, token endpoint failure, or downstream 401 | Logical client name, sanitized auth mode, token endpoint status and safe headers, refresh/cooldown timing | [OAuth2 refresh](#oauth2-refresh) |
@@ -90,12 +91,39 @@ See [Response compression](12-proxy-tls.md#response-compression) and
 
 See [Diagnosing saturation](05-connection-pool.md#diagnosing-saturation).
 
+## Pre-response transport failures
+
+Use this bounded matrix; do not infer ownership from elapsed time or exception text alone.
+The commands are out-of-process checks against approved diagnostic endpoints, not proof
+that the starter made the same request. Replace every `EXAMPLE_` value locally and redact
+hosts, certificate subjects, and proxy details before sharing output.
+
+| Stage | Proven runtime evidence | Sanitized reproduction |
+|---|---|---|
+| `DNS_RESOLUTION` | `UnknownHostException` on the final business-request transport chain | Resolve an approved diagnostic name with `getent hosts "$EXAMPLE_DIAGNOSTIC_HOST"` and capture resolver configuration without search-domain secrets. |
+| `PROXY_CONNECT` | Netty `ProxyConnectException`; an HTTPS tunnel rejection can have an outer TLS exception | Run `curl --proxy "http://$EXAMPLE_PROXY_HOST:$EXAMPLE_PROXY_PORT" --head --verbose "https://$EXAMPLE_SAFE_TARGET"`; never include proxy credentials. |
+| `CONNECT` | Direct `ConnectException` or Netty connect timeout | Run `curl --connect-timeout 2 --head "http://$EXAMPLE_HOST:$EXAMPLE_PORT/health"` from the same network boundary. |
+| `TLS_HANDSHAKE` | `SSLException`, including certificate validation | Run `openssl s_client -connect "$EXAMPLE_HOST:$EXAMPLE_PORT" -servername "$EXAMPLE_SERVER_NAME" -brief </dev/null`; share only approved certificate metadata. |
+| `POOL_ACQUIRE` | Reactor Pool acquire timeout, pending limit, or shutdown | Reproduce only with the bounded load fixture described under [Pool saturation](#pool-saturation); it does not distinguish H1 connection from H2 stream pressure. |
+| `REQUEST_WRITE` | Netty write timeout after transport dispatch | Use an approved non-secret bounded upload fixture and record cancellation plus bytes accepted by the fixture; do not replay production payloads. |
+| `RESPONSE_HEADERS` | Read timeout after final dispatch with no observed status | Use an approved fixture that delays headers beyond the configured timeout and record that the fixture received the request. |
+| `RESPONSE_BODY` | Read timeout after an observed status | Use an approved fixture that sends headers and one bounded chunk before delaying; release consumed buffers. |
+
+`ErrorCategory` remains unchanged: DNS maps to `UNKNOWN_HOST`, TLS to `TLS_ERROR`,
+and direct connect failures to `CONNECT_ERROR`. Proxy tunnel failures retain whichever
+existing category the outer exception proves. A nested `AuthProviderException` is a hard
+boundary. A custom filter that fails before the final request observation cannot promote
+a nested transport exception into a business-request stage. Provider diagnostics and the
+Actuator `rhttpclients` endpoint expose configuration, not request-scoped stages.
+
 ## Timeout phases
 
-Use only a proven stage: `CONNECT`, `POOL_ACQUIRE`, `REQUEST_WRITE`,
-`RESPONSE_HEADERS`, or `RESPONSE_BODY`. `RESPONSE_HEADERS` requires final-attempt
+Use only a proven stage: `DNS_RESOLUTION`, `PROXY_CONNECT`, `CONNECT`,
+`TLS_HANDSHAKE`, `POOL_ACQUIRE`, `REQUEST_WRITE`, `RESPONSE_HEADERS`, or
+`RESPONSE_BODY`. `RESPONSE_HEADERS` requires final-attempt
 dispatch evidence and no observed status. `RESPONSE_BODY` retains the observed
-status. Nested auth and other pre-dispatch read timeouts stay unattributed.
+status. Auth-provider failures are a hard boundary, and arbitrary custom-filter wrappers
+without final-request dispatch evidence stay unattributed.
 
 For `LogicalCallTimeoutException`, compare `logical-call-timeout-ms` with the
 per-attempt response timeout and the final subscription-attempt count. The logical

@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Map;
 
@@ -219,6 +220,18 @@ class OpenTelemetryHttpClientObserverTest {
         assertThat(java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(durationNs))
                 .as("span duration must match event.durationMs (within 1 ms tolerance for clock granularity)")
                 .isBetween(1499L, 1501L);
+    }
+
+    @Test
+    void recordsAdditiveDnsFailureStage() {
+        observer.record(new HttpClientObserverEvent(
+                "user-service", "user.get", "GET", "/users/{id}",
+                null, 25L, new UnknownHostException("missing.invalid"),
+                ErrorCategory.UNKNOWN_HOST, null, null));
+
+        SpanData span = onlySpan();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_FAILURE_STAGE))
+                .isEqualTo("DNS_RESOLUTION");
     }
 
     @Test

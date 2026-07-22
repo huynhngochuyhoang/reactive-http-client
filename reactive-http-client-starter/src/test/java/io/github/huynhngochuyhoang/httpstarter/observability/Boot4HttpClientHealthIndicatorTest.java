@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
+import java.net.UnknownHostException;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -204,6 +205,23 @@ class Boot4HttpClientHealthIndicatorTest {
         assertThat(health.getDetails().toString())
                 .doesNotContain("server.address")
                 .doesNotContain("127.0.0.1");
+    }
+
+    @Test
+    void additivePreResponseStagesRemainGeneralHealthErrors() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(registry, config);
+        observer.record(new HttpClientObserverEvent(
+                "dns-client", "op", "GET", "/p",
+                null, 25L, new UnknownHostException("missing.invalid"),
+                ErrorCategory.UNKNOWN_HOST, null, null));
+
+        Health health = indicator(registry, config).health();
+
+        assertThat(clientDetails(health, "dns-client"))
+                .containsEntry("errors", 1L)
+                .containsEntry("poolAcquireFailureCount", 0L);
     }
 
     // -------------------------------------------------------------------------

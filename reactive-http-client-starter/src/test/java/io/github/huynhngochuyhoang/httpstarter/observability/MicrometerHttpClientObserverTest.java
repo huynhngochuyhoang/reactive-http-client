@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Map;
 
@@ -507,6 +508,24 @@ class MicrometerHttpClientObserverTest {
                 .timer();
         assertNotNull(mainTimer, "main timer must still carry high-cardinality tags when histogram is enabled");
         assertEquals(1, mainTimer.count());
+    }
+
+    @Test
+    void recordsAdditiveDnsFailureStageAsLowCardinalityTag() {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(
+                meterRegistry, new ReactiveHttpClientProperties.ObservabilityConfig());
+
+        observer.record(new HttpClientObserverEvent(
+                "user-service", "user.get", "GET", "/users/{id}",
+                null, 25, new UnknownHostException("missing.invalid"),
+                ErrorCategory.UNKNOWN_HOST, null, null));
+
+        Timer timer = meterRegistry.find("reactive.http.client.requests")
+                .tag("failure.stage", HttpClientFailureStage.DNS_RESOLUTION.name())
+                .timer();
+        assertNotNull(timer);
+        assertEquals(1, timer.count());
     }
 
     @Test
