@@ -25,10 +25,10 @@ class ReactiveHttpClientContractSnapshotTest {
                 .render();
 
         assertThat(snapshot).isEqualTo("""
-                | Client | Interface | Declared By | Inherited | Method | Generic Bindings | Response Type | Body Type | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Timeout | Resilience | Redirect | Auth | Body |
-                |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-                | internal-users | %s | %s | true | getUser(java.lang.String) | none | java.lang.String | none | GET | /internal-users/{id} | http://internal.example | property | users.get | users.get | client:1000ms | retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled | manual | none | NONE |
-                | partner-users | %s | %s | true | getUser(java.lang.String) | none | java.lang.String | none | GET | /partner-users/{id} | http://partner.example | property | users.get | users.get | client:2000ms | retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled | manual | none | NONE |
+                | Client | Interface | Declared By | Inherited | Method | Generic Bindings | Response Type | Body Type | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Response Timeout | Logical-Call Budget | Resilience | Redirect | Auth | Body |
+                |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+                | internal-users | %s | %s | true | getUser(java.lang.String) | none | java.lang.String | none | GET | /internal-users/{id} | http://internal.example | property | users.get | users.get | client:1000ms | 0ms | retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled | manual | none | NONE |
+                | partner-users | %s | %s | true | getUser(java.lang.String) | none | java.lang.String | none | GET | /partner-users/{id} | http://partner.example | property | users.get | users.get | client:2000ms | 0ms | retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled | manual | none | NONE |
                 """.formatted(
                 InternalUserClient.class.getName(), SharedUserOperations.class.getName(),
                 PartnerUserClient.class.getName(), SharedUserOperations.class.getName()));

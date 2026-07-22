@@ -7,6 +7,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.exception.*;
 import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.CompositeHttpClientObserver;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.reactivestreams.Publisher;
@@ -30,6 +31,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Signal;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClientRequest;
 import reactor.util.context.ContextView;
@@ -61,7 +63,8 @@ import java.util.function.Function;
  *   <li>Build and execute a WebClient request</li>
  *   <li>Decode errors with {@link DefaultErrorDecoder}</li>
  *   <li>Optionally apply native request timeout, then Resilience4j operators
- *       (retry -> rate-limiter -> circuit-breaker -> bulkhead)</li>
+ *       (retry -> rate-limiter -> circuit-breaker -> bulkhead), then one
+ *       end-to-end logical-call timeout budget</li>
  * </ol>
  */
 public class ReactiveClientInvocationHandler implements InvocationHandler {
@@ -259,6 +262,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         boolean hasContentTypeHeader = contentTypeHeader != null;
 
         long timeoutMs = resolveTimeoutMs(plan, effectiveApi.timeoutMs());
+        long logicalCallTimeoutMs = clientConfig.getLogicalCallTimeoutMs();
 
         final MultiValueMap<String, HttpEntity<?>> multipartBody = plan.multipart()
                 ? buildMultipartBody(plan, args)
@@ -273,7 +277,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 || effectiveApi.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET
                 || isClientLevelRequestTimeoutConfigured()
                 || timeoutMs > 0;
-        boolean usesSubscriptionState = usesSubscriptionState(plan, exchangeLogger, observer, lifecycleHooks);
+        boolean usesSubscriptionState = usesSubscriptionState(
+                plan, exchangeLogger, observer, lifecycleHooks, logicalCallTimeoutMs);
         Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = usesSubscriptionState
                 ? statefulRequestHeadersSpec(plan, effectiveApi, resolved, contentTypeHeader, hasAcceptHeader,
                 hasContentTypeHeader, multipartBody, lifecycleHooks, exchangeLogger, timeoutMs, shouldApplyResponseTimeout)
@@ -285,6 +290,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     ? exchange(requestHeadersSpecMono, response -> buildFlux(response, plan.responseType()))
                     : exchangeStateless(requestHeadersSpecMono, response -> buildFlux(response, plan.responseType()));
             flux = applyResilienceFlux(flux, plan, effectiveApi.httpMethod(), resolved);
+            flux = applyLogicalCallTimeoutFlux(flux, logicalCallTimeoutMs);
             if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
                 Flux<?> capturedFlux = flux;
                 flux = Flux.deferContextual(ctx -> {
@@ -328,6 +334,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 : exchangeStateless(requestHeadersSpecMono, response -> buildMono(response, plan.responseType())))
                 .next();
         mono = applyResilienceMono(mono, plan, effectiveApi.httpMethod(), resolved);
+        mono = applyLogicalCallTimeoutMono(mono, logicalCallTimeoutMs);
         if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
             Mono<?> capturedMono = mono;
             mono = Mono.deferContextual(ctx -> {
@@ -380,13 +387,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private boolean usesSubscriptionState(RequestPlan plan,
                                           HttpExchangeLogger exchangeLogger,
                                           HttpClientObserver observer,
-                                          List<ReactiveHttpClientLifecycleHook> lifecycleHooks) {
+                                          List<ReactiveHttpClientLifecycleHook> lifecycleHooks,
+                                          long logicalCallTimeoutMs) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         return exchangeLogger != null
                 || observer != null
                 || !lifecycleHooks.isEmpty()
                 || clientConfig.hasAuthConfigured()
                 || (resilience != null && resilience.isEnabled())
+                || logicalCallTimeoutMs > 0
                 || StringUtils.hasText(plan.generatedIdempotencyKeyHeader());
     }
 
@@ -412,6 +421,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             int attempt = state.attemptCount.incrementAndGet();
             state.start.compareAndSet(0L, System.currentTimeMillis());
             state.resetAttemptEvidence();
+            state.attemptInProgress.set(true);
             notifyLifecycleAttempt(lifecycleHooks, plan, effectiveApi, preparedResolved, state.requestUrl.get(), null, null, attempt);
             if (exchangeLogger == null && state.firstAttempt.compareAndSet(true, false)) {
                 logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.start.get());
@@ -538,7 +548,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
                 }
                 return Flux.from(successResponseHandler.apply(clientResponse));
-            }));
+            })).doFinally(ignored -> state.attemptInProgress.set(false));
         });
     }
 
@@ -571,7 +581,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     .doOnNext(entity -> {
                         state.responseStatus.set(entity.getStatusCode());
                         state.responseHeaders.set(copyHeaders(entity.getHeaders()));
-                    }));
+                    }))
+                    .doFinally(ignored -> state.attemptInProgress.set(false));
         });
     }
 
@@ -759,6 +770,46 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         flux = applyCircuitBreakerFlux(flux, resolveResilienceInstanceName(plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker()));
         flux = applyBulkheadFlux(flux, resolveResilienceInstanceName(plan.bulkheadInstanceName(), resilience.getBulkhead()));
         return flux;
+    }
+
+    private Mono<?> applyLogicalCallTimeoutMono(Mono<?> mono, long timeoutMs) {
+        if (timeoutMs <= 0) {
+            return mono;
+        }
+        return Mono.deferContextual(context -> {
+            SubscriptionState state = subscriptionState(context);
+            state.start.compareAndSet(0L, System.currentTimeMillis());
+            @SuppressWarnings("unchecked")
+            Mono<Signal<Object>> sourceSignal = ((Mono<Object>) mono).materialize();
+            Mono<Signal<Object>> deadline = Mono.delay(Duration.ofMillis(timeoutMs))
+                    .map(ignored -> Signal.error(logicalCallTimeout(state, timeoutMs)));
+            return Mono.firstWithSignal(sourceSignal, deadline).dematerialize();
+        });
+    }
+
+    private Flux<?> applyLogicalCallTimeoutFlux(Flux<?> flux, long timeoutMs) {
+        if (timeoutMs <= 0) {
+            return flux;
+        }
+        return Flux.deferContextual(context -> {
+            SubscriptionState state = subscriptionState(context);
+            state.start.compareAndSet(0L, System.currentTimeMillis());
+            Mono<Void> deadline = Mono.delay(Duration.ofMillis(timeoutMs))
+                    .flatMap(ignored -> Mono.error(logicalCallTimeout(state, timeoutMs)));
+            return flux.takeUntilOther(deadline);
+        });
+    }
+
+    private LogicalCallTimeoutException logicalCallTimeout(SubscriptionState state, long timeoutMs) {
+        HttpClientFailureStage failureStage = null;
+        if (state.attemptInProgress.get()) {
+            if (state.responseStatus.get() != null) {
+                failureStage = HttpClientFailureStage.RESPONSE_BODY;
+            }
+        } else {
+            state.resetAttemptEvidence();
+        }
+        return new LogicalCallTimeoutException(timeoutMs, failureStage);
     }
 
     /** Per-method override wins; otherwise the client-level config applies. */
@@ -1808,6 +1859,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         private final AtomicReference<HttpStatusCode> responseStatus = new AtomicReference<>();
         private final AtomicReference<Map<String, List<String>>> responseHeaders = new AtomicReference<>(Map.of());
         private final AtomicReference<Throwable> terminalError = new AtomicReference<>();
+        private final AtomicBoolean attemptInProgress = new AtomicBoolean();
 
         private SubscriptionState(RequestArgumentResolver.ResolvedArgs resolved) {
             this.preparedResolved = new AtomicReference<>(resolved);

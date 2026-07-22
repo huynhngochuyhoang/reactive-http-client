@@ -6,6 +6,7 @@ import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.*;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
+import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.netty.handler.timeout.ReadTimeoutException;
@@ -16,6 +17,7 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -93,6 +95,25 @@ class MockReactiveHttpClientTest {
     }
 
     record SignedRequest(String orderId, int amount) {}
+
+    @Test
+    void logicalCallTimeoutUsesTheProductionBudgetOperator() {
+        DefaultDataBufferFactory buffers = new DefaultDataBufferFactory();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .logicalCallTimeout(60)
+                .respondTo(HttpMethod.GET, "/users/1", exchange -> ClientResponse.create(org.springframework.http.HttpStatus.OK)
+                        .body(Flux.concat(
+                                Mono.just(buffers.wrap("first".getBytes(StandardCharsets.UTF_8))),
+                                Mono.delay(java.time.Duration.ofMillis(200))
+                                        .thenReturn(buffers.wrap("second".getBytes(StandardCharsets.UTF_8)))))
+                        .build())
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(1))
+                .expectError(LogicalCallTimeoutException.class)
+                .verify();
+        assertThat(mock.exchanges()).hasSize(1);
+    }
 
     @Test
     void publisherUploadIsColdAndMaterializedOncePerMockRetryAttempt() {

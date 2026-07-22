@@ -37,7 +37,7 @@ redirect dispatches below the `WebClient` filter boundary, so one consistent
 count cannot be proven across all supported paths.
 
 Each caller subscription receives separate attempt, idempotency-key, duration,
-request-observation, response, and terminal-error state, including concurrent
+logical-call deadline, request-observation, response, and terminal-error state, including concurrent
 subscriptions to the same cold publisher. Resilience retries clear prior-attempt
 evidence. The hidden auth replay also clears request and response evidence before
 new auth is resolved, then records the replay only if it reaches the final
@@ -56,6 +56,14 @@ Per-attempt evidence is reset on resilience retry and hidden 401 auth refresh;
 nested auth and other pre-dispatch read timeouts, plus generic timeouts, remain
 stage-unknown. Concrete connect, pool-acquire, and write exceptions do not require
 URL evidence.
+
+An enabled `logical-call-timeout-ms` wraps the full caller subscription and does
+not reset for resilience retries, redirects, or hidden auth refresh. Its
+`LogicalCallTimeoutException` reports `RESPONSE_BODY` only when the current final
+attempt observed response status. Expiry before status, including before dispatch,
+in the pool queue, or between attempts, remains stage-unknown. Lifecycle hooks, observer events, and
+exchange-log contexts receive the same terminal exception, status, attempt count,
+and derived failure stage.
 
 For `Mono<ResponseEntity<Flux<DataBuffer>>>`, terminal lifecycle, observer, and exchange-log records describe response-envelope completion. They do not indicate that the inner streamed body was subscribed or fully consumed. A later inner-body timeout or cancellation does not rewrite the already reported successful envelope terminal record. Direct `Flux<DataBuffer>` methods report terminal state when the stream itself completes, errors, or is cancelled.
 
@@ -84,7 +92,7 @@ Use exchange logging for per-call request/response metadata, and use the diagnos
 
 ## Runtime diagnostics provider
 
-Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, timeout summary, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
+Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, per-attempt response-timeout summary, logical-call budget, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
 
 Use `ReactiveHttpClientDiagnosticsSnapshot` when a support bundle, startup log,
 or local custom endpoint needs deterministic Markdown or JSON output from those
@@ -174,7 +182,7 @@ management:
 The endpoint id is `rhttpclients`. A read operation returns diagnostics schema v1 JSON with
 `schemaVersion`, `projectVersion`, `clientCount`, `endpointCount`, `inheritedEndpointCount`, and
 one `clients` entry per registered client. Each client entry includes client
-name, interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, timeout source/value, resilience summary, auth
+name, interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, timeout source/value, `logicalCallTimeoutMs`, resilience summary, auth
 mode, redirect-following flag, strict unsafe-retry and strict body-signing
 validation flags, endpoint count, and inherited endpoint count. Strict flags are
 true only when the corresponding validation path is active for the resolved

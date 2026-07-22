@@ -86,6 +86,29 @@ This helper creates an in-process `ClientResponse` body failure. It does not emu
 DNS, connection, pool acquisition, request writes, socket timing, or enforcement of
 `@TimeoutMs`/`request-timeout-ms`. Use a real server and transport for those tests.
 
+The mock can apply the starter-owned end-to-end budget when a unit test needs to
+assert deadline cancellation and `LogicalCallTimeoutException` without claiming a
+network phase:
+
+```java
+MockReactiveHttpClient<UserService> mock = MockReactiveHttpClient
+        .forClient(UserService.class)
+        .logicalCallTimeout(100)
+        .respondTo(HttpMethod.GET, "/users/42", exchange ->
+                ClientResponse.create(HttpStatus.OK)
+                        .body(Flux.never())
+                        .build())
+        .build();
+
+StepVerifier.create(mock.proxy().getUser(42))
+        .expectErrorSatisfies(error ->
+                assertThat(error).isInstanceOf(LogicalCallTimeoutException.class))
+        .verify();
+```
+
+This proves starter-owned budget behavior only. Pool, connect, write, and response
+phase attribution still require real transport fixtures.
+
 ### Inherited endpoint contracts
 
 For shared contracts, build the mock for the concrete annotated child client, not

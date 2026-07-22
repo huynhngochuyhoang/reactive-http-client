@@ -268,6 +268,12 @@ public final class MockReactiveHttpClient<T> {
             return this;
         }
 
+        /** Applies the production logical-call timeout budget to this mock client. */
+        public Builder<T> logicalCallTimeout(long timeoutMs) {
+            clientConfig.setLogicalCallTimeoutMs(timeoutMs);
+            return this;
+        }
+
         /** Uses the application JSON codec for auth-aware request byte materialization. */
         public Builder<T> jsonCodec(ReactiveHttpClientJsonCodec jsonCodec) {
             this.jsonCodec = Objects.requireNonNull(jsonCodec, "jsonCodec");

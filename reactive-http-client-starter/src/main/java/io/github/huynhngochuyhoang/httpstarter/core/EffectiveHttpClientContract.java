@@ -16,6 +16,7 @@ record EffectiveHttpClientContract(
         String apiName,
         String apiRef,
         TimeoutPolicy timeout,
+        long logicalCallTimeoutMs,
         ResiliencePolicy resilience,
         String redirectPolicy,
         String authMode,

@@ -522,7 +522,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         boolean observabilityEnabled = observabilityConfig == null || observabilityConfig.isEnabled();
 
         log.debug("Reactive HTTP client [{}] startup configuration: baseUrl={} (source={}), protocol={}, poolSource={}, "
-                        + "pool=maxConnections:{}, pendingAcquireTimeoutMs:{}, proxy={}, tls={}, auth={}, requestTimeout={}, resilience={}, "
+                        + "pool=maxConnections:{}, pendingAcquireTimeoutMs:{}, proxy={}, tls={}, auth={}, requestTimeout={}, logicalCallTimeout={}ms, resilience={}, "
                         + "observability={}, exchangeLogging={}, logPreset={}",
                 clientName,
                 baseUrl,
@@ -535,6 +535,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 tlsSummary(tls),
                 authSummary(config),
                 requestTimeoutSummary(config),
+                config.getLogicalCallTimeoutMs(),
                 resilienceSummary(resilience),
                 observabilityEnabled ? "enabled" : "disabled",
                 config.isExchangeLoggingEnabled() ? "enabled" : "disabled",
@@ -555,13 +556,14 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         boolean observabilityEnabled = observabilityConfig == null || observabilityConfig.isEnabled();
 
         log.debug("Reactive HTTP client [{}] startup summary: interface={}, endpoints={}, inheritedEndpoints={}, "
-                        + "baseUrlSource={}, timeout={}, resilience={}, auth={}, redirects={}, observability={}",
+                        + "baseUrlSource={}, timeout={}, logicalCallTimeout={}ms, resilience={}, auth={}, redirects={}, observability={}",
                 summary.clientName(),
                 summary.clientInterface(),
                 summary.endpointCount(),
                 summary.inheritedEndpointCount(),
                 summary.baseUrlSource(),
                 diagnosticsTimeoutSummary(summary.timeout()),
+                config.getLogicalCallTimeoutMs(),
                 diagnosticsResilienceSummary(summary.resilience()),
                 summary.authMode(),
                 summary.followRedirects() ? "follow" : "manual",
@@ -598,7 +600,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             log.debug("Reactive HTTP client [{}] method policy: method=[{}#{}], declaredBy={}, "
                             + "concreteClient={}, inherited={}, apiRef={}, genericBindings={}, responseType={}, "
                             + "bodyType={}, httpMethod={}, pathTemplate={}, baseUrl={} (source={}), "
-                            + "requestTimeout={}, redirectPolicy={}, retrySafety={}, bodyRepeatability={}",
+                            + "requestTimeout={}, logicalCallTimeout={}ms, redirectPolicy={}, retrySafety={}, bodyRepeatability={}",
                     clientName,
                     method.getDeclaringClass().getSimpleName(),
                     method.getName(),
@@ -614,6 +616,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     baseUrl,
                     baseUrlSource,
                     requestTimeoutSummary(plan, effectiveApi, clientConfig),
+                    clientConfig.getLogicalCallTimeoutMs(),
                     clientConfig.isFollowRedirects() ? "follow" : "manual",
                     diagnosticRetrySafety(plan, effectiveApi.httpMethod(), clientConfig),
                     plan.bodyRepeatability());

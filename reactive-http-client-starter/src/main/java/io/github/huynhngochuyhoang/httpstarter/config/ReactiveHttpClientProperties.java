@@ -363,6 +363,7 @@ public class ReactiveHttpClientProperties {
 
         private static final int MAX_CODEC_MAX_IN_MEMORY_SIZE_MB = Integer.MAX_VALUE / (1024 * 1024);
         private static final long MAX_REQUEST_TIMEOUT_MS = 30L * 60 * 1000;
+        private static final long MAX_LOGICAL_CALL_TIMEOUT_MS = 30L * 60 * 1000;
 
         private String baseUrl;
         private int codecMaxInMemorySizeMb = 2;
@@ -373,6 +374,8 @@ public class ReactiveHttpClientProperties {
         private LogPreset logPreset = LogPreset.METADATA_ONLY;
         /** Per-request response timeout in milliseconds. {@code null} means not configured; {@code 0} disables it. */
         private Long requestTimeoutMs;
+        /** End-to-end logical-call timeout in milliseconds. {@code 0} disables it. */
+        private long logicalCallTimeoutMs;
         /**
          * Bean name of {@code AuthProvider} to use for this client.
          * Empty means no automatic auth injection.
@@ -457,6 +460,16 @@ public class ReactiveHttpClientProperties {
             this.requestTimeoutMs = requestTimeoutMs;
         }
         public boolean isRequestTimeoutMsConfigured() { return requestTimeoutMs != null; }
+
+        public long getLogicalCallTimeoutMs() { return logicalCallTimeoutMs; }
+        public void setLogicalCallTimeoutMs(long logicalCallTimeoutMs) {
+            requireAtLeast("reactive.http.clients.*.logical-call-timeout-ms", logicalCallTimeoutMs, 0);
+            requireAtMost(
+                    "reactive.http.clients.*.logical-call-timeout-ms",
+                    logicalCallTimeoutMs,
+                    MAX_LOGICAL_CALL_TIMEOUT_MS);
+            this.logicalCallTimeoutMs = logicalCallTimeoutMs;
+        }
 
         public boolean isExchangeLoggingEnabled() {
             return logExchange;

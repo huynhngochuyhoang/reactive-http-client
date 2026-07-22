@@ -15,6 +15,7 @@
       "poolMetricsEnabled": false,
       "timeoutSource": "client",
       "timeoutMs": 750,
+      "logicalCallTimeoutMs": 0,
       "resilienceConfigured": false,
       "retry": "disabled",
       "rateLimiter": "disabled",

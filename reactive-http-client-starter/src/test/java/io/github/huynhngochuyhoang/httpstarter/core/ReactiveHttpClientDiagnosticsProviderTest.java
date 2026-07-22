@@ -43,7 +43,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     private static final Set<String> CLIENT_SCHEMA_FIELDS = Set.of(
             "clientName", "clientInterface", "baseUrlSource", "poolSource",
             "poolMaxConnections", "poolPendingAcquireTimeoutMs", "poolMetricsEnabled",
-            "timeoutSource", "timeoutMs", "resilienceConfigured", "retry", "rateLimiter",
+            "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
+            "resilienceConfigured", "retry", "rateLimiter",
             "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
             "strictBodySigningValidation", "authMode", "followRedirects", "endpointCount",
             "inheritedEndpointCount");
@@ -60,6 +61,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setBaseUrl("https://user:token@example.com");
         config.setRequestTimeoutMs(500);
+        config.setLogicalCallTimeoutMs(2_000);
         config.setAuthProvider("secretAuthProviderBean");
         config.setDefaultHeaders(Map.of("Authorization", "Bearer secret-token"));
         config.setFollowRedirects(true);
@@ -288,6 +290,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                       "poolMetricsEnabled": false,
                       "timeoutSource": "client",
                       "timeoutMs": 750,
+                      "logicalCallTimeoutMs": 0,
                       "resilienceConfigured": false,
                       "retry": "disabled",
                       "rateLimiter": "disabled",
@@ -341,6 +344,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("poolMaxConnections", 200)
                 .containsEntry("poolPendingAcquireTimeoutMs", 5000L)
                 .containsEntry("poolMetricsEnabled", false)
+                .containsEntry("logicalCallTimeoutMs", 2_000L)
                 .containsEntry("strictUnsafeRetryValidation", false)
                 .containsEntry("strictBodySigningValidation", false);
         assertThat(collectionClient)
@@ -348,6 +352,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("poolMaxConnections", null)
                 .containsEntry("poolPendingAcquireTimeoutMs", null)
                 .containsEntry("poolMetricsEnabled", null)
+                .containsEntry("logicalCallTimeoutMs", null)
                 .containsEntry("strictUnsafeRetryValidation", null)
                 .containsEntry("strictBodySigningValidation", null)
                 .containsEntry("timeoutMs", 500L)
@@ -359,9 +364,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("| Client count | `1` |")
                 .contains("| Endpoint count | `2` |")
                 .contains("| Inherited endpoint count | `1` |")
-                .contains("| Client | Interface | Base URL source | Pool | Timeout | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |")
+                .contains("| Client | Interface | Base URL source | Pool | Response timeout | Logical-call budget | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |")
                 .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName()
-                        + "` | `property` | `unknown` | `client:500` |")
+                        + "` | `property` | `unknown` | `client:500` | `unknown` |")
                 .contains("| `unknown` | `unknown` | `provider-bean` | `true` | `2` | `1` |");
     }
 
@@ -511,8 +516,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(List.of(summary));
         Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(List.of(summary));
 
-        assertThat(markdown).contains("| `summary-client` | `com.example.SummaryClient` | `property` | `unknown` | `disabled:0` | `configured=false, retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled` | `unknown` | `unknown` |");
+        assertThat(markdown).contains("| `summary-client` | `com.example.SummaryClient` | `property` | `unknown` | `disabled:0` | `unknown` | `configured=false, retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled` | `unknown` | `unknown` |");
         assertThat(json)
+                .contains("\"logicalCallTimeoutMs\": null")
                 .contains("\"strictUnsafeRetryValidation\": null")
                 .contains("\"strictBodySigningValidation\": null")
                 .doesNotContain("\"strictUnsafeRetryValidation\": false")
@@ -725,6 +731,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setBaseUrl("https://user:token@example.com");
         config.setRequestTimeoutMs(500);
+        config.setLogicalCallTimeoutMs(2_000);
         config.setAuthProvider("secretAuthProviderBean");
         config.setDefaultHeaders(Map.of("Authorization", "Bearer secret-token"));
         config.setFollowRedirects(true);
