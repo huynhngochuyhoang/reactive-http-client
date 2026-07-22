@@ -158,7 +158,7 @@ class ReactiveHttpClientAutoConfigurationTest {
                                     "poolSource", "poolMaxConnections", "poolPendingAcquireTimeoutMs",
                                     "poolMetricsEnabled", "poolProtocol", "poolCapacityBasis",
                                     "poolMaxConcurrentStreams", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
-                                    "resilienceConfigured", "retry", "rateLimiter", "circuitBreaker",
+                                    "compressionEnabled", "codecMaxInMemorySizeMb", "resilienceConfigured", "retry", "rateLimiter", "circuitBreaker",
                                     "bulkhead", "strictUnsafeRetryValidation",
                                     "strictBodySigningValidation", "authMode", "followRedirects",
                                     "endpointCount", "inheritedEndpointCount");
@@ -166,6 +166,8 @@ class ReactiveHttpClientAutoConfigurationTest {
                     assertThat(clients.get(0).get("poolPendingAcquireTimeoutMs")).isInstanceOf(Long.class);
                     assertThat(clients.get(0).get("timeoutMs")).isInstanceOf(Long.class);
                     assertThat(clients.get(0).get("logicalCallTimeoutMs")).isInstanceOf(Long.class);
+                    assertThat(clients.get(0).get("compressionEnabled")).isInstanceOf(Boolean.class);
+                    assertThat(clients.get(0).get("codecMaxInMemorySizeMb")).isInstanceOf(Integer.class);
                     assertThat(clients.get(0).get("followRedirects")).isInstanceOf(Boolean.class);
                     assertThat(clients.get(0))
                             .containsEntry("clientName", "diagnostic-client")

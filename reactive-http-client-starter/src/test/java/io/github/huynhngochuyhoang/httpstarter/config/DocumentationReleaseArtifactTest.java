@@ -55,6 +55,8 @@ class DocumentationReleaseArtifactTest {
         String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
         String currentScope = markdownSection(operations, "## Current release scope", "## First response");
         String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String compressionContract = Files.readString(root.resolve("docs/12-proxy-tls.md"));
+        String diagnosticsContexts = Files.readString(root.resolve("docs/21-diagnostic-contexts.md"));
         String productionChecklist = Files.readString(root.resolve("docs/16-production-checklist.md"));
         String readme = Files.readString(root.resolve("README.md"));
 
@@ -91,7 +93,20 @@ class DocumentationReleaseArtifactTest {
                 .contains("do not report only the synthetic")
                 .contains("Do not include request or response payloads by default")
                 .contains("A missing stage\nis unknown")
-                .contains("[Operations Troubleshooting](30-operations-troubleshooting.md)");
+                .contains("[Operations Troubleshooting](30-operations-troubleshooting.md)")
+                .contains("codecMaxInMemorySizeMb")
+                .contains("framing-complete truncated gzip member");
+        assertThat(compressionContract)
+                .contains("| Encoded wire bytes |")
+                .contains("Decoded unary value")
+                .contains("Bodiless result")
+                .contains("Direct or envelope `Flux<DataBuffer>`")
+                .contains("size is **unknown**, not zero")
+                .contains("closes the affected pooled");
+        assertThat(diagnosticsContexts)
+                .contains("`compressionEnabled`")
+                .contains("`codecMaxInMemorySizeMb`")
+                .contains("collection overloads render those provider-only values as `null`");
         assertThat(productionChecklist)
                 .contains("Leave `compression-enabled: false`")
                 .contains("[Operations Troubleshooting](30-operations-troubleshooting.md)");

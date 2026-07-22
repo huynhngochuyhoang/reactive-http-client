@@ -259,20 +259,43 @@ Evidence:
 
 ## Priority 6 - Compression and Aggregate-Limit Boundaries
 
-### [ ] 6.1 Define byte and aggregation ownership
+### [x] 6.1 Define byte and aggregation ownership
 
-- [ ] Document encoded, decoded, advertised, consumed, and unknown byte boundaries.
-- [ ] Define limits for unary JSON, Problem Detail, bodiless, `ResponseEntity`, and
+- [x] Document encoded, decoded, advertised, consumed, and unknown byte boundaries.
+- [x] Define limits for unary JSON, Problem Detail, bodiless, `ResponseEntity`, and
       streaming responses.
-- [ ] Prevent compressed unary payloads from bypassing decoded aggregate safeguards.
-- [ ] Keep streaming incremental and caller-owned.
+- [x] Prevent compressed unary payloads from bypassing decoded aggregate safeguards.
+- [x] Keep streaming incremental and caller-owned.
 
-### [ ] 6.2 Prove release behavior
+### [x] 6.2 Prove release behavior
 
-- [ ] Cover gzip truncation, corruption, cancellation, and oversized payloads.
-- [ ] Verify pooled connections and buffers release exactly once.
-- [ ] Avoid hidden body aggregation for streaming diagnostics.
-- [ ] Align configuration metadata, diagnostics, operations docs, and real-wire tests.
+- [x] Cover gzip truncation, corruption, cancellation, and oversized payloads.
+- [x] Verify pooled connections and buffers release exactly once.
+- [x] Avoid hidden body aggregation for streaming diagnostics.
+- [x] Align configuration metadata, diagnostics, operations docs, and real-wire tests.
+
+Evidence:
+
+- The response-compression contract now separates encoded wire bytes, decoded
+  application bytes, advertised post-transport length, consumed bytes, and unknown
+  size. Decoded unary values and `ResponseEntity<T>` use the codec aggregate cap;
+  error mapping keeps independent decoded 4 KiB/64 KiB retention caps; bodiless
+  results drain; and direct/envelope `DataBuffer` streams remain incremental.
+- Real one-connection-pool tests prove highly compressible decoded JSON and
+  `ResponseEntity` payloads cannot bypass a 1 MiB codec cap, Problem Detail input
+  truncates at 64 KiB while draining, unexpected bodiless content is drained, and
+  multi-megabyte direct/envelope streams are not hiddenly aggregated.
+- Real-wire cancellation, truncated gzip, and corrupt gzip coverage verifies
+  terminal behavior and subsequent pool usability. Corrupt decompression closes the
+  affected channel; the documented contract conservatively records that a
+  framing-complete truncated gzip member may expose partial decoded data. Existing
+  pooled-buffer error-capture tests continue to prove every consumed buffer is
+  released, including cancellation paths.
+- Provider-backed diagnostics schema v1 now adds `compressionEnabled` and
+  `codecMaxInMemorySizeMb`; collection-backed snapshots preserve `null`/unknown.
+  Configuration metadata, generated property reference, support-bundle and
+  operations guidance, schema fixture, changelog, and focused documentation tests
+  use the same decoded aggregation and streaming ownership semantics.
 
 ---
 

@@ -44,9 +44,29 @@ negotiation or automatic decompression is installed; an application that adds
 `Accept-Encoding` then owns the resulting encoded representation.
 
 Unary JSON, errors, `ResponseEntity`, direct streams, and streaming envelopes
-are decompressed consistently. Streaming bodies are not aggregated to measure
-their decoded size. See [Observability](08-observability.md) for byte-counter
-semantics.
+are decompressed consistently. The boundaries are intentionally different:
+
+| Boundary or response shape | Ownership and limit |
+|---|---|
+| Encoded wire bytes | Reactor Netty reads and incrementally decompresses them. The starter does not add a second encoded-size cap. |
+| Decoded unary value (including `Mono<T>` and `ResponseEntity<T>`) | Spring codecs aggregate the decoded representation and enforce `codec-max-in-memory-size-mb` after decompression. `0` means unlimited. |
+| Decoded default error body | `DefaultErrorDecoder` retains at most 4 KiB, drains the remainder, and releases consumed buffers. |
+| Decoded `application/problem+json` error | The mapper receives at most 64 KiB; exception body access remains capped at 4 KiB. The remainder is drained and released. |
+| Bodiless result (`Mono<Void>` or `ResponseEntity<Void>`) | The decoded body is drained and released without retaining an aggregate. |
+| Direct or envelope `Flux<DataBuffer>` | Decoded chunks remain incremental, bypass the codec aggregate cap, and become caller-owned after emission. |
+
+An **advertised** size is only a surviving post-transport `Content-Length`; it
+does not prove how many encoded or decoded bytes were **consumed**. When automatic
+decompression removes that header, size is **unknown**, not zero. The starter does
+not consume a stream to calculate it. See [Observability](08-observability.md) for
+byte-counter semantics.
+
+Corrupt gzip content terminates the response and closes the affected pooled
+connection so a later request cannot reuse corrupt decoder state. HTTP framing can
+still be complete while the gzip member is truncated; Reactor Netty may then expose
+partial decoded data without a decompression exception. Applications that require
+whole-representation integrity must validate an application checksum, digest, or
+format-level completeness signal.
 
 ## Transport-owned request headers
 
