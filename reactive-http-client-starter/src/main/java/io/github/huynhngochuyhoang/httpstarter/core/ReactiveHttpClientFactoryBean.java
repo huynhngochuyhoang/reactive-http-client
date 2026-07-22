@@ -274,7 +274,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                             @Override
                             public void exceptionCaught(ChannelHandlerContext context, Throwable error) {
                                 if (isDecompressionFailure(error)) {
-                                    context.close();
+                                    context.fireExceptionCaught(error);
+                                    context.executor().execute(context::close);
                                     return;
                                 }
                                 context.fireExceptionCaught(error);

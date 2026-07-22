@@ -9,6 +9,7 @@ import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
+import io.netty.handler.codec.compression.DecompressionException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -209,14 +210,22 @@ class ReactiveHttpClientCompressionContractTest {
     @Test
     void truncatedAndCorruptGzipTerminateCleanlyAndLaterRequestsStillComplete() {
         try (CompressionServer server = new CompressionServer();
-             ClientFixture fixture = ClientFixture.create(server, true, false, null, 1)) {
+             ClientFixture fixture = ClientFixture.create(server, true, true, null, 1)) {
             CompressionClient client = fixture.client();
 
             String truncated = client.truncatedGzip().block(CALL_TIMEOUT);
             assertThat(truncated != null ? truncated.length() : 0)
                     .isLessThan(CompressionServer.OVERSIZED_VALUE.length());
             assertThat(client.probe().block(CALL_TIMEOUT)).isEqualTo("probe");
-            assertThat(catchThrowable(() -> client.corruptGzip().block(CALL_TIMEOUT))).isNotNull();
+            Throwable corruptGzipError = catchThrowable(() -> client.corruptGzip().block(CALL_TIMEOUT));
+            assertThat(corruptGzipError).isNotNull();
+            assertThat(hasCause(corruptGzipError, DecompressionException.class)).isTrue();
+            assertThat(hasCause(fixture.diagnostics().lastObserverEvent().getError(),
+                    DecompressionException.class)).isTrue();
+            assertThat(hasCause(fixture.diagnostics().lastExchangeLog().error(),
+                    DecompressionException.class)).isTrue();
+            assertThat(hasCause(fixture.diagnostics().lastLifecycleContext().error(),
+                    DecompressionException.class)).isTrue();
             assertThat(client.probe().block(CALL_TIMEOUT)).isEqualTo("probe");
         }
     }
@@ -298,6 +307,18 @@ class ReactiveHttpClientCompressionContractTest {
         } else {
             assertThat(event.getResponseBytes()).isEqualTo(Long.parseLong(contentLength));
         }
+    }
+
+    private static boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+        Throwable current = error;
+        for (int depth = 0; current != null && depth < 16; depth++) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            Throwable cause = current.getCause();
+            current = cause != current ? cause : null;
+        }
+        return false;
     }
 
     private static String readAndRelease(DataBuffer buffer) {
@@ -474,6 +495,11 @@ class ReactiveHttpClientCompressionContractTest {
         private final ReactiveHttpClientLifecycleHook lifecycleHook = new ReactiveHttpClientLifecycleHook() {
             @Override
             public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+                lifecycleContexts.add(context);
+            }
+
+            @Override
+            public void onError(ReactiveHttpClientLifecycleContext context) {
                 lifecycleContexts.add(context);
             }
         };
