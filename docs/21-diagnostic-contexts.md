@@ -18,6 +18,32 @@ available.
 | Subscription-attempt count | Terminal `subscriptionAttemptCount()` for the logical call | Terminal `getAttemptCount()` for the logical call | `attemptNumber()` identifies the current callback attempt; terminal callbacks receive the final attempt number | No |
 | Proven failure stage | `failureStage()` | `getFailureStage()` | `failureStage()` | No |
 
+## Call and dispatch boundaries
+
+| Boundary | Meaning | Effect on `attemptCount` |
+|---|---|---:|
+| Java method invocation | Creates one cold `Mono` or `Flux`; no request is sent yet | None |
+| Caller subscription | Starts one independent logical call with its own mutable reporting state | Remains `0` until the request publisher is subscribed |
+| Initial request subscription | Starts the first request attempt; a resilience rejection can occur before this boundary | Becomes `1` |
+| Resilience4j retry subscription | Re-subscribes to the request publisher inside the same logical call | Increments by `1` |
+| Outbound dispatch | Passes the request through the final observation filter toward the connector | No direct effect |
+
+`attemptCount`, `subscriptionAttemptCount`, and lifecycle `attemptNumber` retain
+their established subscription-attempt meaning. They are not wire-request
+counters. A transport-followed redirect or the auth filter's one-time `401`
+refresh can issue another HTTP request while the subscription-attempt count stays
+`1`. The starter does not expose a dispatch count because Reactor Netty owns
+redirect dispatches below the `WebClient` filter boundary, so one consistent
+count cannot be proven across all supported paths.
+
+Each caller subscription receives separate attempt, idempotency-key, duration,
+request-observation, response, and terminal-error state, including concurrent
+subscriptions to the same cold publisher. Resilience retries clear prior-attempt
+evidence. The hidden auth replay also clears request and response evidence before
+new auth is resolved, then records the replay only if it reaches the final
+observation filter. Transport-owned redirects retain the original declarative
+request snapshot and the final response status.
+
 Subscription-attempt values count reactive subscriptions, not guaranteed HTTP
 network sends. After retry exhaustion, terminal contexts retain the final emitted
 throwable and final subscription-attempt count; earlier attempt failures are not

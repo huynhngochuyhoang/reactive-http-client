@@ -6,10 +6,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Immutable data class carrying all observable data for a single HTTP exchange.
+ * Immutable data class carrying terminal observable data for one logical client call.
  *
  * <p>Created by {@link io.github.huynhngochuyhoang.httpstarter.core.ReactiveClientInvocationHandler} after
- * each request completes and passed to every registered {@link HttpClientObserver}.
+ * the returned publisher terminates and passed to every registered {@link HttpClientObserver}.
+ * A logical call can contain multiple retry subscriptions or transport-owned dispatches.
  */
 public final class HttpClientObserverEvent {
 
@@ -219,9 +220,11 @@ public final class HttpClientObserverEvent {
     public Object getResponseBody() { return responseBody; }
 
     /**
-     * Total number of subscription attempts made to the underlying publisher, including the
-     * first attempt. Values greater than 1 indicate that Resilience4j retry fired at least once.
-     * Useful for detecting whether a downstream service is degraded.
+     * Total number of subscriptions to the retryable request publisher within this logical call,
+     * including the first attempt. A value of 0 means resilience rejected the call before the
+     * initial request subscription. Values greater than 1 indicate that Resilience4j retry fired
+     * at least once. This is not a count of HTTP dispatches: redirects and a one-time auth replay
+     * can produce more than one wire request within one subscription attempt.
      */
     public int getAttemptCount() { return attemptCount; }
 

@@ -31,7 +31,9 @@ import reactor.test.StepVerifier;
 import java.lang.reflect.Method;
 import java.net.ConnectException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -81,6 +83,37 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         HttpClientObserverEvent event = observed.get();
         assertNotNull(event);
         assertEquals(ErrorCategory.TIMEOUT, event.getErrorCategory());
+    }
+
+    @Test
+    void customFilterFailureBeforeDispatchHasNoRequestOrResponseEvidence() {
+        AtomicInteger exchanges = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter((request, next) -> Mono.error(new IllegalStateException("filter failed")))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> {
+                    exchanges.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+                })
+                .build();
+
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set);
+
+        StepVerifier.create(invoke(handler))
+                .expectErrorMatches(error -> error instanceof IllegalStateException
+                        && "filter failed".equals(error.getMessage()))
+                .verify();
+
+        HttpClientObserverEvent event = observed.get();
+        assertNotNull(event);
+        assertEquals(0, exchanges.get());
+        assertEquals(1, event.getAttemptCount());
+        assertNull(event.getStatusCode());
+        assertNull(event.getFailureStage());
+        assertNull(event.getRequestUrl());
+        assertTrue(event.getRequestHeaders().isEmpty());
     }
 
     @Test
@@ -155,6 +188,61 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         assertNull(event.getFailureStage());
         assertNull(event.getRequestUrl());
         assertTrue(event.getRequestHeaders().isEmpty());
+    }
+
+    @Test
+    void unauthorizedAuthRefreshSuccessReportsReplayMetadataWithinOneSubscriptionAttempt() {
+        AtomicInteger authAttempts = new AtomicInteger();
+        AtomicInteger exchanges = new AtomicInteger();
+        List<String> authorizationHeaders = new ArrayList<>();
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest request) {
+                return Mono.just(AuthContext.builder()
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer token-" + authAttempts.incrementAndGet())
+                        .build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                return Mono.empty();
+            }
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(new OutboundAuthFilter("test-client", authProvider))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> {
+                    authorizationHeaders.add(request.headers().getFirst(HttpHeaders.AUTHORIZATION));
+                    if (exchanges.incrementAndGet() == 1) {
+                        return Mono.just(ClientResponse.create(HttpStatus.UNAUTHORIZED)
+                                .body("refresh")
+                                .build());
+                    }
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+                            .body("ok")
+                            .build());
+                })
+                .build();
+
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        ReactiveClientInvocationHandler handler = createHandler(
+                webClient, 5000, observed::set, "serializationAuthProvider");
+
+        StepVerifier.create(invoke(handler))
+                .expectNext("ok")
+                .verifyComplete();
+
+        HttpClientObserverEvent event = observed.get();
+        assertNotNull(event);
+        assertEquals(2, authAttempts.get());
+        assertEquals(2, exchanges.get());
+        assertEquals(List.of("Bearer token-1", "Bearer token-2"), authorizationHeaders);
+        assertEquals(1, event.getAttemptCount());
+        assertEquals(HttpStatus.OK.value(), event.getStatusCode());
+        assertEquals("http://test.local/users", event.getRequestUrl());
+        assertEquals("Bearer token-2", event.getRequestHeaders().get(HttpHeaders.AUTHORIZATION));
     }
 
     @Test
@@ -369,6 +457,10 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         assertNotNull(event);
         assertEquals(ErrorCategory.UNKNOWN, event.getErrorCategory());
         assertEquals(1, event.getAttemptCount());
+        assertNull(event.getStatusCode());
+        assertNull(event.getFailureStage());
+        assertNull(event.getRequestUrl());
+        assertTrue(event.getRequestHeaders().isEmpty());
         assertTrue(event.getDurationMs() < 5000);
     }
 

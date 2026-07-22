@@ -7,6 +7,9 @@ import java.util.*;
 
 /**
  * Immutable call state passed to {@link ReactiveHttpClientLifecycleHook} methods.
+ * {@code attemptNumber} identifies a subscription to the retryable request publisher,
+ * not a guaranteed outbound HTTP dispatch.
+ * A terminal context can report 0 when resilience rejected the call before that subscription.
  * This context intentionally has no response-header or byte-size fields; lifecycle hooks
  * must not consume request or response publishers to infer encoded or decoded sizes.
  */

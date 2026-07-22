@@ -411,11 +411,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             state.preparedResolved.set(preparedResolved);
             int attempt = state.attemptCount.incrementAndGet();
             state.start.compareAndSet(0L, System.currentTimeMillis());
-            state.requestUrl.set(null);
-            state.finalRequestObservation.set(null);
-            state.responseStatus.set(null);
-            state.responseHeaders.set(Map.of());
-            state.terminalError.set(null);
+            state.resetAttemptEvidence();
             notifyLifecycleAttempt(lifecycleHooks, plan, effectiveApi, preparedResolved, state.requestUrl.get(), null, null, attempt);
             if (exchangeLogger == null && state.firstAttempt.compareAndSet(true, false)) {
                 logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.start.get());
@@ -432,7 +428,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     timeoutMs,
                     shouldApplyResponseTimeout,
                     state.requestUrl,
-                    state.finalRequestObservation));
+                    state.finalRequestObservation,
+                    state::resetAttemptEvidence));
         });
     }
 
@@ -464,6 +461,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     timeoutMs,
                     shouldApplyResponseTimeout,
                     null,
+                    null,
                     null));
         });
     }
@@ -479,7 +477,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
             AtomicReference<URI> requestUrl,
-            AtomicReference<FinalRequestObservation> finalRequestObservation) {
+            AtomicReference<FinalRequestObservation> finalRequestObservation,
+            Runnable requestObservationReset) {
         WebClient.RequestBodySpec preparedRequestSpec = webClient
                 .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
                 .uri(uriBuilder -> buildRequestUri(uriBuilder, effectiveApi.pathTemplate(), resolved));
@@ -518,17 +517,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (finalRequestObservation != null) {
             requestHeadersSpec = requestHeadersSpec.attribute(FINAL_REQUEST_OBSERVATION_ATTRIBUTE, finalRequestObservation);
         }
-        if (requestUrl != null || finalRequestObservation != null) {
+        if (requestObservationReset != null) {
             requestHeadersSpec = requestHeadersSpec.attribute(
                     AuthRequest.REQUEST_OBSERVATION_RESET_ATTRIBUTE,
-                    (Runnable) () -> {
-                        if (requestUrl != null) {
-                            requestUrl.set(null);
-                        }
-                        if (finalRequestObservation != null) {
-                            finalRequestObservation.set(null);
-                        }
-                    });
+                    requestObservationReset);
         }
         return configureNativeRequest(requestHeadersSpec, timeoutMs, shouldApplyResponseTimeout, requestUrl);
     }
@@ -1819,6 +1811,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         private SubscriptionState(RequestArgumentResolver.ResolvedArgs resolved) {
             this.preparedResolved = new AtomicReference<>(resolved);
+        }
+
+        private void resetAttemptEvidence() {
+            requestUrl.set(null);
+            finalRequestObservation.set(null);
+            responseStatus.set(null);
+            responseHeaders.set(Map.of());
+            terminalError.set(null);
         }
     }
 

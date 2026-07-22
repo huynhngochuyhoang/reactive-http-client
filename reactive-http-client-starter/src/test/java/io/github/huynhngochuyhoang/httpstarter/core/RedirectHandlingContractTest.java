@@ -120,7 +120,8 @@ class RedirectHandlingContractTest {
     void followedRedirectReportsOriginalDeclarativeRequestToObserverAndExchangeLogger() {
         AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
         RecordingExchangeLogger logger = new RecordingExchangeLogger();
-        DisposableServer server = redirectToFinalServer(HttpStatus.FOUND.value(), HttpStatus.OK.value(), "followed");
+        AtomicInteger dispatches = new AtomicInteger();
+        DisposableServer server = redirectToFinalServer(HttpStatus.FOUND.value(), HttpStatus.OK.value(), "followed", dispatches);
         try {
             String baseUrl = serverBaseUrl(server);
             RedirectClient client = createFactoryClient(
@@ -139,11 +140,14 @@ class RedirectHandlingContractTest {
                     })
                     .verifyComplete();
 
+            assertThat(dispatches).hasValue(2);
             assertThat(observed.get().getRequestUrl()).isEqualTo(baseUrl + "/start");
             assertThat(observed.get().getServerAddress()).isEqualTo("127.0.0.1");
             assertThat(observed.get().getServerPort()).isEqualTo(server.port());
+            assertThat(observed.get().getAttemptCount()).isEqualTo(1);
             assertThat(logger.context.get().requestUrl()).hasToString(baseUrl + "/start");
             assertThat(logger.context.get().responseStatus()).isEqualTo(HttpStatus.OK.value());
+            assertThat(logger.context.get().subscriptionAttemptCount()).isEqualTo(1);
         } finally {
             server.disposeNow(Duration.ofSeconds(5));
         }
@@ -438,14 +442,27 @@ class RedirectHandlingContractTest {
     }
 
     private static DisposableServer redirectToFinalServer(int redirectStatus, int finalStatus, String finalBody) {
+        return redirectToFinalServer(redirectStatus, finalStatus, finalBody, new AtomicInteger());
+    }
+
+    private static DisposableServer redirectToFinalServer(
+            int redirectStatus,
+            int finalStatus,
+            String finalBody,
+            AtomicInteger dispatches) {
         return HttpServer.create()
                 .port(0)
                 .route(routes -> routes
-                        .get("/start", (request, response) -> response.status(redirectStatus)
-                                .addHeader(HttpHeaders.LOCATION, "/final")
-                                .send())
-                        .get("/final", (request, response) -> response.status(finalStatus)
-                                .sendString(Mono.just(finalBody))))
+                        .get("/start", (request, response) -> {
+                            dispatches.incrementAndGet();
+                            return response.status(redirectStatus)
+                                    .addHeader(HttpHeaders.LOCATION, "/final")
+                                    .send();
+                        })
+                        .get("/final", (request, response) -> {
+                            dispatches.incrementAndGet();
+                            return response.status(finalStatus).sendString(Mono.just(finalBody));
+                        }))
                 .bindNow();
     }
 
