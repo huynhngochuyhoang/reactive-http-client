@@ -362,6 +362,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("Release bundle without a sources jar unexpectedly passed")
                 .contains("Release bundle without a Javadoc jar unexpectedly passed")
                 .contains("Release bundle with a mismatched module POM version unexpectedly passed")
+                .contains("Release bundle with a matching parent but mismatched project version unexpectedly passed")
                 .contains("Release bundle with a mismatched binary version unexpectedly passed")
                 .contains("3.1.0-SNAPSHOT")
                 .contains("conflicting local candidate unexpectedly passed");

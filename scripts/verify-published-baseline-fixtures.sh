@@ -13,6 +13,7 @@ rm -rf "$BASE/fixture-local-$VERSION" "$BASE/fixture-central-$VERSION" \
   "$BASE/fixture-release-$VERSION" "$BASE/fixture-release-missing-sources-$VERSION" \
   "$BASE/fixture-release-missing-javadoc-$VERSION" \
   "$BASE/fixture-release-mixed-pom-$VERSION" \
+  "$BASE/fixture-release-mixed-project-version-$VERSION" \
   "$BASE/fixture-release-mixed-jar-$VERSION" "$WORK"
 
 seed_artifact() {
@@ -121,6 +122,17 @@ if "$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
     fixture-release-mixed-pom "$VERSION" "$WORK/release-mixed-pom" \
     --release-artifacts "${release_artifacts[@]}"; then
   echo "Release bundle with a mismatched module POM version unexpectedly passed" >&2
+  exit 1
+fi
+
+seed_release_bundle fixture-release-mixed-project-version
+printf '<project><parent><version>%s</version></parent><version>other</version></project>\n' \
+  "$VERSION" \
+  > "$BASE/fixture-release-mixed-project-version-$VERSION/$GROUP_PATH/reactive-http-client-test/$VERSION/reactive-http-client-test-$VERSION.pom"
+if "$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
+    fixture-release-mixed-project-version "$VERSION" "$WORK/release-mixed-project-version" \
+    --release-artifacts "${release_artifacts[@]}"; then
+  echo "Release bundle with a matching parent but mismatched project version unexpectedly passed" >&2
   exit 1
 fi
 

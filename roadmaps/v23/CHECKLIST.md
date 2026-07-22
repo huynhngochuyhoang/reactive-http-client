@@ -41,11 +41,12 @@ Evidence:
   `api.compatibility.baseline.version=3.3.0-SNAPSHOT` both failed at the inherited
   same-version guard as required.
 - Hardened `verify-published-baseline-provenance.sh --release-artifacts` to compare
-  each published POM's declared project/parent version and every binary JAR's
-  embedded Maven `pom.properties` version with the requested baseline. Added
-  negative fixtures for a mismatched module POM and a mismatched binary while
-  retaining stale repository, local marker, unrelated version, and missing
-  attachment rejection.
+  each published POM's direct project version, falling back to its parent version
+  only when the project version is omitted, and every binary JAR's embedded Maven
+  `pom.properties` version with the requested baseline. Negative fixtures cover a
+  mismatched parent-only module POM, a matching parent with a mismatched direct
+  project version, and a mismatched binary while retaining stale repository, local
+  marker, unrelated version, and missing attachment rejection.
 - `scripts/verify-published-release-artifacts.sh 3.2.0` passed from an absent
   Central-only repository through the neutral Boot 4 consumer model. Evidence at
   `target/release-evidence/published-baselines/release-artifacts-3.2.0/` records

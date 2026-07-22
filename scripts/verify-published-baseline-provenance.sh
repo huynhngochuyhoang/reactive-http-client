@@ -42,12 +42,37 @@ CHECKSUMS="$EVIDENCE_DIR/project-artifact-sha256.txt"
 
 declared_pom_version() {
   local pom="$1"
-  local compact
-  local version
-  compact="$(tr -d '[:space:]' < "$pom")"
-  version="${compact#*<version>}"
-  [[ "$version" != "$compact" ]] || return 1
-  printf '%s\n' "${version%%</version>*}"
+  perl -0777 -e '
+    my @path;
+    my ($project_version, $parent_version);
+    while (<>) {
+      while (/<!--.*?-->|<\?.*?\?>|<![^>]*>|<[^>]+>|[^<]+/gs) {
+        my $token = $&;
+        next if $token =~ /^<(?:!--|\?|!)/;
+        if ($token =~ m{^</}) {
+          pop @path;
+          next;
+        }
+        if ($token =~ /^</) {
+          my ($name) = $token =~ m{^<\s*(?:[^:\s>]+:)?([^:\s/>]+)};
+          next unless defined $name;
+          push @path, lc $name;
+          pop @path if $token =~ m{/\s*>$};
+          next;
+        }
+        my $path = join "/", @path;
+        $project_version .= $token if $path eq "project/version";
+        $parent_version .= $token if $path eq "project/parent/version";
+      }
+    }
+    for ($project_version, $parent_version) {
+      next unless defined;
+      s/^\s+|\s+$//g;
+    }
+    my $version = length($project_version // "") ? $project_version : $parent_version;
+    exit 1 unless defined $version && length $version;
+    print "$version\n";
+  ' "$pom"
 }
 
 embedded_jar_version() {
