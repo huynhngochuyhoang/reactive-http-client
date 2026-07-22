@@ -113,12 +113,37 @@ reactive:
             audience: https://api.example.com/
             auth-style: form-post    # basic-auth by default; use form-post when the token server requires body credentials
             expiry-leeway-ms: 60000  # subtract 60s from expires_in before caching
+            token-service:
+              connect-timeout-ms: 2000
+              request-timeout-ms: 5000
+              max-connections: 2
+              pending-acquire-timeout-ms: 5000
+              retry-max-attempts: 1  # one means no retry
+              retry-backoff-ms: 100
+              # proxy:            # direct by default; does not inherit the business proxy
+              #   type: HTTP
+              #   host: token-proxy.example.com
+              #   port: 8080
+              # tls:              # platform TLS defaults unless explicitly configured
+              #   trust-store: classpath:certs/token-truststore.p12
+              #   trust-store-password: ${TOKEN_TRUSTSTORE_PASSWORD}
 ```
 
 `auth-style: basic-auth` sends credentials in the token request `Authorization`
 header. `auth-style: form-post` sends `client_id` and `client_secret` as
 form-encoded token request fields for providers that require RFC 6749 body
 credentials.
+
+The built-in object-style provider owns a separate Reactor Netty connection pool
+and connector for token acquisition. Its timeout, pool, proxy, TLS, and retry
+policy comes only from `token-service`; business-client proxy/TLS settings,
+business Resilience4j operators, per-client customizers, redirects, and the
+application `WebClient.Builder` filters are not inherited. `request-timeout-ms:
+0` disables the per-token-attempt total timeout, and `retry-max-attempts: 1`
+keeps retries disabled. Opt-in retries cover token-request timeouts, transport
+failures, HTTP `429`, and HTTP `5xx`; credential failures and malformed token
+responses are never retried. The token pool is disposed with its client proxy; Reactor Netty shared
+event-loop resources remain framework-owned.
 
 The token provider maps `expires_in` to an `AccessToken` expiry timestamp after
 subtracting `expiry-leeway-ms`. `RefreshingBearerAuthProvider` caches the token,
@@ -133,11 +158,13 @@ returned to the normal error-decoding path without another refresh loop.
 Token endpoint failures are reported as `AuthProviderException`. HTTP 4xx/5xx
 responses include the status and a bounded, redacted response-body snippet. The
 sanitized HTTP cause retains the status, safe headers such as `Retry-After`, the
-full sanitized body for typed decoding, and the configured WebClient codecs; it
-removes token-request metadata and redacts credential-bearing response headers.
+full sanitized body for typed decoding, and the token-service WebClient codecs;
+it removes token-request metadata and redacts credential-bearing response headers.
 Malformed, empty, and missing-`access_token` 2xx responses use fixed diagnostics
-without chaining raw decoder text. WebClient `defaultStatusHandler` exceptions
-continue to take precedence and remain owned by that custom handler. Client
+without chaining raw decoder text. For manual providers, `WebClient`
+`defaultStatusHandler` exceptions continue to take precedence and remain owned
+by that caller-configured handler; object-style providers use the isolated
+built-in status mapping. Client
 secrets, access tokens, refresh tokens, cookies, and Basic credentials are not
 included in built-in failure messages or sanitized causes. See
 [Production Support Bundles](26-support-bundles.md) for safe OAuth2/auth incident
@@ -157,10 +184,17 @@ AuthProvider userServiceAuthProvider(WebClient.Builder builder) {
                     // .audience("https://api.example.com/")        // optional
                     // .authStyle(AuthStyle.FORM_POST)              // default: BASIC_AUTH
                     // .expiryLeeway(Duration.ofSeconds(30))        // refresh slightly early
+                    // .requestTimeout(Duration.ofSeconds(5))       // zero disables it
+                    // .retryMaxAttempts(1)                         // one disables retry
+                    // .retryBackoff(Duration.ofMillis(100))
                     .build();
     return new RefreshingBearerAuthProvider(tokenProvider);
 }
 ```
+
+Manual provider wiring remains caller-owned: the supplied `WebClient` controls
+its connector, pool, filters, proxy/TLS, and lifecycle. The starter does not
+replace or dispose those resources.
 
 Supported authentication styles:
 

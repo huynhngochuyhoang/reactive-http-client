@@ -60,6 +60,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     private Class<T> type;
     private ApplicationContext applicationContext;
     private ConnectionProvider connectionProvider;
+    private ConnectionProvider tokenServiceConnectionProvider;
     private ProtocolAwareConnectionPoolMeterRegistrar connectionPoolMeterRegistrar;
 
     // -------------------------------------------------------------------------
@@ -200,17 +201,22 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
      */
     @Override
     public void destroy() {
-        if (connectionProvider != null) {
-            try {
-                connectionProvider.disposeLater().block(Duration.ofSeconds(5));
-            } catch (RuntimeException e) {
-                log.warn("Error while disposing ConnectionProvider for client [{}]",
-                        type != null ? type.getSimpleName() : "?", e);
-            } finally {
-                if (connectionPoolMeterRegistrar != null) {
-                    connectionPoolMeterRegistrar.close();
-                }
-            }
+        disposeConnectionProvider(connectionProvider, "business");
+        disposeConnectionProvider(tokenServiceConnectionProvider, "OAuth2 token-service");
+        if (connectionPoolMeterRegistrar != null) {
+            connectionPoolMeterRegistrar.close();
+        }
+    }
+
+    private void disposeConnectionProvider(ConnectionProvider provider, String owner) {
+        if (provider == null) {
+            return;
+        }
+        try {
+            provider.disposeLater().block(Duration.ofSeconds(5));
+        } catch (RuntimeException error) {
+            log.warn("Error while disposing {} ConnectionProvider for client [{}]",
+                    owner, type != null ? type.getSimpleName() : "?", error);
         }
     }
 
@@ -557,7 +563,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         boolean observabilityEnabled = observabilityConfig == null || observabilityConfig.isEnabled();
 
         log.debug("Reactive HTTP client [{}] startup configuration: baseUrl={} (source={}), protocol={}, poolSource={}, "
-                        + "pool=maxConnections:{}, pendingAcquireTimeoutMs:{}, proxy={}, tls={}, auth={}, requestTimeout={}, logicalCallTimeout={}ms, resilience={}, "
+                        + "pool=maxConnections:{}, pendingAcquireTimeoutMs:{}, proxy={}, tls={}, auth={}, tokenService={}, requestTimeout={}, logicalCallTimeout={}ms, resilience={}, "
                         + "observability={}, exchangeLogging={}, logPreset={}",
                 clientName,
                 baseUrl,
@@ -569,6 +575,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 proxySummary(proxy),
                 tlsSummary(tls),
                 authSummary(config),
+                tokenServiceSummary(config),
                 requestTimeoutSummary(config),
                 config.getLogicalCallTimeoutMs(),
                 resilienceSummary(resilience),
@@ -745,6 +752,24 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             return "configured(" + config.getAuth().getType() + ")";
         }
         return "none";
+    }
+
+    private static String tokenServiceSummary(ReactiveHttpClientProperties.ClientConfig config) {
+        if (StringUtils.hasText(config.getAuthProvider())
+                || config.getAuth() == null
+                || !OAuth2ClientCredentialsAuthProviderFactory.TYPE.equalsIgnoreCase(config.getAuth().getType())) {
+            return "not-applicable";
+        }
+        ReactiveHttpClientProperties.OAuth2TokenServiceConfig policy =
+                config.getAuth().getOauth2ClientCredentials().getTokenService();
+        return "owned(connectTimeoutMs=" + policy.getConnectTimeoutMs()
+                + ", requestTimeoutMs=" + policy.getRequestTimeoutMs()
+                + ", maxConnections=" + policy.getMaxConnections()
+                + ", pendingAcquireTimeoutMs=" + policy.getPendingAcquireTimeoutMs()
+                + ", retryMaxAttempts=" + policy.getRetryMaxAttempts()
+                + ", retryBackoffMs=" + policy.getRetryBackoffMs()
+                + ", proxy=" + (policy.getProxy() != null ? "configured" : "direct")
+                + ", tls=" + (policy.getTls() != null ? "configured" : "platform-default") + ")";
     }
 
     private static String requestTimeoutSummary(ReactiveHttpClientProperties.ClientConfig config) {
@@ -1501,9 +1526,73 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "No AuthProviderFactory supports auth type '" + type + "' for client '" + clientName + "'"));
-        WebClient.Builder builder = applicationContext
-                .getBeanProvider(WebClient.Builder.class)
-                .getIfAvailable(WebClient::builder);
+        WebClient.Builder builder;
+        if (factory instanceof OAuth2ClientCredentialsAuthProviderFactory) {
+            builder = buildOAuth2TokenServiceWebClientBuilder(clientName,
+                    config.getAuth().getOauth2ClientCredentials().getTokenService());
+        } else {
+            builder = applicationContext
+                    .getBeanProvider(WebClient.Builder.class)
+                    .getIfAvailable(WebClient::builder);
+        }
         return factory.create(clientName, config.getAuth(), builder);
+    }
+
+    private WebClient.Builder buildOAuth2TokenServiceWebClientBuilder(
+            String clientName,
+            ReactiveHttpClientProperties.OAuth2TokenServiceConfig tokenService) {
+        ReactiveHttpClientProperties.OAuth2TokenServiceConfig policy = tokenService != null
+                ? tokenService
+                : new ReactiveHttpClientProperties.OAuth2TokenServiceConfig();
+        validateTokenServiceTransport(clientName, policy);
+        String poolName = "reactive-http-client-" + clientName + "-oauth2-token-service"
+                + (type != null ? "-" + type.getName() : "");
+        this.tokenServiceConnectionProvider = ConnectionProvider.builder(poolName)
+                .maxConnections(policy.getMaxConnections())
+                .pendingAcquireTimeout(Duration.ofMillis(policy.getPendingAcquireTimeoutMs()))
+                .build();
+        HttpClient tokenHttpClient = HttpClient.create(this.tokenServiceConnectionProvider)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, policy.getConnectTimeoutMs());
+
+        ReactiveHttpClientProperties.ProxyConfig proxy = policy.getProxy();
+        if (proxy != null && proxy.getType() != ReactiveHttpClientProperties.ProxyConfig.Type.NONE
+                && StringUtils.hasText(proxy.getHost())) {
+            tokenHttpClient = HttpProxyApplier.apply(tokenHttpClient, proxy);
+        }
+        if (policy.getTls() != null) {
+            tokenHttpClient = TlsContextApplier.apply(
+                    tokenHttpClient, policy.getTls(), clientName + " OAuth2 token service");
+        }
+        return WebClient.builder().clientConnector(new ReactorClientHttpConnector(tokenHttpClient));
+    }
+
+    private static void validateTokenServiceTransport(
+            String clientName,
+            ReactiveHttpClientProperties.OAuth2TokenServiceConfig policy) {
+        String owner = "OAuth2 token service for client '" + clientName + "'";
+        ReactiveHttpClientProperties.ProxyConfig proxy = policy.getProxy();
+        if (proxy != null && proxy.getType() != ReactiveHttpClientProperties.ProxyConfig.Type.NONE) {
+            boolean hasHost = StringUtils.hasText(proxy.getHost());
+            boolean hasPort = proxy.getPort() > 0;
+            if (hasHost != hasPort) {
+                throw new IllegalArgumentException("Proxy host and a valid port must be configured together for "
+                        + owner + ".");
+            }
+            if (StringUtils.hasText(proxy.getUsername()) != StringUtils.hasText(proxy.getPassword())) {
+                throw new IllegalArgumentException("Proxy username and password must be configured together for "
+                        + owner + ".");
+            }
+        }
+        ReactiveHttpClientProperties.TlsConfig tls = policy.getTls();
+        if (tls != null) {
+            if (StringUtils.hasText(tls.getTrustStorePassword()) && !StringUtils.hasText(tls.getTrustStore())) {
+                throw new IllegalArgumentException(
+                        "TLS trust-store-password is set but trust-store is blank for " + owner + ".");
+            }
+            if (StringUtils.hasText(tls.getKeyStorePassword()) && !StringUtils.hasText(tls.getKeyStore())) {
+                throw new IllegalArgumentException(
+                        "TLS key-store-password is set but key-store is blank for " + owner + ".");
+            }
+        }
     }
 }

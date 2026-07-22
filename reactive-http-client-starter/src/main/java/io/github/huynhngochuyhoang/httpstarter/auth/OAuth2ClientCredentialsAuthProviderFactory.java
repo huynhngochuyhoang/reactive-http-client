@@ -32,7 +32,10 @@ public final class OAuth2ClientCredentialsAuthProviderFactory implements AuthPro
                         .clientSecret(required(oauth.getClientSecret(), clientName, "auth.oauth2-client-credentials.client-secret"))
                         .scope(oauth.getScope())
                         .audience(oauth.getAudience())
-                        .expiryLeeway(Duration.ofMillis(Math.max(0, oauth.getExpiryLeewayMs())));
+                        .expiryLeeway(Duration.ofMillis(Math.max(0, oauth.getExpiryLeewayMs())))
+                        .requestTimeout(Duration.ofMillis(oauth.getTokenService().getRequestTimeoutMs()))
+                        .retryMaxAttempts(oauth.getTokenService().getRetryMaxAttempts())
+                        .retryBackoff(Duration.ofMillis(oauth.getTokenService().getRetryBackoffMs()));
 
         if (StringUtils.hasText(oauth.getAuthStyle())) {
             builder.authStyle(OAuth2ClientCredentialsTokenProvider.AuthStyle.valueOf(

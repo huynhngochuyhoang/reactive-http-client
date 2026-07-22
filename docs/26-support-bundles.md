@@ -331,7 +331,18 @@ Minimal safe bundle:
 
 Do not include raw token endpoint request bodies, raw token responses, bearer
 tokens, Basic credentials, refresh tokens, client secrets, cookies, or signed
-Authorization headers. For AWS SigV4, include the body shape (`byte[]`, `String`,
+Authorization headers.
+
+For the built-in object-style OAuth2 provider, record only the sanitized
+`token-service` policy: connect/request timeout, maximum connections, pending
+acquire timeout, retry attempts/backoff, whether a proxy is configured, and
+whether custom TLS is configured. Do not record proxy credentials, trust-store
+passwords, client IDs, client secrets, token endpoint query strings, or tokens.
+Token-service failures remain `AuthProviderException` failures for the logical
+business client; they are not promoted into business-request DNS, connect,
+proxy, TLS, or response stages. Raw token-request wrappers are replaced by a fixed transport diagnostic and a
+cause-type-only safe cause so request metadata cannot expose Basic credentials.
+For AWS SigV4, include the body shape (`byte[]`, `String`,
 JSON object, publisher, multipart, or empty) and whether the request uses a
 custom `WebClient` codec configuration; do not include the signature or payload.
 

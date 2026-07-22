@@ -555,6 +555,7 @@ public class ReactiveHttpClientProperties {
         private String audience;
         private String authStyle;
         private long expiryLeewayMs = 30_000;
+        private OAuth2TokenServiceConfig tokenService = new OAuth2TokenServiceConfig();
 
         public String getTokenUri() { return tokenUri; }
         public void setTokenUri(String tokenUri) { this.tokenUri = tokenUri; }
@@ -576,6 +577,82 @@ public class ReactiveHttpClientProperties {
 
         public long getExpiryLeewayMs() { return expiryLeewayMs; }
         public void setExpiryLeewayMs(long expiryLeewayMs) { this.expiryLeewayMs = expiryLeewayMs; }
+
+        public OAuth2TokenServiceConfig getTokenService() { return tokenService; }
+        public void setTokenService(OAuth2TokenServiceConfig tokenService) {
+            this.tokenService = tokenService != null ? tokenService : new OAuth2TokenServiceConfig();
+        }
+    }
+
+    /** Dedicated transport policy for built-in OAuth2 token acquisition. */
+    public static class OAuth2TokenServiceConfig {
+        private static final long MAX_TIMEOUT_MS = 30L * 60 * 1000;
+        private static final int MAX_RETRY_ATTEMPTS = 10;
+
+        private int connectTimeoutMs = 2_000;
+        private long requestTimeoutMs;
+        private int maxConnections = 2;
+        private long pendingAcquireTimeoutMs = 5_000;
+        private int retryMaxAttempts = 1;
+        private long retryBackoffMs = 100;
+        private ProxyConfig proxy;
+        private TlsConfig tls;
+
+        public int getConnectTimeoutMs() { return connectTimeoutMs; }
+        public void setConnectTimeoutMs(int connectTimeoutMs) {
+            this.connectTimeoutMs = requireAtLeast(
+                    "reactive.http.clients.*.auth.oauth2-client-credentials.token-service.connect-timeout-ms",
+                    connectTimeoutMs, 1);
+        }
+
+        public long getRequestTimeoutMs() { return requestTimeoutMs; }
+        public void setRequestTimeoutMs(long requestTimeoutMs) {
+            requireAtLeast("reactive.http.clients.*.auth.oauth2-client-credentials.token-service.request-timeout-ms",
+                    requestTimeoutMs, 0);
+            this.requestTimeoutMs = requireAtMost(
+                    "reactive.http.clients.*.auth.oauth2-client-credentials.token-service.request-timeout-ms",
+                    requestTimeoutMs, MAX_TIMEOUT_MS);
+        }
+
+        public int getMaxConnections() { return maxConnections; }
+        public void setMaxConnections(int maxConnections) {
+            this.maxConnections = requireAtLeast(
+                    "reactive.http.clients.*.auth.oauth2-client-credentials.token-service.max-connections",
+                    maxConnections, 1);
+        }
+
+        public long getPendingAcquireTimeoutMs() { return pendingAcquireTimeoutMs; }
+        public void setPendingAcquireTimeoutMs(long pendingAcquireTimeoutMs) {
+            this.pendingAcquireTimeoutMs = requireAtLeast(
+                    "reactive.http.clients.*.auth.oauth2-client-credentials.token-service.pending-acquire-timeout-ms",
+                    pendingAcquireTimeoutMs, 0);
+        }
+
+        public int getRetryMaxAttempts() { return retryMaxAttempts; }
+        public void setRetryMaxAttempts(int retryMaxAttempts) {
+            int validated = requireAtLeast(
+                    "reactive.http.clients.*.auth.oauth2-client-credentials.token-service.retry-max-attempts",
+                    retryMaxAttempts, 1);
+            if (validated > MAX_RETRY_ATTEMPTS) {
+                throw new IllegalArgumentException(
+                        "reactive.http.clients.*.auth.oauth2-client-credentials.token-service.retry-max-attempts "
+                                + "must be <= " + MAX_RETRY_ATTEMPTS + " but was " + retryMaxAttempts + ".");
+            }
+            this.retryMaxAttempts = validated;
+        }
+
+        public long getRetryBackoffMs() { return retryBackoffMs; }
+        public void setRetryBackoffMs(long retryBackoffMs) {
+            this.retryBackoffMs = requireAtLeast(
+                    "reactive.http.clients.*.auth.oauth2-client-credentials.token-service.retry-backoff-ms",
+                    retryBackoffMs, 0);
+        }
+
+        public ProxyConfig getProxy() { return proxy; }
+        public void setProxy(ProxyConfig proxy) { this.proxy = proxy; }
+
+        public TlsConfig getTls() { return tls; }
+        public void setTls(TlsConfig tls) { this.tls = tls; }
     }
 
     public static class AwsSigV4AuthConfig {

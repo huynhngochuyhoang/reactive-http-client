@@ -246,6 +246,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "reactive.http.clients.[name].request-timeout-ms",
                 "reactive.http.clients.[name].auth-provider",
                 "reactive.http.clients.[name].auth.oauth2-client-credentials.token-uri",
+                "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.request-timeout-ms",
                 "reactive.http.clients.[name].auth.aws-sig-v4.region",
                 "reactive.http.clients.[name].resilience.enabled",
                 "reactive.http.clients.[name].resilience.retry",
@@ -531,6 +532,12 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.clients.[name].apis.[api-name].timeout-ms", -1);
         assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.auth-style", "basic-auth");
         assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.expiry-leeway-ms", 30000);
+        assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.connect-timeout-ms", 2000);
+        assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.request-timeout-ms", 0);
+        assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.max-connections", 2);
+        assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.pending-acquire-timeout-ms", 5000);
+        assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.retry-max-attempts", 1);
+        assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.retry-backoff-ms", 100);
         assertDefaultValue(metadata, "reactive.http.clients.[name].auth.aws-sig-v4.strict-body-signing-validation", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.enabled", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.retry", "default");

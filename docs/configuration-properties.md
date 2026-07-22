@@ -25,6 +25,27 @@
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.client-secret` | `java.lang.String` |  | OAuth2 client secret for type oauth2-client-credentials. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.expiry-leeway-ms` | `java.lang.Long` | `30000` | Milliseconds subtracted from OAuth2 expires_in before caching the access token. Default: 30000. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.scope` | `java.lang.String` |  | Optional OAuth2 scope sent to the token endpoint. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.connect-timeout-ms` | `java.lang.Integer` | `2000` | Connect timeout for the isolated OAuth2 token-service transport in milliseconds. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.max-connections` | `java.lang.Integer` | `2` | Maximum connections in the client-owned OAuth2 token-service pool. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.pending-acquire-timeout-ms` | `java.lang.Long` | `5000` | Maximum OAuth2 token-service pool acquisition wait in milliseconds. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.host` | `java.lang.String` |  | Token-service proxy host. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.non-proxy-hosts` | `java.lang.String` |  | Token-service non-proxy hosts regex. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.password` | `java.lang.String` |  | Token-service proxy authentication password. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.port` | `java.lang.Integer` |  | Token-service proxy port. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.type` | `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type` |  | Token-service proxy type. Set to NONE or omit the proxy block for a direct connection. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.username` | `java.lang.String` |  | Token-service proxy authentication username. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.request-timeout-ms` | `java.lang.Long` | `0` | Total timeout for each OAuth2 token request in milliseconds. Zero disables it. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.retry-backoff-ms` | `java.lang.Long` | `100` | Fixed delay between transient OAuth2 token request attempts in milliseconds. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.retry-max-attempts` | `java.lang.Integer` | `1` | Total OAuth2 token request attempts for timeouts, transport failures, HTTP 429, and 5xx responses. One disables retry. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.ciphers` | `java.util.List<java.lang.String>` |  | Token-service allowed TLS cipher suites override. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.insecure-trust-all` | `java.lang.Boolean` |  | Token-service certificate verification disable override — NEVER use in production. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.key-store` | `java.lang.String` |  | Token-service keystore path override for mTLS client certificate. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.key-store-password` | `java.lang.String` |  | Token-service keystore password override. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.key-store-type` | `java.lang.String` |  | Token-service keystore format override. Default: PKCS12. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.protocols` | `java.util.List<java.lang.String>` |  | Token-service allowed TLS protocol versions override. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.trust-store` | `java.lang.String` |  | Token-service truststore path override. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.trust-store-password` | `java.lang.String` |  | Token-service truststore password override. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.trust-store-type` | `java.lang.String` |  | Token-service truststore format override. Default: PKCS12. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.token-uri` | `java.lang.String` |  | OAuth2 token endpoint URI for type oauth2-client-credentials. |  |
 | `reactive.http.clients.[name].auth.type` | `java.lang.String` |  | Object-style auth provider type. Built-in values: oauth2-client-credentials, aws-sigv4. Ignored when auth-provider bean name is set. |  |
 | `reactive.http.clients.[name].base-url` | `java.lang.String` |  | Base URL for this client (e.g. https://api.example.com). |  |

@@ -17,14 +17,17 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.UnsupportedMediaTypeException;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.util.UriUtils;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
@@ -102,6 +105,9 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
     private final String audience;
     private final AuthStyle authStyle;
     private final Duration expiryLeeway;
+    private final Duration requestTimeout;
+    private final int retryMaxAttempts;
+    private final Duration retryBackoff;
     private final String diagnosticClientName;
     private final Pattern clientSecretPattern;
 
@@ -121,8 +127,20 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         this.authStyle = b.authStyle != null ? b.authStyle : AuthStyle.BASIC_AUTH;
         this.diagnosticClientName = StringUtils.hasText(b.clientName) ? b.clientName : null;
         this.expiryLeeway = b.expiryLeeway != null ? b.expiryLeeway : Duration.ofSeconds(30);
+        this.requestTimeout = b.requestTimeout != null ? b.requestTimeout : Duration.ZERO;
+        this.retryMaxAttempts = b.retryMaxAttempts;
+        this.retryBackoff = b.retryBackoff != null ? b.retryBackoff : Duration.ofMillis(100);
         if (this.expiryLeeway.isNegative()) {
             throw new IllegalArgumentException("expiryLeeway must not be negative");
+        }
+        if (this.requestTimeout.isNegative()) {
+            throw new IllegalArgumentException("requestTimeout must not be negative");
+        }
+        if (this.retryMaxAttempts < 1) {
+            throw new IllegalArgumentException("retryMaxAttempts must be >= 1");
+        }
+        if (this.retryBackoff.isNegative()) {
+            throw new IllegalArgumentException("retryBackoff must not be negative");
         }
     }
 
@@ -157,12 +175,31 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
                     .body(BodyInserters.fromFormData(form));
         }
 
-        return spec.retrieve()
+        Mono<AccessToken> tokenRequest = spec.retrieve()
                 .bodyToMono(TokenResponse.class)
                 .map(this::toAccessToken)
-                .switchIfEmpty(Mono.defer(() -> Mono.error(missingAccessTokenFailure())))
+                .switchIfEmpty(Mono.defer(() -> Mono.error(missingAccessTokenFailure())));
+        if (!requestTimeout.isZero()) {
+            tokenRequest = tokenRequest.timeout(requestTimeout);
+        }
+        if (retryMaxAttempts > 1) {
+            if (retryBackoff.isZero()) {
+                tokenRequest = tokenRequest.retryWhen(Retry.max(retryMaxAttempts - 1L)
+                        .filter(this::isRetryableTokenServiceFailure)
+                        .onRetryExhaustedThrow((specification, signal) -> signal.failure()));
+            } else {
+                tokenRequest = tokenRequest.retryWhen(Retry.fixedDelay(retryMaxAttempts - 1L, retryBackoff)
+                        .filter(this::isRetryableTokenServiceFailure)
+                        .onRetryExhaustedThrow((specification, signal) -> signal.failure()));
+            }
+        }
+        return tokenRequest
                 .onErrorMap(WebClientResponseException.class, this::tokenEndpointException)
-                .onErrorMap(this::isTokenResponseDecodeFailure, this::malformedTokenResponseException);
+                .onErrorMap(WebClientRequestException.class, this::tokenTransportException)
+                .onErrorMap(this::isTokenResponseDecodeFailure, this::malformedTokenResponseException)
+                .onErrorMap(TimeoutException.class, error -> authFailure(
+                        "OAuth2 token endpoint timed out after " + requestTimeout.toMillis() + " ms",
+                        new TimeoutException("OAuth2 token request timed out")));
     }
 
     private RuntimeException tokenEndpointException(WebClientResponseException responseException) {
@@ -178,6 +215,14 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         return authHttpFailure(diagnostic, sanitizedCause);
     }
 
+    private RuntimeException tokenTransportException(WebClientRequestException error) {
+        Throwable transportCause = error.getCause();
+        String causeType = transportCause != null ? transportCause.getClass().getSimpleName() : "unknown";
+        return authFailure(
+                "OAuth2 token endpoint transport failed",
+                new IllegalStateException("OAuth2 token transport failure type: " + causeType));
+    }
+
     private RuntimeException malformedTokenResponseException(Throwable cause) {
         String safeCauseMessage = cause instanceof UnsupportedMediaTypeException
                 ? "Unsupported OAuth2 token response content type"
@@ -185,6 +230,17 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         return authFailure(
                 "OAuth2 token endpoint returned malformed JSON token response",
                 new IllegalStateException(safeCauseMessage));
+    }
+
+    private boolean isRetryableTokenServiceFailure(Throwable error) {
+        if (error instanceof TimeoutException || error instanceof WebClientRequestException) {
+            return true;
+        }
+        if (error instanceof WebClientResponseException responseError) {
+            int status = responseError.getStatusCode().value();
+            return status == 429 || status >= 500;
+        }
+        return false;
     }
 
     private boolean isTokenResponseDecodeFailure(Throwable error) {
@@ -574,6 +630,9 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
         private AuthStyle authStyle;
         private String clientName;
         private Duration expiryLeeway;
+        private Duration requestTimeout;
+        private int retryMaxAttempts = 1;
+        private Duration retryBackoff;
 
         private Builder(WebClient webClient) {
             this.webClient = webClient;
@@ -589,6 +648,15 @@ public final class OAuth2ClientCredentialsTokenProvider implements AccessTokenPr
 
         /** How much time to subtract from the server's {@code expires_in} when setting {@link AccessToken#expiresAt()}. */
         public Builder expiryLeeway(Duration expiryLeeway) { this.expiryLeeway = expiryLeeway; return this; }
+
+        /** Total timeout for each token request; {@code Duration.ZERO} disables it. */
+        public Builder requestTimeout(Duration requestTimeout) { this.requestTimeout = requestTimeout; return this; }
+
+        /** Total token request attempts; {@code 1} disables retries. */
+        public Builder retryMaxAttempts(int retryMaxAttempts) { this.retryMaxAttempts = retryMaxAttempts; return this; }
+
+        /** Fixed delay between transient token request attempts. */
+        public Builder retryBackoff(Duration retryBackoff) { this.retryBackoff = retryBackoff; return this; }
 
         public OAuth2ClientCredentialsTokenProvider build() {
             return new OAuth2ClientCredentialsTokenProvider(this);
