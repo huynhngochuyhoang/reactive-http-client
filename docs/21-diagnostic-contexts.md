@@ -92,7 +92,7 @@ Use exchange logging for per-call request/response metadata, and use the diagnos
 
 ## Runtime diagnostics provider
 
-Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, per-attempt response-timeout summary, logical-call budget, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
+Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, configured pool protocol/capacity basis with an unknown peer stream limit, per-attempt response-timeout summary, logical-call budget, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
 
 Use `ReactiveHttpClientDiagnosticsSnapshot` when a support bundle, startup log,
 or local custom endpoint needs deterministic Markdown or JSON output from those
@@ -139,8 +139,8 @@ facts remain `null` in map/JSON and `unknown` in Markdown. The fixture and JVM
 and native checks reject removal, rename, type drift, or accidental secret-bearing
 fields.
 
-Request-scoped transport facts introduced in V22, including negotiated protocol,
-content encoding, failure stage, error category, request/response headers, and
+Request-scoped transport facts introduced in V22, including the actual negotiated
+protocol and peer-advertised stream limit, content encoding, failure stage, error category, request/response headers, and
 payload sizes, are intentionally not copied into this configured-client schema.
 They belong to observer, lifecycle, or exchange-log records. Adding them here
 without a stable configured value would collapse unknown and per-request states;

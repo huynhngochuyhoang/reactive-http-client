@@ -162,20 +162,50 @@ Evidence:
 
 ## Priority 4 - Protocol-Aware Pool Capacity
 
-### [ ] 4.1 Distinguish connection and stream pressure
+### [x] 4.1 Distinguish connection and stream pressure
 
-- [ ] Add real HTTP/1.1 and HTTP/2 bounded-capacity fixtures.
-- [ ] Distinguish queued connection acquisition from HTTP/2 stream-capacity pressure
+- [x] Add real HTTP/1.1 and HTTP/2 bounded-capacity fixtures.
+- [x] Distinguish queued connection acquisition from HTTP/2 stream-capacity pressure
       only where Reactor Netty supplies proof.
-- [ ] Report unknown instead of inferring unsupported distinctions.
-- [ ] Keep metrics and support metadata bounded and address-free.
+- [x] Report unknown instead of inferring unsupported distinctions.
+- [x] Keep metrics and support metadata bounded and address-free.
 
-### [ ] 4.2 Prove pool ownership under pressure
+### [x] 4.2 Prove pool ownership under pressure
 
-- [ ] Cover cancellation and timeout of queued demand.
-- [ ] Verify released capacity serves later requests without leaks or starvation.
-- [ ] Verify factory destruction waits for owned resources and pending demand terminates.
-- [ ] Align health, diagnostics, failure-stage, and operations guidance.
+- [x] Cover cancellation and timeout of queued demand.
+- [x] Verify released capacity serves later requests without leaks or starvation.
+- [x] Verify factory destruction waits for owned resources and pending demand terminates.
+- [x] Align health, diagnostics, failure-stage, and operations guidance.
+
+Evidence:
+
+- Added real HTTP/1.1 and H2C fixtures with one physical connection; the H2 peer
+  advertises one concurrent stream. HTTP/1.1 queues additional connection demand,
+  while H2 multiplexing uses one transport and queues the second stream until peer
+  capacity is released.
+- Pool metrics now use one factory-owned registrar per client and the starter-owned
+  `reactive.http.client.connection.pool.*` namespace, avoiding incompatible tag sets
+  when Reactor Netty built-in meters coexist. Common
+  `total.connections` and `idle.connections` gauges carry only the bounded pool
+  name; HTTP/1.1 adds active/pending connection gauges, while HTTP/2 adds
+  `active.streams` and `pending.streams`. Remote addresses are deliberately
+  omitted, and factory
+  destruction removes the registered meters after provider disposal.
+- Provider-backed schema-v1 diagnostics add configured `poolProtocol`,
+  `poolCapacityBasis`, and nullable `poolMaxConcurrentStreams`. H2 reports
+  connection-and-peer-stream capacity but leaves the negotiated peer limit unknown;
+  collection-backed snapshots preserve unknown/null semantics.
+- Real H2 pressure coverage proves queued cancellation and acquire timeout do not
+  consume later stream capacity, released capacity serves the next request on the
+  same transport, and factory shutdown terminates active/pending demand and waits
+  for owned provider disposal.
+- `POOL_ACQUIRE` remains bounded generic pool-admission evidence because Reactor
+  Pool terminal exceptions do not prove connection versus H2 stream pressure.
+  Health retains the bounded aggregate failure count; diagnostics, support-bundle,
+  observability, pool, and operations guidance document the same boundary.
+- Focused protocol-capacity, existing pool/H2, diagnostics, Actuator, health, and
+  release-documentation suites passed. The complete starter and test-helper suites
+  and `git diff --check` passed.
 
 ---
 

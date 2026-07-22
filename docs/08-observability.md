@@ -190,7 +190,7 @@ The endpoint returns the same provider-backed JSON-safe fields as `ReactiveHttpC
 
 ## Connection-pool metrics
 
-Enable Reactor Netty pool gauges per client or globally:
+Enable address-free starter aggregate pool gauges per client or globally:
 
 ```yaml
 reactive:
@@ -204,16 +204,19 @@ reactive:
           metrics-enabled: true   # per-client
 ```
 
-Gauges published:
+Under the `reactive.http.client.connection.pool` namespace, common gauges are
+`total.connections` and `idle.connections`. HTTP/1.1 adds `active.connections` and
+`pending.connections`; HTTP/2 adds `active.streams` and `pending.streams` because
+the public pool view does not prove how streams are distributed across
+physical connections. The peer-advertised H2 stream limit is runtime state and
+remains unknown in configured-client diagnostics.
 
-| Gauge | Description |
-|---|---|
-| `reactor.netty.connection.provider.total.connections` | All connections |
-| `reactor.netty.connection.provider.active.connections` | Connections in use |
-| `reactor.netty.connection.provider.idle.connections` | Available idle connections |
-| `reactor.netty.connection.provider.pending.connections` | Callers waiting for a connection |
-
-All gauges are tagged with `name = reactive-http-client-<clientName>`.
+These starter-owned names do not collide with Reactor Netty's built-in
+`reactor.netty.connection.provider.*` families, whose tag set includes provider and
+remote-address dimensions. All starter pool gauges carry only the bounded
+`name = reactive-http-client-<clientName>-<interface>` tag. They do not export a
+remote-address tag. See [Connection pool](05-connection-pool.md#connection-pool-metrics)
+for the complete protocol-aware interpretation.
 
 ---
 

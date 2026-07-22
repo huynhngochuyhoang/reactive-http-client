@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Open the post-`3.2.0` development line.** Verified the complete `3.2.0` parent, starter, test-helper, and OTel release bundle from Maven Central; moved public examples plus API, consumer, and benchmark baselines to `3.2.0`; advanced reactor-only coordinates to `3.3.0-SNAPSHOT`; and made published-release verification resolve from a neutral consumer model so the current reactor cannot satisfy its own parent POM.
 - **End-to-end timeout budget.** Added opt-in `logical-call-timeout-ms` as one subscription-local deadline across resilience admission, auth, pool acquisition, redirects, retries, and starter-owned response consumption; preserved existing per-attempt timeout precedence and streaming-envelope ownership; guarded retry cleanup by attempt number; and aligned final-attempt failure stages, diagnostics, metadata, docs, and test-helper support.
+- **Protocol-aware pool capacity.** Added address-free per-client pool meters under the starter-owned `reactive.http.client.connection.pool.*` namespace so Reactor Netty built-in metric families can coexist; separated HTTP/1.1 pending connections from HTTP/2 active/pending streams, retained unknown peer stream limits in sanitized diagnostics, and added real one-connection H1/H2 pressure coverage for queueing, cancellation, timeout, reuse, and owned shutdown.
 
 ## [3.2.0] - 2026-07-21
 

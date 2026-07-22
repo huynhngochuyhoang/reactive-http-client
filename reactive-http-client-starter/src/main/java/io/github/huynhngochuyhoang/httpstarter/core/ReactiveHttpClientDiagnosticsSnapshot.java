@@ -130,6 +130,9 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             clientMap.put("poolMaxConnections", poolMaxConnections(entry.pool()));
             clientMap.put("poolPendingAcquireTimeoutMs", poolPendingAcquireTimeoutMs(entry.pool()));
             clientMap.put("poolMetricsEnabled", poolMetricsEnabled(entry.pool()));
+            clientMap.put("poolProtocol", poolProtocol(entry.pool()));
+            clientMap.put("poolCapacityBasis", poolCapacityBasis(entry.pool()));
+            clientMap.put("poolMaxConcurrentStreams", poolMaxConcurrentStreams(entry.pool()));
             clientMap.put("timeoutSource", client.timeout().source());
             clientMap.put("timeoutMs", client.timeout().timeoutMs());
             clientMap.put("logicalCallTimeoutMs", entry.logicalCallTimeoutMs());
@@ -184,6 +187,9 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             nullableField(out, 3, "poolMaxConnections", poolMaxConnections(entry.pool()), true);
             nullableField(out, 3, "poolPendingAcquireTimeoutMs", poolPendingAcquireTimeoutMs(entry.pool()), true);
             field(out, 3, "poolMetricsEnabled", poolMetricsEnabled(entry.pool()), true);
+            field(out, 3, "poolProtocol", poolProtocol(entry.pool()), true);
+            field(out, 3, "poolCapacityBasis", poolCapacityBasis(entry.pool()), true);
+            nullableField(out, 3, "poolMaxConcurrentStreams", poolMaxConcurrentStreams(entry.pool()), true);
             field(out, 3, "timeoutSource", client.timeout().source(), true);
             field(out, 3, "timeoutMs", client.timeout().timeoutMs(), true);
             nullableField(out, 3, "logicalCallTimeoutMs", entry.logicalCallTimeoutMs(), true);
@@ -313,7 +319,11 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
         }
         return pool.source() + ":maxConnections=" + pool.maxConnections()
                 + ", pendingAcquireTimeoutMs=" + pool.pendingAcquireTimeoutMs()
-                + ", metrics=" + pool.metricsEnabled();
+                + ", metrics=" + pool.metricsEnabled()
+                + ", protocol=" + pool.protocol()
+                + ", capacity=" + pool.capacityBasis()
+                + ", maxConcurrentStreams="
+                + (pool.maxConcurrentStreams() != null ? pool.maxConcurrentStreams() : "unknown");
     }
 
     private static String poolSource(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
@@ -330,6 +340,18 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     private static Boolean poolMetricsEnabled(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
         return pool != null ? pool.metricsEnabled() : null;
+    }
+
+    private static String poolProtocol(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
+        return pool != null ? pool.protocol() : "unknown";
+    }
+
+    private static String poolCapacityBasis(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
+        return pool != null ? pool.capacityBasis() : "unknown";
+    }
+
+    private static Long poolMaxConcurrentStreams(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
+        return pool != null ? pool.maxConcurrentStreams() : null;
     }
 
     private static String timeout(ReactiveHttpClientDiagnosticsProvider.TimeoutSummary timeout) {

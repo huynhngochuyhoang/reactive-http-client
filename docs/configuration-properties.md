@@ -41,7 +41,7 @@
 | `reactive.http.clients.[name].pool.max-connections` | `java.lang.Integer` |  | Per-client connection pool max connections override. Overrides the global pool when set. |  |
 | `reactive.http.clients.[name].pool.max-idle-time-ms` | `java.lang.Long` |  | Per-client idle eviction timeout override in milliseconds. 0 means no idle eviction. |  |
 | `reactive.http.clients.[name].pool.max-life-time-ms` | `java.lang.Long` |  | Per-client connection max lifetime override in milliseconds. 0 means unlimited. |  |
-| `reactive.http.clients.[name].pool.metrics-enabled` | `java.lang.Boolean` |  | Per-client pool metrics override. When true, publishes Reactor Netty pool gauges to the MeterRegistry. |  |
+| `reactive.http.clients.[name].pool.metrics-enabled` | `java.lang.Boolean` |  | Per-client pool metrics override. When true, publishes address-free starter aggregate pool gauges to the MeterRegistry. |  |
 | `reactive.http.clients.[name].pool.pending-acquire-timeout-ms` | `java.lang.Long` |  | Per-client pending acquire timeout override in milliseconds. |  |
 | `reactive.http.clients.[name].proxy.host` | `java.lang.String` |  | Per-client proxy host override. |  |
 | `reactive.http.clients.[name].proxy.non-proxy-hosts` | `java.lang.String` |  | Per-client non-proxy hosts regex override. |  |
@@ -76,7 +76,7 @@
 | `reactive.http.network.connection-pool.max-connections` | `java.lang.Integer` | `200` | Maximum number of connections in the pool. Default: 200. |  |
 | `reactive.http.network.connection-pool.max-idle-time-ms` | `java.lang.Long` | `0` | Idle duration in milliseconds after which a pooled connection is evicted. 0 means no idle eviction (Reactor Netty default). Default: 0. |  |
 | `reactive.http.network.connection-pool.max-life-time-ms` | `java.lang.Long` | `0` | Maximum lifetime in milliseconds of a pooled connection. 0 means unlimited (Reactor Netty default). Default: 0. |  |
-| `reactive.http.network.connection-pool.metrics-enabled` | `java.lang.Boolean` | `false` | When true, publishes Reactor Netty pool gauges (reactor.netty.connection.provider.*) to the MeterRegistry. Requires micrometer-core. Default: false. |  |
+| `reactive.http.network.connection-pool.metrics-enabled` | `java.lang.Boolean` | `false` | When true, publishes address-free starter aggregate pool gauges (reactive.http.client.connection.pool.*) to the MeterRegistry. Requires micrometer-core. Default: false. |  |
 | `reactive.http.network.connection-pool.pending-acquire-timeout-ms` | `java.lang.Long` | `5000` | Maximum time in milliseconds to wait for a connection from the pool before failing. Default: 5000. |  |
 | `reactive.http.network.network-read-timeout-ms` | `java.lang.Integer` | `60000` | Netty ReadTimeoutHandler safety-net: fires when no inbound bytes arrive for this duration. Sized well above any per-request timeout. Default: 60000. |  |
 | `reactive.http.network.network-write-timeout-ms` | `java.lang.Integer` | `60000` | Netty WriteTimeoutHandler safety-net: fires when no outbound bytes are accepted for this duration. Sized well above any per-request timeout. Default: 60000. |  |

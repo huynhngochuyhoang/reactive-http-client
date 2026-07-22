@@ -137,7 +137,12 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 clientOverride ? "client" : "global",
                 pool.getMaxConnections(),
                 pool.getPendingAcquireTimeoutMs(),
-                pool.isMetricsEnabled());
+                pool.isMetricsEnabled(),
+                clientConfig != null && clientConfig.isHttp2Enabled() ? "HTTP/2" : "HTTP/1.1",
+                clientConfig != null && clientConfig.isHttp2Enabled()
+                        ? "connections-and-peer-streams"
+                        : "connections",
+                null);
     }
 
     private Class<?> clientInterface(String beanName) {
@@ -322,7 +327,10 @@ public class ReactiveHttpClientDiagnosticsProvider {
             String source,
             int maxConnections,
             long pendingAcquireTimeoutMs,
-            boolean metricsEnabled
+            boolean metricsEnabled,
+            String protocol,
+            String capacityBasis,
+            Long maxConcurrentStreams
     ) {
     }
 

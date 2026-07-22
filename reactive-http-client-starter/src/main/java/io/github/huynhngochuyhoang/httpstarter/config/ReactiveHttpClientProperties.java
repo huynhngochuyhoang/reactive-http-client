@@ -195,8 +195,8 @@ public class ReactiveHttpClientProperties {
         /** Interval at which the provider sweeps for evictable connections. {@code 0} disables background eviction. */
         private long evictInBackgroundMs = 0;
         /**
-         * When {@code true}, the provider publishes Reactor Netty's built-in pool metrics
-         * ({@code reactor.netty.connection.provider.*} gauges) to the globally-registered
+         * When {@code true}, the provider publishes address-free aggregate pool metrics
+         * ({@code reactive.http.client.connection.pool.*} gauges) to the globally-registered
          * {@code MeterRegistry}. Requires {@code micrometer-core} on the classpath;
          * leave {@code false} (the default) to avoid the small per-request overhead
          * when pool visibility isn't needed.

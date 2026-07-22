@@ -156,7 +156,8 @@ class ReactiveHttpClientAutoConfigurationTest {
                     assertThat(clients.get(0))
                             .containsOnlyKeys("clientName", "clientInterface", "baseUrlSource",
                                     "poolSource", "poolMaxConnections", "poolPendingAcquireTimeoutMs",
-                                    "poolMetricsEnabled", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
+                                    "poolMetricsEnabled", "poolProtocol", "poolCapacityBasis",
+                                    "poolMaxConcurrentStreams", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
                                     "resilienceConfigured", "retry", "rateLimiter", "circuitBreaker",
                                     "bulkhead", "strictUnsafeRetryValidation",
                                     "strictBodySigningValidation", "authMode", "followRedirects",
