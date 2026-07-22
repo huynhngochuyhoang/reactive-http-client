@@ -1,5 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.observability;
 
+import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
+
 /**
  * Bounded stage of an outbound failure when the runtime provides conclusive evidence.
  *
@@ -75,6 +77,9 @@ public enum HttpClientFailureStage {
         Throwable current = error;
         int depth = 0;
         while (current != null && depth < MAX_CAUSE_DEPTH) {
+            if (current instanceof LogicalCallTimeoutException logicalCallTimeout) {
+                return logicalCallTimeout.getFailureStage();
+            }
             String className = current.getClass().getName();
             if (POOL_ACQUIRE_TIMEOUT.equals(className)
                     || POOL_ACQUIRE_PENDING_LIMIT.equals(className)

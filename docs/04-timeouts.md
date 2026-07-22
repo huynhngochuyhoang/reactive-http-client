@@ -1,6 +1,8 @@
 # Timeouts
 
-The starter has transport safety nets plus an optional per-request response timeout. Understanding which boundary fired is critical to avoiding hard-to-debug incidents.
+The starter has transport safety nets, an optional per-attempt response timeout,
+and an optional end-to-end logical-call budget. Understanding which boundary
+fired is critical to avoiding hard-to-debug incidents.
 
 ---
 
@@ -8,6 +10,7 @@ The starter has transport safety nets plus an optional per-request response time
 
 | Layer | Property / annotation | Default | Scope | Fires when |
 |---|---|---|---|---|
+| Logical-call budget | `reactive.http.clients.<name>.logical-call-timeout-ms` | disabled | One caller subscription | Total wall-clock time from subscription through resilience admission, serialization, auth, pool acquisition, redirects, retries, and starter-owned response consumption reaches the budget |
 | TCP connect timeout | `reactive.http.network.connect-timeout-ms` | 2 000 ms | TCP handshake only | A new connection cannot be established within the limit |
 | Per-request response timeout | `@TimeoutMs(ms)` (method), `@ApiRef timeout-ms`, or `request-timeout-ms` (client) | disabled | Per attempt | No response headers or body data arrive within the configured read interval; retries each install their own timeout |
 | Safety-net read timeout | `reactive.http.network.network-read-timeout-ms` | 60 000 ms | Per pooled connection | No inbound bytes for this duration — catches stuck sockets |
@@ -23,12 +26,49 @@ The starter has transport safety nets plus an optional per-request response time
 4. Deprecated `resilience.timeout-ms` is accepted as a compatibility alias only when `request-timeout-ms` is not configured.
 5. Safety-net timeouts (`network-read-timeout-ms` / `network-write-timeout-ms`) are independent of the per-request timeout and act as absolute upper bounds on socket inactivity.
 
+`logical-call-timeout-ms` does not participate in that precedence chain. It is
+an independent outer deadline for the concrete client. `0` disables it. When it
+is enabled together with connect, pool-acquire, request-write, response, method,
+or Resilience4j limits, the first failure wins. A retry gets a fresh per-attempt
+response timeout, but it does not get a fresh logical-call budget.
+
 For inherited endpoint methods, the method metadata comes from the parent interface,
 but the client-level `request-timeout-ms` comes from the concrete
 `@ReactiveHttpClient` child being invoked. Two child clients can therefore share
 the same parent method and still use different client-level timeout policies.
 
 **Rule of thumb:** set the safety-net timeouts well above the largest `@TimeoutMs`, `@ApiRef timeout-ms`, or `request-timeout-ms` you use. This ensures the per-request timeout always fires first, so retries behave predictably. If the safety net fires instead, no retry is attempted — the socket is dropped.
+
+## End-to-end logical-call budget
+
+The logical-call budget is opt-in and subscription-local. Calling a client
+method still creates a cold publisher. Every independent subscription starts a
+fresh monotonic deadline; retry subscriptions, Reactor Netty redirects, and the
+auth filter's one-time `401` refresh stay inside that same deadline.
+
+```yaml
+reactive:
+  http:
+    clients:
+      user-service:
+        logical-call-timeout-ms: 7000
+        request-timeout-ms: 2500
+```
+
+This example allows no more than 7 seconds for the complete logical call while
+retaining the existing 2.5-second response timeout on every dispatched attempt.
+The logical budget can expire before dispatch while waiting for auth,
+Resilience4j admission, or pool capacity; during an attempt; or between retries.
+It raises `LogicalCallTimeoutException`, retains `ErrorCategory.TIMEOUT`, and
+includes `HttpClientFailureStage.RESPONSE_BODY` only when the final attempt has
+observed response status. Before status, the starter cannot distinguish a pool
+wait from a dispatched request waiting for headers, so the stage stays unknown
+rather than inventing a transport phase.
+
+For direct `Flux<T>` responses, the budget remains active until that stream
+terminates. For `Mono<ResponseEntity<Flux<DataBuffer>>>`, the budget governs only
+acquisition of the response envelope. Once the outer `Mono` succeeds, the caller
+owns the inner body and its later consumption is not subject to this budget.
 
 ## Proven timeout phases
 
@@ -91,6 +131,7 @@ reactive:
     clients:
       user-service:
         base-url: https://api.example.com
+        logical-call-timeout-ms: 12000 # total budget across all attempts
         request-timeout-ms: 5000   # per-request default for this client
 ```
 

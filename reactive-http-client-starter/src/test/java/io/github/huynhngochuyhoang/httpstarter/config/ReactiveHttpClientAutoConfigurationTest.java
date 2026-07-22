@@ -156,7 +156,7 @@ class ReactiveHttpClientAutoConfigurationTest {
                     assertThat(clients.get(0))
                             .containsOnlyKeys("clientName", "clientInterface", "baseUrlSource",
                                     "poolSource", "poolMaxConnections", "poolPendingAcquireTimeoutMs",
-                                    "poolMetricsEnabled", "timeoutSource", "timeoutMs",
+                                    "poolMetricsEnabled", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
                                     "resilienceConfigured", "retry", "rateLimiter", "circuitBreaker",
                                     "bulkhead", "strictUnsafeRetryValidation",
                                     "strictBodySigningValidation", "authMode", "followRedirects",
@@ -164,6 +164,7 @@ class ReactiveHttpClientAutoConfigurationTest {
                     assertThat(clients.get(0).get("poolMaxConnections")).isInstanceOf(Integer.class);
                     assertThat(clients.get(0).get("poolPendingAcquireTimeoutMs")).isInstanceOf(Long.class);
                     assertThat(clients.get(0).get("timeoutMs")).isInstanceOf(Long.class);
+                    assertThat(clients.get(0).get("logicalCallTimeoutMs")).isInstanceOf(Long.class);
                     assertThat(clients.get(0).get("followRedirects")).isInstanceOf(Boolean.class);
                     assertThat(clients.get(0))
                             .containsEntry("clientName", "diagnostic-client")
@@ -171,6 +172,7 @@ class ReactiveHttpClientAutoConfigurationTest {
                             .containsEntry("baseUrlSource", "property")
                             .containsEntry("timeoutSource", "client")
                             .containsEntry("timeoutMs", 500L)
+                            .containsEntry("logicalCallTimeoutMs", 0L)
                             .containsEntry("resilienceConfigured", true)
                             .containsEntry("authMode", "provider-bean")
                             .containsEntry("followRedirects", true)

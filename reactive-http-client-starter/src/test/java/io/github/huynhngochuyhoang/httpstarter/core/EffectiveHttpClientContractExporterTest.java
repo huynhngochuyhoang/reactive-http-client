@@ -23,6 +23,7 @@ class EffectiveHttpClientContractExporterTest {
     void exportsDirectMethodContract() {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setFollowRedirects(true);
+        config.setLogicalCallTimeoutMs(2_000);
         ReactiveHttpClientProperties.ResilienceConfig resilience = config.getResilience();
         resilience.setEnabled(true);
         resilience.setRetry("client-retry");
@@ -43,6 +44,7 @@ class EffectiveHttpClientContractExporterTest {
         assertThat(contract.apiName()).isEqualTo("items.create");
         assertThat(contract.apiRef()).isNull();
         assertThat(contract.timeout()).isEqualTo(new EffectiveHttpClientContract.TimeoutPolicy("method", 250));
+        assertThat(contract.logicalCallTimeoutMs()).isEqualTo(2_000);
         assertThat(contract.resilience()).isEqualTo(new EffectiveHttpClientContract.ResiliencePolicy(
                 "method-retry", "client-rate-limiter", "client-circuit-breaker", "client-bulkhead"));
         assertThat(contract.redirectPolicy()).isEqualTo("follow");

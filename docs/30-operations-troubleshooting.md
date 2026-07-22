@@ -92,6 +92,12 @@ Use only a proven stage: `CONNECT`, `POOL_ACQUIRE`, `REQUEST_WRITE`,
 dispatch evidence and no observed status. `RESPONSE_BODY` retains the observed
 status. Nested auth and other pre-dispatch read timeouts stay unattributed.
 
+For `LogicalCallTimeoutException`, compare `logical-call-timeout-ms` with the
+per-attempt response timeout and the final subscription-attempt count. The logical
+budget includes resilience admission, auth, pool waiting, redirects, retries, and
+starter-owned response consumption without resetting between them. Expiry before
+dispatch or between attempts intentionally has no transport stage.
+
 For a streaming envelope, the outer terminal record covers envelope delivery;
 a later inner-body timeout belongs to the body subscriber. See
 [Proven timeout phases](04-timeouts.md#proven-timeout-phases).

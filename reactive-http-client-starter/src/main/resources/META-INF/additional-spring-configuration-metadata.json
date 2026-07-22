@@ -364,6 +364,13 @@
       "defaultValue": 0
     },
     {
+      "name": "reactive.http.clients.[name].logical-call-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "Optional end-to-end timeout budget for one subscription, including resilience admission, retries, redirects, auth, pool acquisition, and starter-owned response consumption. 0 disables the budget. Default: 0.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "defaultValue": 0
+    },
+    {
       "name": "reactive.http.clients.[name].default-headers",
       "type": "java.util.Map<java.lang.String,java.lang.String>",
       "description": "Static headers added to every request for this client. Method-level @HeaderParam values with the same header name override configured defaults.",

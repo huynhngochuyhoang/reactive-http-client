@@ -114,21 +114,49 @@ Evidence:
 
 ## Priority 3 - End-to-End Timeout Budget
 
-### [ ] 3.1 Define the opt-in logical-call budget
+### [x] 3.1 Define the opt-in logical-call budget
 
-- [ ] Preserve all existing timeout properties, precedence, and `0 = disabled` behavior.
-- [ ] Make any new budget monotonic and subscription-local.
-- [ ] Ensure retry, redirect, and auth refresh do not reset the budget.
-- [ ] Define interaction with connect, pool-acquire, request-write, response,
+- [x] Preserve all existing timeout properties, precedence, and `0 = disabled` behavior.
+- [x] Make any new budget monotonic and subscription-local.
+- [x] Ensure retry, redirect, and auth refresh do not reset the budget.
+- [x] Define interaction with connect, pool-acquire, request-write, response,
       method, and Resilience4j timeouts.
 
-### [ ] 3.2 Prove timeout ownership
+### [x] 3.2 Prove timeout ownership
 
-- [ ] Cover exhaustion before dispatch, between retries, in the pool queue, and
+- [x] Cover exhaustion before dispatch, between retries, in the pool queue, and
       during unary response consumption with real-clock fixtures.
-- [ ] Keep streaming-envelope acquisition separate from caller-owned body consumption.
-- [ ] Report only the final attempt's proven timeout phase.
-- [ ] Align lifecycle, observer, exchange-log, diagnostics, mock, metadata, and docs.
+- [x] Keep streaming-envelope acquisition separate from caller-owned body consumption.
+- [x] Report only the final attempt's proven timeout phase.
+- [x] Align lifecycle, observer, exchange-log, diagnostics, mock, metadata, and docs.
+
+Evidence:
+
+- Added opt-in per-client `logical-call-timeout-ms` with `0` disabled and bounded
+  validation. The existing method/API/client/deprecated response-timeout precedence
+  is unchanged. The new outer deadline starts once per cold-publisher subscription
+  after invocation and does not restart for Resilience4j admission/retry, redirect,
+  auth refresh, pool acquisition, or response consumption.
+- `LogicalCallTimeoutException` retains `ErrorCategory.TIMEOUT` and carries only a
+  proven final-attempt stage. An observed status proves `RESPONSE_BODY`; expiry
+  before status remains unknown because URL/request creation does not distinguish
+  pool queueing from a dispatched request waiting for headers. Prior-attempt state
+  is cleared between retries and hidden auth replay, and compare-and-set cleanup
+  prevents a late prior-attempt `doFinally` from clearing the active retry.
+- Real-clock contracts cover auth expiry before dispatch, retry backoff, hidden
+  `401` refresh, a saturated one-connection pool, redirect handling, unary response
+  consumption, an active direct stream, and delayed caller-owned envelope body
+  consumption. Additional cases prove `0` remains disabled and the existing native
+  per-attempt response timeout wins when it expires first.
+- Lifecycle hooks, observer events, and exchange-log contexts agree on terminal
+  status, error, attempt count, and failure stage. Effective-contract and runtime
+  diagnostics expose the separate budget, diagnostics schema v1 adds
+  `logicalCallTimeoutMs`, and `MockReactiveHttpClient.logicalCallTimeout(...)`
+  applies the production operator without claiming transport-phase simulation.
+- `LogicalCallTimeoutBudgetContractTest` passed all 11 cases. The focused metadata,
+  generated documentation, diagnostics, factory, contract snapshot, exporter, and
+  mock-helper tests passed. `mvn -q -pl reactive-http-client-test -am test` passed
+  the complete starter and test-helper suites, and `git diff --check` passed.
 
 ---
 

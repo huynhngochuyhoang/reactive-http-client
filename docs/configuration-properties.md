@@ -36,6 +36,7 @@
 | `reactive.http.clients.[name].http2-enabled` | `java.lang.Boolean` | `false` | Enable Reactor Netty HTTP/2 for this client. Default: false. |  |
 | `reactive.http.clients.[name].log-exchange` | `java.lang.Boolean` | `false` | Enable structured HTTP exchange logging (request + response) for all methods on this client. Default: false. |  |
 | `reactive.http.clients.[name].log-preset` | `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$LogPreset` | `"metadata-only"` | Controls how much data the default exchange logger writes when log-exchange is enabled or @LogHttpExchange uses DefaultHttpExchangeLogger. Values: metadata-only, headers, bodies. Default: metadata-only. |  |
+| `reactive.http.clients.[name].logical-call-timeout-ms` | `java.lang.Long` | `0` | Optional end-to-end timeout budget for one subscription, including resilience admission, retries, redirects, auth, pool acquisition, and starter-owned response consumption. 0 disables the budget. Default: 0. |  |
 | `reactive.http.clients.[name].pool.evict-in-background-ms` | `java.lang.Long` |  | Per-client background eviction interval override in milliseconds. 0 disables background eviction. |  |
 | `reactive.http.clients.[name].pool.max-connections` | `java.lang.Integer` |  | Per-client connection pool max connections override. Overrides the global pool when set. |  |
 | `reactive.http.clients.[name].pool.max-idle-time-ms` | `java.lang.Long` |  | Per-client idle eviction timeout override in milliseconds. 0 means no idle eviction. |  |

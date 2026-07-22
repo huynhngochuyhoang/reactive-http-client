@@ -84,7 +84,8 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 summary,
                 strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceOperatorApplier),
                 strictBodySigningValidation(clientConfig),
-                poolSummary(clientConfig));
+                poolSummary(clientConfig),
+                clientConfig.getLogicalCallTimeoutMs());
     }
 
     static ClientSummary clientSummary(Class<?> clientInterface,
@@ -312,7 +313,8 @@ public class ReactiveHttpClientDiagnosticsProvider {
             ClientSummary summary,
             boolean strictUnsafeRetryValidation,
             boolean strictBodySigningValidation,
-            PoolSummary pool
+            PoolSummary pool,
+            long logicalCallTimeoutMs
     ) {
     }
 

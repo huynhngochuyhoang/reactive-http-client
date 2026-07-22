@@ -21,6 +21,7 @@ class ReactiveHttpClientPropertiesTest {
         assertFalse(config.getResilience().isEnabled());
         assertEquals(0, config.getRequestTimeoutMs());
         assertFalse(config.isRequestTimeoutMsConfigured());
+        assertEquals(0, config.getLogicalCallTimeoutMs());
         assertEquals(0, config.getResilience().getTimeoutMs());
         assertFalse(config.getResilience().isTimeoutMsConfigured());
         assertTrue(config.getResilience().getRetryMethods().contains("GET"));
@@ -205,6 +206,18 @@ class ReactiveHttpClientPropertiesTest {
     }
 
     @Test
+    void logicalCallTimeoutBudgetBindsIndependentlyFromRequestTimeout() {
+        Map<String, Object> yaml = new LinkedHashMap<>();
+        yaml.put("reactive.http.clients.users.request-timeout-ms", 500);
+        yaml.put("reactive.http.clients.users.logical-call-timeout-ms", 2_000);
+
+        ReactiveHttpClientProperties.ClientConfig config = bind(yaml).getClients().get("users");
+
+        assertEquals(500, config.getRequestTimeoutMs());
+        assertEquals(2_000, config.getLogicalCallTimeoutMs());
+    }
+
+    @Test
     void deprecatedResilienceTimeoutStillBindsAsAlias() {
         Map<String, Object> yaml = new LinkedHashMap<>();
         yaml.put("reactive.http.clients.users.resilience.timeout-ms", 4_000);
@@ -362,6 +375,16 @@ class ReactiveHttpClientPropertiesTest {
                 "reactive.http.clients.*.request-timeout-ms", ">= 0");
         assertInvalidConfig(() -> config.setRequestTimeoutMs(30L * 60 * 1000 + 1),
                 "reactive.http.clients.*.request-timeout-ms", "<= 1800000");
+    }
+
+    @Test
+    void invalidLogicalCallTimeoutIncludesPropertyNameAndAcceptedRange() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+
+        assertInvalidConfig(() -> config.setLogicalCallTimeoutMs(-1),
+                "reactive.http.clients.*.logical-call-timeout-ms", ">= 0");
+        assertInvalidConfig(() -> config.setLogicalCallTimeoutMs(30L * 60 * 1000 + 1),
+                "reactive.http.clients.*.logical-call-timeout-ms", "<= 1800000");
     }
 
     @Test

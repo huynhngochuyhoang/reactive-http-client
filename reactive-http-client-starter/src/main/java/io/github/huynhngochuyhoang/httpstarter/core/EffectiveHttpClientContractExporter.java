@@ -98,6 +98,7 @@ final class EffectiveHttpClientContractExporter {
                 plan.apiName(),
                 plan.apiRefName(),
                 timeoutPolicy(plan, effectiveApi, clientConfig),
+                clientConfig.getLogicalCallTimeoutMs(),
                 resiliencePolicy(plan, effectiveApi.httpMethod(), clientConfig, resilienceOperatorApplier),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 authMode(clientConfig),
