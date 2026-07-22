@@ -135,8 +135,11 @@ The v1 root field set is `schemaVersion`, `projectVersion`, `clientCount`,
 `endpointCount`, `inheritedEndpointCount`, and `clients`. Client entries retain
 the reviewed field names and JSON value kinds in the source-controlled fixture.
 Provider and collection map output, rendered JSON, Markdown, and the Actuator
-endpoint use the same logical fields; collection-only pool and strict-validation
-facts remain `null` in map/JSON and `unknown` in Markdown. The fixture and JVM
+endpoint use the same logical fields. Provider-backed entries include the configured
+`compressionEnabled` policy and `codecMaxInMemorySizeMb` decoded unary aggregate
+limit; collection overloads render those provider-only values as `null` in map/JSON
+and `unknown` in Markdown. Collection-only pool and strict-validation facts retain
+the same unknown semantics. The fixture and JVM
 and native checks reject removal, rename, type drift, or accidental secret-bearing
 fields.
 

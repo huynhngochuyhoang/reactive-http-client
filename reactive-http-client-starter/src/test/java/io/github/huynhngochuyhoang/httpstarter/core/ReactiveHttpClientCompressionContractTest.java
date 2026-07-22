@@ -12,6 +12,7 @@ import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverE
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferLimitException;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -30,7 +31,9 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -127,6 +130,93 @@ class ReactiveHttpClientCompressionContractTest {
                         assertThat(exception.getStatusCode()).isEqualTo(503);
                         assertThat(exception.getResponseBody()).isEqualTo("unavailable");
                     });
+            assertThat(client.probe().block(CALL_TIMEOUT)).isEqualTo("probe");
+        }
+    }
+
+    @Test
+    void decodedUnaryBodiesCannotBypassAggregateLimitThroughCompression() {
+        try (CompressionServer server = new CompressionServer();
+             ClientFixture fixture = ClientFixture.create(server, true, false, null, 1)) {
+            CompressionClient client = fixture.client();
+
+            assertThat(catchThrowable(() -> client.oversizedJson().block(CALL_TIMEOUT)))
+                    .isInstanceOf(DataBufferLimitException.class);
+            assertThat(catchThrowable(() -> client.oversizedEntity().block(CALL_TIMEOUT)))
+                    .isInstanceOf(DataBufferLimitException.class);
+            assertThat(server.records().stream()
+                    .filter(record -> record.path().startsWith("/oversized-"))
+                    .toList())
+                    .hasSize(2)
+                    .allSatisfy(record -> assertThat(record.wireBytes()).isLessThan(16 * 1024));
+            assertThat(client.probe().block(CALL_TIMEOUT)).isEqualTo("probe");
+        }
+    }
+
+    @Test
+    void compressedErrorAndBodilessBodiesUseIndependentBoundedDrainPolicies() {
+        try (CompressionServer server = new CompressionServer();
+             ClientFixture fixture = ClientFixture.create(server, true, false, null, 1)) {
+            CompressionClient client = fixture.client();
+
+            assertThat(catchThrowable(() -> client.oversizedProblem().block(CALL_TIMEOUT)))
+                    .isInstanceOf(RemoteServiceException.class);
+            ErrorResponseContext captured = fixture.lastErrorResponse();
+            assertThat(captured).isNotNull();
+            assertThat(captured.responseBodyTruncated()).isTrue();
+            assertThat(captured.retainedResponseBodyBytes()).isEqualTo(64 * 1024);
+            String problemConnection = server.lastRecord().connectionId();
+            assertThat(client.probe().block(CALL_TIMEOUT)).isEqualTo("probe");
+            assertThat(server.lastRecord().connectionId()).isEqualTo(problemConnection);
+
+            client.unexpectedBodiless().block(CALL_TIMEOUT);
+            String bodilessConnection = server.lastRecord().connectionId();
+            assertThat(client.probe().block(CALL_TIMEOUT)).isEqualTo("probe");
+            assertThat(server.lastRecord().connectionId()).isEqualTo(bodilessConnection);
+        }
+    }
+
+    @Test
+    void compressedStreamingBodiesRemainIncrementalAndCallerOwned() {
+        try (CompressionServer server = new CompressionServer();
+             ClientFixture fixture = ClientFixture.create(server, true, false, null, 1)) {
+            CompressionClient client = fixture.client();
+
+            Integer decodedBytes = client.oversizedStream()
+                    .map(buffer -> {
+                        try {
+                            return buffer.readableByteCount();
+                        } finally {
+                            DataBufferUtils.release(buffer);
+                        }
+                    })
+                    .reduce(0, Integer::sum)
+                    .block(CALL_TIMEOUT);
+            assertThat(decodedBytes).isGreaterThan(1024 * 1024);
+
+            ResponseEntity<Flux<DataBuffer>> envelope = client.oversizedStreamingEntity()
+                    .block(CALL_TIMEOUT);
+            assertThat(envelope).isNotNull();
+            assertThat(envelope.getBody()).isNotNull();
+            assertThat(envelope.getBody()
+                    .take(1)
+                    .map(ReactiveHttpClientCompressionContractTest::readAndRelease)
+                    .blockLast(CALL_TIMEOUT)).isNotEmpty();
+            assertThat(client.probe().block(CALL_TIMEOUT)).isEqualTo("probe");
+        }
+    }
+
+    @Test
+    void truncatedAndCorruptGzipTerminateCleanlyAndLaterRequestsStillComplete() {
+        try (CompressionServer server = new CompressionServer();
+             ClientFixture fixture = ClientFixture.create(server, true, false, null, 1)) {
+            CompressionClient client = fixture.client();
+
+            String truncated = client.truncatedGzip().block(CALL_TIMEOUT);
+            assertThat(truncated != null ? truncated.length() : 0)
+                    .isLessThan(CompressionServer.OVERSIZED_VALUE.length());
+            assertThat(client.probe().block(CALL_TIMEOUT)).isEqualTo("probe");
+            assertThat(catchThrowable(() -> client.corruptGzip().block(CALL_TIMEOUT))).isNotNull();
             assertThat(client.probe().block(CALL_TIMEOUT)).isEqualTo("probe");
         }
     }
@@ -250,6 +340,30 @@ class ReactiveHttpClientCompressionContractTest {
         @GET("/server-error")
         Mono<String> serverError();
 
+        @GET("/oversized-json")
+        Mono<Payload> oversizedJson();
+
+        @GET("/oversized-entity")
+        Mono<ResponseEntity<Payload>> oversizedEntity();
+
+        @GET("/oversized-problem")
+        Mono<String> oversizedProblem();
+
+        @GET("/unexpected-bodiless")
+        Mono<Void> unexpectedBodiless();
+
+        @GET("/oversized-stream")
+        Flux<DataBuffer> oversizedStream();
+
+        @GET("/oversized-stream")
+        Mono<ResponseEntity<Flux<DataBuffer>>> oversizedStreamingEntity();
+
+        @GET("/truncated-gzip")
+        Mono<String> truncatedGzip();
+
+        @GET("/corrupt-gzip")
+        Mono<String> corruptGzip();
+
         @GET("/probe")
         Mono<String> probe();
     }
@@ -262,27 +376,43 @@ class ReactiveHttpClientCompressionContractTest {
         private final ReactiveHttpClientFactoryBean<CompressionClient> factory;
         private final CompressionClient client;
         private final RecordingDiagnostics diagnostics;
+        private final AtomicReference<ErrorResponseContext> lastErrorResponse;
         private boolean closed;
 
         private ClientFixture(StaticApplicationContext context,
                               ReactiveHttpClientFactoryBean<CompressionClient> factory,
                               CompressionClient client,
-                              RecordingDiagnostics diagnostics) {
+                              RecordingDiagnostics diagnostics,
+                              AtomicReference<ErrorResponseContext> lastErrorResponse) {
             this.context = context;
             this.factory = factory;
             this.client = client;
             this.diagnostics = diagnostics;
+            this.lastErrorResponse = lastErrorResponse;
         }
 
         static ClientFixture create(CompressionServer server,
                                     boolean compressionEnabled,
                                     boolean diagnosticsEnabled,
                                     String defaultAcceptEncoding) {
+            return create(server, compressionEnabled, diagnosticsEnabled, defaultAcceptEncoding, 2);
+        }
+
+        static ClientFixture create(CompressionServer server,
+                                    boolean compressionEnabled,
+                                    boolean diagnosticsEnabled,
+                                    String defaultAcceptEncoding,
+                                    int codecMaxInMemorySizeMb) {
             StaticApplicationContext context = new StaticApplicationContext();
             ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
             ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
             config.setBaseUrl("http://127.0.0.1:" + server.port());
             config.setCompressionEnabled(compressionEnabled);
+            config.setCodecMaxInMemorySizeMb(codecMaxInMemorySizeMb);
+            ReactiveHttpClientProperties.ConnectionPoolConfig pool =
+                    new ReactiveHttpClientProperties.ConnectionPoolConfig();
+            pool.setMaxConnections(1);
+            config.setPool(pool);
             if (defaultAcceptEncoding != null) {
                 config.getDefaultHeaders().put(HttpHeaders.ACCEPT_ENCODING, defaultAcceptEncoding);
             }
@@ -293,6 +423,13 @@ class ReactiveHttpClientCompressionContractTest {
                 context.getBeanFactory().registerSingleton("compressionLifecycleHook", diagnostics.lifecycleHook());
                 context.getBeanFactory().registerSingleton("compressionExchangeLogger", diagnostics.exchangeLogger());
             }
+            AtomicReference<ErrorResponseContext> lastErrorResponse = new AtomicReference<>();
+            ErrorResponseMapper capturingMapper = errorContext -> {
+                lastErrorResponse.set(errorContext);
+                return Optional.empty();
+            };
+            context.getBeanFactory().registerSingleton(
+                    "defaultErrorDecoder", new DefaultErrorDecoder(null, List.of(capturingMapper)));
             properties.getClients().put("compression-contract", config);
 
             context.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
@@ -302,7 +439,8 @@ class ReactiveHttpClientCompressionContractTest {
             ReactiveHttpClientFactoryBean<CompressionClient> factory = new ReactiveHttpClientFactoryBean<>();
             factory.setType(CompressionClient.class);
             factory.setApplicationContext(context);
-            return new ClientFixture(context, factory, factory.getObject(), diagnostics);
+            return new ClientFixture(
+                    context, factory, factory.getObject(), diagnostics, lastErrorResponse);
         }
 
         CompressionClient client() {
@@ -311,6 +449,10 @@ class ReactiveHttpClientCompressionContractTest {
 
         RecordingDiagnostics diagnostics() {
             return diagnostics;
+        }
+
+        ErrorResponseContext lastErrorResponse() {
+            return lastErrorResponse.get();
         }
 
         @Override
@@ -382,6 +524,8 @@ class ReactiveHttpClientCompressionContractTest {
 
     private static final class CompressionServer implements AutoCloseable {
         private static final byte[] STREAM_BODY = "firstsecond".getBytes(StandardCharsets.UTF_8);
+        private static final String OVERSIZED_VALUE = "x".repeat(1024 * 1024 + 128);
+        private static final byte[] OVERSIZED_BODY = OVERSIZED_VALUE.getBytes(StandardCharsets.UTF_8);
         private final List<RequestRecord> records = new CopyOnWriteArrayList<>();
         private final DisposableServer server;
 
@@ -396,6 +540,9 @@ class ReactiveHttpClientCompressionContractTest {
                         String requestContentEncoding = request.requestHeaders().get(HttpHeaders.CONTENT_ENCODING);
                         boolean acceptsGzip = acceptEncoding != null
                                 && acceptEncoding.toLowerCase().contains("gzip");
+                        AtomicReference<String> connectionId = new AtomicReference<>();
+                        request.withConnection(connection ->
+                                connectionId.set(connection.channel().id().asLongText()));
                         return request.receive().aggregate().asString(StandardCharsets.UTF_8)
                                 .defaultIfEmpty("")
                                 .flatMap(requestBody -> respond(path, acceptsGzip, requestBody, response)
@@ -405,7 +552,8 @@ class ReactiveHttpClientCompressionContractTest {
                                                 requestContentEncoding,
                                                 requestBody,
                                                 usesGzip(path, acceptsGzip),
-                                                wireBytes(path, acceptsGzip, requestBody)))));
+                                                wireBytes(path, acceptsGzip, requestBody),
+                                                connectionId.get()))));
                     })
                     .bindNow();
         }
@@ -457,6 +605,27 @@ class ReactiveHttpClientCompressionContractTest {
                     response.status(503);
                     yield send(response, bytes("unavailable"), MediaType.TEXT_PLAIN_VALUE, acceptsGzip, true);
                 }
+                case "/oversized-json", "/oversized-entity" ->
+                        send(response, json(OVERSIZED_VALUE), MediaType.APPLICATION_JSON_VALUE,
+                                acceptsGzip, true);
+                case "/oversized-problem" -> {
+                    response.status(502);
+                    yield send(response,
+                            bytes("{\"title\":\"Large problem\",\"detail\":\""
+                                    + OVERSIZED_VALUE + "\"}"),
+                            MediaType.APPLICATION_PROBLEM_JSON_VALUE, acceptsGzip, true);
+                }
+                case "/unexpected-bodiless", "/oversized-stream" ->
+                        send(response, OVERSIZED_BODY, MediaType.APPLICATION_OCTET_STREAM_VALUE,
+                                acceptsGzip, true);
+                case "/truncated-gzip" -> {
+                    byte[] encoded = gzip(OVERSIZED_BODY);
+                    yield sendGzip(response, Arrays.copyOf(encoded, Math.min(16, encoded.length)),
+                            MediaType.TEXT_PLAIN_VALUE);
+                }
+                case "/corrupt-gzip" -> {
+                    yield sendGzip(response, bytes("not-a-gzip-stream"), MediaType.TEXT_PLAIN_VALUE);
+                }
                 case "/probe" -> send(response, bytes("probe"), MediaType.TEXT_PLAIN_VALUE, false, true);
                 default -> response.status(HttpStatus.NOT_FOUND.value()).send();
             };
@@ -483,6 +652,20 @@ class ReactiveHttpClientCompressionContractTest {
             return response.sendByteArray(chunks).then();
         }
 
+        private Mono<Void> sendGzip(reactor.netty.http.server.HttpServerResponse response,
+                                    byte[] wireBody,
+                                    String contentType) {
+            response.header(HttpHeaders.CONTENT_TYPE, contentType);
+            response.header(HttpHeaders.CONTENT_ENCODING, "gzip");
+            response.header(HttpHeaders.CONTENT_LENGTH, Integer.toString(wireBody.length));
+            int split = Math.max(1, wireBody.length / 2);
+            return response.sendByteArray(Flux.concat(
+                    Mono.just(Arrays.copyOfRange(wireBody, 0, split)),
+                    Mono.delay(Duration.ofMillis(25))
+                            .thenReturn(Arrays.copyOfRange(wireBody, split, wireBody.length))))
+                    .then();
+        }
+
         private boolean usesGzip(String path, boolean acceptsGzip) {
             return acceptsGzip && !path.equals("/identity") && !path.equals("/empty") && !path.equals("/probe");
         }
@@ -494,11 +677,23 @@ class ReactiveHttpClientCompressionContractTest {
                 case "/direct-stream", "/stream-entity", "/chunked-stream" -> STREAM_BODY;
                 case "/client-error" -> bytes("invalid");
                 case "/server-error" -> bytes("unavailable");
+                case "/oversized-json", "/oversized-entity" -> json(OVERSIZED_VALUE);
+                case "/oversized-problem" -> bytes("{\"title\":\"Large problem\",\"detail\":\""
+                        + OVERSIZED_VALUE + "\"}");
+                case "/unexpected-bodiless", "/oversized-stream" -> OVERSIZED_BODY;
+                case "/truncated-gzip" -> {
+                    byte[] encoded = gzip(OVERSIZED_BODY);
+                    yield Arrays.copyOf(encoded, Math.min(16, encoded.length));
+                }
+                case "/corrupt-gzip" -> bytes("not-a-gzip-stream");
                 case "/identity" -> bytes("identity");
                 case "/echo" -> bytes(requestBody);
                 case "/probe" -> bytes("probe");
                 default -> new byte[0];
             };
+            if (path.equals("/truncated-gzip") || path.equals("/corrupt-gzip")) {
+                return body.length;
+            }
             return usesGzip(path, acceptsGzip) ? gzip(body).length : body.length;
         }
 
@@ -527,6 +722,7 @@ class ReactiveHttpClientCompressionContractTest {
                                  String requestContentEncoding,
                                  String requestBody,
                                  boolean gzipResponse,
-                                 int wireBytes) {
+                                 int wireBytes,
+                                 String connectionId) {
     }
 }

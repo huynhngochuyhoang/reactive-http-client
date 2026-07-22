@@ -28,7 +28,7 @@ Runtime retry diagnostics, startup method diagnostics, effective-contract snapsh
 
 ## Streaming responses
 
-Methods that declare `Flux<DataBuffer>` or `Mono<ResponseEntity<Flux<DataBuffer>>>` as their return type bypass the in-memory codec entirely. Payloads of any size are streamed without risk of a `DataBufferLimitException`, regardless of the `codec-max-in-memory-size-mb` setting. Streaming bodies are pass-through; the starter does not aggregate or inspect them.
+Methods that declare `Flux<DataBuffer>` or `Mono<ResponseEntity<Flux<DataBuffer>>>` as their return type bypass the in-memory codec entirely. Payloads of any size are streamed without risk of a `DataBufferLimitException`, regardless of the `codec-max-in-memory-size-mb` setting. With response compression enabled, Reactor Netty incrementally decompresses the wire representation before emitting these chunks; the starter still does not aggregate or inspect them. Emitted decoded buffers are caller-owned.
 
 ---
 

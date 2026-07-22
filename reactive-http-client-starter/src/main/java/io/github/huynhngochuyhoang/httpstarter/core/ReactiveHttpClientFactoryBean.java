@@ -4,7 +4,10 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.auth.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
+import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import org.reactivestreams.Publisher;
@@ -266,6 +269,18 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                             resolvedNetworkConfig.getNetworkReadTimeoutMs(), TimeUnit.MILLISECONDS));
                     connection.addHandlerLast(new WriteTimeoutHandler(
                             resolvedNetworkConfig.getNetworkWriteTimeoutMs(), TimeUnit.MILLISECONDS));
+                    if (config.isCompressionEnabled()) {
+                        connection.addHandlerLast(new ChannelInboundHandlerAdapter() {
+                            @Override
+                            public void exceptionCaught(ChannelHandlerContext context, Throwable error) {
+                                if (isDecompressionFailure(error)) {
+                                    context.close();
+                                    return;
+                                }
+                                context.fireExceptionCaught(error);
+                            }
+                        });
+                    }
                 })
                 .compress(config.isCompressionEnabled());
         if (config.isFollowRedirects()) {
@@ -343,6 +358,18 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             }
             return next.exchange(request);
         };
+    }
+
+    private static boolean isDecompressionFailure(Throwable error) {
+        Throwable current = error;
+        for (int depth = 0; current != null && depth < 16; depth++) {
+            if (current instanceof DecompressionException) {
+                return true;
+            }
+            Throwable cause = current.getCause();
+            current = cause != current ? cause : null;
+        }
+        return false;
     }
 
     static HttpClient applyHttpProtocol(HttpClient httpClient,

@@ -56,6 +56,11 @@ creates an exception or invokes an `ErrorResponseMapper`:
 | Default error bodies | 4 KiB | Generic exceptions and custom mappers |
 | `application/problem+json` bodies | 64 KiB | Mapper input for Problem Detail and other structured mappers |
 
+These caps count decoded bytes after connector decompression. They are independent
+from `codec-max-in-memory-size-mb`, which applies to codec-aggregated successful
+unary values and `ResponseEntity<T>` bodies. Bodiless success paths retain no
+body aggregate; they drain and release any unexpected decoded content.
+
 `HttpClientException`, `RemoteServiceException`, and the Problem Detail exception
 subclasses still expose at most 4 KiB from `getResponseBody()`. The larger
 Problem Detail cap is for mapper parsing reliability, so a structured mapper can

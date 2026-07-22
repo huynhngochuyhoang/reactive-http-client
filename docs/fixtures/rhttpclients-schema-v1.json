@@ -19,6 +19,8 @@
       "timeoutSource": "client",
       "timeoutMs": 750,
       "logicalCallTimeoutMs": 0,
+      "compressionEnabled": true,
+      "codecMaxInMemorySizeMb": 4,
       "resilienceConfigured": false,
       "retry": "disabled",
       "rateLimiter": "disabled",

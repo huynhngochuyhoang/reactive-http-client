@@ -355,8 +355,9 @@ key was present and which source provided it.
 
 Minimal safe bundle:
 
-- Diagnostics snapshot showing `http2Enabled` and `compressionEnabled` for the
-  affected client.
+- Provider-backed diagnostics snapshot showing `poolProtocol`,
+  `compressionEnabled`, and the decoded unary `codecMaxInMemorySizeMb` policy for
+  the affected client.
 - Downstream-observed protocol (`HTTP/1.1`, H2, or H2C), TLS/ALPN mode, and the
   proxy, ingress, or service-mesh hops in the path.
 - The complete first Reactor Netty decoder exception and channel context for a
@@ -372,7 +373,11 @@ decompression can remove encoded representation headers, so an unknown response
 size is expected and is not evidence of a missing body. When compression is
 enabled, application-provided `Accept-Encoding` is a configuration conflict.
 Record only header presence unless an approved incident procedure requires a
-sanitized value.
+sanitized value. Distinguish encoded wire bytes, decoded application bytes, an
+advertised post-transport length, bytes actually consumed, and an unknown size. A
+framing-complete truncated gzip member can yield partial decoded data without an
+exception, so retain application checksum or format-completeness evidence when full
+payload integrity matters.
 
 ## Pool Saturation Incidents
 

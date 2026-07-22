@@ -44,6 +44,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
             "clientName", "clientInterface", "baseUrlSource", "poolSource",
             "poolMaxConnections", "poolPendingAcquireTimeoutMs", "poolMetricsEnabled",
             "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
+            "compressionEnabled", "codecMaxInMemorySizeMb",
             "resilienceConfigured", "retry", "rateLimiter",
             "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
             "strictBodySigningValidation", "authMode", "followRedirects", "endpointCount",
@@ -286,6 +287,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setBaseUrl("https://inventory-api.example.invalid");
         config.setRequestTimeoutMs(750);
+        config.setCompressionEnabled(true);
+        config.setCodecMaxInMemorySizeMb(4);
         config.setAuthProvider("internalSupportAuthProvider");
         config.setDefaultHeaders(Map.of(
                 "Authorization", "Bearer raw-token",
@@ -321,6 +324,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                       "timeoutSource": "client",
                       "timeoutMs": 750,
                       "logicalCallTimeoutMs": 0,
+                      "compressionEnabled": true,
+                      "codecMaxInMemorySizeMb": 4,
                       "resilienceConfigured": false,
                       "retry": "disabled",
                       "rateLimiter": "disabled",
@@ -378,6 +383,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("poolCapacityBasis", "connections")
                 .containsEntry("poolMaxConcurrentStreams", null)
                 .containsEntry("logicalCallTimeoutMs", 2_000L)
+                .containsEntry("compressionEnabled", false)
+                .containsEntry("codecMaxInMemorySizeMb", 2)
                 .containsEntry("strictUnsafeRetryValidation", false)
                 .containsEntry("strictBodySigningValidation", false);
         assertThat(collectionClient)
@@ -389,6 +396,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("poolCapacityBasis", "unknown")
                 .containsEntry("poolMaxConcurrentStreams", null)
                 .containsEntry("logicalCallTimeoutMs", null)
+                .containsEntry("compressionEnabled", null)
+                .containsEntry("codecMaxInMemorySizeMb", null)
                 .containsEntry("strictUnsafeRetryValidation", null)
                 .containsEntry("strictBodySigningValidation", null)
                 .containsEntry("timeoutMs", 500L)
@@ -400,9 +409,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("| Client count | `1` |")
                 .contains("| Endpoint count | `2` |")
                 .contains("| Inherited endpoint count | `1` |")
-                .contains("| Client | Interface | Base URL source | Pool | Response timeout | Logical-call budget | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |")
+                .contains("| Client | Interface | Base URL source | Pool | Response timeout | Logical-call budget | Compression | Decoded aggregate limit | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |")
                 .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName()
-                        + "` | `property` | `unknown` | `client:500` | `unknown` |")
+                        + "` | `property` | `unknown` | `client:500` | `unknown` | `unknown` | `unknown` |")
                 .contains("| `unknown` | `unknown` | `provider-bean` | `true` | `2` | `1` |");
     }
 
@@ -552,15 +561,19 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(List.of(summary));
         Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(List.of(summary));
 
-        assertThat(markdown).contains("| `summary-client` | `com.example.SummaryClient` | `property` | `unknown` | `disabled:0` | `unknown` | `configured=false, retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled` | `unknown` | `unknown` |");
+        assertThat(markdown).contains("| `summary-client` | `com.example.SummaryClient` | `property` | `unknown` | `disabled:0` | `unknown` | `unknown` | `unknown` | `configured=false, retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled` | `unknown` | `unknown` |");
         assertThat(json)
                 .contains("\"logicalCallTimeoutMs\": null")
+                .contains("\"compressionEnabled\": null")
+                .contains("\"codecMaxInMemorySizeMb\": null")
                 .contains("\"strictUnsafeRetryValidation\": null")
                 .contains("\"strictBodySigningValidation\": null")
                 .doesNotContain("\"strictUnsafeRetryValidation\": false")
                 .doesNotContain("\"strictBodySigningValidation\": false");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> clients = (List<Map<String, Object>>) snapshot.get("clients");
+        assertThat(clients.get(0).get("compressionEnabled")).isNull();
+        assertThat(clients.get(0).get("codecMaxInMemorySizeMb")).isNull();
         assertThat(clients.get(0).get("strictUnsafeRetryValidation")).isNull();
         assertThat(clients.get(0).get("strictBodySigningValidation")).isNull();
     }

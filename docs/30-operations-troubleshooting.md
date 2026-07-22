@@ -66,11 +66,18 @@ contract.
   does not compress request bodies.
 - When connector compression is enabled, application code must not also supply
   `Accept-Encoding` through defaults, method arguments, forwarding, or filters.
+- Unary values and `ResponseEntity<T>` enforce `codec-max-in-memory-size-mb` on
+  decoded bytes after decompression. Error retention uses separate decoded 4 KiB
+  and 64 KiB caps; bodiless paths drain; `DataBuffer` streams remain incremental
+  and caller-owned.
 - Automatic decompression can remove the encoded `Content-Length` and
   `Content-Encoding`; response-size diagnostics are then unknown. Do not consume
   a stream merely to calculate a size.
-- Compare the downstream's encoded response with the post-transport headers and
-  decoded data seen by the application.
+- Compare encoded downstream bytes, decoded application bytes, any advertised
+  post-transport length, and whether the body was actually consumed.
+- Corrupt gzip closes the affected pooled connection. A framing-complete truncated
+  gzip member can still produce partial decoded data, so use an application checksum
+  or format-level completeness check when whole-payload integrity is required.
 
 See [Response compression](12-proxy-tls.md#response-compression) and
 [response-size semantics](08-observability.md#reactivehttpclientrequestsresponsesize-distributionsummary).

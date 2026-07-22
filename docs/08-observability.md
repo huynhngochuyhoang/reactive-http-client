@@ -53,7 +53,10 @@ processing. Chunked responses and those without the header are skipped. Reactor
 Netty removes the compressed representation length during automatic gzip
 decompression, so those responses report unknown and are skipped rather than
 being mislabeled as decoded bytes. Streaming bodies are never consumed to
-calculate this metric.
+calculate this metric. Here, **encoded** and **decoded** describe representation
+boundaries, **advertised** is the surviving header value, **consumed** is actual
+body demand, and **unknown** means no trustworthy advertised count exists. This
+metric records only advertised bytes; it is not a decoded or consumed byte counter.
 
 Tags: `client.name`, `api.name`, `http.method`, `uri`.
 

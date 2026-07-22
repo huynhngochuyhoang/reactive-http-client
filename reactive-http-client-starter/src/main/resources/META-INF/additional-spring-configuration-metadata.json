@@ -317,14 +317,14 @@
     {
       "name": "reactive.http.clients.[name].codec-max-in-memory-size-mb",
       "type": "java.lang.Integer",
-      "description": "Maximum in-memory codec buffer size in MiB for response decoding. Default: 2.",
+      "description": "Maximum decoded unary response aggregation size in MiB after transport decompression. Applies to codec-decoded values and ResponseEntity values, not bounded error retention or DataBuffer streams. 0 means unlimited. Default: 2.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
       "defaultValue": 2
     },
     {
       "name": "reactive.http.clients.[name].compression-enabled",
       "type": "java.lang.Boolean",
-      "description": "Enable Reactor Netty response compression negotiation and decompression (Accept-Encoding: gzip). Request bodies are not compressed. Default: false.",
+      "description": "Enable Reactor Netty response compression negotiation and incremental decompression (Accept-Encoding: gzip). Request bodies are not compressed. Default: false.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
       "defaultValue": false
     },

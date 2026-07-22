@@ -366,7 +366,9 @@ public class ReactiveHttpClientProperties {
         private static final long MAX_LOGICAL_CALL_TIMEOUT_MS = 30L * 60 * 1000;
 
         private String baseUrl;
+        /** Decoded unary response aggregation limit in MiB. { 0} means unlimited. */
         private int codecMaxInMemorySizeMb = 2;
+        /** Enables connector-owned response compression negotiation and incremental decompression. */
         private boolean compressionEnabled = false;
         private boolean http2Enabled = false;
         private boolean followRedirects = false;

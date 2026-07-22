@@ -85,7 +85,9 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceOperatorApplier),
                 strictBodySigningValidation(clientConfig),
                 poolSummary(clientConfig),
-                clientConfig.getLogicalCallTimeoutMs());
+                clientConfig.getLogicalCallTimeoutMs(),
+                clientConfig.isCompressionEnabled(),
+                clientConfig.getCodecMaxInMemorySizeMb());
     }
 
     static ClientSummary clientSummary(Class<?> clientInterface,
@@ -319,7 +321,9 @@ public class ReactiveHttpClientDiagnosticsProvider {
             boolean strictUnsafeRetryValidation,
             boolean strictBodySigningValidation,
             PoolSummary pool,
-            long logicalCallTimeoutMs
+            long logicalCallTimeoutMs,
+            boolean compressionEnabled,
+            int codecMaxInMemorySizeMb
     ) {
     }
 
