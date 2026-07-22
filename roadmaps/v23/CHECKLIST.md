@@ -301,20 +301,49 @@ Evidence:
 
 ## Priority 7 - OAuth2 Token-Service Transport Isolation
 
-### [ ] 7.1 Separate token-service policy
+### [x] 7.1 Separate token-service policy
 
-- [ ] Make token-service timeout, proxy/TLS, retry, and connection ownership explicit.
-- [ ] Preserve single-flight refresh, waiter cancellation, invalidation, and one-time
+- [x] Make token-service timeout, proxy/TLS, retry, and connection ownership explicit.
+- [x] Preserve single-flight refresh, waiter cancellation, invalidation, and one-time
       `401` replay across logical clients.
-- [ ] Keep business-client names correct while identifying token-service failures.
-- [ ] Avoid silently inheriting incompatible business-request transport assumptions.
+- [x] Keep business-client names correct while identifying token-service failures.
+- [x] Avoid silently inheriting incompatible business-request transport assumptions.
 
-### [ ] 7.2 Preserve sanitized diagnostics
+### [x] 7.2 Preserve sanitized diagnostics
 
-- [ ] Preserve status, safe headers, typed sanitized body decoding, and safe causes.
-- [ ] Cover raw, encoded, escaped, nested, and Basic credential redaction.
-- [ ] Prove observers, logs, exceptions, and support snapshots contain no credentials.
-- [ ] Add real token-service transport and concurrency fixtures.
+- [x] Preserve status, safe headers, typed sanitized body decoding, and safe causes.
+- [x] Cover raw, encoded, escaped, nested, and Basic credential redaction.
+- [x] Prove observers, logs, exceptions, and support snapshots contain no credentials.
+- [x] Add real token-service transport and concurrency fixtures.
+
+Evidence:
+
+- Built-in object-style OAuth2 now owns a separate Reactor Netty connector and
+  bounded pool per client. The additive `token-service` block controls connect
+  and total request timeout, pool capacity/acquisition, direct-or-explicit proxy,
+  platform-or-explicit TLS, and opt-in transient retry. Defaults preserve disabled
+  request timeout and one attempt; business filters, redirects, resilience
+  operators, proxy/TLS, and per-client customizers are not inherited.
+- Transient retry is limited to token-request timeout, transport failures, HTTP
+  `429`, and `5xx`; credential failures and malformed responses are not retried.
+  The provider-owned pool is synchronously disposed with the business client,
+  while manually wired and custom providers retain caller-owned `WebClient`
+  transport and lifecycle. Startup diagnostics report only bounded policy values.
+- A real loopback token/API fixture proves concurrent callers share one refresh,
+  business-only filters do not reach the token service, configured token retries
+  do not duplicate the business request, hidden `401` replay invalidates and
+  refreshes exactly once, final authorization uses the fresh token, and shutdown
+  disposes the isolated pool. Existing cancellation, invalidation, failure-cooldown,
+  multi-client naming, lifecycle, observer, exchange-log, and replay suites passed.
+- Existing sanitization coverage retains HTTP status, safe headers, full sanitized
+  typed-decoding bytes and configured token-service codecs while redacting raw,
+  form, URL-encoded, JSON-escaped, nested JSON, colon-delimited, Basic, header, and
+  request metadata variants. Support guidance records only bounded policy and
+  preserves `AuthProviderException` as the token-service/business-stage boundary.
+- Focused provider, refresh, lifecycle, factory, real-transport, binding, metadata,
+  generated-reference, and native-hint tests passed. The complete starter and
+  test-helper suites, strict starter japicmp against published `3.2.0`, metadata
+  JSON validation, and `git diff --check` passed.
 
 ---
 

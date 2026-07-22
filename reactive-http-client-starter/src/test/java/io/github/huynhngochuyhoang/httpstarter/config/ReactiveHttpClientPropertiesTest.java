@@ -77,6 +77,64 @@ class ReactiveHttpClientPropertiesTest {
     }
 
     @Test
+    void shouldBindIsolatedOAuth2TokenServicePolicy() {
+        Map<String, Object> yaml = new LinkedHashMap<>();
+        String prefix = "reactive.http.clients.payments.auth.oauth2-client-credentials.token-service.";
+        yaml.put("reactive.http.clients.payments.auth.type", "oauth2-client-credentials");
+        yaml.put(prefix + "connect-timeout-ms", 1500);
+        yaml.put(prefix + "request-timeout-ms", 4000);
+        yaml.put(prefix + "max-connections", 3);
+        yaml.put(prefix + "pending-acquire-timeout-ms", 2500);
+        yaml.put(prefix + "retry-max-attempts", 2);
+        yaml.put(prefix + "retry-backoff-ms", 75);
+        yaml.put(prefix + "proxy.type", "HTTP");
+        yaml.put(prefix + "proxy.host", "proxy.example.com");
+        yaml.put(prefix + "proxy.port", 8080);
+        yaml.put(prefix + "tls.trust-store", "classpath:token-truststore.p12");
+
+        ReactiveHttpClientProperties.OAuth2TokenServiceConfig tokenService = bind(yaml)
+                .getClients().get("payments").getAuth().getOauth2ClientCredentials().getTokenService();
+
+        assertEquals(1500, tokenService.getConnectTimeoutMs());
+        assertEquals(4000, tokenService.getRequestTimeoutMs());
+        assertEquals(3, tokenService.getMaxConnections());
+        assertEquals(2500, tokenService.getPendingAcquireTimeoutMs());
+        assertEquals(2, tokenService.getRetryMaxAttempts());
+        assertEquals(75, tokenService.getRetryBackoffMs());
+        assertEquals("proxy.example.com", tokenService.getProxy().getHost());
+        assertEquals("classpath:token-truststore.p12", tokenService.getTls().getTrustStore());
+    }
+
+    @Test
+    void shouldUseSafeOAuth2TokenServiceDefaults() {
+        ReactiveHttpClientProperties.OAuth2TokenServiceConfig tokenService =
+                new ReactiveHttpClientProperties.OAuth2TokenServiceConfig();
+
+        assertEquals(2000, tokenService.getConnectTimeoutMs());
+        assertEquals(0, tokenService.getRequestTimeoutMs());
+        assertEquals(2, tokenService.getMaxConnections());
+        assertEquals(5000, tokenService.getPendingAcquireTimeoutMs());
+        assertEquals(1, tokenService.getRetryMaxAttempts());
+        assertEquals(100, tokenService.getRetryBackoffMs());
+        assertNull(tokenService.getProxy());
+        assertNull(tokenService.getTls());
+    }
+
+    @Test
+    void shouldRejectInvalidOAuth2TokenServicePolicy() {
+        ReactiveHttpClientProperties.OAuth2TokenServiceConfig tokenService =
+                new ReactiveHttpClientProperties.OAuth2TokenServiceConfig();
+
+        assertThrows(IllegalArgumentException.class, () -> tokenService.setConnectTimeoutMs(0));
+        assertThrows(IllegalArgumentException.class, () -> tokenService.setRequestTimeoutMs(-1));
+        assertThrows(IllegalArgumentException.class, () -> tokenService.setMaxConnections(0));
+        assertThrows(IllegalArgumentException.class, () -> tokenService.setPendingAcquireTimeoutMs(-1));
+        assertThrows(IllegalArgumentException.class, () -> tokenService.setRetryMaxAttempts(0));
+        assertThrows(IllegalArgumentException.class, () -> tokenService.setRetryMaxAttempts(11));
+        assertThrows(IllegalArgumentException.class, () -> tokenService.setRetryBackoffMs(-1));
+    }
+
+    @Test
     void shouldUseLogExchangeForExchangeLogging() {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
 

@@ -58,6 +58,24 @@
       "sourceMethod": "getOauth2ClientCredentials()"
     },
     {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2TokenServiceConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2ClientCredentialsAuthConfig",
+      "sourceMethod": "getTokenService()"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2TokenServiceConfig",
+      "sourceMethod": "getProxy()"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2TokenServiceConfig",
+      "sourceMethod": "getTls()"
+    },
+    {
       "name": "reactive.http.clients.[name].auth.aws-sig-v4",
       "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$AwsSigV4AuthConfig",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$AuthConfig",
@@ -437,6 +455,138 @@
       "description": "Milliseconds subtracted from OAuth2 expires_in before caching the access token. Default: 30000.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2ClientCredentialsAuthConfig",
       "defaultValue": 30000
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.connect-timeout-ms",
+      "type": "java.lang.Integer",
+      "description": "Connect timeout for the isolated OAuth2 token-service transport in milliseconds.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2TokenServiceConfig",
+      "defaultValue": 2000
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.request-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "Total timeout for each OAuth2 token request in milliseconds. Zero disables it.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2TokenServiceConfig",
+      "defaultValue": 0
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.max-connections",
+      "type": "java.lang.Integer",
+      "description": "Maximum connections in the client-owned OAuth2 token-service pool.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2TokenServiceConfig",
+      "defaultValue": 2
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.pending-acquire-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "Maximum OAuth2 token-service pool acquisition wait in milliseconds.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2TokenServiceConfig",
+      "defaultValue": 5000
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.retry-max-attempts",
+      "type": "java.lang.Integer",
+      "description": "Total OAuth2 token request attempts for timeouts, transport failures, HTTP 429, and 5xx responses. One disables retry.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2TokenServiceConfig",
+      "defaultValue": 1
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.retry-backoff-ms",
+      "type": "java.lang.Long",
+      "description": "Fixed delay between transient OAuth2 token request attempts in milliseconds.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$OAuth2TokenServiceConfig",
+      "defaultValue": 100
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.type",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type",
+      "description": "Token-service proxy type. Set to NONE or omit the proxy block for a direct connection.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.host",
+      "type": "java.lang.String",
+      "description": "Token-service proxy host.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.port",
+      "type": "java.lang.Integer",
+      "description": "Token-service proxy port.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.username",
+      "type": "java.lang.String",
+      "description": "Token-service proxy authentication username.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.password",
+      "type": "java.lang.String",
+      "description": "Token-service proxy authentication password.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.non-proxy-hosts",
+      "type": "java.lang.String",
+      "description": "Token-service non-proxy hosts regex.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.trust-store",
+      "type": "java.lang.String",
+      "description": "Token-service truststore path override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.trust-store-password",
+      "type": "java.lang.String",
+      "description": "Token-service truststore password override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.trust-store-type",
+      "type": "java.lang.String",
+      "description": "Token-service truststore format override. Default: PKCS12.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.key-store",
+      "type": "java.lang.String",
+      "description": "Token-service keystore path override for mTLS client certificate.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.key-store-password",
+      "type": "java.lang.String",
+      "description": "Token-service keystore password override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.key-store-type",
+      "type": "java.lang.String",
+      "description": "Token-service keystore format override. Default: PKCS12.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.protocols",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Token-service allowed TLS protocol versions override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.ciphers",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Token-service allowed TLS cipher suites override.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.insecure-trust-all",
+      "type": "java.lang.Boolean",
+      "description": "Token-service certificate verification disable override \u2014 NEVER use in production.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$TlsConfig"
     },
     {
       "name": "reactive.http.clients.[name].auth.aws-sig-v4.access-key-id",
@@ -860,6 +1010,31 @@
         {
           "value": "NONE",
           "description": "Disable proxy for this client (overrides a global proxy)."
+        }
+      ]
+    },
+    {
+      "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.type",
+      "values": [
+        {
+          "value": "HTTP",
+          "description": "Plain HTTP CONNECT proxy."
+        },
+        {
+          "value": "HTTPS",
+          "description": "HTTPS CONNECT proxy."
+        },
+        {
+          "value": "SOCKS4",
+          "description": "SOCKS4 proxy."
+        },
+        {
+          "value": "SOCKS5",
+          "description": "SOCKS5 proxy."
+        },
+        {
+          "value": "NONE",
+          "description": "Use a direct token-service connection."
         }
       ]
     },

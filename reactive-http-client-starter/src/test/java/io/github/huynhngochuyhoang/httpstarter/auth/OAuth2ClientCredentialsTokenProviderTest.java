@@ -14,11 +14,13 @@ import reactor.test.StepVerifier;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1051,6 +1053,123 @@ class OAuth2ClientCredentialsTokenProviderTest {
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessageContaining("OAuth2 token endpoint returned no access_token")
                             .hasMessageNotContaining("malformed JSON");
+                })
+                .verify();
+    }
+
+    @Test
+    void retriesOnlyTransientTokenServiceFailures() {
+        AtomicInteger requests = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> {
+                    int attempt = requests.incrementAndGet();
+                    if (attempt < 3) {
+                        return Mono.just(ClientResponse.create(HttpStatus.SERVICE_UNAVAILABLE)
+                                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                                .body("{\"error\":\"temporarily_unavailable\"}")
+                                .build());
+                    }
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                            .body("{\"access_token\":\"token\"}")
+                            .build());
+                })
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider = OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                .tokenUri("https://auth.example.com/oauth/token")
+                .clientId("client")
+                .clientSecret("secret")
+                .retryMaxAttempts(3)
+                .retryBackoff(Duration.ZERO)
+                .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .assertNext(token -> assertThat(token.tokenValue()).isEqualTo("token"))
+                .verifyComplete();
+        assertThat(requests).hasValue(3);
+    }
+
+    @Test
+    void doesNotRetryCredentialFailures() {
+        AtomicInteger requests = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> {
+                    requests.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.UNAUTHORIZED)
+                            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                            .body("{\"error\":\"invalid_client\"}")
+                            .build());
+                })
+                .build();
+
+        OAuth2ClientCredentialsTokenProvider provider = OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                .tokenUri("https://auth.example.com/oauth/token")
+                .clientId("client")
+                .clientSecret("secret")
+                .retryMaxAttempts(3)
+                .retryBackoff(Duration.ZERO)
+                .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> assertThat(error.getMessage())
+                        .contains("OAuth2 token endpoint returned HTTP 401"))
+                .verify();
+        assertThat(requests).hasValue(1);
+    }
+
+    @Test
+    void tokenRequestTimeoutUsesSanitizedClientScopedFailure() {
+        WebClient webClient = WebClient.builder()
+                .exchangeFunction(request -> Mono.never())
+                .build();
+        OAuth2ClientCredentialsTokenProvider provider = OAuth2ClientCredentialsTokenProvider.builder(webClient)
+                .tokenUri("https://auth.example.com/oauth/token")
+                .clientId("client")
+                .clientSecret("secret-value")
+                .clientName("payments")
+                .requestTimeout(Duration.ofMillis(20))
+                .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(((AuthProviderException) error).getClientName()).isEqualTo("payments");
+                    assertThat(error.getMessage())
+                            .contains("OAuth2 token endpoint timed out after 20 ms")
+                            .doesNotContain("secret-value");
+                    assertThat(error.getCause()).isInstanceOf(java.util.concurrent.TimeoutException.class);
+                })
+                .verify();
+    }
+
+    @Test
+    void tokenTransportFailureDoesNotExposeRequestMetadata() throws Exception {
+        int closedPort;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            closedPort = socket.getLocalPort();
+        }
+        OAuth2ClientCredentialsTokenProvider provider = OAuth2ClientCredentialsTokenProvider
+                .builder(WebClient.builder().build())
+                .tokenUri("http://127.0.0.1:" + closedPort + "/oauth/token")
+                .clientId("client-id")
+                .clientSecret("secret-value")
+                .clientName("payments")
+                .build();
+
+        StepVerifier.create(provider.fetchToken())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(AuthProviderException.class);
+                    assertThat(((AuthProviderException) error).getClientName()).isEqualTo("payments");
+                    assertThat(error.getMessage())
+                            .contains("OAuth2 token endpoint transport failed")
+                            .doesNotContain("secret-value", "client-id", "Authorization", "Basic");
+                    assertThat(error.getCause())
+                            .isInstanceOf(IllegalStateException.class)
+                            .isNotInstanceOf(WebClientRequestException.class);
+                    assertThat(error.getCause().getMessage())
+                            .contains("OAuth2 token transport failure type")
+                            .doesNotContain("secret-value", "client-id", "Authorization", "Basic");
                 })
                 .verify();
     }
