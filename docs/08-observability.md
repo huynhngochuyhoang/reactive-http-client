@@ -204,16 +204,16 @@ reactive:
           metrics-enabled: true   # per-client
 ```
 
-Gauges published:
+Common gauges are `total.connections` and `idle.connections`. HTTP/1.1 adds
+`active.connections` and `pending.connections`; HTTP/2 adds `active.streams`
+and `pending.streams` because the public pool view does not prove how streams are
+distributed across physical connections. The peer-advertised H2 stream limit is runtime
+state and remains unknown in configured-client diagnostics.
 
-| Gauge | Description |
-|---|---|
-| `reactor.netty.connection.provider.total.connections` | All connections |
-| `reactor.netty.connection.provider.active.connections` | Connections in use |
-| `reactor.netty.connection.provider.idle.connections` | Available idle connections |
-| `reactor.netty.connection.provider.pending.connections` | Callers waiting for a connection |
-
-All gauges are tagged with `name = reactive-http-client-<clientName>`.
+All pool gauges carry only the bounded
+`name = reactive-http-client-<clientName>-<interface>` tag. They do not export a
+remote-address tag. See [Connection pool](05-connection-pool.md#connection-pool-metrics)
+for the complete protocol-aware interpretation.
 
 ---
 

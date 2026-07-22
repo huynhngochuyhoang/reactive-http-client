@@ -57,6 +57,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     private Class<T> type;
     private ApplicationContext applicationContext;
     private ConnectionProvider connectionProvider;
+    private ProtocolAwareConnectionPoolMeterRegistrar connectionPoolMeterRegistrar;
 
     // -------------------------------------------------------------------------
     // FactoryBean contract
@@ -202,6 +203,10 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             } catch (RuntimeException e) {
                 log.warn("Error while disposing ConnectionProvider for client [{}]",
                         type != null ? type.getSimpleName() : "?", e);
+            } finally {
+                if (connectionPoolMeterRegistrar != null) {
+                    connectionPoolMeterRegistrar.close();
+                }
             }
         }
     }
@@ -246,7 +251,9 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             providerBuilder.evictInBackground(Duration.ofMillis(pool.getEvictInBackgroundMs()));
         }
         if (pool.isMetricsEnabled()) {
-            providerBuilder.metrics(true);
+            this.connectionPoolMeterRegistrar =
+                    new ProtocolAwareConnectionPoolMeterRegistrar(poolName, config.isHttp2Enabled());
+            providerBuilder.metrics(true, () -> this.connectionPoolMeterRegistrar);
         }
         // Store the provider on the instance field so destroy() can dispose it cleanly on context shutdown.
         this.connectionProvider = providerBuilder.build();

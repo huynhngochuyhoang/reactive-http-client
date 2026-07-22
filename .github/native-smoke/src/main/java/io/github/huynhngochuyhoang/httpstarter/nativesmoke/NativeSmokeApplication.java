@@ -90,7 +90,8 @@ public class NativeSmokeApplication {
             Set<String> clientFields = Set.of(
                     "clientName", "clientInterface", "baseUrlSource", "poolSource",
                     "poolMaxConnections", "poolPendingAcquireTimeoutMs", "poolMetricsEnabled",
-                    "timeoutSource", "timeoutMs", "resilienceConfigured", "retry", "rateLimiter",
+                    "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams",
+                    "timeoutSource", "timeoutMs", "logicalCallTimeoutMs", "resilienceConfigured", "retry", "rateLimiter",
                     "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
                     "strictBodySigningValidation", "authMode", "followRedirects", "endpointCount",
                     "inheritedEndpointCount");
@@ -118,13 +119,21 @@ public class NativeSmokeApplication {
             require(providerClient.get("poolMaxConnections") instanceof Integer
                             && providerClient.get("poolPendingAcquireTimeoutMs") instanceof Long
                             && providerClient.get("poolMetricsEnabled") instanceof Boolean
+                            && providerClient.get("poolProtocol") instanceof String
+                            && providerClient.get("poolCapacityBasis") instanceof String
+                            && providerClient.get("poolMaxConcurrentStreams") == null
                             && providerClient.get("timeoutMs") instanceof Long
+                            && providerClient.get("logicalCallTimeoutMs") instanceof Long
                             && providerClient.get("followRedirects") instanceof Boolean,
                     "provider diagnostics field types changed");
             require("unknown".equals(collectionClient.get("poolSource"))
                             && collectionClient.get("poolMaxConnections") == null
                             && collectionClient.get("poolPendingAcquireTimeoutMs") == null
                             && collectionClient.get("poolMetricsEnabled") == null
+                            && "unknown".equals(collectionClient.get("poolProtocol"))
+                            && "unknown".equals(collectionClient.get("poolCapacityBasis"))
+                            && collectionClient.get("poolMaxConcurrentStreams") == null
+                            && collectionClient.get("logicalCallTimeoutMs") == null
                             && collectionClient.get("strictUnsafeRetryValidation") == null
                             && collectionClient.get("strictBodySigningValidation") == null,
                     "collection diagnostics unknown states changed");

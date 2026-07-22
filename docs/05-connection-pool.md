@@ -21,7 +21,7 @@ reactive:
 
 | Property | Default | Description |
 |---|---|---|
-| `max-connections` | `200` | Maximum concurrent connections per pool |
+| `max-connections` | `200` | Maximum physical connections per pool; it is not an HTTP/2 stream limit |
 | `pending-acquire-timeout-ms` | `5000` | How long a caller waits for a connection when the pool is full |
 | `max-idle-time-ms` | `0` (off) | Evict connections that have been idle longer than this |
 | `max-life-time-ms` | `0` (unlimited) | Recycle connections older than this regardless of activity |
@@ -63,18 +63,39 @@ Load balancers and NAT gateways silently drop idle connections. Without idle evi
 
 ---
 
+## Protocol-aware capacity
+
+For the default HTTP/1.1 transport, one connection serves one active exchange at a
+time. `max-connections` therefore bounds physical connections and additional
+demand enters the connection-acquisition queue.
+
+With `http2-enabled: true`, `max-connections` still bounds physical connections,
+but each connection can carry concurrent streams. The peer advertises the stream
+limit at runtime. The starter does not turn that negotiated value into configuration
+metadata or infer it from `max-connections`; provider-backed diagnostics report
+`poolProtocol=HTTP/2`, `poolCapacityBasis=connections-and-peer-streams`, and
+`poolMaxConcurrentStreams=null` (unknown). HTTP/1.1 reports
+`poolCapacityBasis=connections`.
+
 ## Connection-pool metrics
 
-When `metrics-enabled: true`, the `ConnectionProvider` publishes four Reactor Netty gauges to the global `MeterRegistry`:
+When `metrics-enabled: true`, the starter publishes address-free Reactor Netty
+pool gauges to the global `MeterRegistry`. Every gauge has exactly one bounded
+`name=reactive-http-client-<clientName>-<interface>` tag; remote addresses are
+not tags.
 
-| Gauge | Description |
-|---|---|
-| `reactor.netty.connection.provider.total.connections` | All connections (active + idle) |
-| `reactor.netty.connection.provider.active.connections` | Connections currently in use |
-| `reactor.netty.connection.provider.idle.connections` | Idle connections available for reuse |
-| `reactor.netty.connection.provider.pending.connections` | Callers waiting to acquire a connection |
+Common gauges are `total.connections` and `idle.connections`. Protocol-specific
+capacity gauges are:
 
-All gauges carry a `name` tag of the form `reactive-http-client-<clientName>`.
+| Protocol | Gauge | Description |
+|---|---|---|
+| HTTP/1.1 | `reactor.netty.connection.provider.active.connections` | Physical connections serving an exchange |
+| HTTP/1.1 | `reactor.netty.connection.provider.pending.connections` | Calls waiting for physical connection capacity |
+| HTTP/2 | `reactor.netty.connection.provider.active.streams` | Active streams on pooled H2 connections |
+| HTTP/2 | `reactor.netty.connection.provider.pending.streams` | Calls waiting for peer-advertised stream capacity |
+
+The public H2 pool view does not prove how active streams are distributed across
+physical connections, so the starter does not publish `active.connections` for H2.
 
 ## Diagnosing saturation
 
@@ -85,12 +106,20 @@ connection, is cancelled and removed from the queue, or fails after
 `ErrorCategory.TIMEOUT` mapping and add the bounded optional stage
 `POOL_ACQUIRE`; generic timeouts remain stage-unknown.
 
-Use `pending.connections` together with `active.connections` and the per-call
-`failure.stage` metric tag. The health detail `poolAcquireFailureCount` reports the
-probe-window count, while provider-backed diagnostics expose only sanitized pool
-source, maximum connections, pending timeout, and metrics-enabled policy. These
-surfaces do not expose a remote address; observer and OTel server-address fields
-remain controlled by `include-server-address` (default `false`).
+For HTTP/1.1, use `pending.connections` with `active.connections`. For HTTP/2,
+use `pending.streams` with `active.streams` and the physical-connection gauges.
+A non-zero H2 pending-stream gauge is proof of stream-capacity pressure while it is
+observed. A `POOL_ACQUIRE` failure alone remains generic pool-admission evidence:
+Reactor Pool timeout, pending-limit, and shutdown exceptions do not safely identify
+connection versus stream pressure.
+
+The health detail `poolAcquireFailureCount` intentionally aggregates those proven
+pool-admission failures for the probe window. Provider-backed diagnostics expose
+only sanitized configured protocol, capacity basis, pool source, maximum
+connections, pending timeout, and metrics policy. The negotiated H2 stream limit
+remains unknown. Metrics and support metadata do not expose a remote address;
+observer and OTel server-address fields remain controlled by
+`include-server-address` (default `false`).
 
 Idle and lifetime limits are enforced on acquire, and `evict-in-background-ms`
 adds proactive sweeps. Factory shutdown disposes the provider and terminates active

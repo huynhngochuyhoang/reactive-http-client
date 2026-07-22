@@ -43,7 +43,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     private static final Set<String> CLIENT_SCHEMA_FIELDS = Set.of(
             "clientName", "clientInterface", "baseUrlSource", "poolSource",
             "poolMaxConnections", "poolPendingAcquireTimeoutMs", "poolMetricsEnabled",
-            "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
+            "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
             "resilienceConfigured", "retry", "rateLimiter",
             "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
             "strictBodySigningValidation", "authMode", "followRedirects", "endpointCount",
@@ -203,7 +203,34 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("poolSource", "global")
                 .containsEntry("poolMaxConnections", 200)
                 .containsEntry("poolPendingAcquireTimeoutMs", 5000L)
-                .containsEntry("poolMetricsEnabled", false));
+                .containsEntry("poolMetricsEnabled", false)
+                .containsEntry("poolProtocol", "HTTP/1.1")
+                .containsEntry("poolCapacityBasis", "connections")
+                .containsEntry("poolMaxConcurrentStreams", null));
+    }
+
+    @Test
+    void reportsHttp2ConnectionAndPeerStreamCapacityWithoutInventingALimit() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setHttp2Enabled(true);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider));
+
+        assertThat(client)
+                .containsEntry("poolProtocol", "HTTP/2")
+                .containsEntry("poolCapacityBasis", "connections-and-peer-streams")
+                .containsEntry("poolMaxConcurrentStreams", null);
+        assertThat(client.toString()).doesNotContain("example.com", "127.0.0.1");
     }
 
     @Test
@@ -222,7 +249,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("| Inherited endpoint count | `1` |")
                 .contains("Strict retry validation")
                 .contains("Strict body-signing validation")
-                .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName() + "` | `property` | `global:maxConnections=200, pendingAcquireTimeoutMs=5000, metrics=false` | `client:500` |")
+                .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName() + "` | `property` | `global:maxConnections=200, pendingAcquireTimeoutMs=5000, metrics=false, protocol=HTTP/1.1, capacity=connections, maxConcurrentStreams=unknown` | `client:500` |")
                 .contains("configured=true, retry=unavailable")
                 .contains("| `provider-bean` | `true` | `2` | `1` |");
         assertThat(json)
@@ -288,6 +315,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                       "poolMaxConnections": 200,
                       "poolPendingAcquireTimeoutMs": 5000,
                       "poolMetricsEnabled": false,
+                      "poolProtocol": "HTTP/1.1",
+                      "poolCapacityBasis": "connections",
+                      "poolMaxConcurrentStreams": null,
                       "timeoutSource": "client",
                       "timeoutMs": 750,
                       "logicalCallTimeoutMs": 0,
@@ -344,6 +374,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("poolMaxConnections", 200)
                 .containsEntry("poolPendingAcquireTimeoutMs", 5000L)
                 .containsEntry("poolMetricsEnabled", false)
+                .containsEntry("poolProtocol", "HTTP/1.1")
+                .containsEntry("poolCapacityBasis", "connections")
+                .containsEntry("poolMaxConcurrentStreams", null)
                 .containsEntry("logicalCallTimeoutMs", 2_000L)
                 .containsEntry("strictUnsafeRetryValidation", false)
                 .containsEntry("strictBodySigningValidation", false);
@@ -352,6 +385,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("poolMaxConnections", null)
                 .containsEntry("poolPendingAcquireTimeoutMs", null)
                 .containsEntry("poolMetricsEnabled", null)
+                .containsEntry("poolProtocol", "unknown")
+                .containsEntry("poolCapacityBasis", "unknown")
+                .containsEntry("poolMaxConcurrentStreams", null)
                 .containsEntry("logicalCallTimeoutMs", null)
                 .containsEntry("strictUnsafeRetryValidation", null)
                 .containsEntry("strictBodySigningValidation", null)

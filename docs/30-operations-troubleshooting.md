@@ -76,10 +76,13 @@ See [Response compression](12-proxy-tls.md#response-compression) and
 
 ## Pool saturation
 
-- Compare active connections with the configured maximum and inspect pending
-  connections over the same time window.
+- For HTTP/1.1, compare active connections with the configured maximum and inspect
+  `pending.connections` over the same time window.
+- For HTTP/2, inspect physical connection gauges together with `active.streams`
+  and `pending.streams`; the peer-advertised stream limit is not exported.
 - `POOL_ACQUIRE` is bounded evidence of an acquire timeout, pending limit, or
-  pool shutdown. It retains `ErrorCategory.TIMEOUT`; an absent stage is unknown.
+  pool shutdown, but not proof of connection versus stream pressure. It retains
+  `ErrorCategory.TIMEOUT`; an absent stage is unknown.
 - Check cancellation, idle/lifetime eviction, and factory shutdown before
   increasing limits. A larger queue can hide overload and increase latency.
 

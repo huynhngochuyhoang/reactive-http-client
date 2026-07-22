@@ -378,12 +378,15 @@ sanitized value.
 
 Minimal safe bundle:
 
-- Provider-backed diagnostics snapshot showing pool source, maximum connections,
-  pending-acquire timeout, and whether pool metrics are enabled.
-- `reactor.netty.connection.provider.active.connections`, `.idle.connections`,
-  `.total.connections`, and `.pending.connections` for the affected client.
+- Provider-backed diagnostics snapshot showing configured protocol, capacity basis,
+  pool source, maximum physical connections, pending-acquire timeout, and whether
+  pool metrics are enabled. A null H2 stream limit is expected.
+- `reactor.netty.connection.provider.idle.connections` and `.total.connections`
+  for the affected client. Add `.active.connections` and `.pending.connections`
+  for HTTP/1.1 or `.active.streams` and `.pending.streams` for HTTP/2.
 - Request timer samples grouped by `failure.stage`; `POOL_ACQUIRE` is bounded
-  proof of a Reactor Pool acquisition failure, while an absent stage is unknown.
+  proof of a Reactor Pool admission failure, but does not by itself distinguish
+  connection from H2 stream pressure. An absent stage is unknown.
 - Health details including `poolAcquireFailureCount` for the same probe window.
 - Metadata-only exchange logs or lifecycle/observer output with category and stage.
 
