@@ -14,6 +14,36 @@ Each actual transport request gets one body subscription. A retry, a body-preser
 
 `Flux<DataBuffer>` and `Flux<byte[]>` default to `application/octet-stream`; DTO publishers default to JSON and remain encoded by the configured WebClient codecs. Custom auth providers receive the publisher as request metadata but must not subscribe to it. Built-in AWS SigV4 rejects publisher bodies before transport because it cannot prove the payload hash without consuming the stream.
 
+### Wire framing and request ownership
+
+The transport owns framing; applications must not supply `Content-Length` or
+`Transfer-Encoding`. Under HTTP/1.1, `byte[]` and a `Resource` with a known
+length use transport-generated `Content-Length`. Publisher bodies, direct
+`DataBuffer`, `InputStream`, `Reader`, and `ReadableByteChannel` bodies use
+`Transfer-Encoding: chunked` because their final length is not known before the
+write starts. Under HTTP/2 the same streaming bodies use DATA frames and cannot carry the
+HTTP/1.1 `Transfer-Encoding` header. Reactor Netty server handlers expose an
+HTTP-object compatibility view that can synthesize `transfer-encoding: chunked`
+after decoding an unknown-length H2 stream; do not treat that value as a captured
+wire header.
+
+Direct `DataBuffer`, `InputStream`, and `ReadableByteChannel` bodies default to
+`application/octet-stream`. A `Reader` defaults to UTF-8 `text/plain`; a
+caller-supplied `Content-Type` remains authoritative. A `Resource` uses the
+Spring resource writer, including media-type inference from its filename and
+its known length when available.
+
+Passing a body transfers write ownership for that transport attempt. Spring
+closes `InputStream`, `Reader`, and `ReadableByteChannel` bodies on completion,
+error, or cancellation. A `Resource` is opened and closed once per request
+attempt. Emitted `DataBuffer` values are released by the HTTP writer after the
+write or when discarded because the request is cancelled. Do not release an
+emitted buffer concurrently from application code.
+
+A peer disconnect or write timeout cancels body demand. It does not make a
+partially written request replay-safe: a retry, redirect, or hidden auth replay
+still creates a new transport request and a new body subscription/read.
+
 ### Request-body repeatability matrix
 
 | Body shape | Classification | Replay ownership |

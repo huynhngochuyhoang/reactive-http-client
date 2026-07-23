@@ -82,7 +82,7 @@ owns the inner body and its later consumption is not subject to this budget.
 | `CONNECT` | Connection refusal or Netty connect timeout | No HTTP status or response headers |
 | `TLS_HANDSHAKE` | `SSLException` during handshake or certificate validation | No HTTP status or response headers |
 | `POOL_ACQUIRE` | Reactor Pool acquire timeout, pending limit, or shutdown while waiting | No HTTP status or response headers |
-| `REQUEST_WRITE` | Netty write timeout | No response status or headers |
+| `REQUEST_WRITE` | Netty write timeout after the final request was dispatched | No response status or headers |
 | `RESPONSE_HEADERS` | Netty read timeout after final request dispatch but before status was observed | No HTTP status or response headers |
 | `RESPONSE_BODY` | Netty read timeout after status was observed | Status is retained; exchange logs also retain response headers |
 

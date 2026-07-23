@@ -349,20 +349,49 @@ Evidence:
 
 ## Priority 8 - Streaming Upload Wire Contract
 
-### [ ] 8.1 Prove outbound framing and ownership
+### [x] 8.1 Prove outbound framing and ownership
 
-- [ ] Cover publisher, `DataBuffer`, resource, and application-stream bodies at a
+- [x] Cover publisher, `DataBuffer`, resource, and application-stream bodies at a
       real server boundary.
-- [ ] Define deterministic content-length versus chunked transfer behavior.
-- [ ] Verify cancellation, partial writes, disconnects, and backpressure ownership.
-- [ ] Prove no hidden duplicate subscription or read across retry, redirect, or auth.
+- [x] Define deterministic content-length versus chunked transfer behavior.
+- [x] Verify cancellation, partial writes, disconnects, and backpressure ownership.
+- [x] Prove no hidden duplicate subscription or read across retry, redirect, or auth.
 
-### [ ] 8.2 Enforce replay and signing contracts
+### [x] 8.2 Enforce replay and signing contracts
 
-- [ ] Keep non-repeatable body rejection or warnings aligned with strict/runtime policy.
-- [ ] Require SigV4 bytes to match the actual outbound representation.
-- [ ] Cover write timeout and unsafe replay before and after dispatch.
-- [ ] Align effective-contract, diagnostics, mock helpers, and streaming docs.
+- [x] Keep non-repeatable body rejection or warnings aligned with strict/runtime policy.
+- [x] Require SigV4 bytes to match the actual outbound representation.
+- [x] Cover write timeout and unsafe replay before and after dispatch.
+- [x] Align effective-contract, diagnostics, mock helpers, and streaming docs.
+
+Evidence:
+
+- Real HTTP/1.1 coverage sends publisher, direct `DataBuffer`, known-length
+  `Resource`, `InputStream`, `Reader`, and `ReadableByteChannel` bodies. Unknown-length
+  streaming bodies use chunked framing, while the known resource carries an exact
+  content length. H2C coverage proves HTTP/2 negotiation and distinguishes its DATA
+  frames from Reactor Netty's synthetic server-side transfer-encoding compatibility
+  view.
+- Application-owned byte and character streams are read off the event loop and closed
+  on terminal signals. A peer-disconnect fixture proves partial delivery cancels
+  bounded upstream demand, releases every pooled `DataBuffer`, and leaves the client
+  pool usable for the next request.
+- Retry, redirect, and hidden OAuth2 401 replay fixtures count one publisher
+  subscription or resource read for each actual dispatch. No eager subscription or
+  hidden buffering was added; one-shot streams remain application-owned and require a
+  caller-supplied replayable body when replay is enabled.
+- Existing runtime warnings and strict built-in SigV4 validation retain the
+  `NON_REPEATABLE` versus `APPLICATION_OWNED` distinction. Effective-contract
+  snapshots now prove publisher/direct-buffer and Java stream/resource classifications.
+- Real-wire SigV4 tests compare `x-amz-content-sha256` with the exact byte and JSON
+  representations received by the server. Body-write timeout tests preserve
+  `REQUEST_WRITE` only after dispatch; auth failure before dispatch remains an auth
+  failure without a transport stage.
+- Mock helper coverage materializes and closes an `InputStream` once without making it
+  repeatable. Streaming, retry, timeout, test-helper, operations, and changelog guidance
+  describe the same framing, ownership, replay, and signing boundaries.
+- Focused upload, retry-safety, strict-signing, diagnostics, observability, and mock
+  suites passed. The complete starter and test-helper suites passed.
 
 ---
 

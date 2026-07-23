@@ -1,17 +1,18 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
-import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
-import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
-import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
+import io.netty.buffer.PooledByteBufAllocator;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.core.io.buffer.NettyDataBuffer;
+import org.springframework.core.io.buffer.NettyDataBufferFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -19,14 +20,17 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
+import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.server.HttpServer;
 
-import java.io.ByteArrayInputStream;
-import java.io.FilterInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -36,6 +40,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 class StreamingUploadOwnershipTest {
 
@@ -100,6 +105,40 @@ class StreamingUploadOwnershipTest {
     }
 
     @Test
+    void peerDisconnectAfterPartialWriteCancelsDemandAndReleasesPooledBuffers() {
+        try (UploadServer server = new UploadServer(); ClientFixture fixture = ClientFixture.create(server)) {
+            NettyDataBufferFactory buffers = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
+            List<NettyDataBuffer> emittedBuffers = new CopyOnWriteArrayList<>();
+            AtomicInteger emitted = new AtomicInteger();
+            AtomicBoolean cancelled = new AtomicBoolean();
+            AtomicLong largestDemand = new AtomicLong();
+            Flux<DataBuffer> body = Flux.interval(Duration.ofMillis(1))
+                    .take(256)
+                    .map(index -> {
+                        NettyDataBuffer buffer = buffers.allocateBuffer(32 * 1024);
+                        buffer.write(new byte[32 * 1024]);
+                        emittedBuffers.add(buffer);
+                        emitted.incrementAndGet();
+                        return (DataBuffer) buffer;
+                    })
+                    .doOnRequest(requested -> largestDemand.accumulateAndGet(requested, Math::max))
+                    .doOnCancel(() -> cancelled.set(true));
+
+            Throwable failure = catchThrowable(() ->
+                    fixture.client().disconnectDuringUpload(body).block(CALL_TIMEOUT));
+
+            assertThat(failure).isNotNull();
+            await(cancelled::get, "peer disconnect did not cancel the upload publisher");
+            await(() -> server.partialBytes() > 0, "server did not receive a partial upload");
+            await(() -> emittedBuffers.stream().allMatch(buffer -> buffer.getNativeBuffer().refCnt() == 0),
+                    "outbound pooled buffers were not released");
+            assertThat(emitted.get()).isPositive().isLessThan(256);
+            assertThat(largestDemand.get()).isPositive().isLessThan(Long.MAX_VALUE);
+            assertThat(fixture.client().probe().block(CALL_TIMEOUT)).isEqualTo("probe");
+        }
+    }
+
+    @Test
     void retryAndRedirectResubscribeOnceForEachActualRequest() {
         try (UploadServer server = new UploadServer();
              ClientFixture retrying = ClientFixture.create(server, true, false, null)) {
@@ -137,6 +176,106 @@ class StreamingUploadOwnershipTest {
             assertThat(server.bodiesFor("/auth")).containsExactly("secured", "secured");
             assertThat(authProvider.authCalls).hasValue(2);
             assertThat(authProvider.invalidations).hasValue(1);
+        }
+    }
+
+    @Test
+    void supportedRawBodyShapesUseDeterministicHttp11FramingAndCloseStreams() {
+        try (UploadServer server = new UploadServer(); ClientFixture fixture = ClientFixture.create(server)) {
+            CountingResource resource = new CountingResource("resource-body");
+            CountingInputStream inputStream = new CountingInputStream("input-stream-body");
+            CountingReader reader = new CountingReader("reader-body-✓");
+            CountingChannel channel = new CountingChannel("channel-body");
+
+            assertThat(fixture.client().upload(requestBody("publisher-body", new AtomicInteger()))
+                    .block(CALL_TIMEOUT)).isEqualTo("publisher-body");
+            assertThat(fixture.client().uploadDataBuffer(buffer("data-buffer-body"))
+                    .block(CALL_TIMEOUT)).isEqualTo("data-buffer-body");
+            assertThat(fixture.client().uploadResource(resource)
+                    .block(CALL_TIMEOUT)).isEqualTo("resource-body");
+            assertThat(fixture.client().uploadInputStream(inputStream)
+                    .block(CALL_TIMEOUT)).isEqualTo("input-stream-body");
+            assertThat(fixture.client().uploadReader(reader)
+                    .block(CALL_TIMEOUT)).isEqualTo("reader-body-✓");
+            assertThat(fixture.client().uploadChannel(channel)
+                    .block(CALL_TIMEOUT)).isEqualTo("channel-body");
+
+            assertChunked(server.onlyRequest("/upload"), "publisher-body", "application/octet-stream");
+            assertChunked(server.onlyRequest("/data-buffer"), "data-buffer-body", "application/octet-stream");
+            assertThat(server.onlyRequest("/resource")).satisfies(request -> {
+                assertThat(request.body()).isEqualTo("resource-body");
+                assertThat(request.contentLength()).isEqualTo(String.valueOf("resource-body".getBytes(StandardCharsets.UTF_8).length));
+                assertThat(request.transferEncoding()).isNull();
+                assertThat(request.contentType()).isEqualTo("text/plain");
+            });
+            assertChunked(server.onlyRequest("/input-stream"), "input-stream-body", "application/octet-stream");
+            assertChunked(server.onlyRequest("/reader"), "reader-body-✓", "text/plain;charset=UTF-8");
+            assertChunked(server.onlyRequest("/channel"), "channel-body", "application/octet-stream");
+            assertThat(resource.opens).hasValue(1);
+            assertThat(resource.closes).hasValue(1);
+            assertThat(inputStream.closes).hasValue(1);
+            assertThat(reader.closes).hasValue(1);
+            assertThat(channel.closes).hasValue(1);
+        }
+    }
+
+    @Test
+    void h2cStreamingDistinguishesWireProtocolFromServerCompatibilityHeaders() {
+        try (UploadServer server = new UploadServer(true); ClientFixture fixture = ClientFixture.create(server)) {
+            CountingResource resource = new CountingResource("h2-resource");
+
+            assertThat(fixture.client().upload(requestBody("h2-stream", new AtomicInteger()))
+                    .block(CALL_TIMEOUT)).isEqualTo("h2-stream");
+            assertThat(fixture.client().uploadResource(resource).block(CALL_TIMEOUT))
+                    .isEqualTo("h2-resource");
+
+            assertThat(server.onlyRequest("/upload")).satisfies(request -> {
+                assertThat(request.protocol()).isEqualTo("HTTP/2.0");
+                assertThat(request.body()).isEqualTo("h2-stream");
+                assertThat(request.contentLength()).isNull();
+                assertThat(request.transferEncoding()).isEqualTo("chunked");
+            });
+            assertThat(server.onlyRequest("/resource")).satisfies(request -> {
+                assertThat(request.protocol()).isEqualTo("HTTP/2.0");
+                assertThat(request.body()).isEqualTo("h2-resource");
+                assertThat(request.contentLength()).isEqualTo(String.valueOf(
+                        "h2-resource".getBytes(StandardCharsets.UTF_8).length));
+                assertThat(request.transferEncoding()).isNull();
+            });
+            assertThat(resource.opens).hasValue(1);
+            assertThat(resource.closes).hasValue(1);
+        }
+    }
+
+    private static void assertChunked(RequestRecord request, String body, String contentType) {
+        assertThat(request.body()).isEqualTo(body);
+        assertThat(request.contentLength()).isNull();
+        assertThat(request.transferEncoding()).isEqualTo("chunked");
+        assertThat(request.contentType()).isEqualTo(contentType);
+    }
+
+    @Test
+    void builtInSigV4HashMatchesBytesObservedAtTheWire() {
+        try (UploadServer server = new UploadServer(); SigV4ClientFixture fixture = SigV4ClientFixture.create(server)) {
+            byte[] bytes = "signed-bytes".getBytes(StandardCharsets.UTF_8);
+
+            assertThat(fixture.client().uploadBytes(bytes).block(CALL_TIMEOUT)).isEqualTo("signed-bytes");
+            assertThat(fixture.client().uploadDto(new UploadDto("signed-json")).block(CALL_TIMEOUT))
+                    .contains("signed-json");
+
+            for (String path : List.of("/signed-bytes", "/signed-json")) {
+                RequestRecord request = server.onlyRequest(path);
+                assertThat(request.payloadHash()).isEqualTo(sha256Hex(
+                        request.body().getBytes(StandardCharsets.UTF_8)));
+            }
+        }
+    }
+
+    private static String sha256Hex(byte[] body) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(body));
+        } catch (Exception error) {
+            throw new IllegalStateException(error);
         }
     }
 
@@ -207,8 +346,26 @@ class StreamingUploadOwnershipTest {
         @POST("/upload")
         Mono<String> upload(@Body Flux<DataBuffer> body);
 
+        @POST("/data-buffer")
+        Mono<String> uploadDataBuffer(@Body DataBuffer body);
+
+        @POST("/resource")
+        Mono<String> uploadResource(@Body CountingResource body);
+
+        @POST("/input-stream")
+        Mono<String> uploadInputStream(@Body InputStream body);
+
+        @POST("/reader")
+        Mono<String> uploadReader(@Body Reader body);
+
+        @POST("/channel")
+        Mono<String> uploadChannel(@Body ReadableByteChannel body);
+
         @POST("/slow-upload")
         Mono<String> slowUpload(@Body Flux<DataBuffer> body);
+
+        @POST("/disconnect")
+        Mono<String> disconnectDuringUpload(@Body Flux<DataBuffer> body);
 
         @POST("/retry")
         Mono<String> retryUpload(@Body Flux<DataBuffer> body);
@@ -231,6 +388,15 @@ class StreamingUploadOwnershipTest {
 
         @POST("/probe")
         Mono<String> probe();
+    }
+
+    @ReactiveHttpClient(name = "sigv4-upload")
+    interface SigV4UploadClient {
+        @POST("/signed-bytes")
+        Mono<String> uploadBytes(@Body byte[] body);
+
+        @POST("/signed-json")
+        Mono<String> uploadDto(@Body UploadDto body);
     }
 
     record UploadDto(String name) {}
@@ -260,6 +426,7 @@ class StreamingUploadOwnershipTest {
             ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
             ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
             config.setBaseUrl("http://127.0.0.1:" + server.port());
+            config.setHttp2Enabled(server.http2());
             config.setFollowRedirects(followRedirects);
             ReactiveHttpClientProperties.ConnectionPoolConfig pool =
                     new ReactiveHttpClientProperties.ConnectionPoolConfig();
@@ -307,6 +474,57 @@ class StreamingUploadOwnershipTest {
         }
     }
 
+    private static final class SigV4ClientFixture implements AutoCloseable {
+        private final StaticApplicationContext context;
+        private final ReactiveHttpClientFactoryBean<SigV4UploadClient> factory;
+        private final SigV4UploadClient client;
+
+        private SigV4ClientFixture(StaticApplicationContext context,
+                                   ReactiveHttpClientFactoryBean<SigV4UploadClient> factory,
+                                   SigV4UploadClient client) {
+            this.context = context;
+            this.factory = factory;
+            this.client = client;
+        }
+
+        static SigV4ClientFixture create(UploadServer server) {
+            StaticApplicationContext context = new StaticApplicationContext();
+            ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+            ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+            config.setBaseUrl("http://127.0.0.1:" + server.port());
+            ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+            auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+            auth.getAwsSigV4().setAccessKeyId("wire-test-access-key");
+            auth.getAwsSigV4().setSecretAccessKey("wire-test-secret-key");
+            auth.getAwsSigV4().setRegion("us-east-1");
+            auth.getAwsSigV4().setService("execute-api");
+            auth.getAwsSigV4().setStrictBodySigningValidation(true);
+            config.setAuth(auth);
+            properties.getClients().put("sigv4-upload", config);
+
+            context.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
+            context.getBeanFactory().registerSingleton("starterWebClientBuilder", WebClient.builder());
+            context.getBeanFactory().registerSingleton("reactiveHttpClientJsonCodec", TestJsonCodecs.jsonCodec());
+            context.getBeanFactory().registerSingleton(
+                    "awsSigV4AuthProviderFactory", (AuthProviderFactory) new AwsSigV4AuthProviderFactory());
+
+            ReactiveHttpClientFactoryBean<SigV4UploadClient> factory = new ReactiveHttpClientFactoryBean<>();
+            factory.setType(SigV4UploadClient.class);
+            factory.setApplicationContext(context);
+            return new SigV4ClientFixture(context, factory, factory.getObject());
+        }
+
+        SigV4UploadClient client() {
+            return client;
+        }
+
+        @Override
+        public void close() {
+            factory.destroy();
+            context.close();
+        }
+    }
+
     private static final class RefreshOnceAuthProvider implements InvalidatableAuthProvider {
         private final AtomicInteger authCalls = new AtomicInteger();
         private final AtomicInteger invalidations = new AtomicInteger();
@@ -321,6 +539,69 @@ class StreamingUploadOwnershipTest {
         public Mono<Void> invalidate() {
             invalidations.incrementAndGet();
             return Mono.empty();
+        }
+    }
+
+    private static final class CountingInputStream extends FilterInputStream {
+        private final AtomicInteger closes = new AtomicInteger();
+
+        private CountingInputStream(String value) {
+            super(new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8)));
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (closes.compareAndSet(0, 1)) {
+                super.close();
+            }
+        }
+    }
+
+    private static final class CountingReader extends Reader {
+        private final StringReader delegate;
+        private final AtomicInteger closes = new AtomicInteger();
+
+        private CountingReader(String value) {
+            this.delegate = new StringReader(value);
+        }
+
+        @Override
+        public int read(char[] buffer, int offset, int length) throws IOException {
+            return delegate.read(buffer, offset, length);
+        }
+
+        @Override
+        public void close() {
+            if (closes.compareAndSet(0, 1)) {
+                delegate.close();
+            }
+        }
+    }
+
+    private static final class CountingChannel implements ReadableByteChannel {
+        private final ReadableByteChannel delegate;
+        private final AtomicInteger closes = new AtomicInteger();
+
+        private CountingChannel(String value) {
+            this.delegate = Channels.newChannel(
+                    new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8)));
+        }
+
+        @Override
+        public int read(ByteBuffer destination) throws IOException {
+            return delegate.read(destination);
+        }
+
+        @Override
+        public boolean isOpen() {
+            return delegate.isOpen();
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (closes.compareAndSet(0, 1)) {
+                delegate.close();
+            }
         }
     }
 
@@ -371,10 +652,21 @@ class StreamingUploadOwnershipTest {
         private final AtomicInteger retryRequests = new AtomicInteger();
         private final AtomicInteger multipartRequests = new AtomicInteger();
         private final AtomicBoolean holdStarted = new AtomicBoolean();
+        private final AtomicLong partialBytes = new AtomicLong();
+        private final boolean http2;
         private final DisposableServer server;
 
         private UploadServer() {
-            server = HttpServer.create()
+            this(false);
+        }
+
+        private UploadServer(boolean http2) {
+            this.http2 = http2;
+            HttpServer httpServer = HttpServer.create();
+            if (http2) {
+                httpServer = httpServer.protocol(HttpProtocol.H2C);
+            }
+            server = httpServer
                     .port(0)
                     .handle((request, response) -> {
                         String requestPath = request.path();
@@ -386,10 +678,24 @@ class StreamingUploadOwnershipTest {
                         if ("/probe".equals(path)) {
                             return response.sendString(Mono.just("probe")).then();
                         }
+                        if ("/disconnect".equals(path)) {
+                            return request.receive()
+                                    .take(1)
+                                    .doOnNext(buffer -> partialBytes.addAndGet(buffer.readableBytes()))
+                                    .then(Mono.fromRunnable(() ->
+                                            request.withConnection(connection -> connection.dispose())));
+                        }
                         return request.receive().aggregate().asString(StandardCharsets.UTF_8)
                                 .defaultIfEmpty("")
                                 .flatMap(body -> {
-                                    requests.add(new RequestRecord(path, body));
+                                    requests.add(new RequestRecord(
+                                            path,
+                                            request.version().text(),
+                                            body,
+                                            request.requestHeaders().get(HttpHeaders.CONTENT_LENGTH),
+                                            request.requestHeaders().get(HttpHeaders.TRANSFER_ENCODING),
+                                            request.requestHeaders().get(HttpHeaders.CONTENT_TYPE),
+                                            request.requestHeaders().get("x-amz-content-sha256")));
                                     if ("/retry".equals(path) && retryRequests.incrementAndGet() == 1) {
                                         return response.status(HttpStatus.SERVICE_UNAVAILABLE.value())
                                                 .sendString(Mono.just("retry")).then();
@@ -408,7 +714,9 @@ class StreamingUploadOwnershipTest {
                                         return response.status(HttpStatus.UNAUTHORIZED.value()).send();
                                     }
                                     String responseBody = switch (path) {
-                                        case "/dto", "/upload", "/retry", "/redirect-target", "/auth" -> body;
+                                        case "/dto", "/upload", "/data-buffer", "/resource", "/input-stream",
+                                                "/reader", "/channel", "/signed-bytes", "/signed-json", "/retry",
+                                                "/redirect-target", "/auth" -> body;
                                         case "/multipart" -> "multipart";
                                         case "/slow-upload" -> "uploaded";
                                         default -> "ok";
@@ -423,8 +731,16 @@ class StreamingUploadOwnershipTest {
             return server.port();
         }
 
+        boolean http2() {
+            return http2;
+        }
+
         boolean holdStarted() {
             return holdStarted.get();
+        }
+
+        long partialBytes() {
+            return partialBytes.get();
         }
 
         List<RequestRecord> requests() {
@@ -433,6 +749,14 @@ class StreamingUploadOwnershipTest {
 
         List<String> paths() {
             return requests.stream().map(RequestRecord::path).toList();
+        }
+
+        RequestRecord onlyRequest(String path) {
+            List<RequestRecord> matching = requests.stream()
+                    .filter(request -> path.equals(request.path()))
+                    .toList();
+            assertThat(matching).hasSize(1);
+            return matching.getFirst();
         }
 
         List<String> bodiesFor(String path) {
@@ -448,5 +772,12 @@ class StreamingUploadOwnershipTest {
         }
     }
 
-    private record RequestRecord(String path, String body) {}
+    private record RequestRecord(
+            String path,
+            String protocol,
+            String body,
+            String contentLength,
+            String transferEncoding,
+            String contentType,
+            String payloadHash) {}
 }

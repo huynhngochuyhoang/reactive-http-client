@@ -12,17 +12,23 @@ import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RequestSerializationException;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.netty.handler.timeout.ReadTimeoutException;
+import io.netty.handler.timeout.WriteTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.codec.DecodingException;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -290,6 +296,64 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
     }
 
     @Test
+    void bodyWriteTimeoutAfterDispatchReportsRequestWriteStage() {
+        AtomicInteger exchanges = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> {
+                    exchanges.incrementAndGet();
+                    MockClientHttpRequest output = new MockClientHttpRequest(request.method(), request.url());
+                    return request.writeTo(output, ExchangeStrategies.withDefaults())
+                            .thenReturn(ClientResponse.create(HttpStatus.OK).build());
+                })
+                .build();
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set);
+        DefaultDataBufferFactory buffers = new DefaultDataBufferFactory();
+        Flux<DataBuffer> body = Flux.concat(
+                Mono.just(buffers.wrap("first".getBytes(java.nio.charset.StandardCharsets.UTF_8))),
+                Mono.error(WriteTimeoutException.INSTANCE));
+
+        StepVerifier.create(invokeUpload(handler, body))
+                .expectError(WriteTimeoutException.class)
+                .verify();
+
+        HttpClientObserverEvent event = observed.get();
+        assertNotNull(event);
+        assertEquals(1, exchanges.get());
+        assertEquals(ErrorCategory.TIMEOUT, event.getErrorCategory());
+        assertEquals(HttpClientFailureStage.REQUEST_WRITE, event.getFailureStage());
+        assertEquals("http://test.local/upload", event.getRequestUrl());
+        assertNull(event.getStatusCode());
+    }
+
+    @Test
+    void authWriteTimeoutBeforeDispatchRemainsAnAuthFailureWithoutTransportStage() {
+        AuthProvider authProvider = request -> Mono.error(WriteTimeoutException.INSTANCE);
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(new OutboundAuthFilter("test-client", authProvider))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK).build()))
+                .build();
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        ReactiveClientInvocationHandler handler = createHandler(
+                webClient, 5000, observed::set, "serializationAuthProvider");
+
+        StepVerifier.create(invoke(handler))
+                .expectError(AuthProviderException.class)
+                .verify();
+
+        HttpClientObserverEvent event = observed.get();
+        assertNotNull(event);
+        assertEquals(ErrorCategory.AUTH_PROVIDER_ERROR, event.getErrorCategory());
+        assertNull(event.getFailureStage());
+        assertNull(event.getRequestUrl());
+        assertNull(event.getStatusCode());
+    }
+
+    @Test
     void shouldObserveResponseDecodeErrorCategoryWhenBodyToMonoFails() {
         ClientResponse response = ClientResponse.create(HttpStatus.OK)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -542,6 +606,17 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
     }
 
     @SuppressWarnings("unchecked")
+    private static Mono<String> invokeUpload(
+            ReactiveClientInvocationHandler handler, Flux<DataBuffer> body) {
+        try {
+            Method method = PublisherWriteClient.class.getMethod("upload", Flux.class);
+            return (Mono<String>) handler.invoke(null, method, new Object[]{body});
+        } catch (Throwable error) {
+            return Mono.error(error);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     private static <T> Mono<T> invokeMono(ReactiveClientInvocationHandler handler, Class<?> clientType, String methodName) {
         try {
             Method method = clientType.getMethod(methodName);
@@ -588,6 +663,11 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
     interface FluxIntegerClient {
         @GET("/users")
         Flux<Integer> callIntFlux();
+    }
+
+    interface PublisherWriteClient {
+        @POST("/upload")
+        Mono<String> upload(@Body Flux<DataBuffer> body);
     }
 
     interface SerializationClient {

@@ -26,6 +26,10 @@ import reactor.test.StepVerifier;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.io.ByteArrayInputStream;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
@@ -66,6 +70,9 @@ class MockReactiveHttpClientTest {
 
         @POST("/uploads")
         Mono<String> upload(@Body Flux<DataBuffer> body);
+
+        @POST("/uploads/stream")
+        Mono<String> uploadStream(@Body InputStream body);
 
         @POST("/payments")
         @IdempotencyKey
@@ -139,6 +146,31 @@ class MockReactiveHttpClientTest {
         assertThat(subscriptions).hasValue(2);
         assertThat(mock.exchanges()).hasSize(2)
                 .allSatisfy(exchange -> assertThat(exchange.bodyAsString()).isEqualTo("payload"));
+    }
+
+    @Test
+    void applicationOwnedInputStreamIsMaterializedAndClosedOnce() {
+        AtomicInteger closes = new AtomicInteger();
+        InputStream body = new FilterInputStream(new ByteArrayInputStream(
+                "stream-payload".getBytes(StandardCharsets.UTF_8))) {
+            @Override
+            public void close() throws IOException {
+                if (closes.compareAndSet(0, 1)) {
+                    super.close();
+                }
+            }
+        };
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .respondTo(HttpMethod.POST, "/uploads/stream",
+                        exchange -> MockReactiveHttpClient.text(200, exchange.bodyAsString()))
+                .build();
+
+        Mono<String> response = mock.proxy().uploadStream(body);
+
+        assertThat(closes).hasValue(0);
+        assertThat(response.block()).isEqualTo("stream-payload");
+        assertThat(closes).hasValue(1);
+        assertThat(mock.lastExchange().bodyAsString()).isEqualTo("stream-payload");
     }
 
     interface SharedCatalogOperations {

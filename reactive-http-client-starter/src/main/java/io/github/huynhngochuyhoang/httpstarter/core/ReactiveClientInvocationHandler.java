@@ -19,6 +19,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.*;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.util.MultiValueMap;
@@ -36,10 +37,14 @@ import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClientRequest;
 import reactor.util.context.ContextView;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.net.URI;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -514,6 +519,33 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             requestHeadersSpec = preparedRequestSpec.body(BodyInserters.fromMultipartData(multipartBody));
         } else if (serializedRequestBody.bodyToWrite() instanceof Publisher<?> publisher) {
             requestHeadersSpec = requestFromPublisher(preparedRequestSpec, publisher, plan.bodyType(), hasContentTypeHeader);
+        } else if (serializedRequestBody.bodyToWrite() instanceof DataBuffer dataBuffer) {
+            requestHeadersSpec = requestFromDataBuffers(
+                    preparedRequestSpec, Mono.just(dataBuffer), hasContentTypeHeader);
+        } else if (serializedRequestBody.bodyToWrite() instanceof InputStream inputStream) {
+            Flux<DataBuffer> body = DataBufferUtils.readInputStream(
+                    () -> inputStream, DefaultDataBufferFactory.sharedInstance, 8192)
+                    .subscribeOn(Schedulers.boundedElastic());
+            requestHeadersSpec = requestFromDataBuffers(preparedRequestSpec, body, hasContentTypeHeader);
+        } else if (serializedRequestBody.bodyToWrite() instanceof ReadableByteChannel channel) {
+            Flux<DataBuffer> body = DataBufferUtils.readByteChannel(
+                    () -> channel, DefaultDataBufferFactory.sharedInstance, 8192)
+                    .subscribeOn(Schedulers.boundedElastic());
+            requestHeadersSpec = requestFromDataBuffers(preparedRequestSpec, body, hasContentTypeHeader);
+        } else if (serializedRequestBody.bodyToWrite() instanceof Reader reader) {
+            WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
+            if (!hasContentTypeHeader) {
+                requestWithBodySpec = requestWithBodySpec.contentType(
+                        new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8));
+            }
+            requestHeadersSpec = requestWithBodySpec.body(
+                    BodyInserters.fromPublisher(readerBody(reader), String.class));
+        } else if (serializedRequestBody.bodyToWrite() instanceof Resource resource) {
+            WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
+            if (!hasContentTypeHeader) {
+                requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_OCTET_STREAM);
+            }
+            requestHeadersSpec = requestWithBodySpec.bodyValue(resource);
         } else if (serializedRequestBody.originalBody() != null) {
             WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
             if (!hasContentTypeHeader) {
@@ -928,7 +960,59 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (!hasContentTypeHeader) {
             requestWithBodySpec = requestWithBodySpec.contentType(defaultPublisherContentType(elementClass));
         }
-        return requestWithBodySpec.body(BodyInserters.fromPublisher((Publisher) publisher, (Class) elementClass));
+        Publisher<?> body = publisher;
+        if (DataBuffer.class.isAssignableFrom(elementClass)) {
+            body = Flux.from(publisher).doOnDiscard(DataBuffer.class, DataBufferUtils::release);
+        }
+        return requestWithBodySpec.body(BodyInserters.fromPublisher((Publisher) body, (Class) elementClass));
+    }
+
+    private WebClient.RequestHeadersSpec<?> requestFromDataBuffers(
+            WebClient.RequestBodySpec requestSpec,
+            Publisher<DataBuffer> body,
+            boolean hasContentTypeHeader) {
+        WebClient.RequestBodySpec requestWithBodySpec = requestSpec;
+        if (!hasContentTypeHeader) {
+            requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_OCTET_STREAM);
+        }
+        Flux<DataBuffer> releasableBody = Flux.from(body)
+                .doOnDiscard(DataBuffer.class, DataBufferUtils::release);
+        return requestWithBodySpec.body(BodyInserters.fromDataBuffers(releasableBody));
+    }
+
+    private Flux<String> readerBody(Reader reader) {
+        return Flux.<String>generate(sink -> {
+                    char[] characters = new char[4097];
+                    try {
+                        int read;
+                        do {
+                            read = reader.read(characters, 0, 4096);
+                        } while (read == 0);
+                        if (read < 0) {
+                            sink.complete();
+                            return;
+                        }
+                        if (Character.isHighSurrogate(characters[read - 1])) {
+                            int trailing = reader.read();
+                            if (trailing >= 0) {
+                                characters[read++] = (char) trailing;
+                            }
+                        }
+                        sink.next(new String(characters, 0, read));
+                    } catch (IOException error) {
+                        sink.error(error);
+                    }
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .doFinally(ignored -> closeReader(reader));
+    }
+
+    private void closeReader(Reader reader) {
+        try {
+            reader.close();
+        } catch (IOException error) {
+            log.debug("Failed to close application-owned Reader request body for client [{}]", clientName, error);
+        }
     }
 
     private Class<?> publisherElementClass(Type bodyType) {
