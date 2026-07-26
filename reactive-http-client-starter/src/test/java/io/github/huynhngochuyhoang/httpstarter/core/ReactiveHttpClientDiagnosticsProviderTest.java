@@ -21,6 +21,7 @@ import org.springframework.cglib.proxy.MethodInterceptor;
 import org.springframework.core.Ordered;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.URL;
@@ -30,6 +31,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -180,6 +182,25 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         assertThat(clients.get(0))
                 .containsEntry("authMode", "aws-sigv4")
                 .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
+    void providerSnapshotsDoNotInstantiateLazyClientFactories() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        definition.setLazyInit(true);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", new ReactiveHttpClientProperties.ClientConfig()));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(provider);
+
+        assertThat(snapshot).containsEntry("clientCount", 1);
+        assertThat(beanFactory.containsSingleton("diagnosticClient")).isFalse();
     }
 
     @Test
@@ -357,6 +378,17 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void keepsPublishedSchemaV1KeysAndJsonValueKindsCompatible() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode published = mapper.readTree(Path.of("..", "docs", "fixtures",
+                "rhttpclients-schema-v1-3.2.0.json").toFile());
+        JsonNode current = mapper.readTree(Path.of("..", "docs", "fixtures",
+                "rhttpclients-schema-v1.json").toFile());
+
+        assertCompatibleSchema(published, current, "root");
+    }
+
+    @Test
     void keepsProviderCollectionJsonAndMarkdownOnSchemaV1() throws Exception {
         ReactiveHttpClientDiagnosticsProvider provider = sensitiveDiagnosticsProvider();
         Map<String, Object> providerMap = ReactiveHttpClientDiagnosticsSnapshot.toMap(provider);
@@ -437,13 +469,16 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         RetryRegistry singleAttemptRetryRegistry = RetryRegistry.of(
                 RetryConfig.custom().maxAttempts(1).build());
+        singleAttemptRetryRegistry.retry("default");
         Map<String, Object> singleAttemptClient = snapshotClient(config, singleAttemptRetryRegistry);
 
         assertThat(singleAttemptClient)
                 .containsEntry("resilienceConfigured", true)
                 .containsEntry("strictUnsafeRetryValidation", false);
 
-        Map<String, Object> retryOperatorClient = snapshotClient(config, RetryRegistry.ofDefaults());
+        RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
+        retryRegistry.retry("default");
+        Map<String, Object> retryOperatorClient = snapshotClient(config, retryRegistry);
 
         assertThat(retryOperatorClient)
                 .containsEntry("resilienceConfigured", true)
@@ -464,8 +499,23 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         assertThat(client)
                 .containsEntry("clientName", "diagnostic-missing-retry")
-                .containsEntry("strictUnsafeRetryValidation", false);
+                .containsEntry("strictUnsafeRetryValidation", null);
         assertThat(retryRegistry.find("ghost-retry")).isEmpty();
+    }
+
+    @Test
+    void strictRetryDiagnosticsDoNotCreateDefaultRetryInstances() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setStrictUnsafeRetryValidation(true);
+        config.setResilience(resilience);
+        RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
+
+        Map<String, Object> client = snapshotClient(config, retryRegistry);
+
+        assertThat(client).containsEntry("strictUnsafeRetryValidation", null);
+        assertThat(retryRegistry.getAllRetries()).isEmpty();
     }
 
     @Test
@@ -529,7 +579,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
         definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
         beanFactory.registerBeanDefinition("diagnosticClient", definition);
-        beanFactory.registerSingleton("retryRegistry", RetryRegistry.ofDefaults());
+        RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
+        retryRegistry.retry("default");
+        beanFactory.registerSingleton("retryRegistry", retryRegistry);
 
         ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
@@ -603,6 +655,23 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("\"clientName\": \"custom-client\"")
                 .contains("\"strictUnsafeRetryValidation\": null")
                 .doesNotContain("diagnostic-client");
+    }
+
+    @Test
+    void proxiedCustomProvidersPreserveSummaryOnlyUnknownSemantics() {
+        ReactiveHttpClientDiagnosticsProvider target = new CustomDiagnosticsProvider(
+                new DefaultListableBeanFactory(), new ReactiveHttpClientProperties(), new MethodMetadataCache());
+        ReactiveHttpClientDiagnosticsProvider proxy = classBasedProxy(target);
+
+        Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(proxy);
+
+        Map<String, Object> client = firstClient(snapshot);
+        assertThat(client)
+                .containsEntry("clientName", "custom-client")
+                .containsEntry("strictUnsafeRetryValidation", null)
+                .containsEntry("strictBodySigningValidation", null)
+                .containsEntry("compressionEnabled", null)
+                .containsEntry("codecMaxInMemorySizeMb", null);
     }
 
     @Test
@@ -702,6 +771,29 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         }
     }
 
+    private static void assertCompatibleSchema(JsonNode published, JsonNode current, String path) {
+        assertThat(current)
+                .as("missing diagnostics schema path %s", path)
+                .isNotNull();
+        assertThat(current.getNodeType())
+                .as("diagnostics JSON value kind changed at %s", path)
+                .isEqualTo(published.getNodeType());
+        if (published.isObject()) {
+            for (Entry<String, JsonNode> property : published.properties()) {
+                assertCompatibleSchema(property.getValue(), current.get(property.getKey()),
+                        path + "." + property.getKey());
+            }
+        }
+        else if (published.isArray()) {
+            assertThat(current.size())
+                    .as("diagnostics array became shorter at %s", path)
+                    .isGreaterThanOrEqualTo(published.size());
+            for (int i = 0; i < published.size(); i++) {
+                assertCompatibleSchema(published.get(i), current.get(i), path + "[" + i + "]");
+            }
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> firstClient(Map<String, Object> snapshot) {
         return ((List<Map<String, Object>>) snapshot.get("clients")).get(0);
@@ -709,7 +801,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
     private static ReactiveHttpClientDiagnosticsProvider classBasedProxy(ReactiveHttpClientDiagnosticsProvider target) {
         Enhancer enhancer = new Enhancer();
-        enhancer.setSuperclass(ReactiveHttpClientDiagnosticsProvider.class);
+        enhancer.setSuperclass(target.getClass());
         enhancer.setCallback((MethodInterceptor) (object, method, args, methodProxy) ->
                 method.invoke(target, args != null ? args : new Object[0]));
         return (ReactiveHttpClientDiagnosticsProvider) enhancer.create(
@@ -803,6 +895,20 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 false,
                 1,
                 0);
+    }
+
+    static class CustomDiagnosticsProvider extends ReactiveHttpClientDiagnosticsProvider {
+
+        CustomDiagnosticsProvider(ConfigurableListableBeanFactory beanFactory,
+                                  ReactiveHttpClientProperties properties,
+                                  MethodMetadataCache metadataCache) {
+            super(beanFactory, properties, metadataCache);
+        }
+
+        @Override
+        public List<ClientSummary> clientSummaries() {
+            return List.of(summary("custom-client", "com.example.CustomClient"));
+        }
     }
 
     static class ThrowingAwsSigV4Factory implements AuthProviderFactory {

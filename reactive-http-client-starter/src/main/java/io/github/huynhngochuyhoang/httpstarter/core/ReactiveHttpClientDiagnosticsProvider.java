@@ -211,7 +211,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return "none";
     }
 
-    private boolean strictUnsafeRetryValidation(Class<?> clientInterface,
+    private Boolean strictUnsafeRetryValidation(Class<?> clientInterface,
                                                 ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                 ResilienceOperatorApplier resilienceOperatorApplier) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
@@ -221,6 +221,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 || !resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)) {
             return false;
         }
+        boolean unresolvedRetry = false;
         for (Method method : clientInterface.getMethods()) {
             if (!isDeclarativeClientMethod(method)) {
                 continue;
@@ -232,15 +233,16 @@ public class ReactiveHttpClientDiagnosticsProvider {
             }
             RequestPlan plan = RequestPlan.from(meta, clientInterface);
             String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
-            if (StringUtils.hasText(plan.retryInstanceName())
-                    && !resilienceOperatorApplier.isInstanceConfigured(ResilienceOperatorApplier.InstanceType.RETRY, retryInstance)) {
+            if (!resilienceOperatorApplier.isInstanceConfigured(
+                    ResilienceOperatorApplier.InstanceType.RETRY, retryInstance)) {
+                unresolvedRetry = true;
                 continue;
             }
             if (resilienceOperatorApplier.canRetryMoreThanOnce(retryInstance)) {
                 return true;
             }
         }
-        return false;
+        return unresolvedRetry ? null : false;
     }
 
     private boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
@@ -318,7 +320,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     record ClientSnapshotEntry(
             ClientSummary summary,
-            boolean strictUnsafeRetryValidation,
+            Boolean strictUnsafeRetryValidation,
             boolean strictBodySigningValidation,
             PoolSummary pool,
             long logicalCallTimeoutMs,

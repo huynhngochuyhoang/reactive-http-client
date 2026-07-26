@@ -582,7 +582,9 @@ class ReactiveHttpClientAutoConfigurationTest {
 
         @Bean
         RetryRegistry retryRegistry() {
-            return RetryRegistry.ofDefaults();
+            RetryRegistry registry = RetryRegistry.ofDefaults();
+            registry.retry("strict-retry");
+            return registry;
         }
 
         @Bean

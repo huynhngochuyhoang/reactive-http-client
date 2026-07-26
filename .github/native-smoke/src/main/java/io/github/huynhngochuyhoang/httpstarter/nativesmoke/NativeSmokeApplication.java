@@ -91,7 +91,8 @@ public class NativeSmokeApplication {
                     "clientName", "clientInterface", "baseUrlSource", "poolSource",
                     "poolMaxConnections", "poolPendingAcquireTimeoutMs", "poolMetricsEnabled",
                     "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams",
-                    "timeoutSource", "timeoutMs", "logicalCallTimeoutMs", "resilienceConfigured", "retry", "rateLimiter",
+                    "timeoutSource", "timeoutMs", "logicalCallTimeoutMs", "compressionEnabled",
+                    "codecMaxInMemorySizeMb", "resilienceConfigured", "retry", "rateLimiter",
                     "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
                     "strictBodySigningValidation", "authMode", "followRedirects", "endpointCount",
                     "inheritedEndpointCount");
@@ -124,6 +125,8 @@ public class NativeSmokeApplication {
                             && providerClient.get("poolMaxConcurrentStreams") == null
                             && providerClient.get("timeoutMs") instanceof Long
                             && providerClient.get("logicalCallTimeoutMs") instanceof Long
+                            && providerClient.get("compressionEnabled") instanceof Boolean
+                            && providerClient.get("codecMaxInMemorySizeMb") instanceof Integer
                             && providerClient.get("followRedirects") instanceof Boolean,
                     "provider diagnostics field types changed");
             require("unknown".equals(collectionClient.get("poolSource"))
@@ -134,6 +137,8 @@ public class NativeSmokeApplication {
                             && "unknown".equals(collectionClient.get("poolCapacityBasis"))
                             && collectionClient.get("poolMaxConcurrentStreams") == null
                             && collectionClient.get("logicalCallTimeoutMs") == null
+                            && collectionClient.get("compressionEnabled") == null
+                            && collectionClient.get("codecMaxInMemorySizeMb") == null
                             && collectionClient.get("strictUnsafeRetryValidation") == null
                             && collectionClient.get("strictBodySigningValidation") == null,
                     "collection diagnostics unknown states changed");

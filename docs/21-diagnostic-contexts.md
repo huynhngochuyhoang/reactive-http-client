@@ -117,8 +117,11 @@ JSON, map, and Markdown snapshots declare schema version `1`. Within the `3.x`
 line, schema changes are additive: existing fields keep their names, types, and
 meaning; a field is not removed, retyped, or reinterpreted in a minor release.
 Consumers must ignore fields they do not recognize. The sanitized
-[source-controlled v1 fixture](fixtures/rhttpclients-schema-v1.json) is the
-regression-review baseline.
+[source-controlled current v1 fixture](fixtures/rhttpclients-schema-v1.json) is the
+regression-review baseline. The immutable [published `3.2.0` v1
+fixture](fixtures/rhttpclients-schema-v1-3.2.0.json) additionally prevents a `3.x`
+minor from removing or retyping an already published field while allowing reviewed
+additive fields.
 
 Value semantics are explicit:
 
@@ -126,7 +129,7 @@ Value semantics are explicit:
 |---|---|
 | `true` | The boolean policy or strict-validation path is active and was resolved by the provider-backed snapshot. |
 | `false` | The provider-backed snapshot proved that policy or strict-validation path inactive. |
-| `null` / `unknown` | Provider-only data is unavailable to a collection-backed JSON/map or Markdown snapshot; it is not equivalent to `false`. |
+| `null` / `unknown` | Provider-only data is unavailable or cannot be proven without creating a lazy runtime component; it is not equivalent to `false`. |
 | `disabled` | The timeout or resilience operator is not applied by effective client/method policy. A disabled timeout is `timeoutSource=disabled` and `timeoutMs=0`. |
 | `unavailable` | Resilience is enabled for the effective contract, but the optional operator adapter/registry is unavailable at runtime. |
 | `missing` | No annotation or property supplies the required base URL source; concrete URL values are never exported. |
@@ -152,7 +155,9 @@ such fields are deferred until a future schema can define accurate semantics.
 
 Provider-backed rendering continues to honor an overridden `clientSummaries()`
 method, including through class-based Spring proxies. Such custom summaries use
-the collection contract, so provider-only strict flags remain unknown.
+the collection contract, so provider-only strict flags remain unknown. Diagnostics
+do not instantiate client FactoryBeans, auth providers, or unresolved Resilience4j
+instances; a strict-retry flag stays unknown until its Retry instance already exists.
 
 Snapshots fail explicitly instead of returning partial counts when they exceed
 256 clients, 10,000 aggregate endpoints, 512 characters in an exported text
@@ -160,7 +165,9 @@ field, or 1 MiB of UTF-8 encoded JSON/Markdown. Map and Actuator output are
 measured through the same JSON renderer before they are returned, so they cannot
 bypass the UTF-8 byte limit. These limits bound support-output
 size and client/interface cardinality; `clientCount`, `endpointCount`, and
-`inheritedEndpointCount` therefore always describe every emitted client.
+`inheritedEndpointCount` therefore always describe every emitted client. Health
+details use the same client and text bounds and deterministic client-name ordering;
+their fixed per-client field set remains below the same UTF-8 output ceiling.
 
 ## Opt-in Actuator diagnostics endpoint
 
@@ -186,7 +193,7 @@ management:
 The endpoint id is `rhttpclients`. A read operation returns diagnostics schema v1 JSON with
 `schemaVersion`, `projectVersion`, `clientCount`, `endpointCount`, `inheritedEndpointCount`, and
 one `clients` entry per registered client. Each client entry includes client
-name, interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, timeout source/value, `logicalCallTimeoutMs`, resilience summary, auth
+name, interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, timeout source/value, `logicalCallTimeoutMs`, configured compression, decoded aggregate limit, resilience summary, auth
 mode, redirect-following flag, strict unsafe-retry and strict body-signing
 validation flags, endpoint count, and inherited endpoint count. Strict flags are
 true only when the corresponding validation path is active for the resolved

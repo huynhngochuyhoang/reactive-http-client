@@ -7,9 +7,9 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.boot.health.contributor.Status;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -36,6 +36,8 @@ public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
 
     private static final String ERROR_CATEGORY_NONE = "none";
     private static final String POOL_ACQUIRE_STAGE = HttpClientFailureStage.POOL_ACQUIRE.name();
+    private static final int MAX_CLIENTS = 256;
+    private static final int MAX_CLIENT_NAME_LENGTH = 512;
 
     private final MeterRegistry meterRegistry;
     private final ReactiveHttpClientProperties.ObservabilityConfig observability;
@@ -117,12 +119,16 @@ public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
     }
 
     private Map<String, ClientCounts> snapshotCounts() {
-        Map<String, ClientCounts> snapshot = new HashMap<>();
+        Map<String, ClientCounts> snapshot = new TreeMap<>();
         String metricName = observability.getMetricName();
         for (Timer timer : meterRegistry.find(metricName).timers()) {
             String clientName = timer.getId().getTag("client.name");
             if (clientName == null || clientName.isEmpty()) {
                 continue;
+            }
+            if (clientName.length() > MAX_CLIENT_NAME_LENGTH) {
+                throw new IllegalStateException("Reactive HTTP client health detail exceeds the "
+                        + MAX_CLIENT_NAME_LENGTH + " character client-name limit");
             }
             String errorCategory = timer.getId().getTag("error.category");
             String failureStage = timer.getId().getTag("failure.stage");
@@ -135,6 +141,10 @@ public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
             if (POOL_ACQUIRE_STAGE.equals(failureStage)) {
                 counts.poolAcquireFailures += count;
             }
+        }
+        if (snapshot.size() > MAX_CLIENTS) {
+            throw new IllegalStateException("Reactive HTTP client health detail exceeds the "
+                    + MAX_CLIENTS + " client limit");
         }
         return snapshot;
     }
