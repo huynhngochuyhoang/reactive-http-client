@@ -31,9 +31,9 @@ movement inherited from that Boot line, Resilience4j patch-compatible updates,
 test-only dependency updates, and benchmark harness updates that keep report
 metadata intact.
 
-### V22 resolved supported matrix
+### V23 resolved supported matrix
 
-The `2026-07-20` review retains Spring Boot `4.0.0` as the minimum/default row
+The `2026-07-26` review retains Spring Boot `4.0.0` as the minimum/default row
 and `4.1.0` as the forward-compatibility row. Both rows were resolved from
 separate fresh Maven Central repositories and exercised under a complete Java
 21 JDK.
@@ -72,7 +72,7 @@ trap copies completed and partial row reports to the upload path before
 preserving any failure status. Effective POMs, dependency trees, resolved
 versions, explicit optional-integration back-off results, Surefire and japicmp
 reports, commands, and provenance are copied to
-`target/release-evidence/v22-priority11/`. The manual
+`target/release-evidence/v23-priority11/matrix/`. The manual
 `Supported Dependency Matrix` workflow runs and uploads the same contract.
 
 Requires a minor release: raising the Java baseline, adding a new Spring Boot
