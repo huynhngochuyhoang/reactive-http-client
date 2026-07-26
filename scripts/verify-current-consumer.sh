@@ -67,20 +67,25 @@ stage="mock-tests"
 stage="consumer-tests"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
   help:effective-pom -Doutput="$EVIDENCE_DIR/effective-poms/boot4-current-consumer.xml"
+stage="consumer-effective-pom"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
   dependency:tree -DoutputFile="$EVIDENCE_DIR/dependency-tree.txt"
+stage="dependency-tree"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
   dependency:build-classpath -Dmdep.outputFile="$EVIDENCE_DIR/classpath.txt"
+stage="classpath"
 
 if grep -Eq "$ROOT_DIR/reactive-http-client-(starter|test|otel)/target/(test-)?classes" \
     "$EVIDENCE_DIR/classpath.txt" "$EVIDENCE_DIR/dependency-tree.txt"; then
   fail "assembled consumer resolved reactor output directories"
 fi
+stage="reactor-leakage-checked"
 
 CHECKSUMS="$EVIDENCE_DIR/project-artifact-sha256.txt"
 parent_pom="$LOCAL_REPOSITORY/$GROUP_PATH/reactive-http-client/$PROJECT_VERSION/reactive-http-client-$PROJECT_VERSION.pom"
 [[ -f "$parent_pom" ]] || fail "missing installed reactor parent POM"
 sha256sum "$parent_pom" >> "$CHECKSUMS"
+stage="parent-artifact"
 for module in "${MODULES[@]}"; do
   module_dir="$LOCAL_REPOSITORY/$GROUP_PATH/$module/$PROJECT_VERSION"
   jar="$module_dir/$module-$PROJECT_VERSION.jar"
@@ -89,6 +94,7 @@ for module in "${MODULES[@]}"; do
   grep -q "$jar" "$EVIDENCE_DIR/classpath.txt" \
     || fail "$module jar is absent from the isolated consumer classpath"
   sha256sum "$pom" "$jar" >> "$CHECKSUMS"
+  stage="artifact-$module"
 done
 stage="evidence-verified"
 

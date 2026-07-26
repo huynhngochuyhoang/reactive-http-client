@@ -62,11 +62,14 @@ stage="effective-pom"
 "${MAVEN[@]}" clean test
 stage="consumer-tests"
 "${MAVEN[@]}" dependency:tree -DoutputFile="$EVIDENCE_DIR/dependency-tree.txt"
+stage="dependency-tree"
 "${MAVEN[@]}" dependency:build-classpath -Dmdep.outputFile="$EVIDENCE_DIR/classpath.txt"
+stage="classpath"
 
 parent_dir="$LOCAL_REPOSITORY/$GROUP_PATH/reactive-http-client/$PUBLISHED_VERSION"
 parent_pom="$parent_dir/reactive-http-client-$PUBLISHED_VERSION.pom"
 [[ -f "$parent_pom" ]] || fail "missing published parent POM"
+stage="parent-artifact"
 
 for module in "${MODULES[@]}"; do
   module_dir="$LOCAL_REPOSITORY/$GROUP_PATH/$module/$PUBLISHED_VERSION"
@@ -75,20 +78,24 @@ for module in "${MODULES[@]}"; do
   [[ -f "$jar" && -f "$pom" ]] || fail "missing published jar or POM for $module"
   mvn -q -s "$SETTINGS" -Dmaven.repo.local="$LOCAL_REPOSITORY" -f "$pom" \
     help:effective-pom -Doutput="$EFFECTIVE_POMS/$module.xml"
+  stage="module-effective-pom-$module"
 done
 
 "$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
   consumer "$PUBLISHED_VERSION" "$EVIDENCE_DIR/published-baseline-provenance" \
   reactive-http-client "${MODULES[@]}"
+stage="published-provenance"
 
 if grep -Eq "$ROOT_DIR/reactive-http-client-(starter|test|otel)/target/(test-)?classes" \
     "$EVIDENCE_DIR/classpath.txt" "$EVIDENCE_DIR/dependency-tree.txt"; then
   fail "published consumer resolved reactor output directories"
 fi
+stage="reactor-leakage-checked"
 
 for module in "${MODULES[@]}"; do
   grep -q "$LOCAL_REPOSITORY/$GROUP_PATH/$module/$PUBLISHED_VERSION/$module-$PUBLISHED_VERSION.jar" \
     "$EVIDENCE_DIR/classpath.txt" || fail "$module jar is absent from the isolated consumer classpath"
+  stage="artifact-classpath-$module"
 done
 stage="evidence-verified"
 
