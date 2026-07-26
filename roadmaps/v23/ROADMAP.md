@@ -1,10 +1,20 @@
 # Reactive HTTP Client - Roadmap V23
 
-> **Status:** draft
+> **Status:** completed - released as `3.3.0` on 2026-07-26
 > **Theme:** attempt-scoped correctness and bounded operations after the
 > `3.2.0` wire-diagnostics release
-> **Development line:** `3.3.0-SNAPSHOT`
-> **Published/API baseline:** `3.2.0`
+> **Delivered release:** `3.3.0`
+> **Post-release development line:** `3.4.0-SNAPSHOT`
+> **Published/API baseline:** `3.3.0`
+
+## Completion Record
+
+V23 shipped as `3.3.0` from immutable tag `v3.3.0` at commit
+`c631f6e47ed107a7b50074731b758c030f5717de`. The complete parent, starter,
+test-helper, and OTel release bundle and the assembled Boot 4 consumer were
+verified from Maven Central. Public coordinates and API, consumer, and benchmark
+baselines moved to `3.3.0`; reactor-only development moved to
+`3.4.0-SNAPSHOT`.
 
 ## Current State
 

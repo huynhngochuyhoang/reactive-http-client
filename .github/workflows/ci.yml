@@ -71,7 +71,7 @@ jobs:
 
 
   api-compatibility:
-    name: Public API Compatibility (baseline 3.2.0)
+    name: Public API Compatibility (baseline 3.3.0)
     runs-on: ubuntu-latest
 
     steps:
@@ -85,14 +85,14 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Compare published APIs to 3.2.0
+      - name: Compare published APIs to 3.3.0
         run: |
-          test ! -e target/published-baseline-repositories/api-root-3.2.0 && \
+          test ! -e target/published-baseline-repositories/api-root-3.3.0 && \
           mvn -B -ntp -s .mvn/maven-central-settings.xml \
-            -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.2.0 \
+            -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.3.0 \
             -Papi-compatibility -DskipTests verify && \
-          scripts/verify-published-baseline-provenance.sh api-root 3.2.0 \
-            target/release-evidence/published-baselines/api-root-3.2.0 \
+          scripts/verify-published-baseline-provenance.sh api-root 3.3.0 \
+            target/release-evidence/published-baselines/api-root-3.3.0 \
             reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
 
       - name: Verify published baseline provenance fixtures
@@ -108,7 +108,7 @@ jobs:
           name: api-compatibility-reports
           path: |
             **/target/japicmp/*
-            target/release-evidence/published-baselines/api-root-3.2.0/
+            target/release-evidence/published-baselines/api-root-3.3.0/
           retention-days: 7
 
   release-smoke:
