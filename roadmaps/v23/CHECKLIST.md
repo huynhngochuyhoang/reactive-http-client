@@ -549,13 +549,13 @@ is claimed for this documentation work. Verification:
 -Dtest=DocumentationReleaseArtifactTest,ReactiveHttpClientConfigurationMetadataTest
 test` passed 46 tests.
 
-### [ ] 12.2 Select and prove the release
+### [x] 12.2 Select and prove the release
 
 - [x] Select patch versus minor from delivered public scope.
 - [x] Resolve the complete published baseline and record one target-only readiness manifest.
-- [ ] Run full reactor, strict API, packaging, consumer, transport, AOT/native, and
+- [x] Run full reactor, strict API, packaging, consumer, transport, AOT/native, and
       required benchmark gates from one immutable commit.
-- [ ] Verify publication before moving public coordinates and the next baseline.
+- [x] Verify publication before moving public coordinates and the next baseline.
 - [x] Record explicit blockers when the release is not ready.
 
 Release preparation evidence (2026-07-26):
@@ -588,6 +588,22 @@ Release preparation evidence (2026-07-26):
   companion artifacts, then verify the complete `3.3.0` bundle from Maven
   Central. Do not move public coordinates or either baseline before that final
   publication check passes.
+
+Publication completion evidence (2026-07-26):
+
+- The release was built and published from immutable tag `v3.3.0` at commit
+  `c631f6e47ed107a7b50074731b758c030f5717de` after the required reactor,
+  compatibility, packaging, consumer, transport, AOT/native, and benchmark
+  gates completed.
+- `scripts/verify-published-release-artifacts.sh 3.3.0` resolved the parent POM
+  plus the starter, test-helper, and OTel POM, binary, source, and Javadoc
+  artifacts from a fresh Maven Central repository; all remote markers,
+  effective versions, and SHA-256 provenance checks passed.
+- Public examples and the published consumer, API compatibility, and benchmark
+  baselines now use `3.3.0`. Reactor-only coordinates moved to
+  `3.4.0-SNAPSHOT`, preserving the guard against comparing a development jar to
+  itself. The assembled published Boot 4 consumer and its Central provenance
+  also passed for `3.3.0`. V23 has no promoted numerical benchmark claim.
 
 ---
 
