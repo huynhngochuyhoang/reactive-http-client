@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "projectVersion": "<project-version>",
+  "clientCount": 1,
+  "endpointCount": 2,
+  "inheritedEndpointCount": 1,
+  "clients": [
+    {
+      "clientName": "support-inventory",
+      "clientInterface": "<client-interface>",
+      "baseUrlSource": "property",
+      "poolSource": "global",
+      "poolMaxConnections": 200,
+      "poolPendingAcquireTimeoutMs": 5000,
+      "poolMetricsEnabled": false,
+      "timeoutSource": "client",
+      "timeoutMs": 750,
+      "resilienceConfigured": false,
+      "retry": "disabled",
+      "rateLimiter": "disabled",
+      "circuitBreaker": "disabled",
+      "bulkhead": "disabled",
+      "strictUnsafeRetryValidation": false,
+      "strictBodySigningValidation": false,
+      "authMode": "provider-bean",
+      "followRedirects": false,
+      "endpointCount": 2,
+      "inheritedEndpointCount": 1
+    }
+  ]
+}

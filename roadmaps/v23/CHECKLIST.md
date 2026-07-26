@@ -400,20 +400,42 @@ Evidence:
 
 ## Priority 9 - Diagnostics Schema V1 Compatibility
 
-### [ ] 9.1 Freeze and extend schema v1 safely
+### [x] 9.1 Freeze and extend schema v1 safely
 
-- [ ] Preserve existing keys and value types with source-controlled fixtures.
-- [ ] Make additive fields nullable or unknown when runtime proof is unavailable.
-- [ ] Keep provider-, collection-, custom-provider-, and proxied-provider paths aligned.
-- [ ] Avoid instantiating lazy clients, auth providers, or resilience instances.
+- [x] Preserve existing keys and value types with source-controlled fixtures.
+- [x] Make additive fields nullable or unknown when runtime proof is unavailable.
+- [x] Keep provider-, collection-, custom-provider-, and proxied-provider paths aligned.
+- [x] Avoid instantiating lazy clients, auth providers, or resilience instances.
 
-### [ ] 9.2 Enforce every output bound
+### [x] 9.2 Enforce every output bound
 
-- [ ] Apply UTF-8 byte, client, endpoint, and field limits to JSON, map, Markdown,
+- [x] Apply UTF-8 byte, client, endpoint, and field limits to JSON, map, Markdown,
       Actuator, health, and native output.
-- [ ] Preserve redaction and deterministic ordering across all renderers.
-- [ ] Version any incompatible schema change instead of mutating v1.
-- [ ] Run fixture, endpoint, support-bundle, AOT, and compatibility tests.
+- [x] Preserve redaction and deterministic ordering across all renderers.
+- [x] Version any incompatible schema change instead of mutating v1.
+- [x] Run fixture, endpoint, support-bundle, AOT, and compatibility tests.
+
+Evidence:
+
+- Added an immutable published `3.2.0` schema-v1 fixture and a recursive compatibility
+  assertion that permits additive fields while rejecting removal or JSON value-kind
+  drift. The current exact fixture still freezes ordering, sanitization, and the full
+  reviewed V23 field set.
+- Provider, collection, JSON, Markdown, Actuator, custom-provider, class-proxy, and
+  native paths retain the same keys. Provider-only facts remain nullable/unknown
+  when unavailable; unresolved strict Retry instances are no longer created by a
+  diagnostics read, while resolved one-attempt and multi-attempt instances report
+  false and true respectively. Lazy client factories and auth providers remain
+  uninstantiated.
+- Map and Actuator output continue to pass through the bounded JSON renderer. Health
+  details now use deterministic client-name ordering, reject more than 256 clients or
+  names over 512 characters, and a maximum-cardinality multibyte fixture remains
+  within the 1 MiB UTF-8 ceiling. The existing 10,000-endpoint and renderer byte
+  limits remain covered.
+- Focused schema, endpoint, health, AOT, configuration-metadata, support-bundle, and
+  release-documentation tests passed. The complete starter and test-helper suites
+  passed, strict japicmp against published `3.2.0` passed, and the updated GraalVM 25
+  native image compiled and executed successfully. `git diff --check` passed.
 
 ---
 

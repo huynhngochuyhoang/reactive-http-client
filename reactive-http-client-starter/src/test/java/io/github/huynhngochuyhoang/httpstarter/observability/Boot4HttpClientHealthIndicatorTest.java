@@ -6,11 +6,13 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
+import tools.jackson.databind.ObjectMapper;
 
 import java.net.UnknownHostException;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Tests for {@link Boot4HttpClientHealthIndicator}. Uses a {@link SimpleMeterRegistry}
@@ -224,9 +226,56 @@ class Boot4HttpClientHealthIndicatorTest {
                 .containsEntry("poolAcquireFailureCount", 0L);
     }
 
+    @Test
+    void rendersClientDetailsInDeterministicOrder() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        record(registry, config, "z-client", 1, 0);
+        record(registry, config, "a-client", 1, 0);
+
+        Health health = indicator(registry, config).health();
+
+        assertThat(health.getDetails().keySet())
+                .containsExactly("a-client", "z-client", "errorRateThreshold", "minSamples");
+    }
+
+    @Test
+    void rejectsHealthDetailsBeyondDiagnosticsClientAndFieldBounds() {
+        SimpleMeterRegistry tooManyClients = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        for (int i = 0; i < 257; i++) {
+            record(tooManyClients, config, "client-" + i, 1, 0);
+        }
+
+        assertThatThrownBy(() -> indicator(tooManyClients, config).health())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("256 client limit");
+
+        SimpleMeterRegistry oversizedName = new SimpleMeterRegistry();
+        record(oversizedName, config, "x".repeat(513), 1, 0);
+
+        assertThatThrownBy(() -> indicator(oversizedName, config).health())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("512 character client-name limit");
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    @Test
+    void maximumHealthDetailSetStaysUnderUtf8ByteLimit() throws Exception {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        for (int i = 0; i < 256; i++) {
+            record(registry, config, "界".repeat(500) + String.format("%03d", i), 1, 0);
+        }
+
+        Health health = indicator(registry, config).health();
+
+        assertThat(new ObjectMapper().writeValueAsBytes(health.getDetails()).length)
+                .isLessThanOrEqualTo(1_048_576);
+    }
 
     private static Boot4HttpClientHealthIndicator indicator(
             SimpleMeterRegistry registry,
