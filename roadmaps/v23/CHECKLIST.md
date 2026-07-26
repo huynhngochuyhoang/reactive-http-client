@@ -386,9 +386,10 @@ Evidence:
   `NON_REPEATABLE` versus `APPLICATION_OWNED` distinction. Effective-contract
   snapshots now prove publisher/direct-buffer and Java stream/resource classifications.
 - Real-wire SigV4 tests compare `x-amz-content-sha256` with the exact byte and JSON
-  representations received by the server. Body-write timeout tests preserve
-  `REQUEST_WRITE` only after dispatch; auth failure before dispatch remains an auth
-  failure without a transport stage.
+  representations received by the server. Large `Reader` payloads retain one continuous
+  caller-selected charset encoding even with a JSON content type. Body-write timeout
+  tests preserve `REQUEST_WRITE` only after dispatch; auth and custom-filter write
+  failures before dispatch remain without a transport stage.
 - Mock helper coverage materializes and closes an `InputStream` once without making it
   repeatable. Streaming, retry, timeout, test-helper, operations, and changelog guidance
   describe the same framing, ownership, replay, and signing boundaries.

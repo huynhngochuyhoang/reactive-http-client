@@ -37,10 +37,7 @@ import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClientRequest;
 import reactor.util.context.ContextView;
 
-import java.io.FilterInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
+import java.io.*;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
@@ -542,13 +539,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     .subscribeOn(Schedulers.boundedElastic());
             requestHeadersSpec = requestFromDataBuffers(preparedRequestSpec, body, hasContentTypeHeader, requestBodyOwnership);
         } else if (serializedRequestBody.bodyToWrite() instanceof Reader reader) {
+            Charset charset = rawBodyCharset(resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE));
             WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
             if (!hasContentTypeHeader) {
                 requestWithBodySpec = requestWithBodySpec.contentType(
                         new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8));
             }
-            requestHeadersSpec = requestWithBodySpec.body(
-                    BodyInserters.fromPublisher(readerBody(reader, requestBodyOwnership), String.class));
+            requestHeadersSpec = requestFromDataBuffers(
+                    requestWithBodySpec, readerBody(reader, charset), true, requestBodyOwnership);
         } else if (serializedRequestBody.bodyToWrite() instanceof Resource resource) {
             WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
             if (!hasContentTypeHeader) {
@@ -992,31 +990,47 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return requestWithBodySpec.body(BodyInserters.fromDataBuffers(releasableBody));
     }
 
-    private Flux<String> readerBody(Reader reader, RequestBodyOwnership requestBodyOwnership) {
-        return Flux.<String>generate(sink -> {
+    private Flux<DataBuffer> readerBody(Reader reader, Charset charset) {
+        return Flux.defer(() -> {
                     char[] characters = new char[4097];
-                    try {
-                        int read;
-                        do {
-                            read = reader.read(characters, 0, 4096);
-                        } while (read == 0);
-                        if (read < 0) {
+                    ByteArrayOutputStream bytes = new ByteArrayOutputStream(8192);
+                    OutputStreamWriter writer = new OutputStreamWriter(bytes, charset);
+                    AtomicBoolean finished = new AtomicBoolean();
+                    return Flux.<DataBuffer>generate(sink -> {
+                        if (finished.get()) {
                             sink.complete();
                             return;
                         }
-                        if (Character.isHighSurrogate(characters[read - 1])) {
-                            int trailing = reader.read();
-                            if (trailing >= 0) {
-                                characters[read++] = (char) trailing;
+                        try {
+                            int read;
+                            do {
+                                read = reader.read(characters, 0, 4096);
+                            } while (read == 0);
+                            if (read < 0) {
+                                finished.set(true);
+                                writer.close();
+                            } else {
+                                if (Character.isHighSurrogate(characters[read - 1])) {
+                                    int trailing = reader.read();
+                                    if (trailing >= 0) {
+                                        characters[read++] = (char) trailing;
+                                    }
+                                }
+                                writer.write(characters, 0, read);
+                                writer.flush();
                             }
+                            if (bytes.size() == 0) {
+                                sink.complete();
+                                return;
+                            }
+                            sink.next(DefaultDataBufferFactory.sharedInstance.wrap(bytes.toByteArray()));
+                            bytes.reset();
+                        } catch (IOException error) {
+                            sink.error(error);
                         }
-                        sink.next(new String(characters, 0, read));
-                    } catch (IOException error) {
-                        sink.error(error);
-                    }
+                    });
                 })
-                .subscribeOn(Schedulers.boundedElastic())
-                .doFinally(ignored -> requestBodyOwnership.release());
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     private Flux<?> releaseRequestBodyOnTermination(

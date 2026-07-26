@@ -29,7 +29,10 @@ wire header.
 
 Direct `DataBuffer`, `InputStream`, and `ReadableByteChannel` bodies default to
 `application/octet-stream`. A `Reader` defaults to UTF-8 `text/plain`; a
-caller-supplied `Content-Type` remains authoritative. A `Resource` uses the
+caller-supplied `Content-Type` remains authoritative. Reader characters are encoded
+directly into transport buffers with that media type charset, so JSON media types do
+not route the stream through JSON serialization and encoding state remains continuous
+across chunks. A `Resource` uses the
 Spring resource writer, including media-type inference from its filename and
 its known length when available.
 

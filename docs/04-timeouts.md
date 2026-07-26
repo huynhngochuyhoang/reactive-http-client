@@ -87,8 +87,9 @@ owns the inner body and its later consumption is not subject to this budget.
 | `RESPONSE_BODY` | Netty read timeout after status was observed | Status is retained; exchange logs also retain response headers |
 
 Dispatch evidence is reset for every resilience retry and hidden 401 auth refresh,
-so terminal attribution describes the final attempt. Direct concrete DNS, proxy, connect, TLS, pool-acquire, and write failures remain
-attributable without URL evidence. Auth-provider failures are a hard boundary; arbitrary
+so terminal attribution describes the final attempt. Direct concrete DNS, proxy, connect, TLS, and pool-acquire failures remain
+attributable without URL evidence. Write-timeout attribution requires final-request
+dispatch evidence. Auth-provider failures are a hard boundary; arbitrary
 pre-dispatch filter wrappers remain unknown unless final-request dispatch was observed. A generic `TimeoutException` also does not prove a transport phase. Cancellation is reported as `ErrorCategory.CANCELLED`,
 not as a timeout.
 DNS retains `UNKNOWN_HOST`, TLS retains `TLS_ERROR`, and connect failures retain

@@ -214,6 +214,22 @@ class StreamingUploadOwnershipTest {
     }
 
     @Test
+    void readerBodyPreservesWireBytesForCallerSuppliedContentType() {
+        try (UploadServer server = new UploadServer(); ClientFixture fixture = ClientFixture.create(server)) {
+            String payload = "{\"name\":\"" + "caf\u00e9".repeat(1_500) + "\"}";
+            CountingReader reader = new CountingReader(payload);
+
+            fixture.client().uploadReader(
+                    "application/json;charset=UTF-16", reader).block(CALL_TIMEOUT);
+
+            RequestRecord request = server.onlyRequest("/reader-content-type");
+            assertThat(request.bodyBytes()).containsExactly(payload.getBytes(StandardCharsets.UTF_16));
+            assertThat(request.contentType()).isEqualTo("application/json;charset=UTF-16");
+            assertThat(reader.closes).hasValue(1);
+        }
+    }
+
+    @Test
     void cancellationBeforeBodySubscriptionReleasesEagerStreamingBodies() {
         withHeldConnection(client -> {
             CountingInputStream inputStream = new CountingInputStream("queued-input");
@@ -472,6 +488,9 @@ class StreamingUploadOwnershipTest {
 
         @POST("/reader")
         Mono<String> uploadReader(@Body Reader body);
+
+        @POST("/reader-content-type")
+        Mono<String> uploadReader(@HeaderParam("Content-Type") String contentType, @Body Reader body);
 
         @POST("/channel")
         Mono<String> uploadChannel(@Body ReadableByteChannel body);
@@ -806,13 +825,15 @@ class StreamingUploadOwnershipTest {
                                     .then(Mono.fromRunnable(() ->
                                             request.withConnection(connection -> connection.dispose())));
                         }
-                        return request.receive().aggregate().asString(StandardCharsets.UTF_8)
-                                .defaultIfEmpty("")
-                                .flatMap(body -> {
+                        return request.receive().aggregate().asByteArray()
+                                .defaultIfEmpty(new byte[0])
+                                .flatMap(bodyBytes -> {
+                                    String body = new String(bodyBytes, StandardCharsets.UTF_8);
                                     requests.add(new RequestRecord(
                                             path,
                                             request.version().text(),
                                             body,
+                                            bodyBytes,
                                             request.requestHeaders().get(HttpHeaders.CONTENT_LENGTH),
                                             request.requestHeaders().get(HttpHeaders.TRANSFER_ENCODING),
                                             request.requestHeaders().get(HttpHeaders.CONTENT_TYPE),
@@ -836,7 +857,7 @@ class StreamingUploadOwnershipTest {
                                     }
                                     String responseBody = switch (path) {
                                         case "/dto", "/upload", "/data-buffer", "/resource", "/input-stream",
-                                                "/reader", "/channel", "/signed-bytes", "/signed-json", "/retry",
+                                                "/reader", "/reader-content-type", "/channel", "/signed-bytes", "/signed-json", "/retry",
                                                 "/redirect-target", "/auth" -> body;
                                         case "/multipart" -> "multipart";
                                         case "/slow-upload" -> "uploaded";
@@ -897,6 +918,7 @@ class StreamingUploadOwnershipTest {
             String path,
             String protocol,
             String body,
+            byte[] bodyBytes,
             String contentLength,
             String transferEncoding,
             String contentType,

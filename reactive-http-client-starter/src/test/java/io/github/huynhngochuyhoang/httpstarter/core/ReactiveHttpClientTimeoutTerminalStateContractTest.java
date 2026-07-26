@@ -57,8 +57,10 @@ class ReactiveHttpClientTimeoutTerminalStateContractTest {
                 new ConnectTimeoutException("connect"), null, false))
                 .isEqualTo(HttpClientFailureStage.CONNECT);
         assertThat(HttpClientFailureStage.from(WriteTimeoutException.INSTANCE))
-                .isEqualTo(HttpClientFailureStage.REQUEST_WRITE);
+                .isNull();
         assertThat(HttpClientFailureStage.from(WriteTimeoutException.INSTANCE, null, false))
+                .isNull();
+        assertThat(HttpClientFailureStage.from(WriteTimeoutException.INSTANCE, null, true))
                 .isEqualTo(HttpClientFailureStage.REQUEST_WRITE);
         assertThat(HttpClientFailureStage.from(ReadTimeoutException.INSTANCE)).isNull();
         assertThat(HttpClientFailureStage.from(ReadTimeoutException.INSTANCE, null)).isNull();

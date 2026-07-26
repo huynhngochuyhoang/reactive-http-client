@@ -329,6 +329,29 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
     }
 
     @Test
+    void writeTimeoutFromCustomFilterBeforeDispatchHasNoTransportStage() {
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter((request, next) -> Mono.error(WriteTimeoutException.INSTANCE))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK).build()))
+                .build();
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        ReactiveClientInvocationHandler handler = createHandler(webClient, 5000, observed::set);
+
+        StepVerifier.create(invoke(handler))
+                .expectError(WriteTimeoutException.class)
+                .verify();
+
+        HttpClientObserverEvent event = observed.get();
+        assertNotNull(event);
+        assertEquals(ErrorCategory.TIMEOUT, event.getErrorCategory());
+        assertNull(event.getFailureStage());
+        assertNull(event.getRequestUrl());
+        assertNull(event.getStatusCode());
+    }
+
+    @Test
     void authWriteTimeoutBeforeDispatchRemainsAnAuthFailureWithoutTransportStage() {
         AuthProvider authProvider = request -> Mono.error(WriteTimeoutException.INSTANCE);
         WebClient webClient = WebClient.builder()
