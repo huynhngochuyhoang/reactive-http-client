@@ -25,12 +25,42 @@ fail() {
 [[ ! -e "$LOCAL_REPOSITORY" ]] || fail "fresh repository required; remove $LOCAL_REPOSITORY"
 [[ ! -e "$EVIDENCE_DIR" ]] || fail "fresh evidence directory required; remove $EVIDENCE_DIR"
 mkdir -p "$LOCAL_REPOSITORY" "$EFFECTIVE_POMS" "$REPORTS"
+REPORT_START_MARKER="$EVIDENCE_DIR/report-start.marker"
+touch "$REPORT_START_MARKER"
+stage="setup"
+
+preserve_evidence() {
+  local status=$?
+  trap - EXIT
+  set +e
+  for report in "$ROOT_DIR/.github/boot4-consumer/target/surefire-reports/"*.xml; do
+    [[ -f "$report" && "$report" -nt "$REPORT_START_MARKER" ]] \
+      && cp "$report" "$REPORTS/"
+  done
+  working_tree=clean
+  [[ -z "$(git -C "$ROOT_DIR" status --porcelain)" ]] || working_tree=dirty
+  {
+    echo "publishedVersion=$PUBLISHED_VERSION"
+    echo "fixtureCommit=$(git -C "$ROOT_DIR" rev-parse HEAD)"
+    echo "fixtureWorkingTree=$working_tree"
+    echo "repository=$LOCAL_REPOSITORY"
+    echo "settings=.mvn/maven-central-settings.xml"
+    echo "fixture=.github/boot4-consumer/pom.xml"
+    echo "source=Maven Central"
+    echo "completedStage=$stage"
+    echo "exitStatus=$status"
+  } > "$EVIDENCE_DIR/provenance.properties"
+  exit "$status"
+}
+trap preserve_evidence EXIT
 
 MAVEN=(mvn -q -s "$SETTINGS" -Dmaven.repo.local="$LOCAL_REPOSITORY"
   -f "$FIXTURE_POM" -Dreactive-http-client.version="$PUBLISHED_VERSION")
 
 "${MAVEN[@]}" help:effective-pom -Doutput="$EFFECTIVE_POMS/boot4-published-consumer.xml"
+stage="effective-pom"
 "${MAVEN[@]}" clean test
+stage="consumer-tests"
 "${MAVEN[@]}" dependency:tree -DoutputFile="$EVIDENCE_DIR/dependency-tree.txt"
 "${MAVEN[@]}" dependency:build-classpath -Dmdep.outputFile="$EVIDENCE_DIR/classpath.txt"
 
@@ -60,14 +90,6 @@ for module in "${MODULES[@]}"; do
   grep -q "$LOCAL_REPOSITORY/$GROUP_PATH/$module/$PUBLISHED_VERSION/$module-$PUBLISHED_VERSION.jar" \
     "$EVIDENCE_DIR/classpath.txt" || fail "$module jar is absent from the isolated consumer classpath"
 done
-
-cp "$ROOT_DIR/.github/boot4-consumer/target/surefire-reports/"*.xml "$REPORTS/"
-{
-  echo "publishedVersion=$PUBLISHED_VERSION"
-  echo "repository=$LOCAL_REPOSITORY"
-  echo "settings=.mvn/maven-central-settings.xml"
-  echo "fixture=.github/boot4-consumer/pom.xml"
-  echo "source=Maven Central"
-} > "$EVIDENCE_DIR/provenance.properties"
+stage="evidence-verified"
 
 echo "Published Boot 4 consumer passed against Maven Central artifacts $PUBLISHED_VERSION."

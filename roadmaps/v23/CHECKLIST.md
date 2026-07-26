@@ -441,19 +441,39 @@ Evidence:
 
 ## Priority 10 - Mock and Assembled-Consumer Parity
 
-### [ ] 10.1 Extend stable mock contracts
+### [x] 10.1 Extend stable mock contracts
 
-- [ ] Cover stable timeout, dispatch, OAuth2, upload, and diagnostics additions.
-- [ ] Keep wire timing and protocol negotiation outside mock claims.
-- [ ] Preserve constructor-injected custom logger and application JSON codec parity.
-- [ ] Keep final resolved request metadata aligned with production filters.
+- [x] Cover stable timeout, dispatch, OAuth2, upload, and diagnostics additions.
+- [x] Keep wire timing and protocol negotiation outside mock claims.
+- [x] Preserve constructor-injected custom logger and application JSON codec parity.
+- [x] Keep final resolved request metadata aligned with production filters.
 
-### [ ] 10.2 Reprove assembled consumers
+### [x] 10.2 Reprove assembled consumers
 
-- [ ] Run current `3.3.0-SNAPSHOT` and published `3.2.0` consumers from separate repositories.
-- [ ] Reject reactor leakage in the published lane.
-- [ ] Preserve Surefire and provenance evidence on every failure path.
-- [ ] Run focused helper tests and both assembled-consumer scripts.
+- [x] Run current `3.3.0-SNAPSHOT` and published `3.2.0` consumers from separate repositories.
+- [x] Reject reactor leakage in the published lane.
+- [x] Preserve Surefire and provenance evidence on every failure path.
+- [x] Run focused helper tests and both assembled-consumer scripts.
+
+Evidence:
+
+- Existing focused helper contracts cover logical-call timeout budgets, dispatched and
+  pre-response terminal attribution, one-time `401` auth refresh, cold publisher retry,
+  application-owned stream closure, constructor-injected loggers, application JSON
+  signing bytes, and final resolved URL/header metadata without claiming socket timing,
+  protocol negotiation, compression, pool behavior, or transport backpressure.
+- The assembled Boot 4 fixture now proves constructor-injected logger resolution and
+  verifies that auth-aware DTO bytes produced by the application JSON codec are the exact
+  bytes received by a real loopback server.
+- Current and published verifiers use separate fresh repositories, reject reactor output
+  leakage, copy only current-run Surefire XML from `EXIT` traps, and always write the last
+  completed stage plus original exit status. A failed current-consumer fixture run retained
+  both mock and consumer reports with `exitStatus=1`, proving the failure path.
+- `MockReactiveHttpClientTest` and `Boot4MockReactiveHttpClientTest` passed (37 tests).
+  `scripts/verify-current-consumer.sh` passed for `3.3.0-SNAPSHOT`; the assembled fixture,
+  classpath checks, effective POM, and artifact hashes came from its isolated repository.
+  `scripts/verify-published-consumer.sh 3.2.0` passed against Maven Central artifacts with
+  Central markers/checksums and no reactor classpath entries.
 
 ---
 
