@@ -19,6 +19,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.*;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.util.MultiValueMap;
@@ -36,10 +37,12 @@ import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClientRequest;
 import reactor.util.context.ContextView;
 
+import java.io.*;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.net.URI;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -254,6 +257,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
                 applyDefaultQueryParams(argumentResolver.resolve(plan, args)));
         long requestBytes = measureRequestBodyBytes(resolved.body());
+        RequestBodyOwnership requestBodyOwnership = new RequestBodyOwnership(resolved.body());
 
         HttpExchangeLogger exchangeLogger = resolveExchangeLogger(proxy, method, meta);
 
@@ -281,9 +285,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 plan, exchangeLogger, observer, lifecycleHooks, logicalCallTimeoutMs);
         Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = usesSubscriptionState
                 ? statefulRequestHeadersSpec(plan, effectiveApi, resolved, contentTypeHeader, hasAcceptHeader,
-                hasContentTypeHeader, multipartBody, lifecycleHooks, exchangeLogger, timeoutMs, shouldApplyResponseTimeout)
+                hasContentTypeHeader, multipartBody, lifecycleHooks, exchangeLogger, timeoutMs, shouldApplyResponseTimeout, requestBodyOwnership)
                 : statelessRequestHeadersSpec(plan, effectiveApi, resolved, hasAcceptHeader, hasContentTypeHeader,
-                multipartBody, timeoutMs, shouldApplyResponseTimeout);
+                multipartBody, timeoutMs, shouldApplyResponseTimeout, requestBodyOwnership);
 
         if (plan.returnsFlux()) {
             Flux<?> flux = usesSubscriptionState
@@ -322,6 +326,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                             });
                 });
             }
+            flux = releaseRequestBodyOnTermination(flux, requestBodyOwnership);
             return usesSubscriptionState ? flux.contextWrite(context -> withSubscriptionState(context, resolved)) : flux;
         }
 
@@ -370,6 +375,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         });
             });
         }
+        mono = releaseRequestBodyOnTermination(mono, requestBodyOwnership);
         return usesSubscriptionState ? mono.contextWrite(context -> withSubscriptionState(context, resolved)) : mono;
     }
 
@@ -410,7 +416,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             List<ReactiveHttpClientLifecycleHook> lifecycleHooks,
             HttpExchangeLogger exchangeLogger,
             long timeoutMs,
-            boolean shouldApplyResponseTimeout) {
+            boolean shouldApplyResponseTimeout,
+            RequestBodyOwnership requestBodyOwnership) {
         // Cache the serialized body so retries reuse the bytes without re-serializing.
         Mono<SerializedRequestBody> serializedBodyMono = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader).cache();
         return Mono.deferContextual(context -> {
@@ -439,7 +446,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     shouldApplyResponseTimeout,
                     state.requestUrl,
                     state.finalRequestObservation,
-                    state::resetAttemptEvidence))
+                    state::resetAttemptEvidence,
+                    requestBodyOwnership))
                     .doOnError(ignored -> state.activeAttemptNumber.compareAndSet(attempt, 0))
                     .doOnCancel(() -> state.activeAttemptNumber.compareAndSet(attempt, 0));
         });
@@ -453,7 +461,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             boolean hasContentTypeHeader,
             MultiValueMap<String, HttpEntity<?>> multipartBody,
             long timeoutMs,
-            boolean shouldApplyResponseTimeout) {
+            boolean shouldApplyResponseTimeout,
+            RequestBodyOwnership requestBodyOwnership) {
         return Mono.deferContextual(context -> {
             if (log.isDebugEnabled()) {
                 long startMs = System.currentTimeMillis();
@@ -474,7 +483,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     shouldApplyResponseTimeout,
                     null,
                     null,
-                    null));
+                    null,
+                    requestBodyOwnership));
         });
     }
 
@@ -490,7 +500,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             boolean shouldApplyResponseTimeout,
             AtomicReference<URI> requestUrl,
             AtomicReference<FinalRequestObservation> finalRequestObservation,
-            Runnable requestObservationReset) {
+            Runnable requestObservationReset,
+            RequestBodyOwnership requestBodyOwnership) {
         WebClient.RequestBodySpec preparedRequestSpec = webClient
                 .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
                 .uri(uriBuilder -> buildRequestUri(uriBuilder, effectiveApi.pathTemplate(), resolved));
@@ -514,6 +525,34 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             requestHeadersSpec = preparedRequestSpec.body(BodyInserters.fromMultipartData(multipartBody));
         } else if (serializedRequestBody.bodyToWrite() instanceof Publisher<?> publisher) {
             requestHeadersSpec = requestFromPublisher(preparedRequestSpec, publisher, plan.bodyType(), hasContentTypeHeader);
+        } else if (serializedRequestBody.bodyToWrite() instanceof DataBuffer dataBuffer) {
+            requestHeadersSpec = requestFromDataBuffers(
+                    preparedRequestSpec, Mono.just(dataBuffer), hasContentTypeHeader, requestBodyOwnership);
+        } else if (serializedRequestBody.bodyToWrite() instanceof InputStream inputStream) {
+            Flux<DataBuffer> body = DataBufferUtils.readInputStream(
+                    () -> requestBodyOwnership.nonClosing(inputStream), DefaultDataBufferFactory.sharedInstance, 8192)
+                    .subscribeOn(Schedulers.boundedElastic());
+            requestHeadersSpec = requestFromDataBuffers(preparedRequestSpec, body, hasContentTypeHeader, requestBodyOwnership);
+        } else if (serializedRequestBody.bodyToWrite() instanceof ReadableByteChannel channel) {
+            Flux<DataBuffer> body = DataBufferUtils.readByteChannel(
+                    () -> requestBodyOwnership.nonClosing(channel), DefaultDataBufferFactory.sharedInstance, 8192)
+                    .subscribeOn(Schedulers.boundedElastic());
+            requestHeadersSpec = requestFromDataBuffers(preparedRequestSpec, body, hasContentTypeHeader, requestBodyOwnership);
+        } else if (serializedRequestBody.bodyToWrite() instanceof Reader reader) {
+            Charset charset = rawBodyCharset(resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE));
+            WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
+            if (!hasContentTypeHeader) {
+                requestWithBodySpec = requestWithBodySpec.contentType(
+                        new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8));
+            }
+            requestHeadersSpec = requestFromDataBuffers(
+                    requestWithBodySpec, readerBody(reader, charset), true, requestBodyOwnership);
+        } else if (serializedRequestBody.bodyToWrite() instanceof Resource resource) {
+            WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
+            if (!hasContentTypeHeader) {
+                requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_OCTET_STREAM);
+            }
+            requestHeadersSpec = requestWithBodySpec.bodyValue(resource);
         } else if (serializedRequestBody.originalBody() != null) {
             WebClient.RequestBodySpec requestWithBodySpec = preparedRequestSpec;
             if (!hasContentTypeHeader) {
@@ -928,7 +967,93 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (!hasContentTypeHeader) {
             requestWithBodySpec = requestWithBodySpec.contentType(defaultPublisherContentType(elementClass));
         }
-        return requestWithBodySpec.body(BodyInserters.fromPublisher((Publisher) publisher, (Class) elementClass));
+        Publisher<?> body = publisher;
+        if (DataBuffer.class.isAssignableFrom(elementClass)) {
+            body = Flux.from(publisher).doOnDiscard(DataBuffer.class, DataBufferUtils::release);
+        }
+        return requestWithBodySpec.body(BodyInserters.fromPublisher((Publisher) body, (Class) elementClass));
+    }
+
+    private WebClient.RequestHeadersSpec<?> requestFromDataBuffers(
+            WebClient.RequestBodySpec requestSpec,
+            Publisher<DataBuffer> body,
+            boolean hasContentTypeHeader,
+            RequestBodyOwnership requestBodyOwnership) {
+        WebClient.RequestBodySpec requestWithBodySpec = requestSpec;
+        if (!hasContentTypeHeader) {
+            requestWithBodySpec = requestWithBodySpec.contentType(MediaType.APPLICATION_OCTET_STREAM);
+        }
+        Flux<DataBuffer> releasableBody = Flux.from(body)
+                .doOnSubscribe(ignored -> requestBodyOwnership.transferDataBufferToWriter())
+                .doOnDiscard(DataBuffer.class, DataBufferUtils::release);
+        releasableBody = releasableBody.doFinally(ignored -> requestBodyOwnership.release());
+        return requestWithBodySpec.body(BodyInserters.fromDataBuffers(releasableBody));
+    }
+
+    private Flux<DataBuffer> readerBody(Reader reader, Charset charset) {
+        return Flux.defer(() -> {
+                    char[] characters = new char[4097];
+                    ByteArrayOutputStream bytes = new ByteArrayOutputStream(8192);
+                    OutputStreamWriter writer = new OutputStreamWriter(bytes, charset);
+                    AtomicBoolean finished = new AtomicBoolean();
+                    return Flux.<DataBuffer>generate(sink -> {
+                        if (finished.get()) {
+                            sink.complete();
+                            return;
+                        }
+                        try {
+                            int read;
+                            do {
+                                read = reader.read(characters, 0, 4096);
+                            } while (read == 0);
+                            if (read < 0) {
+                                finished.set(true);
+                                writer.close();
+                            } else {
+                                if (Character.isHighSurrogate(characters[read - 1])) {
+                                    int trailing = reader.read();
+                                    if (trailing >= 0) {
+                                        characters[read++] = (char) trailing;
+                                    }
+                                }
+                                writer.write(characters, 0, read);
+                                writer.flush();
+                            }
+                            if (bytes.size() == 0) {
+                                sink.complete();
+                                return;
+                            }
+                            sink.next(DefaultDataBufferFactory.sharedInstance.wrap(bytes.toByteArray()));
+                            bytes.reset();
+                        } catch (IOException error) {
+                            sink.error(error);
+                        }
+                    });
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private Flux<?> releaseRequestBodyOnTermination(
+            Flux<?> flux, RequestBodyOwnership requestBodyOwnership) {
+        return requestBodyOwnership.requiresCleanup()
+                ? flux.doFinally(ignored -> requestBodyOwnership.release())
+                : flux;
+    }
+
+    private Mono<?> releaseRequestBodyOnTermination(
+            Mono<?> mono, RequestBodyOwnership requestBodyOwnership) {
+        return requestBodyOwnership.requiresCleanup()
+                ? mono.doFinally(ignored -> requestBodyOwnership.release())
+                : mono;
+    }
+
+    private static boolean isRawOrStreamingBody(Object body) {
+        return body instanceof Publisher<?>
+                || body instanceof DataBuffer
+                || body instanceof Resource
+                || body instanceof InputStream
+                || body instanceof Reader
+                || body instanceof ReadableByteChannel;
     }
 
     private Class<?> publisherElementClass(Type bodyType) {
@@ -1153,7 +1278,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (!clientConfig.hasAuthConfigured()) {
             return Mono.just(new SerializedRequestBody(body, body, null));
         }
-        if (body instanceof Publisher<?>) {
+        if (isRawOrStreamingBody(body)) {
             return Mono.just(new SerializedRequestBody(body, body, null));
         }
         if (body instanceof byte[] bytes) {
@@ -1856,6 +1981,75 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             }
         }
         return null;
+    }
+
+    private final class RequestBodyOwnership {
+        private final Object body;
+        private final AtomicBoolean released = new AtomicBoolean();
+
+        private RequestBodyOwnership(Object body) {
+            this.body = body;
+        }
+
+        private boolean requiresCleanup() {
+            return body instanceof DataBuffer
+                    || body instanceof InputStream
+                    || body instanceof Reader
+                    || body instanceof ReadableByteChannel;
+        }
+
+        private InputStream nonClosing(InputStream inputStream) {
+            return new FilterInputStream(inputStream) {
+                @Override
+                public void close() {
+                    // The logical-call ownership guard closes the source exactly once.
+                }
+            };
+        }
+
+        private ReadableByteChannel nonClosing(ReadableByteChannel channel) {
+            return new ReadableByteChannel() {
+                @Override
+                public int read(java.nio.ByteBuffer destination) throws IOException {
+                    return channel.read(destination);
+                }
+
+                @Override
+                public boolean isOpen() {
+                    return channel.isOpen();
+                }
+
+                @Override
+                public void close() {
+                    // The logical-call ownership guard closes the source exactly once.
+                }
+            };
+        }
+
+        private void transferDataBufferToWriter() {
+            if (body instanceof DataBuffer) {
+                released.compareAndSet(false, true);
+            }
+        }
+
+        private void release() {
+            if (!requiresCleanup() || !released.compareAndSet(false, true)) {
+                return;
+            }
+            try {
+                if (body instanceof DataBuffer dataBuffer) {
+                    DataBufferUtils.release(dataBuffer);
+                } else if (body instanceof InputStream inputStream) {
+                    inputStream.close();
+                } else if (body instanceof Reader reader) {
+                    reader.close();
+                } else if (body instanceof ReadableByteChannel channel) {
+                    channel.close();
+                }
+            } catch (Exception error) {
+                log.debug("Failed to release application-owned request body for client [{}]", clientName, error);
+            }
+        }
     }
 
     private static final class SubscriptionState {

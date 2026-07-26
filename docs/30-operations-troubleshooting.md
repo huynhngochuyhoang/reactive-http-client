@@ -151,6 +151,15 @@ a later inner-body timeout belongs to the body subscriber. See
   not aggregate an unbounded publisher to make it reusable.
 - A consumer owns emitted `DataBuffer` values. Release manually consumed or
   discarded buffers, or transfer them to a component that documents ownership.
+- For HTTP/1.1, known-length resources use transport-generated
+  `Content-Length`; publisher and application-stream bodies use chunked framing.
+  HTTP/2 uses DATA frames without a wire `Transfer-Encoding` header; Reactor
+  Netty server handlers can expose a synthetic chunked compatibility value after
+  decoding.
+- On an approved reproduction, record only body shape, framing headers, bounded
+  bytes accepted, cancellation, and final failure stage. Never capture payloads.
+- `REQUEST_WRITE` requires a write timeout after final request dispatch. An auth
+  or custom-filter failure before dispatch remains at its owning boundary.
 - `Mono<ResponseEntity<Flux<DataBuffer>>>` reports envelope completion, not
   inner-body completion.
 

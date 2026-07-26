@@ -51,7 +51,7 @@ public enum HttpClientFailureStage {
      * response headers were observed.
      *
      * @param error terminal outbound error
-     * @return proven DNS, proxy, TLS, connection, pool-acquire, or request-write stage; otherwise {@code null}
+     * @return proven DNS, proxy, TLS, connection, or pool-acquire stage; otherwise {@code null}
      */
     public static HttpClientFailureStage from(Throwable error) {
         return resolve(error, null, false);
@@ -74,8 +74,9 @@ public enum HttpClientFailureStage {
     /**
      * Resolves a stage using explicit evidence that the primary request passed
      * pre-dispatch filters. Dispatch evidence disambiguates read timeouts and arbitrary
-     * outer wrappers; direct concrete pre-response failures and WebClient transport
+     * outer wrappers; direct concrete DNS, proxy, TLS, connection, and pool-acquire
      * failures remain attributable.
+     * Request-write attribution requires dispatch evidence.
      * Auth-provider failures are never promoted into business-request transport stages.
      *
      * @param error terminal outbound error
@@ -131,7 +132,7 @@ public enum HttpClientFailureStage {
                             || className.endsWith("PoolShutdownException"))))) {
                 return POOL_ACQUIRE;
             }
-            if (preResponseFailureEligible && WRITE_TIMEOUT.equals(className)) {
+            if (preResponseFailureEligible && responseStateKnown && WRITE_TIMEOUT.equals(className)) {
                 return REQUEST_WRITE;
             }
             if (concreteFailureEligible && READ_TIMEOUT.equals(className)) {

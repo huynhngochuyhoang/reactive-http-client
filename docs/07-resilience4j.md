@@ -157,7 +157,7 @@ or streaming request bodies to make a retry possible.
 |---|---|
 | JSON objects, `String`, `byte[]`, form fields, multipart `byte[]`, and `FileAttachment` parts | Treated as repeatable by the starter |
 | `Publisher` bodies and `DataBuffer` bodies | Treated as non-repeatable and logged as retry-risky |
-| `Resource` bodies and multipart `Resource` parts | Application-owned; make sure the resource can be read again before enabling retry |
+| `Resource`, `InputStream`, `Reader`, and `ReadableByteChannel` bodies plus multipart `Resource` parts | Application-owned; resources must reopen and one-shot streams must be replaced by a replayable publisher before enabling retry |
 
 When retry is enabled for a method with a non-repeatable or application-owned
 body, the starter logs a warning once per client method. Existing retry behavior

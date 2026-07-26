@@ -3,9 +3,14 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.buffer.DataBuffer;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.InputStream;
+import java.io.Reader;
+import java.nio.channels.ReadableByteChannel;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -95,10 +100,29 @@ class EffectiveHttpClientContractExporterTest {
                         new ReactiveHttpClientProperties.ClientConfig())
                 .render();
 
-        assertThat(contracts).hasSize(2)
+        assertThat(contracts).hasSize(5)
                 .allSatisfy(contract -> assertThat(contract.bodyRepeatability())
                         .isEqualTo(RequestBodyRepeatability.APPLICATION_OWNED));
-        assertThat(snapshot).contains("java.lang.Object", "java.io.InputStream", "APPLICATION_OWNED");
+        assertThat(snapshot).contains(
+                "java.lang.Object", "java.io.InputStream", "java.io.Reader",
+                "java.nio.channels.ReadableByteChannel", "org.springframework.core.io.Resource",
+                "APPLICATION_OWNED");
+    }
+
+    @Test
+    void exportsPublisherAndDirectBufferBodiesAsNonRepeatable() {
+        List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
+                NonRepeatableBodyClient.class, "diagnostic-client",
+                new ReactiveHttpClientProperties.ClientConfig(), metadataCache);
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(NonRepeatableBodyClient.class, "diagnostic-client",
+                        new ReactiveHttpClientProperties.ClientConfig())
+                .render();
+
+        assertThat(contracts).hasSize(2)
+                .allSatisfy(contract -> assertThat(contract.bodyRepeatability())
+                        .isEqualTo(RequestBodyRepeatability.NON_REPEATABLE));
+        assertThat(snapshot).contains("reactor.core.publisher.Flux", "DataBuffer", "NON_REPEATABLE");
     }
 
     @Test
@@ -378,6 +402,23 @@ class EffectiveHttpClientContractExporterTest {
 
         @POST("/stream")
         Mono<String> streamBody(@Body InputStream body);
+
+        @POST("/reader")
+        Mono<String> readerBody(@Body Reader body);
+
+        @POST("/channel")
+        Mono<String> channelBody(@Body ReadableByteChannel body);
+
+        @POST("/resource")
+        Mono<String> resourceBody(@Body Resource body);
+    }
+
+    interface NonRepeatableBodyClient {
+        @POST("/publisher")
+        Mono<String> publisherBody(@Body Flux<DataBuffer> body);
+
+        @POST("/buffer")
+        Mono<String> bufferBody(@Body DataBuffer body);
     }
 
     interface ParentClient {
