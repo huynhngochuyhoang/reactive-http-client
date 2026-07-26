@@ -479,19 +479,49 @@ Evidence:
 
 ## Priority 11 - Dependency, API, AOT, Native, and Benchmark Evidence
 
-### [ ] 11.1 Revalidate compatibility and runtime matrices
+### [x] 11.1 Revalidate compatibility and runtime matrices
 
-- [ ] Record minimum and forward Boot 4 dependency rows under Java 21.
-- [ ] Cover every public addition with japicmp and defer incompatible changes.
-- [ ] Add AOT/runtime hints without deprecated Framework 7 member categories.
-- [ ] Compile and execute one V23 native contract on GraalVM 25 from a clean commit.
+- [x] Record minimum and forward Boot 4 dependency rows under Java 21.
+- [x] Cover every public addition with japicmp and defer incompatible changes.
+- [x] Add AOT/runtime hints without deprecated Framework 7 member categories.
+- [x] Compile and execute one V23 native contract on GraalVM 25 from a clean commit.
 
-### [ ] 11.2 Re-audit changed hot paths
+### [x] 11.2 Re-audit changed hot paths
 
-- [ ] Run benchmark discovery and smoke checks.
-- [ ] Pair changed paths with published `3.2.0` on equivalent stacks.
-- [ ] Keep smoke output out of public numerical claims.
-- [ ] Promote only clean, immutable, versioned benchmark evidence when required.
+- [x] Run benchmark discovery and smoke checks.
+- [x] Pair changed paths with published `3.2.0` on equivalent stacks.
+- [x] Keep smoke output out of public numerical claims.
+- [x] Promote only clean, immutable, versioned benchmark evidence when required.
+
+Evidence:
+
+- `scripts/verify-supported-matrix.sh` passed under Amazon Corretto `21.0.11`
+  for Boot `4.0.0` and `4.1.0`, using separate fresh repositories. Target-only
+  evidence under `target/release-evidence/v23-priority11/matrix/` records
+  Framework/WebFlux `7.0.1`/`7.0.8`, Reactor Netty `1.3.0`/`1.3.6`, Netty
+  `4.2.7.Final`/`4.2.15.Final`, Jackson `3.0.2`/`3.1.4`, Micrometer
+  `1.16.0`/`1.17.0`, OTel `1.55.0`/`1.62.0`, and Resilience4j `2.4.0` for the
+  minimum/forward rows. Full reactor, optional-integration backoff, and assembled
+  consumer contracts passed in both rows.
+- Each matrix row ran strict starter, test-helper, and OTel japicmp against
+  Central `3.2.0` with shared provenance verification. Reports contain only the
+  intended additive OAuth2 token-service, logical-call timeout, bounded failure
+  stage, and mock-helper APIs; no removal or incompatible change was accepted.
+- `ReactiveHttpClientAotSmokeTest` and the generated release guard passed.
+  `OAuth2TokenServiceConfig` is registered for binding, and production runtime
+  hints/AOT processors contain no `MemberCategory` or introspection executable
+  mode.
+- GraalVM `25.0.3` compiled and executed the Boot `4.0.0` native fixture from
+  clean immutable commit `89922ad2f06dbe81e9292e8e2b7c1d3904ba7bcb`. The V23
+  logical-call diagnostics/schema-v1 contract passed; executable SHA-256 is
+  `749434e22844610db5f51e8dbc36ca770363213b6b5d3a81d3e9fb26fdcf98e7`.
+  Native workflow resolution now consistently uses the Central settings file.
+- Current and published-`3.2.0` benchmark discovery passed. Matching smoke runs
+  exercised invocation, request-plan/metadata, loopback JSON, `ResponseEntity`,
+  error mapping, resilience wrappers, exchange logging, Micrometer, and runtime
+  diagnostics on the same Boot `4.0.0` managed stack. Results remain target-only
+  under `target/release-evidence/v23-priority11/benchmark/` and are explicitly
+  marked `publicNumericalClaims=false`; no promoted report was required.
 
 ---
 

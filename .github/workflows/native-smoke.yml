@@ -26,10 +26,10 @@ jobs:
           cache: maven
 
       - name: Install current starter artifacts
-        run: mvn -B -ntp -DskipTests -Dmaven.javadoc.skip=true install
+        run: mvn -B -ntp -U -s .mvn/maven-central-settings.xml -DskipTests -Dmaven.javadoc.skip=true install
 
       - name: Resolve current project version
-        run: echo "PROJECT_VERSION=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)" >> "$GITHUB_ENV"
+        run: echo "PROJECT_VERSION=$(mvn -q -s .mvn/maven-central-settings.xml -DforceStdout help:evaluate -Dexpression=project.version)" >> "$GITHUB_ENV"
 
       - name: Record native toolchain
         run: |
@@ -42,12 +42,12 @@ jobs:
             echo "commit=$(git rev-parse HEAD)"
             echo "sourceState=clean"
             echo "starter=$PROJECT_VERSION"
-            echo "boot=$(mvn -q -f .github/native-smoke/pom.xml -DforceStdout help:evaluate -Dexpression=project.parent.version)"
-            mvn -B -ntp -f .github/native-smoke/pom.xml -Dreactive-http-client.version="$PROJECT_VERSION" dependency:list
+            echo "boot=$(mvn -q -s .mvn/maven-central-settings.xml -f .github/native-smoke/pom.xml -DforceStdout help:evaluate -Dexpression=project.parent.version)"
+            mvn -B -ntp -U -s .mvn/maven-central-settings.xml -f .github/native-smoke/pom.xml -Dreactive-http-client.version="$PROJECT_VERSION" dependency:list
           } 2>&1 | tee target/release-evidence/native-smoke/native-provenance.txt
 
       - name: Build minimal native image
-        run: mvn -B -ntp -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version="$PROJECT_VERSION" native:compile
+        run: mvn -B -ntp -U -s .mvn/maven-central-settings.xml -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version="$PROJECT_VERSION" native:compile
 
       - name: Run minimal native image
         run: |

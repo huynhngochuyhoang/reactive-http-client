@@ -641,7 +641,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void v22SupportedMatrixIsResolvedAndReproducible() throws IOException {
+    void v23SupportedMatrixIsResolvedAndReproducible() throws IOException {
         Path root = projectRoot();
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
         String consumerPom = Files.readString(root.resolve(".github/boot4-consumer/pom.xml"));
@@ -649,12 +649,12 @@ class DocumentationReleaseArtifactTest {
         String workflow = Files.readString(root.resolve(".github/workflows/supported-matrix.yml"));
 
         assertThat(releaseDocs)
-                .contains("### V22 resolved supported matrix")
+                .contains("### V23 resolved supported matrix")
                 .contains("| Spring Framework / WebFlux | `7.0.1` | `7.0.8` |")
                 .contains("| Reactor Netty HTTP | `1.3.0` | `1.3.6` |")
                 .contains("| Jackson Databind | `3.0.2` | `3.1.4` |")
                 .contains("The minimum does not move")
-                .contains("target/release-evidence/v22-priority11/");
+                .contains("target/release-evidence/v23-priority11/matrix/");
         assertThat(consumerPom)
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .contains("<artifactId>spring-boot-dependencies</artifactId>")
@@ -683,7 +683,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(workflow)
                 .contains("name: Supported Dependency Matrix")
                 .contains("scripts/verify-supported-matrix.sh")
-                .contains("target/release-evidence/v22-priority11/");
+                .contains("target/release-evidence/v23-priority11/matrix/");
     }
 
     @Test
@@ -933,6 +933,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(runtimeHints).contains(
                 "ReactiveHttpClientProperties.DiagnosticsEndpointConfig.class",
                 "ReactiveHttpClientProperties.HealthConfig.class",
+                "ReactiveHttpClientProperties.OAuth2TokenServiceConfig.class",
                 "POM_PROPERTIES_RESOURCE");
         assertThat(runtimeHints)
                 .contains("registerConstructor(constructor, ExecutableMode.INVOKE)",
@@ -955,6 +956,7 @@ class DocumentationReleaseArtifactTest {
                 "Content-Encoding\", \"gzip",
                 "compression negotiation header did not reach loopback server",
                 "ProblemDetailRemoteServiceException",
+                "logicalCallTimeoutMs",
                 "reactiveHttpClientDiagnosticsEndpoint",
                 "reactiveHttpClientHealthIndicator",
                 "reactive.http.client.requests");
@@ -967,6 +969,7 @@ class DocumentationReleaseArtifactTest {
                 "set -o pipefail",
                 "test -z \"$(git status --porcelain)\"",
                 "sourceState=clean",
+                "-U -s .mvn/maven-central-settings.xml",
                 "sha256sum .github/native-smoke/target/reactive-http-client-native-smoke",
                 "executableStatus=passed",
                 "target/release-evidence/native-smoke/native-provenance.txt",
