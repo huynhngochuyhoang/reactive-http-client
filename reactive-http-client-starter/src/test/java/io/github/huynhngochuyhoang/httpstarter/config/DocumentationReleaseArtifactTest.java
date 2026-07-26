@@ -239,6 +239,7 @@ class DocumentationReleaseArtifactTest {
         String fixturePom = Files.readString(root.resolve(".github/boot4-consumer/pom.xml"));
         String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
         String currentConsumerScript = Files.readString(root.resolve("scripts/verify-current-consumer.sh"));
+        String publishedConsumerScript = Files.readString(root.resolve("scripts/verify-published-consumer.sh"));
         String testHelperDocs = Files.readString(root.resolve("docs/14-test-helpers.md"));
         String fixtureTest = Files.readString(root.resolve(
                 ".github/boot4-consumer/src/test/java/io/github/huynhngochuyhoang/httpstarter/boot4consumer/Boot4ConsumerApplicationTest.java"));
@@ -269,7 +270,28 @@ class DocumentationReleaseArtifactTest {
                 .contains("dependency:build-classpath")
                 .contains("assembled consumer resolved reactor output directories")
                 .contains("project-artifact-sha256.txt")
+                .contains("stage=\"consumer-effective-pom\"")
+                .contains("stage=\"dependency-tree\"")
+                .contains("stage=\"classpath\"")
+                .contains("stage=\"reactor-leakage-checked\"")
+                .contains("stage=\"artifact-$module\"")
+                .contains("completedStage=$stage")
+                .contains("exitStatus=$status")
                 .contains("provenance.properties");
+        assertThat(publishedConsumerScript)
+                .contains("trap preserve_evidence EXIT")
+                .contains("REPORT_START_MARKER=\"$EVIDENCE_DIR/report-start.marker\"")
+                .contains("\"$report\" -nt \"$REPORT_START_MARKER\"")
+                .contains("fixtureCommit=")
+                .contains("stage=\"dependency-tree\"")
+                .contains("stage=\"classpath\"")
+                .contains("stage=\"module-effective-pom-$module\"")
+                .contains("stage=\"published-provenance\"")
+                .contains("stage=\"reactor-leakage-checked\"")
+                .contains("stage=\"artifact-classpath-$module\"")
+                .contains("completedStage=$stage")
+                .contains("exitStatus=$status")
+                .contains("published consumer resolved reactor output directories");
         assertThat(fixtureTest)
                 .contains("extends SharedOrders<OrderResponse>")
                 .contains("@ApiRef(\"configured\")")
@@ -279,6 +301,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("ProblemDetailHttpClientException.class")
                 .contains("ErrorCategory.TIMEOUT")
                 .contains("Boot4HttpClientHealthIndicator.class")
+                .contains("ConsumerExchangeLogger implements HttpExchangeLogger")
+                .contains("CapturingAuthProvider implements AuthProvider")
+                .contains("PropertyNamingStrategies.SNAKE_CASE")
                 .contains("openTelemetryHttpClientObserver");
         assertThat(releaseDocs)
                 .contains("### Boot 4 assembled consumer fixture")

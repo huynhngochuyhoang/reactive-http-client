@@ -780,9 +780,10 @@ The assembled application performs real inherited-generic and configured
 bodies on bodiless methods, typed `ResponseEntity`, deferred streaming-body
 consumption, timeout classification, and Problem Detail mapping. The same
 application verifies lifecycle and observer terminal metadata, diagnostics,
-health, Micrometer, OTel, and strict retry startup. The full default reactor
-test run supplies detailed OAuth2, SigV4 raw-body signing, and optional
-integration absence fixtures. The normal test-helper sources additionally verify
+health, Micrometer, OTel, strict retry startup, constructor-injected custom
+exchange loggers, and auth-aware application JSON codec bytes on the wire. The
+full default reactor test run supplies detailed OAuth2, SigV4 raw-body signing,
+and optional integration absence fixtures. The normal test-helper sources additionally verify
 Jackson 3 signing bytes and final outbound metadata through
 `MockReactiveHttpClient`.
 
@@ -794,6 +795,8 @@ tree, effective POM, artifact hashes, commit state, and provenance under
 `target/release-evidence/current-consumer/current-3.3.0-SNAPSHOT/`. An `EXIT`
 trap copies only Surefire XML reports created during the current invocation before
 preserving the original verifier status, including when either test stage fails.
+It also records the last completed stage and exit status when a later
+classpath/provenance check fails.
 
 The mock evidence is limited to starter-owned auth, retry, lifecycle, observer,
 exchange-logging, inherited-generic, repeated-header, JSON-codec, and final-request
@@ -822,9 +825,11 @@ It runs the same Boot 4 application fixture against published `3.2.0`, verifies
 the Maven Central `_remote.repositories` marker for the parent and every project artifact,
 rejects reactor `target/classes` entries, and writes target-only dependency
 trees, classpaths, consumer/module effective POMs, published parent/module POM
-and jar SHA-256 values, test reports, and
-provenance under
+and jar SHA-256 values, test reports, fixture commit state, completed stage, exit
+status, and provenance under
 `target/release-evidence/published-consumer/published-3.2.0/`.
+Its `EXIT` trap copies only reports created by the current invocation and retains
+that evidence when a test, Central marker, classpath, or checksum check fails.
 
 The release-artifact command uses its own fresh repository and additionally
 requires the starter, test-helper, and OTel source and Javadoc jars. Its

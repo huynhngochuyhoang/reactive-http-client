@@ -22,14 +22,17 @@ The starter ships a companion artifact for unit-testing `@ReactiveHttpClient` in
 
 ### Ownership boundary
 
-Use the mock for starter-owned behavior: argument expansion, auth filters, application
-JSON codec bytes, retries, lifecycle hooks, observers, exchange logging, inherited
-generic response types, repeated headers, and final resolved request metadata.
+Use the mock for starter-owned behavior: argument expansion, auth filters and one-time
+`401` refresh, logical-call budgets and terminal failure attribution, application JSON
+codec bytes, retry subscriptions, request-body materialization and ownership, lifecycle
+hooks, observers, exchange logging, inherited generic response types, repeated headers,
+and final resolved request metadata.
 
 The mock does not negotiate an HTTP protocol or TLS, compress wire bytes, acquire a
-pooled connection, measure pool timing, or prove connection reuse. Those behaviors
-belong to a real client connector and server. Use the assembled-consumer and transport
-fixtures described in [Native and release compatibility](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)
+pooled connection, apply socket backpressure, measure wire or pool timing, or prove
+connection reuse. Those behaviors belong to a real client connector and server. Use the
+assembled-consumer and transport fixtures described in [Native and release
+compatibility](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)
 when a test depends on transport ownership.
 
 ### Basic setup

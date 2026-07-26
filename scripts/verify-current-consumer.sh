@@ -22,6 +22,7 @@ fail() {
 mkdir -p "$LOCAL_REPOSITORY" "$EVIDENCE_DIR/effective-poms" "$MOCK_REPORTS" "$CONSUMER_REPORTS"
 REPORT_START_MARKER="$EVIDENCE_DIR/report-start.marker"
 touch "$REPORT_START_MARKER"
+stage="setup"
 
 preserve_reports() {
   local status=$?
@@ -35,6 +36,19 @@ preserve_reports() {
     [[ -f "$report" && "$report" -nt "$REPORT_START_MARKER" ]] \
       && cp "$report" "$CONSUMER_REPORTS/"
   done
+  working_tree=clean
+  [[ -z "$(git -C "$ROOT_DIR" status --porcelain)" ]] || working_tree=dirty
+  {
+    echo "projectVersion=$PROJECT_VERSION"
+    echo "commit=$(git -C "$ROOT_DIR" rev-parse HEAD)"
+    echo "workingTree=$working_tree"
+    echo "repository=$LOCAL_REPOSITORY"
+    echo "settings=.mvn/maven-central-settings.xml"
+    echo "fixture=.github/boot4-consumer/pom.xml"
+    echo "source=current reactor installed into a fresh target-local repository"
+    echo "completedStage=$stage"
+    echo "exitStatus=$status"
+  } > "$EVIDENCE_DIR/provenance.properties"
   exit "$status"
 }
 trap preserve_reports EXIT
@@ -42,27 +56,36 @@ trap preserve_reports EXIT
 MAVEN=(mvn -B -ntp -s "$SETTINGS" -Dmaven.repo.local="$LOCAL_REPOSITORY")
 
 "${MAVEN[@]}" -f "$ROOT_DIR/pom.xml" -pl reactive-http-client-starter,reactive-http-client-test,reactive-http-client-otel clean
+stage="reactor-clean"
 "${MAVEN[@]}" -f "$ROOT_DIR/pom.xml" -DskipTests -Dmaven.javadoc.skip=true install
+stage="reactor-install"
 "${MAVEN[@]}" -f "$ROOT_DIR/reactive-http-client-test/pom.xml" \
   -Dtest=MockReactiveHttpClientTest,Boot4MockReactiveHttpClientTest clean test
+stage="mock-tests"
 
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" clean test
+stage="consumer-tests"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
   help:effective-pom -Doutput="$EVIDENCE_DIR/effective-poms/boot4-current-consumer.xml"
+stage="consumer-effective-pom"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
   dependency:tree -DoutputFile="$EVIDENCE_DIR/dependency-tree.txt"
+stage="dependency-tree"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
   dependency:build-classpath -Dmdep.outputFile="$EVIDENCE_DIR/classpath.txt"
+stage="classpath"
 
 if grep -Eq "$ROOT_DIR/reactive-http-client-(starter|test|otel)/target/(test-)?classes" \
     "$EVIDENCE_DIR/classpath.txt" "$EVIDENCE_DIR/dependency-tree.txt"; then
   fail "assembled consumer resolved reactor output directories"
 fi
+stage="reactor-leakage-checked"
 
 CHECKSUMS="$EVIDENCE_DIR/project-artifact-sha256.txt"
 parent_pom="$LOCAL_REPOSITORY/$GROUP_PATH/reactive-http-client/$PROJECT_VERSION/reactive-http-client-$PROJECT_VERSION.pom"
 [[ -f "$parent_pom" ]] || fail "missing installed reactor parent POM"
 sha256sum "$parent_pom" >> "$CHECKSUMS"
+stage="parent-artifact"
 for module in "${MODULES[@]}"; do
   module_dir="$LOCAL_REPOSITORY/$GROUP_PATH/$module/$PROJECT_VERSION"
   jar="$module_dir/$module-$PROJECT_VERSION.jar"
@@ -71,18 +94,8 @@ for module in "${MODULES[@]}"; do
   grep -q "$jar" "$EVIDENCE_DIR/classpath.txt" \
     || fail "$module jar is absent from the isolated consumer classpath"
   sha256sum "$pom" "$jar" >> "$CHECKSUMS"
+  stage="artifact-$module"
 done
-
-working_tree=clean
-[[ -z "$(git -C "$ROOT_DIR" status --porcelain)" ]] || working_tree=dirty
-{
-  echo "projectVersion=$PROJECT_VERSION"
-  echo "commit=$(git -C "$ROOT_DIR" rev-parse HEAD)"
-  echo "workingTree=$working_tree"
-  echo "repository=$LOCAL_REPOSITORY"
-  echo "settings=.mvn/maven-central-settings.xml"
-  echo "fixture=.github/boot4-consumer/pom.xml"
-  echo "source=current reactor installed into a fresh target-local repository"
-} > "$EVIDENCE_DIR/provenance.properties"
+stage="evidence-verified"
 
 echo "Current reactor mock and Boot 4 consumer parity passed for $PROJECT_VERSION."

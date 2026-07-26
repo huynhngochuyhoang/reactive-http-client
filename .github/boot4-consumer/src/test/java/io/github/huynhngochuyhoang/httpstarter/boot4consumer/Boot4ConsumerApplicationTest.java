@@ -1,11 +1,19 @@
 package io.github.huynhngochuyhoang.httpstarter.boot4consumer;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.ApiRef;
+import io.github.huynhngochuyhoang.httpstarter.annotation.Body;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.HeaderParam;
+import io.github.huynhngochuyhoang.httpstarter.annotation.LogHttpExchange;
 import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
+import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.annotation.TimeoutMs;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
+import io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogContext;
+import io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogger;
 import io.github.huynhngochuyhoang.httpstarter.core.Jackson3ReactiveHttpClientJsonCodec;
 import io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientJsonCodec;
@@ -46,6 +54,8 @@ import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -94,6 +104,7 @@ class Boot4ConsumerApplicationTest {
         FAILED.clear();
         AtomicReference<List<String>> repeatedHeaders = new AtomicReference<>();
         AtomicReference<String> propagatedTraceparent = new AtomicReference<>();
+        AtomicReference<String> customJsonBody = new AtomicReference<>();
         DisposableServer server = HttpServer.create().port(0)
                 .route(routes -> routes
                         .get("/direct", (request, response) -> {
@@ -107,6 +118,15 @@ class Boot4ConsumerApplicationTest {
                         .get("/configured/42", (request, response) -> response
                                 .header("Content-Type", "application/json")
                                 .sendString(Mono.just("{\"code\":\"api-ref\"}")).then())
+                        .post("/custom-json", (request, response) -> request.receive()
+                                .aggregate()
+                                .asString()
+                                .flatMap(body -> {
+                                    customJsonBody.set(body);
+                                    return response.header("Content-Type", "application/json")
+                                            .sendString(Mono.just("{\"code\":\"codec\"}"))
+                                            .then();
+                                }))
                         .get("/headers", (request, response) -> {
                             repeatedHeaders.set(request.requestHeaders().getAll("X-Tag"));
                             return response.status(204).send();
@@ -140,6 +160,7 @@ class Boot4ConsumerApplicationTest {
                         "reactive.http.clients.orders.base-url=http://127.0.0.1:" + server.port(),
                         "reactive.http.clients.orders.apis.configured.method=GET",
                         "reactive.http.clients.orders.apis.configured.path=/configured/{id}",
+                        "reactive.http.clients.orders.auth-provider=consumerAuthProvider",
                         "reactive.http.clients.orders.follow-redirects=true",
                         "reactive.http.clients.orders.resilience.enabled=true",
                         "reactive.http.clients.orders.resilience.strict-unsafe-retry-validation=true",
@@ -153,6 +174,11 @@ class Boot4ConsumerApplicationTest {
                     .isEqualTo(new OrderResponse("inherited"));
             assertThat(client.configured("42").block(Duration.ofSeconds(5)))
                     .isEqualTo(new OrderResponse("api-ref"));
+            assertThat(client.customJson(new CustomJsonRequest("codec-order"))
+                    .block(Duration.ofSeconds(5))).isEqualTo(new OrderResponse("codec"));
+            assertThat(customJsonBody.get()).isEqualTo("{\"order_id\":\"codec-order\"}");
+            assertThat(new String((byte[]) context.getBean(CapturingAuthProvider.class)
+                    .requestBody(), StandardCharsets.UTF_8)).isEqualTo(customJsonBody.get());
 
             client.repeatedHeaders(List.of("first", "second")).block(Duration.ofSeconds(5));
             assertThat(repeatedHeaders.get()).containsExactly("first", "second");
@@ -192,6 +218,15 @@ class Boot4ConsumerApplicationTest {
                     .find("reactive.http.client.requests").timer()).isNotNull();
             assertThat(context.getBean(Boot4HttpClientHealthIndicator.class).health().getDetails())
                     .containsKey("orders");
+            ConsumerExchangeLogger exchangeLogger = context.getBean(ConsumerExchangeLogger.class);
+            assertThat(exchangeLogger.dependency()).isSameAs(context.getBean(LoggerDependency.class));
+            assertThat(exchangeLogger.contexts()).singleElement().satisfies(logContext -> {
+                assertThat(logContext.clientName()).isEqualTo("orders");
+                assertThat(logContext.pathTemplate()).isEqualTo("/custom-json");
+                assertThat(logContext.responseStatus()).isEqualTo(200);
+                assertThat(logContext.requestUrl()).hasToString(
+                        "http://127.0.0.1:" + server.port() + "/custom-json");
+            });
             assertThat(SUCCEEDED).anySatisfy(event -> {
                 assertThat(event.clientName()).isEqualTo("orders");
                 assertThat(event.requestUrl()).hasToString(
@@ -229,6 +264,10 @@ class Boot4ConsumerApplicationTest {
         @ApiRef("configured")
         Mono<OrderResponse> configured(@PathVar("id") String id);
 
+        @POST("/custom-json")
+        @LogHttpExchange(logger = ConsumerExchangeLogger.class)
+        Mono<OrderResponse> customJson(@Body CustomJsonRequest request);
+
         @GET("/headers")
         Mono<Void> repeatedHeaders(@HeaderParam("X-Tag") List<String> values);
 
@@ -252,10 +291,74 @@ class Boot4ConsumerApplicationTest {
     record OrderResponse(String code) {
     }
 
+    record CustomJsonRequest(String orderId) {
+    }
+
+    static final class LoggerDependency {
+    }
+
+    static final class ConsumerExchangeLogger implements HttpExchangeLogger {
+        private final LoggerDependency dependency;
+        private final List<HttpExchangeLogContext> contexts = new CopyOnWriteArrayList<>();
+
+        ConsumerExchangeLogger(LoggerDependency dependency) {
+            this.dependency = dependency;
+        }
+
+        @Override
+        public void log(HttpExchangeLogContext context) {
+            contexts.add(context);
+        }
+
+        LoggerDependency dependency() {
+            return dependency;
+        }
+
+        List<HttpExchangeLogContext> contexts() {
+            return contexts;
+        }
+    }
+
+    static final class CapturingAuthProvider implements AuthProvider {
+        private final AtomicReference<Object> requestBody = new AtomicReference<>();
+
+        @Override
+        public Mono<AuthContext> getAuth(AuthRequest request) {
+            requestBody.set(request.requestBody());
+            return Mono.just(AuthContext.empty());
+        }
+
+        Object requestBody() {
+            return requestBody.get();
+        }
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @EnableReactiveHttpClients(basePackageClasses = OrdersClient.class)
     static class ConsumerApplication {
+        @Bean
+        ReactiveHttpClientJsonCodec reactiveHttpClientJsonCodec() {
+            return new Jackson3ReactiveHttpClientJsonCodec(JsonMapper.builder()
+                    .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                    .build());
+        }
+
+        @Bean("consumerAuthProvider")
+        CapturingAuthProvider consumerAuthProvider() {
+            return new CapturingAuthProvider();
+        }
+
+        @Bean
+        LoggerDependency loggerDependency() {
+            return new LoggerDependency();
+        }
+
+        @Bean
+        ConsumerExchangeLogger consumerExchangeLogger(LoggerDependency dependency) {
+            return new ConsumerExchangeLogger(dependency);
+        }
+
         @Bean
         MeterRegistry meterRegistry() {
             return new SimpleMeterRegistry();
