@@ -102,15 +102,15 @@ reactive:
   http:
     clients:
       payment-service:
-        base-url: https://api.example.com
+        base-url: https://payments-api.example.invalid
         auth:
           type: oauth2-client-credentials
           oauth2-client-credentials:
-            token-uri: https://auth.example.com/oauth/token
-            client-id: ${PAYMENT_CLIENT_ID}
-            client-secret: ${PAYMENT_CLIENT_SECRET}
+            token-uri: https://identity.example.invalid/oauth/token
+            client-id: ${EXAMPLE_PAYMENT_CLIENT_ID}
+            client-secret: ${EXAMPLE_PAYMENT_CLIENT_SECRET}
             scope: payments:read payments:write
-            audience: https://api.example.com/
+            audience: https://payments-api.example.invalid/
             auth-style: form-post    # basic-auth by default; use form-post when the token server requires body credentials
             expiry-leeway-ms: 60000  # subtract 60s from expires_in before caching
             token-service:
@@ -122,7 +122,7 @@ reactive:
               retry-backoff-ms: 100
               # proxy:            # direct by default; does not inherit the business proxy
               #   type: HTTP
-              #   host: token-proxy.example.com
+              #   host: token-proxy.example.invalid
               #   port: 8080
               # tls:              # platform TLS defaults unless explicitly configured
               #   trust-store: classpath:certs/token-truststore.p12
@@ -174,14 +174,16 @@ For manual bean wiring, compose `OAuth2ClientCredentialsTokenProvider` with `Ref
 
 ```java
 @Bean("userServiceAuthProvider")
-AuthProvider userServiceAuthProvider(WebClient.Builder builder) {
+AuthProvider userServiceAuthProvider(
+        WebClient.Builder builder,
+        @Value("${example.user-service.client-secret}") String clientSecret) {
     OAuth2ClientCredentialsTokenProvider tokenProvider =
             OAuth2ClientCredentialsTokenProvider.builder(builder.build())
-                    .tokenUri("https://auth.example.com/oauth/token")
+                    .tokenUri("https://identity.example.invalid/oauth/token")
                     .clientId("user-service")
-                    .clientSecret("...")
+                    .clientSecret(clientSecret)
                     .scope("read:users")
-                    // .audience("https://api.example.com/")        // optional
+                    // .audience("https://users-api.example.invalid/") // optional
                     // .authStyle(AuthStyle.FORM_POST)              // default: BASIC_AUTH
                     // .expiryLeeway(Duration.ofSeconds(30))        // refresh slightly early
                     // .requestTimeout(Duration.ofSeconds(5))       // zero disables it

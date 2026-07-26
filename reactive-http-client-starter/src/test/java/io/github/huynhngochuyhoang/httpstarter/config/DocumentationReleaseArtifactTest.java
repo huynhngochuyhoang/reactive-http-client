@@ -47,7 +47,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void v22OperationsGuidanceIsCompleteDiscoverableAndVersionScoped() throws Exception {
+    void v23OperationsGuidanceIsAlignedBoundedDiscoverableAndVersionScoped() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
         String publishedVersion = pomProperty(pomXml, "latest.published.version");
@@ -55,6 +55,9 @@ class DocumentationReleaseArtifactTest {
         String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
         String currentScope = markdownSection(operations, "## Current release scope", "## First response");
         String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String timeoutContract = Files.readString(root.resolve("docs/04-timeouts.md"));
+        String authContract = Files.readString(root.resolve("docs/06-auth-providers.md"));
+        String streamingContract = Files.readString(root.resolve("docs/11-streaming.md"));
         String compressionContract = Files.readString(root.resolve("docs/12-proxy-tls.md"));
         String diagnosticsContexts = Files.readString(root.resolve("docs/21-diagnostic-contexts.md"));
         String productionChecklist = Files.readString(root.resolve("docs/16-production-checklist.md"));
@@ -74,6 +77,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("## Streaming ownership")
                 .contains("## OAuth2 refresh")
                 .contains("## Failure attribution")
+                .contains("## Evidence boundary")
+                .contains("one affected client, one logical-call\nwindow")
+                .contains("Use `.example.invalid` hosts and `EXAMPLE_` placeholders")
+                .contains("do not collect request or response payloads by default")
                 .contains("A missing status or failure stage means\n   unknown")
                 .contains("GET /bad-request HTTP/1.0")
                 .contains("DNS_RESOLUTION")
@@ -96,6 +103,25 @@ class DocumentationReleaseArtifactTest {
                 .contains("[Operations Troubleshooting](30-operations-troubleshooting.md)")
                 .contains("codecMaxInMemorySizeMb")
                 .contains("framing-complete truncated gzip member");
+        assertThat(timeoutContract)
+                .contains("## End-to-end logical-call budget")
+                .contains("opt-in and subscription-local")
+                .contains("stay inside that same deadline")
+                .contains("Dispatch evidence is reset for every resilience retry");
+        assertThat(authContract)
+                .contains("owns a separate Reactor Netty connection pool")
+                .contains("business Resilience4j operators")
+                .contains("payments-api.example.invalid")
+                .contains("identity.example.invalid")
+                .contains("${EXAMPLE_PAYMENT_CLIENT_SECRET}")
+                .doesNotContain("https://api.example.com")
+                .doesNotContain("https://auth.example.com")
+                .doesNotContain(".clientSecret(\"...\")");
+        assertThat(streamingContract)
+                .contains("The transport owns framing")
+                .contains("application-owned")
+                .contains("A retry, a body-preserving redirect, or the built-in one-time 401 auth refresh")
+                .contains("closes or releases it exactly once");
         assertThat(compressionContract)
                 .contains("| Encoded wire bytes |")
                 .contains("Decoded unary value")

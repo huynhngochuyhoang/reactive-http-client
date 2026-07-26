@@ -43,6 +43,20 @@ historical evidence.
 | OAuth2 refresh storm, token endpoint failure, or downstream 401 | Logical client name, sanitized auth mode, token endpoint status and safe headers, refresh/cooldown timing | [OAuth2 refresh](#oauth2-refresh) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
 
+## Evidence boundary
+
+Keep shared incident evidence bounded to one affected client, one logical-call
+window, and the minimum samples needed to show the failure. Record configured
+policy, counts, status, exception and cause types, optional `failure.stage`, and
+header presence; do not collect request or response payloads by default.
+
+Use `.example.invalid` hosts and `EXAMPLE_` placeholders in reviewable commands
+and configuration. Before sharing output, redact credentials, tokens, cookies,
+authorization and signed headers, idempotency-key values, internal addresses,
+certificate subjects, and query strings. The
+[Production Support Bundles](26-support-bundles.md#baseline-bundle) fixture is
+the canonical reviewable layout.
+
 ## Protocol and framing
 
 - `http2-enabled: false` uses HTTP/1.1. With it enabled, an HTTPS base URL uses

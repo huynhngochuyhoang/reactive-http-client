@@ -527,12 +527,27 @@ Evidence:
 
 ## Priority 12 - Documentation and Release Readiness
 
-### [ ] 12.1 Consolidate public and operations guidance
+### [x] 12.1 Consolidate public and operations guidance
 
-- [ ] Align protocol, pool, timeout, OAuth2, compression, streaming, and failure docs.
-- [ ] Use bounded sanitized examples and fake hosts/credentials.
-- [ ] Regenerate configuration metadata/examples and validate public links.
-- [ ] Keep changelog performance wording tied to promoted evidence or non-numerical.
+- [x] Align protocol, pool, timeout, OAuth2, compression, streaming, and failure docs.
+- [x] Use bounded sanitized examples and fake hosts/credentials.
+- [x] Regenerate configuration metadata/examples and validate public links.
+- [x] Keep changelog performance wording tied to promoted evidence or non-numerical.
+
+Evidence (2026-07-26): `docs/30-operations-troubleshooting.md` remains the
+single first-response index and now defines one bounded evidence boundary across
+protocol/framing, pool saturation, logical-call and phase timeouts, isolated
+OAuth2 token-service transport, compression/aggregate limits, streaming wire
+ownership, and compatible failure category/stage attribution. OAuth2 examples in
+`docs/06-auth-providers.md` now use `.example.invalid` hosts and injected
+`EXAMPLE_` credentials instead of copyable literal placeholders. The V23
+documentation contract test covers those cross-guide boundaries, generated
+configuration metadata/examples and all local Markdown links were revalidated,
+and the current changelog remains non-numerical so no promoted benchmark report
+is claimed for this documentation work. Verification:
+`mvn -pl reactive-http-client-starter
+-Dtest=DocumentationReleaseArtifactTest,ReactiveHttpClientConfigurationMetadataTest
+test` passed 46 tests.
 
 ### [ ] 12.2 Select and prove the release
 
