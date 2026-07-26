@@ -1,7 +1,7 @@
 # Benchmarks
 
 The commands in [Commands](#commands) are authoritative for the current
-`3.3.0-SNAPSHOT` development reactor and published `3.2.0` baseline. Versioned
+`3.3.0` release candidate and published `3.2.0` baseline. Versioned
 scope sections preserve V12-V20 evidence and are historical unless explicitly
 identified as current.
 
