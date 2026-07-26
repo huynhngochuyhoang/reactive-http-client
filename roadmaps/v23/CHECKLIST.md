@@ -527,21 +527,67 @@ Evidence:
 
 ## Priority 12 - Documentation and Release Readiness
 
-### [ ] 12.1 Consolidate public and operations guidance
+### [x] 12.1 Consolidate public and operations guidance
 
-- [ ] Align protocol, pool, timeout, OAuth2, compression, streaming, and failure docs.
-- [ ] Use bounded sanitized examples and fake hosts/credentials.
-- [ ] Regenerate configuration metadata/examples and validate public links.
-- [ ] Keep changelog performance wording tied to promoted evidence or non-numerical.
+- [x] Align protocol, pool, timeout, OAuth2, compression, streaming, and failure docs.
+- [x] Use bounded sanitized examples and fake hosts/credentials.
+- [x] Regenerate configuration metadata/examples and validate public links.
+- [x] Keep changelog performance wording tied to promoted evidence or non-numerical.
+
+Evidence (2026-07-26): `docs/30-operations-troubleshooting.md` remains the
+single first-response index and now defines one bounded evidence boundary across
+protocol/framing, pool saturation, logical-call and phase timeouts, isolated
+OAuth2 token-service transport, compression/aggregate limits, streaming wire
+ownership, and compatible failure category/stage attribution. OAuth2 examples in
+`docs/06-auth-providers.md` now use `.example.invalid` hosts and injected
+`EXAMPLE_` credentials instead of copyable literal placeholders. The V23
+documentation contract test covers those cross-guide boundaries, generated
+configuration metadata/examples and all local Markdown links were revalidated,
+and the current changelog remains non-numerical so no promoted benchmark report
+is claimed for this documentation work. Verification:
+`mvn -pl reactive-http-client-starter
+-Dtest=DocumentationReleaseArtifactTest,ReactiveHttpClientConfigurationMetadataTest
+test` passed 46 tests.
 
 ### [ ] 12.2 Select and prove the release
 
-- [ ] Select patch versus minor from delivered public scope.
-- [ ] Resolve the complete published baseline and record one target-only readiness manifest.
+- [x] Select patch versus minor from delivered public scope.
+- [x] Resolve the complete published baseline and record one target-only readiness manifest.
 - [ ] Run full reactor, strict API, packaging, consumer, transport, AOT/native, and
       required benchmark gates from one immutable commit.
 - [ ] Verify publication before moving public coordinates and the next baseline.
-- [ ] Record explicit blockers when the release is not ready.
+- [x] Record explicit blockers when the release is not ready.
+
+Release preparation evidence (2026-07-26):
+
+- Selected minor release `3.3.0`: V23 adds opt-in logical-call timeout and
+  OAuth2 token-service transport configuration plus additive failure-stage,
+  diagnostics, pool-metric, and test-helper contracts. Root, module, benchmark,
+  assembled-consumer, and native-fixture coordinates now use final `3.3.0`;
+  public consumer snippets, `latest.published.version`, API compatibility, and
+  benchmark baselines intentionally remain on published `3.2.0`.
+- Dated the `3.3.0` changelog section without a numerical performance claim.
+  `DocumentationReleaseArtifactTest` passes in `release-candidate` state and
+  generated
+  `target/release-evidence/reactive-http-client-release-evidence.json` with
+  planned final `3.3.0`, published consumer/baseline `3.2.0`, and manual
+  release work still pending.
+- Pre-commit checks passed: `mvn -B -ntp clean verify` (945 tests);
+  `scripts/verify-generation-packaging.sh`; strict all-module japicmp against
+  a fresh Central-only `3.2.0` repository with provenance; the complete
+  published parent/starter/test-helper/OTel POM, binary, source, and Javadoc
+  bundle verifier; API/provenance fixtures; and
+  `scripts/verify-current-consumer.sh` for `3.3.0`.
+- Benchmark discovery and the complete short-form smoke matrix passed for
+  candidate `3.3.0` against baseline metadata `3.2.0`. Output remains
+  target-only, records `benchmark.commit=unknown`, and is not promoted or used
+  for a public numerical claim.
+- Release blockers: commit this release-prep tree, rerun the required matrix,
+  current consumer, strict API, packaging, transport/AOT/native, and benchmark
+  gates from that one clean immutable commit, create tag `v3.3.0`, publish all
+  companion artifacts, then verify the complete `3.3.0` bundle from Maven
+  Central. Do not move public coordinates or either baseline before that final
+  publication check passes.
 
 ---
 

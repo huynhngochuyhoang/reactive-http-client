@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-07-26
+
 ### Changed
 
 - **Streaming upload wire contract.** Added raw `DataBuffer`, `InputStream`, `Reader`, and `ReadableByteChannel` request writers with transport-owned HTTP/1.1 framing and close/discard ownership; preserved continuous caller-selected charset encoding for `Reader` bodies without JSON codec selection; bypassed auth JSON materialization for raw and streaming body shapes; added pre-write cancellation and logical-timeout cleanup for eager streams and direct buffers; preserved application-owned replay warnings and pre-dispatch SigV4 rejection; and added real-wire coverage for known-length resources, chunked streams, peer disconnects, bounded demand, pooled-buffer release, retry/redirect/auth subscriptions, payload-hash equality, and request-write attribution.
@@ -1324,7 +1326,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.3.0...HEAD
+[3.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v2.14.1...v3.0.0
