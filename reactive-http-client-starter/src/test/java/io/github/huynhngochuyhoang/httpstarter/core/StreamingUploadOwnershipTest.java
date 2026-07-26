@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
@@ -176,6 +177,108 @@ class StreamingUploadOwnershipTest {
             assertThat(server.bodiesFor("/auth")).containsExactly("secured", "secured");
             assertThat(authProvider.authCalls).hasValue(2);
             assertThat(authProvider.invalidations).hasValue(1);
+        }
+    }
+
+    @Test
+    void authenticatedRawBodyShapesBypassJsonSerialization() {
+        RefreshOnceAuthProvider authProvider = new RefreshOnceAuthProvider();
+        try (UploadServer server = new UploadServer();
+             ClientFixture fixture = ClientFixture.create(server, false, false, authProvider)) {
+            CountingResource resource = new CountingResource("authenticated-resource");
+            CountingInputStream inputStream = new CountingInputStream("authenticated-input");
+            CountingReader reader = new CountingReader("authenticated-reader");
+            CountingChannel channel = new CountingChannel("authenticated-channel");
+
+            NettyDataBufferFactory buffers = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
+            NettyDataBuffer directBuffer = buffers.allocateBuffer();
+            directBuffer.write("authenticated-buffer".getBytes(StandardCharsets.UTF_8));
+            assertThat(fixture.client().uploadDataBuffer(directBuffer).block(CALL_TIMEOUT))
+                    .isEqualTo("authenticated-buffer");
+            assertThat(directBuffer.getNativeBuffer().refCnt()).isZero();
+            assertThat(fixture.client().uploadResource(resource).block(CALL_TIMEOUT))
+                    .isEqualTo("authenticated-resource");
+            assertThat(fixture.client().uploadInputStream(inputStream).block(CALL_TIMEOUT))
+                    .isEqualTo("authenticated-input");
+            assertThat(fixture.client().uploadReader(reader).block(CALL_TIMEOUT))
+                    .isEqualTo("authenticated-reader");
+            assertThat(fixture.client().uploadChannel(channel).block(CALL_TIMEOUT))
+                    .isEqualTo("authenticated-channel");
+
+            assertThat(resource.opens).hasValue(1);
+            assertThat(resource.closes).hasValue(1);
+            assertThat(inputStream.closes).hasValue(1);
+            assertThat(reader.closes).hasValue(1);
+            assertThat(channel.closes).hasValue(1);
+        }
+    }
+
+    @Test
+    void cancellationBeforeBodySubscriptionReleasesEagerStreamingBodies() {
+        withHeldConnection(client -> {
+            CountingInputStream inputStream = new CountingInputStream("queued-input");
+            Disposable upload = client.uploadInputStream(inputStream)
+                    .subscribe(ignored -> {}, ignored -> {});
+            sleep(Duration.ofMillis(100));
+            assertThat(inputStream.closes).hasValue(0);
+            upload.dispose();
+            await(() -> inputStream.closes.get() == 1, "queued input stream was not closed");
+        });
+        withHeldConnection(client -> {
+            CountingReader reader = new CountingReader("queued-reader");
+            Disposable upload = client.uploadReader(reader)
+                    .subscribe(ignored -> {}, ignored -> {});
+            sleep(Duration.ofMillis(100));
+            assertThat(reader.closes).hasValue(0);
+            upload.dispose();
+            await(() -> reader.closes.get() == 1, "queued reader was not closed");
+        });
+        withHeldConnection(client -> {
+            CountingChannel channel = new CountingChannel("queued-channel");
+            Disposable upload = client.uploadChannel(channel)
+                    .subscribe(ignored -> {}, ignored -> {});
+            sleep(Duration.ofMillis(100));
+            assertThat(channel.closes).hasValue(0);
+            upload.dispose();
+            await(() -> channel.closes.get() == 1, "queued channel was not closed");
+        });
+        withHeldConnection(client -> {
+            NettyDataBufferFactory buffers = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
+            NettyDataBuffer directBuffer = buffers.allocateBuffer();
+            directBuffer.write("queued-buffer".getBytes(StandardCharsets.UTF_8));
+            Disposable upload = client.uploadDataBuffer(directBuffer)
+                    .subscribe(ignored -> {}, ignored -> {});
+            sleep(Duration.ofMillis(100));
+            assertThat(directBuffer.getNativeBuffer().refCnt()).isOne();
+            upload.dispose();
+            await(() -> directBuffer.getNativeBuffer().refCnt() == 0, "queued direct buffer was not released");
+        });
+    }
+
+    @Test
+    void logicalTimeoutBeforeAuthCompletesClosesEagerBodyWithoutDispatch() {
+        InvalidatableAuthProvider pendingAuth = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(AuthRequest request) {
+                return Mono.never();
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                return Mono.empty();
+            }
+        };
+        try (UploadServer server = new UploadServer();
+             ClientFixture fixture = ClientFixture.create(server, false, false, pendingAuth, 50)) {
+            CountingInputStream inputStream = new CountingInputStream("timeout-before-write");
+
+            Throwable failure = catchThrowable(() ->
+                    fixture.client().uploadInputStream(inputStream).block(CALL_TIMEOUT));
+
+            assertThat(failure).hasRootCauseInstanceOf(
+                    io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException.class);
+            assertThat(inputStream.closes).hasValue(1);
+            assertThat(server.requests()).isEmpty();
         }
     }
 
@@ -324,6 +427,18 @@ class StreamingUploadOwnershipTest {
         return BUFFER_FACTORY.wrap(value.getBytes(StandardCharsets.UTF_8));
     }
 
+    private static void withHeldConnection(Consumer<UploadClient> assertion) {
+        try (UploadServer server = new UploadServer(); ClientFixture fixture = ClientFixture.create(server)) {
+            Disposable held = fixture.client().hold().subscribe();
+            await(server::holdStarted, "hold request did not start");
+            try {
+                assertion.accept(fixture.client());
+            } finally {
+                held.dispose();
+            }
+        }
+    }
+
     private static void await(BooleanSupplier condition, String message) {
         long deadline = System.nanoTime() + CALL_TIMEOUT.toNanos();
         while (!condition.getAsBoolean() && System.nanoTime() < deadline) {
@@ -422,12 +537,21 @@ class StreamingUploadOwnershipTest {
                                     boolean retry,
                                     boolean followRedirects,
                                     InvalidatableAuthProvider authProvider) {
+            return create(server, retry, followRedirects, authProvider, 0);
+        }
+
+        static ClientFixture create(UploadServer server,
+                                    boolean retry,
+                                    boolean followRedirects,
+                                    InvalidatableAuthProvider authProvider,
+                                    long logicalCallTimeoutMs) {
             StaticApplicationContext context = new StaticApplicationContext();
             ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
             ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
             config.setBaseUrl("http://127.0.0.1:" + server.port());
             config.setHttp2Enabled(server.http2());
             config.setFollowRedirects(followRedirects);
+            config.setLogicalCallTimeoutMs(logicalCallTimeoutMs);
             ReactiveHttpClientProperties.ConnectionPoolConfig pool =
                     new ReactiveHttpClientProperties.ConnectionPoolConfig();
             pool.setMaxConnections(1);
@@ -551,9 +675,8 @@ class StreamingUploadOwnershipTest {
 
         @Override
         public void close() throws IOException {
-            if (closes.compareAndSet(0, 1)) {
-                super.close();
-            }
+            closes.incrementAndGet();
+            super.close();
         }
     }
 
@@ -572,9 +695,8 @@ class StreamingUploadOwnershipTest {
 
         @Override
         public void close() {
-            if (closes.compareAndSet(0, 1)) {
-                delegate.close();
-            }
+            closes.incrementAndGet();
+            delegate.close();
         }
     }
 
@@ -599,9 +721,8 @@ class StreamingUploadOwnershipTest {
 
         @Override
         public void close() throws IOException {
-            if (closes.compareAndSet(0, 1)) {
-                delegate.close();
-            }
+            closes.incrementAndGet();
+            delegate.close();
         }
     }
 

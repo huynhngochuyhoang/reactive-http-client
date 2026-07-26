@@ -373,7 +373,9 @@ Evidence:
   frames from Reactor Netty's synthetic server-side transfer-encoding compatibility
   view.
 - Application-owned byte and character streams are read off the event loop and closed
-  on terminal signals. A peer-disconnect fixture proves partial delivery cancels
+  on terminal signals, including cancellation or logical timeout before body subscription.
+  Authenticated raw shapes bypass JSON materialization. A peer-disconnect fixture proves
+  partial delivery cancels
   bounded upstream demand, releases every pooled `DataBuffer`, and leaves the client
   pool usable for the next request.
 - Retry, redirect, and hidden OAuth2 401 replay fixtures count one publisher

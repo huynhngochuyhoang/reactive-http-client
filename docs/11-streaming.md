@@ -12,7 +12,7 @@ Mono<Void> upload(@PathVar("key") String key,
 
 Each actual transport request gets one body subscription. A retry, a body-preserving redirect, or the built-in one-time 401 auth refresh creates another transport request and therefore another subscription. The supplied publisher must create fresh content on every subscription when any of those features can replay the request. The starter never caches or aggregates an unbounded publisher to make it repeatable.
 
-`Flux<DataBuffer>` and `Flux<byte[]>` default to `application/octet-stream`; DTO publishers default to JSON and remain encoded by the configured WebClient codecs. Custom auth providers receive the publisher as request metadata but must not subscribe to it. Built-in AWS SigV4 rejects publisher bodies before transport because it cannot prove the payload hash without consuming the stream.
+`Flux<DataBuffer>` and `Flux<byte[]>` default to `application/octet-stream`; DTO publishers default to JSON and remain encoded by the configured WebClient codecs. Publisher, direct `DataBuffer`, `Resource`, `InputStream`, `Reader`, and `ReadableByteChannel` bodies bypass auth JSON materialization and remain available to custom or bearer-token auth as request metadata. Auth providers must not consume them. Built-in AWS SigV4 rejects unsupported streaming bodies before transport because it cannot prove the payload hash without consuming the stream.
 
 ### Wire framing and request ownership
 
@@ -33,12 +33,15 @@ caller-supplied `Content-Type` remains authoritative. A `Resource` uses the
 Spring resource writer, including media-type inference from its filename and
 its known length when available.
 
-Passing a body transfers write ownership for that transport attempt. Spring
-closes `InputStream`, `Reader`, and `ReadableByteChannel` bodies on completion,
-error, or cancellation. A `Resource` is opened and closed once per request
-attempt. Emitted `DataBuffer` values are released by the HTTP writer after the
-write or when discarded because the request is cancelled. Do not release an
-emitted buffer concurrently from application code.
+Subscribing to the client result transfers ownership of an eager direct
+`DataBuffer`, `InputStream`, `Reader`, or `ReadableByteChannel` body. The
+starter closes or releases it exactly once on completion, error, or cancellation,
+including cancellation or logical timeout before the HTTP writer subscribes to
+the body. Once a direct `DataBuffer` write starts, ownership passes to the HTTP
+writer. A `Resource` remains lazy and is opened and closed once per request
+attempt. Publisher-emitted `DataBuffer` values are released by the HTTP writer
+after the write or when discarded because the request is cancelled. Do not
+release an emitted buffer concurrently from application code.
 
 A peer disconnect or write timeout cancels body demand. It does not make a
 partially written request replay-safe: a retry, redirect, or hidden auth replay
