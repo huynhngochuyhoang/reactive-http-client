@@ -17,7 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   envelopes now fail before proxy creation with concrete client, declaring
   method, resolved type, and supported-shape context. Factory startup,
   effective contracts, diagnostics, AOT processing, runtime envelope handling,
-  and `MockReactiveHttpClient` now use the same decision.
+  and `MockReactiveHttpClient` now use the same decision. AOT validation is
+  limited to starter factory beans and honors replacement metadata caches;
+  inherited arrays and wildcard bounds are materialized before unresolved
+  generic checks.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects

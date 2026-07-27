@@ -10,10 +10,7 @@ import reactor.core.publisher.Mono;
 
 import java.io.InputStream;
 import java.io.Reader;
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
+import java.lang.reflect.*;
 import java.nio.channels.ReadableByteChannel;
 import java.util.*;
 
@@ -207,6 +204,17 @@ record RequestPlan(
         }
         Type type = resolvableType.getType();
         Class<?> rawClass = resolvableType.resolve();
+        if (type instanceof GenericArrayType genericArrayType) {
+            Type componentType = resolvedType(
+                    resolvableType.getComponentType(), genericArrayType.getGenericComponentType());
+            if (componentType instanceof Class<?> componentClass) {
+                return Array.newInstance(componentClass, 0).getClass();
+            }
+            return new ResolvedGenericArrayType(componentType);
+        }
+        if (type instanceof WildcardType wildcardType) {
+            return resolvedWildcardType(resolvableType, wildcardType);
+        }
         if (resolvableType.hasGenerics()) {
             if (rawClass == null) {
                 return fallback;
@@ -218,6 +226,29 @@ record RequestPlan(
         }
         if (!(type instanceof TypeVariable<?>)) {
             return type;
+        }
+        return rawClass != null ? rawClass : fallback;
+    }
+
+    private static Type resolvedWildcardType(ResolvableType resolvableType, WildcardType wildcardType) {
+        Type[] lowerBounds = wildcardType.getLowerBounds();
+        if (lowerBounds.length > 0) {
+            Type resolvedLowerBound = resolvedWildcardBound(resolvableType, lowerBounds[0]);
+            return new ResolvedWildcardType(new Type[]{Object.class}, new Type[]{resolvedLowerBound});
+        }
+        Type[] upperBounds = wildcardType.getUpperBounds();
+        Type upperBound = upperBounds.length == 0 ? Object.class : upperBounds[0];
+        return new ResolvedWildcardType(
+                new Type[]{resolvedWildcardBound(resolvableType, upperBound)}, new Type[0]);
+    }
+
+    private static Type resolvedWildcardBound(ResolvableType resolvableType, Type fallback) {
+        Class<?> rawClass = resolvableType.resolve();
+        if (resolvableType.hasGenerics() && rawClass != null) {
+            Type[] generics = Arrays.stream(resolvableType.getGenerics())
+                    .map(generic -> resolvedType(generic, generic.getType()))
+                    .toArray(Type[]::new);
+            return new ResolvedParameterizedType(null, rawClass, generics);
         }
         return rawClass != null ? rawClass : fallback;
     }
@@ -296,6 +327,61 @@ record RequestPlan(
                     .reduce((left, right) -> left + ", " + right)
                     .orElse("")
                     + ">";
+        }
+    }
+
+    private record ResolvedGenericArrayType(Type genericComponentType) implements GenericArrayType {
+        @Override
+        public Type getGenericComponentType() {
+            return genericComponentType;
+        }
+
+        @Override
+        public String getTypeName() {
+            return genericComponentType.getTypeName() + "[]";
+        }
+    }
+
+    private static final class ResolvedWildcardType implements WildcardType {
+        private final Type[] upperBounds;
+        private final Type[] lowerBounds;
+
+        private ResolvedWildcardType(Type[] upperBounds, Type[] lowerBounds) {
+            this.upperBounds = upperBounds.clone();
+            this.lowerBounds = lowerBounds.clone();
+        }
+
+        @Override
+        public Type[] getUpperBounds() {
+            return upperBounds.clone();
+        }
+
+        @Override
+        public Type[] getLowerBounds() {
+            return lowerBounds.clone();
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof WildcardType wildcardType
+                    && Arrays.equals(upperBounds, wildcardType.getUpperBounds())
+                    && Arrays.equals(lowerBounds, wildcardType.getLowerBounds());
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(upperBounds) ^ Arrays.hashCode(lowerBounds);
+        }
+
+        @Override
+        public String getTypeName() {
+            if (lowerBounds.length > 0) {
+                return "? super " + lowerBounds[0].getTypeName();
+            }
+            if (upperBounds.length == 0 || Object.class.equals(upperBounds[0])) {
+                return "?";
+            }
+            return "? extends " + upperBounds[0].getTypeName();
         }
     }
 }

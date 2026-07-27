@@ -30,8 +30,13 @@ final class DeclarativeReturnTypeGrammar {
                     "the outer return type must be exactly Mono or Flux");
         }
 
-        if (!(method.getGenericReturnType() instanceof ParameterizedType)) {
-            return;
+        Type declaredReturnType = method.getGenericReturnType();
+        if (!(declaredReturnType instanceof ParameterizedType)) {
+            if (declaredReturnType instanceof Class<?> declaredClass && declaredClass.equals(outerType)) {
+                return;
+            }
+            throw unsupported(concreteClientInterface, clientName, method, plan.responseType(),
+                    "the outer reactive return type must not be an unresolved type variable");
         }
 
         Type responseType = plan.responseType();
@@ -41,6 +46,10 @@ final class DeclarativeReturnTypeGrammar {
         }
 
         if (Flux.class.equals(outerType)) {
+            if (containsTypeVariable(responseType)) {
+                throw unsupported(concreteClientInterface, clientName, method, responseType,
+                        "the reactive element type must resolve against the concrete client interface");
+            }
             if (ResponseEntity.class.equals(rawClass(responseType))) {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,
                         "ResponseEntity envelopes are supported only inside Mono");

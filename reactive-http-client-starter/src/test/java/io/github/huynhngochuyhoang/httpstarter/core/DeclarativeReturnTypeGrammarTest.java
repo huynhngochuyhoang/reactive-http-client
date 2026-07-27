@@ -47,6 +47,18 @@ class DeclarativeReturnTypeGrammarTest {
     }
 
     @Test
+    void rejectsTypeVariableOuterPublisherAndUnresolvedFluxElements() {
+        assertUnsupported(TypeVariableOuterPublisherClient.class, "outer-variable")
+                .contains("outer reactive return type must not be an unresolved type variable");
+        assertUnsupported(UnresolvedFluxClient.class, "unresolved-flux")
+                .contains("resolvedResponseType=T")
+                .contains("reactive element type must resolve against the concrete client interface");
+        assertUnsupported(RawInheritedFluxClient.class, "raw-inherited-flux")
+                .contains("resolvedResponseType=T")
+                .contains("reactive element type must resolve against the concrete client interface");
+    }
+
+    @Test
     void resolvesMultiLevelInheritedGenericBindingsBeforeValidationAndExport() {
         assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
                 ConcreteListClient.class, "concrete-list"))
@@ -61,6 +73,32 @@ class DeclarativeReturnTypeGrammarTest {
 
         assertThat(contract.responseType()).isEqualTo("java.util.List<java.lang.String>");
         assertThat(contract.genericBindings()).isEqualTo("T=java.util.List<java.lang.String>");
+    }
+
+    @Test
+    void resolvesInheritedGenericArraysAndWildcardBounds() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ConcreteArrayClient.class, "concrete-array"))
+                .doesNotThrowAnyException();
+
+        List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
+                ConcreteArrayClient.class,
+                "concrete-array",
+                new ReactiveHttpClientProperties.ClientConfig(),
+                metadataCache);
+
+        assertThat(contracts)
+                .filteredOn(contract -> contract.apiName().equals("array"))
+                .extracting(EffectiveHttpClientContract::responseType)
+                .containsExactly("java.lang.String[]");
+        assertThat(contracts)
+                .filteredOn(contract -> contract.apiName().equals("wildcards"))
+                .extracting(EffectiveHttpClientContract::responseType)
+                .containsExactly("java.util.List<? extends java.lang.String>");
+        assertThat(contracts)
+                .filteredOn(contract -> contract.apiName().equals("lowerWildcards"))
+                .extracting(EffectiveHttpClientContract::responseType)
+                .containsExactly("java.util.List<? super java.lang.String>");
     }
 
     @Test
@@ -186,5 +224,38 @@ class DeclarativeReturnTypeGrammarTest {
     interface InvalidApiRefClient {
         @ApiRef("nested.lookup")
         Mono<Mono<String>> lookup();
+    }
+
+    interface TypeVariableOuterPublisherClient {
+        @GET("/outer-variable")
+        <R extends Mono<String>> R load();
+    }
+
+    interface UnresolvedFluxClient<T> {
+        @GET("/unresolved")
+        Flux<T> values();
+    }
+
+    interface GenericFluxOperations<T> {
+        @GET("/raw-inherited")
+        Flux<T> values();
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface RawInheritedFluxClient extends GenericFluxOperations {
+    }
+
+    interface GenericArrayOperations<T> {
+        @GET("/array")
+        Mono<T[]> array();
+
+        @GET("/wildcards")
+        Mono<List<? extends T>> wildcards();
+
+        @GET("/lower-wildcards")
+        Mono<List<? super T>> lowerWildcards();
+    }
+
+    interface ConcreteArrayClient extends GenericArrayOperations<String> {
     }
 }

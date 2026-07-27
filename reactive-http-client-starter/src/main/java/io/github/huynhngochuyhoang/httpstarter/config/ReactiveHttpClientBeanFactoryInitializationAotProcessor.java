@@ -27,7 +27,8 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         if (clientInterfaces.isEmpty()) {
             return null;
         }
-        MethodMetadataCache metadataCache = new MethodMetadataCache();
+        MethodMetadataCache metadataCache = beanFactory.getBeanProvider(MethodMetadataCache.class)
+                .getIfAvailable(MethodMetadataCache::new);
         clientInterfaces.forEach(clientInterface -> {
             ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
             if (annotation != null) {
@@ -63,14 +64,15 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
     }
 
     private Class<?> resolveClientInterface(BeanDefinition definition, ClassLoader classLoader) {
+        Class<?> beanClass = resolveClass(definition.getBeanClassName(), classLoader, true);
+        if (beanClass == null || !ReactiveHttpClientFactoryBean.class.isAssignableFrom(beanClass)) {
+            return null;
+        }
+
         Object objectType = definition.getAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
         Class<?> objectTypeClass = resolveClass(objectType, classLoader, true);
         if (objectTypeClass != null) {
             return objectTypeClass;
-        }
-
-        if (!ReactiveHttpClientFactoryBean.class.getName().equals(definition.getBeanClassName())) {
-            return null;
         }
         PropertyValue typeProperty = definition.getPropertyValues().getPropertyValue("type");
         return typeProperty != null ? resolveClass(typeProperty.getValue(), classLoader, false) : null;

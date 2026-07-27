@@ -3,6 +3,8 @@ package io.github.huynhngochuyhoang.httpstarter.config;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.AotSmokeClient;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.InheritedAotSmokeClient;
+import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata;
+import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
 import org.junit.jupiter.api.Test;
@@ -151,6 +153,36 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorUsesReplacementMethodMetadataCache() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", ReplacementMetadataClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ReplacementMetadataClient.class);
+        context.registerBeanDefinition(ReplacementMetadataClient.class.getName(), beanDefinition);
+        context.getBeanFactory().registerSingleton("methodMetadataCache", new ReplacementMethodMetadataCache());
+
+        assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(context.getDefaultListableBeanFactory()))
+                .isNotNull();
+        context.close();
+    }
+
+    @Test
+    void beanFactoryAotProcessorIgnoresAnnotatedClientsBackedByForeignFactoryBeans() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReplacementClientFactoryBean.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ForeignReplacementClient.class);
+        context.registerBeanDefinition(ForeignReplacementClient.class.getName(), beanDefinition);
+
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+
+        assertThat(contribution).isNull();
+        context.close();
+    }
+
+    @Test
     void annotatedClientApplicationCanBeProcessedAheadOfTime() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         context.register(AotSmokeApplication.class);
@@ -200,6 +232,42 @@ class ReactiveHttpClientAotSmokeTest {
     interface InvalidAotReturnClient {
         @GET("/nested")
         Mono<reactor.core.publisher.Flux<String>> nested();
+    }
+
+    @ReactiveHttpClient(name = "replacement-metadata", baseUrl = "http://replacement.test")
+    interface ReplacementMetadataClient {
+        Mono<String> customEndpoint();
+    }
+
+    static final class ReplacementMethodMetadataCache extends MethodMetadataCache {
+        @Override
+        public MethodMetadata get(Method method) {
+            MethodMetadata metadata = new MethodMetadata();
+            metadata.setMethod(method);
+            metadata.setApiName(method.getName());
+            metadata.setHttpMethod("GET");
+            metadata.setPathTemplate("/custom");
+            metadata.setReturnsMono(true);
+            metadata.setResponseType(String.class);
+            return metadata;
+        }
+    }
+
+    @ReactiveHttpClient(name = "foreign-replacement", baseUrl = "http://replacement.test")
+    interface ForeignReplacementClient {
+        String synchronousEndpoint();
+    }
+
+    static final class ReplacementClientFactoryBean implements FactoryBean<ForeignReplacementClient> {
+        @Override
+        public ForeignReplacementClient getObject() {
+            return null;
+        }
+
+        @Override
+        public Class<?> getObjectType() {
+            return ForeignReplacementClient.class;
+        }
     }
 
     @Configuration(proxyBeanMethods = false)
