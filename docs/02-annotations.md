@@ -93,6 +93,34 @@ Java default methods can still be used as local helper methods without HTTP anno
 
 ---
 
+## Declarative return types
+
+Endpoint methods must return exactly `Mono` or `Flux`. The supported response
+shapes are:
+
+| Return type | Behavior |
+|---|---|
+| `Mono<Void>` | Drains/releases the response body and completes without a value |
+| `Mono<T>` | Decodes one value through the configured WebClient codecs |
+| `Mono<ResponseEntity<T>>` | Decodes one value and exposes response status and headers |
+| `Flux<T>` | Decodes a stream of values through the configured WebClient codecs |
+| `Flux<DataBuffer>` | Streams caller-owned buffers without aggregation |
+| `Mono<ResponseEntity<Flux<DataBuffer>>>` | Exposes status and headers with a caller-owned, unaggregated buffer stream |
+
+Raw `Mono` and `Flux` declarations remain accepted for compatibility, but they
+erase response type information. Prefer one of the typed forms above.
+
+The starter resolves inherited and multi-level generic bindings against each
+concrete `@ReactiveHttpClient` before proxy creation. Unbound type variables,
+nested publishers such as `Mono<Mono<T>>` or `Flux<Flux<T>>`, and unsupported
+envelopes such as `Flux<ResponseEntity<T>>` or
+`Mono<ResponseEntity<Flux<Dto>>>` fail at startup. Use direct `Flux<Dto>` when
+only decoded elements are needed, or
+`Mono<ResponseEntity<Flux<DataBuffer>>>` when streaming status and headers are
+also required.
+
+---
+
 ## HTTP verb annotations
 
 Each annotation accepts a single `value` attribute: the path template.

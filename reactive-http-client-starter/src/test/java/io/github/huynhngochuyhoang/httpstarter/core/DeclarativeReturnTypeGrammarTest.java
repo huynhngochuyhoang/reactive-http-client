@@ -1,0 +1,190 @@
+package io.github.huynhngochuyhoang.httpstarter.core;
+
+import io.github.huynhngochuyhoang.httpstarter.annotation.ApiRef;
+import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import org.assertj.core.api.AbstractStringAssert;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.ResponseEntity;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.*;
+
+class DeclarativeReturnTypeGrammarTest {
+
+    private final MethodMetadataCache metadataCache = new MethodMetadataCache();
+
+    @Test
+    void acceptsLegacyUnaryEnvelopeFluxAndRawStreamingShapes() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ValidShapesClient.class, "valid-shapes"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsNestedPublishersAndUnsupportedEnvelopes() {
+        assertUnsupported(NestedMonoClient.class, "nested-mono")
+                .contains("resolvedResponseType=reactor.core.publisher.Mono<java.lang.String>")
+                .contains("a Mono element type cannot contain another reactive Publisher");
+        assertUnsupported(NestedFluxClient.class, "nested-flux")
+                .contains("resolvedResponseType=reactor.core.publisher.Flux<java.lang.String>")
+                .contains("a Flux element type cannot contain another reactive Publisher");
+        assertUnsupported(NestedPublisherContainerClient.class, "nested-container")
+                .contains("java.util.List<reactor.core.publisher.Flux<java.lang.String>>")
+                .contains("a Mono element type cannot contain another reactive Publisher");
+        assertUnsupported(UnsupportedStreamingEnvelopeClient.class, "typed-streaming-envelope")
+                .contains("ResponseEntity<reactor.core.publisher.Flux<java.lang.String>>")
+                .contains("the only reactive ResponseEntity body supported is Flux<DataBuffer>");
+        assertUnsupported(FluxEnvelopeClient.class, "flux-envelope")
+                .contains("ResponseEntity envelopes are supported only inside Mono");
+        assertUnsupported(RawResponseEntityClient.class, "raw-envelope")
+                .contains("resolvedResponseType=org.springframework.http.ResponseEntity<T>")
+                .contains("ResponseEntity must declare a resolvable body type");
+    }
+
+    @Test
+    void resolvesMultiLevelInheritedGenericBindingsBeforeValidationAndExport() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ConcreteListClient.class, "concrete-list"))
+                .doesNotThrowAnyException();
+
+        EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
+                        ConcreteListClient.class,
+                        "concrete-list",
+                        new ReactiveHttpClientProperties.ClientConfig(),
+                        metadataCache)
+                .get(0);
+
+        assertThat(contract.responseType()).isEqualTo("java.util.List<java.lang.String>");
+        assertThat(contract.genericBindings()).isEqualTo("T=java.util.List<java.lang.String>");
+    }
+
+    @Test
+    void rejectsInheritedGenericPublisherBindingWithConcreteAndDeclaringContext() {
+        assertUnsupported(InheritedPublisherClient.class, "inherited-publisher")
+                .contains("concreteClient=" + InheritedPublisherClient.class.getName())
+                .contains("declaringInterface=" + GenericOperations.class.getName())
+                .contains("method=public abstract reactor.core.publisher.Mono<T> "
+                        + GenericOperations.class.getName() + ".load()")
+                .contains("resolvedResponseType=reactor.core.publisher.Flux<java.lang.String>")
+                .contains("Supported return shapes:");
+    }
+
+    @Test
+    void rejectsApiRefMethodBeforeConfigurationOrDispatch() {
+        assertUnsupported(InvalidApiRefClient.class, "api-ref-client")
+                .contains("declaringInterface=" + InvalidApiRefClient.class.getName())
+                .contains("resolvedResponseType=reactor.core.publisher.Mono<java.lang.String>");
+    }
+
+    @Test
+    void exporterAndDiagnosticsUseTheSameReturnGrammar() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+
+        assertThatThrownBy(() -> EffectiveHttpClientContractExporter.export(
+                NestedMonoClient.class, "diagnostic-client", config, metadataCache))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unsupported declarative return type")
+                .hasMessageContaining("resolvedResponseType=reactor.core.publisher.Mono<java.lang.String>");
+        assertThatThrownBy(() -> ReactiveHttpClientDiagnosticsProvider.clientSummary(
+                NestedMonoClient.class, "diagnostic-client", config, metadataCache, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unsupported declarative return type")
+                .hasMessageContaining("resolvedResponseType=reactor.core.publisher.Mono<java.lang.String>");
+    }
+
+    private AbstractStringAssert<?> assertUnsupported(Class<?> clientInterface, String clientName) {
+        Throwable failure = catchThrowable(() ->
+                metadataCache.validateDeclarativeReturnTypes(clientInterface, clientName));
+        assertThat(failure)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("reactive HTTP client '" + clientName + "'")
+                .hasMessageContaining("concreteClient=" + clientInterface.getName())
+                .hasMessageContaining("Supported return shapes:");
+        return assertThat(failure.getMessage());
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface ValidShapesClient {
+        @GET("/raw-mono")
+        Mono rawMono();
+
+        @GET("/raw-flux")
+        Flux rawFlux();
+
+        @GET("/void")
+        Mono<Void> voidMono();
+
+        @GET("/value")
+        Mono<String> value();
+
+        @GET("/entity")
+        Mono<ResponseEntity<String>> entity();
+
+        @GET("/void-entity")
+        Mono<ResponseEntity<Void>> voidEntity();
+
+        @GET("/values")
+        Flux<String> values();
+
+        @GET("/buffers")
+        Flux<DataBuffer> buffers();
+
+        @GET("/streaming-entity")
+        Mono<ResponseEntity<Flux<DataBuffer>>> streamingEntity();
+    }
+
+    interface NestedMonoClient {
+        @GET("/nested")
+        Mono<Mono<String>> nested();
+    }
+
+    interface NestedFluxClient {
+        @GET("/nested")
+        Flux<Flux<String>> nested();
+    }
+
+    interface NestedPublisherContainerClient {
+        @GET("/nested")
+        Mono<List<Flux<String>>> nested();
+    }
+
+    interface UnsupportedStreamingEnvelopeClient {
+        @GET("/stream")
+        Mono<ResponseEntity<Flux<String>>> stream();
+    }
+
+    interface FluxEnvelopeClient {
+        @GET("/entities")
+        Flux<ResponseEntity<String>> entities();
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface RawResponseEntityClient {
+        @GET("/entity")
+        Mono<ResponseEntity> entity();
+    }
+
+    interface GenericOperations<T> {
+        @GET("/generic")
+        Mono<T> load();
+    }
+
+    interface ListOperations<R> extends GenericOperations<List<R>> {
+    }
+
+    interface ConcreteListClient extends ListOperations<String> {
+    }
+
+    interface InheritedPublisherClient extends GenericOperations<Flux<String>> {
+    }
+
+    interface InvalidApiRefClient {
+        @ApiRef("nested.lookup")
+        Mono<Mono<String>> lookup();
+    }
+}

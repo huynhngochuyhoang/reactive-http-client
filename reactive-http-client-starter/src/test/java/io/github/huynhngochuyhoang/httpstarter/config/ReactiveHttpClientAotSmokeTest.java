@@ -26,6 +26,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ReactiveHttpClientAotSmokeTest {
 
@@ -133,6 +134,23 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorRejectsUnsupportedDeclarativeReturnType() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", InvalidAotReturnClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, InvalidAotReturnClient.class);
+        context.registerBeanDefinition(InvalidAotReturnClient.class.getName(), beanDefinition);
+
+        assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(context.getDefaultListableBeanFactory()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("reactive HTTP client 'invalid-aot-return'")
+                .hasMessageContaining("concreteClient=" + InvalidAotReturnClient.class.getName())
+                .hasMessageContaining("resolvedResponseType=reactor.core.publisher.Flux<java.lang.String>");
+        context.close();
+    }
+
+    @Test
     void annotatedClientApplicationCanBeProcessedAheadOfTime() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         context.register(AotSmokeApplication.class);
@@ -176,6 +194,12 @@ class ReactiveHttpClientAotSmokeTest {
 
     @ReactiveHttpClient(name = "child-smoke", baseUrl = "http://child-smoke.test")
     interface ChildSmokeClient extends ParentSmokeOperations {
+    }
+
+    @ReactiveHttpClient(name = "invalid-aot-return", baseUrl = "http://invalid-aot.test")
+    interface InvalidAotReturnClient {
+        @GET("/nested")
+        Mono<reactor.core.publisher.Flux<String>> nested();
     }
 
     @Configuration(proxyBeanMethods = false)

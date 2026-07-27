@@ -73,6 +73,7 @@ final class EffectiveHttpClientContractExporter {
                                                         boolean validateResilienceInstances) {
         MethodMetadata meta = metadataCache.get(method);
         RequestPlan plan = RequestPlan.from(meta, clientInterface);
+        DeclarativeReturnTypeGrammar.validate(clientInterface, clientName, plan);
         EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);
         if (validateResilienceInstances) {
             validateResilienceInstances(plan, method, clientName, clientConfig, resilienceOperatorApplier);

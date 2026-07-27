@@ -1,5 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
+import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.TypeReference;
@@ -25,6 +27,13 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         if (clientInterfaces.isEmpty()) {
             return null;
         }
+        MethodMetadataCache metadataCache = new MethodMetadataCache();
+        clientInterfaces.forEach(clientInterface -> {
+            ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+            if (annotation != null) {
+                metadataCache.validateDeclarativeReturnTypes(clientInterface, annotation.name());
+            }
+        });
         return (generationContext, beanFactoryInitializationCode) -> clientInterfaces.forEach(clientInterface -> {
             generationContext.getRuntimeHints().proxies().registerJdkProxy(clientInterface);
             var reflectionHints = generationContext.getRuntimeHints().reflection();

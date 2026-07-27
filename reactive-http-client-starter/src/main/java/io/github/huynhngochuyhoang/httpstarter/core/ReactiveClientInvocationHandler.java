@@ -330,7 +330,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return usesSubscriptionState ? flux.contextWrite(context -> withSubscriptionState(context, resolved)) : flux;
         }
 
-        Mono<?> mono = isResponseEntityOfFluxDataBuffer(plan.responseType())
+        Mono<?> mono = DeclarativeReturnTypeGrammar.isStreamingResponseEntity(plan.responseType())
                 ? (usesSubscriptionState
                 ? exchangeStreamingResponseEntity(requestHeadersSpecMono)
                 : exchangeStreamingResponseEntityStateless(requestHeadersSpecMono))
@@ -674,11 +674,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private Mono<?> buildMono(ClientResponse response, Type responseType) {
         // Streaming passthrough for Mono<ResponseEntity<Flux<DataBuffer>>>: skip the
         // in-memory codec entirely so large payloads aren't bound by codec-max-in-memory-size.
-        if (isResponseEntityOfFluxDataBuffer(responseType)) {
+        if (DeclarativeReturnTypeGrammar.isStreamingResponseEntity(responseType)) {
             return buildStreamingResponseEntity(response);
         }
 
-        Type responseEntityBodyType = responseEntityBodyType(responseType);
+        Type responseEntityBodyType = DeclarativeReturnTypeGrammar.responseEntityBodyType(responseType);
         if (responseEntityBodyType != null) {
             return buildResponseEntityMono(response, responseEntityBodyType);
         }
@@ -747,25 +747,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return response.bodyToFlux(responseClass);
         }
         return response.bodyToFlux(ParameterizedTypeReference.forType(responseType));
-    }
-
-    /** Returns the body type when {@code responseType} is {@code ResponseEntity<T>}. */
-    private static Type responseEntityBodyType(Type responseType) {
-        if (!(responseType instanceof java.lang.reflect.ParameterizedType outer)) return null;
-        if (!(outer.getRawType() instanceof Class<?> outerRaw)) return null;
-        if (!ResponseEntity.class.equals(outerRaw)) return null;
-        Type[] outerArgs = outer.getActualTypeArguments();
-        return outerArgs.length == 1 ? outerArgs[0] : null;
-    }
-
-    /** {@code true} when {@code responseType} is exactly {@code ResponseEntity<Flux<DataBuffer>>}. */
-    private static boolean isResponseEntityOfFluxDataBuffer(Type responseType) {
-        Type bodyType = responseEntityBodyType(responseType);
-        if (!(bodyType instanceof java.lang.reflect.ParameterizedType inner)) return false;
-        if (!(inner.getRawType() instanceof Class<?> innerRaw)) return false;
-        if (!Flux.class.equals(innerRaw)) return false;
-        Type[] innerArgs = inner.getActualTypeArguments();
-        return innerArgs.length == 1 && DataBuffer.class.equals(innerArgs[0]);
     }
 
     private Mono<?> applyResilienceMono(Mono<?> mono,

@@ -50,6 +50,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class MockReactiveHttpClientTest {
 
+    interface InvalidNestedResponseClient {
+        @GET("/nested")
+        Mono<ResponseEntity<Flux<String>>> nested();
+    }
+
     interface SampleClient {
         @GET("/users/{id}")
         Mono<String> getUser(@PathVar("id") long id);
@@ -1004,6 +1009,16 @@ class MockReactiveHttpClientTest {
                 .hasStatusCode(404);
 
         assertThat(mock.exchanges()).hasSize(1);
+    }
+
+    @Test
+    void buildRejectsUnsupportedDeclarativeReturnTypeBeforeAnyExchange() {
+        assertThatThrownBy(() -> MockReactiveHttpClient.forClient(InvalidNestedResponseClient.class).build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("reactive HTTP client 'mock-client'")
+                .hasMessageContaining("concreteClient=" + InvalidNestedResponseClient.class.getName())
+                .hasMessageContaining("ResponseEntity<reactor.core.publisher.Flux<java.lang.String>>")
+                .hasMessageContaining("the only reactive ResponseEntity body supported is Flux<DataBuffer>");
     }
 
     @Test

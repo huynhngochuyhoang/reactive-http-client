@@ -346,6 +346,11 @@ public final class MockReactiveHttpClient<T> {
         }
 
         public MockReactiveHttpClient<T> build() {
+            ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+            String clientName = annotation != null ? annotation.name() : "mock-client";
+            MethodMetadataCache metadataCache = new MethodMetadataCache();
+            metadataCache.validateDeclarativeReturnTypes(clientInterface, clientName);
+
             List<RecordedExchange> exchanges = new CopyOnWriteArrayList<>();
             List<Matcher> liveMatchers = new CopyOnWriteArrayList<>(matchers);
             AtomicReference<ClientResponse> fallbackRef = new AtomicReference<>(fallback);
@@ -379,9 +384,6 @@ public final class MockReactiveHttpClient<T> {
                             return response;
                         }));
             });
-
-            ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
-            String clientName = annotation != null ? annotation.name() : "mock-client";
 
             WebClient.Builder webClientBuilder = WebClient.builder()
                     .baseUrl(baseUrl)
@@ -420,7 +422,7 @@ public final class MockReactiveHttpClient<T> {
 
             ReactiveClientInvocationHandler handler = ReactiveClientInvocationHandler.create(
                     webClient,
-                    new MethodMetadataCache(),
+                    metadataCache,
                     new RequestArgumentResolver(),
                     new DefaultErrorDecoder(),
                     clientConfig,
