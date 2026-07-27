@@ -59,6 +59,28 @@ class DeclarativeReturnTypeGrammarTest {
     }
 
     @Test
+    void rejectsBoundedUnresolvedVariablesButAcceptsConcreteBindings() {
+        assertUnsupported(BoundedMethodVariableClient.class, "bounded-method-variable")
+                .contains("resolvedResponseType=" + BaseDto.class.getName())
+                .contains("reactive element type must resolve against the concrete client interface");
+        assertUnsupported(UnresolvedBoundedClient.class, "bounded-client-variable")
+                .contains("reactive element type must resolve against the concrete client interface");
+        assertUnsupported(RawBoundedClient.class, "raw-bounded-client")
+                .contains("reactive element type must resolve against the concrete client interface");
+
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ConcreteBoundedClient.class, "concrete-bounded-client"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsReifiablePublisherArrays() {
+        assertUnsupported(PublisherArrayClient.class, "publisher-array")
+                .contains("resolvedResponseType=reactor.core.publisher.Flux[]")
+                .contains("a Mono element type cannot contain another reactive Publisher");
+    }
+
+    @Test
     void resolvesMultiLevelInheritedGenericBindingsBeforeValidationAndExport() {
         assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
                 ConcreteListClient.class, "concrete-list"))
@@ -257,5 +279,37 @@ class DeclarativeReturnTypeGrammarTest {
     }
 
     interface ConcreteArrayClient extends GenericArrayOperations<String> {
+    }
+
+    static class BaseDto {
+    }
+
+    static final class SpecialDto extends BaseDto {
+    }
+
+    interface BoundedMethodVariableClient {
+        @GET("/bounded-method")
+        <R extends BaseDto> Mono<R> load();
+    }
+
+    interface BoundedOperations<T extends BaseDto> {
+        @GET("/bounded")
+        Mono<T> load();
+    }
+
+    interface UnresolvedBoundedClient<T extends BaseDto> extends BoundedOperations<T> {
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface RawBoundedClient extends BoundedOperations {
+    }
+
+    interface ConcreteBoundedClient extends BoundedOperations<SpecialDto> {
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface PublisherArrayClient {
+        @GET("/publisher-array")
+        Mono<Flux[]> load();
     }
 }

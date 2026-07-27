@@ -7,7 +7,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.lang.reflect.*;
-import java.util.Arrays;
+import java.util.*;
 
 /**
  * Internal grammar for response shapes the invocation handler can execute
@@ -31,7 +31,7 @@ final class DeclarativeReturnTypeGrammar {
         }
 
         Type declaredReturnType = method.getGenericReturnType();
-        if (!(declaredReturnType instanceof ParameterizedType)) {
+        if (!(declaredReturnType instanceof ParameterizedType parameterizedReturnType)) {
             if (declaredReturnType instanceof Class<?> declaredClass && declaredClass.equals(outerType)) {
                 return;
             }
@@ -43,6 +43,11 @@ final class DeclarativeReturnTypeGrammar {
         if (responseType == null) {
             throw unsupported(concreteClientInterface, clientName, method, null,
                     "the parameterized reactive return type has no resolvable element type");
+        }
+        Type declaredResponseType = parameterizedReturnType.getActualTypeArguments()[0];
+        if (containsUnresolvedTypeVariable(declaredResponseType, concreteClientInterface, method)) {
+            throw unsupported(concreteClientInterface, clientName, method, responseType,
+                    "the reactive element type must resolve against the concrete client interface");
         }
 
         if (Flux.class.equals(outerType)) {
@@ -107,6 +112,9 @@ final class DeclarativeReturnTypeGrammar {
     }
 
     private static boolean containsPublisher(Type type) {
+        if (type instanceof Class<?> clazz && clazz.isArray()) {
+            return containsPublisher(clazz.getComponentType());
+        }
         Class<?> rawType = rawClass(type);
         if (rawType != null && Publisher.class.isAssignableFrom(rawType)) {
             return true;
@@ -125,6 +133,73 @@ final class DeclarativeReturnTypeGrammar {
             return containsPublisher(arrayType.getGenericComponentType());
         }
         return false;
+    }
+
+    private static boolean containsUnresolvedTypeVariable(Type type,
+                                                          Class<?> concreteClientInterface,
+                                                          Method method) {
+        Map<TypeVariable<?>, Type> bindings = findTypeBindings(
+                concreteClientInterface, method.getDeclaringClass(), new HashMap<>());
+        return containsUnresolvedTypeVariable(
+                type, bindings != null ? bindings : Map.of(), new HashSet<>());
+    }
+
+    private static boolean containsUnresolvedTypeVariable(Type type,
+                                                          Map<TypeVariable<?>, Type> bindings,
+                                                          Set<TypeVariable<?>> visiting) {
+        if (type instanceof TypeVariable<?> variable) {
+            Type binding = bindings.get(variable);
+            if (binding == null || !visiting.add(variable)) {
+                return true;
+            }
+            boolean unresolved = containsUnresolvedTypeVariable(binding, bindings, visiting);
+            visiting.remove(variable);
+            return unresolved;
+        }
+        if (type instanceof ParameterizedType parameterizedType) {
+            return Arrays.stream(parameterizedType.getActualTypeArguments())
+                    .anyMatch(argument -> containsUnresolvedTypeVariable(argument, bindings, visiting));
+        }
+        if (type instanceof WildcardType wildcardType) {
+            return Arrays.stream(wildcardType.getUpperBounds())
+                    .anyMatch(bound -> containsUnresolvedTypeVariable(bound, bindings, visiting))
+                    || Arrays.stream(wildcardType.getLowerBounds())
+                    .anyMatch(bound -> containsUnresolvedTypeVariable(bound, bindings, visiting));
+        }
+        if (type instanceof GenericArrayType arrayType) {
+            return containsUnresolvedTypeVariable(arrayType.getGenericComponentType(), bindings, visiting);
+        }
+        return false;
+    }
+
+    private static Map<TypeVariable<?>, Type> findTypeBindings(Type currentType,
+                                                               Class<?> targetType,
+                                                               Map<TypeVariable<?>, Type> inheritedBindings) {
+        Class<?> currentClass = rawClass(currentType);
+        if (currentClass == null) {
+            return null;
+        }
+        Map<TypeVariable<?>, Type> bindings = new HashMap<>(inheritedBindings);
+        if (currentType instanceof ParameterizedType parameterizedType) {
+            TypeVariable<?>[] variables = currentClass.getTypeParameters();
+            Type[] arguments = parameterizedType.getActualTypeArguments();
+            for (int i = 0; i < Math.min(variables.length, arguments.length); i++) {
+                bindings.put(variables[i], arguments[i]);
+            }
+        }
+        if (currentClass.equals(targetType)) {
+            return bindings;
+        }
+        for (Type parentInterface : currentClass.getGenericInterfaces()) {
+            Map<TypeVariable<?>, Type> result = findTypeBindings(parentInterface, targetType, bindings);
+            if (result != null) {
+                return result;
+            }
+        }
+        Type superclass = currentClass.getGenericSuperclass();
+        return superclass != null
+                ? findTypeBindings(superclass, targetType, bindings)
+                : null;
     }
 
     private static boolean containsTypeVariable(Type type) {

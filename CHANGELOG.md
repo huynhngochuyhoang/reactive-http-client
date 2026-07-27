@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `MockReactiveHttpClient` now use the same decision. AOT validation is
   limited to starter factory beans and honors replacement metadata caches;
   inherited arrays and wildcard bounds are materialized before unresolved
-  generic checks.
+  generic checks, bounded unresolved variables remain invalid, and publisher
+  arrays are rejected as nested reactive values.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects
