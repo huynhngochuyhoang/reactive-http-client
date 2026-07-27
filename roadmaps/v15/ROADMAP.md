@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V15
 
-> **Status:** completed and prepared for release as `2.11.0` after V15
+> **Status:** completed and released as `2.11.0` after V15
 > production-hardening, diagnostics, auth, benchmark-audit, and release-readiness
 > work.
 

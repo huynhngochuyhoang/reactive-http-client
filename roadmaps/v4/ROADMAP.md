@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V4
 
-> **Status:** draft after completing the V3 maturity roadmap. V3 made the
+> **Status:** completed and released as `2.3.0`. V3 made the
 > starter safer and easier to operate. V4 should focus on extensibility without
 > turning the HTTP starter into a general integration framework.
 

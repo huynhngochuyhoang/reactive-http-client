@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V3
 
-> **Status:** draft after the 2.0.0 work. V1 established the production
+> **Status:** completed across `2.1.0` and `2.2.0`. V1 established the production
 > platform; V2 filled the major gaps around auth, observability, test helpers,
 > rate limiting, TLS, and cleanup. V3 should be a maturity roadmap: fewer new
 > abstractions, stronger defaults, better diagnostics, and cleaner migration
