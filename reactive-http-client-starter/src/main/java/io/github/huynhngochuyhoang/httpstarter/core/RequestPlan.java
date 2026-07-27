@@ -215,14 +215,17 @@ record RequestPlan(
         if (type instanceof WildcardType wildcardType) {
             return resolvedWildcardType(resolvableType, wildcardType);
         }
-        if (resolvableType.hasGenerics()) {
+        if (type instanceof ParameterizedType || resolvableType.hasGenerics()) {
             if (rawClass == null) {
                 return fallback;
             }
             Type[] generics = Arrays.stream(resolvableType.getGenerics())
                     .map(generic -> resolvedType(generic, generic.getType()))
                     .toArray(Type[]::new);
-            return new ResolvedParameterizedType(ownerType(type), rawClass, generics);
+            Type ownerType = type instanceof ParameterizedType parameterizedType
+                    ? resolvedOwnerType(parameterizedType.getOwnerType(), resolvableType)
+                    : null;
+            return new ResolvedParameterizedType(ownerType, rawClass, generics);
         }
         if (!(type instanceof TypeVariable<?>)) {
             return type;
@@ -253,9 +256,9 @@ record RequestPlan(
         return rawClass != null ? rawClass : fallback;
     }
 
-    private static Type ownerType(Type type) {
-        return type instanceof ParameterizedType parameterizedType
-                ? parameterizedType.getOwnerType()
+    private static Type resolvedOwnerType(Type ownerType, ResolvableType context) {
+        return ownerType != null
+                ? resolvedType(ResolvableType.forType(ownerType, context), ownerType)
                 : null;
     }
 
@@ -321,7 +324,13 @@ record RequestPlan(
 
         @Override
         public String getTypeName() {
-            return rawType.getTypeName() + "<"
+            String typeName = ownerType != null
+                    ? ownerType.getTypeName() + "$" + rawType.getSimpleName()
+                    : rawType.getTypeName();
+            if (actualTypeArguments.length == 0) {
+                return typeName;
+            }
+            return typeName + "<"
                     + Arrays.stream(actualTypeArguments)
                     .map(Type::getTypeName)
                     .reduce((left, right) -> left + ", " + right)

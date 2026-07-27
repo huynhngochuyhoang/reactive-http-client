@@ -112,6 +112,9 @@ final class DeclarativeReturnTypeGrammar {
     }
 
     private static boolean containsPublisher(Type type) {
+        if (type == null) {
+            return false;
+        }
         if (type instanceof Class<?> clazz && clazz.isArray()) {
             return containsPublisher(clazz.getComponentType());
         }
@@ -120,7 +123,8 @@ final class DeclarativeReturnTypeGrammar {
             return true;
         }
         if (type instanceof ParameterizedType parameterizedType) {
-            return Arrays.stream(parameterizedType.getActualTypeArguments())
+            return containsPublisher(parameterizedType.getOwnerType())
+                    || Arrays.stream(parameterizedType.getActualTypeArguments())
                     .anyMatch(DeclarativeReturnTypeGrammar::containsPublisher);
         }
         if (type instanceof WildcardType wildcardType) {
@@ -147,6 +151,9 @@ final class DeclarativeReturnTypeGrammar {
     private static boolean containsUnresolvedTypeVariable(Type type,
                                                           Map<TypeVariable<?>, Type> bindings,
                                                           Set<TypeVariable<?>> visiting) {
+        if (type == null) {
+            return false;
+        }
         if (type instanceof TypeVariable<?> variable) {
             Type binding = bindings.get(variable);
             if (binding == null || !visiting.add(variable)) {
@@ -157,7 +164,8 @@ final class DeclarativeReturnTypeGrammar {
             return unresolved;
         }
         if (type instanceof ParameterizedType parameterizedType) {
-            return Arrays.stream(parameterizedType.getActualTypeArguments())
+            return containsUnresolvedTypeVariable(parameterizedType.getOwnerType(), bindings, visiting)
+                    || Arrays.stream(parameterizedType.getActualTypeArguments())
                     .anyMatch(argument -> containsUnresolvedTypeVariable(argument, bindings, visiting));
         }
         if (type instanceof WildcardType wildcardType) {
@@ -203,11 +211,15 @@ final class DeclarativeReturnTypeGrammar {
     }
 
     private static boolean containsTypeVariable(Type type) {
+        if (type == null) {
+            return false;
+        }
         if (type instanceof TypeVariable<?>) {
             return true;
         }
         if (type instanceof ParameterizedType parameterizedType) {
-            return Arrays.stream(parameterizedType.getActualTypeArguments())
+            return containsTypeVariable(parameterizedType.getOwnerType())
+                    || Arrays.stream(parameterizedType.getActualTypeArguments())
                     .anyMatch(DeclarativeReturnTypeGrammar::containsTypeVariable);
         }
         if (type instanceof WildcardType wildcardType) {

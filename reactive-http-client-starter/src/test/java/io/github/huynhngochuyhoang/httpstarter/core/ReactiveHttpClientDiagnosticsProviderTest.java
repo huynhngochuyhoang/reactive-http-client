@@ -129,6 +129,26 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void replacementFactoryClientsSkipStarterReturnGrammarInDiagnostics() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReplacementDiagnosticClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ReplacementDiagnosticClient.class);
+        beanFactory.registerBeanDefinition("replacementDiagnosticClient", definition);
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, new ReactiveHttpClientProperties(), new MethodMetadataCache());
+
+        assertThat(provider.clientSummaries())
+                .singleElement()
+                .satisfies(summary -> {
+                    assertThat(summary.clientName()).isEqualTo("replacement-diagnostic");
+                    assertThat(summary.endpointCount()).isEqualTo(1);
+                });
+        assertThat(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider))
+                .containsEntry("clientCount", 1);
+    }
+
+    @Test
     void clientSummariesDoNotResolveStrictAuthProviders() {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         GenericBeanDefinition definition = new GenericBeanDefinition();
@@ -1000,5 +1020,28 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         @GET("/direct")
         Mono<String> direct();
+    }
+
+    @ReactiveHttpClient(
+            name = "replacement-diagnostic",
+            baseUrl = "http://replacement-diagnostic.test")
+    interface ReplacementDiagnosticClient {
+
+        @GET("/nested")
+        Mono<Mono<String>> nested();
+    }
+
+    static final class ReplacementDiagnosticClientFactoryBean
+            implements FactoryBean<ReplacementDiagnosticClient> {
+
+        @Override
+        public ReplacementDiagnosticClient getObject() {
+            return null;
+        }
+
+        @Override
+        public Class<?> getObjectType() {
+            return ReplacementDiagnosticClient.class;
+        }
     }
 }

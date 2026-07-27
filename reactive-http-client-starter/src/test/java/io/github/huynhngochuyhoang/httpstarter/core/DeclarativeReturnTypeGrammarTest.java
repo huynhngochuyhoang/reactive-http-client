@@ -124,6 +124,26 @@ class DeclarativeReturnTypeGrammarTest {
     }
 
     @Test
+    void resolvesParameterizedOwnerBindingsAndRejectsUnresolvedOwners() {
+        assertUnsupported(UnresolvedOwnerClient.class, "unresolved-owner")
+                .contains("reactive element type must resolve against the concrete client interface");
+
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ConcreteOwnerClient.class, "concrete-owner"))
+                .doesNotThrowAnyException();
+        EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
+                        ConcreteOwnerClient.class,
+                        "concrete-owner",
+                        new ReactiveHttpClientProperties.ClientConfig(),
+                        metadataCache)
+                .get(0);
+
+        assertThat(contract.responseType()).isEqualTo(
+                DeclarativeReturnTypeGrammarTest.class.getName()
+                        + "$GenericOuter<java.lang.String>$Body");
+    }
+
+    @Test
     void rejectsInheritedGenericPublisherBindingWithConcreteAndDeclaringContext() {
         assertUnsupported(InheritedPublisherClient.class, "inherited-publisher")
                 .contains("concreteClient=" + InheritedPublisherClient.class.getName())
@@ -311,5 +331,21 @@ class DeclarativeReturnTypeGrammarTest {
     interface PublisherArrayClient {
         @GET("/publisher-array")
         Mono<Flux[]> load();
+    }
+
+    static class GenericOuter<T> {
+        class Body {
+        }
+    }
+
+    interface OwnerOperations<T> {
+        @GET("/owner")
+        Mono<GenericOuter<T>.Body> load();
+    }
+
+    interface UnresolvedOwnerClient<T> extends OwnerOperations<T> {
+    }
+
+    interface ConcreteOwnerClient extends OwnerOperations<String> {
     }
 }

@@ -54,11 +54,24 @@ final class EffectiveHttpClientContractExporter {
                                                     ResilienceOperatorApplier resilienceOperatorApplier,
                                                     Predicate<Method> methodFilter,
                                                     boolean validateResilienceInstances) {
+        return export(clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier,
+                methodFilter, validateResilienceInstances, true);
+    }
+
+    static List<EffectiveHttpClientContract> export(Class<?> clientInterface,
+                                                    String clientName,
+                                                    ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                    MethodMetadataCache metadataCache,
+                                                    ResilienceOperatorApplier resilienceOperatorApplier,
+                                                    Predicate<Method> methodFilter,
+                                                    boolean validateResilienceInstances,
+                                                    boolean validateDeclarativeReturnTypes) {
         return Arrays.stream(clientInterface.getMethods())
                 .filter(EffectiveHttpClientContractExporter::isDeclarativeClientMethod)
                 .filter(method -> methodFilter == null || methodFilter.test(method))
                 .map(method -> contract(clientInterface, clientName, clientConfig, metadataCache,
-                        resilienceOperatorApplier, method, validateResilienceInstances))
+                        resilienceOperatorApplier, method, validateResilienceInstances,
+                        validateDeclarativeReturnTypes))
                 .sorted(Comparator.comparing(EffectiveHttpClientContract::declaringInterface)
                         .thenComparing(EffectiveHttpClientContract::javaMethodSignature))
                 .toList();
@@ -70,10 +83,13 @@ final class EffectiveHttpClientContractExporter {
                                                         MethodMetadataCache metadataCache,
                                                         ResilienceOperatorApplier resilienceOperatorApplier,
                                                         Method method,
-                                                        boolean validateResilienceInstances) {
+                                                        boolean validateResilienceInstances,
+                                                        boolean validateDeclarativeReturnTypes) {
         MethodMetadata meta = metadataCache.get(method);
         RequestPlan plan = RequestPlan.from(meta, clientInterface);
-        DeclarativeReturnTypeGrammar.validate(clientInterface, clientName, plan);
+        if (validateDeclarativeReturnTypes) {
+            DeclarativeReturnTypeGrammar.validate(clientInterface, clientName, plan);
+        }
         EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);
         if (validateResilienceInstances) {
             validateResilienceInstances(plan, method, clientName, clientConfig, resilienceOperatorApplier);

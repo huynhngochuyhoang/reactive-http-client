@@ -42,10 +42,10 @@ public class ReactiveHttpClientDiagnosticsProvider {
     public List<ClientSummary> clientSummaries() {
         ResilienceOperatorApplier resilienceOperatorApplier = resilienceOperatorApplier();
         return List.of(beanFactory.getBeanDefinitionNames()).stream()
-                .map(this::clientInterface)
+                .map(this::clientRegistration)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(clientInterface -> clientSummaryEntry(clientInterface, resilienceOperatorApplier))
+                .map(registration -> clientSummaryEntry(registration, resilienceOperatorApplier))
                 .sorted(Comparator.comparing(ClientSummary::clientName)
                         .thenComparing(ClientSummary::clientInterface))
                 .toList();
@@ -54,32 +54,36 @@ public class ReactiveHttpClientDiagnosticsProvider {
     List<ClientSnapshotEntry> clientSnapshotEntries() {
         ResilienceOperatorApplier resilienceOperatorApplier = resilienceOperatorApplier();
         return List.of(beanFactory.getBeanDefinitionNames()).stream()
-                .map(this::clientInterface)
+                .map(this::clientRegistration)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(clientInterface -> clientSnapshotEntry(clientInterface, resilienceOperatorApplier))
+                .map(registration -> clientSnapshotEntry(registration, resilienceOperatorApplier))
                 .sorted(Comparator.comparing((ClientSnapshotEntry entry) -> entry.summary().clientName())
                         .thenComparing(entry -> entry.summary().clientInterface()))
                 .toList();
     }
 
-    private ClientSummary clientSummaryEntry(Class<?> clientInterface,
+    private ClientSummary clientSummaryEntry(ClientRegistration registration,
                                              ResilienceOperatorApplier resilienceOperatorApplier) {
+        Class<?> clientInterface = registration.clientInterface();
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         String clientName = annotation != null ? annotation.name() : "";
         ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
-        return clientSummary(clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
+        return clientSummary(clientInterface, clientName, clientConfig, metadataCache,
+                resilienceOperatorApplier, registration.starterFactory());
     }
 
-    private ClientSnapshotEntry clientSnapshotEntry(Class<?> clientInterface,
+    private ClientSnapshotEntry clientSnapshotEntry(ClientRegistration registration,
                                                     ResilienceOperatorApplier resilienceOperatorApplier) {
+        Class<?> clientInterface = registration.clientInterface();
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         String clientName = annotation != null ? annotation.name() : "";
         ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
         ClientSummary summary = clientSummary(
-                clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier);
+                clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier,
+                registration.starterFactory());
         return new ClientSnapshotEntry(
                 summary,
                 strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceOperatorApplier),
@@ -95,12 +99,23 @@ public class ReactiveHttpClientDiagnosticsProvider {
                                        ReactiveHttpClientProperties.ClientConfig clientConfig,
                                        MethodMetadataCache metadataCache,
                                        ResilienceOperatorApplier resilienceOperatorApplier) {
+        return clientSummary(clientInterface, clientName, clientConfig, metadataCache,
+                resilienceOperatorApplier, true);
+    }
+
+    private static ClientSummary clientSummary(Class<?> clientInterface,
+                                               String clientName,
+                                               ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                               MethodMetadataCache metadataCache,
+                                               ResilienceOperatorApplier resilienceOperatorApplier,
+                                               boolean validateDeclarativeReturnTypes) {
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         ReactiveHttpClientProperties.ClientConfig resolvedConfig = clientConfig != null
                 ? clientConfig
                 : new ReactiveHttpClientProperties.ClientConfig();
         List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
-                clientInterface, clientName, resolvedConfig, metadataCache, resilienceOperatorApplier, null, false);
+                clientInterface, clientName, resolvedConfig, metadataCache, resilienceOperatorApplier,
+                null, false, validateDeclarativeReturnTypes);
         long inherited = contracts.stream()
                 .filter(EffectiveHttpClientContract::inherited)
                 .count();
@@ -147,27 +162,44 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 null);
     }
 
-    private Class<?> clientInterface(String beanName) {
+    private ClientRegistration clientRegistration(String beanName) {
         BeanDefinition definition = beanFactory.getBeanDefinition(beanName);
+        boolean starterFactory = isStarterFactory(definition);
         Object objectType = definition.getAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
-        if (objectType == null && ReactiveHttpClientFactoryBean.class.getName().equals(definition.getBeanClassName())) {
+        if (objectType == null && starterFactory) {
             objectType = definition.getPropertyValues().get("type");
         }
         if (objectType instanceof Class<?> clazz && clazz.isInterface()
                 && clazz.isAnnotationPresent(ReactiveHttpClient.class)) {
-            return clazz;
+            return new ClientRegistration(clazz, starterFactory);
         }
         if (objectType instanceof String className) {
             try {
                 Class<?> clazz = ClassUtils.resolveClassName(className, beanFactory.getBeanClassLoader());
                 if (clazz.isInterface() && clazz.isAnnotationPresent(ReactiveHttpClient.class)) {
-                    return clazz;
+                    return new ClientRegistration(clazz, starterFactory);
                 }
             } catch (IllegalArgumentException ignored) {
                 return null;
             }
         }
         return null;
+    }
+
+    private boolean isStarterFactory(BeanDefinition definition) {
+        String beanClassName = definition.getBeanClassName();
+        if (beanClassName == null) {
+            return false;
+        }
+        try {
+            Class<?> beanClass = ClassUtils.resolveClassName(beanClassName, beanFactory.getBeanClassLoader());
+            return ReactiveHttpClientFactoryBean.class.isAssignableFrom(beanClass);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    private record ClientRegistration(Class<?> clientInterface, boolean starterFactory) {
     }
 
     private static EffectiveHttpClientContract.TimeoutPolicy representativeTimeout(List<EffectiveHttpClientContract> contracts) {
