@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V16
 
-> **Status:** completed for the `2.12.0` candidate line.
+> **Status:** completed and released as `2.12.0`.
 
 V15 finished the production-hardening cycle around diagnostics, auth refresh
 failure handling, inherited generic endpoint types, streaming ownership,
@@ -327,4 +327,3 @@ that evidence current without adding brittle automation.
 - [x] Release readiness evidence names the selected version and baseline.
 - [x] Changelog entries stay under `Unreleased` until release prep starts.
 - [x] Release tests pass before marking V16 complete.
-

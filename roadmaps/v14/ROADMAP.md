@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V14
 
-> **Status:** draft after V12/V13 benchmark work. V12 and V13 add a benchmark
+> **Status:** completed after the `2.10.0` release. V12 and V13 added a benchmark
 > module, promoted benchmark documentation, release-evidence metadata, and
 > measured runtime optimizations. That scope is large enough for a minor release:
 > publish it as `2.10.0`, not a patch release, unless all benchmark/docs features

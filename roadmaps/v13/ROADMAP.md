@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V13
 
-> **Status:** draft after V12 benchmark evidence. V13 turns release-quality
+> **Status:** completed in the `2.10.0` release cycle. V13 turned release-quality
 > benchmark output into public performance documentation, publishes a curated
 > report, and uses measured scenarios to choose small optimization work.
 

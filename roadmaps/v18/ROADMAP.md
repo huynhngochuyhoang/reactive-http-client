@@ -1,6 +1,6 @@
 # Reactive HTTP Client — Roadmap V18
 
-> **Status:** completed for the `2.14.0` candidate line on 2026-07-10. V17 completed the
+> **Status:** completed and released as `2.14.0` on 2026-07-10. V17 completed the
 > post-`2.12.0` baseline transition, diagnostics/support-bundle stabilization,
 > strict-mode adoption audits, native hint re-audit, and dependency-baseline
 > readiness. V18 should stay focused on the next baseline transition, release

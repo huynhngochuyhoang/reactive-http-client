@@ -1,6 +1,7 @@
 # Reactive HTTP Client — Roadmap V12
 
-> **Status:** draft after `2.9.0`. V12 focuses on reproducible performance
+> **Status:** completed in the `2.10.0` release cycle. V12 focused on
+> reproducible performance
 > evidence so users can compare the starter against raw `WebClient` and Spring
 > HTTP Interface clients before trusting it in production paths.
 

@@ -1,6 +1,8 @@
 # Reactive HTTP Client — Roadmap V2
 
-> **Status:** baseline v1.14.0 (2026-05-12). The V1 roadmap
+> **Status:** completed and released as `2.0.0`. This roadmap predates the
+> separate execution-checklist convention. Baseline v1.14.0 (2026-05-12). The
+> V1 roadmap
 > ([`v1/ROADMAP.md`](../v1/ROADMAP.md) + [`v1/CHECKLIST.md`](../v1/CHECKLIST.md)) is functionally complete: OpenTelemetry
 > tracing and baggage propagation, multipart, test helpers, per-client pools,
 > HTTP proxy + TLS/mTLS, actuator health indicator + pool metrics, OAuth2

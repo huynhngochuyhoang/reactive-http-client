@@ -37,6 +37,76 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void roadmapArchiveIsContiguousLinkedAndStatusConsistent() throws IOException {
+        Path archive = projectRoot().resolve("roadmaps");
+        String index = Files.readString(archive.resolve("README.md"));
+        List<Integer> versions;
+        try (Stream<Path> paths = Files.list(archive)) {
+            versions = paths
+                    .filter(Files::isDirectory)
+                    .map(path -> path.getFileName().toString())
+                    .filter(name -> name.matches("v\\d+"))
+                    .map(name -> Integer.parseInt(name.substring(1)))
+                    .sorted()
+                    .toList();
+        }
+
+        List<Integer> expectedVersions = new ArrayList<>();
+        for (int version = 1; version <= 24; version++) {
+            expectedVersions.add(version);
+        }
+        assertThat(versions).as("contiguous V1-V24 roadmap directories").isEqualTo(expectedVersions);
+        assertThat(index)
+                .contains("acceptance boxes preserve the proposal")
+                .contains("V2 predates the separate execution-checklist convention")
+                .contains("V24 is the only active draft");
+
+        for (int version : versions) {
+            Path directory = archive.resolve("v" + version);
+            Path roadmap = directory.resolve("ROADMAP.md");
+            Path checklist = directory.resolve("CHECKLIST.md");
+            String roadmapTarget = "(v" + version + "/ROADMAP.md)";
+            String checklistTarget = "(v" + version + "/CHECKLIST.md)";
+            String indexRow = index.lines()
+                    .filter(line -> line.startsWith("| V" + version + " |"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Missing V" + version + " roadmap index row"));
+
+            assertThat(roadmap).as("V%s roadmap", version).exists();
+            assertThat(indexRow).contains(roadmapTarget);
+
+            String roadmapStatus = Files.readString(roadmap).lines()
+                    .filter(line -> line.startsWith("> **Status:**"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Missing V" + version + " roadmap status"));
+            if (version == 24) {
+                assertThat(roadmapStatus).containsIgnoringCase("draft");
+                assertThat(indexRow).contains("Draft");
+            }
+            else if (version == 19) {
+                assertThat(roadmapStatus).containsIgnoringCase("no-go");
+                assertThat(indexRow).containsIgnoringCase("no-go");
+            }
+            else {
+                assertThat(roadmapStatus).containsAnyOf("completed", "released");
+                assertThat(indexRow).contains("Completed");
+            }
+
+            if (version == 2) {
+                assertThat(checklist).doesNotExist();
+                assertThat(indexRow).contains("pre-convention");
+            }
+            else {
+                assertThat(checklist).as("V%s checklist", version).exists();
+                assertThat(indexRow).contains(checklistTarget);
+                assertThat(Files.readString(checklist))
+                        .as("V%s checklist sibling roadmap link", version)
+                        .contains("(ROADMAP.md)");
+            }
+        }
+    }
+
+    @Test
     void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

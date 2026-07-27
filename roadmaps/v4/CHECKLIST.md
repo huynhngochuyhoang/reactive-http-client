@@ -67,6 +67,11 @@
 
 ## Release Readiness
 
+> Historical note: this block was not updated when `2.3.0` shipped. The checked
+> implementation sections above, the `2.3.0` changelog section, and the V5
+> completion record supersede these unchecked administrative boxes; they are not
+> active release tasks.
+
 - [ ] `CHANGELOG.md` has V4 entries grouped under Added/Changed/Fixed/Docs.
 - [ ] README remains short and links to detailed docs.
 - [ ] New properties have configuration metadata and metadata tests.

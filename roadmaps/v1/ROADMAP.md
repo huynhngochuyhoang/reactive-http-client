@@ -1,5 +1,9 @@
 # Reactive HTTP Client — Improvement Roadmap
 
+> **Status:** completed before V2. The sibling execution checklist and
+> changelog are the completion record; acceptance boxes below preserve the
+> original planning snapshot.
+>
 > Baseline: v1.8.1 (2026-04-23). All items from `TASK.md` are shipped; see `CHANGELOG.md`
 > for what has already been addressed. This document only lists **new work** — nothing
 > already shipped or already planned under `TASK.md` is restated here.
