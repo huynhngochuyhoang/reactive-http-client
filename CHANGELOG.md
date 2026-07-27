@@ -23,7 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generic checks, bounded unresolved variables remain invalid, and publisher
   arrays are rejected as nested reactive values. Parameterized owner bindings
   are resolved for runtime codecs and diagnostics, while diagnostics skip this
-  starter-only grammar for clients supplied by replacement factory beans.
+  starter-only grammar for clients supplied by replacement factory beans. AOT
+  processing recognizes starter factories declared through `@Bean` methods,
+  and wildcard-wrapped `ResponseEntity` envelopes are rejected at startup.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects

@@ -49,6 +49,10 @@ final class DeclarativeReturnTypeGrammar {
             throw unsupported(concreteClientInterface, clientName, method, responseType,
                     "the reactive element type must resolve against the concrete client interface");
         }
+        if (hasDirectWildcardBound(responseType, ResponseEntity.class)) {
+            throw unsupported(concreteClientInterface, clientName, method, responseType,
+                    "ResponseEntity envelopes must be declared directly as Mono<ResponseEntity<T>>");
+        }
 
         if (Flux.class.equals(outerType)) {
             if (containsTypeVariable(responseType)) {
@@ -137,6 +141,16 @@ final class DeclarativeReturnTypeGrammar {
             return containsPublisher(arrayType.getGenericComponentType());
         }
         return false;
+    }
+
+    private static boolean hasDirectWildcardBound(Type type, Class<?> expectedRawType) {
+        if (!(type instanceof WildcardType wildcardType)) {
+            return false;
+        }
+        return Arrays.stream(wildcardType.getUpperBounds())
+                .anyMatch(bound -> expectedRawType.equals(rawClass(bound)))
+                || Arrays.stream(wildcardType.getLowerBounds())
+                .anyMatch(bound -> expectedRawType.equals(rawClass(bound)));
     }
 
     private static boolean containsUnresolvedTypeVariable(Type type,

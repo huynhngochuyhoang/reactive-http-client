@@ -17,9 +17,7 @@ import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
 import org.springframework.beans.factory.support.RootBeanDefinition;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.*;
 import org.springframework.context.aot.ApplicationContextAotGenerator;
 import org.springframework.javapoet.ClassName;
 import reactor.core.publisher.Mono;
@@ -91,6 +89,32 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.proxies().forInterfaces(AotSmokeClient.class))
                 .accepts(generationContext.getRuntimeHints());
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(AotSmokeClient.class, "ping")))
+                .accepts(generationContext.getRuntimeHints());
+        context.close();
+    }
+
+    @Test
+    void beanFactoryAotProcessorRegistersHintsForFactoryMethodClientFactories() {
+        AnnotationConfigApplicationContext context =
+                new AnnotationConfigApplicationContext(FactoryMethodAotConfiguration.class);
+        RootBeanDefinition beanDefinition = (RootBeanDefinition) context.getBeanFactory()
+                .getBeanDefinition("factoryMethodAotClient");
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, FactoryMethodAotClient.class);
+
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+        DefaultGenerationContext generationContext = newGenerationContext();
+
+        assertThat(beanDefinition.getResolvableType().resolve())
+                .isEqualTo(ReactiveHttpClientFactoryBean.class);
+        assertThat(contribution).isNotNull();
+        contribution.applyTo(generationContext, null);
+
+        assertThat(RuntimeHintsPredicates.proxies().forInterfaces(FactoryMethodAotClient.class))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                method(FactoryMethodAotClient.class, "ping")))
                 .accepts(generationContext.getRuntimeHints());
         context.close();
     }
@@ -226,6 +250,24 @@ class ReactiveHttpClientAotSmokeTest {
 
     @ReactiveHttpClient(name = "child-smoke", baseUrl = "http://child-smoke.test")
     interface ChildSmokeClient extends ParentSmokeOperations {
+    }
+
+    @ReactiveHttpClient(name = "factory-method-aot", baseUrl = "http://factory-method.test")
+    interface FactoryMethodAotClient {
+        @GET("/ping")
+        Mono<String> ping();
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class FactoryMethodAotConfiguration {
+        @Bean
+        @Lazy
+        ReactiveHttpClientFactoryBean<FactoryMethodAotClient> factoryMethodAotClient() {
+            ReactiveHttpClientFactoryBean<FactoryMethodAotClient> factoryBean =
+                    new ReactiveHttpClientFactoryBean<>();
+            factoryBean.setType(FactoryMethodAotClient.class);
+            return factoryBean;
+        }
     }
 
     @ReactiveHttpClient(name = "invalid-aot-return", baseUrl = "http://invalid-aot.test")

@@ -41,6 +41,10 @@ class DeclarativeReturnTypeGrammarTest {
                 .contains("the only reactive ResponseEntity body supported is Flux<DataBuffer>");
         assertUnsupported(FluxEnvelopeClient.class, "flux-envelope")
                 .contains("ResponseEntity envelopes are supported only inside Mono");
+        assertUnsupported(WildcardMonoEnvelopeClient.class, "wildcard-mono-envelope")
+                .contains("ResponseEntity envelopes must be declared directly as Mono<ResponseEntity<T>>");
+        assertUnsupported(WildcardFluxEnvelopeClient.class, "wildcard-flux-envelope")
+                .contains("ResponseEntity envelopes must be declared directly as Mono<ResponseEntity<T>>");
         assertUnsupported(RawResponseEntityClient.class, "raw-envelope")
                 .contains("resolvedResponseType=org.springframework.http.ResponseEntity<T>")
                 .contains("ResponseEntity must declare a resolvable body type");
@@ -214,6 +218,12 @@ class DeclarativeReturnTypeGrammarTest {
         @GET("/buffers")
         Flux<DataBuffer> buffers();
 
+        @GET("/wildcard-value")
+        Mono<? extends BaseDto> wildcardValue();
+
+        @GET("/wildcard-values")
+        Flux<? extends BaseDto> wildcardValues();
+
         @GET("/streaming-entity")
         Mono<ResponseEntity<Flux<DataBuffer>>> streamingEntity();
     }
@@ -241,6 +251,16 @@ class DeclarativeReturnTypeGrammarTest {
     interface FluxEnvelopeClient {
         @GET("/entities")
         Flux<ResponseEntity<String>> entities();
+    }
+
+    interface WildcardMonoEnvelopeClient {
+        @GET("/entity")
+        Mono<? extends ResponseEntity<String>> entity();
+    }
+
+    interface WildcardFluxEnvelopeClient {
+        @GET("/entities")
+        Flux<? extends ResponseEntity<String>> entities();
     }
 
     @SuppressWarnings("rawtypes")

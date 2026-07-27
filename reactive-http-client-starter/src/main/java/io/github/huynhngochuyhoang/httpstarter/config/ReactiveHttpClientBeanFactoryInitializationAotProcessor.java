@@ -11,6 +11,7 @@ import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContrib
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.core.ResolvableType;
 import org.springframework.util.ClassUtils;
 
 import java.util.ArrayList;
@@ -65,7 +66,11 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
 
     private Class<?> resolveClientInterface(BeanDefinition definition, ClassLoader classLoader) {
         Class<?> beanClass = resolveClass(definition.getBeanClassName(), classLoader, true);
-        if (beanClass == null || !ReactiveHttpClientFactoryBean.class.isAssignableFrom(beanClass)) {
+        ResolvableType beanType = definition.getResolvableType();
+        Class<?> resolvedBeanType = beanType.resolve();
+        if ((beanClass == null || !ReactiveHttpClientFactoryBean.class.isAssignableFrom(beanClass))
+                && (resolvedBeanType == null
+                || !ReactiveHttpClientFactoryBean.class.isAssignableFrom(resolvedBeanType))) {
             return null;
         }
 
@@ -75,7 +80,10 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             return objectTypeClass;
         }
         PropertyValue typeProperty = definition.getPropertyValues().getPropertyValue("type");
-        return typeProperty != null ? resolveClass(typeProperty.getValue(), classLoader, false) : null;
+        if (typeProperty != null) {
+            return resolveClass(typeProperty.getValue(), classLoader, false);
+        }
+        return beanType.as(FactoryBean.class).getGeneric(0).resolve();
     }
 
     private Class<?> resolveClass(Object value, ClassLoader classLoader, boolean ignoreResolutionFailures) {
