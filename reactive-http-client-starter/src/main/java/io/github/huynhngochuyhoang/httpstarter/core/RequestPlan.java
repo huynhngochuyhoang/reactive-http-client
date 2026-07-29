@@ -251,7 +251,10 @@ record RequestPlan(
             Type[] generics = Arrays.stream(resolvableType.getGenerics())
                     .map(generic -> resolvedType(generic, generic.getType()))
                     .toArray(Type[]::new);
-            return new ResolvedParameterizedType(null, rawClass, generics);
+            Type ownerType = fallback instanceof ParameterizedType parameterizedType
+                    ? resolvedOwnerType(parameterizedType.getOwnerType(), resolvableType)
+                    : null;
+            return new ResolvedParameterizedType(ownerType, rawClass, generics);
         }
         return rawClass != null ? rawClass : fallback;
     }

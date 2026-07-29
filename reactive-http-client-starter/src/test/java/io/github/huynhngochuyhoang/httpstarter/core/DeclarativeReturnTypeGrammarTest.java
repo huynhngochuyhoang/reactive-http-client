@@ -148,6 +148,24 @@ class DeclarativeReturnTypeGrammarTest {
     }
 
     @Test
+    void preservesParameterizedOwnerBindingsInsideWildcardBounds() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                WildcardOwnerClient.class, "wildcard-owner"))
+                .doesNotThrowAnyException();
+
+        EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
+                        WildcardOwnerClient.class,
+                        "wildcard-owner",
+                        new ReactiveHttpClientProperties.ClientConfig(),
+                        metadataCache)
+                .get(0);
+
+        assertThat(contract.responseType()).isEqualTo(
+                "? extends " + DeclarativeReturnTypeGrammarTest.class.getName()
+                        + "$WildcardOuter<java.lang.String>$Body<java.lang.Integer>");
+    }
+
+    @Test
     void rejectsInheritedGenericPublisherBindingWithConcreteAndDeclaringContext() {
         assertUnsupported(InheritedPublisherClient.class, "inherited-publisher")
                 .contains("concreteClient=" + InheritedPublisherClient.class.getName())
@@ -367,5 +385,15 @@ class DeclarativeReturnTypeGrammarTest {
     }
 
     interface ConcreteOwnerClient extends OwnerOperations<String> {
+    }
+
+    static class WildcardOuter<T> {
+        class Body<U> {
+        }
+    }
+
+    interface WildcardOwnerClient {
+        @GET("/wildcard-owner")
+        Mono<? extends WildcardOuter<String>.Body<Integer>> load();
     }
 }

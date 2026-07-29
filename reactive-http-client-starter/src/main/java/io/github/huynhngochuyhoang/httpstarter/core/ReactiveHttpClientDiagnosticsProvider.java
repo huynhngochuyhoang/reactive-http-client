@@ -168,6 +168,10 @@ public class ReactiveHttpClientDiagnosticsProvider {
         Object objectType = definition.getAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
         if (objectType == null && starterFactory) {
             objectType = definition.getPropertyValues().get("type");
+            if (objectType == null) {
+                objectType = definition.getResolvableType()
+                        .as(FactoryBean.class).getGeneric(0).resolve();
+            }
         }
         if (objectType instanceof Class<?> clazz && clazz.isInterface()
                 && clazz.isAnnotationPresent(ReactiveHttpClient.class)) {
@@ -188,15 +192,19 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     private boolean isStarterFactory(BeanDefinition definition) {
         String beanClassName = definition.getBeanClassName();
-        if (beanClassName == null) {
-            return false;
+        if (beanClassName != null) {
+            try {
+                Class<?> beanClass = ClassUtils.resolveClassName(beanClassName, beanFactory.getBeanClassLoader());
+                if (ReactiveHttpClientFactoryBean.class.isAssignableFrom(beanClass)) {
+                    return true;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Fall through to the factory-method return type.
+            }
         }
-        try {
-            Class<?> beanClass = ClassUtils.resolveClassName(beanClassName, beanFactory.getBeanClassLoader());
-            return ReactiveHttpClientFactoryBean.class.isAssignableFrom(beanClass);
-        } catch (IllegalArgumentException ignored) {
-            return false;
-        }
+        Class<?> resolvedBeanType = definition.getResolvableType().resolve();
+        return resolvedBeanType != null
+                && ReactiveHttpClientFactoryBean.class.isAssignableFrom(resolvedBeanType);
     }
 
     private record ClientRegistration(Class<?> clientInterface, boolean starterFactory) {

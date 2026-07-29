@@ -18,6 +18,10 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.cglib.proxy.Enhancer;
 import org.springframework.cglib.proxy.MethodInterceptor;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.Ordered;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -146,6 +150,20 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 });
         assertThat(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider))
                 .containsEntry("clientCount", 1);
+    }
+
+    @Test
+    void factoryMethodStarterClientsUseReturnGrammarInDiagnostics() {
+        try (AnnotationConfigApplicationContext context =
+                     new AnnotationConfigApplicationContext(FactoryMethodDiagnosticsConfiguration.class)) {
+            ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                    context.getBeanFactory(), new ReactiveHttpClientProperties(), new MethodMetadataCache());
+
+            assertThatThrownBy(provider::clientSummaries)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("reactive HTTP client 'factory-method-diagnostic'")
+                    .hasMessageContaining("a Mono element type cannot contain another reactive Publisher");
+        }
     }
 
     @Test
@@ -1042,6 +1060,28 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         @Override
         public Class<?> getObjectType() {
             return ReplacementDiagnosticClient.class;
+        }
+    }
+
+    @ReactiveHttpClient(
+            name = "factory-method-diagnostic",
+            baseUrl = "http://factory-method-diagnostic.test")
+    interface FactoryMethodDiagnosticClient {
+
+        @GET("/nested")
+        Mono<Mono<String>> nested();
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class FactoryMethodDiagnosticsConfiguration {
+
+        @Bean
+        @Lazy
+        ReactiveHttpClientFactoryBean<FactoryMethodDiagnosticClient> factoryMethodDiagnosticClient() {
+            ReactiveHttpClientFactoryBean<FactoryMethodDiagnosticClient> factoryBean =
+                    new ReactiveHttpClientFactoryBean<>();
+            factoryBean.setType(FactoryMethodDiagnosticClient.class);
+            return factoryBean;
         }
     }
 }
