@@ -49,6 +49,10 @@ final class DeclarativeReturnTypeGrammar {
             throw unsupported(concreteClientInterface, clientName, method, responseType,
                     "the reactive element type must resolve against the concrete client interface");
         }
+        if (directWildcardBoundAssignableTo(responseType, Void.class) != null) {
+            throw unsupported(concreteClientInterface, clientName, method, responseType,
+                    "bodiless Void responses must declare Void directly");
+        }
         Class<?> wildcardEnvelopeType = directWildcardBoundAssignableTo(responseType, ResponseEntity.class);
         if (wildcardEnvelopeType != null) {
             String reason = ResponseEntity.class.equals(wildcardEnvelopeType)
@@ -72,6 +76,11 @@ final class DeclarativeReturnTypeGrammar {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,
                         "ResponseEntity envelopes are supported only inside Mono");
             }
+            if (responseRawType != null && DataBuffer.class.isAssignableFrom(responseRawType)
+                    && !DataBuffer.class.equals(responseRawType)) {
+                throw unsupported(concreteClientInterface, clientName, method, responseType,
+                        "raw DataBuffer streams must be declared directly as Flux<DataBuffer>");
+            }
             if (directWildcardBoundAssignableTo(responseType, DataBuffer.class) != null) {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,
                         "raw DataBuffer streams must be declared directly as Flux<DataBuffer>");
@@ -88,6 +97,10 @@ final class DeclarativeReturnTypeGrammar {
             if (bodyType == null || containsTypeVariable(bodyType)) {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,
                         "ResponseEntity must declare a resolvable body type");
+            }
+            if (directWildcardBoundAssignableTo(bodyType, Void.class) != null) {
+                throw unsupported(concreteClientInterface, clientName, method, responseType,
+                        "bodiless Void responses must declare Void directly");
             }
             if (containsResponseEntity(bodyType)) {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,

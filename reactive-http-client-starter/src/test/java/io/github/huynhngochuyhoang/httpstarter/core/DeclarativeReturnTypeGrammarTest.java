@@ -63,6 +63,16 @@ class DeclarativeReturnTypeGrammarTest {
     void rejectsWildcardDataBufferStreamsWithoutRawBufferOwnershipHandling() {
         assertUnsupported(WildcardDataBufferClient.class, "wildcard-data-buffer")
                 .contains("raw DataBuffer streams must be declared directly as Flux<DataBuffer>");
+        assertUnsupported(DataBufferSubtypeClient.class, "data-buffer-subtype")
+                .contains("raw DataBuffer streams must be declared directly as Flux<DataBuffer>");
+    }
+
+    @Test
+    void rejectsWildcardBodilessResponsesWithoutExactVoidHandling() {
+        assertUnsupported(WildcardVoidClient.class, "wildcard-void")
+                .contains("bodiless Void responses must declare Void directly");
+        assertUnsupported(WildcardVoidEntityClient.class, "wildcard-void-entity")
+                .contains("bodiless Void responses must declare Void directly");
     }
 
     @Test
@@ -341,6 +351,24 @@ class DeclarativeReturnTypeGrammarTest {
     interface WildcardDataBufferClient {
         @GET("/buffers")
         Flux<? extends DataBuffer> buffers();
+    }
+
+    abstract static class CustomDataBuffer implements DataBuffer {
+    }
+
+    interface DataBufferSubtypeClient {
+        @GET("/buffers")
+        Flux<CustomDataBuffer> buffers();
+    }
+
+    interface WildcardVoidClient {
+        @GET("/void")
+        Mono<? extends Void> complete();
+    }
+
+    interface WildcardVoidEntityClient {
+        @GET("/void")
+        Mono<ResponseEntity<? extends Void>> complete();
     }
 
     interface NestedResponseEntityClient {
