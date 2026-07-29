@@ -349,6 +349,17 @@ record RequestPlan(
         }
 
         @Override
+        public boolean equals(Object other) {
+            return other instanceof GenericArrayType arrayType
+                    && Objects.equals(genericComponentType, arrayType.getGenericComponentType());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(genericComponentType);
+        }
+
+        @Override
         public String getTypeName() {
             return genericComponentType.getTypeName() + "[]";
         }
