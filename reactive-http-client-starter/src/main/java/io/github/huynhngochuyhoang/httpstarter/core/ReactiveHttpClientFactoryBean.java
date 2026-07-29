@@ -102,6 +102,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 .getIfAvailable(MethodMetadataCache::new);
         validateDeclarativeMethodContracts(type, clientName, metadataCache);
         validateApiRefMappings(type, metadataCache, config, clientName);
+        metadataCache.validateDeclarativeReturnTypes(type, clientName);
 
         AuthProvider authProvider = resolveAuthProvider(clientName, config);
         logStartupConfiguration(

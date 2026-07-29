@@ -8,8 +8,10 @@ import reactor.core.publisher.Mono;
 
 import java.io.InputStream;
 import java.io.Reader;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.nio.channels.ReadableByteChannel;
 import java.util.List;
 
@@ -300,6 +302,23 @@ class MethodMetadataValidationTest {
         assertEquals(RequestBodyRepeatability.REPEATABLE, busSubmit.bodyRepeatability());
     }
 
+    @Test
+    void resolvedGenericArraysUseStructuralGenericArrayTypeEquality() throws Exception {
+        MethodMetadataCache cache = new MethodMetadataCache();
+        Method inheritedMethod = ParameterizedArrayClient.class.getMethod("load");
+        GenericArrayType resolvedType = assertInstanceOf(GenericArrayType.class,
+                RequestPlan.from(cache.get(inheritedMethod), ParameterizedArrayClient.class).responseType());
+
+        ParameterizedType explicitReturnType = (ParameterizedType)
+                ExplicitParameterizedArrayClient.class.getMethod("load").getGenericReturnType();
+        Type equivalentType = explicitReturnType.getActualTypeArguments()[0];
+        GenericArrayType equivalentArrayType = assertInstanceOf(GenericArrayType.class, equivalentType);
+
+        assertEquals(equivalentArrayType, resolvedType);
+        assertEquals(resolvedType, equivalentArrayType);
+        assertEquals(equivalentArrayType.hashCode(), resolvedType.hashCode());
+    }
+
     interface InvalidReturnTypeClient {
         @GET("/items")
         String call();
@@ -457,6 +476,19 @@ class MethodMetadataValidationTest {
     }
 
     interface TrainApiOperators extends ApiOperators<TrainResponse> {
+    }
+
+    interface GenericArrayOperations<T> {
+        @GET("/array")
+        Mono<T[]> load();
+    }
+
+    interface ParameterizedArrayClient extends GenericArrayOperations<List<String>> {
+    }
+
+    interface ExplicitParameterizedArrayClient {
+        @GET("/array")
+        Mono<List<String>[]> load();
     }
 
     static class BaseResponse {

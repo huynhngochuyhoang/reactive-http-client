@@ -6,6 +6,7 @@ import reactor.core.publisher.Mono;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -34,6 +35,24 @@ public class MethodMetadataCache {
 
     public MethodMetadata get(Method method) {
         return cache.computeIfAbsent(method, this::parse);
+    }
+
+    /**
+     * Validates every abstract endpoint return type after resolving inherited
+     * generic bindings against the concrete client interface.
+     *
+     * @param clientInterface concrete reactive HTTP client interface
+     * @param clientName logical client name used in validation diagnostics
+     */
+    public void validateDeclarativeReturnTypes(Class<?> clientInterface, String clientName) {
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method)) {
+                continue;
+            }
+            MethodMetadata metadata = get(method);
+            DeclarativeReturnTypeGrammar.validate(
+                    clientInterface, clientName, RequestPlan.from(metadata, clientInterface));
+        }
     }
 
     /**
@@ -289,6 +308,16 @@ public class MethodMetadataCache {
             meta.setHttpMethod(httpMethod);
             meta.setPathTemplate(pathTemplate);
         }
+    }
+
+    private static boolean isDeclarativeClientMethod(Method method) {
+        int modifiers = method.getModifiers();
+        return method.getDeclaringClass() != Object.class
+                && Modifier.isAbstract(modifiers)
+                && !Modifier.isStatic(modifiers)
+                && !method.isSynthetic()
+                && !method.isDefault()
+                && !method.isBridge();
     }
 
     private static void requireNonBlankAnnotationValue(String value, String annotationName, Method method) {

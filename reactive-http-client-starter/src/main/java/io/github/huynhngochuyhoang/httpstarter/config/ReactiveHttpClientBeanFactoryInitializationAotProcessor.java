@@ -1,5 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
+import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.TypeReference;
@@ -9,6 +11,7 @@ import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContrib
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.core.ResolvableType;
 import org.springframework.util.ClassUtils;
 
 import java.util.ArrayList;
@@ -25,6 +28,14 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         if (clientInterfaces.isEmpty()) {
             return null;
         }
+        MethodMetadataCache metadataCache = beanFactory.getBeanProvider(MethodMetadataCache.class)
+                .getIfAvailable(MethodMetadataCache::new);
+        clientInterfaces.forEach(clientInterface -> {
+            ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
+            if (annotation != null) {
+                metadataCache.validateDeclarativeReturnTypes(clientInterface, annotation.name());
+            }
+        });
         return (generationContext, beanFactoryInitializationCode) -> clientInterfaces.forEach(clientInterface -> {
             generationContext.getRuntimeHints().proxies().registerJdkProxy(clientInterface);
             var reflectionHints = generationContext.getRuntimeHints().reflection();
@@ -54,17 +65,25 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
     }
 
     private Class<?> resolveClientInterface(BeanDefinition definition, ClassLoader classLoader) {
+        Class<?> beanClass = resolveClass(definition.getBeanClassName(), classLoader, true);
+        ResolvableType beanType = definition.getResolvableType();
+        Class<?> resolvedBeanType = beanType.resolve();
+        if ((beanClass == null || !ReactiveHttpClientFactoryBean.class.isAssignableFrom(beanClass))
+                && (resolvedBeanType == null
+                || !ReactiveHttpClientFactoryBean.class.isAssignableFrom(resolvedBeanType))) {
+            return null;
+        }
+
         Object objectType = definition.getAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
         Class<?> objectTypeClass = resolveClass(objectType, classLoader, true);
         if (objectTypeClass != null) {
             return objectTypeClass;
         }
-
-        if (!ReactiveHttpClientFactoryBean.class.getName().equals(definition.getBeanClassName())) {
-            return null;
-        }
         PropertyValue typeProperty = definition.getPropertyValues().getPropertyValue("type");
-        return typeProperty != null ? resolveClass(typeProperty.getValue(), classLoader, false) : null;
+        if (typeProperty != null) {
+            return resolveClass(typeProperty.getValue(), classLoader, false);
+        }
+        return beanType.as(FactoryBean.class).getGeneric(0).resolve();
     }
 
     private Class<?> resolveClass(Object value, ClassLoader classLoader, boolean ignoreResolutionFailures) {

@@ -1,0 +1,618 @@
+package io.github.huynhngochuyhoang.httpstarter.core;
+
+import io.github.huynhngochuyhoang.httpstarter.annotation.ApiRef;
+import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import org.assertj.core.api.AbstractStringAssert;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.*;
+
+class DeclarativeReturnTypeGrammarTest {
+
+    private final MethodMetadataCache metadataCache = new MethodMetadataCache();
+
+    @Test
+    void acceptsLegacyUnaryEnvelopeFluxAndRawStreamingShapes() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ValidShapesClient.class, "valid-shapes"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsNestedPublishersAndUnsupportedEnvelopes() {
+        assertUnsupported(NestedMonoClient.class, "nested-mono")
+                .contains("resolvedResponseType=reactor.core.publisher.Mono<java.lang.String>")
+                .contains("a Mono element type cannot contain another reactive Publisher");
+        assertUnsupported(NestedFluxClient.class, "nested-flux")
+                .contains("resolvedResponseType=reactor.core.publisher.Flux<java.lang.String>")
+                .contains("a Flux element type cannot contain another reactive Publisher");
+        assertUnsupported(NestedPublisherContainerClient.class, "nested-container")
+                .contains("java.util.List<reactor.core.publisher.Flux<java.lang.String>>")
+                .contains("a Mono element type cannot contain another reactive Publisher");
+        assertUnsupported(UnsupportedStreamingEnvelopeClient.class, "typed-streaming-envelope")
+                .contains("ResponseEntity<reactor.core.publisher.Flux<java.lang.String>>")
+                .contains("the only reactive ResponseEntity body supported is Flux<DataBuffer>");
+        assertUnsupported(FluxEnvelopeClient.class, "flux-envelope")
+                .contains("ResponseEntity envelopes are supported only inside Mono");
+        assertUnsupported(WildcardMonoEnvelopeClient.class, "wildcard-mono-envelope")
+                .contains("ResponseEntity envelopes must be declared directly as Mono<ResponseEntity<T>>");
+        assertUnsupported(WildcardFluxEnvelopeClient.class, "wildcard-flux-envelope")
+                .contains("ResponseEntity envelopes must be declared directly as Mono<ResponseEntity<T>>");
+        assertUnsupported(MonoResponseEntitySubclassClient.class, "mono-envelope-subclass")
+                .contains("ResponseEntity subclasses are not supported as declarative return types");
+        assertUnsupported(FluxResponseEntitySubclassClient.class, "flux-envelope-subclass")
+                .contains("ResponseEntity subclasses are not supported as declarative return types");
+        assertUnsupported(WildcardResponseEntitySubclassClient.class, "wildcard-envelope-subclass")
+                .contains("ResponseEntity subclasses are not supported as declarative return types");
+        assertUnsupported(InheritedResponseEntitySubclassClient.class, "inherited-envelope-subclass")
+                .contains("ResponseEntity subclasses are not supported as declarative return types");
+        assertUnsupported(RawResponseEntityClient.class, "raw-envelope")
+                .contains("resolvedResponseType=org.springframework.http.ResponseEntity")
+                .contains("ResponseEntity must declare a resolvable body type");
+    }
+
+    @Test
+    void rejectsWildcardDataBufferStreamsWithoutRawBufferOwnershipHandling() {
+        assertUnsupported(WildcardDataBufferClient.class, "wildcard-data-buffer")
+                .contains("raw DataBuffer streams must be declared directly as Flux<DataBuffer>");
+        assertUnsupported(DataBufferSubtypeClient.class, "data-buffer-subtype")
+                .contains("raw DataBuffer streams must be declared directly as Flux<DataBuffer>");
+    }
+
+    @Test
+    void rejectsWildcardBodilessResponsesWithoutExactVoidHandling() {
+        assertUnsupported(WildcardVoidClient.class, "wildcard-void")
+                .contains("bodiless Void responses must declare Void directly");
+        assertUnsupported(WildcardVoidEntityClient.class, "wildcard-void-entity")
+                .contains("bodiless Void responses must declare Void directly");
+    }
+
+    @Test
+    void rejectsResponseEntityTypesNestedInsideEnvelopeBodies() {
+        assertUnsupported(NestedResponseEntityClient.class, "nested-envelope")
+                .contains("a ResponseEntity body cannot contain another ResponseEntity envelope");
+        assertUnsupported(WildcardNestedResponseEntityClient.class, "wildcard-nested-envelope")
+                .contains("a ResponseEntity body cannot contain another ResponseEntity envelope");
+        assertUnsupported(SubclassNestedResponseEntityClient.class, "subclass-nested-envelope")
+                .contains("a ResponseEntity body cannot contain another ResponseEntity envelope");
+        assertUnsupported(ContainerNestedResponseEntityClient.class, "container-nested-envelope")
+                .contains("a ResponseEntity body cannot contain another ResponseEntity envelope");
+    }
+
+    @Test
+    void rejectsResponseEntityTypesNestedInsideOrdinaryResponseElements() {
+        assertUnsupported(MonoContainerResponseEntityClient.class, "mono-container-envelope")
+                .contains("a Mono element type cannot contain a ResponseEntity envelope");
+        assertUnsupported(FluxArrayResponseEntityClient.class, "flux-array-envelope")
+                .contains("a Flux element type cannot contain a ResponseEntity envelope");
+    }
+
+    @Test
+    void inspectsOnlyOwnerBindingsForNestedResponseEntities() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ResponseEntityOwnerPayloadClient.class, "response-entity-owner-payload"))
+                .doesNotThrowAnyException();
+        assertUnsupported(ResponseEntityOwnerBindingClient.class, "response-entity-owner-binding")
+                .contains("a ResponseEntity body cannot contain another ResponseEntity envelope");
+    }
+
+    @Test
+    void rejectsTypeVariableOuterPublisherAndUnresolvedFluxElements() {
+        assertUnsupported(TypeVariableOuterPublisherClient.class, "outer-variable")
+                .contains("outer reactive return type must not be an unresolved type variable");
+        assertUnsupported(UnresolvedFluxClient.class, "unresolved-flux")
+                .contains("resolvedResponseType=T")
+                .contains("reactive element type must resolve against the concrete client interface");
+        assertUnsupported(RawInheritedFluxClient.class, "raw-inherited-flux")
+                .contains("resolvedResponseType=T")
+                .contains("reactive element type must resolve against the concrete client interface");
+    }
+
+    @Test
+    void rejectsBoundedUnresolvedVariablesButAcceptsConcreteBindings() {
+        assertUnsupported(BoundedMethodVariableClient.class, "bounded-method-variable")
+                .contains("resolvedResponseType=" + BaseDto.class.getName())
+                .contains("reactive element type must resolve against the concrete client interface");
+        assertUnsupported(UnresolvedBoundedClient.class, "bounded-client-variable")
+                .contains("reactive element type must resolve against the concrete client interface");
+        assertUnsupported(RawBoundedClient.class, "raw-bounded-client")
+                .contains("reactive element type must resolve against the concrete client interface");
+
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ConcreteBoundedClient.class, "concrete-bounded-client"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsReifiablePublisherArrays() {
+        assertUnsupported(PublisherArrayClient.class, "publisher-array")
+                .contains("resolvedResponseType=reactor.core.publisher.Flux[]")
+                .contains("a Mono element type cannot contain another reactive Publisher");
+    }
+
+    @Test
+    void preservesRawGenericElementClassesDuringValidationAndExport() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                RawGenericShapesClient.class, "raw-generic-shapes"))
+                .doesNotThrowAnyException();
+
+        List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
+                RawGenericShapesClient.class,
+                "raw-generic-shapes",
+                new ReactiveHttpClientProperties.ClientConfig(),
+                metadataCache);
+
+        assertThat(contracts)
+                .filteredOn(contract -> contract.apiName().equals("rawList"))
+                .extracting(EffectiveHttpClientContract::responseType)
+                .containsExactly(List.class.getName());
+        assertThat(contracts)
+                .filteredOn(contract -> contract.apiName().equals("rawDto"))
+                .extracting(EffectiveHttpClientContract::responseType)
+                .containsExactly(GenericDto.class.getName());
+    }
+
+    @Test
+    void inspectsOnlyOwnerBindingsForNestedPublishers() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                PublisherOwnerPayloadClient.class, "publisher-owner-payload"))
+                .doesNotThrowAnyException();
+        assertUnsupported(ReactiveOwnerBindingClient.class, "reactive-owner-binding")
+                .contains("a Mono element type cannot contain another reactive Publisher");
+    }
+
+    @Test
+    void resolvesMultiLevelInheritedGenericBindingsBeforeValidationAndExport() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ConcreteListClient.class, "concrete-list"))
+                .doesNotThrowAnyException();
+
+        EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
+                        ConcreteListClient.class,
+                        "concrete-list",
+                        new ReactiveHttpClientProperties.ClientConfig(),
+                        metadataCache)
+                .get(0);
+
+        assertThat(contract.responseType()).isEqualTo("java.util.List<java.lang.String>");
+        assertThat(contract.genericBindings()).isEqualTo("T=java.util.List<java.lang.String>");
+    }
+
+    @Test
+    void resolvesInheritedGenericArraysAndWildcardBounds() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ConcreteArrayClient.class, "concrete-array"))
+                .doesNotThrowAnyException();
+
+        List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
+                ConcreteArrayClient.class,
+                "concrete-array",
+                new ReactiveHttpClientProperties.ClientConfig(),
+                metadataCache);
+
+        assertThat(contracts)
+                .filteredOn(contract -> contract.apiName().equals("array"))
+                .extracting(EffectiveHttpClientContract::responseType)
+                .containsExactly("java.lang.String[]");
+        assertThat(contracts)
+                .filteredOn(contract -> contract.apiName().equals("wildcards"))
+                .extracting(EffectiveHttpClientContract::responseType)
+                .containsExactly("java.util.List<? extends java.lang.String>");
+        assertThat(contracts)
+                .filteredOn(contract -> contract.apiName().equals("lowerWildcards"))
+                .extracting(EffectiveHttpClientContract::responseType)
+                .containsExactly("java.util.List<? super java.lang.String>");
+    }
+
+    @Test
+    void resolvesParameterizedOwnerBindingsAndRejectsUnresolvedOwners() {
+        assertUnsupported(UnresolvedOwnerClient.class, "unresolved-owner")
+                .contains("reactive element type must resolve against the concrete client interface");
+
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ConcreteOwnerClient.class, "concrete-owner"))
+                .doesNotThrowAnyException();
+        EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
+                        ConcreteOwnerClient.class,
+                        "concrete-owner",
+                        new ReactiveHttpClientProperties.ClientConfig(),
+                        metadataCache)
+                .get(0);
+
+        assertThat(contract.responseType()).isEqualTo(
+                DeclarativeReturnTypeGrammarTest.class.getName()
+                        + "$GenericOuter<java.lang.String>$Body");
+    }
+
+    @Test
+    void preservesParameterizedOwnerBindingsInsideWildcardBounds() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                WildcardOwnerClient.class, "wildcard-owner"))
+                .doesNotThrowAnyException();
+
+        EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
+                        WildcardOwnerClient.class,
+                        "wildcard-owner",
+                        new ReactiveHttpClientProperties.ClientConfig(),
+                        metadataCache)
+                .get(0);
+
+        assertThat(contract.responseType()).isEqualTo(
+                "? extends " + DeclarativeReturnTypeGrammarTest.class.getName()
+                        + "$WildcardOuter<java.lang.String>$Body<java.lang.Integer>");
+    }
+
+    @Test
+    void rejectsInheritedGenericPublisherBindingWithConcreteAndDeclaringContext() {
+        assertUnsupported(InheritedPublisherClient.class, "inherited-publisher")
+                .contains("concreteClient=" + InheritedPublisherClient.class.getName())
+                .contains("declaringInterface=" + GenericOperations.class.getName())
+                .contains("method=public abstract reactor.core.publisher.Mono<T> "
+                        + GenericOperations.class.getName() + ".load()")
+                .contains("resolvedResponseType=reactor.core.publisher.Flux<java.lang.String>")
+                .contains("Supported return shapes:");
+    }
+
+    @Test
+    void rejectsApiRefMethodBeforeConfigurationOrDispatch() {
+        assertUnsupported(InvalidApiRefClient.class, "api-ref-client")
+                .contains("declaringInterface=" + InvalidApiRefClient.class.getName())
+                .contains("resolvedResponseType=reactor.core.publisher.Mono<java.lang.String>");
+    }
+
+    @Test
+    void exporterAndDiagnosticsUseTheSameReturnGrammar() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+
+        assertThatThrownBy(() -> EffectiveHttpClientContractExporter.export(
+                NestedMonoClient.class, "diagnostic-client", config, metadataCache))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unsupported declarative return type")
+                .hasMessageContaining("resolvedResponseType=reactor.core.publisher.Mono<java.lang.String>");
+        assertThatThrownBy(() -> ReactiveHttpClientDiagnosticsProvider.clientSummary(
+                NestedMonoClient.class, "diagnostic-client", config, metadataCache, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unsupported declarative return type")
+                .hasMessageContaining("resolvedResponseType=reactor.core.publisher.Mono<java.lang.String>");
+    }
+
+    private AbstractStringAssert<?> assertUnsupported(Class<?> clientInterface, String clientName) {
+        Throwable failure = catchThrowable(() ->
+                metadataCache.validateDeclarativeReturnTypes(clientInterface, clientName));
+        assertThat(failure)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("reactive HTTP client '" + clientName + "'")
+                .hasMessageContaining("concreteClient=" + clientInterface.getName())
+                .hasMessageContaining("Supported return shapes:");
+        return assertThat(failure.getMessage());
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface ValidShapesClient {
+        @GET("/raw-mono")
+        Mono rawMono();
+
+        @GET("/raw-flux")
+        Flux rawFlux();
+
+        @GET("/void")
+        Mono<Void> voidMono();
+
+        @GET("/value")
+        Mono<String> value();
+
+        @GET("/entity")
+        Mono<ResponseEntity<String>> entity();
+
+        @GET("/void-entity")
+        Mono<ResponseEntity<Void>> voidEntity();
+
+        @GET("/values")
+        Flux<String> values();
+
+        @GET("/buffers")
+        Flux<DataBuffer> buffers();
+
+        @GET("/wildcard-value")
+        Mono<? extends BaseDto> wildcardValue();
+
+        @GET("/wildcard-values")
+        Flux<? extends BaseDto> wildcardValues();
+
+        @GET("/streaming-entity")
+        Mono<ResponseEntity<Flux<DataBuffer>>> streamingEntity();
+    }
+
+    interface NestedMonoClient {
+        @GET("/nested")
+        Mono<Mono<String>> nested();
+    }
+
+    interface NestedFluxClient {
+        @GET("/nested")
+        Flux<Flux<String>> nested();
+    }
+
+    interface NestedPublisherContainerClient {
+        @GET("/nested")
+        Mono<List<Flux<String>>> nested();
+    }
+
+    interface UnsupportedStreamingEnvelopeClient {
+        @GET("/stream")
+        Mono<ResponseEntity<Flux<String>>> stream();
+    }
+
+    interface FluxEnvelopeClient {
+        @GET("/entities")
+        Flux<ResponseEntity<String>> entities();
+    }
+
+    interface WildcardMonoEnvelopeClient {
+        @GET("/entity")
+        Mono<? extends ResponseEntity<String>> entity();
+    }
+
+    interface WildcardFluxEnvelopeClient {
+        @GET("/entities")
+        Flux<? extends ResponseEntity<String>> entities();
+    }
+
+    static final class CustomResponseEntity extends ResponseEntity<String> {
+        CustomResponseEntity() {
+            super(HttpStatus.OK);
+        }
+    }
+
+    interface MonoResponseEntitySubclassClient {
+        @GET("/entity")
+        Mono<CustomResponseEntity> entity();
+    }
+
+    interface FluxResponseEntitySubclassClient {
+        @GET("/entities")
+        Flux<CustomResponseEntity> entities();
+    }
+
+    interface WildcardResponseEntitySubclassClient {
+        @GET("/entities")
+        Flux<? extends CustomResponseEntity> entities();
+    }
+
+    interface GenericEnvelopeOperations<T> {
+        @GET("/entity")
+        Mono<T> entity();
+    }
+
+    interface InheritedResponseEntitySubclassClient
+            extends GenericEnvelopeOperations<CustomResponseEntity> {
+    }
+
+    interface WildcardDataBufferClient {
+        @GET("/buffers")
+        Flux<? extends DataBuffer> buffers();
+    }
+
+    abstract static class CustomDataBuffer implements DataBuffer {
+    }
+
+    interface DataBufferSubtypeClient {
+        @GET("/buffers")
+        Flux<CustomDataBuffer> buffers();
+    }
+
+    interface WildcardVoidClient {
+        @GET("/void")
+        Mono<? extends Void> complete();
+    }
+
+    interface WildcardVoidEntityClient {
+        @GET("/void")
+        Mono<ResponseEntity<? extends Void>> complete();
+    }
+
+    interface NestedResponseEntityClient {
+        @GET("/entity")
+        Mono<ResponseEntity<ResponseEntity<String>>> entity();
+    }
+
+    interface WildcardNestedResponseEntityClient {
+        @GET("/entity")
+        Mono<ResponseEntity<? extends ResponseEntity<String>>> entity();
+    }
+
+    interface SubclassNestedResponseEntityClient {
+        @GET("/entity")
+        Mono<ResponseEntity<CustomResponseEntity>> entity();
+    }
+
+    interface ContainerNestedResponseEntityClient {
+        @GET("/entity")
+        Mono<ResponseEntity<List<ResponseEntity<String>>>> entity();
+    }
+
+    interface MonoContainerResponseEntityClient {
+        @GET("/entity")
+        Mono<List<ResponseEntity<String>>> entity();
+    }
+
+    interface FluxArrayResponseEntityClient {
+        @GET("/entities")
+        Flux<ResponseEntity<String>[]> entities();
+    }
+
+    static class ResponseEntityOwner<T> extends ResponseEntity<T> {
+        ResponseEntityOwner() {
+            super(HttpStatus.OK);
+        }
+
+        class Payload {
+        }
+    }
+
+    interface ResponseEntityOwnerPayloadClient {
+        @GET("/entity")
+        Mono<ResponseEntity<ResponseEntityOwner<String>.Payload>> entity();
+    }
+
+    interface ResponseEntityOwnerBindingClient {
+        @GET("/entity")
+        Mono<ResponseEntity<GenericPayloadOwner<ResponseEntity<String>>.Payload>> entity();
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface RawResponseEntityClient {
+        @GET("/entity")
+        Mono<ResponseEntity> entity();
+    }
+
+    interface GenericOperations<T> {
+        @GET("/generic")
+        Mono<T> load();
+    }
+
+    interface ListOperations<R> extends GenericOperations<List<R>> {
+    }
+
+    interface ConcreteListClient extends ListOperations<String> {
+    }
+
+    interface InheritedPublisherClient extends GenericOperations<Flux<String>> {
+    }
+
+    interface InvalidApiRefClient {
+        @ApiRef("nested.lookup")
+        Mono<Mono<String>> lookup();
+    }
+
+    interface TypeVariableOuterPublisherClient {
+        @GET("/outer-variable")
+        <R extends Mono<String>> R load();
+    }
+
+    interface UnresolvedFluxClient<T> {
+        @GET("/unresolved")
+        Flux<T> values();
+    }
+
+    interface GenericFluxOperations<T> {
+        @GET("/raw-inherited")
+        Flux<T> values();
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface RawInheritedFluxClient extends GenericFluxOperations {
+    }
+
+    interface GenericArrayOperations<T> {
+        @GET("/array")
+        Mono<T[]> array();
+
+        @GET("/wildcards")
+        Mono<List<? extends T>> wildcards();
+
+        @GET("/lower-wildcards")
+        Mono<List<? super T>> lowerWildcards();
+    }
+
+    interface ConcreteArrayClient extends GenericArrayOperations<String> {
+    }
+
+    static class BaseDto {
+    }
+
+    static final class SpecialDto extends BaseDto {
+    }
+
+    interface BoundedMethodVariableClient {
+        @GET("/bounded-method")
+        <R extends BaseDto> Mono<R> load();
+    }
+
+    interface BoundedOperations<T extends BaseDto> {
+        @GET("/bounded")
+        Mono<T> load();
+    }
+
+    interface UnresolvedBoundedClient<T extends BaseDto> extends BoundedOperations<T> {
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface RawBoundedClient extends BoundedOperations {
+    }
+
+    interface ConcreteBoundedClient extends BoundedOperations<SpecialDto> {
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface PublisherArrayClient {
+        @GET("/publisher-array")
+        Mono<Flux[]> load();
+    }
+
+    static class GenericDto<T> {
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface RawGenericShapesClient {
+        @GET("/raw-list")
+        Mono<List> rawList();
+
+        @GET("/raw-dto")
+        Flux<GenericDto> rawDto();
+    }
+
+    abstract static class PublisherOwner<T> implements org.reactivestreams.Publisher<T> {
+        class Payload {
+        }
+    }
+
+    interface PublisherOwnerPayloadClient {
+        @GET("/payload")
+        Mono<PublisherOwner<String>.Payload> payload();
+    }
+
+    static class GenericPayloadOwner<T> {
+        class Payload {
+        }
+    }
+
+    interface ReactiveOwnerBindingClient {
+        @GET("/payload")
+        Mono<GenericPayloadOwner<Flux<String>>.Payload> payload();
+    }
+
+    static class GenericOuter<T> {
+        class Body {
+        }
+    }
+
+    interface OwnerOperations<T> {
+        @GET("/owner")
+        Mono<GenericOuter<T>.Body> load();
+    }
+
+    interface UnresolvedOwnerClient<T> extends OwnerOperations<T> {
+    }
+
+    interface ConcreteOwnerClient extends OwnerOperations<String> {
+    }
+
+    static class WildcardOuter<T> {
+        class Body<U> {
+        }
+    }
+
+    interface WildcardOwnerClient {
+        @GET("/wildcard-owner")
+        Mono<? extends WildcardOuter<String>.Body<Integer>> load();
+    }
+}

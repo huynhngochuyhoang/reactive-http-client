@@ -81,26 +81,48 @@ Evidence:
 
 ## Priority 2 - Declarative Return-Type Grammar
 
-### [ ] 2.1 Define one supported response-shape grammar
+### [x] 2.1 Define one supported response-shape grammar
 
-- [ ] Inventory raw and parameterized `Mono`/`Flux`, `Void`, `ResponseEntity<T>`,
+- [x] Inventory raw and parameterized `Mono`/`Flux`, `Void`, `ResponseEntity<T>`,
       direct `Flux<T>`, `Flux<DataBuffer>`, and
       `Mono<ResponseEntity<Flux<DataBuffer>>>` behavior.
-- [ ] Centralize the supported-shape decision without adding a new public
+- [x] Centralize the supported-shape decision without adding a new public
       abstraction unless compatibility requires one.
-- [ ] Resolve inherited and multi-level generic return types against the concrete
+- [x] Resolve inherited and multi-level generic return types against the concrete
       client before validation.
-- [ ] Preserve existing valid unary, typed `Flux<T>`, and raw streaming paths.
+- [x] Preserve existing valid unary, typed `Flux<T>`, and raw streaming paths.
 
-### [ ] 2.2 Reject ambiguous nested reactive envelopes at startup
+### [x] 2.2 Reject ambiguous nested reactive envelopes at startup
 
-- [ ] Reject `Mono<ResponseEntity<Flux<Dto>>>`, `Mono<Mono<T>>`,
+- [x] Reject `Mono<ResponseEntity<Flux<Dto>>>`, `Mono<Mono<T>>`,
       `Flux<Flux<T>>`, and equivalent unresolved shapes before proxy creation.
-- [ ] Include concrete client, declaring interface, full method signature,
+- [x] Include concrete client, declaring interface, full method signature,
       resolved response type, and a supported alternative in each error.
-- [ ] Apply the same decision in startup validation, effective-contract export,
+- [x] Apply the same decision in startup validation, effective-contract export,
       diagnostics, AOT metadata, and `MockReactiveHttpClient`.
-- [ ] Add direct, inherited, generic, `@ApiRef`, AOT, mock, and compatibility tests.
+- [x] Add direct, inherited, generic, `@ApiRef`, AOT, mock, and compatibility tests.
+
+Evidence:
+
+- Added the internal `DeclarativeReturnTypeGrammar` and exposed validation through
+  the existing compatibility-covered `MethodMetadataCache` surface. The grammar
+  resolves each `RequestPlan` against the concrete child client, preserves raw
+  outer `Mono`/`Flux` compatibility, and rejects unresolved type variables,
+  nested publishers, raw response envelopes, and typed publisher envelopes other
+  than `Mono<ResponseEntity<Flux<DataBuffer>>>`.
+- `ReactiveHttpClientFactoryBean`, effective-contract/diagnostics export, the
+  bean-factory AOT processor, runtime `ResponseEntity` handling, and
+  `MockReactiveHttpClient` now share that decision. Existing annotation and URI
+  validation still retain their prior error precedence.
+- `DeclarativeReturnTypeGrammarTest`,
+  `ReactiveHttpClientFactoryBeanDiagnosticsTest`,
+  `ReactiveHttpClientAotSmokeTest`, and `MockReactiveHttpClientTest` cover direct,
+  inherited, multi-level generic, `@ApiRef`, factory, diagnostic/export, AOT, and
+  mock paths. Focused tests and the full starter/test-helper reactor passed.
+- Strict module-scoped japicmp against the provenance-verified published `3.3.0`
+  baseline passed. The report records only the additive, binary/source-compatible
+  `MethodMetadataCache.validateDeclarativeReturnTypes(Class<?>, String)` method
+  for this priority. `git diff --check` passed.
 
 ---
 

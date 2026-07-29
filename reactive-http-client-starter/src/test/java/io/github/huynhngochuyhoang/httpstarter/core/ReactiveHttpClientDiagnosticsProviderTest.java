@@ -18,6 +18,10 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.cglib.proxy.Enhancer;
 import org.springframework.cglib.proxy.MethodInterceptor;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.Ordered;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -126,6 +130,40 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 beanFactory, new ReactiveHttpClientProperties(), new MethodMetadataCache());
 
         assertThat(provider.clientSummaries()).isEmpty();
+    }
+
+    @Test
+    void replacementFactoryClientsSkipStarterReturnGrammarInDiagnostics() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReplacementDiagnosticClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ReplacementDiagnosticClient.class);
+        beanFactory.registerBeanDefinition("replacementDiagnosticClient", definition);
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, new ReactiveHttpClientProperties(), new MethodMetadataCache());
+
+        assertThat(provider.clientSummaries())
+                .singleElement()
+                .satisfies(summary -> {
+                    assertThat(summary.clientName()).isEqualTo("replacement-diagnostic");
+                    assertThat(summary.endpointCount()).isEqualTo(1);
+                });
+        assertThat(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider))
+                .containsEntry("clientCount", 1);
+    }
+
+    @Test
+    void factoryMethodStarterClientsUseReturnGrammarInDiagnostics() {
+        try (AnnotationConfigApplicationContext context =
+                     new AnnotationConfigApplicationContext(FactoryMethodDiagnosticsConfiguration.class)) {
+            ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                    context.getBeanFactory(), new ReactiveHttpClientProperties(), new MethodMetadataCache());
+
+            assertThatThrownBy(provider::clientSummaries)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("reactive HTTP client 'factory-method-diagnostic'")
+                    .hasMessageContaining("a Mono element type cannot contain another reactive Publisher");
+        }
     }
 
     @Test
@@ -1000,5 +1038,50 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         @GET("/direct")
         Mono<String> direct();
+    }
+
+    @ReactiveHttpClient(
+            name = "replacement-diagnostic",
+            baseUrl = "http://replacement-diagnostic.test")
+    interface ReplacementDiagnosticClient {
+
+        @GET("/nested")
+        Mono<Mono<String>> nested();
+    }
+
+    static final class ReplacementDiagnosticClientFactoryBean
+            implements FactoryBean<ReplacementDiagnosticClient> {
+
+        @Override
+        public ReplacementDiagnosticClient getObject() {
+            return null;
+        }
+
+        @Override
+        public Class<?> getObjectType() {
+            return ReplacementDiagnosticClient.class;
+        }
+    }
+
+    @ReactiveHttpClient(
+            name = "factory-method-diagnostic",
+            baseUrl = "http://factory-method-diagnostic.test")
+    interface FactoryMethodDiagnosticClient {
+
+        @GET("/nested")
+        Mono<Mono<String>> nested();
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class FactoryMethodDiagnosticsConfiguration {
+
+        @Bean
+        @Lazy
+        ReactiveHttpClientFactoryBean<FactoryMethodDiagnosticClient> factoryMethodDiagnosticClient() {
+            ReactiveHttpClientFactoryBean<FactoryMethodDiagnosticClient> factoryBean =
+                    new ReactiveHttpClientFactoryBean<>();
+            factoryBean.setType(FactoryMethodDiagnosticClient.class);
+            return factoryBean;
+        }
     }
 }

@@ -1201,6 +1201,20 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
+    void failsFastWhenInheritedGenericReturnTypeResolvesToNestedPublisher() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("invalid-return-client", clientConfig("http://localhost:8080"));
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, InvalidInheritedReturnClient.class).getObject())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("reactive HTTP client 'invalid-return-client'")
+                .hasMessageContaining("concreteClient=" + InvalidInheritedReturnClient.class.getName())
+                .hasMessageContaining("declaringInterface=" + GenericReturnOperations.class.getName())
+                .hasMessageContaining("resolvedResponseType=reactor.core.publisher.Flux<java.lang.String>")
+                .hasMessageContaining("Supported return shapes:");
+    }
+
+    @Test
     void allowsDefaultHelperMethodWithoutEndpointMetadata() throws Exception {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         properties.getClients().put("helper-client", clientConfig("http://localhost:8080"));
@@ -1858,6 +1872,15 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     @ReactiveHttpClient(name = "invalid-contract-client")
     interface MissingEndpointFactoryClient {
         Mono<String> missing();
+    }
+
+    interface GenericReturnOperations<T> {
+        @GET("/nested")
+        Mono<T> nested();
+    }
+
+    @ReactiveHttpClient(name = "invalid-return-client")
+    interface InvalidInheritedReturnClient extends GenericReturnOperations<Flux<String>> {
     }
 
     @ReactiveHttpClient(name = "helper-client")
