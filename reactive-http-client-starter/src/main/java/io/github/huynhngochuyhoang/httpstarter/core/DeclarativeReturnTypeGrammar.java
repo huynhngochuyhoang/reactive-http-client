@@ -85,6 +85,10 @@ final class DeclarativeReturnTypeGrammar {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,
                         "raw DataBuffer streams must be declared directly as Flux<DataBuffer>");
             }
+            if (containsResponseEntity(responseType)) {
+                throw unsupported(concreteClientInterface, clientName, method, responseType,
+                        "a Flux element type cannot contain a ResponseEntity envelope");
+            }
             if (containsPublisher(responseType)) {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,
                         "a Flux element type cannot contain another reactive Publisher");
@@ -116,6 +120,10 @@ final class DeclarativeReturnTypeGrammar {
         if (containsTypeVariable(responseType)) {
             throw unsupported(concreteClientInterface, clientName, method, responseType,
                     "the reactive element type must resolve against the concrete client interface");
+        }
+        if (containsResponseEntity(responseType)) {
+            throw unsupported(concreteClientInterface, clientName, method, responseType,
+                    "a Mono element type cannot contain a ResponseEntity envelope");
         }
         if (containsPublisher(responseType)) {
             throw unsupported(concreteClientInterface, clientName, method, responseType,

@@ -88,6 +88,14 @@ class DeclarativeReturnTypeGrammarTest {
     }
 
     @Test
+    void rejectsResponseEntityTypesNestedInsideOrdinaryResponseElements() {
+        assertUnsupported(MonoContainerResponseEntityClient.class, "mono-container-envelope")
+                .contains("a Mono element type cannot contain a ResponseEntity envelope");
+        assertUnsupported(FluxArrayResponseEntityClient.class, "flux-array-envelope")
+                .contains("a Flux element type cannot contain a ResponseEntity envelope");
+    }
+
+    @Test
     void inspectsOnlyOwnerBindingsForNestedResponseEntities() {
         assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
                 ResponseEntityOwnerPayloadClient.class, "response-entity-owner-payload"))
@@ -429,6 +437,16 @@ class DeclarativeReturnTypeGrammarTest {
     interface ContainerNestedResponseEntityClient {
         @GET("/entity")
         Mono<ResponseEntity<List<ResponseEntity<String>>>> entity();
+    }
+
+    interface MonoContainerResponseEntityClient {
+        @GET("/entity")
+        Mono<List<ResponseEntity<String>>> entity();
+    }
+
+    interface FluxArrayResponseEntityClient {
+        @GET("/entities")
+        Flux<ResponseEntity<String>[]> entities();
     }
 
     static class ResponseEntityOwner<T> extends ResponseEntity<T> {

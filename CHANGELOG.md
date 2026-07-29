@@ -39,7 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inherit publisher classification from an enclosing owner class while reactive
   owner type arguments remain invalid. Envelope-body inspection likewise ignores
   enclosing `ResponseEntity` classes while still rejecting `ResponseEntity`
-  values carried in owner type arguments.
+  values carried in owner type arguments, collections, arrays, and other ordinary
+  reactive response element graphs.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects
