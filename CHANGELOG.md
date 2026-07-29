@@ -34,7 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Resolved parameterized array types now use structural `GenericArrayType`
   equality so reflection and codec type tokens recognize equivalent arrays.
   Wildcard `Void` responses and concrete `DataBuffer` subtypes now fail at
-  startup rather than bypassing bodiless or raw-buffer ownership handling.
+  startup rather than bypassing bodiless or raw-buffer ownership handling. Raw
+  generic element classes retain raw codec semantics, and nested DTOs no longer
+  inherit publisher classification from an enclosing owner class while reactive
+  owner type arguments remain invalid.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects

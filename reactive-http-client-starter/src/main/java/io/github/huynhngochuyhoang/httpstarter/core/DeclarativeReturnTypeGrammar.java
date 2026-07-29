@@ -157,7 +157,7 @@ final class DeclarativeReturnTypeGrammar {
             return true;
         }
         if (type instanceof ParameterizedType parameterizedType) {
-            return containsPublisher(parameterizedType.getOwnerType())
+            return containsPublisherInOwnerBindings(parameterizedType.getOwnerType())
                     || Arrays.stream(parameterizedType.getActualTypeArguments())
                     .anyMatch(DeclarativeReturnTypeGrammar::containsPublisher);
         }
@@ -171,6 +171,15 @@ final class DeclarativeReturnTypeGrammar {
             return containsPublisher(arrayType.getGenericComponentType());
         }
         return false;
+    }
+
+    private static boolean containsPublisherInOwnerBindings(Type ownerType) {
+        if (!(ownerType instanceof ParameterizedType parameterizedOwner)) {
+            return false;
+        }
+        return containsPublisherInOwnerBindings(parameterizedOwner.getOwnerType())
+                || Arrays.stream(parameterizedOwner.getActualTypeArguments())
+                .anyMatch(DeclarativeReturnTypeGrammar::containsPublisher);
     }
 
     private static boolean containsResponseEntity(Type type) {

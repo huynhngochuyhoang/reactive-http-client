@@ -215,6 +215,9 @@ record RequestPlan(
         if (type instanceof WildcardType wildcardType) {
             return resolvedWildcardType(resolvableType, wildcardType);
         }
+        if (type instanceof Class<?>) {
+            return type;
+        }
         if (type instanceof ParameterizedType || resolvableType.hasGenerics()) {
             if (rawClass == null) {
                 return fallback;
@@ -246,6 +249,9 @@ record RequestPlan(
     }
 
     private static Type resolvedWildcardBound(ResolvableType resolvableType, Type fallback) {
+        if (fallback instanceof Class<?>) {
+            return fallback;
+        }
         Class<?> rawClass = resolvableType.resolve();
         if (resolvableType.hasGenerics() && rawClass != null) {
             Type[] generics = Arrays.stream(resolvableType.getGenerics())

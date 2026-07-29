@@ -55,7 +55,7 @@ class DeclarativeReturnTypeGrammarTest {
         assertUnsupported(InheritedResponseEntitySubclassClient.class, "inherited-envelope-subclass")
                 .contains("ResponseEntity subclasses are not supported as declarative return types");
         assertUnsupported(RawResponseEntityClient.class, "raw-envelope")
-                .contains("resolvedResponseType=org.springframework.http.ResponseEntity<T>")
+                .contains("resolvedResponseType=org.springframework.http.ResponseEntity")
                 .contains("ResponseEntity must declare a resolvable body type");
     }
 
@@ -118,6 +118,37 @@ class DeclarativeReturnTypeGrammarTest {
     void rejectsReifiablePublisherArrays() {
         assertUnsupported(PublisherArrayClient.class, "publisher-array")
                 .contains("resolvedResponseType=reactor.core.publisher.Flux[]")
+                .contains("a Mono element type cannot contain another reactive Publisher");
+    }
+
+    @Test
+    void preservesRawGenericElementClassesDuringValidationAndExport() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                RawGenericShapesClient.class, "raw-generic-shapes"))
+                .doesNotThrowAnyException();
+
+        List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
+                RawGenericShapesClient.class,
+                "raw-generic-shapes",
+                new ReactiveHttpClientProperties.ClientConfig(),
+                metadataCache);
+
+        assertThat(contracts)
+                .filteredOn(contract -> contract.apiName().equals("rawList"))
+                .extracting(EffectiveHttpClientContract::responseType)
+                .containsExactly(List.class.getName());
+        assertThat(contracts)
+                .filteredOn(contract -> contract.apiName().equals("rawDto"))
+                .extracting(EffectiveHttpClientContract::responseType)
+                .containsExactly(GenericDto.class.getName());
+    }
+
+    @Test
+    void inspectsOnlyOwnerBindingsForNestedPublishers() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                PublisherOwnerPayloadClient.class, "publisher-owner-payload"))
+                .doesNotThrowAnyException();
+        assertUnsupported(ReactiveOwnerBindingClient.class, "reactive-owner-binding")
                 .contains("a Mono element type cannot contain another reactive Publisher");
     }
 
@@ -479,6 +510,38 @@ class DeclarativeReturnTypeGrammarTest {
     interface PublisherArrayClient {
         @GET("/publisher-array")
         Mono<Flux[]> load();
+    }
+
+    static class GenericDto<T> {
+    }
+
+    @SuppressWarnings("rawtypes")
+    interface RawGenericShapesClient {
+        @GET("/raw-list")
+        Mono<List> rawList();
+
+        @GET("/raw-dto")
+        Flux<GenericDto> rawDto();
+    }
+
+    abstract static class PublisherOwner<T> implements org.reactivestreams.Publisher<T> {
+        class Payload {
+        }
+    }
+
+    interface PublisherOwnerPayloadClient {
+        @GET("/payload")
+        Mono<PublisherOwner<String>.Payload> payload();
+    }
+
+    static class GenericPayloadOwner<T> {
+        class Payload {
+        }
+    }
+
+    interface ReactiveOwnerBindingClient {
+        @GET("/payload")
+        Mono<GenericPayloadOwner<Flux<String>>.Payload> payload();
     }
 
     static class GenericOuter<T> {
