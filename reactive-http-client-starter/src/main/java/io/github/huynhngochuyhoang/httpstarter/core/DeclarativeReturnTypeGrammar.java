@@ -89,6 +89,10 @@ final class DeclarativeReturnTypeGrammar {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,
                         "ResponseEntity must declare a resolvable body type");
             }
+            if (containsResponseEntity(bodyType)) {
+                throw unsupported(concreteClientInterface, clientName, method, responseType,
+                        "a ResponseEntity body cannot contain another ResponseEntity envelope");
+            }
             if (containsPublisher(bodyType) && !isFluxDataBuffer(bodyType)) {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,
                         "the only reactive ResponseEntity body supported is Flux<DataBuffer>");
@@ -152,6 +156,34 @@ final class DeclarativeReturnTypeGrammar {
         }
         if (type instanceof GenericArrayType arrayType) {
             return containsPublisher(arrayType.getGenericComponentType());
+        }
+        return false;
+    }
+
+    private static boolean containsResponseEntity(Type type) {
+        if (type == null) {
+            return false;
+        }
+        if (type instanceof Class<?> clazz && clazz.isArray()) {
+            return containsResponseEntity(clazz.getComponentType());
+        }
+        Class<?> rawType = rawClass(type);
+        if (rawType != null && ResponseEntity.class.isAssignableFrom(rawType)) {
+            return true;
+        }
+        if (type instanceof ParameterizedType parameterizedType) {
+            return containsResponseEntity(parameterizedType.getOwnerType())
+                    || Arrays.stream(parameterizedType.getActualTypeArguments())
+                    .anyMatch(DeclarativeReturnTypeGrammar::containsResponseEntity);
+        }
+        if (type instanceof WildcardType wildcardType) {
+            return Arrays.stream(wildcardType.getUpperBounds())
+                    .anyMatch(DeclarativeReturnTypeGrammar::containsResponseEntity)
+                    || Arrays.stream(wildcardType.getLowerBounds())
+                    .anyMatch(DeclarativeReturnTypeGrammar::containsResponseEntity);
+        }
+        if (type instanceof GenericArrayType arrayType) {
+            return containsResponseEntity(arrayType.getGenericComponentType());
         }
         return false;
     }

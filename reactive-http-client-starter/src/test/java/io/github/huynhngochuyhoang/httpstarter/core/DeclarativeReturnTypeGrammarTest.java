@@ -66,6 +66,18 @@ class DeclarativeReturnTypeGrammarTest {
     }
 
     @Test
+    void rejectsResponseEntityTypesNestedInsideEnvelopeBodies() {
+        assertUnsupported(NestedResponseEntityClient.class, "nested-envelope")
+                .contains("a ResponseEntity body cannot contain another ResponseEntity envelope");
+        assertUnsupported(WildcardNestedResponseEntityClient.class, "wildcard-nested-envelope")
+                .contains("a ResponseEntity body cannot contain another ResponseEntity envelope");
+        assertUnsupported(SubclassNestedResponseEntityClient.class, "subclass-nested-envelope")
+                .contains("a ResponseEntity body cannot contain another ResponseEntity envelope");
+        assertUnsupported(ContainerNestedResponseEntityClient.class, "container-nested-envelope")
+                .contains("a ResponseEntity body cannot contain another ResponseEntity envelope");
+    }
+
+    @Test
     void rejectsTypeVariableOuterPublisherAndUnresolvedFluxElements() {
         assertUnsupported(TypeVariableOuterPublisherClient.class, "outer-variable")
                 .contains("outer reactive return type must not be an unresolved type variable");
@@ -329,6 +341,26 @@ class DeclarativeReturnTypeGrammarTest {
     interface WildcardDataBufferClient {
         @GET("/buffers")
         Flux<? extends DataBuffer> buffers();
+    }
+
+    interface NestedResponseEntityClient {
+        @GET("/entity")
+        Mono<ResponseEntity<ResponseEntity<String>>> entity();
+    }
+
+    interface WildcardNestedResponseEntityClient {
+        @GET("/entity")
+        Mono<ResponseEntity<? extends ResponseEntity<String>>> entity();
+    }
+
+    interface SubclassNestedResponseEntityClient {
+        @GET("/entity")
+        Mono<ResponseEntity<CustomResponseEntity>> entity();
+    }
+
+    interface ContainerNestedResponseEntityClient {
+        @GET("/entity")
+        Mono<ResponseEntity<List<ResponseEntity<String>>>> entity();
     }
 
     @SuppressWarnings("rawtypes")
