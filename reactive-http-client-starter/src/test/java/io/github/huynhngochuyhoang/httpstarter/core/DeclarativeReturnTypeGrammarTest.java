@@ -88,6 +88,15 @@ class DeclarativeReturnTypeGrammarTest {
     }
 
     @Test
+    void inspectsOnlyOwnerBindingsForNestedResponseEntities() {
+        assertThatCode(() -> metadataCache.validateDeclarativeReturnTypes(
+                ResponseEntityOwnerPayloadClient.class, "response-entity-owner-payload"))
+                .doesNotThrowAnyException();
+        assertUnsupported(ResponseEntityOwnerBindingClient.class, "response-entity-owner-binding")
+                .contains("a ResponseEntity body cannot contain another ResponseEntity envelope");
+    }
+
+    @Test
     void rejectsTypeVariableOuterPublisherAndUnresolvedFluxElements() {
         assertUnsupported(TypeVariableOuterPublisherClient.class, "outer-variable")
                 .contains("outer reactive return type must not be an unresolved type variable");
@@ -420,6 +429,25 @@ class DeclarativeReturnTypeGrammarTest {
     interface ContainerNestedResponseEntityClient {
         @GET("/entity")
         Mono<ResponseEntity<List<ResponseEntity<String>>>> entity();
+    }
+
+    static class ResponseEntityOwner<T> extends ResponseEntity<T> {
+        ResponseEntityOwner() {
+            super(HttpStatus.OK);
+        }
+
+        class Payload {
+        }
+    }
+
+    interface ResponseEntityOwnerPayloadClient {
+        @GET("/entity")
+        Mono<ResponseEntity<ResponseEntityOwner<String>.Payload>> entity();
+    }
+
+    interface ResponseEntityOwnerBindingClient {
+        @GET("/entity")
+        Mono<ResponseEntity<GenericPayloadOwner<ResponseEntity<String>>.Payload>> entity();
     }
 
     @SuppressWarnings("rawtypes")

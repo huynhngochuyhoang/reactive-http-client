@@ -194,7 +194,7 @@ final class DeclarativeReturnTypeGrammar {
             return true;
         }
         if (type instanceof ParameterizedType parameterizedType) {
-            return containsResponseEntity(parameterizedType.getOwnerType())
+            return containsResponseEntityInOwnerBindings(parameterizedType.getOwnerType())
                     || Arrays.stream(parameterizedType.getActualTypeArguments())
                     .anyMatch(DeclarativeReturnTypeGrammar::containsResponseEntity);
         }
@@ -208,6 +208,15 @@ final class DeclarativeReturnTypeGrammar {
             return containsResponseEntity(arrayType.getGenericComponentType());
         }
         return false;
+    }
+
+    private static boolean containsResponseEntityInOwnerBindings(Type ownerType) {
+        if (!(ownerType instanceof ParameterizedType parameterizedOwner)) {
+            return false;
+        }
+        return containsResponseEntityInOwnerBindings(parameterizedOwner.getOwnerType())
+                || Arrays.stream(parameterizedOwner.getActualTypeArguments())
+                .anyMatch(DeclarativeReturnTypeGrammar::containsResponseEntity);
     }
 
     private static Class<?> directWildcardBoundAssignableTo(Type type, Class<?> expectedRawType) {
