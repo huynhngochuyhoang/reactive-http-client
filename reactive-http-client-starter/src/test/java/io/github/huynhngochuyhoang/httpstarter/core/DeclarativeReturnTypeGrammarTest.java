@@ -6,6 +6,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -45,9 +46,23 @@ class DeclarativeReturnTypeGrammarTest {
                 .contains("ResponseEntity envelopes must be declared directly as Mono<ResponseEntity<T>>");
         assertUnsupported(WildcardFluxEnvelopeClient.class, "wildcard-flux-envelope")
                 .contains("ResponseEntity envelopes must be declared directly as Mono<ResponseEntity<T>>");
+        assertUnsupported(MonoResponseEntitySubclassClient.class, "mono-envelope-subclass")
+                .contains("ResponseEntity subclasses are not supported as declarative return types");
+        assertUnsupported(FluxResponseEntitySubclassClient.class, "flux-envelope-subclass")
+                .contains("ResponseEntity subclasses are not supported as declarative return types");
+        assertUnsupported(WildcardResponseEntitySubclassClient.class, "wildcard-envelope-subclass")
+                .contains("ResponseEntity subclasses are not supported as declarative return types");
+        assertUnsupported(InheritedResponseEntitySubclassClient.class, "inherited-envelope-subclass")
+                .contains("ResponseEntity subclasses are not supported as declarative return types");
         assertUnsupported(RawResponseEntityClient.class, "raw-envelope")
                 .contains("resolvedResponseType=org.springframework.http.ResponseEntity<T>")
                 .contains("ResponseEntity must declare a resolvable body type");
+    }
+
+    @Test
+    void rejectsWildcardDataBufferStreamsWithoutRawBufferOwnershipHandling() {
+        assertUnsupported(WildcardDataBufferClient.class, "wildcard-data-buffer")
+                .contains("raw DataBuffer streams must be declared directly as Flux<DataBuffer>");
     }
 
     @Test
@@ -279,6 +294,41 @@ class DeclarativeReturnTypeGrammarTest {
     interface WildcardFluxEnvelopeClient {
         @GET("/entities")
         Flux<? extends ResponseEntity<String>> entities();
+    }
+
+    static final class CustomResponseEntity extends ResponseEntity<String> {
+        CustomResponseEntity() {
+            super(HttpStatus.OK);
+        }
+    }
+
+    interface MonoResponseEntitySubclassClient {
+        @GET("/entity")
+        Mono<CustomResponseEntity> entity();
+    }
+
+    interface FluxResponseEntitySubclassClient {
+        @GET("/entities")
+        Flux<CustomResponseEntity> entities();
+    }
+
+    interface WildcardResponseEntitySubclassClient {
+        @GET("/entities")
+        Flux<? extends CustomResponseEntity> entities();
+    }
+
+    interface GenericEnvelopeOperations<T> {
+        @GET("/entity")
+        Mono<T> entity();
+    }
+
+    interface InheritedResponseEntitySubclassClient
+            extends GenericEnvelopeOperations<CustomResponseEntity> {
+    }
+
+    interface WildcardDataBufferClient {
+        @GET("/buffers")
+        Flux<? extends DataBuffer> buffers();
     }
 
     @SuppressWarnings("rawtypes")

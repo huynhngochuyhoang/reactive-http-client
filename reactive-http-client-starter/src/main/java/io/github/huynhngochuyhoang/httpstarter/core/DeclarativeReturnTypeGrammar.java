@@ -49,9 +49,18 @@ final class DeclarativeReturnTypeGrammar {
             throw unsupported(concreteClientInterface, clientName, method, responseType,
                     "the reactive element type must resolve against the concrete client interface");
         }
-        if (hasDirectWildcardBound(responseType, ResponseEntity.class)) {
+        Class<?> wildcardEnvelopeType = directWildcardBoundAssignableTo(responseType, ResponseEntity.class);
+        if (wildcardEnvelopeType != null) {
+            String reason = ResponseEntity.class.equals(wildcardEnvelopeType)
+                    ? "ResponseEntity envelopes must be declared directly as Mono<ResponseEntity<T>>"
+                    : "ResponseEntity subclasses are not supported as declarative return types";
+            throw unsupported(concreteClientInterface, clientName, method, responseType, reason);
+        }
+        Class<?> responseRawType = rawClass(responseType);
+        if (responseRawType != null && !ResponseEntity.class.equals(responseRawType)
+                && ResponseEntity.class.isAssignableFrom(responseRawType)) {
             throw unsupported(concreteClientInterface, clientName, method, responseType,
-                    "ResponseEntity envelopes must be declared directly as Mono<ResponseEntity<T>>");
+                    "ResponseEntity subclasses are not supported as declarative return types");
         }
 
         if (Flux.class.equals(outerType)) {
@@ -62,6 +71,10 @@ final class DeclarativeReturnTypeGrammar {
             if (ResponseEntity.class.equals(rawClass(responseType))) {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,
                         "ResponseEntity envelopes are supported only inside Mono");
+            }
+            if (directWildcardBoundAssignableTo(responseType, DataBuffer.class) != null) {
+                throw unsupported(concreteClientInterface, clientName, method, responseType,
+                        "raw DataBuffer streams must be declared directly as Flux<DataBuffer>");
             }
             if (containsPublisher(responseType)) {
                 throw unsupported(concreteClientInterface, clientName, method, responseType,
@@ -143,14 +156,23 @@ final class DeclarativeReturnTypeGrammar {
         return false;
     }
 
-    private static boolean hasDirectWildcardBound(Type type, Class<?> expectedRawType) {
+    private static Class<?> directWildcardBoundAssignableTo(Type type, Class<?> expectedRawType) {
         if (!(type instanceof WildcardType wildcardType)) {
-            return false;
+            return null;
         }
-        return Arrays.stream(wildcardType.getUpperBounds())
-                .anyMatch(bound -> expectedRawType.equals(rawClass(bound)))
-                || Arrays.stream(wildcardType.getLowerBounds())
-                .anyMatch(bound -> expectedRawType.equals(rawClass(bound)));
+        for (Type bound : wildcardType.getUpperBounds()) {
+            Class<?> rawBound = rawClass(bound);
+            if (rawBound != null && expectedRawType.isAssignableFrom(rawBound)) {
+                return rawBound;
+            }
+        }
+        for (Type bound : wildcardType.getLowerBounds()) {
+            Class<?> rawBound = rawClass(bound);
+            if (rawBound != null && expectedRawType.isAssignableFrom(rawBound)) {
+                return rawBound;
+            }
+        }
+        return null;
     }
 
     private static boolean containsUnresolvedTypeVariable(Type type,
