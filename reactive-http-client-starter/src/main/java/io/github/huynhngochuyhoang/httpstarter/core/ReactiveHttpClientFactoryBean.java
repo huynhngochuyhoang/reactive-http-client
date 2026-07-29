@@ -792,7 +792,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         if (resilience == null || !resilience.isEnabled()) {
             return "disabled";
         }
-        return "enabled(retry=" + resilience.getRetry()
+        return "configured(retry=" + resilience.getRetry()
                 + ", retryMethods=" + resilience.getRetryMethods()
                 + ", rateLimiter=" + resilience.getRateLimiter()
                 + ", circuitBreaker=" + resilience.getCircuitBreaker()
@@ -1229,9 +1229,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             MethodMetadata meta = metadataCache.get(method);
             RequestPlan plan = RequestPlan.from(meta, clientInterface);
             String httpMethod = diagnosticHttpMethod(meta, clientConfig);
-            boolean retryEnabled = isRetryMethodEnabled(resilience, httpMethod)
-                    && resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY);
-            String retryInstance = retryEnabled
+            boolean retryConfiguredForMethod = isRetryMethodEnabled(resilience, httpMethod);
+            String retryInstance = retryConfiguredForMethod
                     ? operatorDiagnostic(resilienceOperatorApplier,
                     ResilienceOperatorApplier.InstanceType.RETRY,
                     plan.retryInstanceName(),
@@ -1247,7 +1246,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     ResilienceOperatorApplier.InstanceType.BULKHEAD,
                     plan.bulkheadInstanceName(), resilience.getBulkhead());
             log.debug("Reactive HTTP client [{}] method [{}#{}] resilience: httpMethod={}, retry={}, "
-                            + "rateLimiter={}, circuitBreaker={}, bulkhead={}, retrySafety={}, bodyRepeatability={}, operatorOrder={}",
+                            + "rateLimiter={}, circuitBreaker={}, bulkhead={}, retrySafety={}, bodyRepeatability={}, "
+                            + "operatorOrder={}, subscriptionOrder={}",
                     clientName,
                     method.getDeclaringClass().getSimpleName(),
                     method.getName(),
@@ -1258,7 +1258,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     bulkheadInstance,
                     diagnosticRetrySafety(plan, httpMethod, clientConfig),
                     plan.bodyRepeatability(),
-                    ReactiveClientInvocationHandler.RESILIENCE_OPERATOR_ORDER);
+                    ReactiveClientInvocationHandler.RESILIENCE_OPERATOR_ORDER,
+                    ReactiveClientInvocationHandler.RESILIENCE_SUBSCRIPTION_ORDER);
         }
     }
 
@@ -1308,7 +1309,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                                              String methodLevel,
                                              String clientLevel) {
         if (!resilienceOperatorApplier.isOperatorAvailable(type)) {
-            return "disabled";
+            return "unavailable";
         }
         return resolveResilienceInstanceName(methodLevel, clientLevel);
     }

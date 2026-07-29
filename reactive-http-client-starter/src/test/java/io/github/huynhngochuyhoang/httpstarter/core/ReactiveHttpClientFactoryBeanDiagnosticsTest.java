@@ -84,7 +84,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .contains("proxy=enabled")
                     .contains("credentials=[REDACTED]")
                     .contains("tls=custom")
-                    .contains("resilience=enabled")
+                    .contains("resilience=configured")
                     .contains("retryMethods=")
                     .contains("operatorOrder=retry -> rate-limiter -> circuit-breaker -> bulkhead")
                     .contains("exchangeLogging=enabled")
@@ -450,7 +450,9 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .contains("retrySafety=SAFE_METHOD")
                     .contains("method [ResilienceDiagnosticClient#write] resilience")
                     .contains("retrySafety=EXPLICIT_IDEMPOTENCY_KEY")
-                    .contains("operatorOrder=retry -> rate-limiter -> circuit-breaker -> bulkhead");
+                    .contains("operatorOrder=retry -> rate-limiter -> circuit-breaker -> bulkhead")
+                    .contains("subscriptionOrder=logical-call-timeout -> bulkhead -> circuit-breaker -> "
+                            + "rate-limiter -> retry -> request-attempt");
         } finally {
             logger.setLevel(previousLevel);
             factoryBean.destroy();
@@ -485,7 +487,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
-    void debugStartupDiagnosticsDisableUnavailableOperators(CapturedOutput output) throws Exception {
+    void debugStartupDiagnosticsReportUnavailableOperators(CapturedOutput output) throws Exception {
         Logger logger = (Logger) LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
         Level previousLevel = logger.getLevel();
         logger.setLevel(Level.DEBUG);
@@ -503,7 +505,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
             assertThat(output.getOut())
                     .contains("method [DefaultIdempotencyKeyDiagnosticClient#create] resilience: httpMethod=POST, "
-                            + "retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled");
+                            + "retry=unavailable, rateLimiter=unavailable, circuitBreaker=unavailable, bulkhead=unavailable");
         } finally {
             logger.setLevel(previousLevel);
             factoryBean.destroy();
