@@ -128,24 +128,53 @@ Evidence:
 
 ## Priority 3 - Resilience Operator Composition Contract
 
-### [ ] 3.1 Freeze the existing wrapper semantics
+### [x] 3.1 Freeze the existing wrapper semantics
 
-- [ ] Build a deterministic fixture with retry, rate limiter, circuit breaker,
+- [x] Build a deterministic fixture with retry, rate limiter, circuit breaker,
       bulkhead, per-attempt timeout, and logical-call timeout enabled together.
-- [ ] Record which operators acquire once per logical subscription and which
+- [x] Record which operators acquire once per logical subscription and which
       observe each retry subscription.
-- [ ] Prove retry exhaustion produces the expected circuit outcomes, permissions,
+- [x] Prove retry exhaustion produces the expected circuit outcomes, permissions,
       occupancy, attempt count, and one terminal result.
-- [ ] Keep operator ordering internal and non-configurable.
+- [x] Keep operator ordering internal and non-configurable.
 
-### [ ] 3.2 Prove permit and terminal cleanup
+### [x] 3.2 Prove permit and terminal cleanup
 
-- [ ] Cover cancellation and logical-budget expiry during admission, execution,
+- [x] Cover cancellation and logical-budget expiry during admission, execution,
       retry delay, and response consumption.
-- [ ] Verify every permit is released once and no delayed retry remains active.
-- [ ] Report missing/no-op optional operators as unavailable, not active.
-- [ ] Align startup diagnostics, lifecycle, observer, exchange logging, metrics,
+- [x] Verify every permit is released once and no delayed retry remains active.
+- [x] Report missing/no-op optional operators as unavailable, not active.
+- [x] Align startup diagnostics, lifecycle, observer, exchange logging, metrics,
       docs, and test helpers with the proven semantics.
+
+Evidence:
+
+- `ResilienceOperatorCompositionContractTest` composes real Resilience4j Retry,
+  RateLimiter, CircuitBreaker, and Bulkhead operators with native per-attempt and
+  logical-call timeouts. Three timed-out request dispatches consume one rate
+  permission and one bulkhead admission, produce one failed/open circuit result,
+  and report three subscription attempts through one terminal lifecycle,
+  observer, exchange-log, and Micrometer result.
+- The frozen transform order remains
+  `retry -> rate-limiter -> circuit-breaker -> bulkhead`; startup diagnostics and
+  `docs/07-resilience4j.md` also record the reverse subscription boundary as
+  `logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt`.
+  No public ordering configuration was added.
+- Admission timeout, retry-delay timeout, execution cancellation, and response
+  consumption cancellation fixtures prove that bulkhead permits converge,
+  circuit outcomes follow Resilience4j Reactor semantics, and no cancelled
+  admission or delayed retry subscribes the request source later. Delayed
+  rate-limiter admission is now part of the cancellable reactive chain rather
+  than a detached timer.
+- Startup summaries distinguish configured resilience from active operators;
+  per-method diagnostics report missing registries/no-op adapters as
+  `unavailable`. Existing no-op and mock-helper paths remain pass-through and use
+  the same production invocation-handler composition.
+- Focused composition, operator, timeout-budget, and diagnostics tests passed.
+  The full starter suite and the starter-plus-test-helper reactor suite passed.
+  Strict starter-module japicmp passed against published `3.3.0` from the fresh
+  `target/api-starter-3.3.0-resilience-composition` repository. `git diff --check`
+  passed.
 
 ---
 

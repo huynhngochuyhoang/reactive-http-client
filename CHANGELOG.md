@@ -41,6 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enclosing `ResponseEntity` classes while still rejecting `ResponseEntity`
   values carried in owner type arguments, collections, arrays, and other ordinary
   reactive response element graphs.
+- **Resilience composition contract.** Froze the internal transformation and
+  subscription wrapper order across per-attempt request timeouts and the logical
+  call budget; documented one outer rate-limiter, circuit-breaker, and bulkhead
+  admission around retry attempts; made delayed rate-limiter admission cancel
+  with the logical call; aligned unavailable-operator startup diagnostics; and
+  added deterministic timeout, retry-exhaustion, cancellation, permit, terminal
+  lifecycle, exchange-log, observer, and Micrometer evidence.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects

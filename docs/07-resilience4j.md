@@ -230,17 +230,51 @@ resilience4j:
 
 ---
 
-## Operator ordering
+## Operator composition
 
-The starter applies the native request timeout first, then resilience operators in this order:
+The starter keeps one internal, non-configurable transformation order:
 
 ```text
 retry -> rate-limiter -> circuit-breaker -> bulkhead
 ```
 
-The same order appears in DEBUG startup diagnostics as `operatorOrder=retry -> rate-limiter -> circuit-breaker -> bulkhead`. With this ordering, the rate limiter wraps the retried operation at the starter layer instead of being treated as another timeout or bulkhead setting.
+Reactor enters those wrappers in reverse order at subscription time. The complete
+call boundary is:
 
-When DEBUG logging is enabled for `ReactiveHttpClientFactoryBean`, startup diagnostics also list per-method resilience decisions: resolved HTTP method, retry instance or disabled retry, rate limiter, circuit breaker, bulkhead, retry-safety classification, body-repeatability classification, and operator order.
+```text
+logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt
+```
+
+The boundaries have these semantics:
+
+| Boundary | Scope |
+|---|---|
+| Logical-call timeout | One absolute budget around admission, retry delays, every request attempt, and response consumption |
+| Bulkhead | Acquires once and remains occupied for the retry sequence until terminal completion or cancellation |
+| Circuit breaker | Acquires once and records the result visible after retry succeeds or is exhausted |
+| Rate limiter | Reserves one permission for the retry sequence; a reserved rate permission is not refunded on cancellation |
+| Retry | Coordinates the configured source subscriptions and delay between them |
+| Request attempt | Rebuilds and dispatches one request subscription; the native request timeout is applied independently to every attempt |
+
+Retry exhaustion therefore records multiple Retry attempts but one failed
+CircuitBreaker call, one RateLimiter permission, one Bulkhead occupancy interval,
+and one terminal starter observer, lifecycle, exchange-log, and metrics result.
+Cancellation or logical-budget expiry cancels pending rate-limiter admission and
+retry delays, and releases acquired Bulkhead/CircuitBreaker permissions without
+subscribing a delayed request source later.
+
+For a multi-value `Flux` that emits at least one value before caller cancellation,
+Resilience4j records the CircuitBreaker/Bulkhead operation as successful according
+to its Reactor operator semantics. The starter's terminal lifecycle, observer,
+exchange-log, and Micrometer request result still reports cancellation.
+
+DEBUG startup diagnostics expose both
+`operatorOrder=retry -> rate-limiter -> circuit-breaker -> bulkhead` and
+`subscriptionOrder=logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt`.
+They also list each resolved operator instance, retry-safety classification, and
+body-repeatability classification. Missing optional registries and the no-op
+fallback are shown as `unavailable`; configured names are not reported as active
+operators when their adapter is unavailable.
 
 ---
 

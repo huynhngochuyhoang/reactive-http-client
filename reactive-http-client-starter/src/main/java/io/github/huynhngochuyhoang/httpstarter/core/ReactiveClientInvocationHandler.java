@@ -67,7 +67,8 @@ import java.util.function.Function;
  *   <li>Decode errors with {@link DefaultErrorDecoder}</li>
  *   <li>Optionally apply native request timeout, then Resilience4j operators
  *       (retry -> rate-limiter -> circuit-breaker -> bulkhead), then one
- *       end-to-end logical-call timeout budget</li>
+ *       end-to-end logical-call timeout budget. At subscription time the wrappers
+ *       are entered in the reverse order around the retry attempt source</li>
  * </ol>
  */
 public class ReactiveClientInvocationHandler implements InvocationHandler {
@@ -78,6 +79,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     static final String FINAL_REQUEST_OBSERVATION_ATTRIBUTE =
             ReactiveClientInvocationHandler.class.getName() + ".finalRequestObservation";
     static final String RESILIENCE_OPERATOR_ORDER = "retry -> rate-limiter -> circuit-breaker -> bulkhead";
+    static final String RESILIENCE_SUBSCRIPTION_ORDER =
+            "logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt";
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     private static final Object SUBSCRIPTION_STATE_CONTEXT_KEY = new Object();
     private static final int MAX_LOGGER_CACHE_SIZE = 256;
