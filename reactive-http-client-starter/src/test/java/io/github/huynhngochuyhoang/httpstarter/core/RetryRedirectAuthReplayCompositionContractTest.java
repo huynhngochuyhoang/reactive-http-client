@@ -25,8 +25,7 @@ import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
-import java.io.ByteArrayInputStream;
-import java.io.FilterInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -181,9 +181,10 @@ class RetryRedirectAuthReplayCompositionContractTest {
 
     @Test
     void replayableApplicationOwnedResourceIsReopenedWithoutStarterBuffering() {
-        try (ReplayServer server = new ReplayServer();
-             ClientFixture fixture = ClientFixture.create(server, true, true, null)) {
-            CountingResource resource = new CountingResource("application-owned-resource");
+        GatedResource resource = new GatedResource(
+                "application-owned-resource-".repeat(2_048), 4);
+        try (GatedResourceReplayServer server = new GatedResourceReplayServer(resource);
+             ClientFixture fixture = ClientFixture.create(server.baseUrl(), true, true, null)) {
 
             assertThat(fixture.client().resourceRetryRedirect(resource).block(BLOCK_TIMEOUT)).isEqualTo("ok");
 
@@ -191,6 +192,7 @@ class RetryRedirectAuthReplayCompositionContractTest {
                     assertThat(request.bodyBytes()).containsExactly(resource.bytes()));
             assertThat(resource.opens).hasValue(4);
             assertThat(resource.closes).hasValue(4);
+            assertThat(resource.firstChunksBeforeSourceCompletion).hasValue(4);
             assertSingleIdempotencyKey(server.businessRequests());
         }
     }
@@ -312,16 +314,21 @@ class RetryRedirectAuthReplayCompositionContractTest {
 
         private static ClientFixture create(
                 ReplayServer server, boolean retry, boolean followRedirects, AuthProvider authProvider) {
-            return create(server, retry, followRedirects, authProvider, false);
+            return create(server.baseUrl(), retry, followRedirects, authProvider, false);
+        }
+
+        private static ClientFixture create(
+                String baseUrl, boolean retry, boolean followRedirects, AuthProvider authProvider) {
+            return create(baseUrl, retry, followRedirects, authProvider, false);
         }
 
         private static ClientFixture createWithOAuth(
                 ReplayServer server, boolean retry, boolean followRedirects) {
-            return create(server, retry, followRedirects, null, true);
+            return create(server.baseUrl(), retry, followRedirects, null, true);
         }
 
         private static ClientFixture create(
-                ReplayServer server,
+                String baseUrl,
                 boolean retry,
                 boolean followRedirects,
                 AuthProvider authProvider,
@@ -330,7 +337,7 @@ class RetryRedirectAuthReplayCompositionContractTest {
             ReplayDiagnostics diagnostics = new ReplayDiagnostics();
             ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
             ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
-            config.setBaseUrl(server.baseUrl());
+            config.setBaseUrl(baseUrl);
             config.setFollowRedirects(followRedirects);
 
             if (retry) {
@@ -349,7 +356,7 @@ class RetryRedirectAuthReplayCompositionContractTest {
             if (oauth) {
                 ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
                 auth.setType(OAuth2ClientCredentialsAuthProviderFactory.TYPE);
-                auth.getOauth2ClientCredentials().setTokenUri(server.baseUrl() + "/token");
+                auth.getOauth2ClientCredentials().setTokenUri(baseUrl + "/token");
                 auth.getOauth2ClientCredentials().setClientId("replay-client");
                 auth.getOauth2ClientCredentials().setClientSecret("replay-secret");
                 auth.getOauth2ClientCredentials().getTokenService().setRetryMaxAttempts(1);
@@ -461,6 +468,7 @@ class RetryRedirectAuthReplayCompositionContractTest {
             assertThat(cancellations).hasValue(0);
             assertThat(observerEvents).singleElement().satisfies(event -> {
                 assertThat(event.getAttemptCount()).isEqualTo(attempts);
+                assertTerminalAuthFailure(event.getError());
                 assertThat(event.getStatusCode()).isNull();
                 assertThat(event.getRequestUrl()).isNull();
                 assertThat(event.getRequestHeaders()).isEmpty();
@@ -468,18 +476,25 @@ class RetryRedirectAuthReplayCompositionContractTest {
             });
             assertThat(errorContexts).singleElement().satisfies(context -> {
                 assertThat(context.attemptNumber()).isEqualTo(attempts);
+                assertTerminalAuthFailure(context.error());
                 assertThat(context.statusCode()).isNull();
                 assertThat(context.requestUrl()).isNull();
                 assertThat(context.failureStage()).isNull();
             });
             assertThat(exchangeLogs).singleElement().satisfies(log -> {
                 assertThat(log.subscriptionAttemptCount()).isEqualTo(attempts);
+                assertTerminalAuthFailure(log.error());
                 assertThat(log.responseStatus()).isNull();
                 assertThat(log.responseHeaders()).isEmpty();
                 assertThat(log.responseHeaders()).doesNotContainKey(PRIOR_RESPONSE_HEADER);
                 assertThat(log.requestUrl()).isNull();
                 assertThat(log.failureStage()).isNull();
             });
+        }
+
+        private void assertTerminalAuthFailure(Throwable error) {
+            assertThat(error).isInstanceOf(AuthProviderException.class);
+            assertThat(error).hasRootCauseMessage("token service unavailable");
         }
 
         private void awaitCancellation() throws InterruptedException {
@@ -564,13 +579,6 @@ class RetryRedirectAuthReplayCompositionContractTest {
                                             .header(HttpHeaders.LOCATION, "/repeatable-redirect/final").send();
                                 }
                                 if ("/repeatable-redirect/final".equals(path)) {
-                                    return retryOncePerKey(record, response);
-                                }
-                                if ("/resource-retry-redirect".equals(path)) {
-                                    return response.status(307)
-                                            .header(HttpHeaders.LOCATION, "/resource-retry-redirect/final").send();
-                                }
-                                if ("/resource-retry-redirect/final".equals(path)) {
                                     return retryOncePerKey(record, response);
                                 }
                                 if ("/cancel-redirect".equals(path)) {
@@ -682,18 +690,89 @@ class RetryRedirectAuthReplayCompositionContractTest {
         }
     }
 
-    private static final class CountingResource extends AbstractResource {
+    private static final class GatedResourceReplayServer implements AutoCloseable {
+        private final GatedResource resource;
+        private final List<RequestRecord> businessRequests = new CopyOnWriteArrayList<>();
+        private final Map<String, AtomicInteger> finalCallsByKey = new ConcurrentHashMap<>();
+        private final DisposableServer server;
+
+        private GatedResourceReplayServer(GatedResource resource) {
+            this.resource = resource;
+            this.server = HttpServer.create()
+                    .port(0)
+                    .handle((request, response) -> {
+                        String path = normalizedPath(request.path());
+                        ByteArrayOutputStream body = new ByteArrayOutputStream();
+                        AtomicBoolean firstChunk = new AtomicBoolean();
+                        return request.receive().asByteArray()
+                                .doOnNext(bytes -> {
+                                    if (firstChunk.compareAndSet(false, true)) {
+                                        resource.onFirstNetworkChunk();
+                                    }
+                                    body.writeBytes(bytes);
+                                })
+                                .then(Mono.defer(() -> {
+                                    RequestRecord record = RequestRecord.from(
+                                            path, request.requestHeaders(), body.toByteArray());
+                                    businessRequests.add(record);
+                                    if ("/resource-retry-redirect".equals(path)) {
+                                        return response.status(307)
+                                                .header(HttpHeaders.LOCATION,
+                                                        "/resource-retry-redirect/final")
+                                                .send();
+                                    }
+                                    if ("/resource-retry-redirect/final".equals(path)) {
+                                        int call = finalCallsByKey
+                                                .computeIfAbsent(record.idempotencyKey(),
+                                                        ignored -> new AtomicInteger())
+                                                .incrementAndGet();
+                                        return call == 1
+                                                ? response.status(503)
+                                                        .sendString(Mono.just("retry")).then()
+                                                : response.sendString(Mono.just("ok")).then();
+                                    }
+                                    return response.status(404).send();
+                                }));
+                    })
+                    .bindNow();
+        }
+
+        private String baseUrl() {
+            return "http://127.0.0.1:" + server.port();
+        }
+
+        private List<RequestRecord> businessRequests() {
+            return List.copyOf(businessRequests);
+        }
+
+        @Override
+        public void close() {
+            server.disposeNow(BLOCK_TIMEOUT);
+        }
+    }
+
+    private static final class GatedResource extends AbstractResource {
         private final byte[] bytes;
+        private final CountDownLatch[] firstChunkObserved;
+        private final AtomicBoolean[] sourceCompleted;
         private final AtomicInteger opens = new AtomicInteger();
         private final AtomicInteger closes = new AtomicInteger();
+        private final AtomicInteger serverDispatches = new AtomicInteger();
+        private final AtomicInteger firstChunksBeforeSourceCompletion = new AtomicInteger();
 
-        private CountingResource(String value) {
+        private GatedResource(String value, int expectedDispatches) {
             this.bytes = value.getBytes(StandardCharsets.UTF_8);
+            this.firstChunkObserved = new CountDownLatch[expectedDispatches];
+            this.sourceCompleted = new AtomicBoolean[expectedDispatches];
+            for (int i = 0; i < expectedDispatches; i++) {
+                firstChunkObserved[i] = new CountDownLatch(1);
+                sourceCompleted[i] = new AtomicBoolean();
+            }
         }
 
         @Override
         public String getDescription() {
-            return "replayable application-owned resource";
+            return "gated replayable application-owned resource";
         }
 
         @Override
@@ -708,19 +787,75 @@ class RetryRedirectAuthReplayCompositionContractTest {
 
         @Override
         public InputStream getInputStream() {
-            opens.incrementAndGet();
-            return new FilterInputStream(new ByteArrayInputStream(bytes)) {
+            int dispatch = opens.getAndIncrement();
+            if (dispatch >= firstChunkObserved.length) {
+                throw new IllegalStateException("Unexpected resource replay " + dispatch);
+            }
+            return new InputStream() {
+                private int position;
+                private boolean gatePassed;
                 private boolean closed;
 
                 @Override
-                public void close() throws IOException {
+                public int read() throws IOException {
+                    byte[] single = new byte[1];
+                    int count = read(single, 0, 1);
+                    return count < 0 ? -1 : Byte.toUnsignedInt(single[0]);
+                }
+
+                @Override
+                public int read(byte[] destination, int offset, int length) throws IOException {
+                    if (length == 0) {
+                        return 0;
+                    }
+                    if (position >= bytes.length) {
+                        sourceCompleted[dispatch].set(true);
+                        return -1;
+                    }
+                    if (position > 0 && !gatePassed) {
+                        awaitFirstNetworkChunk(dispatch);
+                        gatePassed = true;
+                    }
+                    int allowed = position == 0 ? Math.min(length, 1_024) : length;
+                    int count = Math.min(allowed, bytes.length - position);
+                    System.arraycopy(bytes, position, destination, offset, count);
+                    position += count;
+                    if (position == bytes.length) {
+                        sourceCompleted[dispatch].set(true);
+                    }
+                    return count;
+                }
+
+                @Override
+                public void close() {
                     if (!closed) {
                         closed = true;
                         closes.incrementAndGet();
                     }
-                    super.close();
                 }
             };
+        }
+
+        private void awaitFirstNetworkChunk(int dispatch) throws IOException {
+            try {
+                if (!firstChunkObserved[dispatch].await(2, TimeUnit.SECONDS)) {
+                    throw new IOException("Resource was aggregated before dispatch " + dispatch);
+                }
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while awaiting resource dispatch", error);
+            }
+        }
+
+        private void onFirstNetworkChunk() {
+            int dispatch = serverDispatches.getAndIncrement();
+            if (dispatch >= firstChunkObserved.length) {
+                throw new IllegalStateException("Unexpected server dispatch " + dispatch);
+            }
+            if (!sourceCompleted[dispatch].get()) {
+                firstChunksBeforeSourceCompletion.incrementAndGet();
+            }
+            firstChunkObserved[dispatch].countDown();
         }
 
         private byte[] bytes() {

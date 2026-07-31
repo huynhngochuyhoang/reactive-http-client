@@ -208,9 +208,11 @@ Evidence:
   token refreshes, wire paths, and cold publisher-body subscriptions.
 - Two subscriptions to one cold proxy publisher generate two distinct idempotency
   keys while all four retry/redirect dispatches inside each subscription retain its
-  key. Repeatable UTF-8 text produces identical bytes on every dispatch. A replayable
-  application-owned `Resource` is reopened and closed once per retry/redirect
-  dispatch with identical wire bytes, proving that the starter does not buffer it.
+  key. Repeatable UTF-8 text produces identical bytes on every dispatch. A gated,
+  application-owned `Resource` withholds each replay remainder until the real server
+  receives its first chunk; all four first chunks arrive before source completion, and
+  every stream is reopened and closed once with identical wire bytes. The fixture fails
+  if the starter aggregates the resource before dispatch.
   Cold non-repeatable publishers are subscribed once per dispatch. Existing warning
   and strict body-signing tests retain the documented non-repeatable/application-owned
   behavior.
