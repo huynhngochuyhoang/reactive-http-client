@@ -208,17 +208,22 @@ Evidence:
   token refreshes, wire paths, and cold publisher-body subscriptions.
 - Two subscriptions to one cold proxy publisher generate two distinct idempotency
   keys while all four retry/redirect dispatches inside each subscription retain its
-  key. Repeatable UTF-8 text produces identical bytes on every dispatch; cold
-  application-owned publishers are subscribed once per dispatch and are never
-  buffered by the starter. Existing warning and strict body-signing tests retain
-  the documented non-repeatable/application-owned behavior.
+  key. Repeatable UTF-8 text produces identical bytes on every dispatch. A replayable
+  application-owned `Resource` is reopened and closed once per retry/redirect
+  dispatch with identical wire bytes, proving that the starter does not buffer it.
+  Cold non-repeatable publishers are subscribed once per dispatch. Existing warning
+  and strict body-signing tests retain the documented non-repeatable/application-owned
+  behavior.
 - Same-authority redirect plus auth refresh preserves the bearer and caller headers.
   Cross-authority redirect evidence removes `Authorization`, `Cookie`, and
   `Proxy-Authorization` while preserving the non-sensitive idempotency key.
 - Success fixtures produce one terminal observer/exchange-log result with resilience
   attempt counts that exclude redirect and auth replay dispatches. A final
-  pre-dispatch auth failure after prior `401` and `503` responses reports attempt 2
-  with no stale URL, headers, status, or failure stage.
+  pre-dispatch auth failure after prior sentinel-bearing `401` and `503` responses
+  reports attempt 2 with no stale URL, headers, status, or failure stage. Cancellation
+  while the redirected target dispatch is in flight reports one visible attempt, one
+  terminal cancellation, no response metadata from the preceding `307`, and no extra
+  body subscription after transport cancellation.
 - Focused replay, redirect, OAuth2, upload ownership, idempotency, retry-warning,
   and terminal-state tests passed. The full starter suite and the
   starter-plus-test-helper reactor suite passed. Strict starter-module japicmp

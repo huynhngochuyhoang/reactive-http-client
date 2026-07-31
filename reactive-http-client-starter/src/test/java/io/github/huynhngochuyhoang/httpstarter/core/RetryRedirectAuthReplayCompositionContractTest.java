@@ -12,24 +12,29 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.context.support.StaticApplicationContext;
+import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
+import java.io.ByteArrayInputStream;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -40,6 +45,7 @@ class RetryRedirectAuthReplayCompositionContractTest {
 
     private static final Duration BLOCK_TIMEOUT = Duration.ofSeconds(5);
     private static final DefaultDataBufferFactory BUFFER_FACTORY = new DefaultDataBufferFactory();
+    private static final String PRIOR_RESPONSE_HEADER = "X-Replay-Prior-Response";
 
     @ParameterizedTest
     @ValueSource(ints = {307, 308})
@@ -173,6 +179,43 @@ class RetryRedirectAuthReplayCompositionContractTest {
     }
 
     @Test
+    void replayableApplicationOwnedResourceIsReopenedWithoutStarterBuffering() {
+        try (ReplayServer server = new ReplayServer();
+             ClientFixture fixture = ClientFixture.create(server, true, true, null)) {
+            CountingResource resource = new CountingResource("application-owned-resource");
+
+            assertThat(fixture.client().resourceRetryRedirect(resource).block(BLOCK_TIMEOUT)).isEqualTo("ok");
+
+            assertThat(server.businessRequests()).hasSize(4).allSatisfy(request ->
+                    assertThat(request.bodyBytes()).containsExactly(resource.bytes()));
+            assertThat(resource.opens).hasValue(4);
+            assertThat(resource.closes).hasValue(4);
+            assertSingleIdempotencyKey(server.businessRequests());
+        }
+    }
+
+    @Test
+    void cancellationDuringRedirectDispatchReportsOnlyTheFinalVisibleOutcome() throws InterruptedException {
+        try (ReplayServer server = new ReplayServer();
+             ClientFixture fixture = ClientFixture.create(server, true, true, null)) {
+            AtomicInteger bodySubscriptions = new AtomicInteger();
+            Disposable subscription = fixture.client().cancelRedirect(body("cancel-redirect", bodySubscriptions))
+                    .subscribe(ignored -> { }, ignored -> { });
+            assertThat(server.awaitCancelledRedirectTarget()).isTrue();
+
+            subscription.dispose();
+
+            assertThat(server.awaitCancelledRedirectDisconnect()).isTrue();
+            fixture.diagnostics().awaitCancellation();
+            assertThat(server.businessRequests()).extracting(RequestRecord::path)
+                    .containsExactly("/cancel-redirect", "/cancel-redirect/final");
+            assertThat(bodySubscriptions).hasValue(2);
+            assertSingleIdempotencyKey(server.businessRequests());
+            fixture.diagnostics().assertCancelledCall(1, server.baseUrl() + "/cancel-redirect");
+        }
+    }
+
+    @Test
     void finalPreDispatchAuthFailureDoesNotReusePriorAttemptEvidence() {
         AtomicInteger tokenFetches = new AtomicInteger();
         AuthProvider authProvider = new RefreshingBearerAuthProvider(() -> {
@@ -244,6 +287,14 @@ class RetryRedirectAuthReplayCompositionContractTest {
         Mono<String> repeatableRedirect(
                 @HeaderParam("Content-Type") String contentType,
                 @Body String body);
+
+        @POST("/resource-retry-redirect")
+        @IdempotencyKey
+        Mono<String> resourceRetryRedirect(@Body org.springframework.core.io.Resource body);
+
+        @POST("/cancel-redirect")
+        @IdempotencyKey
+        Mono<String> cancelRedirect(@Body Flux<DataBuffer> body);
 
         @POST("/terminal-auth")
         @IdempotencyKey
@@ -333,6 +384,7 @@ class RetryRedirectAuthReplayCompositionContractTest {
         private final AtomicInteger cancellations = new AtomicInteger();
         private final List<HttpClientObserverEvent> observerEvents = new CopyOnWriteArrayList<>();
         private final List<ReactiveHttpClientLifecycleContext> errorContexts = new CopyOnWriteArrayList<>();
+        private final List<ReactiveHttpClientLifecycleContext> cancellationContexts = new CopyOnWriteArrayList<>();
         private final List<HttpExchangeLogContext> exchangeLogs = new CopyOnWriteArrayList<>();
 
         @Override
@@ -364,6 +416,7 @@ class RetryRedirectAuthReplayCompositionContractTest {
         @Override
         public void onCancel(ReactiveHttpClientLifecycleContext context) {
             cancellations.incrementAndGet();
+            cancellationContexts.add(context);
         }
 
         @Override
@@ -409,7 +462,47 @@ class RetryRedirectAuthReplayCompositionContractTest {
             assertThat(exchangeLogs).singleElement().satisfies(log -> {
                 assertThat(log.subscriptionAttemptCount()).isEqualTo(attempts);
                 assertThat(log.responseStatus()).isNull();
+                assertThat(log.responseHeaders()).isEmpty();
+                assertThat(log.responseHeaders()).doesNotContainKey(PRIOR_RESPONSE_HEADER);
                 assertThat(log.requestUrl()).isNull();
+                assertThat(log.failureStage()).isNull();
+            });
+        }
+
+        private void awaitCancellation() throws InterruptedException {
+            long deadline = System.nanoTime() + BLOCK_TIMEOUT.toNanos();
+            while (cancellations.get() == 0 && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            assertThat(cancellations).hasValue(1);
+        }
+
+        private void assertCancelledCall(int attempts, String requestUrl) {
+            assertThat(successes).hasValue(0);
+            assertThat(errors).hasValue(0);
+            assertThat(cancellations).hasValue(1);
+            assertThat(starts).hasValue(1);
+            assertThat(retries).hasValue(0);
+            assertThat(observerEvents).singleElement().satisfies(event -> {
+                assertThat(event.getAttemptCount()).isEqualTo(attempts);
+                assertThat(event.getError()).isInstanceOf(CancellationException.class);
+                assertThat(event.getStatusCode()).isNull();
+                assertThat(event.getRequestUrl()).isEqualTo(requestUrl);
+                assertThat(event.getFailureStage()).isNull();
+            });
+            assertThat(cancellationContexts).singleElement().satisfies(context -> {
+                assertThat(context.attemptNumber()).isEqualTo(attempts);
+                assertThat(context.error()).isInstanceOf(CancellationException.class);
+                assertThat(context.statusCode()).isNull();
+                assertThat(context.requestUrl()).hasToString(requestUrl);
+                assertThat(context.failureStage()).isNull();
+            });
+            assertThat(exchangeLogs).singleElement().satisfies(log -> {
+                assertThat(log.subscriptionAttemptCount()).isEqualTo(attempts);
+                assertThat(log.error()).isInstanceOf(CancellationException.class);
+                assertThat(log.responseStatus()).isNull();
+                assertThat(log.responseHeaders()).isEmpty();
+                assertThat(log.requestUrl()).hasToString(requestUrl);
                 assertThat(log.failureStage()).isNull();
             });
         }
@@ -419,6 +512,8 @@ class RetryRedirectAuthReplayCompositionContractTest {
         private final List<RequestRecord> businessRequests = new CopyOnWriteArrayList<>();
         private final Map<String, AtomicInteger> finalCallsByKey = new ConcurrentHashMap<>();
         private final AtomicInteger tokenRequests = new AtomicInteger();
+        private final CountDownLatch cancelledRedirectTarget = new CountDownLatch(1);
+        private final CountDownLatch cancelledRedirectDisconnect = new CountDownLatch(1);
         private final String crossAuthorityUrl;
         private final DisposableServer server;
 
@@ -458,6 +553,22 @@ class RetryRedirectAuthReplayCompositionContractTest {
                                 if ("/repeatable-redirect/final".equals(path)) {
                                     return retryOncePerKey(record, response);
                                 }
+                                if ("/resource-retry-redirect".equals(path)) {
+                                    return response.status(307)
+                                            .header(HttpHeaders.LOCATION, "/resource-retry-redirect/final").send();
+                                }
+                                if ("/resource-retry-redirect/final".equals(path)) {
+                                    return retryOncePerKey(record, response);
+                                }
+                                if ("/cancel-redirect".equals(path)) {
+                                    return response.status(307)
+                                            .header(PRIOR_RESPONSE_HEADER, "redirect-307")
+                                            .header(HttpHeaders.LOCATION, "/cancel-redirect/final").send();
+                                }
+                                if ("/cancel-redirect/final".equals(path)) {
+                                    cancelledRedirectTarget.countDown();
+                                    return Mono.<Void>never().doOnCancel(cancelledRedirectDisconnect::countDown);
+                                }
                                 if ("/retry-auth".equals(path)) {
                                     if ("Bearer token-1".equals(record.authorization())) {
                                         return response.status(401).send();
@@ -478,8 +589,11 @@ class RetryRedirectAuthReplayCompositionContractTest {
                                 }
                                 if ("/terminal-auth".equals(path)) {
                                     return "Bearer token-1".equals(record.authorization())
-                                            ? response.status(401).send()
-                                            : response.status(503).sendString(Mono.just("retry")).then();
+                                            ? response.status(401)
+                                                    .header(PRIOR_RESPONSE_HEADER, "auth-401").send()
+                                            : response.status(503)
+                                                    .header(PRIOR_RESPONSE_HEADER, "retry-503")
+                                                    .sendString(Mono.just("retry")).then();
                                 }
                                 return ok(response);
                             }))
@@ -509,6 +623,14 @@ class RetryRedirectAuthReplayCompositionContractTest {
 
         private List<RequestRecord> businessRequests() {
             return List.copyOf(businessRequests);
+        }
+
+        private boolean awaitCancelledRedirectTarget() throws InterruptedException {
+            return cancelledRedirectTarget.await(BLOCK_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        }
+
+        private boolean awaitCancelledRedirectDisconnect() throws InterruptedException {
+            return cancelledRedirectDisconnect.await(BLOCK_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         }
 
         @Override
@@ -541,6 +663,52 @@ class RetryRedirectAuthReplayCompositionContractTest {
         @Override
         public void close() {
             server.disposeNow(BLOCK_TIMEOUT);
+        }
+    }
+
+    private static final class CountingResource extends AbstractResource {
+        private final byte[] bytes;
+        private final AtomicInteger opens = new AtomicInteger();
+        private final AtomicInteger closes = new AtomicInteger();
+
+        private CountingResource(String value) {
+            this.bytes = value.getBytes(StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public String getDescription() {
+            return "replayable application-owned resource";
+        }
+
+        @Override
+        public String getFilename() {
+            return "replay.txt";
+        }
+
+        @Override
+        public long contentLength() {
+            return bytes.length;
+        }
+
+        @Override
+        public InputStream getInputStream() {
+            opens.incrementAndGet();
+            return new FilterInputStream(new ByteArrayInputStream(bytes)) {
+                private boolean closed;
+
+                @Override
+                public void close() throws IOException {
+                    if (!closed) {
+                        closed = true;
+                        closes.incrementAndGet();
+                    }
+                    super.close();
+                }
+            };
+        }
+
+        private byte[] bytes() {
+            return bytes.clone();
         }
     }
 
