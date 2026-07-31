@@ -301,12 +301,14 @@ Evidence:
 Evidence:
 
 - `Http2GoAwayRetirementContractTest` sends a real H2C
-  `GOAWAY(NO_ERROR)` with zero extra stream identifiers while a stream is
-  active and the peer advertises spare stream capacity. A call created only
-  after GOAWAY remains undispatched while the accepted odd-numbered stream
-  completes and throughout a bounded open-socket observation window; after the
-  peer closes that draining socket, the call runs on a distinct replacement
-  connection without exceeding `maxConnections=1`.
+  `GOAWAY(NO_ERROR)` with zero extra stream identifiers while two streams are
+  active and the peer advertises spare stream capacity. The fixture captures the
+  encoded frame and asserts its actual last-stream identifier: one accepted odd
+  stream is below the boundary, one is at it, and later demand would require the
+  next odd identifier above it. That later call remains undispatched while both
+  accepted streams complete and throughout a bounded open-socket observation
+  window; after the peer closes that draining socket, the call runs on a distinct
+  replacement connection without exceeding `maxConnections=1`.
 - A processed `Flux<DataBuffer>` upload receives its response with one source
   subscription and one server dispatch. GOAWAY therefore adds no hidden retry
   for a body the peer may already have processed.

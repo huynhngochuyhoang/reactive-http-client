@@ -33,8 +33,9 @@ configured connection pool.
 An HTTP/2 peer can send `GOAWAY` to retire one physical connection. Streams at
 or below the peer's last-stream identifier may already have been processed and
 can complete on the draining connection. The client does not open new streams
-on that connection; later demand uses replacement capacity after the draining
-socket leaves the pool.
+on that connection. When the pool has spare physical capacity, later demand can
+open a replacement connection while accepted streams continue on the draining
+socket. When the pool is at its physical bound, later demand waits for capacity.
 
 `max-connections` remains a physical-connection bound during retirement. With a
 one-connection pool, pending calls can remain queued while an accepted stream

@@ -5,8 +5,8 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.*;
 import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame;
 import io.netty.handler.codec.http2.DefaultHttp2ResetFrame;
 import io.netty.handler.codec.http2.Http2Error;
@@ -53,31 +53,45 @@ class Http2GoAwayRetirementContractTest {
     private static final Duration CALL_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration RETIREMENT_OBSERVATION = Duration.ofMillis(250);
     private static final long PENDING_ACQUIRE_TIMEOUT_MS = 30_000;
+    private static final int HTTP2_FRAME_HEADER_LENGTH = 9;
+    private static final int GOAWAY_PAYLOAD_LENGTH = 8;
+    private static final int GOAWAY_FRAME_TYPE = 7;
+    private static final int GOAWAY_EXTRA_STREAM_IDS = 0;
 
     @Test
     void goAwayLetsAcceptedStreamCompleteAndMovesPendingDemandToReplacementConnection() throws Exception {
         try (RetirementServer server = RetirementServer.create(8, false);
              MeterFixture meters = new MeterFixture();
              ClientFixture fixture = ClientFixture.create(server, true, false)) {
-            CompletableFuture<String> accepted = fixture.client().hold("accepted").toFuture();
-            server.awaitPath("/hold/accepted");
-            RequestRecord acceptedRecord = server.record("/hold/accepted");
+            CompletableFuture<String> acceptedLower = fixture.client().hold("accepted-lower").toFuture();
+            server.awaitPath("/hold/accepted-lower");
+            RequestRecord lowerRecord = server.record("/hold/accepted-lower");
+            CompletableFuture<String> acceptedBoundary = fixture.client().hold("accepted-boundary").toFuture();
+            server.awaitPath("/hold/accepted-boundary");
+            RequestRecord boundaryRecord = server.record("/hold/accepted-boundary");
+            assertThat(boundaryRecord.transportChannelId()).isEqualTo(lowerRecord.transportChannelId());
             meters.awaitGauge(ProtocolAwareConnectionPoolMeterRegistrar.ACTIVE_STREAMS,
-                    fixture.poolName(), 1);
+                    fixture.poolName(), 2);
 
-            GoAwayEvidence goAway = server.retire(acceptedRecord.transportChannelId());
+            GoAwayEvidence goAway = server.retire(boundaryRecord.transportChannelId());
             assertThat(goAway.errorCode()).isEqualTo(Http2Error.NO_ERROR.code());
-            assertThat(goAway.extraStreamIds()).isZero();
-            assertThat(acceptedRecord.streamId()).isPositive().isOdd();
+            assertThat(lowerRecord.streamId()).isPositive().isOdd();
+            assertThat(boundaryRecord.streamId()).isGreaterThan(lowerRecord.streamId()).isOdd();
+            assertThat(lowerRecord.streamId()).isLessThan(goAway.lastStreamId());
+            assertThat(boundaryRecord.streamId()).isEqualTo(goAway.lastStreamId());
+            assertThat(boundaryRecord.streamId() + 2).isGreaterThan(goAway.lastStreamId());
 
             CompletableFuture<String> replacement = fixture.client().hold("replacement").toFuture();
             meters.awaitGauge(ProtocolAwareConnectionPoolMeterRegistrar.PENDING_STREAMS,
                     fixture.poolName(), 1);
-            assertThat(accepted).isNotDone();
+            assertThat(acceptedLower).isNotDone();
+            assertThat(acceptedBoundary).isNotDone();
             assertThat(server.paths()).doesNotContain("/hold/replacement");
 
-            server.release("accepted");
-            assertThat(accepted.get(5, TimeUnit.SECONDS)).isEqualTo("accepted");
+            server.release("accepted-lower");
+            server.release("accepted-boundary");
+            assertThat(acceptedLower.get(5, TimeUnit.SECONDS)).isEqualTo("accepted-lower");
+            assertThat(acceptedBoundary.get(5, TimeUnit.SECONDS)).isEqualTo("accepted-boundary");
             meters.awaitGaugeValue(ProtocolAwareConnectionPoolMeterRegistrar.ACTIVE_STREAMS,
                     fixture.poolName(), 0);
             assertThat(replacement).as("replacement call while GOAWAY socket remains open").isNotDone();
@@ -88,11 +102,11 @@ class Http2GoAwayRetirementContractTest {
                     RETIREMENT_OBSERVATION,
                     "GOAWAY connection should remain draining while its socket is open");
 
-            server.closeTransport(acceptedRecord.transportChannelId());
+            server.closeTransport(boundaryRecord.transportChannelId());
             server.awaitPath("/hold/replacement");
             RequestRecord replacementRecord = server.record("/hold/replacement");
             assertThat(replacementRecord.transportChannelId())
-                    .isNotEqualTo(acceptedRecord.transportChannelId());
+                    .isNotEqualTo(boundaryRecord.transportChannelId());
 
             server.release("replacement");
             assertThat(replacement.get(5, TimeUnit.SECONDS)).isEqualTo("replacement");
@@ -416,6 +430,7 @@ class Http2GoAwayRetirementContractTest {
         private final Sinks.One<Void> cancellationObserved = Sinks.one();
         private final List<RequestRecord> records = new CopyOnWriteArrayList<>();
         private final Map<String, Channel> transports = new ConcurrentHashMap<>();
+        private final AtomicInteger goAwayCaptureSequence = new AtomicInteger();
         private final boolean gzipResponses;
         private final DisposableServer server;
 
@@ -490,12 +505,13 @@ class Http2GoAwayRetirementContractTest {
         }
 
         GoAwayEvidence retire(String transportChannelId) throws Exception {
-            sendGoAway(transportChannelId).get(5, TimeUnit.SECONDS);
-            return new GoAwayEvidence(Http2Error.NO_ERROR.code(), 0);
+            GoAwayWrite goAway = sendGoAway(transportChannelId);
+            goAway.writeFuture().get(5, TimeUnit.SECONDS);
+            return goAway.wireEvidence().get(5, TimeUnit.SECONDS);
         }
 
         Mono<Void> retireAsync(String transportChannelId) {
-            return Mono.create(sink -> sendGoAway(transportChannelId).addListener(write -> {
+            return Mono.create(sink -> sendGoAway(transportChannelId).writeFuture().addListener(write -> {
                 if (write.isSuccess()) {
                     sink.success();
                 } else {
@@ -504,12 +520,52 @@ class Http2GoAwayRetirementContractTest {
             }));
         }
 
-        private ChannelFuture sendGoAway(String transportChannelId) {
+        private GoAwayWrite sendGoAway(String transportChannelId) {
             Channel transport = transports.get(transportChannelId);
             assertThat(transport).as("captured H2 transport channel").isNotNull();
+            CompletableFuture<GoAwayEvidence> wireEvidence = new CompletableFuture<>();
+            String captureName = "goaway-wire-capture-" + goAwayCaptureSequence.incrementAndGet();
+            transport.pipeline().addFirst(captureName, new ChannelOutboundHandlerAdapter() {
+                @Override
+                public void write(ChannelHandlerContext context, Object message, ChannelPromise promise) {
+                    GoAwayEvidence evidence = decodeGoAway(message);
+                    context.write(message, promise);
+                    if (evidence != null) {
+                        wireEvidence.complete(evidence);
+                        context.pipeline().remove(this);
+                    }
+                }
+            });
+
             DefaultHttp2GoAwayFrame frame = new DefaultHttp2GoAwayFrame(Http2Error.NO_ERROR);
-            frame.setExtraStreamIds(0);
-            return transport.writeAndFlush(frame);
+            frame.setExtraStreamIds(GOAWAY_EXTRA_STREAM_IDS);
+            ChannelFuture writeFuture = transport.writeAndFlush(frame);
+            writeFuture.addListener(write -> {
+                if (!write.isSuccess()) {
+                    wireEvidence.completeExceptionally(write.cause());
+                }
+            });
+            return new GoAwayWrite(writeFuture, wireEvidence);
+        }
+
+        private static GoAwayEvidence decodeGoAway(Object message) {
+            if (!(message instanceof ByteBuf frame)
+                    || frame.readableBytes() < HTTP2_FRAME_HEADER_LENGTH + GOAWAY_PAYLOAD_LENGTH) {
+                return null;
+            }
+            int index = frame.readerIndex();
+            int payloadLength = frame.getUnsignedMedium(index);
+            int frameType = frame.getUnsignedByte(index + 3);
+            int frameStreamId = frame.getInt(index + 5) & Integer.MAX_VALUE;
+            if (payloadLength < GOAWAY_PAYLOAD_LENGTH
+                    || frameType != GOAWAY_FRAME_TYPE
+                    || frameStreamId != 0
+                    || frame.readableBytes() < HTTP2_FRAME_HEADER_LENGTH + payloadLength) {
+                return null;
+            }
+            int lastStreamId = frame.getInt(index + 9) & Integer.MAX_VALUE;
+            long errorCode = frame.getUnsignedInt(index + 13);
+            return new GoAwayEvidence(errorCode, lastStreamId);
         }
 
         void closeTransport(String transportChannelId) throws Exception {
@@ -608,6 +664,10 @@ class Http2GoAwayRetirementContractTest {
                                  String wireContentEncoding) {
     }
 
-    private record GoAwayEvidence(long errorCode, int extraStreamIds) {
+    private record GoAwayEvidence(long errorCode, int lastStreamId) {
+    }
+
+    private record GoAwayWrite(ChannelFuture writeFuture,
+                               CompletableFuture<GoAwayEvidence> wireEvidence) {
     }
 }
