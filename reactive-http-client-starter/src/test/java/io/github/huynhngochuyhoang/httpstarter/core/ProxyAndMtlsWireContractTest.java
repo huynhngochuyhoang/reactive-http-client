@@ -40,6 +40,7 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 class ProxyAndMtlsWireContractTest {
 
     private static final Duration CALL_TIMEOUT = Duration.ofSeconds(8);
+    private static final String IPV4_LOOPBACK = "127.0.0.1";
     private static final String STORE_PASSWORD = "test-store-password";
     private static final String PROXY_USER = "wire-user";
     private static final String PROXY_PASSWORD = "wire-proxy-password";
@@ -247,7 +248,7 @@ class ProxyAndMtlsWireContractTest {
             boolean authenticated) {
         ReactiveHttpClientProperties.ProxyConfig config = new ReactiveHttpClientProperties.ProxyConfig();
         config.setType(type);
-        config.setHost("127.0.0.1");
+        config.setHost(IPV4_LOOPBACK);
         config.setPort(proxy.port());
         if (authenticated) {
             config.setUsername(PROXY_USER);
@@ -544,7 +545,7 @@ class ProxyAndMtlsWireContractTest {
             this.username = username;
             this.password = password;
             this.serverSocket = new ServerSocket();
-            serverSocket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+            serverSocket.bind(new InetSocketAddress(IPV4_LOOPBACK, 0));
             executor.submit(this::acceptLoop);
         }
 
