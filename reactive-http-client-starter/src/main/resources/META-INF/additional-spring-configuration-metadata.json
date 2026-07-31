@@ -229,7 +229,7 @@
     {
       "name": "reactive.http.network.proxy.type",
       "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type",
-      "description": "Proxy protocol type. Set to NONE to explicitly bypass a global proxy for one client. Default: HTTP.",
+      "description": "Proxy transport type. HTTP uses plaintext CONNECT for HTTP and HTTPS targets; HTTPS is a deprecated compatibility alias and does not add TLS to the proxy hop. SOCKS4 and SOCKS5 delegate to Reactor Netty. Set NONE to bypass the proxy. Default: HTTP.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig",
       "defaultValue": "HTTP"
     },
@@ -501,7 +501,7 @@
     {
       "name": "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.type",
       "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type",
-      "description": "Token-service proxy type. Set to NONE or omit the proxy block for a direct connection.",
+      "description": "Token-service proxy transport type. HTTP uses plaintext CONNECT; HTTPS is its deprecated compatibility alias and does not add TLS to the proxy hop. Set NONE or omit the proxy block for a direct connection.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
     },
     {
@@ -752,7 +752,7 @@
     {
       "name": "reactive.http.clients.[name].proxy.type",
       "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type",
-      "description": "Per-client proxy type override. Set to NONE to bypass a global proxy for this client.",
+      "description": "Per-client proxy transport override. HTTP uses plaintext CONNECT; HTTPS is its deprecated compatibility alias and does not add TLS to the proxy hop. Set NONE to bypass a global proxy.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig"
     },
     {
@@ -968,11 +968,11 @@
       "values": [
         {
           "value": "HTTP",
-          "description": "Plain HTTP CONNECT proxy."
+          "description": "Plaintext HTTP CONNECT tunnel for HTTP and HTTPS targets."
         },
         {
           "value": "HTTPS",
-          "description": "HTTPS CONNECT proxy."
+          "description": "Deprecated compatibility alias for HTTP; does not enable TLS to the proxy hop."
         },
         {
           "value": "SOCKS4",
@@ -993,11 +993,11 @@
       "values": [
         {
           "value": "HTTP",
-          "description": "Plain HTTP CONNECT proxy."
+          "description": "Plaintext HTTP CONNECT tunnel for HTTP and HTTPS targets."
         },
         {
           "value": "HTTPS",
-          "description": "HTTPS CONNECT proxy."
+          "description": "Deprecated compatibility alias for HTTP; does not enable TLS to the proxy hop."
         },
         {
           "value": "SOCKS4",
@@ -1018,11 +1018,11 @@
       "values": [
         {
           "value": "HTTP",
-          "description": "Plain HTTP CONNECT proxy."
+          "description": "Plaintext HTTP CONNECT tunnel for HTTP and HTTPS targets."
         },
         {
           "value": "HTTPS",
-          "description": "HTTPS CONNECT proxy."
+          "description": "Deprecated compatibility alias for HTTP; does not enable TLS to the proxy hop."
         },
         {
           "value": "SOCKS4",

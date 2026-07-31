@@ -103,6 +103,23 @@ framing mutation, stale bytes, or a non-HTTP peer on the connection.
 
 ## HTTP proxy
 
+The starter delegates proxy handshakes to Reactor Netty. The configured type has
+the following wire meaning:
+
+| Type | Wire behavior |
+|---|---|
+| `HTTP` | Opens a plaintext connection to the proxy and uses HTTP `CONNECT` for both `http://` and `https://` targets. Target TLS, when present, runs inside the tunnel. |
+| `HTTPS` | Deprecated compatibility alias for `HTTP`. It does **not** add TLS between the client and proxy. |
+| `SOCKS4` / `SOCKS5` | Uses Reactor Netty's SOCKS tunnel handler for the selected protocol. |
+| `NONE` | Connects directly and overrides a configured global proxy. |
+
+This transport does not emit absolute-form requests to a traditional HTTP forward
+proxy. Configure a proxy that accepts `CONNECT`, including for plaintext HTTP
+targets. Local release fixtures exercise authenticated HTTP `CONNECT`, SOCKS4,
+and SOCKS5 tunnels. Proxy credentials stay transport-owned and are omitted from
+starter request diagnostics; startup summaries render only
+`credentials=[REDACTED]`.
+
 ### Global proxy
 
 ```yaml
@@ -110,7 +127,7 @@ reactive:
   http:
     network:
       proxy:
-        type: HTTP                             # HTTP | HTTPS | SOCKS4 | SOCKS5 | NONE
+        type: HTTP                             # HTTP | SOCKS4 | SOCKS5 | NONE; HTTPS is a deprecated HTTP alias
         host: proxy.corp.example
         port: 3128
         username: ${PROXY_USER}               # optional
@@ -157,7 +174,9 @@ reactive:
 non-proxy-hosts: "localhost|127\\.0\\.0\\.1|.*\\.internal|.*\\.corp\\.example"
 ```
 
-Use `.*\.internal` (regex) — **not** `*.internal` (glob).
+Use `.*\.internal` (regex) — **not** `*.internal` (glob). The pattern is
+matched against the target host before connecting: a match bypasses the proxy,
+and a non-match uses it. Both paths are covered by a local wire fixture.
 
 ---
 
@@ -192,6 +211,12 @@ reactive:
         key-store-password: changeit
         key-store-type: PKCS12          # default
 ```
+
+The configured key store is presented during the TLS handshake. Local contract
+fixtures require a trusted client identity and verify it over HTTP/1.1 and TLS
+H2; missing and untrusted identities fail during `TLS_HANDSHAKE`. Trust-store and
+key-store passwords, certificate bytes, and private keys are never added to
+request diagnostics or support snapshots.
 
 ### Protocol and cipher restrictions
 

@@ -237,22 +237,47 @@ Evidence:
 
 ## Priority 5 - Real Proxy and mTLS Wire Contracts
 
-### [ ] 5.1 Prove successful proxy behavior
+### [x] 5.1 Prove successful proxy behavior
 
-- [ ] Add a local forward proxy for successful HTTP absolute-form forwarding.
-- [ ] Add successful HTTPS `CONNECT` tunneling through the configured proxy.
-- [ ] Cover proxy authentication without exposing credentials in any diagnostic.
-- [ ] Prove both proxy and bypass paths for `non-proxy-hosts` Java regexes.
-- [ ] Cover SOCKS locally or narrow public support wording explicitly.
-- [ ] Align `HTTP` and `HTTPS` proxy enum wording with Reactor Netty behavior and
+- [x] Add a local proxy that proves Reactor Netty uses HTTP `CONNECT` for HTTP
+      and HTTPS targets; explicitly document that absolute-form forwarding is not
+      emitted.
+- [x] Add successful HTTPS `CONNECT` tunneling through the configured proxy.
+- [x] Cover proxy authentication without exposing credentials in any diagnostic.
+- [x] Prove both proxy and bypass paths for `non-proxy-hosts` Java regexes.
+- [x] Cover SOCKS4 and SOCKS5 with deterministic local tunnel fixtures.
+- [x] Align `HTTP` and `HTTPS` proxy enum wording with Reactor Netty behavior and
       compatibility evidence.
 
-### [ ] 5.2 Prove configured client-certificate mTLS
+### [x] 5.2 Prove configured client-certificate mTLS
 
-- [ ] Add a local server that accepts the configured trusted client identity.
-- [ ] Reject missing and untrusted client certificates deterministically.
-- [ ] Preserve bounded TLS failure attribution and secret redaction.
-- [ ] Cover HTTP/1.1 and TLS H2 where the fixture supports both.
+- [x] Add a local server that accepts the configured trusted client identity.
+- [x] Reject missing and untrusted client certificates deterministically.
+- [x] Preserve bounded TLS failure attribution and secret redaction.
+- [x] Cover HTTP/1.1 and TLS H2 where the fixture supports both.
+
+Evidence:
+
+- `ProxyAndMtlsWireContractTest` drives real starter factories through a local
+  authenticated HTTP tunnel. The proxy records `CONNECT` for plaintext HTTP and
+  HTTPS targets, proving the Reactor Netty transport does not use absolute-form
+  forwarding. Both `HTTP` and the deprecated `HTTPS` compatibility alias use the
+  same plaintext proxy hop; target TLS remains end to end inside the tunnel.
+- The wire fixture verifies successful Basic proxy authentication, deterministic
+  `407` rejection, and absence of usernames, passwords, and
+  `Proxy-Authorization` from observer, lifecycle, and exchange-log diagnostics.
+  Existing startup-summary, effective-contract, and support-snapshot contracts
+  retain redacted or omitted proxy credentials.
+- The same fixture proves Java-regex `non-proxy-hosts` bypass and non-match routing,
+  plus successful local SOCKS4 and SOCKS5 tunnels. Configuration metadata and
+  `docs/12-proxy-tls.md` now describe the actual transport semantics.
+- A client-auth-required TLS server accepts only the configured trusted identity.
+  The starter presents that identity over HTTP/1.1 and ALPN-negotiated H2; missing
+  and untrusted key stores fail before any application request with bounded
+  `TLS_HANDSHAKE` attribution across observer, lifecycle, and exchange logging,
+  without store-password leakage. Focused and full starter verification passed,
+  strict starter-module japicmp passed against published `3.3.0`, and
+  `git diff --check` passed.
 
 ---
 

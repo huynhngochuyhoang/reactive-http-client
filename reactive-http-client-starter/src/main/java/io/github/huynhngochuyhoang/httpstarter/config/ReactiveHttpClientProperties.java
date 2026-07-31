@@ -235,7 +235,9 @@ public class ReactiveHttpClientProperties {
     // ---- HTTP proxy configuration ----
 
     /**
-     * Routes outbound calls through an HTTP / HTTPS / SOCKS proxy.
+     * Routes outbound calls through a Reactor Netty HTTP CONNECT or SOCKS proxy.
+     * {@link Type#HTTP} and the deprecated {@link Type#HTTPS} alias both use a
+     * plaintext HTTP connection to the proxy; target TLS remains inside the tunnel.
      *
      * <p>Example:
      * <pre>{@code
@@ -253,7 +255,18 @@ public class ReactiveHttpClientProperties {
      */
     public static class ProxyConfig {
 
-        public enum Type { HTTP, HTTPS, SOCKS4, SOCKS5, NONE }
+        public enum Type {
+            HTTP,
+            /**
+             * @deprecated Compatibility alias for {@link #HTTP}. This does not enable
+             * TLS between the client and proxy.
+             */
+            @Deprecated(since = "3.4.0", forRemoval = false)
+            HTTPS,
+            SOCKS4,
+            SOCKS5,
+            NONE
+        }
 
         /** Proxy protocol; set to {@link Type#NONE} to explicitly disable inherited global proxy. */
         private Type type = Type.HTTP;
