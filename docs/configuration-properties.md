@@ -32,7 +32,7 @@
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.non-proxy-hosts` | `java.lang.String` |  | Token-service non-proxy hosts regex. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.password` | `java.lang.String` |  | Token-service proxy authentication password. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.port` | `java.lang.Integer` |  | Token-service proxy port. |  |
-| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.type` | `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type` |  | Token-service proxy type. Set to NONE or omit the proxy block for a direct connection. |  |
+| `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.type` | `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type` |  | Token-service proxy transport type. HTTP uses plaintext CONNECT; HTTPS is its deprecated compatibility alias and does not add TLS to the proxy hop. Set NONE or omit the proxy block for a direct connection. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.proxy.username` | `java.lang.String` |  | Token-service proxy authentication username. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.request-timeout-ms` | `java.lang.Long` | `0` | Total timeout for each OAuth2 token request in milliseconds. Zero disables it. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.retry-backoff-ms` | `java.lang.Long` | `100` | Fixed delay between transient OAuth2 token request attempts in milliseconds. |  |
@@ -68,7 +68,7 @@
 | `reactive.http.clients.[name].proxy.non-proxy-hosts` | `java.lang.String` |  | Per-client non-proxy hosts regex override. |  |
 | `reactive.http.clients.[name].proxy.password` | `java.lang.String` |  | Per-client proxy authentication password override. |  |
 | `reactive.http.clients.[name].proxy.port` | `java.lang.Integer` |  | Per-client proxy port override. |  |
-| `reactive.http.clients.[name].proxy.type` | `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type` |  | Per-client proxy type override. Set to NONE to bypass a global proxy for this client. |  |
+| `reactive.http.clients.[name].proxy.type` | `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type` |  | Per-client proxy transport override. HTTP uses plaintext CONNECT; HTTPS is its deprecated compatibility alias and does not add TLS to the proxy hop. Set NONE to bypass a global proxy. |  |
 | `reactive.http.clients.[name].proxy.username` | `java.lang.String` |  | Per-client proxy authentication username override. |  |
 | `reactive.http.clients.[name].request-timeout-ms` | `java.lang.Long` | `0` | Canonical per-request response timeout in milliseconds applied via HttpClientRequest.responseTimeout(). 0 disables the timeout. Wins over deprecated resilience.timeout-ms. Default: 0. |  |
 | `reactive.http.clients.[name].resilience.bulkhead` | `java.lang.String` | `"default"` | Name of the Resilience4j Bulkhead instance from application config. Default: default. |  |
@@ -105,7 +105,7 @@
 | `reactive.http.network.proxy.non-proxy-hosts` | `java.lang.String` |  | Java regex pattern for hosts that bypass the proxy (pipe-separated alternatives). Example: localhost\|.*\.internal. |  |
 | `reactive.http.network.proxy.password` | `java.lang.String` |  | Optional proxy authentication password. |  |
 | `reactive.http.network.proxy.port` | `java.lang.Integer` |  | Proxy port number. |  |
-| `reactive.http.network.proxy.type` | `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type` | `"HTTP"` | Proxy protocol type. Set to NONE to explicitly bypass a global proxy for one client. Default: HTTP. |  |
+| `reactive.http.network.proxy.type` | `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ProxyConfig$Type` | `"HTTP"` | Proxy transport type. HTTP uses plaintext CONNECT for HTTP and HTTPS targets; HTTPS is a deprecated compatibility alias and does not add TLS to the proxy hop. SOCKS4 and SOCKS5 delegate to Reactor Netty. Set NONE to bypass the proxy. Default: HTTP. |  |
 | `reactive.http.network.proxy.username` | `java.lang.String` |  | Optional proxy authentication username. |  |
 | `reactive.http.network.read-timeout-ms` | `java.lang.Integer` |  | Deprecated alias for network-read-timeout-ms. Use network-read-timeout-ms instead. | warning; replacement: `reactive.http.network.network-read-timeout-ms` |
 | `reactive.http.network.tls.ciphers` | `java.util.List<java.lang.String>` |  | Allowed TLS cipher suites. Empty list means JDK defaults. |  |

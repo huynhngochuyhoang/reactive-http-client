@@ -184,8 +184,8 @@ the network features already advertised publicly.
 
 **Acceptance:**
 
-- A local forward proxy proves successful HTTP absolute-form forwarding and HTTPS
-  `CONNECT` tunneling through the starter proxy.
+- A local proxy proves successful HTTP and HTTPS `CONNECT` tunneling through
+  the starter and records that Reactor Netty does not emit absolute-form forwarding.
 - Proxy authentication succeeds without exposing credentials in errors, logs,
   diagnostics, support snapshots, or test output.
 - `non-proxy-hosts` proves both bypass and proxy paths with the documented Java

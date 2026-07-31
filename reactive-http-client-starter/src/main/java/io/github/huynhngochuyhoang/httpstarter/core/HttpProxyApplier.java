@@ -36,7 +36,7 @@ final class HttpProxyApplier {
         if (type == null) return ProxyProvider.Proxy.HTTP;
         return switch (type) {
             case HTTP, NONE -> ProxyProvider.Proxy.HTTP;
-            case HTTPS -> ProxyProvider.Proxy.HTTP; // HTTPS proxy still tunnels via HTTP CONNECT
+            case HTTPS -> ProxyProvider.Proxy.HTTP; // Deprecated compatibility alias; the proxy hop is plaintext HTTP.
             case SOCKS4 -> ProxyProvider.Proxy.SOCKS4;
             case SOCKS5 -> ProxyProvider.Proxy.SOCKS5;
         };

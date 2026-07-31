@@ -55,6 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subscriptions; proves subscription-local generated idempotency keys, identical
   repeatable bytes, unbuffered application-owned replay, same/cross-authority
   sensitive-header policy, and final-attempt-only terminal diagnostics.
+- **Proxy and mTLS wire contracts.** Added real starter-factory evidence for
+  authenticated HTTP `CONNECT`, Java-regex proxy bypass, SOCKS4, SOCKS5, and
+  HTTPS tunneling; documented that Reactor Netty uses `CONNECT` for plaintext
+  HTTP targets and that the deprecated `HTTPS` type is an `HTTP` compatibility
+  alias rather than TLS to the proxy. Added client-auth-required HTTP/1.1 and H2
+  fixtures that accept the configured trusted identity, reject missing/untrusted
+  identities, and preserve redacted `TLS_HANDSHAKE` diagnostics.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects
