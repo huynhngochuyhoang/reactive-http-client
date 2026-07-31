@@ -16,6 +16,7 @@ import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.Disposable;
@@ -27,10 +28,14 @@ import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.server.HttpServer;
 import reactor.netty.resources.ConnectionProvider;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,26 +44,25 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
+import java.util.zip.GZIPOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class Http2GoAwayRetirementContractTest {
 
     private static final Duration CALL_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration RETIREMENT_OBSERVATION = Duration.ofMillis(250);
+    private static final long PENDING_ACQUIRE_TIMEOUT_MS = 30_000;
 
     @Test
     void goAwayLetsAcceptedStreamCompleteAndMovesPendingDemandToReplacementConnection() throws Exception {
-        try (RetirementServer server = RetirementServer.create(1, false);
+        try (RetirementServer server = RetirementServer.create(8, false);
              MeterFixture meters = new MeterFixture();
              ClientFixture fixture = ClientFixture.create(server, true, false)) {
             CompletableFuture<String> accepted = fixture.client().hold("accepted").toFuture();
             server.awaitPath("/hold/accepted");
             RequestRecord acceptedRecord = server.record("/hold/accepted");
-
-            CompletableFuture<String> replacement = fixture.client().hold("replacement").toFuture();
             meters.awaitGauge(ProtocolAwareConnectionPoolMeterRegistrar.ACTIVE_STREAMS,
-                    fixture.poolName(), 1);
-            meters.awaitGauge(ProtocolAwareConnectionPoolMeterRegistrar.PENDING_STREAMS,
                     fixture.poolName(), 1);
 
             GoAwayEvidence goAway = server.retire(acceptedRecord.transportChannelId());
@@ -66,11 +70,24 @@ class Http2GoAwayRetirementContractTest {
             assertThat(goAway.extraStreamIds()).isZero();
             assertThat(acceptedRecord.streamId()).isPositive().isOdd();
 
+            CompletableFuture<String> replacement = fixture.client().hold("replacement").toFuture();
+            meters.awaitGauge(ProtocolAwareConnectionPoolMeterRegistrar.PENDING_STREAMS,
+                    fixture.poolName(), 1);
             assertThat(accepted).isNotDone();
             assertThat(server.paths()).doesNotContain("/hold/replacement");
 
             server.release("accepted");
             assertThat(accepted.get(5, TimeUnit.SECONDS)).isEqualTo("accepted");
+            meters.awaitGaugeValue(ProtocolAwareConnectionPoolMeterRegistrar.ACTIVE_STREAMS,
+                    fixture.poolName(), 0);
+            assertThat(replacement).as("replacement call while GOAWAY socket remains open").isNotDone();
+            assertThat(server.paths()).as("requests observed before retired socket close")
+                    .doesNotContain("/hold/replacement");
+            assertRemainsTrue(() -> !replacement.isDone()
+                            && !server.paths().contains("/hold/replacement"),
+                    RETIREMENT_OBSERVATION,
+                    "GOAWAY connection should remain draining while its socket is open");
+
             server.closeTransport(acceptedRecord.transportChannelId());
             server.awaitPath("/hold/replacement");
             RequestRecord replacementRecord = server.record("/hold/replacement");
@@ -144,26 +161,33 @@ class Http2GoAwayRetirementContractTest {
             assertThat(server.record("/reset").transportChannelId())
                     .isEqualTo(retained.transportChannelId());
             server.retire(retained.transportChannelId());
-            cancelled.dispose();
-            server.releaseStream();
 
+            server.releaseReset();
+            assertThat(reset.get(5, TimeUnit.SECONDS)).isTrue();
+            cancelled.dispose();
+            server.awaitCancellation();
+            meters.awaitGaugeValue(ProtocolAwareConnectionPoolMeterRegistrar.ACTIVE_STREAMS,
+                    fixture.poolName(), 1);
+
+            server.releaseStream();
             String streamed = entity.getBody()
                     .map(Http2GoAwayRetirementContractTest::readAndRelease)
                     .reduce("", String::concat)
                     .block(CALL_TIMEOUT);
             assertThat(streamed).isEqualTo(RetirementServer.FIRST_CHUNK + RetirementServer.SECOND_CHUNK);
-            assertThat(reset.get(5, TimeUnit.SECONDS)).isTrue();
             assertThat(cancelled.isDisposed()).isTrue();
             assertThat(cancelledChunks.get()).isPositive();
-            server.closeTransport(retained.transportChannelId());
-
-            assertThat(fixture.client().probe().block(CALL_TIMEOUT)).isEqualTo("probe");
-            assertThat(server.record("/probe").transportChannelId())
-                    .isNotEqualTo(retained.transportChannelId());
+            assertThat(retained.acceptEncoding()).contains("gzip");
+            assertThat(retained.wireContentEncoding()).isEqualTo("gzip");
             meters.awaitGaugeValue(ProtocolAwareConnectionPoolMeterRegistrar.ACTIVE_STREAMS,
                     fixture.poolName(), 0);
             meters.awaitGaugeValue(ProtocolAwareConnectionPoolMeterRegistrar.PENDING_STREAMS,
                     fixture.poolName(), 0);
+
+            server.closeTransport(retained.transportChannelId());
+            assertThat(fixture.client().probe().block(CALL_TIMEOUT)).isEqualTo("probe");
+            assertThat(server.record("/probe").transportChannelId())
+                    .isNotEqualTo(retained.transportChannelId());
         }
     }
 
@@ -180,11 +204,17 @@ class Http2GoAwayRetirementContractTest {
             meters.awaitGauge(ProtocolAwareConnectionPoolMeterRegistrar.PENDING_STREAMS,
                     fixture.poolName(), 1);
 
+            long shutdownStarted = System.nanoTime();
             CompletableFuture<Void> shutdown = CompletableFuture.runAsync(fixture::close);
             shutdown.get(5, TimeUnit.SECONDS);
+            Duration shutdownDuration = Duration.ofNanos(System.nanoTime() - shutdownStarted);
 
             await(retiredActive::isDone, "retired active stream should terminate during shutdown");
             await(pending::isDone, "pending stream should terminate during shutdown");
+            assertThat(shutdownDuration).isLessThan(Duration.ofSeconds(5));
+            assertThat(shutdownDuration.toMillis()).isLessThan(PENDING_ACQUIRE_TIMEOUT_MS);
+            assertThat(retiredActive).isCompletedExceptionally();
+            assertThat(pending).isCompletedExceptionally();
             assertThat(fixture.connectionProvider().isDisposed()).isTrue();
             assertThat(server.paths()).doesNotContain("/hold/pending");
             assertThat(meters.find(ProtocolAwareConnectionPoolMeterRegistrar.ACTIVE_STREAMS,
@@ -220,6 +250,21 @@ class Http2GoAwayRetirementContractTest {
             }
         }
         assertThat(condition.getAsBoolean()).as(message).isTrue();
+    }
+
+    private static void assertRemainsTrue(BooleanSupplier condition,
+                                          Duration duration,
+                                          String message) {
+        long deadline = System.nanoTime() + duration.toNanos();
+        while (System.nanoTime() < deadline) {
+            assertThat(condition.getAsBoolean()).as(message).isTrue();
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(ex);
+            }
+        }
     }
 
     @ReactiveHttpClient(name = "goaway-contract")
@@ -274,7 +319,7 @@ class Http2GoAwayRetirementContractTest {
             ReactiveHttpClientProperties.ConnectionPoolConfig pool =
                     new ReactiveHttpClientProperties.ConnectionPoolConfig();
             pool.setMaxConnections(1);
-            pool.setPendingAcquireTimeoutMs(2_000);
+            pool.setPendingAcquireTimeoutMs(PENDING_ACQUIRE_TIMEOUT_MS);
             pool.setMetricsEnabled(metricsEnabled);
             config.setPool(pool);
             properties.getClients().put("goaway-contract", config);
@@ -343,12 +388,15 @@ class Http2GoAwayRetirementContractTest {
         }
 
         void awaitGaugeValue(String name, String poolName, double expected) {
-            await(() -> {
-                io.micrometer.core.instrument.Gauge gauge = registry.find(name)
-                        .tag("name", poolName)
-                        .gauge();
-                return gauge != null && gauge.value() == expected;
-            }, name + " should converge to " + expected);
+            await(() -> gaugeValue(name, poolName) == expected,
+                    name + " should converge to " + expected);
+        }
+
+        double gaugeValue(String name, String poolName) {
+            io.micrometer.core.instrument.Gauge gauge = registry.find(name)
+                    .tag("name", poolName)
+                    .gauge();
+            return gauge != null ? gauge.value() : Double.NaN;
         }
 
         @Override
@@ -364,33 +412,44 @@ class Http2GoAwayRetirementContractTest {
 
         private final Map<String, Sinks.One<Void>> holds = new ConcurrentHashMap<>();
         private final Sinks.One<Void> streamRelease = Sinks.one();
+        private final Sinks.One<Void> resetRelease = Sinks.one();
+        private final Sinks.One<Void> cancellationObserved = Sinks.one();
         private final List<RequestRecord> records = new CopyOnWriteArrayList<>();
         private final Map<String, Channel> transports = new ConcurrentHashMap<>();
+        private final boolean gzipResponses;
         private final DisposableServer server;
 
-        private RetirementServer(int maxConcurrentStreams, boolean compression) {
+        private RetirementServer(int maxConcurrentStreams, boolean gzipResponses) {
+            this.gzipResponses = gzipResponses;
             server = HttpServer.create()
                     .host("127.0.0.1")
                     .port(0)
                     .protocol(HttpProtocol.H2C)
                     .http2Settings(settings -> settings.maxConcurrentStreams(maxConcurrentStreams))
-                    .compress(compression)
                     .handle((request, response) -> {
                         String path = request.path().startsWith("/") ? request.path() : "/" + request.path();
+                        String acceptEncoding = request.requestHeaders().get(HttpHeaders.ACCEPT_ENCODING);
+                        String wireContentEncoding = gzipResponses
+                                && path.equals("/stream-entity")
+                                && acceptEncoding != null
+                                && acceptEncoding.toLowerCase(Locale.ROOT).contains("gzip")
+                                ? "gzip"
+                                : null;
                         AtomicReference<Channel> streamChannel = new AtomicReference<>();
                         request.withConnection(connection -> {
                             streamChannel.set(connection.channel());
-                            RequestRecord record = record(path, connection.channel());
+                            RequestRecord record = record(path, connection.channel(),
+                                    acceptEncoding, wireContentEncoding);
                             records.add(record);
                             transports.put(record.transportChannelId(), transportChannel(connection.channel()));
                         });
-                        return respond(path, streamChannel, request, response);
+                        return respond(path, streamChannel, request, response, wireContentEncoding);
                     })
                     .bindNow();
         }
 
-        static RetirementServer create(int maxConcurrentStreams, boolean compression) {
-            return new RetirementServer(maxConcurrentStreams, compression);
+        static RetirementServer create(int maxConcurrentStreams, boolean gzipResponses) {
+            return new RetirementServer(maxConcurrentStreams, gzipResponses);
         }
 
         String baseUrl() {
@@ -420,6 +479,14 @@ class Http2GoAwayRetirementContractTest {
 
         void releaseStream() {
             streamRelease.tryEmitEmpty();
+        }
+
+        void releaseReset() {
+            resetRelease.tryEmitEmpty();
+        }
+
+        void awaitCancellation() {
+            cancellationObserved.asMono().block(CALL_TIMEOUT);
         }
 
         GoAwayEvidence retire(String transportChannelId) throws Exception {
@@ -455,13 +522,15 @@ class Http2GoAwayRetirementContractTest {
         public void close() {
             holds.values().forEach(sink -> sink.tryEmitEmpty());
             streamRelease.tryEmitEmpty();
+            resetRelease.tryEmitEmpty();
             server.disposeNow(Duration.ofSeconds(5));
         }
 
         private Mono<Void> respond(String path,
                                    AtomicReference<Channel> streamChannel,
                                    reactor.netty.http.server.HttpServerRequest request,
-                                   reactor.netty.http.server.HttpServerResponse response) {
+                                   reactor.netty.http.server.HttpServerResponse response,
+                                   String wireContentEncoding) {
             if (path.startsWith("/hold/")) {
                 String id = path.substring(path.lastIndexOf('/') + 1);
                 return holds.computeIfAbsent(id, ignored -> Sinks.one()).asMono()
@@ -471,24 +540,56 @@ class Http2GoAwayRetirementContractTest {
                 case "/upload-retire" -> request.receive().aggregate().asString(StandardCharsets.UTF_8)
                         .flatMap(body -> retireAsync(transportChannelId(streamChannel.get()))
                                 .then(response.sendString(Mono.just(body)).then()));
-                case "/stream-entity" -> response.sendString(Flux.concat(
-                        Mono.just(FIRST_CHUNK),
-                        streamRelease.asMono().thenReturn(SECOND_CHUNK))).then();
+                case "/stream-entity" -> streamingResponse(response, wireContentEncoding);
                 case "/cancel" -> response.sendString(Flux.concat(
-                        Mono.just("c".repeat(4096)),
-                        Flux.interval(Duration.ofMillis(25)).map(index -> "cancel-" + index))).then();
-                case "/reset" -> Mono.from(response.sendHeaders()).then(Mono.fromRunnable(() ->
-                        streamChannel.get().writeAndFlush(new DefaultHttp2ResetFrame(Http2Error.CANCEL))));
+                                Mono.just("c".repeat(4096)),
+                                Flux.interval(Duration.ofMillis(25)).map(index -> "cancel-" + index))
+                        .doOnCancel(() -> cancellationObserved.tryEmitEmpty())).then();
+                case "/reset" -> Mono.from(response.sendHeaders())
+                        .then(resetRelease.asMono())
+                        .then(Mono.fromRunnable(() -> streamChannel.get()
+                                .writeAndFlush(new DefaultHttp2ResetFrame(Http2Error.CANCEL))));
                 case "/probe" -> response.sendString(Mono.just("probe")).then();
                 default -> response.status(404).send();
             };
         }
 
-        private static RequestRecord record(String path, Channel streamChannel) {
+        private Mono<Void> streamingResponse(
+                reactor.netty.http.server.HttpServerResponse response,
+                String wireContentEncoding) {
+            byte[] body = (FIRST_CHUNK + SECOND_CHUNK).getBytes(StandardCharsets.UTF_8);
+            byte[] wireBody = "gzip".equals(wireContentEncoding) ? gzip(body) : body;
+            int split = Math.max(1, wireBody.length / 2);
+            if (wireContentEncoding != null) {
+                response.header(HttpHeaders.CONTENT_ENCODING, wireContentEncoding);
+            }
+            return response.sendByteArray(Flux.concat(
+                    Mono.just(Arrays.copyOfRange(wireBody, 0, split)),
+                    streamRelease.asMono().thenReturn(
+                            Arrays.copyOfRange(wireBody, split, wireBody.length))))
+                    .then();
+        }
+
+        private static byte[] gzip(byte[] value) {
+            try (ByteArrayOutputStream output = new ByteArrayOutputStream();
+                 GZIPOutputStream gzip = new GZIPOutputStream(output)) {
+                gzip.write(value);
+                gzip.finish();
+                return output.toByteArray();
+            } catch (IOException ex) {
+                throw new IllegalStateException("Failed to gzip retirement response", ex);
+            }
+        }
+
+        private static RequestRecord record(String path,
+                                            Channel streamChannel,
+                                            String acceptEncoding,
+                                            String wireContentEncoding) {
             int streamId = streamChannel instanceof Http2StreamChannel http2
                     ? http2.stream().id()
                     : -1;
-            return new RequestRecord(path, transportChannelId(streamChannel), streamId);
+            return new RequestRecord(path, transportChannelId(streamChannel), streamId,
+                    acceptEncoding, wireContentEncoding);
         }
 
         private static String transportChannelId(Channel channel) {
@@ -500,7 +601,11 @@ class Http2GoAwayRetirementContractTest {
         }
     }
 
-    private record RequestRecord(String path, String transportChannelId, int streamId) {
+    private record RequestRecord(String path,
+                                 String transportChannelId,
+                                 int streamId,
+                                 String acceptEncoding,
+                                 String wireContentEncoding) {
     }
 
     private record GoAwayEvidence(long errorCode, int extraStreamIds) {

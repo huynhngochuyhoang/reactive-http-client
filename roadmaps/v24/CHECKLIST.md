@@ -301,25 +301,27 @@ Evidence:
 Evidence:
 
 - `Http2GoAwayRetirementContractTest` sends a real H2C
-  `GOAWAY(NO_ERROR)` with zero extra stream identifiers through the accepted
-  socket while a stream is active. The accepted odd-numbered client stream
-  completes on the draining connection; one-stream pool demand remains pending
-  until the peer closes that socket, then runs on a distinct replacement
+  `GOAWAY(NO_ERROR)` with zero extra stream identifiers while a stream is
+  active and the peer advertises spare stream capacity. A call created only
+  after GOAWAY remains undispatched while the accepted odd-numbered stream
+  completes and throughout a bounded open-socket observation window; after the
+  peer closes that draining socket, the call runs on a distinct replacement
   connection without exceeding `maxConnections=1`.
 - A processed `Flux<DataBuffer>` upload receives its response with one source
   subscription and one server dispatch. GOAWAY therefore adds no hidden retry
   for a body the peer may already have processed.
-- The same real transport preserves a compressed
-  `ResponseEntity<Flux<DataBuffer>>` body while an accepted sibling stream is
-  cancelled and another is reset. Emitted buffers are released by the test
-  consumer, the replacement probe succeeds, and active/pending stream gauges
-  converge to zero.
-- Shutdown with a draining active stream and queued demand completes inside the
-  factory's five-second disposal bound, terminates both futures, disposes the
-  provider, removes starter-owned stream gauges, and never dispatches the queued
-  request. `docs/12-proxy-tls.md` and `docs/30-operations-troubleshooting.md`
-  distinguish graceful GOAWAY from connection failure and document the
-  one-connection retirement queue.
+- The same real transport gates its reset frame until GOAWAY has flushed,
+  observes sibling cancellation at the server, and proves active-stream
+  accounting drops while the draining socket remains open. The retained
+  `ResponseEntity<Flux<DataBuffer>>` response records client gzip negotiation,
+  sends explicit `Content-Encoding: gzip` wire bytes, decodes successfully, and
+  releases emitted buffers before a replacement probe succeeds.
+- Shutdown uses a 30-second pending-acquire timeout but completes draining active
+  and queued futures exceptionally inside the factory's five-second disposal
+  bound, disposes the provider, removes starter-owned stream gauges, and never
+  dispatches the queued request. `docs/12-proxy-tls.md` and
+  `docs/30-operations-troubleshooting.md` distinguish graceful GOAWAY from
+  connection failure and document the one-connection retirement queue.
 
 ---
 
