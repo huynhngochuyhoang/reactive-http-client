@@ -180,24 +180,58 @@ Evidence:
 
 ## Priority 4 - Retry, Redirect, and Auth Replay Composition
 
-### [ ] 4.1 Add a bounded pairwise real-server matrix
+### [x] 4.1 Add a bounded pairwise real-server matrix
 
-- [ ] Cover retry plus `307`/`308`.
-- [ ] Cover retry plus one-time OAuth2 `401` refresh.
-- [ ] Cover redirect plus OAuth2 refresh.
-- [ ] Distinguish outer subscription, resilience subscription, hidden auth replay,
+- [x] Cover retry plus `307`/`308`.
+- [x] Cover retry plus one-time OAuth2 `401` refresh.
+- [x] Cover redirect plus OAuth2 refresh.
+- [x] Distinguish outer subscription, resilience subscription, hidden auth replay,
       redirect dispatch, and body subscription counts.
 
-### [ ] 4.2 Preserve replay safety and final-attempt truth
+### [x] 4.2 Preserve replay safety and final-attempt truth
 
-- [ ] Keep generated idempotency keys fresh per outer subscription and stable
+- [x] Keep generated idempotency keys fresh per outer subscription and stable
       across every replay in that subscription.
-- [ ] Prove repeatable bodies reproduce identical bytes without buffering
+- [x] Prove repeatable bodies reproduce identical bytes without buffering
       application-owned bodies.
-- [ ] Preserve documented warning/rejection behavior for non-repeatable bodies.
-- [ ] Enforce same-authority and cross-authority sensitive-header policy.
-- [ ] Prevent prior dispatch URL/header/status/failure evidence from leaking into
+- [x] Preserve documented warning/rejection behavior for non-repeatable bodies.
+- [x] Enforce same-authority and cross-authority sensitive-header policy.
+- [x] Prevent prior dispatch URL/header/status/failure evidence from leaking into
       the terminal visible result.
+
+Evidence:
+
+- `RetryRedirectAuthReplayCompositionContractTest` uses production client factories
+  and real Reactor Netty servers for retry plus both `307` and `308`, retry plus
+  built-in OAuth2 client-credentials `401` refresh, and redirect plus OAuth2
+  refresh. It separately records outer subscriptions, lifecycle retry attempts,
+  token refreshes, wire paths, and cold publisher-body subscriptions.
+- Two subscriptions to one cold proxy publisher generate two distinct idempotency
+  keys while all four retry/redirect dispatches inside each subscription retain its
+  key. Repeatable UTF-8 text produces identical bytes on every dispatch. A gated,
+  application-owned `Resource` withholds each replay remainder until the real server
+  receives its first chunk; all four first chunks arrive before source completion, and
+  every stream is reopened and closed once with identical wire bytes. The fixture fails
+  if the starter aggregates the resource before dispatch.
+  Cold non-repeatable publishers are subscribed once per dispatch. Existing warning
+  and strict body-signing tests retain the documented non-repeatable/application-owned
+  behavior.
+- Same-authority redirect plus auth refresh preserves the bearer and caller headers.
+  Cross-authority redirect evidence removes `Authorization`, `Cookie`, and
+  `Proxy-Authorization` while preserving the non-sensitive idempotency key.
+- Success fixtures produce one terminal observer/exchange-log result with resilience
+  attempt counts that exclude redirect and auth replay dispatches. A final
+  pre-dispatch auth failure after a sentinel-bearing `401` auth replay and a partial
+  `200` response-body timeout reports attempt 2 with no stale URL, headers, status, or
+  `RESPONSE_BODY` failure stage. Cancellation while the redirected target
+  dispatch is in flight reports one visible attempt, one terminal cancellation,
+  no response metadata from the preceding `307`, and no extra body subscription after
+  transport cancellation.
+- Focused replay, redirect, OAuth2, upload ownership, idempotency, retry-warning,
+  and terminal-state tests passed. The full starter suite and the
+  starter-plus-test-helper reactor suite passed. Strict starter-module japicmp
+  passed against the provenance-verified published `3.3.0` baseline from
+  `target/api-starter-3.3.0-resilience-composition`. `git diff --check` passed.
 
 ---
 

@@ -171,6 +171,32 @@ logging each emit one terminal record with the final subscription-attempt count.
 The count records subscriptions, not guaranteed HTTP network sends. See
 [Lifecycle Hooks](19-lifecycle-hooks.md).
 
+### Retry, redirect, and auth replay
+
+These replay mechanisms have different count boundaries:
+
+| Mechanism | Counted as a subscription attempt | Wire/body effect |
+|---|---|---|
+| Resilience4j retry | Yes | Rebuilds the declarative request and can dispatch it again |
+| One-time `401` auth refresh | No | Replays the request once inside the current retry attempt after releasing the `401` body |
+| Automatic `307`/`308` redirect | No | Reactor Netty dispatches the redirected request inside the current retry attempt |
+
+A body-preserving redirect or auth replay subscribes a publisher body again. The
+starter does not buffer application-owned bodies for these hidden dispatches. A
+method-generated idempotency key is fresh for each outer subscription and remains
+stable across resilience retries, the one-time auth replay, and redirect hops in
+that subscription. Repeatable scalar bodies are encoded again and must produce the
+same bytes; publisher and application-owned bodies retain the warning and ownership
+contract above.
+
+Same-authority redirects preserve request headers. Cross-authority redirects use
+Reactor Netty policy and remove `Authorization`, `Cookie`, `Proxy-Authorization`,
+and `Expect`; the starter does not restore them on the redirected request. Terminal
+lifecycle, observer, and exchange-log facts describe the final resilience attempt.
+A prior attempt cannot contribute its status, response headers, request observation,
+or failure stage. Redirect URL fields continue to describe the original declarative
+request, as documented in [Error Handling](03-error-handling.md#redirect-responses).
+
 ### Resilience4j instance configuration
 
 ```yaml
