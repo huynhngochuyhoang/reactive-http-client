@@ -219,11 +219,12 @@ Evidence:
   `Proxy-Authorization` while preserving the non-sensitive idempotency key.
 - Success fixtures produce one terminal observer/exchange-log result with resilience
   attempt counts that exclude redirect and auth replay dispatches. A final
-  pre-dispatch auth failure after prior sentinel-bearing `401` and `503` responses
-  reports attempt 2 with no stale URL, headers, status, or failure stage. Cancellation
-  while the redirected target dispatch is in flight reports one visible attempt, one
-  terminal cancellation, no response metadata from the preceding `307`, and no extra
-  body subscription after transport cancellation.
+  pre-dispatch auth failure after a sentinel-bearing `401` auth replay and a partial
+  `200` response-body timeout reports attempt 2 with no stale URL, headers, status, or
+  `RESPONSE_BODY` failure stage. Cancellation while the redirected target
+  dispatch is in flight reports one visible attempt, one terminal cancellation,
+  no response metadata from the preceding `307`, and no extra body subscription after
+  transport cancellation.
 - Focused replay, redirect, OAuth2, upload ownership, idempotency, retry-warning,
   and terminal-state tests passed. The full starter suite and the
   starter-plus-test-helper reactor suite passed. Strict starter-module japicmp

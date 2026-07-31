@@ -4,6 +4,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.github.resilience4j.retry.RetryConfig;
@@ -240,6 +241,7 @@ class RetryRedirectAuthReplayCompositionContractTest {
             assertThat(bodySubscriptions).hasValue(2);
             assertThat(server.businessRequests()).hasSize(2);
             assertSingleIdempotencyKey(server.businessRequests());
+            fixture.diagnostics().assertRetriedFailureStage(HttpClientFailureStage.RESPONSE_BODY);
             fixture.diagnostics().assertPreDispatchFailure(2);
         }
     }
@@ -297,6 +299,7 @@ class RetryRedirectAuthReplayCompositionContractTest {
         Mono<String> cancelRedirect(@Body Flux<DataBuffer> body);
 
         @POST("/terminal-auth")
+        @TimeoutMs(75)
         @IdempotencyKey
         Mono<String> terminalAuthFailure(@Body Flux<DataBuffer> body);
     }
@@ -337,8 +340,11 @@ class RetryRedirectAuthReplayCompositionContractTest {
                 resilience.setRetry("replay-composition");
                 resilience.setRetryMethods(Set.of("POST"));
                 config.setResilience(resilience);
-                context.getBeanFactory().registerSingleton("retryRegistry", RetryRegistry.of(
-                        RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ZERO).build()));
+                RetryRegistry retryRegistry = RetryRegistry.of(
+                        RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ZERO).build());
+                retryRegistry.retry("replay-composition").getEventPublisher()
+                        .onRetry(event -> diagnostics.retryFailures.add(event.getLastThrowable()));
+                context.getBeanFactory().registerSingleton("retryRegistry", retryRegistry);
             }
             if (oauth) {
                 ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
@@ -383,6 +389,7 @@ class RetryRedirectAuthReplayCompositionContractTest {
         private final AtomicInteger errors = new AtomicInteger();
         private final AtomicInteger cancellations = new AtomicInteger();
         private final List<HttpClientObserverEvent> observerEvents = new CopyOnWriteArrayList<>();
+        private final List<Throwable> retryFailures = new CopyOnWriteArrayList<>();
         private final List<ReactiveHttpClientLifecycleContext> errorContexts = new CopyOnWriteArrayList<>();
         private final List<ReactiveHttpClientLifecycleContext> cancellationContexts = new CopyOnWriteArrayList<>();
         private final List<HttpExchangeLogContext> exchangeLogs = new CopyOnWriteArrayList<>();
@@ -440,6 +447,12 @@ class RetryRedirectAuthReplayCompositionContractTest {
                 assertThat(log.requestUrl()).hasToString(requestUrl);
                 assertThat(log.failureStage()).isNull();
             });
+        }
+
+        private void assertRetriedFailureStage(HttpClientFailureStage expected) {
+            assertThat(retryFailures).singleElement().satisfies(error ->
+                    assertThat(HttpClientFailureStage.from(error, HttpStatus.OK.value(), true))
+                            .isEqualTo(expected));
         }
 
         private void assertPreDispatchFailure(int attempts) {
@@ -591,9 +604,12 @@ class RetryRedirectAuthReplayCompositionContractTest {
                                     return "Bearer token-1".equals(record.authorization())
                                             ? response.status(401)
                                                     .header(PRIOR_RESPONSE_HEADER, "auth-401").send()
-                                            : response.status(503)
-                                                    .header(PRIOR_RESPONSE_HEADER, "retry-503")
-                                                    .sendString(Mono.just("retry")).then();
+                                            : response.status(200)
+                                                    .header(PRIOR_RESPONSE_HEADER, "response-body-timeout")
+                                                    .sendString(Flux.concat(
+                                                            Mono.just("partial"),
+                                                            Mono.delay(Duration.ofMillis(250)).thenReturn("late")))
+                                                    .then();
                                 }
                                 return ok(response);
                             }))
