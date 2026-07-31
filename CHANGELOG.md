@@ -62,6 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alias rather than TLS to the proxy. Added client-auth-required HTTP/1.1 and H2
   fixtures that accept the configured trusted identity, reject missing/untrusted
   identities, and preserve redacted `TLS_HANDSHAKE` diagnostics.
+- **HTTP/2 GOAWAY retirement contract.** Added a real H2C peer that sends
+  `GOAWAY(NO_ERROR)` while streams are active; accepted streams retain their
+  response, cancellation, reset, compression, and buffer ownership, while
+  pending demand moves to replacement capacity after the peer closes the
+  draining socket. Pool stream gauges converge, factory shutdown remains
+  bounded, and a processed non-repeatable upload is never implicitly replayed.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects

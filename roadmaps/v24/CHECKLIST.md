@@ -283,20 +283,43 @@ Evidence:
 
 ## Priority 6 - HTTP/2 GOAWAY and Connection Retirement
 
-### [ ] 6.1 Add real retirement fixtures
+### [x] 6.1 Add real retirement fixtures
 
-- [ ] Send H2/H2C `GOAWAY` while at least one stream is active.
-- [ ] Verify accepted streams follow the peer last-stream identifier semantics.
-- [ ] Verify later calls use replacement connection/stream capacity.
-- [ ] Do not imply retry for a possibly processed non-repeatable request.
+- [x] Send H2/H2C `GOAWAY` while at least one stream is active.
+- [x] Verify accepted streams follow the peer last-stream identifier semantics.
+- [x] Verify later calls use replacement connection/stream capacity.
+- [x] Do not imply retry for a possibly processed non-repeatable request.
 
-### [ ] 6.2 Prove pool and shutdown convergence
+### [x] 6.2 Prove pool and shutdown convergence
 
-- [ ] Verify active and pending stream gauges converge after retirement.
-- [ ] Keep cancellation, reset, compression, and response ownership stream-local.
-- [ ] Verify factory shutdown terminates active/pending work within the bounded
+- [x] Verify active and pending stream gauges converge after retirement.
+- [x] Keep cancellation, reset, compression, and response ownership stream-local.
+- [x] Verify factory shutdown terminates active/pending work within the bounded
       disposal policy.
-- [ ] Add operations guidance for graceful retirement versus connection failure.
+- [x] Add operations guidance for graceful retirement versus connection failure.
+
+Evidence:
+
+- `Http2GoAwayRetirementContractTest` sends a real H2C
+  `GOAWAY(NO_ERROR)` with zero extra stream identifiers through the accepted
+  socket while a stream is active. The accepted odd-numbered client stream
+  completes on the draining connection; one-stream pool demand remains pending
+  until the peer closes that socket, then runs on a distinct replacement
+  connection without exceeding `maxConnections=1`.
+- A processed `Flux<DataBuffer>` upload receives its response with one source
+  subscription and one server dispatch. GOAWAY therefore adds no hidden retry
+  for a body the peer may already have processed.
+- The same real transport preserves a compressed
+  `ResponseEntity<Flux<DataBuffer>>` body while an accepted sibling stream is
+  cancelled and another is reset. Emitted buffers are released by the test
+  consumer, the replacement probe succeeds, and active/pending stream gauges
+  converge to zero.
+- Shutdown with a draining active stream and queued demand completes inside the
+  factory's five-second disposal bound, terminates both futures, disposes the
+  provider, removes starter-owned stream gauges, and never dispatches the queued
+  request. `docs/12-proxy-tls.md` and `docs/30-operations-troubleshooting.md`
+  distinguish graceful GOAWAY from connection failure and document the
+  one-connection retirement queue.
 
 ---
 

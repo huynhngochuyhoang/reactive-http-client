@@ -112,6 +112,26 @@ See [Response compression](12-proxy-tls.md#response-compression) and
 
 See [Diagnosing saturation](05-connection-pool.md#diagnosing-saturation).
 
+### HTTP/2 retirement versus connection failure
+
+A peer `GOAWAY(NO_ERROR)` is graceful retirement, not by itself a request
+failure. Preserve the error code and last-stream identifier when the peer or an
+intermediary exposes them. Streams accepted at or below that identifier may
+finish on the old socket; do not classify them as unprocessed or replay-safe.
+New demand must not use the draining socket.
+
+During retirement, correlate `total.connections`, `active.streams`, and
+`pending.streams`. With `max-connections: 1`, the draining socket can occupy the
+only physical slot until its accepted streams finish and the peer closes it, so
+pending streams can rise temporarily before a replacement connection appears.
+They must converge after replacement dispatch or bounded pool shutdown. A reset,
+compression error, timeout, or premature close is a stream/connection failure
+and should be diagnosed from its terminal error and failure stage; do not infer
+one from a graceful GOAWAY alone. Factory shutdown applies the same bounded
+five-second connection-provider disposal policy to draining and pending work.
+
+See [GOAWAY and connection retirement](12-proxy-tls.md#goaway-and-connection-retirement).
+
 ## Pre-response transport failures
 
 Use this bounded matrix; do not infer ownership from elapsed time or exception text alone.

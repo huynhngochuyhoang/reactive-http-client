@@ -28,6 +28,22 @@ default. Unary values, `ResponseEntity<T>`, direct streaming bodies, and
 stream retains independent cancellation and error ownership while sharing the
 configured connection pool.
 
+### GOAWAY and connection retirement
+
+An HTTP/2 peer can send `GOAWAY` to retire one physical connection. Streams at
+or below the peer's last-stream identifier may already have been processed and
+can complete on the draining connection. The client does not open new streams
+on that connection; later demand uses replacement capacity after the draining
+socket leaves the pool.
+
+`max-connections` remains a physical-connection bound during retirement. With a
+one-connection pool, pending calls can remain queued while an accepted stream
+finishes and the peer keeps the draining socket open. Once the peer closes that
+socket, queued work can use a new connection. A `GOAWAY` frame is not evidence
+that a possibly processed request is safe to replay. The starter adds no
+GOAWAY-specific retry; configured retry, redirect, and auth replay retain their
+normal method, idempotency, and request-body repeatability rules.
+
 ## Response compression
 
 `compression-enabled` is opt-in per client. When enabled, Reactor Netty adds
