@@ -48,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the logical call; aligned unavailable-operator startup diagnostics; and
   added deterministic timeout, retry-exhaustion, cancellation, permit, terminal
   lifecycle, exchange-log, observer, and Micrometer evidence.
+- **Retry, redirect, and auth replay composition.** Added a bounded real-server
+  pairwise matrix for retry plus `307`/`308`, retry plus one-time OAuth2 `401`
+  refresh, and redirect plus OAuth2 refresh. The evidence separates outer and
+  resilience subscriptions from hidden auth replay, redirect dispatches, and body
+  subscriptions; proves subscription-local generated idempotency keys, identical
+  repeatable bytes, unbuffered application-owned replay, same/cross-authority
+  sensitive-header policy, and final-attempt-only terminal diagnostics.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects
