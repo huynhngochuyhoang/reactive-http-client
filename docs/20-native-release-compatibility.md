@@ -792,9 +792,9 @@ runs the complete mock parity classes, then runs the assembled consumer against
 the installed jars. It rejects reactor `target/classes` leakage and records
 separate mock and real-server test reports, the consumer classpath, dependency
 tree, effective POM, artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-3.4.0-SNAPSHOT/`. An `EXIT`
-trap copies only Surefire XML reports created during the current invocation before
-preserving the original verifier status, including when either test stage fails.
+`target/release-evidence/current-consumer/current-3.4.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
+test stage. An `EXIT` trap repeats that filtered copy before preserving the original
+verifier status, including when either test stage fails.
 It also records the last completed stage and exit status when a later
 classpath/provenance check fails.
 
@@ -828,8 +828,9 @@ trees, classpaths, consumer/module effective POMs, published parent/module POM
 and jar SHA-256 values, test reports, fixture commit state, completed stage, exit
 status, and provenance under
 `target/release-evidence/published-consumer/published-3.3.0/`.
-Its `EXIT` trap copies only reports created by the current invocation and retains
-that evidence when a test, Central marker, classpath, or checksum check fails.
+Fresh Surefire XML is copied immediately after the consumer test stage. Its `EXIT`
+trap repeats that filtered copy and retains the evidence when a test, Central marker,
+classpath, or checksum check fails.
 
 The release-artifact command uses its own fresh repository and additionally
 requires the starter, test-helper, and OTel source and Javadoc jars. Its

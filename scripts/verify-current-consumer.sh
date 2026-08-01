@@ -24,18 +24,26 @@ REPORT_START_MARKER="$EVIDENCE_DIR/report-start.marker"
 touch "$REPORT_START_MARKER"
 stage="setup"
 
-preserve_reports() {
-  local status=$?
-  trap - EXIT
-  set +e
+copy_mock_reports() {
   for report in "$ROOT_DIR/reactive-http-client-test/target/surefire-reports/"*.xml; do
     [[ -f "$report" && "$report" -nt "$REPORT_START_MARKER" ]] \
       && cp "$report" "$MOCK_REPORTS/"
   done
+}
+
+copy_consumer_reports() {
   for report in "$ROOT_DIR/.github/boot4-consumer/target/surefire-reports/"*.xml; do
     [[ -f "$report" && "$report" -nt "$REPORT_START_MARKER" ]] \
       && cp "$report" "$CONSUMER_REPORTS/"
   done
+}
+
+preserve_reports() {
+  local status=$?
+  trap - EXIT
+  set +e
+  copy_mock_reports
+  copy_consumer_reports
   working_tree=clean
   [[ -z "$(git -C "$ROOT_DIR" status --porcelain)" ]] || working_tree=dirty
   {
@@ -62,9 +70,11 @@ stage="reactor-install"
 "${MAVEN[@]}" -f "$ROOT_DIR/reactive-http-client-test/pom.xml" \
   -Dtest=MockReactiveHttpClientTest,Boot4MockReactiveHttpClientTest clean test
 stage="mock-tests"
+copy_mock_reports
 
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" clean test
 stage="consumer-tests"
+copy_consumer_reports
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
   help:effective-pom -Doutput="$EVIDENCE_DIR/effective-poms/boot4-current-consumer.xml"
 stage="consumer-effective-pom"

@@ -386,22 +386,41 @@ Evidence:
 
 ## Priority 8 - Mock and Assembled-Consumer Parity
 
-### [ ] 8.1 Keep mock behavior within stable starter-owned boundaries
+### [x] 8.1 Keep mock behavior within stable starter-owned boundaries
 
-- [ ] Reject the same unsupported method shapes as production.
-- [ ] Distinguish mock response sequencing from real socket dispatch semantics.
-- [ ] Preserve constructor-injected logger, application codec, auth-provider,
+- [x] Reject the same unsupported method shapes as production.
+- [x] Distinguish mock response sequencing from real socket dispatch semantics.
+- [x] Preserve constructor-injected logger, application codec, auth-provider,
       inherited generic, and ordered lifecycle behavior.
-- [ ] Add focused replay and composition assertions without simulating transport
+- [x] Add focused replay and composition assertions without simulating transport
       facts the mock cannot prove.
 
-### [ ] 8.2 Keep independent consumers isolated and reproducible
+### [x] 8.2 Keep independent consumers isolated and reproducible
 
-- [ ] Run current `3.4.0-SNAPSHOT` and published `3.3.0` consumers from separate
+- [x] Run current `3.4.0-SNAPSHOT` and published `3.3.0` consumers from separate
       repositories.
-- [ ] Reject reactor/local-repository leakage in the published lane.
-- [ ] Copy failure evidence incrementally and identify the last completed stage.
-- [ ] Reject stale Surefire evidence from previous verifier runs.
+- [x] Reject reactor/local-repository leakage in the published lane.
+- [x] Copy failure evidence incrementally and identify the last completed stage.
+- [x] Reject stale Surefire evidence from previous verifier runs.
+
+Evidence:
+
+- `MockReactiveHttpClientTest` delegates unsupported-shape rejection to the same
+  production metadata grammar and retains constructor-injected logger,
+  application Jackson 3 codec/auth bytes, inherited generic decoding, and
+  annotation-aware lifecycle ordering coverage. Its focused composition case
+  records the canned `401`, `503`, `200` sequence as three in-process exchanges,
+  two outer subscription attempts, one auth invalidation, and one terminal
+  observer event without inferring sockets, pool activity, or physical dispatch.
+- `verify-current-consumer.sh` and `verify-published-consumer.sh` copy only XML
+  newer than an invocation marker immediately after each test stage and repeat
+  that copy from their exit traps. Both preserve the last completed stage and
+  original exit status; fresh evidence directories prevent stale report reuse.
+- Fresh isolated runs passed for current `3.4.0-SNAPSHOT` and Maven Central
+  `3.3.0`. The current lane recorded 39 mock tests and 3 assembled-consumer tests;
+  the published lane recorded 3 assembled-consumer tests plus Central remote
+  markers and checksums. Both provenance files ended at `evidence-verified` with
+  exit status 0, and classpath/dependency checks found no reactor output leakage.
 
 ---
 

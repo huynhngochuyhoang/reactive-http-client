@@ -346,7 +346,10 @@ mock.exchanges().forEach(exchange ->
 The supplied provider can be an in-memory test double. The helper serves one
 HTTP 401 and then delegates later requests; the production filter invalidates
 auth and sends one more request. Both outbound attempts remain in
-`exchanges()`.
+`exchanges()`. A composed `401`, `503`, `200` handler sequence produces three
+recorded in-process exchanges but two outer retry subscription attempts. That
+sequence is canned-response evidence only; it is not a socket-dispatch or
+connection-count assertion.
 
 ---
 
