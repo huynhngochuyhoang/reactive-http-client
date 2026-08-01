@@ -78,8 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lookup across sole, primary, priority, fallback, and default candidates. Snapshots
   read already-cached singleton `FactoryBean` products without creating uncached
   or uninspectable products, clients, auth providers, Retry instances, or network resources.
-  A deferred application factory (a lazy singleton or non-singleton scope) with an
-  uninspectable product keeps registry-dependent facts unknown beside visible candidates
+  An uninstantiated, uninspectable factory of any bean role or scope keeps
+  registry-dependent facts unknown beside visible candidates
   unless candidate metadata excludes it or proves an existing registry is the sole primary. Unresolved registry state affects strict-retry
   diagnostics only when at least one client method is retry-eligible; otherwise the
   validation flag is definitively inactive. The structured logger example now emits

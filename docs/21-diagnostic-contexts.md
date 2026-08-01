@@ -166,10 +166,10 @@ exist. If no method is retry-eligible, the flag is `false` without registry insp
 Registry selection searches parent factories and follows Spring direct-type lookup
 semantics for sole, primary, priority, fallback, and default candidates. An
 already-cached singleton `FactoryBean` product can supply that evidence, while an
-uncached or uninspectable application product remains unknown and is not created by
-diagnostics. An uninspectable deferred application factory (a lazy singleton or
-non-singleton scope) also keeps registry-dependent facts unknown beside visible
-candidates unless bean-definition metadata proves it cannot affect selection: candidate
+uncached or uninspectable `FactoryBean` product remains unknown and is not created by
+diagnostics. An uninstantiated, uninspectable factory of any bean role or scope also
+keeps registry-dependent facts unknown beside visible candidates unless
+bean-definition metadata proves it cannot affect selection: candidate
 filtering excludes it, or an existing registry is the sole primary candidate.
 
 Snapshots fail explicitly instead of returning partial counts when they exceed

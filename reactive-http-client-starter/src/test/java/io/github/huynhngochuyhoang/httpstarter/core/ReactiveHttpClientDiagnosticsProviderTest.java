@@ -402,6 +402,65 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsKeepUninspectableNonApplicationFactoryBeansUnknown() {
+        for (int role : new int[]{BeanDefinition.ROLE_SUPPORT, BeanDefinition.ROLE_INFRASTRUCTURE}) {
+            DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+            AtomicInteger factoryCreations = new AtomicInteger();
+            AtomicInteger productCreations = new AtomicInteger();
+            GenericBeanDefinition retryDefinition = new GenericBeanDefinition();
+            retryDefinition.setBeanClass(UninspectableRetryRegistryFactoryBean.class);
+            retryDefinition.setLazyInit(true);
+            retryDefinition.setRole(role);
+            retryDefinition.setInstanceSupplier(() -> {
+                factoryCreations.incrementAndGet();
+                return new UninspectableRetryRegistryFactoryBean(productCreations);
+            });
+            beanFactory.registerBeanDefinition("uninspectableRetryRegistry", retryDefinition);
+
+            Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                    diagnosticsProvider(beanFactory, strictRetryClientConfig())));
+
+            assertThat(client)
+                    .containsEntry("retry", "unavailable")
+                    .containsEntry("strictUnsafeRetryValidation", null);
+            assertThat(factoryCreations).hasValue(0);
+            assertThat(productCreations).hasValue(0);
+        }
+    }
+
+    @Test
+    void providerSnapshotsKeepPostRefreshNonLazyFactoryBeansUnknown() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            DefaultListableBeanFactory beanFactory = context.getDefaultListableBeanFactory();
+            GenericBeanDefinition clientDefinition = new GenericBeanDefinition();
+            clientDefinition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+            clientDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+            beanFactory.registerBeanDefinition("diagnosticClient", clientDefinition);
+
+            AtomicInteger factoryCreations = new AtomicInteger();
+            AtomicInteger productCreations = new AtomicInteger();
+            GenericBeanDefinition retryDefinition = new GenericBeanDefinition();
+            retryDefinition.setBeanClass(UninspectableRetryRegistryFactoryBean.class);
+            retryDefinition.setInstanceSupplier(() -> {
+                factoryCreations.incrementAndGet();
+                return new UninspectableRetryRegistryFactoryBean(productCreations);
+            });
+            beanFactory.registerBeanDefinition("uninspectableRetryRegistry", retryDefinition);
+
+            Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                    diagnosticsProvider(beanFactory, strictRetryClientConfig())));
+
+            assertThat(client)
+                    .containsEntry("retry", "unavailable")
+                    .containsEntry("strictUnsafeRetryValidation", null);
+            assertThat(factoryCreations).hasValue(0);
+            assertThat(productCreations).hasValue(0);
+            assertThat(beanFactory.containsSingleton("uninspectableRetryRegistry")).isFalse();
+        }
+    }
+
+    @Test
     void providerSnapshotsKeepUninspectablePrototypeFactoryBeansUnknown() {
         DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
         AtomicInteger factoryCreations = new AtomicInteger();
