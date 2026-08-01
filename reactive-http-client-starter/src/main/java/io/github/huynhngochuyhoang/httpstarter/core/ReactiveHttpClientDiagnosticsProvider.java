@@ -544,10 +544,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 continue;
             }
             BeanDefinition definition = beanDefinition(factory, beanName);
-            if (definition == null
-                    || definition.isAbstract()
-                    || definition.getRole() != BeanDefinition.ROLE_APPLICATION
-                    || (definition.isSingleton() && !definition.isLazyInit())) {
+            if (definition == null || definition.isAbstract()) {
                 continue;
             }
             Class<?> factoryType = beanType(factory, definition);

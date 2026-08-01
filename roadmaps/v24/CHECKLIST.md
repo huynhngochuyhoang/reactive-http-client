@@ -364,8 +364,8 @@ Evidence:
   lazy candidates, searches parent factories, and follows Spring direct lookup for
   sole, primary, priority, fallback, and default candidates. It reads an
   already-cached singleton `FactoryBean` product without creating an uncached or
-  uninspectable one. A deferred application factory (a lazy singleton or non-singleton scope) with an
-  uninspectable product keeps registry-dependent facts unknown beside visible candidates
+  uninspectable one. An uninstantiated, uninspectable factory of any bean role or scope keeps
+  registry-dependent facts unknown beside visible candidates
   unless candidate metadata excludes it or proves an existing registry is the sole primary.
   Provider-backed rendering leaves lazy registries and client factories
   uninstantiated, does not create missing Retry instances or auth providers, and
