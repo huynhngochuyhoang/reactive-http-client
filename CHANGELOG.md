@@ -74,9 +74,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   structural category, stage, duration, and attempt semantics. Default exchange
   logs and OTel exception events no longer export arbitrary exception messages
   or stack traces. Provider snapshots now distinguish absent resilience registries
-  from unresolved lazy registries, honor the primary initialized candidate, and
+  from unresolved lazy registries, search parent factories, and mirror Spring direct
+  lookup across sole, primary, priority, fallback, and default candidates. Snapshots
   read already-cached singleton `FactoryBean` products without creating uncached
-  products, clients, auth providers, Retry instances, or network resources.
+  or uninspectable products, clients, auth providers, Retry instances, or network resources.
   Deterministic bounded schema v1 output is retained.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning

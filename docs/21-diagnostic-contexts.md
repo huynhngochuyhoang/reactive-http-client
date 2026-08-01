@@ -161,9 +161,10 @@ the collection contract, so provider-only strict flags remain unknown. Diagnosti
 do not instantiate client FactoryBeans, auth providers, lazy Resilience4j registry
 beans, unresolved Resilience4j instances, proxy connections, or other network
 resources. A strict-retry flag stays unknown until its selected registry and Retry instance
-already exist. Registry selection honors the primary candidate. An already-cached
-singleton `FactoryBean` product can supply that evidence, while an uncached product
-remains unknown and is not created by diagnostics.
+already exist. Registry selection searches parent factories and follows Spring direct-type lookup
+semantics for sole, primary, priority, fallback, and default candidates. An
+already-cached singleton `FactoryBean` product can supply that evidence, while an
+uncached or uninspectable product remains unknown and is not created by diagnostics.
 
 Snapshots fail explicitly instead of returning partial counts when they exceed
 256 clients, 10,000 aggregate endpoints, 512 characters in an exported text

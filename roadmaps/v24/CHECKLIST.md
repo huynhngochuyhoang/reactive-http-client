@@ -361,8 +361,10 @@ Evidence:
   exception message or stack trace. Regression tests use a credential-bearing
   10,000-character custom-filter error and prove that payload is absent.
 - Diagnostics registry discovery distinguishes absent registries from unresolved
-  lazy candidates, honors the primary initialized registry, and reads an
-  already-cached singleton `FactoryBean` product without creating an uncached one.
+  lazy candidates, searches parent factories, and follows Spring direct lookup for
+  sole, primary, priority, fallback, and default candidates. It reads an
+  already-cached singleton `FactoryBean` product without creating an uncached or
+  uninspectable one.
   Provider-backed rendering leaves lazy registries and client factories
   uninstantiated, does not create missing Retry instances or auth providers, and
   therefore cannot create connector, proxy, pool, or network resources. Unresolved

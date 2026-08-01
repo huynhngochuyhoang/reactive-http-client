@@ -4,20 +4,22 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
+import org.springframework.core.OrderComparator;
+import org.springframework.core.ResolvableType;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Provides sanitized runtime summaries for registered {@link ReactiveHttpClient}
@@ -369,53 +371,49 @@ public class ReactiveHttpClientDiagnosticsProvider {
     private ExistingBeanLookup existingBean(String className) {
         try {
             Class<?> type = ClassUtils.forName(className, beanFactory.getBeanClassLoader());
-            String[] beanNames = beanFactory.getBeanNamesForType(type, true, false);
-            if (beanNames.length == 0) {
-                return ExistingBeanLookup.absent();
-            }
-            String beanName = selectedBeanName(beanNames);
-            if (beanName == null) {
-                return ExistingBeanLookup.unresolvedLookup();
-            }
-            Object singleton = beanFactory.getSingleton(beanName);
-            if (type.isInstance(singleton)) {
-                return ExistingBeanLookup.available(singleton);
-            }
-            if (singleton instanceof FactoryBean<?>) {
-                Object product = cachedFactoryBeanProduct(beanName);
-                if (type.isInstance(product)) {
-                    return ExistingBeanLookup.available(product);
-                }
-            }
-            return ExistingBeanLookup.unresolvedLookup();
+            return existingBean(beanFactory, type);
         } catch (ClassNotFoundException | LinkageError ex) {
             return ExistingBeanLookup.absent();
         }
     }
 
-    private String selectedBeanName(String[] beanNames) {
-        String soleCandidate = null;
-        int candidateCount = 0;
+    private ExistingBeanLookup existingBean(ConfigurableListableBeanFactory factory, Class<?> type) {
+        String[] beanNames = factory.getBeanNamesForType(type, true, false);
+        if (beanNames.length == 0) {
+            if (hasUninspectableFactoryBean(factory, type, beanNames)) {
+                return ExistingBeanLookup.unresolvedLookup();
+            }
+            BeanFactory parent = factory.getParentBeanFactory();
+            if (parent instanceof ConfigurableListableBeanFactory parentFactory) {
+                return existingBean(parentFactory, type);
+            }
+            return parent == null ? ExistingBeanLookup.absent() : ExistingBeanLookup.unresolvedLookup();
+        }
+        String beanName = selectedBeanName(factory, type, beanNames);
+        if (beanName == null) {
+            return ExistingBeanLookup.unresolvedLookup();
+        }
+        Object value = existingSingletonValue(factory, type, beanName);
+        return value != null
+                ? ExistingBeanLookup.available(value)
+                : ExistingBeanLookup.unresolvedLookup();
+    }
+
+    private String selectedBeanName(ConfigurableListableBeanFactory factory,
+                                    Class<?> type,
+                                    String[] beanNames) {
+        List<String> candidates = candidateNames(factory, beanNames);
+        if (candidates.size() == 1) {
+            return candidates.get(0);
+        }
+
         String primaryCandidate = null;
         int primaryCount = 0;
-        String nonFallbackCandidate = null;
-        int nonFallbackCount = 0;
-        for (String beanName : beanNames) {
-            BeanDefinition definition = beanFactory.containsBeanDefinition(beanName)
-                    ? beanFactory.getBeanDefinition(beanName)
-                    : null;
-            if (definition != null && !definition.isAutowireCandidate()) {
-                continue;
-            }
-            soleCandidate = beanName;
-            candidateCount++;
+        for (String beanName : candidates) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
             if (definition != null && definition.isPrimary()) {
                 primaryCandidate = beanName;
                 primaryCount++;
-            }
-            if (definition == null || !definition.isFallback()) {
-                nonFallbackCandidate = beanName;
-                nonFallbackCount++;
             }
         }
         if (primaryCount == 1) {
@@ -424,14 +422,178 @@ public class ReactiveHttpClientDiagnosticsProvider {
         if (primaryCount > 1) {
             return null;
         }
-        if (candidateCount == 1) {
-            return soleCandidate;
+
+        String nonFallbackCandidate = null;
+        int nonFallbackCount = 0;
+        for (String beanName : candidates) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition == null || !definition.isFallback()) {
+                nonFallbackCandidate = beanName;
+                nonFallbackCount++;
+            }
         }
-        return nonFallbackCount == 1 ? nonFallbackCandidate : null;
+        if (nonFallbackCount == 1) {
+            return nonFallbackCandidate;
+        }
+
+        PriorityCandidate priorityCandidate = priorityCandidate(factory, type, candidates);
+        if (priorityCandidate.conflict()) {
+            return null;
+        }
+        if (priorityCandidate.beanName() != null) {
+            return priorityCandidate.beanName();
+        }
+
+        String defaultCandidate = null;
+        for (String beanName : candidates) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            boolean isDefault = !(definition instanceof AbstractBeanDefinition abstractDefinition)
+                    || abstractDefinition.isDefaultCandidate();
+            if (isDefault) {
+                if (defaultCandidate != null) {
+                    return null;
+                }
+                defaultCandidate = beanName;
+            }
+        }
+        return defaultCandidate;
     }
 
-    private Object cachedFactoryBeanProduct(String beanName) {
-        if (!(beanFactory instanceof FactoryBeanRegistrySupport registry)
+    private static List<String> candidateNames(ConfigurableListableBeanFactory factory,
+                                               String[] beanNames) {
+        if (beanNames.length == 1) {
+            return List.of(beanNames[0]);
+        }
+        List<String> autowireCandidates = new ArrayList<>(beanNames.length);
+        for (String beanName : beanNames) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition == null || definition.isAutowireCandidate()) {
+                autowireCandidates.add(beanName);
+            }
+        }
+        return autowireCandidates.isEmpty() ? List.of(beanNames) : autowireCandidates;
+    }
+
+    private PriorityCandidate priorityCandidate(ConfigurableListableBeanFactory factory,
+                                                Class<?> type,
+                                                List<String> candidates) {
+        if (!(factory instanceof DefaultListableBeanFactory defaultFactory)
+                || !(defaultFactory.getDependencyComparator() instanceof OrderComparator comparator)) {
+            return PriorityCandidate.none();
+        }
+        String selected = null;
+        Integer selectedPriority = null;
+        boolean conflict = false;
+        for (String beanName : candidates) {
+            Object candidate = candidateValue(factory, type, beanName);
+            if (candidate == null) {
+                continue;
+            }
+            Integer priority = comparator.getPriority(candidate);
+            if (priority == null) {
+                continue;
+            }
+            if (selectedPriority == null || priority < selectedPriority) {
+                selected = beanName;
+                selectedPriority = priority;
+                conflict = false;
+            } else if (priority.equals(selectedPriority)) {
+                conflict = true;
+            }
+        }
+        return new PriorityCandidate(selected, conflict);
+    }
+
+    private Object candidateValue(ConfigurableListableBeanFactory factory,
+                                  Class<?> type,
+                                  String beanName) {
+        Object value = existingSingletonValue(factory, type, beanName);
+        return value != null ? value : factory.getType(beanName, false);
+    }
+
+    private Object existingSingletonValue(ConfigurableListableBeanFactory factory,
+                                          Class<?> type,
+                                          String beanName) {
+        Object singleton = factory.getSingleton(beanName);
+        if (type.isInstance(singleton)) {
+            return singleton;
+        }
+        if (singleton instanceof FactoryBean<?>) {
+            Object product = cachedFactoryBeanProduct(factory, beanName);
+            if (type.isInstance(product)) {
+                return product;
+            }
+        }
+        return null;
+    }
+
+    private boolean hasUninspectableFactoryBean(ConfigurableListableBeanFactory factory,
+                                                Class<?> type,
+                                                String[] knownBeanNames) {
+        List<String> knownNames = List.of(knownBeanNames);
+        for (String beanName : factory.getBeanDefinitionNames()) {
+            if (knownNames.contains(beanName) || factory.containsSingleton(beanName)) {
+                continue;
+            }
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition == null || definition.isAbstract()) {
+                continue;
+            }
+            Class<?> factoryType = beanType(factory, definition);
+            if (factoryType == null || !FactoryBean.class.isAssignableFrom(factoryType)) {
+                continue;
+            }
+            Class<?> objectType = factoryBeanObjectType(factory, definition);
+            if (objectType == null || type.isAssignableFrom(objectType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Class<?> beanType(ConfigurableListableBeanFactory factory,
+                                     BeanDefinition definition) {
+        Class<?> type = definition.getResolvableType().resolve();
+        if (type != null || definition.getBeanClassName() == null) {
+            return type;
+        }
+        try {
+            return ClassUtils.resolveClassName(
+                    definition.getBeanClassName(), factory.getBeanClassLoader());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private static Class<?> factoryBeanObjectType(ConfigurableListableBeanFactory factory,
+                                                  BeanDefinition definition) {
+        Object objectType = definition.getAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
+        if (objectType instanceof Class<?> clazz) {
+            return clazz;
+        }
+        if (objectType instanceof ResolvableType resolvableType) {
+            return resolvableType.resolve();
+        }
+        if (objectType instanceof String className) {
+            try {
+                return ClassUtils.resolveClassName(className, factory.getBeanClassLoader());
+            } catch (IllegalArgumentException ex) {
+                return null;
+            }
+        }
+        return definition.getResolvableType().as(FactoryBean.class).getGeneric(0).resolve();
+    }
+
+    private static BeanDefinition beanDefinition(ConfigurableListableBeanFactory factory,
+                                                 String beanName) {
+        return factory.containsBeanDefinition(beanName)
+                ? factory.getMergedBeanDefinition(beanName)
+                : null;
+    }
+
+    private Object cachedFactoryBeanProduct(ConfigurableListableBeanFactory factory,
+                                            String beanName) {
+        if (!(factory instanceof FactoryBeanRegistrySupport registry)
                 || GET_CACHED_FACTORY_BEAN_OBJECT == null) {
             return null;
         }
@@ -440,6 +602,13 @@ public class ReactiveHttpClientDiagnosticsProvider {
             return ReflectionUtils.invokeMethod(GET_CACHED_FACTORY_BEAN_OBJECT, registry, beanName);
         } catch (RuntimeException ex) {
             return null;
+        }
+    }
+
+    private record PriorityCandidate(String beanName, boolean conflict) {
+
+        private static PriorityCandidate none() {
+            return new PriorityCandidate(null, false);
         }
     }
 
