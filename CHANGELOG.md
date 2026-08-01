@@ -68,6 +68,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pending demand moves to replacement capacity after the peer closes the
   draining socket. Pool stream gauges converge, factory shutdown remains
   bounded, and a processed non-repeatable upload is never implicitly replayed.
+- **Terminal diagnostics under composition.** Aligned the retry/redirect/auth
+  terminal fact fixture across lifecycle hooks, observer events, exchange logs,
+  Micrometer timers, and Actuator health, with OTel preserving the same
+  structural category, stage, duration, and attempt semantics. Default exchange
+  logs and OTel exception events no longer export arbitrary exception messages
+  or stack traces. Provider snapshots now inspect only already-created
+  resilience registry singletons, preserving lazy client, auth-provider,
+  Retry-instance, and network-resource boundaries while retaining deterministic
+  bounded schema v1 output.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects

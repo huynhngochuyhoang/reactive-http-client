@@ -242,6 +242,45 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsDoNotInstantiateLazyResilienceRegistries() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition clientDefinition = new GenericBeanDefinition();
+        clientDefinition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        clientDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", clientDefinition);
+        java.util.concurrent.atomic.AtomicInteger registryCreations =
+                new java.util.concurrent.atomic.AtomicInteger();
+        GenericBeanDefinition retryDefinition = new GenericBeanDefinition();
+        retryDefinition.setBeanClass(RetryRegistry.class);
+        retryDefinition.setLazyInit(true);
+        retryDefinition.setInstanceSupplier(() -> {
+            registryCreations.incrementAndGet();
+            return RetryRegistry.ofDefaults();
+        });
+        beanFactory.registerBeanDefinition("lazyRetryRegistry", retryDefinition);
+
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience =
+                new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setStrictUnsafeRetryValidation(true);
+        config.setResilience(resilience);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider));
+
+        assertThat(client)
+                .containsEntry("retry", "unavailable")
+                .containsEntry("strictUnsafeRetryValidation", false);
+        assertThat(registryCreations).hasValue(0);
+        assertThat(beanFactory.containsSingleton("lazyRetryRegistry")).isFalse();
+        assertThat(beanFactory.containsSingleton("diagnosticClient")).isFalse();
+    }
+
+    @Test
     void providerSnapshotsUseDefaultPoolWhenNetworkConfigurationIsNull() {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         GenericBeanDefinition definition = new GenericBeanDefinition();

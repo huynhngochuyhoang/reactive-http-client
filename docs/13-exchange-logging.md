@@ -71,7 +71,7 @@ reactive:
 
 | Preset | Logged data |
 |---|---|
-| `metadata-only` | Method, path template, status, duration, and error. Headers and bodies are omitted. This is the default. |
+| `metadata-only` | Method, path template, status, duration, error type, category, and proven failure stage. Headers, bodies, and exception messages are omitted. This is the default. |
 | `headers` | Metadata plus inbound, request, and response headers. Sensitive headers are redacted. Bodies are omitted. |
 | `bodies` | Metadata, redacted headers, and request/response bodies. Use only when payload logging is acceptable. |
 
@@ -126,8 +126,13 @@ safe logging bundles.
 ### Default log format (error)
 
 ```
-[user-service] GET /users/{id} inboundHeaders={...} reqHeaders={...} reqBody=[OMITTED] respStatus=404 respHeaders={...} respBody=[OMITTED] duration=12ms subscriptionAttemptCount=1 error=HttpClientException: 404 Not Found
+[user-service] GET /users/{id} inboundHeaders={...} reqHeaders={...} reqBody=[OMITTED] respStatus=404 respHeaders={...} respBody=[OMITTED] duration=12ms subscriptionAttemptCount=1 errorType=io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException errorCategory=CLIENT_ERROR failureStage=none
 ```
+
+The default logger never appends an exception message, cause text, or stack
+trace. This keeps arbitrary auth-provider and custom-filter payload text out of
+built-in logs while retaining structural error type, category, and proven
+failure-stage metadata.
 
 ---
 
@@ -149,7 +154,7 @@ public class AuditExchangeLogger implements HttpExchangeLogger {
                     context.pathTemplate(),
                     context.responseStatus(),
                     context.durationMs(),
-                    context.error().getMessage());
+                    context.error().getClass().getName());
         } else {
             log.info("[{}] {} {} -> {} ({}ms)",
                     context.clientName(),
@@ -169,6 +174,10 @@ Annotate individual methods to select the logger class to use:
 @LogHttpExchange(logger = AuditExchangeLogger.class)
 Mono<Order> placeOrder(@Body NewOrder body);
 ```
+
+Custom loggers receive the raw throwable and must bound and sanitize any
+exception message before persisting it. Logging only the exception class,
+category, and proven failure stage matches the built-in support-safe policy.
 
 To share a single configured instance (e.g. one that needs constructor injection), register it as a Spring bean:
 

@@ -330,22 +330,46 @@ Evidence:
 
 ## Priority 7 - Terminal Diagnostics Under Feature Composition
 
-### [ ] 7.1 Keep one terminal fact model
+### [x] 7.1 Keep one terminal fact model
 
-- [ ] Align lifecycle, observer, exchange log, Micrometer, OTel, and health facts
+- [x] Align lifecycle, observer, exchange log, Micrometer, OTel, and health facts
       across V24 composition fixtures.
-- [ ] Prevent prior-attempt URL, headers, status, and dispatch evidence from
+- [x] Prevent prior-attempt URL, headers, status, and dispatch evidence from
       leaking into pre-dispatch terminal failures.
-- [ ] Keep arbitrary auth/custom-filter failures sanitized and bounded.
-- [ ] Preserve additive, deterministic diagnostics schema v1 output without
+- [x] Keep arbitrary auth/custom-filter failures sanitized and bounded.
+- [x] Preserve additive, deterministic diagnostics schema v1 output without
       request-scoped configured-client fields.
 
-### [ ] 7.2 Keep diagnostics side-effect free
+### [x] 7.2 Keep diagnostics side-effect free
 
-- [ ] Prove diagnostics do not instantiate lazy clients or auth providers.
-- [ ] Prove diagnostics do not create resilience instances or network resources.
-- [ ] Preserve bounded map, JSON, and Markdown snapshot limits.
-- [ ] Run support-bundle schema fixtures and compatibility tests.
+- [x] Prove diagnostics do not instantiate lazy clients or auth providers.
+- [x] Prove diagnostics do not create resilience instances or network resources.
+- [x] Preserve bounded map, JSON, and Markdown snapshot limits.
+- [x] Run support-bundle schema fixtures and compatibility tests.
+
+Evidence:
+
+- The real retry/redirect/auth composition fixture now carries its terminal
+  pre-dispatch auth failure through lifecycle, observer, exchange-log, Micrometer,
+  and health assertions. All exposed facts agree on client, API/method, null final
+  status and dispatch evidence, `AUTH_PROVIDER_ERROR`, unknown failure stage,
+  non-negative duration, and subscription-attempt count; prior response headers, URL,
+  status, and `RESPONSE_BODY` evidence remain absent. The OTel companion maps the
+  same observer fact model to one error span with the matching structural fields.
+- `DefaultHttpExchangeLogger` now records only error type, category, and proven
+  stage. The OTel observer emits a structural `exception.type` event without
+  exception message or stack trace. Regression tests use a credential-bearing
+  10,000-character custom-filter error and prove that payload is absent.
+- Diagnostics registry discovery now reads only already-created singleton
+  registries. Provider-backed map rendering leaves a lazy Retry registry and lazy
+  client factory uninstantiated, does not create missing Retry instances or auth
+  providers, and therefore cannot create their connector, proxy, pool, or network
+  resources. Unavailable policy remains explicit rather than triggering setup.
+- Existing schema-v1 fixtures retain the exact root/client field sets and value
+  kinds without request-scoped facts. Client, endpoint, text, and 1 MiB UTF-8 map,
+  JSON, and Markdown limits all passed. Focused tests plus the full starter and
+  OTel suites passed. Strict japicmp for both modules passed against published
+  `3.3.0` with Central-only settings; `git diff --check` passed.
 
 ---
 

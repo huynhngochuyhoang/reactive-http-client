@@ -63,6 +63,22 @@ class DefaultHttpExchangeLoggerTest {
     }
 
     @Test
+    void errorLoggingOmitsArbitraryExceptionMessages(CapturedOutput output) {
+        String secret = "Bearer secret-token-" + "x".repeat(10_000);
+
+        logger.log(context(ReactiveHttpClientProperties.LogPreset.METADATA_ONLY,
+                new IllegalStateException(secret)));
+
+        assertThat(output)
+                .contains("errorType=java.lang.IllegalStateException")
+                .contains("errorCategory=UNKNOWN")
+                .contains("failureStage=none")
+                .doesNotContain(secret)
+                .doesNotContain("secret-token");
+        assertThat(output.getOut().length()).isLessThan(2_000);
+    }
+
+    @Test
     void legacyContextConstructorDefaultsToMetadataOnlyPreset() {
         HttpExchangeLogContext context = new HttpExchangeLogContext(
                 "orders",

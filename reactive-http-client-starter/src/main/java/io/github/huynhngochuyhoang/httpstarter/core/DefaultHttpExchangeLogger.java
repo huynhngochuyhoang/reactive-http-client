@@ -1,6 +1,9 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategories;
+import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +61,9 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
         Map<String, List<String>> responseHeaders = logHeaders ? redactResponseHeaders(context.responseHeaders()) : Map.of();
         Object requestBody = shouldLogBodies(context) ? context.requestBody() : OMITTED;
         Object responseBody = shouldLogBodies(context) ? context.responseBody() : OMITTED;
-        log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms subscriptionAttemptCount={} error={}",
+        ErrorCategory errorCategory = ErrorCategories.from(context.error(), context.responseStatus());
+        HttpClientFailureStage failureStage = context.failureStage();
+        log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms subscriptionAttemptCount={} errorType={} errorCategory={} failureStage={}",
                 context.clientName(),
                 context.httpMethod(),
                 context.pathTemplate(),
@@ -70,7 +75,9 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
                 responseBody,
                 context.durationMs(),
                 context.subscriptionAttemptCount(),
-                context.error().toString());
+                context.error().getClass().getName(),
+                errorCategory != null ? errorCategory.name() : "none",
+                failureStage != null ? failureStage.name() : "none");
     }
 
     private boolean shouldLogHeaders(HttpExchangeLogContext context) {

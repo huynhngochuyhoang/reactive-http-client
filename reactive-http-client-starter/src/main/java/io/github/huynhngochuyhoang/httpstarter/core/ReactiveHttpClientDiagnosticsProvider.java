@@ -352,7 +352,13 @@ public class ReactiveHttpClientDiagnosticsProvider {
     private Object bean(String className) {
         try {
             Class<?> type = ClassUtils.forName(className, beanFactory.getBeanClassLoader());
-            return beanFactory.getBeanProvider(type).getIfAvailable();
+            for (String beanName : beanFactory.getBeanNamesForType(type, false, false)) {
+                Object singleton = beanFactory.getSingleton(beanName);
+                if (type.isInstance(singleton)) {
+                    return singleton;
+                }
+            }
+            return null;
         } catch (ClassNotFoundException | LinkageError ex) {
             return null;
         }

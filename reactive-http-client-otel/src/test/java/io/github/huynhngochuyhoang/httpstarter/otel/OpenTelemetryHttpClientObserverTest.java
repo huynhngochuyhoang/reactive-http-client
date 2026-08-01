@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.otel;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.observability.CompositeHttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
@@ -139,8 +140,45 @@ class OpenTelemetryHttpClientObserverTest {
                 .isEqualTo("RATE_LIMITED");
         assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_ATTEMPT_COUNT)).isEqualTo(3L);
 
-        // Recorded exception event must be present
-        assertThat(span.getEvents()).extracting(e -> e.getName()).contains("exception");
+        assertThat(span.getStatus().getDescription()).isEmpty();
+        assertThat(span.getEvents()).singleElement().satisfies(exception -> {
+            assertThat(exception.getName()).isEqualTo("exception");
+            assertThat(exception.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_EXCEPTION_TYPE))
+                    .isEqualTo(RuntimeException.class.getName());
+            assertThat(exception.getAttributes().asMap().keySet())
+                    .containsExactly(OpenTelemetryHttpClientObserver.ATTR_EXCEPTION_TYPE);
+            assertThat(exception.getAttributes().toString()).doesNotContain("rate limited");
+        });
+    }
+
+    @Test
+    void composedPreDispatchAuthFailureExportsOnlyTerminalStructuralFacts() {
+        String secret = "Bearer secret-token-" + "x".repeat(10_000);
+        AuthProviderException failure = new AuthProviderException(
+                "replay-composition", new IllegalStateException(secret));
+
+        observer.record(new HttpClientObserverEvent(
+                "replay-composition", "terminalAuthFailure", "POST", "/terminal-auth",
+                null, 75L, failure, ErrorCategory.AUTH_PROVIDER_ERROR, null, null,
+                2, HttpClientObserverEvent.UNKNOWN_SIZE, HttpClientObserverEvent.UNKNOWN_SIZE,
+                null, null, null, Map.of()));
+
+        SpanData span = onlySpan();
+        assertThat(span.getName()).isEqualTo("POST terminalAuthFailure");
+        assertThat(span.getStatus()).isEqualTo(StatusData.error());
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_CLIENT_NAME))
+                .isEqualTo("replay-composition");
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_HTTP_METHOD))
+                .isEqualTo("POST");
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_HTTP_STATUS_CODE)).isNull();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_ERROR_TYPE))
+                .isEqualTo(ErrorCategory.AUTH_PROVIDER_ERROR.name());
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_FAILURE_STAGE)).isNull();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_ATTEMPT_COUNT)).isEqualTo(2L);
+        assertThat(span.getEvents()).singleElement().satisfies(exception -> assertThat(
+                exception.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_EXCEPTION_TYPE))
+                .isEqualTo(AuthProviderException.class.getName()));
+        assertThat(span.toString()).doesNotContain("secret-token", secret);
     }
 
     @Test

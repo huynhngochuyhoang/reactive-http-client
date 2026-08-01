@@ -77,7 +77,9 @@ header snapshot is already filtered and redacted by `InboundHeadersWebFilter`.
 
 Custom `HttpClientObserver` implementations receive raw final outbound request
 headers. Observer events do not expose response headers. The built-in Micrometer
-and OpenTelemetry observers do not log request-header values.
+and OpenTelemetry observers do not log request-header values. Micrometer tags
+only the exception class name; OpenTelemetry emits only a structural
+exception-type event, without exception message or stack trace.
 
 Lifecycle hooks receive prepared resolved request headers before later
 `WebClient` filters run. Error mappers receive read-only raw response headers.
@@ -156,8 +158,10 @@ such fields are deferred until a future schema can define accurate semantics.
 Provider-backed rendering continues to honor an overridden `clientSummaries()`
 method, including through class-based Spring proxies. Such custom summaries use
 the collection contract, so provider-only strict flags remain unknown. Diagnostics
-do not instantiate client FactoryBeans, auth providers, or unresolved Resilience4j
-instances; a strict-retry flag stays unknown until its Retry instance already exists.
+do not instantiate client FactoryBeans, auth providers, lazy Resilience4j registry
+beans, unresolved Resilience4j instances, proxy connections, or other network
+resources. A strict-retry flag stays unknown until its registry singleton and
+Retry instance already exist.
 
 Snapshots fail explicitly instead of returning partial counts when they exceed
 256 clients, 10,000 aggregate endpoints, 512 characters in an exported text
