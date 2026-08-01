@@ -47,6 +47,7 @@ import java.util.function.BooleanSupplier;
 import java.util.zip.GZIPOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class Http2GoAwayRetirementContractTest {
 
@@ -120,7 +121,7 @@ class Http2GoAwayRetirementContractTest {
     }
 
     @Test
-    void goAwayDoesNotReplayAProcessedNonRepeatableUpload() throws Exception {
+    void goAwayDoesNotReplayAProcessedUploadAfterAcceptedStreamReset() throws Exception {
         try (RetirementServer server = RetirementServer.create(8, false);
              ClientFixture fixture = ClientFixture.create(server, false, false)) {
             AtomicInteger subscriptions = new AtomicInteger();
@@ -129,9 +130,11 @@ class Http2GoAwayRetirementContractTest {
                 return Flux.just(buffer("part-1"), buffer("-part-2"));
             });
 
-            assertThat(fixture.client().uploadAndRetire(body).block(CALL_TIMEOUT))
-                    .isEqualTo("part-1-part-2");
+            assertThatThrownBy(() -> fixture.client().uploadAndRetire(body).block(CALL_TIMEOUT))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageNotContaining("Timeout on blocking read");
             assertThat(subscriptions).hasValue(1);
+            assertThat(server.processedUploads()).containsExactly("part-1-part-2");
             assertThat(server.records("/upload-retire")).hasSize(1);
 
             RequestRecord upload = server.record("/upload-retire");
@@ -429,6 +432,7 @@ class Http2GoAwayRetirementContractTest {
         private final Sinks.One<Void> resetRelease = Sinks.one();
         private final Sinks.One<Void> cancellationObserved = Sinks.one();
         private final List<RequestRecord> records = new CopyOnWriteArrayList<>();
+        private final List<String> processedUploads = new CopyOnWriteArrayList<>();
         private final Map<String, Channel> transports = new ConcurrentHashMap<>();
         private final AtomicInteger goAwayCaptureSequence = new AtomicInteger();
         private final boolean gzipResponses;
@@ -477,6 +481,10 @@ class Http2GoAwayRetirementContractTest {
 
         List<RequestRecord> records(String path) {
             return records.stream().filter(record -> record.path().equals(path)).toList();
+        }
+
+        List<String> processedUploads() {
+            return List.copyOf(processedUploads);
         }
 
         RequestRecord record(String path) {
@@ -594,8 +602,11 @@ class Http2GoAwayRetirementContractTest {
             }
             return switch (path) {
                 case "/upload-retire" -> request.receive().aggregate().asString(StandardCharsets.UTF_8)
-                        .flatMap(body -> retireAsync(transportChannelId(streamChannel.get()))
-                                .then(response.sendString(Mono.just(body)).then()));
+                        .flatMap(body -> {
+                            processedUploads.add(body);
+                            return retireAsync(transportChannelId(streamChannel.get()))
+                                    .then(resetWithoutResponse(streamChannel.get()));
+                        });
                 case "/stream-entity" -> streamingResponse(response, wireContentEncoding);
                 case "/cancel" -> response.sendString(Flux.concat(
                                 Mono.just("c".repeat(4096)),
@@ -608,6 +619,19 @@ class Http2GoAwayRetirementContractTest {
                 case "/probe" -> response.sendString(Mono.just("probe")).then();
                 default -> response.status(404).send();
             };
+        }
+
+        private static Mono<Void> resetWithoutResponse(Channel streamChannel) {
+            return Mono.<Void>create(sink -> streamChannel
+                            .writeAndFlush(new DefaultHttp2ResetFrame(Http2Error.CANCEL))
+                            .addListener(write -> {
+                                if (write.isSuccess()) {
+                                    sink.success();
+                                } else {
+                                    sink.error(write.cause());
+                                }
+                            }))
+                    .then(Mono.never());
         }
 
         private Mono<Void> streamingResponse(

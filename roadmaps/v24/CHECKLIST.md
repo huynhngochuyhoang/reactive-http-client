@@ -309,9 +309,10 @@ Evidence:
   accepted streams complete and throughout a bounded open-socket observation
   window; after the peer closes that draining socket, the call runs on a distinct
   replacement connection without exceeding `maxConnections=1`.
-- A processed `Flux<DataBuffer>` upload receives its response with one source
-  subscription and one server dispatch. GOAWAY therefore adds no hidden retry
-  for a body the peer may already have processed.
+- A `Flux<DataBuffer>` upload is fully consumed and recorded by the peer before
+  GOAWAY is flushed and the accepted stream is reset without a response. The
+  client call fails with one source subscription, one processed body, and one
+  server dispatch, proving that ambiguous failure adds no hidden replay.
 - The same real transport gates its reset frame until GOAWAY has flushed,
   observes sibling cancellation at the server, and proves active-stream
   accounting drops while the draining socket remains open. The retained
