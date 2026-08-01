@@ -4,14 +4,18 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
-import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
-import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
-import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
+import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategories;
+import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
+import io.github.huynhngochuyhoang.httpstarter.observability.*;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.Status;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -400,10 +404,15 @@ class RetryRedirectAuthReplayCompositionContractTest {
         private final List<ReactiveHttpClientLifecycleContext> errorContexts = new CopyOnWriteArrayList<>();
         private final List<ReactiveHttpClientLifecycleContext> cancellationContexts = new CopyOnWriteArrayList<>();
         private final List<HttpExchangeLogContext> exchangeLogs = new CopyOnWriteArrayList<>();
+        private final ReactiveHttpClientProperties.ObservabilityConfig observability = observability();
+        private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        private final MicrometerHttpClientObserver metrics =
+                new MicrometerHttpClientObserver(meterRegistry, observability);
 
         @Override
         public void record(HttpClientObserverEvent event) {
             observerEvents.add(event);
+            metrics.record(event);
         }
 
         @Override
@@ -490,6 +499,68 @@ class RetryRedirectAuthReplayCompositionContractTest {
                 assertThat(log.requestUrl()).isNull();
                 assertThat(log.failureStage()).isNull();
             });
+            assertTerminalFactParity(attempts);
+        }
+
+        private void assertTerminalFactParity(int attempts) {
+            HttpClientObserverEvent event = observerEvents.get(0);
+            ReactiveHttpClientLifecycleContext lifecycle = errorContexts.get(0);
+            HttpExchangeLogContext exchange = exchangeLogs.get(0);
+
+            assertThat(event.getClientName()).isEqualTo("replay-composition");
+            assertThat(lifecycle.clientName()).isEqualTo(event.getClientName());
+            assertThat(exchange.clientName()).isEqualTo(event.getClientName());
+            assertThat(event.getApiName()).isEqualTo("terminalAuthFailure");
+            assertThat(lifecycle.apiName()).isEqualTo(event.getApiName());
+            assertThat(event.getHttpMethod()).isEqualTo("POST");
+            assertThat(lifecycle.httpMethod()).isEqualTo(event.getHttpMethod());
+            assertThat(exchange.httpMethod()).isEqualTo(event.getHttpMethod());
+            assertThat(lifecycle.error()).isSameAs(event.getError());
+            assertThat(exchange.error()).isSameAs(event.getError());
+            assertThat(ErrorCategories.from(lifecycle.error(), lifecycle.statusCode()))
+                    .isEqualTo(ErrorCategory.AUTH_PROVIDER_ERROR);
+            assertThat(ErrorCategories.from(exchange.error(), exchange.responseStatus()))
+                    .isEqualTo(event.getErrorCategory())
+                    .isEqualTo(ErrorCategory.AUTH_PROVIDER_ERROR);
+            assertThat(event.getAttemptCount()).isEqualTo(attempts);
+            assertThat(lifecycle.attemptNumber()).isEqualTo(attempts);
+            assertThat(exchange.subscriptionAttemptCount()).isEqualTo(attempts);
+            assertThat(event.getDurationMs()).isGreaterThanOrEqualTo(0L);
+            assertThat(exchange.durationMs()).isGreaterThanOrEqualTo(0L);
+            assertThat(Math.abs(event.getDurationMs() - exchange.durationMs())).isLessThanOrEqualTo(100L);
+
+            Timer timer = meterRegistry.find(observability.getMetricName())
+                    .tag("client.name", "replay-composition")
+                    .tag("api.name", "terminalAuthFailure")
+                    .tag("http.method", "POST")
+                    .tag("http.status_code", "NONE")
+                    .tag("outcome", "UNKNOWN")
+                    .tag("exception", AuthProviderException.class.getSimpleName())
+                    .tag("error.category", ErrorCategory.AUTH_PROVIDER_ERROR.name())
+                    .tag("failure.stage", "none")
+                    .timer();
+            assertThat(timer).isNotNull();
+            assertThat(timer.count()).isEqualTo(1L);
+            assertThat(timer.totalTime(TimeUnit.MILLISECONDS))
+                    .isEqualTo((double) event.getDurationMs());
+            assertThat(meterRegistry.find(observability.getMetricName() + ".attempts")
+                    .tag("client.name", "replay-composition")
+                    .summary().totalAmount()).isEqualTo(attempts);
+
+            Health health = new Boot4HttpClientHealthIndicator(meterRegistry, observability).health();
+            assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+            assertThat(health.getDetails()).containsKey("replay-composition");
+            assertThat(health.getDetails().get("replay-composition").toString())
+                    .contains("sampleCount=1", "errorCount=1", "status=DOWN")
+                    .doesNotContain("token service unavailable");
+        }
+
+        private static ReactiveHttpClientProperties.ObservabilityConfig observability() {
+            ReactiveHttpClientProperties.ObservabilityConfig config =
+                    new ReactiveHttpClientProperties.ObservabilityConfig();
+            config.getHealth().setMinSamples(1);
+            config.getHealth().setErrorRateThreshold(0.5d);
+            return config;
         }
 
         private void assertTerminalAuthFailure(Throwable error) {

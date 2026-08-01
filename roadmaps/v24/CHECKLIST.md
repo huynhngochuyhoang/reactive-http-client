@@ -330,22 +330,57 @@ Evidence:
 
 ## Priority 7 - Terminal Diagnostics Under Feature Composition
 
-### [ ] 7.1 Keep one terminal fact model
+### [x] 7.1 Keep one terminal fact model
 
-- [ ] Align lifecycle, observer, exchange log, Micrometer, OTel, and health facts
+- [x] Align lifecycle, observer, exchange log, Micrometer, OTel, and health facts
       across V24 composition fixtures.
-- [ ] Prevent prior-attempt URL, headers, status, and dispatch evidence from
+- [x] Prevent prior-attempt URL, headers, status, and dispatch evidence from
       leaking into pre-dispatch terminal failures.
-- [ ] Keep arbitrary auth/custom-filter failures sanitized and bounded.
-- [ ] Preserve additive, deterministic diagnostics schema v1 output without
+- [x] Keep arbitrary auth/custom-filter failures sanitized and bounded.
+- [x] Preserve additive, deterministic diagnostics schema v1 output without
       request-scoped configured-client fields.
 
-### [ ] 7.2 Keep diagnostics side-effect free
+### [x] 7.2 Keep diagnostics side-effect free
 
-- [ ] Prove diagnostics do not instantiate lazy clients or auth providers.
-- [ ] Prove diagnostics do not create resilience instances or network resources.
-- [ ] Preserve bounded map, JSON, and Markdown snapshot limits.
-- [ ] Run support-bundle schema fixtures and compatibility tests.
+- [x] Prove diagnostics do not instantiate lazy clients or auth providers.
+- [x] Prove diagnostics do not create resilience instances or network resources.
+- [x] Preserve bounded map, JSON, and Markdown snapshot limits.
+- [x] Run support-bundle schema fixtures and compatibility tests.
+
+Evidence:
+
+- The real retry/redirect/auth composition fixture now carries its terminal
+  pre-dispatch auth failure through lifecycle, observer, exchange-log, Micrometer,
+  and health assertions. All exposed facts agree on client, API/method, null final
+  status and dispatch evidence, `AUTH_PROVIDER_ERROR`, unknown failure stage,
+  non-negative duration, and subscription-attempt count; prior response headers, URL,
+  status, and `RESPONSE_BODY` evidence remain absent. The OTel companion maps the
+  same observer fact model to one error span with the matching structural fields.
+- `DefaultHttpExchangeLogger` now records only error type, category, and proven
+  stage. The OTel observer emits a structural `exception.type` event without
+  exception message or stack trace. Regression tests use a credential-bearing
+  10,000-character custom-filter error and prove that payload is absent.
+- Diagnostics registry discovery distinguishes absent registries from unresolved
+  lazy candidates, searches parent factories, and follows Spring direct lookup for
+  sole, primary, priority, fallback, and default candidates. It reads an
+  already-cached singleton `FactoryBean` product without creating an uncached or
+  uninspectable one. An uninstantiated factory whose static product type is unknown or only a supertype
+  of the requested registry keeps registry-dependent facts unknown, regardless of bean role
+  or scope, beside visible candidates
+  unless candidate metadata excludes it or proves an existing registry is the sole primary
+  or non-fallback candidate.
+  Provider-backed rendering leaves lazy registries and client factories
+  uninstantiated, does not create missing Retry instances or auth providers, and
+  therefore cannot create connector, proxy, pool, or network resources. Unresolved
+  strict validation remains `null` rather than being reported as inactive, but only
+  when at least one method is retry-eligible; clients with no eligible methods report
+  the validation as inactive without inspecting the registry. The structured exchange
+  logger example exports only structural error type, category, and proven failure stage.
+- Existing schema-v1 fixtures retain the exact root/client field sets and value
+  kinds without request-scoped facts. Client, endpoint, text, and 1 MiB UTF-8 map,
+  JSON, and Markdown limits all passed. Focused tests plus the full starter and
+  OTel suites passed. Strict japicmp for both modules passed against published
+  `3.3.0` with Central-only settings; `git diff --check` passed.
 
 ---
 

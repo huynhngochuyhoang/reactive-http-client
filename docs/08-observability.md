@@ -296,7 +296,11 @@ fields. `HttpExchangeLogContext` exposes post-transport response headers but no
 byte counter. Lifecycle hooks and exchange loggers must not consume streaming
 bodies to infer encoded or decoded sizes.
 
-Errors set `StatusCode.ERROR` and call `recordException(...)` so the exception event appears in the span.
+Errors set `StatusCode.ERROR` and add one structural `exception` event containing
+only `exception.type`. The built-in observer intentionally omits exception
+messages and stack traces so arbitrary auth-provider or custom-filter payload
+text is not exported. The structural `error.type` and `rhttp.failure.stage`
+attributes retain the diagnostic classification.
 
 ### Trace context and baggage propagation
 

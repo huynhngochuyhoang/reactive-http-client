@@ -68,6 +68,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pending demand moves to replacement capacity after the peer closes the
   draining socket. Pool stream gauges converge, factory shutdown remains
   bounded, and a processed non-repeatable upload is never implicitly replayed.
+- **Terminal diagnostics under composition.** Aligned the retry/redirect/auth
+  terminal fact fixture across lifecycle hooks, observer events, exchange logs,
+  Micrometer timers, and Actuator health, with OTel preserving the same
+  structural category, stage, duration, and attempt semantics. Default exchange
+  logs and OTel exception events no longer export arbitrary exception messages
+  or stack traces. Provider snapshots now distinguish absent resilience registries
+  from unresolved lazy registries, search parent factories, and mirror Spring direct
+  lookup across sole, primary, priority, fallback, and default candidates. Snapshots
+  read already-cached singleton `FactoryBean` products without creating uncached
+  or uninspectable products, clients, auth providers, Retry instances, or network resources.
+  An uninstantiated factory whose static product type is unknown or only a supertype
+  of the requested registry keeps registry-dependent facts unknown, regardless of bean role
+  or scope, beside visible candidates
+  unless candidate metadata excludes it or proves an existing registry is the sole primary
+  or non-fallback candidate. Unresolved registry state affects strict-retry
+  diagnostics only when at least one client method is retry-eligible; otherwise the
+  validation flag is definitively inactive. The structured logger example now emits
+  only error type, category, and proven failure stage.
+  Deterministic bounded schema v1 output is retained.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects

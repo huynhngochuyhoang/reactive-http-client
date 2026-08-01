@@ -77,7 +77,9 @@ header snapshot is already filtered and redacted by `InboundHeadersWebFilter`.
 
 Custom `HttpClientObserver` implementations receive raw final outbound request
 headers. Observer events do not expose response headers. The built-in Micrometer
-and OpenTelemetry observers do not log request-header values.
+and OpenTelemetry observers do not log request-header values. Micrometer tags
+only the exception class name; OpenTelemetry emits only a structural
+exception-type event, without exception message or stack trace.
 
 Lifecycle hooks receive prepared resolved request headers before later
 `WebClient` filters run. Error mappers receive read-only raw response headers.
@@ -156,8 +158,20 @@ such fields are deferred until a future schema can define accurate semantics.
 Provider-backed rendering continues to honor an overridden `clientSummaries()`
 method, including through class-based Spring proxies. Such custom summaries use
 the collection contract, so provider-only strict flags remain unknown. Diagnostics
-do not instantiate client FactoryBeans, auth providers, or unresolved Resilience4j
-instances; a strict-retry flag stays unknown until its Retry instance already exists.
+do not instantiate client FactoryBeans, auth providers, lazy Resilience4j registry
+beans, unresolved Resilience4j instances, proxy connections, or other network
+resources. For a client with at least one method enabled by `retry-methods`, a
+strict-retry flag stays unknown until its selected registry and Retry instance already
+exist. If no method is retry-eligible, the flag is `false` without registry inspection.
+Registry selection searches parent factories and follows Spring direct-type lookup
+semantics for sole, primary, priority, fallback, and default candidates. An
+already-cached singleton `FactoryBean` product can supply that evidence, while an
+uncached or uninspectable `FactoryBean` product remains unknown and is not created by
+diagnostics. An uninstantiated factory whose static product type is unknown or only a
+supertype of the requested registry keeps registry-dependent facts unknown,
+regardless of bean role or scope, unless bean-definition metadata proves selection
+is unaffected: candidate filtering excludes it, or an existing registry is the
+sole primary or non-fallback candidate.
 
 Snapshots fail explicitly instead of returning partial counts when they exceed
 256 clients, 10,000 aggregate endpoints, 512 characters in an exported text

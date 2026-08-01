@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +71,7 @@ public class OpenTelemetryHttpClientObserver implements HttpClientObserver {
     static final AttributeKey<Long> ATTR_REQUEST_BYTES = AttributeKey.longKey("rhttp.request.bytes");
     static final AttributeKey<Long> ATTR_RESPONSE_BYTES = AttributeKey.longKey("rhttp.response.bytes");
     static final AttributeKey<String> ATTR_FAILURE_STAGE = AttributeKey.stringKey("rhttp.failure.stage");
+    static final AttributeKey<String> ATTR_EXCEPTION_TYPE = AttributeKey.stringKey("exception.type");
 
     private final Tracer tracer;
     private final ReactiveHttpClientProperties.ObservabilityConfig config;
@@ -129,10 +131,9 @@ public class OpenTelemetryHttpClientObserver implements HttpClientObserver {
             Span span = builder.startSpan();
             try {
                 if (event.isError()) {
-                    span.setStatus(StatusCode.ERROR, event.getError().getMessage() != null
-                            ? event.getError().getMessage()
-                            : event.getError().getClass().getSimpleName());
-                    span.recordException(event.getError());
+                    span.setStatus(StatusCode.ERROR);
+                    span.addEvent("exception", Attributes.of(
+                            ATTR_EXCEPTION_TYPE, event.getError().getClass().getName()));
                 }
             } finally {
                 span.end(end.toEpochMilli(), TimeUnit.MILLISECONDS);

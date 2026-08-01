@@ -4,18 +4,22 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
+import org.springframework.core.OrderComparator;
+import org.springframework.core.ResolvableType;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Provides sanitized runtime summaries for registered {@link ReactiveHttpClient}
@@ -26,6 +30,9 @@ import java.util.Objects;
  * endpoint and keep endpoint exposure policy local to the application.
  */
 public class ReactiveHttpClientDiagnosticsProvider {
+
+    private static final Method GET_CACHED_FACTORY_BEAN_OBJECT = ReflectionUtils.findMethod(
+            FactoryBeanRegistrySupport.class, "getCachedObjectForFactoryBean", String.class);
 
     private final ConfigurableListableBeanFactory beanFactory;
     private final ReactiveHttpClientProperties properties;
@@ -40,24 +47,24 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     public List<ClientSummary> clientSummaries() {
-        ResilienceOperatorApplier resilienceOperatorApplier = resilienceOperatorApplier();
+        ResilienceDiagnostics resilienceDiagnostics = resilienceDiagnostics();
         return List.of(beanFactory.getBeanDefinitionNames()).stream()
                 .map(this::clientRegistration)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(registration -> clientSummaryEntry(registration, resilienceOperatorApplier))
+                .map(registration -> clientSummaryEntry(registration, resilienceDiagnostics.operatorApplier()))
                 .sorted(Comparator.comparing(ClientSummary::clientName)
                         .thenComparing(ClientSummary::clientInterface))
                 .toList();
     }
 
     List<ClientSnapshotEntry> clientSnapshotEntries() {
-        ResilienceOperatorApplier resilienceOperatorApplier = resilienceOperatorApplier();
+        ResilienceDiagnostics resilienceDiagnostics = resilienceDiagnostics();
         return List.of(beanFactory.getBeanDefinitionNames()).stream()
                 .map(this::clientRegistration)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(registration -> clientSnapshotEntry(registration, resilienceOperatorApplier))
+                .map(registration -> clientSnapshotEntry(registration, resilienceDiagnostics))
                 .sorted(Comparator.comparing((ClientSnapshotEntry entry) -> entry.summary().clientName())
                         .thenComparing(entry -> entry.summary().clientInterface()))
                 .toList();
@@ -75,18 +82,19 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     private ClientSnapshotEntry clientSnapshotEntry(ClientRegistration registration,
-                                                    ResilienceOperatorApplier resilienceOperatorApplier) {
+                                                    ResilienceDiagnostics resilienceDiagnostics) {
         Class<?> clientInterface = registration.clientInterface();
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         String clientName = annotation != null ? annotation.name() : "";
         ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
         ClientSummary summary = clientSummary(
-                clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier,
+                clientInterface, clientName, clientConfig, metadataCache, resilienceDiagnostics.operatorApplier(),
                 registration.starterFactory());
         return new ClientSnapshotEntry(
                 summary,
-                strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceOperatorApplier),
+                strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceDiagnostics.operatorApplier(),
+                        resilienceDiagnostics.retryRegistryUnresolved()),
                 strictBodySigningValidation(clientConfig),
                 poolSummary(clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
@@ -253,14 +261,16 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     private Boolean strictUnsafeRetryValidation(Class<?> clientInterface,
                                                 ReactiveHttpClientProperties.ClientConfig clientConfig,
-                                                ResilienceOperatorApplier resilienceOperatorApplier) {
+                                                ResilienceOperatorApplier resilienceOperatorApplier,
+                                                boolean retryRegistryUnresolved) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null
                 || !resilience.isEnabled()
-                || !resilience.isStrictUnsafeRetryValidation()
-                || !resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)) {
+                || !resilience.isStrictUnsafeRetryValidation()) {
             return false;
         }
+        boolean retryOperatorAvailable = resilienceOperatorApplier.isOperatorAvailable(
+                ResilienceOperatorApplier.InstanceType.RETRY);
         boolean unresolvedRetry = false;
         for (Method method : clientInterface.getMethods()) {
             if (!isDeclarativeClientMethod(method)) {
@@ -270,6 +280,12 @@ public class ReactiveHttpClientDiagnosticsProvider {
             String httpMethod = diagnosticHttpMethod(meta, clientConfig);
             if (!isRetryMethodEnabled(resilience, httpMethod)) {
                 continue;
+            }
+            if (retryRegistryUnresolved) {
+                return null;
+            }
+            if (!retryOperatorAvailable) {
+                return false;
             }
             RequestPlan plan = RequestPlan.from(meta, clientInterface);
             String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
@@ -336,25 +352,335 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 && !method.isBridge();
     }
 
-    private ResilienceOperatorApplier resilienceOperatorApplier() {
-        Object circuitBreakerRegistry = bean("io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry");
-        Object retryRegistry = bean("io.github.resilience4j.retry.RetryRegistry");
-        Object bulkheadRegistry = bean("io.github.resilience4j.bulkhead.BulkheadRegistry");
-        Object rateLimiterRegistry = bean("io.github.resilience4j.ratelimiter.RateLimiterRegistry");
+    private ResilienceDiagnostics resilienceDiagnostics() {
+        ExistingBeanLookup circuitBreakerRegistry = existingBean(
+                "io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry");
+        ExistingBeanLookup retryRegistry = existingBean("io.github.resilience4j.retry.RetryRegistry");
+        ExistingBeanLookup bulkheadRegistry = existingBean("io.github.resilience4j.bulkhead.BulkheadRegistry");
+        ExistingBeanLookup rateLimiterRegistry = existingBean(
+                "io.github.resilience4j.ratelimiter.RateLimiterRegistry");
+        ResilienceOperatorApplier operatorApplier;
         try {
-            return new Resilience4jOperatorApplier(
-                    circuitBreakerRegistry, retryRegistry, bulkheadRegistry, rateLimiterRegistry);
+            operatorApplier = new Resilience4jOperatorApplier(
+                    circuitBreakerRegistry.value(), retryRegistry.value(),
+                    bulkheadRegistry.value(), rateLimiterRegistry.value());
         } catch (LinkageError error) {
-            return new NoopResilienceOperatorApplier();
+            operatorApplier = new NoopResilienceOperatorApplier();
+        }
+        return new ResilienceDiagnostics(operatorApplier, retryRegistry.unresolved());
+    }
+
+    private ExistingBeanLookup existingBean(String className) {
+        try {
+            Class<?> type = ClassUtils.forName(className, beanFactory.getBeanClassLoader());
+            return existingBean(beanFactory, type);
+        } catch (ClassNotFoundException | LinkageError ex) {
+            return ExistingBeanLookup.absent();
         }
     }
 
-    private Object bean(String className) {
-        try {
-            Class<?> type = ClassUtils.forName(className, beanFactory.getBeanClassLoader());
-            return beanFactory.getBeanProvider(type).getIfAvailable();
-        } catch (ClassNotFoundException | LinkageError ex) {
+    private ExistingBeanLookup existingBean(ConfigurableListableBeanFactory factory, Class<?> type) {
+        String[] beanNames = factory.getBeanNamesForType(type, true, false);
+        List<String> uninspectableFactoryBeans = uninspectableFactoryBeanNames(
+                factory, type, beanNames);
+        if (!uninspectableFactoryBeans.isEmpty()
+                && !selectionUnaffectedByUninspectableFactories(
+                        factory, beanNames, uninspectableFactoryBeans)) {
+            return ExistingBeanLookup.unresolvedLookup();
+        }
+        if (beanNames.length == 0) {
+            BeanFactory parent = factory.getParentBeanFactory();
+            if (parent instanceof ConfigurableListableBeanFactory parentFactory) {
+                return existingBean(parentFactory, type);
+            }
+            return parent == null ? ExistingBeanLookup.absent() : ExistingBeanLookup.unresolvedLookup();
+        }
+        String beanName = selectedBeanName(factory, type, beanNames);
+        if (beanName == null) {
+            return ExistingBeanLookup.unresolvedLookup();
+        }
+        Object value = existingSingletonValue(factory, type, beanName);
+        return value != null
+                ? ExistingBeanLookup.available(value)
+                : ExistingBeanLookup.unresolvedLookup();
+    }
+
+    private String selectedBeanName(ConfigurableListableBeanFactory factory,
+                                    Class<?> type,
+                                    String[] beanNames) {
+        List<String> candidates = candidateNames(factory, beanNames);
+        if (candidates.size() == 1) {
+            return candidates.get(0);
+        }
+
+        String primaryCandidate = null;
+        int primaryCount = 0;
+        for (String beanName : candidates) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition != null && definition.isPrimary()) {
+                primaryCandidate = beanName;
+                primaryCount++;
+            }
+        }
+        if (primaryCount == 1) {
+            return primaryCandidate;
+        }
+        if (primaryCount > 1) {
             return null;
+        }
+
+        String nonFallbackCandidate = null;
+        int nonFallbackCount = 0;
+        for (String beanName : candidates) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition == null || !definition.isFallback()) {
+                nonFallbackCandidate = beanName;
+                nonFallbackCount++;
+            }
+        }
+        if (nonFallbackCount == 1) {
+            return nonFallbackCandidate;
+        }
+
+        PriorityCandidate priorityCandidate = priorityCandidate(factory, type, candidates);
+        if (priorityCandidate.conflict()) {
+            return null;
+        }
+        if (priorityCandidate.beanName() != null) {
+            return priorityCandidate.beanName();
+        }
+
+        String defaultCandidate = null;
+        for (String beanName : candidates) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            boolean isDefault = !(definition instanceof AbstractBeanDefinition abstractDefinition)
+                    || abstractDefinition.isDefaultCandidate();
+            if (isDefault) {
+                if (defaultCandidate != null) {
+                    return null;
+                }
+                defaultCandidate = beanName;
+            }
+        }
+        return defaultCandidate;
+    }
+
+    private static List<String> candidateNames(ConfigurableListableBeanFactory factory,
+                                               String[] beanNames) {
+        if (beanNames.length == 1) {
+            return List.of(beanNames[0]);
+        }
+        List<String> autowireCandidates = new ArrayList<>(beanNames.length);
+        for (String beanName : beanNames) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition == null || definition.isAutowireCandidate()) {
+                autowireCandidates.add(beanName);
+            }
+        }
+        return autowireCandidates.isEmpty() ? List.of(beanNames) : autowireCandidates;
+    }
+
+    private PriorityCandidate priorityCandidate(ConfigurableListableBeanFactory factory,
+                                                Class<?> type,
+                                                List<String> candidates) {
+        if (!(factory instanceof DefaultListableBeanFactory defaultFactory)
+                || !(defaultFactory.getDependencyComparator() instanceof OrderComparator comparator)) {
+            return PriorityCandidate.none();
+        }
+        String selected = null;
+        Integer selectedPriority = null;
+        boolean conflict = false;
+        for (String beanName : candidates) {
+            Object candidate = candidateValue(factory, type, beanName);
+            if (candidate == null) {
+                continue;
+            }
+            Integer priority = comparator.getPriority(candidate);
+            if (priority == null) {
+                continue;
+            }
+            if (selectedPriority == null || priority < selectedPriority) {
+                selected = beanName;
+                selectedPriority = priority;
+                conflict = false;
+            } else if (priority.equals(selectedPriority)) {
+                conflict = true;
+            }
+        }
+        return new PriorityCandidate(selected, conflict);
+    }
+
+    private Object candidateValue(ConfigurableListableBeanFactory factory,
+                                  Class<?> type,
+                                  String beanName) {
+        Object value = existingSingletonValue(factory, type, beanName);
+        return value != null ? value : factory.getType(beanName, false);
+    }
+
+    private Object existingSingletonValue(ConfigurableListableBeanFactory factory,
+                                          Class<?> type,
+                                          String beanName) {
+        Object singleton = factory.getSingleton(beanName);
+        if (type.isInstance(singleton)) {
+            return singleton;
+        }
+        if (singleton instanceof FactoryBean<?>) {
+            Object product = cachedFactoryBeanProduct(factory, beanName);
+            if (type.isInstance(product)) {
+                return product;
+            }
+        }
+        return null;
+    }
+
+    private List<String> uninspectableFactoryBeanNames(
+            ConfigurableListableBeanFactory factory,
+            Class<?> type,
+            String[] knownBeanNames) {
+        List<String> knownNames = List.of(knownBeanNames);
+        List<String> uninspectableNames = new ArrayList<>();
+        for (String beanName : factory.getBeanDefinitionNames()) {
+            if (knownNames.contains(beanName) || factory.containsSingleton(beanName)) {
+                continue;
+            }
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition == null || definition.isAbstract()) {
+                continue;
+            }
+            Class<?> factoryType = beanType(factory, definition);
+            if (factoryType == null || !FactoryBean.class.isAssignableFrom(factoryType)) {
+                continue;
+            }
+            Class<?> objectType = factoryBeanObjectType(factory, definition);
+            if (objectType == null
+                    || type.isAssignableFrom(objectType)
+                    || objectType.isAssignableFrom(type)) {
+                uninspectableNames.add(beanName);
+            }
+        }
+        return uninspectableNames;
+    }
+
+    private static boolean selectionUnaffectedByUninspectableFactories(
+            ConfigurableListableBeanFactory factory,
+            String[] knownBeanNames,
+            List<String> uninspectableBeanNames) {
+        if (knownBeanNames.length == 0) {
+            return false;
+        }
+        List<String> allBeanNames = new ArrayList<>(
+                knownBeanNames.length + uninspectableBeanNames.size());
+        Collections.addAll(allBeanNames, knownBeanNames);
+        allBeanNames.addAll(uninspectableBeanNames);
+        List<String> candidates = candidateNames(factory, allBeanNames.toArray(String[]::new));
+        Set<String> uninspectableNames = Set.copyOf(uninspectableBeanNames);
+        if (candidates.stream().noneMatch(uninspectableNames::contains)) {
+            return true;
+        }
+
+        String primaryCandidate = null;
+        int primaryCount = 0;
+        for (String beanName : candidates) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition != null && definition.isPrimary()) {
+                primaryCandidate = beanName;
+                primaryCount++;
+            }
+        }
+        if (primaryCount > 0) {
+            return primaryCount == 1 && !uninspectableNames.contains(primaryCandidate);
+        }
+
+        String nonFallbackCandidate = null;
+        int nonFallbackCount = 0;
+        for (String beanName : candidates) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition == null || !definition.isFallback()) {
+                nonFallbackCandidate = beanName;
+                nonFallbackCount++;
+            }
+        }
+        return nonFallbackCount == 1 && !uninspectableNames.contains(nonFallbackCandidate);
+    }
+
+    private static Class<?> beanType(ConfigurableListableBeanFactory factory,
+                                     BeanDefinition definition) {
+        Class<?> type = definition.getResolvableType().resolve();
+        if (type != null || definition.getBeanClassName() == null) {
+            return type;
+        }
+        try {
+            return ClassUtils.resolveClassName(
+                    definition.getBeanClassName(), factory.getBeanClassLoader());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private static Class<?> factoryBeanObjectType(ConfigurableListableBeanFactory factory,
+                                                  BeanDefinition definition) {
+        Object objectType = definition.getAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
+        if (objectType instanceof Class<?> clazz) {
+            return clazz;
+        }
+        if (objectType instanceof ResolvableType resolvableType) {
+            return resolvableType.resolve();
+        }
+        if (objectType instanceof String className) {
+            try {
+                return ClassUtils.resolveClassName(className, factory.getBeanClassLoader());
+            } catch (IllegalArgumentException ex) {
+                return null;
+            }
+        }
+        return definition.getResolvableType().as(FactoryBean.class).getGeneric(0).resolve();
+    }
+
+    private static BeanDefinition beanDefinition(ConfigurableListableBeanFactory factory,
+                                                 String beanName) {
+        return factory.containsBeanDefinition(beanName)
+                ? factory.getMergedBeanDefinition(beanName)
+                : null;
+    }
+
+    private Object cachedFactoryBeanProduct(ConfigurableListableBeanFactory factory,
+                                            String beanName) {
+        if (!(factory instanceof FactoryBeanRegistrySupport registry)
+                || GET_CACHED_FACTORY_BEAN_OBJECT == null) {
+            return null;
+        }
+        try {
+            ReflectionUtils.makeAccessible(GET_CACHED_FACTORY_BEAN_OBJECT);
+            return ReflectionUtils.invokeMethod(GET_CACHED_FACTORY_BEAN_OBJECT, registry, beanName);
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private record PriorityCandidate(String beanName, boolean conflict) {
+
+        private static PriorityCandidate none() {
+            return new PriorityCandidate(null, false);
+        }
+    }
+
+    private record ResilienceDiagnostics(
+            ResilienceOperatorApplier operatorApplier,
+            boolean retryRegistryUnresolved) {
+    }
+
+    private record ExistingBeanLookup(Object value, boolean unresolved) {
+
+        private static ExistingBeanLookup available(Object value) {
+            return new ExistingBeanLookup(value, false);
+        }
+
+        private static ExistingBeanLookup absent() {
+            return new ExistingBeanLookup(null, false);
+        }
+
+        private static ExistingBeanLookup unresolvedLookup() {
+            return new ExistingBeanLookup(null, true);
         }
     }
 

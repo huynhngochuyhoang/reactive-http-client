@@ -6,6 +6,7 @@ import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
 import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
+import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
 
 import java.lang.reflect.Modifier;
 
@@ -77,7 +78,19 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
             registerPublicMembers(hints, configurationType);
         }
         registerPublicMembers(hints, ReactiveHttpClientFactoryBean.class);
+        registerFactoryBeanCacheLookup(hints);
         hints.resources().registerPattern(POM_PROPERTIES_RESOURCE);
+    }
+
+    private static void registerFactoryBeanCacheLookup(RuntimeHints hints) {
+        try {
+            hints.reflection().registerMethod(
+                    FactoryBeanRegistrySupport.class.getDeclaredMethod(
+                            "getCachedObjectForFactoryBean", String.class),
+                    ExecutableMode.INVOKE);
+        } catch (NoSuchMethodException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     private static void registerPublicMembers(RuntimeHints hints, Class<?> type) {
