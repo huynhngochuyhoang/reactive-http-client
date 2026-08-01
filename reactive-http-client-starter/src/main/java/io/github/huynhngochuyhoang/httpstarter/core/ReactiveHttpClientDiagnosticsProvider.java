@@ -381,7 +381,11 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     private ExistingBeanLookup existingBean(ConfigurableListableBeanFactory factory, Class<?> type) {
         String[] beanNames = factory.getBeanNamesForType(type, true, false);
-        if (hasUninspectableFactoryBean(factory, type, beanNames)) {
+        List<String> uninspectableFactoryBeans = uninspectableFactoryBeanNames(
+                factory, type, beanNames);
+        if (!uninspectableFactoryBeans.isEmpty()
+                && !selectionUnaffectedByUninspectableFactories(
+                        factory, beanNames, uninspectableFactoryBeans)) {
             return ExistingBeanLookup.unresolvedLookup();
         }
         if (beanNames.length == 0) {
@@ -529,10 +533,12 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return null;
     }
 
-    private boolean hasUninspectableFactoryBean(ConfigurableListableBeanFactory factory,
-                                                Class<?> type,
-                                                String[] knownBeanNames) {
+    private List<String> uninspectableFactoryBeanNames(
+            ConfigurableListableBeanFactory factory,
+            Class<?> type,
+            String[] knownBeanNames) {
         List<String> knownNames = List.of(knownBeanNames);
+        List<String> uninspectableNames = new ArrayList<>();
         for (String beanName : factory.getBeanDefinitionNames()) {
             if (knownNames.contains(beanName) || factory.containsSingleton(beanName)) {
                 continue;
@@ -550,10 +556,39 @@ public class ReactiveHttpClientDiagnosticsProvider {
             }
             Class<?> objectType = factoryBeanObjectType(factory, definition);
             if (objectType == null || type.isAssignableFrom(objectType)) {
-                return true;
+                uninspectableNames.add(beanName);
             }
         }
-        return false;
+        return uninspectableNames;
+    }
+
+    private static boolean selectionUnaffectedByUninspectableFactories(
+            ConfigurableListableBeanFactory factory,
+            String[] knownBeanNames,
+            List<String> uninspectableBeanNames) {
+        if (knownBeanNames.length == 0) {
+            return false;
+        }
+        List<String> allBeanNames = new ArrayList<>(
+                knownBeanNames.length + uninspectableBeanNames.size());
+        Collections.addAll(allBeanNames, knownBeanNames);
+        allBeanNames.addAll(uninspectableBeanNames);
+        List<String> candidates = candidateNames(factory, allBeanNames.toArray(String[]::new));
+        Set<String> uninspectableNames = Set.copyOf(uninspectableBeanNames);
+        if (candidates.stream().noneMatch(uninspectableNames::contains)) {
+            return true;
+        }
+
+        String primaryCandidate = null;
+        int primaryCount = 0;
+        for (String beanName : candidates) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition != null && definition.isPrimary()) {
+                primaryCandidate = beanName;
+                primaryCount++;
+            }
+        }
+        return primaryCount == 1 && !uninspectableNames.contains(primaryCandidate);
     }
 
     private static Class<?> beanType(ConfigurableListableBeanFactory factory,
