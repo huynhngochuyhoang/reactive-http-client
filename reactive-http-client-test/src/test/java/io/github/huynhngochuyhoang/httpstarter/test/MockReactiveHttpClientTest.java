@@ -434,6 +434,70 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void authReplayAndRetrySequenceRecordsInProcessAttemptsOnly() {
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger invalidationCalls = new AtomicInteger();
+        AtomicInteger responsesAfterUnauthorized = new AtomicInteger();
+        List<String> lifecycleEvents = new CopyOnWriteArrayList<>();
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(AuthRequest request) {
+                return Mono.just(AuthContext.builder()
+                        .header("Authorization", "Bearer sequence-" + authCalls.incrementAndGet())
+                        .build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                invalidationCalls.incrementAndGet();
+                return Mono.empty();
+            }
+        };
+        ReactiveHttpClientLifecycleHook lifecycleHook = new ReactiveHttpClientLifecycleHook() {
+            @Override
+            public void onStart(ReactiveHttpClientLifecycleContext context) {
+                lifecycleEvents.add("start:" + context.attemptNumber());
+            }
+
+            @Override
+            public void onRetryAttempt(ReactiveHttpClientLifecycleContext context) {
+                lifecycleEvents.add("retry:" + context.attemptNumber());
+            }
+
+            @Override
+            public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+                lifecycleEvents.add("success:" + context.attemptNumber());
+            }
+        };
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .retry(2, "GET")
+                .withAuthProvider(authProvider)
+                .withLifecycleHook(lifecycleHook)
+                .withObserver(observed::add)
+                .respondTo(HttpMethod.GET, "/users/42",
+                        MockReactiveHttpClient.unauthorizedOnceThen(exchange ->
+                                responsesAfterUnauthorized.incrementAndGet() == 1
+                                        ? MockReactiveHttpClient.text(503, "retry")
+                                        : MockReactiveHttpClient.text(200, "alice")))
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectNext("alice")
+                .verifyComplete();
+
+        assertThat(mock.exchanges()).extracting(exchange -> exchange.statusCode().value())
+                .containsExactly(401, 503, 200);
+        assertThat(authCalls).hasValue(3);
+        assertThat(invalidationCalls).hasValue(1);
+        assertThat(lifecycleEvents).containsExactly("start:1", "retry:2", "success:2");
+        assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getStatusCode()).isEqualTo(200);
+            assertThat(event.getAttemptCount()).isEqualTo(2);
+        });
+    }
+
+    @Test
     void authorizationHeaderAbsenceCanBeAssertedAfterFilters() {
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
                 .respondTo(HttpMethod.GET, "/users/42",

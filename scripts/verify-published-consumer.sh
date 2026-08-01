@@ -29,14 +29,18 @@ REPORT_START_MARKER="$EVIDENCE_DIR/report-start.marker"
 touch "$REPORT_START_MARKER"
 stage="setup"
 
-preserve_evidence() {
-  local status=$?
-  trap - EXIT
-  set +e
+copy_consumer_reports() {
   for report in "$ROOT_DIR/.github/boot4-consumer/target/surefire-reports/"*.xml; do
     [[ -f "$report" && "$report" -nt "$REPORT_START_MARKER" ]] \
       && cp "$report" "$REPORTS/"
   done
+}
+
+preserve_evidence() {
+  local status=$?
+  trap - EXIT
+  set +e
+  copy_consumer_reports
   working_tree=clean
   [[ -z "$(git -C "$ROOT_DIR" status --porcelain)" ]] || working_tree=dirty
   {
@@ -61,6 +65,7 @@ MAVEN=(mvn -q -s "$SETTINGS" -Dmaven.repo.local="$LOCAL_REPOSITORY"
 stage="effective-pom"
 "${MAVEN[@]}" clean test
 stage="consumer-tests"
+copy_consumer_reports
 "${MAVEN[@]}" dependency:tree -DoutputFile="$EVIDENCE_DIR/dependency-tree.txt"
 stage="dependency-tree"
 "${MAVEN[@]}" dependency:build-classpath -Dmdep.outputFile="$EVIDENCE_DIR/classpath.txt"

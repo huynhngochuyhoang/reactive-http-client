@@ -87,6 +87,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validation flag is definitively inactive. The structured logger example now emits
   only error type, category, and proven failure stage.
   Deterministic bounded schema v1 output is retained.
+- **Mock and assembled-consumer parity.** Kept mock validation on the production
+  declarative return-type grammar and added focused `401` auth replay plus `503`
+  retry sequencing across recorded exchanges, lifecycle attempts, and the single
+  terminal observer event. Documentation now distinguishes in-process response
+  sequences from socket dispatches. Current-reactor and published-consumer
+  verifiers copy fresh Surefire evidence immediately after each test stage while
+  retaining failure-safe exit traps, isolated repositories, stage provenance,
+  Central markers, and reactor-leakage rejection.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects
