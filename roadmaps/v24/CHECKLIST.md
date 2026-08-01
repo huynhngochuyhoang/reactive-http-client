@@ -367,7 +367,8 @@ Evidence:
   uninspectable one. An uninstantiated factory whose static product type is unknown or only a supertype
   of the requested registry keeps registry-dependent facts unknown, regardless of bean role
   or scope, beside visible candidates
-  unless candidate metadata excludes it or proves an existing registry is the sole primary.
+  unless candidate metadata excludes it or proves an existing registry is the sole primary
+  or non-fallback candidate.
   Provider-backed rendering leaves lazy registries and client factories
   uninstantiated, does not create missing Retry instances or auth providers, and
   therefore cannot create connector, proxy, pool, or network resources. Unresolved

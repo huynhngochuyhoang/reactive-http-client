@@ -169,9 +169,9 @@ already-cached singleton `FactoryBean` product can supply that evidence, while a
 uncached or uninspectable `FactoryBean` product remains unknown and is not created by
 diagnostics. An uninstantiated factory whose static product type is unknown or only a
 supertype of the requested registry keeps registry-dependent facts unknown,
-regardless of bean role or scope, unless bean-definition metadata proves it
-cannot affect selection: candidate
-filtering excludes it, or an existing registry is the sole primary candidate.
+regardless of bean role or scope, unless bean-definition metadata proves selection
+is unaffected: candidate filtering excludes it, or an existing registry is the
+sole primary or non-fallback candidate.
 
 Snapshots fail explicitly instead of returning partial counts when they exceed
 256 clients, 10,000 aggregate endpoints, 512 characters in an exported text

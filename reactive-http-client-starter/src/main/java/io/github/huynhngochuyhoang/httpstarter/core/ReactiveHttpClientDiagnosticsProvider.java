@@ -587,7 +587,20 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 primaryCount++;
             }
         }
-        return primaryCount == 1 && !uninspectableNames.contains(primaryCandidate);
+        if (primaryCount > 0) {
+            return primaryCount == 1 && !uninspectableNames.contains(primaryCandidate);
+        }
+
+        String nonFallbackCandidate = null;
+        int nonFallbackCount = 0;
+        for (String beanName : candidates) {
+            BeanDefinition definition = beanDefinition(factory, beanName);
+            if (definition == null || !definition.isFallback()) {
+                nonFallbackCandidate = beanName;
+                nonFallbackCount++;
+            }
+        }
+        return nonFallbackCount == 1 && !uninspectableNames.contains(nonFallbackCandidate);
     }
 
     private static Class<?> beanType(ConfigurableListableBeanFactory factory,

@@ -81,7 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   An uninstantiated factory whose static product type is unknown or only a supertype
   of the requested registry keeps registry-dependent facts unknown, regardless of bean role
   or scope, beside visible candidates
-  unless candidate metadata excludes it or proves an existing registry is the sole primary. Unresolved registry state affects strict-retry
+  unless candidate metadata excludes it or proves an existing registry is the sole primary
+  or non-fallback candidate. Unresolved registry state affects strict-retry
   diagnostics only when at least one client method is retry-eligible; otherwise the
   validation flag is definitively inactive. The structured logger example now emits
   only error type, category, and proven failure stage.

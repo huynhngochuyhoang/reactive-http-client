@@ -567,6 +567,36 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsUseRegularRegistryBesideFallbackUninspectableFactory() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
+        retryRegistry.retry("default");
+        registerRetryRegistry(beanFactory, "regularRetryRegistry", retryRegistry, false);
+        beanFactory.getBean("regularRetryRegistry");
+
+        AtomicInteger factoryCreations = new AtomicInteger();
+        AtomicInteger productCreations = new AtomicInteger();
+        GenericBeanDefinition retryDefinition = new GenericBeanDefinition();
+        retryDefinition.setBeanClass(UninspectableRetryRegistryFactoryBean.class);
+        retryDefinition.setLazyInit(true);
+        retryDefinition.setFallback(true);
+        retryDefinition.setInstanceSupplier(() -> {
+            factoryCreations.incrementAndGet();
+            return new UninspectableRetryRegistryFactoryBean(productCreations);
+        });
+        beanFactory.registerBeanDefinition("fallbackRetryRegistry", retryDefinition);
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictRetryClientConfig())));
+
+        assertThat(client)
+                .containsEntry("retry", "default")
+                .containsEntry("strictUnsafeRetryValidation", true);
+        assertThat(factoryCreations).hasValue(0);
+        assertThat(productCreations).hasValue(0);
+    }
+
+    @Test
     void providerSnapshotsIgnoreNonAutowireUninspectableFactories() {
         DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
         RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
