@@ -16,6 +16,7 @@ import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
+import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.annotation.*;
 import org.springframework.context.aot.ApplicationContextAotGenerator;
@@ -68,6 +69,10 @@ class ReactiveHttpClientAotSmokeTest {
                 .allSatisfy(type -> assertThat(hints.reflection().getTypeHint(type))
                         .as(type.getName())
                         .isNotNull());
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                FactoryBeanRegistrySupport.class.getDeclaredMethod(
+                        "getCachedObjectForFactoryBean", String.class)))
+                .accepts(hints);
         assertThat(RuntimeHintsPredicates.resource().forResource(ReactiveHttpClientRuntimeHints.POM_PROPERTIES_RESOURCE))
                 .accepts(hints);
     }

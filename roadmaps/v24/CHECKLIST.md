@@ -360,11 +360,13 @@ Evidence:
   stage. The OTel observer emits a structural `exception.type` event without
   exception message or stack trace. Regression tests use a credential-bearing
   10,000-character custom-filter error and prove that payload is absent.
-- Diagnostics registry discovery now reads only already-created singleton
-  registries. Provider-backed map rendering leaves a lazy Retry registry and lazy
-  client factory uninstantiated, does not create missing Retry instances or auth
-  providers, and therefore cannot create their connector, proxy, pool, or network
-  resources. Unavailable policy remains explicit rather than triggering setup.
+- Diagnostics registry discovery distinguishes absent registries from unresolved
+  lazy candidates, honors the primary initialized registry, and reads an
+  already-cached singleton `FactoryBean` product without creating an uncached one.
+  Provider-backed rendering leaves lazy registries and client factories
+  uninstantiated, does not create missing Retry instances or auth providers, and
+  therefore cannot create connector, proxy, pool, or network resources. Unresolved
+  strict validation remains `null` rather than being reported as inactive.
 - Existing schema-v1 fixtures retain the exact root/client field sets and value
   kinds without request-scoped facts. Client, endpoint, text, and 1 MiB UTF-8 map,
   JSON, and Markdown limits all passed. Focused tests plus the full starter and

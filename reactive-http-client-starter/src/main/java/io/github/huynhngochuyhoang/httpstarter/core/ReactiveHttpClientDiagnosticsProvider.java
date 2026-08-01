@@ -7,7 +7,9 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Method;
@@ -27,6 +29,9 @@ import java.util.Objects;
  */
 public class ReactiveHttpClientDiagnosticsProvider {
 
+    private static final Method GET_CACHED_FACTORY_BEAN_OBJECT = ReflectionUtils.findMethod(
+            FactoryBeanRegistrySupport.class, "getCachedObjectForFactoryBean", String.class);
+
     private final ConfigurableListableBeanFactory beanFactory;
     private final ReactiveHttpClientProperties properties;
     private final MethodMetadataCache metadataCache;
@@ -40,24 +45,24 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     public List<ClientSummary> clientSummaries() {
-        ResilienceOperatorApplier resilienceOperatorApplier = resilienceOperatorApplier();
+        ResilienceDiagnostics resilienceDiagnostics = resilienceDiagnostics();
         return List.of(beanFactory.getBeanDefinitionNames()).stream()
                 .map(this::clientRegistration)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(registration -> clientSummaryEntry(registration, resilienceOperatorApplier))
+                .map(registration -> clientSummaryEntry(registration, resilienceDiagnostics.operatorApplier()))
                 .sorted(Comparator.comparing(ClientSummary::clientName)
                         .thenComparing(ClientSummary::clientInterface))
                 .toList();
     }
 
     List<ClientSnapshotEntry> clientSnapshotEntries() {
-        ResilienceOperatorApplier resilienceOperatorApplier = resilienceOperatorApplier();
+        ResilienceDiagnostics resilienceDiagnostics = resilienceDiagnostics();
         return List.of(beanFactory.getBeanDefinitionNames()).stream()
                 .map(this::clientRegistration)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(registration -> clientSnapshotEntry(registration, resilienceOperatorApplier))
+                .map(registration -> clientSnapshotEntry(registration, resilienceDiagnostics))
                 .sorted(Comparator.comparing((ClientSnapshotEntry entry) -> entry.summary().clientName())
                         .thenComparing(entry -> entry.summary().clientInterface()))
                 .toList();
@@ -75,18 +80,19 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     private ClientSnapshotEntry clientSnapshotEntry(ClientRegistration registration,
-                                                    ResilienceOperatorApplier resilienceOperatorApplier) {
+                                                    ResilienceDiagnostics resilienceDiagnostics) {
         Class<?> clientInterface = registration.clientInterface();
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         String clientName = annotation != null ? annotation.name() : "";
         ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
         ClientSummary summary = clientSummary(
-                clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier,
+                clientInterface, clientName, clientConfig, metadataCache, resilienceDiagnostics.operatorApplier(),
                 registration.starterFactory());
         return new ClientSnapshotEntry(
                 summary,
-                strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceOperatorApplier),
+                strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceDiagnostics.operatorApplier(),
+                        resilienceDiagnostics.retryRegistryUnresolved()),
                 strictBodySigningValidation(clientConfig),
                 poolSummary(clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
@@ -253,12 +259,18 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     private Boolean strictUnsafeRetryValidation(Class<?> clientInterface,
                                                 ReactiveHttpClientProperties.ClientConfig clientConfig,
-                                                ResilienceOperatorApplier resilienceOperatorApplier) {
+                                                ResilienceOperatorApplier resilienceOperatorApplier,
+                                                boolean retryRegistryUnresolved) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null
                 || !resilience.isEnabled()
-                || !resilience.isStrictUnsafeRetryValidation()
-                || !resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)) {
+                || !resilience.isStrictUnsafeRetryValidation()) {
+            return false;
+        }
+        if (retryRegistryUnresolved) {
+            return null;
+        }
+        if (!resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)) {
             return false;
         }
         boolean unresolvedRetry = false;
@@ -336,31 +348,118 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 && !method.isBridge();
     }
 
-    private ResilienceOperatorApplier resilienceOperatorApplier() {
-        Object circuitBreakerRegistry = bean("io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry");
-        Object retryRegistry = bean("io.github.resilience4j.retry.RetryRegistry");
-        Object bulkheadRegistry = bean("io.github.resilience4j.bulkhead.BulkheadRegistry");
-        Object rateLimiterRegistry = bean("io.github.resilience4j.ratelimiter.RateLimiterRegistry");
+    private ResilienceDiagnostics resilienceDiagnostics() {
+        ExistingBeanLookup circuitBreakerRegistry = existingBean(
+                "io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry");
+        ExistingBeanLookup retryRegistry = existingBean("io.github.resilience4j.retry.RetryRegistry");
+        ExistingBeanLookup bulkheadRegistry = existingBean("io.github.resilience4j.bulkhead.BulkheadRegistry");
+        ExistingBeanLookup rateLimiterRegistry = existingBean(
+                "io.github.resilience4j.ratelimiter.RateLimiterRegistry");
+        ResilienceOperatorApplier operatorApplier;
         try {
-            return new Resilience4jOperatorApplier(
-                    circuitBreakerRegistry, retryRegistry, bulkheadRegistry, rateLimiterRegistry);
+            operatorApplier = new Resilience4jOperatorApplier(
+                    circuitBreakerRegistry.value(), retryRegistry.value(),
+                    bulkheadRegistry.value(), rateLimiterRegistry.value());
         } catch (LinkageError error) {
-            return new NoopResilienceOperatorApplier();
+            operatorApplier = new NoopResilienceOperatorApplier();
+        }
+        return new ResilienceDiagnostics(operatorApplier, retryRegistry.unresolved());
+    }
+
+    private ExistingBeanLookup existingBean(String className) {
+        try {
+            Class<?> type = ClassUtils.forName(className, beanFactory.getBeanClassLoader());
+            String[] beanNames = beanFactory.getBeanNamesForType(type, true, false);
+            if (beanNames.length == 0) {
+                return ExistingBeanLookup.absent();
+            }
+            String beanName = selectedBeanName(beanNames);
+            if (beanName == null) {
+                return ExistingBeanLookup.unresolvedLookup();
+            }
+            Object singleton = beanFactory.getSingleton(beanName);
+            if (type.isInstance(singleton)) {
+                return ExistingBeanLookup.available(singleton);
+            }
+            if (singleton instanceof FactoryBean<?>) {
+                Object product = cachedFactoryBeanProduct(beanName);
+                if (type.isInstance(product)) {
+                    return ExistingBeanLookup.available(product);
+                }
+            }
+            return ExistingBeanLookup.unresolvedLookup();
+        } catch (ClassNotFoundException | LinkageError ex) {
+            return ExistingBeanLookup.absent();
         }
     }
 
-    private Object bean(String className) {
-        try {
-            Class<?> type = ClassUtils.forName(className, beanFactory.getBeanClassLoader());
-            for (String beanName : beanFactory.getBeanNamesForType(type, false, false)) {
-                Object singleton = beanFactory.getSingleton(beanName);
-                if (type.isInstance(singleton)) {
-                    return singleton;
-                }
+    private String selectedBeanName(String[] beanNames) {
+        String soleCandidate = null;
+        int candidateCount = 0;
+        String primaryCandidate = null;
+        int primaryCount = 0;
+        String nonFallbackCandidate = null;
+        int nonFallbackCount = 0;
+        for (String beanName : beanNames) {
+            BeanDefinition definition = beanFactory.containsBeanDefinition(beanName)
+                    ? beanFactory.getBeanDefinition(beanName)
+                    : null;
+            if (definition != null && !definition.isAutowireCandidate()) {
+                continue;
             }
+            soleCandidate = beanName;
+            candidateCount++;
+            if (definition != null && definition.isPrimary()) {
+                primaryCandidate = beanName;
+                primaryCount++;
+            }
+            if (definition == null || !definition.isFallback()) {
+                nonFallbackCandidate = beanName;
+                nonFallbackCount++;
+            }
+        }
+        if (primaryCount == 1) {
+            return primaryCandidate;
+        }
+        if (primaryCount > 1) {
             return null;
-        } catch (ClassNotFoundException | LinkageError ex) {
+        }
+        if (candidateCount == 1) {
+            return soleCandidate;
+        }
+        return nonFallbackCount == 1 ? nonFallbackCandidate : null;
+    }
+
+    private Object cachedFactoryBeanProduct(String beanName) {
+        if (!(beanFactory instanceof FactoryBeanRegistrySupport registry)
+                || GET_CACHED_FACTORY_BEAN_OBJECT == null) {
             return null;
+        }
+        try {
+            ReflectionUtils.makeAccessible(GET_CACHED_FACTORY_BEAN_OBJECT);
+            return ReflectionUtils.invokeMethod(GET_CACHED_FACTORY_BEAN_OBJECT, registry, beanName);
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private record ResilienceDiagnostics(
+            ResilienceOperatorApplier operatorApplier,
+            boolean retryRegistryUnresolved) {
+    }
+
+    private record ExistingBeanLookup(Object value, boolean unresolved) {
+
+        private static ExistingBeanLookup available(Object value) {
+            return new ExistingBeanLookup(value, false);
+        }
+
+        private static ExistingBeanLookup absent() {
+            return new ExistingBeanLookup(null, false);
+        }
+
+        private static ExistingBeanLookup unresolvedLookup() {
+            return new ExistingBeanLookup(null, true);
         }
     }
 

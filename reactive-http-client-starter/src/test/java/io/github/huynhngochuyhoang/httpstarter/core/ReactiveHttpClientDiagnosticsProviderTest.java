@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -248,8 +249,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         clientDefinition.setBeanClass(ReactiveHttpClientFactoryBean.class);
         clientDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
         beanFactory.registerBeanDefinition("diagnosticClient", clientDefinition);
-        java.util.concurrent.atomic.AtomicInteger registryCreations =
-                new java.util.concurrent.atomic.AtomicInteger();
+        AtomicInteger registryCreations = new AtomicInteger();
         GenericBeanDefinition retryDefinition = new GenericBeanDefinition();
         retryDefinition.setBeanClass(RetryRegistry.class);
         retryDefinition.setLazyInit(true);
@@ -274,10 +274,61 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         assertThat(client)
                 .containsEntry("retry", "unavailable")
-                .containsEntry("strictUnsafeRetryValidation", false);
+                .containsEntry("strictUnsafeRetryValidation", null);
         assertThat(registryCreations).hasValue(0);
         assertThat(beanFactory.containsSingleton("lazyRetryRegistry")).isFalse();
         assertThat(beanFactory.containsSingleton("diagnosticClient")).isFalse();
+    }
+
+    @Test
+    void providerSnapshotsUseThePrimaryExistingRetryRegistry() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        RetryRegistry secondary = RetryRegistry.of(RetryConfig.custom().maxAttempts(1).build());
+        secondary.retry("default");
+        RetryRegistry primary = RetryRegistry.ofDefaults();
+        primary.retry("default");
+        registerRetryRegistry(beanFactory, "secondaryRetryRegistry", secondary, false);
+        registerRetryRegistry(beanFactory, "primaryRetryRegistry", primary, true);
+        beanFactory.getBean("secondaryRetryRegistry");
+        beanFactory.getBean("primaryRetryRegistry");
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictRetryClientConfig())));
+
+        assertThat(client).containsEntry("strictUnsafeRetryValidation", true);
+    }
+
+    @Test
+    void providerSnapshotsReadCachedFactoryBeanRegistryProducts() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
+        retryRegistry.retry("default");
+        AtomicInteger productCreations = new AtomicInteger();
+        beanFactory.registerSingleton("retryRegistryFactory",
+                new RetryRegistryFactoryBean(retryRegistry, productCreations));
+        assertThat(beanFactory.getBean("retryRegistryFactory")).isSameAs(retryRegistry);
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictRetryClientConfig())));
+
+        assertThat(client).containsEntry("strictUnsafeRetryValidation", true);
+        assertThat(productCreations).hasValue(1);
+    }
+
+    @Test
+    void providerSnapshotsDoNotCreateUncachedFactoryBeanRegistryProducts() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        AtomicInteger productCreations = new AtomicInteger();
+        beanFactory.registerSingleton("retryRegistryFactory",
+                new RetryRegistryFactoryBean(RetryRegistry.ofDefaults(), productCreations));
+        assertThat(beanFactory.getBean("&retryRegistryFactory"))
+                .isInstanceOf(RetryRegistryFactoryBean.class);
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictRetryClientConfig())));
+
+        assertThat(client).containsEntry("strictUnsafeRetryValidation", null);
+        assertThat(productCreations).hasValue(0);
     }
 
     @Test
@@ -892,6 +943,45 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                         new MethodMetadataCache()});
     }
 
+    private static DefaultListableBeanFactory diagnosticClientBeanFactory() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
+        beanFactory.registerBeanDefinition("diagnosticClient", definition);
+        return beanFactory;
+    }
+
+    private static ReactiveHttpClientProperties.ClientConfig strictRetryClientConfig() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        ReactiveHttpClientProperties.ResilienceConfig resilience =
+                new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setStrictUnsafeRetryValidation(true);
+        config.setResilience(resilience);
+        return config;
+    }
+
+    private static ReactiveHttpClientDiagnosticsProvider diagnosticsProvider(
+            DefaultListableBeanFactory beanFactory,
+            ReactiveHttpClientProperties.ClientConfig config) {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+        return new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+    }
+
+    private static void registerRetryRegistry(DefaultListableBeanFactory beanFactory,
+                                              String beanName,
+                                              RetryRegistry registry,
+                                              boolean primary) {
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(RetryRegistry.class);
+        definition.setInstanceSupplier(() -> registry);
+        definition.setPrimary(primary);
+        beanFactory.registerBeanDefinition(beanName, definition);
+    }
+
     private static Map<String, Object> snapshotClient(ReactiveHttpClientProperties.ClientConfig config) {
         return snapshotClient(config, null);
     }
@@ -1086,6 +1176,33 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         @GET("/nested")
         Mono<Mono<String>> nested();
+    }
+
+    static final class RetryRegistryFactoryBean implements FactoryBean<RetryRegistry> {
+
+        private final RetryRegistry retryRegistry;
+        private final AtomicInteger productCreations;
+
+        RetryRegistryFactoryBean(RetryRegistry retryRegistry, AtomicInteger productCreations) {
+            this.retryRegistry = retryRegistry;
+            this.productCreations = productCreations;
+        }
+
+        @Override
+        public RetryRegistry getObject() {
+            productCreations.incrementAndGet();
+            return retryRegistry;
+        }
+
+        @Override
+        public Class<?> getObjectType() {
+            return RetryRegistry.class;
+        }
+
+        @Override
+        public boolean isSingleton() {
+            return true;
+        }
     }
 
     static final class ReplacementDiagnosticClientFactoryBean
