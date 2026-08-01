@@ -283,20 +283,48 @@ Evidence:
 
 ## Priority 6 - HTTP/2 GOAWAY and Connection Retirement
 
-### [ ] 6.1 Add real retirement fixtures
+### [x] 6.1 Add real retirement fixtures
 
-- [ ] Send H2/H2C `GOAWAY` while at least one stream is active.
-- [ ] Verify accepted streams follow the peer last-stream identifier semantics.
-- [ ] Verify later calls use replacement connection/stream capacity.
-- [ ] Do not imply retry for a possibly processed non-repeatable request.
+- [x] Send H2/H2C `GOAWAY` while at least one stream is active.
+- [x] Verify accepted streams follow the peer last-stream identifier semantics.
+- [x] Verify later calls use replacement connection/stream capacity.
+- [x] Do not imply retry for a possibly processed non-repeatable request.
 
-### [ ] 6.2 Prove pool and shutdown convergence
+### [x] 6.2 Prove pool and shutdown convergence
 
-- [ ] Verify active and pending stream gauges converge after retirement.
-- [ ] Keep cancellation, reset, compression, and response ownership stream-local.
-- [ ] Verify factory shutdown terminates active/pending work within the bounded
+- [x] Verify active and pending stream gauges converge after retirement.
+- [x] Keep cancellation, reset, compression, and response ownership stream-local.
+- [x] Verify factory shutdown terminates active/pending work within the bounded
       disposal policy.
-- [ ] Add operations guidance for graceful retirement versus connection failure.
+- [x] Add operations guidance for graceful retirement versus connection failure.
+
+Evidence:
+
+- `Http2GoAwayRetirementContractTest` sends a real H2C
+  `GOAWAY(NO_ERROR)` with zero extra stream identifiers while two streams are
+  active and the peer advertises spare stream capacity. The fixture captures the
+  encoded frame and asserts its actual last-stream identifier: one accepted odd
+  stream is below the boundary, one is at it, and later demand would require the
+  next odd identifier above it. That later call remains undispatched while both
+  accepted streams complete and throughout a bounded open-socket observation
+  window; after the peer closes that draining socket, the call runs on a distinct
+  replacement connection without exceeding `maxConnections=1`.
+- A `Flux<DataBuffer>` upload is fully consumed and recorded by the peer before
+  GOAWAY is flushed and the accepted stream is reset without a response. The
+  client call fails with one source subscription, one processed body, and one
+  server dispatch, proving that ambiguous failure adds no hidden replay.
+- The same real transport gates its reset frame until GOAWAY has flushed,
+  observes sibling cancellation at the server, and proves active-stream
+  accounting drops while the draining socket remains open. The retained
+  `ResponseEntity<Flux<DataBuffer>>` response records client gzip negotiation,
+  sends explicit `Content-Encoding: gzip` wire bytes, decodes successfully, and
+  releases emitted buffers before a replacement probe succeeds.
+- Shutdown uses a 30-second pending-acquire timeout but completes draining active
+  and queued futures exceptionally inside the factory's five-second disposal
+  bound, disposes the provider, removes starter-owned stream gauges, and never
+  dispatches the queued request. `docs/12-proxy-tls.md` and
+  `docs/30-operations-troubleshooting.md` distinguish graceful GOAWAY from
+  connection failure and document the one-connection retirement queue.
 
 ---
 
