@@ -13,6 +13,7 @@ import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.FactoryBean;
+import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
@@ -388,6 +389,30 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 diagnosticsProvider(beanFactory, strictRetryClientConfig())));
 
         assertThat(client).containsEntry("strictUnsafeRetryValidation", null);
+        assertThat(factoryCreations).hasValue(0);
+        assertThat(productCreations).hasValue(0);
+    }
+
+    @Test
+    void providerSnapshotsKeepUninspectablePrototypeFactoryBeansUnknown() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        AtomicInteger factoryCreations = new AtomicInteger();
+        AtomicInteger productCreations = new AtomicInteger();
+        GenericBeanDefinition retryDefinition = new GenericBeanDefinition();
+        retryDefinition.setBeanClass(UninspectableRetryRegistryFactoryBean.class);
+        retryDefinition.setScope(BeanDefinition.SCOPE_PROTOTYPE);
+        retryDefinition.setInstanceSupplier(() -> {
+            factoryCreations.incrementAndGet();
+            return new UninspectableRetryRegistryFactoryBean(productCreations);
+        });
+        beanFactory.registerBeanDefinition("prototypeRetryRegistry", retryDefinition);
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictRetryClientConfig())));
+
+        assertThat(client)
+                .containsEntry("retry", "unavailable")
+                .containsEntry("strictUnsafeRetryValidation", null);
         assertThat(factoryCreations).hasValue(0);
         assertThat(productCreations).hasValue(0);
     }

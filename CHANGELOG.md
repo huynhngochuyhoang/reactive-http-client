@@ -78,8 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lookup across sole, primary, priority, fallback, and default candidates. Snapshots
   read already-cached singleton `FactoryBean` products without creating uncached
   or uninspectable products, clients, auth providers, Retry instances, or network resources.
-  A lazy application factory with an uninspectable product keeps registry-dependent
-  facts unknown even when another registry candidate is visible.
+  A deferred application factory (a lazy singleton or non-singleton scope) with an
+  uninspectable product keeps registry-dependent facts unknown even when another
+  registry candidate is visible.
   Deterministic bounded schema v1 output is retained.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning

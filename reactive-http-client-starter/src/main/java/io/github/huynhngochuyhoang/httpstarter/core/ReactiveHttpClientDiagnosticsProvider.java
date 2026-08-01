@@ -539,7 +539,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
             if (definition == null
                     || definition.isAbstract()
                     || definition.getRole() != BeanDefinition.ROLE_APPLICATION
-                    || !definition.isLazyInit()) {
+                    || (definition.isSingleton() && !definition.isLazyInit())) {
                 continue;
             }
             Class<?> factoryType = beanType(factory, definition);

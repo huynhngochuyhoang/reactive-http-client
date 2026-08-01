@@ -165,8 +165,9 @@ already exist. Registry selection searches parent factories and follows Spring d
 semantics for sole, primary, priority, fallback, and default candidates. An
 already-cached singleton `FactoryBean` product can supply that evidence, while an
 uncached or uninspectable application product remains unknown and is not created by
-diagnostics. An uninspectable lazy application factory also keeps registry-dependent
-facts unknown when another registry candidate is already visible.
+diagnostics. An uninspectable deferred application factory (a lazy singleton or non-singleton
+scope) also keeps registry-dependent facts unknown when another registry candidate
+is already visible.
 
 Snapshots fail explicitly instead of returning partial counts when they exceed
 256 clients, 10,000 aggregate endpoints, 512 characters in an exported text
