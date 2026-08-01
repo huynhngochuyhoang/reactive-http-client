@@ -370,7 +370,10 @@ Evidence:
   Provider-backed rendering leaves lazy registries and client factories
   uninstantiated, does not create missing Retry instances or auth providers, and
   therefore cannot create connector, proxy, pool, or network resources. Unresolved
-  strict validation remains `null` rather than being reported as inactive.
+  strict validation remains `null` rather than being reported as inactive, but only
+  when at least one method is retry-eligible; clients with no eligible methods report
+  the validation as inactive without inspecting the registry. The structured exchange
+  logger example exports only structural error type, category, and proven failure stage.
 - Existing schema-v1 fixtures retain the exact root/client field sets and value
   kinds without request-scoped facts. Client, endpoint, text, and 1 MiB UTF-8 map,
   JSON, and Markdown limits all passed. Focused tests plus the full starter and

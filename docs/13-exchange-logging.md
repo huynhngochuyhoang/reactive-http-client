@@ -235,7 +235,12 @@ HttpExchangeLogger structuredExchangeLogger(ObjectMapper mapper) {
         fields.put("durationMs", context.durationMs());
         fields.put("subscriptionAttemptCount", context.subscriptionAttemptCount());
         if (context.error() != null) {
-            fields.put("error", context.error().getMessage());
+            fields.put("errorType", context.error().getClass().getName());
+            fields.put("errorCategory",
+                    ErrorCategories.from(context.error(), context.responseStatus()).name());
+            fields.put("failureStage", context.failureStage() != null
+                    ? context.failureStage().name()
+                    : null);
         }
         try {
             log.info(mapper.writeValueAsString(fields));
@@ -245,6 +250,9 @@ HttpExchangeLogger structuredExchangeLogger(ObjectMapper mapper) {
     };
 }
 ```
+
+This example records bounded structural failure metadata and deliberately omits
+exception messages, cause text, and stack traces.
 
 ---
 

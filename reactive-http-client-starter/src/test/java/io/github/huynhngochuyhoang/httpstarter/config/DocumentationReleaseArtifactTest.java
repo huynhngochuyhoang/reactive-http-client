@@ -792,7 +792,11 @@ class DocumentationReleaseArtifactTest {
         assertThat(exchangeLogging)
                 .contains("MockReactiveHttpClient` uses an isolated application context")
                 .contains(".withExchangeLogger(logger)")
-                .contains("either `@Bean` or component scanning, not\nboth");
+                .contains("either `@Bean` or component scanning, not\nboth")
+                .contains("fields.put(\"errorType\"")
+                .contains("fields.put(\"errorCategory\"")
+                .contains("fields.put(\"failureStage\"")
+                .doesNotContain("fields.put(\"error\", context.error().getMessage())");
         assertThat(releaseDocs).contains("exchange-logger, and assertion methods");
         assertThat(pomXml).contains("<include>io.github.huynhngochuyhoang.httpstarter.test</include>");
     }

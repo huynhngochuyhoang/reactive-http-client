@@ -277,6 +277,14 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         assertThat(client)
                 .containsEntry("retry", "unavailable")
                 .containsEntry("strictUnsafeRetryValidation", null);
+
+        resilience.setRetryMethods(Set.of());
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider)))
+                .containsEntry("strictUnsafeRetryValidation", false);
+        resilience.setRetryMethods(Set.of("POST"));
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider)))
+                .containsEntry("strictUnsafeRetryValidation", false);
+
         assertThat(registryCreations).hasValue(0);
         assertThat(beanFactory.containsSingleton("lazyRetryRegistry")).isFalse();
         assertThat(beanFactory.containsSingleton("diagnosticClient")).isFalse();

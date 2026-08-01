@@ -80,7 +80,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or uninspectable products, clients, auth providers, Retry instances, or network resources.
   A deferred application factory (a lazy singleton or non-singleton scope) with an
   uninspectable product keeps registry-dependent facts unknown even when another
-  registry candidate is visible.
+  registry candidate is visible. Unresolved registry state affects strict-retry
+  diagnostics only when at least one client method is retry-eligible; otherwise the
+  validation flag is definitively inactive. The structured logger example now emits
+  only error type, category, and proven failure stage.
   Deterministic bounded schema v1 output is retained.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning

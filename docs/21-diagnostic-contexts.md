@@ -160,8 +160,10 @@ method, including through class-based Spring proxies. Such custom summaries use
 the collection contract, so provider-only strict flags remain unknown. Diagnostics
 do not instantiate client FactoryBeans, auth providers, lazy Resilience4j registry
 beans, unresolved Resilience4j instances, proxy connections, or other network
-resources. A strict-retry flag stays unknown until its selected registry and Retry instance
-already exist. Registry selection searches parent factories and follows Spring direct-type lookup
+resources. For a client with at least one method enabled by `retry-methods`, a
+strict-retry flag stays unknown until its selected registry and Retry instance already
+exist. If no method is retry-eligible, the flag is `false` without registry inspection.
+Registry selection searches parent factories and follows Spring direct-type lookup
 semantics for sole, primary, priority, fallback, and default candidates. An
 already-cached singleton `FactoryBean` product can supply that evidence, while an
 uncached or uninspectable application product remains unknown and is not created by
