@@ -379,10 +379,10 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     private ExistingBeanLookup existingBean(ConfigurableListableBeanFactory factory, Class<?> type) {
         String[] beanNames = factory.getBeanNamesForType(type, true, false);
+        if (hasUninspectableFactoryBean(factory, type, beanNames)) {
+            return ExistingBeanLookup.unresolvedLookup();
+        }
         if (beanNames.length == 0) {
-            if (hasUninspectableFactoryBean(factory, type, beanNames)) {
-                return ExistingBeanLookup.unresolvedLookup();
-            }
             BeanFactory parent = factory.getParentBeanFactory();
             if (parent instanceof ConfigurableListableBeanFactory parentFactory) {
                 return existingBean(parentFactory, type);
@@ -536,7 +536,10 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 continue;
             }
             BeanDefinition definition = beanDefinition(factory, beanName);
-            if (definition == null || definition.isAbstract()) {
+            if (definition == null
+                    || definition.isAbstract()
+                    || definition.getRole() != BeanDefinition.ROLE_APPLICATION
+                    || !definition.isLazyInit()) {
                 continue;
             }
             Class<?> factoryType = beanType(factory, definition);
