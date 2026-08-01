@@ -402,6 +402,30 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsKeepObjectTypedFactoryBeanDefinitionsUnknown() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        AtomicInteger factoryCreations = new AtomicInteger();
+        AtomicInteger productCreations = new AtomicInteger();
+        GenericBeanDefinition retryDefinition = new GenericBeanDefinition();
+        retryDefinition.setBeanClass(ObjectTypedRetryRegistryFactoryBean.class);
+        retryDefinition.setLazyInit(true);
+        retryDefinition.setInstanceSupplier(() -> {
+            factoryCreations.incrementAndGet();
+            return new ObjectTypedRetryRegistryFactoryBean(productCreations);
+        });
+        beanFactory.registerBeanDefinition("objectTypedRetryRegistry", retryDefinition);
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictRetryClientConfig())));
+
+        assertThat(client)
+                .containsEntry("retry", "unavailable")
+                .containsEntry("strictUnsafeRetryValidation", null);
+        assertThat(factoryCreations).hasValue(0);
+        assertThat(productCreations).hasValue(0);
+    }
+
+    @Test
     void providerSnapshotsKeepUninspectableNonApplicationFactoryBeansUnknown() {
         for (int role : new int[]{BeanDefinition.ROLE_SUPPORT, BeanDefinition.ROLE_INFRASTRUCTURE}) {
             DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
@@ -1492,6 +1516,26 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         private final AtomicInteger productCreations;
 
         UninspectableRetryRegistryFactoryBean(AtomicInteger productCreations) {
+            this.productCreations = productCreations;
+        }
+
+        @Override
+        public Object getObject() {
+            productCreations.incrementAndGet();
+            return RetryRegistry.ofDefaults();
+        }
+
+        @Override
+        public Class<?> getObjectType() {
+            return RetryRegistry.class;
+        }
+    }
+
+    static final class ObjectTypedRetryRegistryFactoryBean implements FactoryBean<Object> {
+
+        private final AtomicInteger productCreations;
+
+        ObjectTypedRetryRegistryFactoryBean(AtomicInteger productCreations) {
             this.productCreations = productCreations;
         }
 

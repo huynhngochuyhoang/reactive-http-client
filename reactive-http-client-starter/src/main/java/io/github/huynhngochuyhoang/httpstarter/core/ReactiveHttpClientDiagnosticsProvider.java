@@ -552,7 +552,9 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 continue;
             }
             Class<?> objectType = factoryBeanObjectType(factory, definition);
-            if (objectType == null || type.isAssignableFrom(objectType)) {
+            if (objectType == null
+                    || type.isAssignableFrom(objectType)
+                    || objectType.isAssignableFrom(type)) {
                 uninspectableNames.add(beanName);
             }
         }
