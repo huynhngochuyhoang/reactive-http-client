@@ -743,7 +743,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void v23SupportedMatrixIsResolvedAndReproducible() throws IOException {
+    void v24SupportedMatrixIsResolvedAndReproducible() throws IOException {
         Path root = projectRoot();
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
         String consumerPom = Files.readString(root.resolve(".github/boot4-consumer/pom.xml"));
@@ -752,11 +752,12 @@ class DocumentationReleaseArtifactTest {
 
         assertThat(releaseDocs)
                 .contains("### V23 resolved supported matrix")
+                .contains("### V24 supported-matrix revalidation")
                 .contains("| Spring Framework / WebFlux | `7.0.1` | `7.0.8` |")
                 .contains("| Reactor Netty HTTP | `1.3.0` | `1.3.6` |")
                 .contains("| Jackson Databind | `3.0.2` | `3.1.4` |")
                 .contains("The minimum does not move")
-                .contains("target/release-evidence/v23-priority11/matrix/");
+                .contains("target/release-evidence/v24-priority9/matrix/");
         assertThat(consumerPom)
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .contains("<artifactId>spring-boot-dependencies</artifactId>")
@@ -774,6 +775,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("resilience4jBindersSkippedWhenRegistryBeansMissing")
                 .contains("diagnosticsEndpointSkippedWhenActuatorEndpointClassesMissing")
                 .contains("autoConfigurationBacksOffWithoutOpenTelemetryApi")
+                .contains("userSuppliedOauth2AuthProviderFactoryOverridesBuiltInFactory")
+                .contains("target/release-evidence/v24-priority9/matrix")
                 .contains("optional-integration-contracts.properties")
                 .contains("Partial matrix evidence preserved under");
         int rowLoop = verifier.indexOf("for boot_version in");
@@ -785,7 +788,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(workflow)
                 .contains("name: Supported Dependency Matrix")
                 .contains("scripts/verify-supported-matrix.sh")
-                .contains("target/release-evidence/v23-priority11/matrix/");
+                .contains("target/release-evidence/v24-priority9/matrix/");
     }
 
     @Test

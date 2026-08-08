@@ -57,6 +57,14 @@ observability, and test-library movement exercises the starter without forcing
 consumers to upgrade. No configuration or public API migration is required by
 this review.
 
+### V24 supported-matrix revalidation
+
+V24 keeps the same minimum and forward rows, but reruns the complete reactor,
+assembled consumer, optional-integration back-off, and strict API comparison
+after its return-grammar, composition, proxy, HTTP/2, and diagnostics changes.
+The V23 table above remains immutable resolved-version evidence; each V24 run
+records its own fresh resolved dependency provenance.
+
 Run the full review with an active complete JDK 21:
 
 ```bash
@@ -72,7 +80,7 @@ trap copies completed and partial row reports to the upload path before
 preserving any failure status. Effective POMs, dependency trees, resolved
 versions, explicit optional-integration back-off results, Surefire and japicmp
 reports, commands, and provenance are copied to
-`target/release-evidence/v23-priority11/matrix/`. The manual
+`target/release-evidence/v24-priority9/matrix/`. The manual
 `Supported Dependency Matrix` workflow runs and uploads the same contract.
 
 Requires a minor release: raising the Java baseline, adding a new Spring Boot
