@@ -16,7 +16,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <reactive-http-client.version>3.4.0</reactive-http-client.version>
+        <reactive-http-client.version>3.5.0-SNAPSHOT</reactive-http-client.version>
         <native.maven.plugin.version>0.11.1</native.maven.plugin.version>
     </properties>
 

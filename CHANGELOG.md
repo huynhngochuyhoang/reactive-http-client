@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Open the post-`3.4.0` development line.** Verified the complete `3.4.0` parent, starter, test-helper, and OTel release bundle plus the assembled Boot 4 consumer from Maven Central; moved public examples plus API, consumer, and benchmark baselines to `3.4.0`; and advanced reactor-only coordinates to `3.5.0-SNAPSHOT` so compatibility checks cannot compare the current reactor with itself.
+
 ## [3.4.0] - 2026-08-08
 
 ### Changed
@@ -23,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kept diagnostics available in the published `3.3.0` benchmark lane, and
   reviewed current and baseline target-only reports with the non-gating
   comparator. No generated report was promoted and no numerical performance
-  claim is made for this release candidate.
+  claim is made for this release.
 - **Declarative return-type grammar.** Added one inherited-generic-aware startup
   validator for supported `Mono`, `Flux`, `ResponseEntity`, and raw
   `DataBuffer` streaming shapes; nested publishers and ambiguous response
