@@ -211,6 +211,69 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v24DocumentationConsolidatesContractsAndHistoricalEvidence() throws IOException {
+        Path root = projectRoot();
+        String productionChecklist = Files.readString(root.resolve("docs/16-production-checklist.md"));
+        String resilience = Files.readString(root.resolve("docs/07-resilience4j.md"));
+        String transport = Files.readString(root.resolve("docs/12-proxy-tls.md"));
+        String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String readme = Files.readString(root.resolve("README.md"));
+
+        assertThat(productionChecklist)
+                .contains("### Supported return shapes")
+                .contains("| `Mono<Void>` |")
+                .contains("| `Mono<ResponseEntity<Flux<DataBuffer>>>` |")
+                .contains("### Replay-safety decision path")
+                .contains("actual nonblank `Idempotency-Key`")
+                .contains("cold replayable publisher or reopenable resource")
+                .contains("one logical-call timeout around one bulkhead")
+                .contains("`HTTP` uses `CONNECT` for HTTP and HTTPS targets")
+                .contains("GOAWAY alone never proves replay safety");
+        assertThat(resilience)
+                .contains("retry -> rate-limiter -> circuit-breaker -> bulkhead")
+                .contains("One-time `401` auth refresh")
+                .contains("Automatic `307`/`308` redirect");
+        assertThat(transport)
+                .contains("uses HTTP `CONNECT` for both `http://` and `https://` targets")
+                .contains("Deprecated compatibility alias for `HTTP`")
+                .contains("When the pool has spare physical capacity")
+                .contains("verify it over HTTP/1.1 and TLS\nH2");
+        assertThat(operations)
+                .contains("canonical current first-response index")
+                .contains("Use `.example.invalid` hosts and `EXAMPLE_` placeholders")
+                .contains("[Production Support Bundles](26-support-bundles.md#baseline-bundle)");
+        assertThat(supportBundles)
+                .contains("canonical current capture procedure")
+                .contains("[Operations Troubleshooting](30-operations-troubleshooting.md)")
+                .contains("`.example.invalid`")
+                .contains("EXAMPLE_");
+        assertThat(readme)
+                .contains("Current return-shape, replay-safety, transport, and production checks")
+                .contains("Canonical current incident-capture procedure")
+                .contains("Immutable historical promoted benchmark evidence")
+                .contains("Current 2.x-to-3.x migration guidance");
+
+        Map<String, String> historicalEvidence = Map.of(
+                "docs/27-v16-to-v17-adoption.md", "Immutable historical migration evidence",
+                "docs/29-v19-release-decision.md", "Immutable historical release evidence",
+                "docs/api-report-2.14.0-to-3.0.0-candidate.md", "Immutable historical API evidence",
+                "docs/api-report-2.14.1-to-3.0.0.md", "Immutable historical API evidence",
+                "docs/benchmark-report-2.9.0.md", "Immutable historical benchmark evidence",
+                "docs/benchmark-report-2.10.0.md", "Immutable historical benchmark evidence",
+                "docs/benchmark-report-2.11.0.md", "Immutable historical benchmark evidence",
+                "docs/benchmark-report-2.12.0.md", "Immutable historical benchmark evidence");
+        for (Map.Entry<String, String> entry : historicalEvidence.entrySet()) {
+            assertThat(Files.readString(root.resolve(entry.getKey())))
+                    .as(entry.getKey())
+                    .contains(entry.getValue());
+        }
+        assertThat(Files.readString(root.resolve("docs/28-spring-boot-4-jackson-migration.md")))
+                .contains("**Current migration guide.**")
+                .contains("immutable\n> historical evidence");
+    }
+
+    @Test
     void releaseVersionContractDistinguishesSnapshotCandidateAndPublishedStates() {
         ReleaseVersionContract snapshot = releaseVersionContract(
                 "3.1.0-SNAPSHOT", "3.0.0", "## [Unreleased]\n");

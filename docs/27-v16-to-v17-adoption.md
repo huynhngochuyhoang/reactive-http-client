@@ -1,5 +1,10 @@
 # V16 to V17 Adoption Guide
 
+> **Immutable historical migration evidence.** This guide records the V16-to-V17
+> adoption sequence. Do not use its release-scoped wording as current setup or
+> incident instructions. Use the [current production checklist](16-production-checklist.md)
+> and [operations troubleshooting guide](30-operations-troubleshooting.md).
+
 Use this guide after upgrading from the V16 release line. The V17 work is mostly
 about making V16 diagnostics and strict validation easier to adopt safely; start
 by capturing support-safe evidence, then enable strict startup validation one

@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documentation and operations consolidation.** Added one production-facing
+  return-shape table and replay-safety decision path, aligned concise resilience,
+  proxy, mTLS, and HTTP/2 retirement guidance with V24 fixtures, kept operations
+  troubleshooting and support bundles as the canonical current incident entry
+  points, and labeled versioned migration, API, benchmark, and release-decision
+  artifacts as immutable historical evidence.
 - **Scoped benchmark re-audit.** Added a one-feature rate-limiter loopback row,
   kept diagnostics available in the published `3.3.0` benchmark lane, and
   reviewed current and baseline target-only reports with the non-gating

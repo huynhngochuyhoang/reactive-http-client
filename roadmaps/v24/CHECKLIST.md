@@ -524,23 +524,48 @@ Evidence:
 
 ## Priority 11 - Documentation and Operations Consolidation
 
-### [ ] 11.1 Align public contract guidance
+### [x] 11.1 Align public contract guidance
 
-- [ ] Add a concise supported return-shape table.
-- [ ] Add one replay-safety decision path.
-- [ ] Align resilience composition, proxy type, mTLS, and H2 retirement wording
+- [x] Add a concise supported return-shape table.
+- [x] Add one replay-safety decision path.
+- [x] Align resilience composition, proxy type, mTLS, and H2 retirement wording
       with real fixtures.
-- [ ] Keep README concise and link to canonical detailed guidance.
+- [x] Keep README concise and link to canonical detailed guidance.
 
-### [ ] 11.2 Separate current instructions from historical evidence
+### [x] 11.2 Separate current instructions from historical evidence
 
-- [ ] Label migration, API-report, benchmark-report, and release-decision docs as
+- [x] Label migration, API-report, benchmark-report, and release-decision docs as
       immutable historical evidence where applicable.
-- [ ] Keep operations troubleshooting and support bundles as canonical incident
+- [x] Keep operations troubleshooting and support bundles as canonical incident
       entry points.
-- [ ] Use sanitized `EXAMPLE_` and `.example.invalid` placeholders.
-- [ ] Run generated metadata, example-property, anchor, local-link, roadmap-link,
+- [x] Use sanitized `EXAMPLE_` and `.example.invalid` placeholders.
+- [x] Run generated metadata, example-property, anchor, local-link, roadmap-link,
       and public-version tests.
+
+Evidence:
+
+- `docs/16-production-checklist.md` now contains the concise supported
+  `Mono`/`Flux` return-shape table, links to the full declarative grammar and
+  streaming ownership contract, and one ordered decision path covering duplicate
+  safety, idempotency keys, body repeatability, built-in SigV4, and strict
+  validation.
+- The production checklist summarizes the fixed resilience boundary plus the
+  authenticated `CONNECT`/SOCKS proxy, deprecated `HTTPS` alias, HTTP/1.1 and
+  TLS-H2 mTLS, and capacity-aware GOAWAY retirement contracts already proved by
+  the V24 wire fixtures. Canonical detail remains in `docs/07-resilience4j.md`,
+  `docs/11-streaming.md`, and `docs/12-proxy-tls.md`; README remains a link
+  index.
+- Versioned V16-to-V17 adoption, API reports, benchmark reports, and the V19
+  no-go decision now carry explicit immutable-historical banners. The active
+  Boot 4 migration guide is labeled current. `docs/30-operations-troubleshooting.md`
+  and `docs/26-support-bundles.md` are reciprocal canonical triage/capture
+  entry points and retain reviewable `.example.invalid` and `EXAMPLE_`
+  placeholders.
+- `DocumentationReleaseArtifactTest.v24DocumentationConsolidatesContractsAndHistoricalEvidence`
+  freezes these distinctions. The complete generated metadata, example-property,
+  generated-reference, anchor, local-link, roadmap-link, and public-version gate
+  passed with
+  `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest,ReactiveHttpClientConfigurationMetadataTest test`.
 
 ---
 

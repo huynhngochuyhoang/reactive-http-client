@@ -1,5 +1,9 @@
 # Spring Boot 4 and Starter 3.x Migration
 
+> **Current migration guide.** Use this page for supported 2.x-to-3.x migration
+> instructions. Linked API reports and versioned release decisions are immutable
+> historical evidence, not commands for the current reactor.
+
 This guide migrates published Spring Boot 3.5 starter 2.x applications to the
 Spring Boot 4 starter 3.x line. The current reactor version is
 `3.4.0-SNAPSHOT`; use published `3.3.0` when consuming it from a release
