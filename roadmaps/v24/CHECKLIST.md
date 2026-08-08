@@ -472,42 +472,100 @@ Evidence:
 
 ## Priority 10 - Benchmark and Allocation Re-Audit
 
-### [ ] 10.1 Keep benchmark comparison fair and scoped
+### [x] 10.1 Keep benchmark comparison fair and scoped
 
-- [ ] Pass discovery and fairness guards before measurements.
-- [ ] Rerun only production paths changed by V24.
-- [ ] Keep current and published `3.3.0` reports in distinct fresh repositories.
-- [ ] Compare equivalent Boot, transport, codec, and optional-feature work.
+- [x] Pass discovery and fairness guards before measurements.
+- [x] Rerun only production paths changed by V24.
+- [x] Keep current and published `3.3.0` reports in distinct fresh repositories.
+- [x] Compare equivalent Boot, transport, codec, and optional-feature work.
 
-### [ ] 10.2 Record review evidence without broad claims
+### [x] 10.2 Record review evidence without broad claims
 
-- [ ] Review movement by named scenario and allocation profile.
-- [ ] Keep smoke output out of public numerical claims.
-- [ ] Keep normal CI free of hard numeric performance gates.
-- [ ] Promote a clean report only if `3.4.0` notes make a numerical performance
+- [x] Review movement by named scenario and allocation profile.
+- [x] Keep smoke output out of public numerical claims.
+- [x] Keep normal CI free of hard numeric performance gates.
+- [x] Promote a clean report only if `3.4.0` notes make a numerical performance
       or allocation claim.
+
+Evidence:
+
+- Added `starterFeatureRateLimiterWrapperGetNoBody` with one isolated
+  `RateLimiterRegistry`, the same loopback transport and response validation as
+  the existing resilience rows, and setup-time parity checks. The published
+  baseline profile now keeps the diagnostics benchmark because published
+  `3.3.0` contains its required public APIs. Current and published-baseline
+  discovery passed all 15 report/fairness tests and discovered the same scoped
+  rows before measurement.
+- Release-quality JMH runs used GC allocation profiling and separate previously
+  absent Maven repositories under `/tmp` for current `3.4.0-SNAPSHOT` and
+  published `3.3.0`. Both resolved Boot `4.0.0`, Framework/WebFlux `7.0.1`,
+  Reactor Netty `1.3.0`, Netty `4.2.7.Final`, Jackson `3.0.2`, Micrometer
+  `1.16.0`, and OTel `1.55.0`. The current lane also passed all 936 starter
+  tests before measurement.
+- Target-only reports remain at
+  `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md` and
+  `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.3.0/release-jmh.md`;
+  the non-gating comparison is
+  `reactive-http-client-benchmarks/target/benchmark-reports/v24-current-vs-published-3.3.0.md`.
+  Allocation stayed below every review trigger for default unary, JSON,
+  `ResponseEntity`, retry, rate-limiter, diagnostics-disabled, and runtime
+  diagnostics-provider rows. Latency review markers moved in both directions
+  across starter and raw/framework controls, so they are treated as local-run
+  variance rather than a starter-only regression or optimization.
+- No smoke number or broad raw-`WebClient` parity statement was published. The
+  comparator ran with `benchmark.compare.fail-on-review=false`; normal CI has no
+  numeric gate. The current report records
+  `ba475e5-dirty-v24-priority10`, so it was deliberately not promoted. The
+  Unreleased notes make no numerical performance or allocation claim; a clean
+  rerun and promoted `docs/benchmark-report-3.4.0.md` remain conditional on such
+  a claim being added during release preparation.
 
 ---
 
 ## Priority 11 - Documentation and Operations Consolidation
 
-### [ ] 11.1 Align public contract guidance
+### [x] 11.1 Align public contract guidance
 
-- [ ] Add a concise supported return-shape table.
-- [ ] Add one replay-safety decision path.
-- [ ] Align resilience composition, proxy type, mTLS, and H2 retirement wording
+- [x] Add a concise supported return-shape table.
+- [x] Add one replay-safety decision path.
+- [x] Align resilience composition, proxy type, mTLS, and H2 retirement wording
       with real fixtures.
-- [ ] Keep README concise and link to canonical detailed guidance.
+- [x] Keep README concise and link to canonical detailed guidance.
 
-### [ ] 11.2 Separate current instructions from historical evidence
+### [x] 11.2 Separate current instructions from historical evidence
 
-- [ ] Label migration, API-report, benchmark-report, and release-decision docs as
+- [x] Label migration, API-report, benchmark-report, and release-decision docs as
       immutable historical evidence where applicable.
-- [ ] Keep operations troubleshooting and support bundles as canonical incident
+- [x] Keep operations troubleshooting and support bundles as canonical incident
       entry points.
-- [ ] Use sanitized `EXAMPLE_` and `.example.invalid` placeholders.
-- [ ] Run generated metadata, example-property, anchor, local-link, roadmap-link,
+- [x] Use sanitized `EXAMPLE_` and `.example.invalid` placeholders.
+- [x] Run generated metadata, example-property, anchor, local-link, roadmap-link,
       and public-version tests.
+
+Evidence:
+
+- `docs/16-production-checklist.md` now contains the concise supported
+  `Mono`/`Flux` return-shape table, links to the full declarative grammar and
+  streaming ownership contract, and one ordered decision path covering duplicate
+  safety, idempotency keys, body repeatability, built-in SigV4, and strict
+  validation.
+- The production checklist summarizes the fixed resilience boundary plus the
+  authenticated `CONNECT`/SOCKS proxy, deprecated `HTTPS` alias, HTTP/1.1 and
+  TLS-H2 mTLS, and capacity-aware GOAWAY retirement contracts already proved by
+  the V24 wire fixtures. Canonical detail remains in `docs/07-resilience4j.md`,
+  `docs/11-streaming.md`, and `docs/12-proxy-tls.md`; README remains a link
+  index.
+- Versioned V16-to-V17 adoption, API reports, benchmark reports, and the V19
+  no-go decision now carry explicit immutable-historical banners. The active
+  Boot 4 migration guide is labeled current. `docs/30-operations-troubleshooting.md`
+  and `docs/26-support-bundles.md` are reciprocal canonical triage/capture
+  entry points and retain reviewable `.example.invalid` and `EXAMPLE_`
+  placeholders.
+- `DocumentationReleaseArtifactTest.v24DocumentationConsolidatesContractsAndHistoricalEvidence`
+  freezes these distinctions. The complete generated metadata, example-property,
+  generated-reference, anchor, local-link, roadmap-link, and public-version gate
+  passed with
+  `mvn -q -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest,ReactiveHttpClientConfigurationMetadataTest test`.
 
 ---
 

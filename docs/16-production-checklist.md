@@ -9,6 +9,23 @@ Use this checklist before putting a `@ReactiveHttpClient` client on a production
 - Keep method paths, HTTP verbs, path variables, query parameters, and body types explicit.
 - Use `@ApiRef` only when method/path/timeout must be controlled from configuration.
 
+### Supported return shapes
+
+| Return shape | Contract |
+|---|---|
+| `Mono<Void>` | Drain and release the body; expose no value. |
+| `Mono<T>` | Decode one value with the configured codecs. |
+| `Mono<ResponseEntity<T>>` | Decode one value and preserve status and headers. |
+| `Flux<T>` | Decode a stream of values with the configured codecs. |
+| `Flux<DataBuffer>` | Stream unaggregated, caller-owned buffers. |
+| `Mono<ResponseEntity<Flux<DataBuffer>>>` | Preserve status and headers while the caller owns the unaggregated inner stream. |
+
+Raw `Mono` and `Flux` remain compatibility shapes but erase response type
+information. Nested publishers, nested or `Flux`-wrapped `ResponseEntity`
+values, unresolved type variables, and concrete `DataBuffer` subtypes are not
+supported. See the canonical [declarative return-type grammar](02-annotations.md#declarative-return-types)
+and [streaming ownership contract](11-streaming.md#streaming-responses).
+
 ## Timeouts and pool
 
 - Set `reactive.http.network.connect-timeout-ms`.
@@ -39,6 +56,17 @@ reactive:
 - When compression is enabled, do not add `Accept-Encoding` in application
   headers; Reactor Netty owns negotiation and incremental decompression.
 
+Wire-contract checks:
+
+| Feature | Production rule verified by the transport fixtures |
+|---|---|
+| HTTP proxy | `HTTP` uses `CONNECT` for HTTP and HTTPS targets; deprecated `HTTPS` is only an `HTTP` alias. `SOCKS4` and `SOCKS5` use their respective tunnels. |
+| mTLS | Configure both trust and key stores. Missing or untrusted client identities fail during `TLS_HANDSHAKE` for HTTP/1.1 and TLS H2. |
+| HTTP/2 retirement | Accepted streams at or below the peer GOAWAY boundary may finish, but new streams do not use the draining connection. Replacement can start immediately when physical pool capacity remains; a one-connection pool waits for capacity. GOAWAY alone never proves replay safety. |
+
+Use the detailed [HTTP/2, proxy, and TLS/mTLS contract](12-proxy-tls.md) for
+configuration and incident interpretation.
+
 ## Auth and request defaults
 
 - Prefer an `AuthProvider` for credentials that rotate or require signing.
@@ -67,6 +95,40 @@ reactive:
 
 - Keep retries limited to idempotent methods unless the downstream contract is explicitly safe.
 - Use bulkheads and rate limiters for shared downstreams that can overload callers.
+
+The fixed composition is one logical-call timeout around one bulkhead,
+circuit-breaker, and rate-limiter admission, with retry and its request attempts
+inside those operators. See [operator composition](07-resilience4j.md#operator-composition).
+
+### Replay-safety decision path
+
+Before enabling retry, automatic `307`/`308` redirect following, or one-time
+`401` auth refresh for a request that carries a body:
+
+1. **Can another dispatch occur?** If none of those mechanisms apply, no replay
+   contract is needed.
+2. **Is the operation duplicate-safe?** Supported declarative `GET`,
+   `HEAD`, `PUT`, `DELETE`, and `OPTIONS` methods are classified as safe.
+   For `POST`, `PATCH`, or another unsafe method, require a downstream
+   idempotency contract and an actual nonblank `Idempotency-Key` on every call.
+3. **Can the body produce the same bytes again?** Scalar bytes, strings, and
+   concrete DTOs are repeatable. A publisher must be cold and replayable, and a
+   `Resource` must reopen. Do not replay an eager `InputStream`, `Reader`,
+   channel, direct `DataBuffer`, `Object`, or erased generic; redesign that
+   method around a cold replayable publisher or reopenable resource first. The
+   starter does not buffer these bodies to make them repeatable.
+4. **Does auth signing support that body?** Built-in AWS SigV4 rejects body
+   shapes whose stable bytes cannot be proven before dispatch.
+5. **Can startup prove the policy?** Enable strict unsafe-retry or strict
+   built-in signing validation only for contracts that do not depend on a
+   nullable runtime header or unknown runtime body type.
+
+Every resilience retry is a new subscription attempt; a body-preserving
+redirect or hidden `401` refresh can add dispatches and body subscriptions
+inside that attempt. A generated idempotency key stays stable within one outer
+subscription. Use the canonical [retry/replay composition contract](07-resilience4j.md#retry-redirect-and-auth-replay)
+and [request-body repeatability matrix](11-streaming.md#request-body-repeatability-matrix)
+for the detailed ownership rules.
 
 ## Observability
 

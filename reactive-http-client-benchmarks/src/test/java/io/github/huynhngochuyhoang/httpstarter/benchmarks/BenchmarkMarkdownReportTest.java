@@ -109,15 +109,10 @@ class BenchmarkMarkdownReportTest {
     @Test
     void everyCurrentBenchmarkMethodHasAnExplicitClassification() throws Exception {
         Stream<Class<?>> benchmarkTypes = Stream.of(
-                        LoopbackClientComparisonBenchmark.class,
-                        StarterInvocationBenchmark.class,
-                        StarterInvocationInternalsBenchmark.class);
-        try {
-            benchmarkTypes = Stream.concat(benchmarkTypes, Stream.of(Class.forName(
-                    "io.github.huynhngochuyhoang.httpstarter.benchmarks.StarterDiagnosticsOverheadBenchmark")));
-        } catch (ClassNotFoundException ignored) {
-            // The published-baseline profile excludes diagnostics that require current-only APIs.
-        }
+                LoopbackClientComparisonBenchmark.class,
+                StarterInvocationBenchmark.class,
+                StarterInvocationInternalsBenchmark.class,
+                StarterDiagnosticsOverheadBenchmark.class);
 
         String[] results = benchmarkTypes
                 .flatMap(type -> Arrays.stream(type.getDeclaredMethods()))

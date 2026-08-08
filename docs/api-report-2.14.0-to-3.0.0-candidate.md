@@ -1,5 +1,9 @@
 # Public API Report: 2.14.0 to 3.0.0 Candidate
 
+> **Immutable historical API evidence.** This report describes only the named
+> candidate comparison. Do not rerun its command as current compatibility
+> guidance; use [Native Image and Release Compatibility](20-native-release-compatibility.md).
+
 This source-controlled summary reviews the report-only japicmp comparison
 between published 2.14.0 artifacts and the isolated Boot 4 candidate assembled
 from the 2.14.1 workspace. The candidate label does not publish or rename the

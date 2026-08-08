@@ -1,9 +1,9 @@
 # Operations Troubleshooting
 
-Use this page as the first-response index for an outbound client incident. It
-connects the starter's bounded diagnostic signals to the detailed operating
-guides; it does not replace transport traces, downstream logs, or application
-metrics.
+Use this page as the canonical current first-response index for an outbound
+client incident. It connects the starter's bounded diagnostic signals to
+the detailed operating guides; it does not replace transport traces, downstream
+logs, or application metrics.
 
 ## Current release scope
 

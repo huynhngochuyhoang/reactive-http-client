@@ -218,21 +218,21 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [Exchange Logging](docs/13-exchange-logging.md) | Request/response logging |
 | [Test Helpers](docs/14-test-helpers.md) | Mock clients and assertions |
 | [Per-Client Customizer](docs/15-customizer.md) | Custom WebClient filters |
-| [Production Checklist](docs/16-production-checklist.md) | Production readiness checks |
+| [Production Checklist](docs/16-production-checklist.md) | Current return-shape, replay-safety, transport, and production checks |
 | [Migration from WebClient](docs/17-migration-from-webclient.md) | Migration examples |
 | [Conflict and Cardinality Guardrails](docs/18-conflict-cardinality-guardrails.md) | Precedence and safe observability defaults |
 | [Lifecycle Hooks](docs/19-lifecycle-hooks.md) | Ordered invocation callbacks |
 | [Native Image and Release Compatibility](docs/20-native-release-compatibility.md) | AOT support and smoke matrix |
 | [Diagnostic Context Contracts](docs/21-diagnostic-contexts.md) | Extension-point capability matrix |
 | [Benchmarks](docs/22-benchmarks.md) | Benchmark harness and commands |
-| [Benchmark Report 2.12.0](docs/benchmark-report-2.12.0.md) | Promoted release-quality benchmark report |
+| [Benchmark Report 2.12.0](docs/benchmark-report-2.12.0.md) | Immutable historical promoted benchmark evidence |
 | [Performance Summary](docs/23-performance-summary.md) | Interpreting benchmark data |
-| [Production Support Bundles](docs/26-support-bundles.md) | Safe incident evidence examples |
-| [Operations Troubleshooting](docs/30-operations-troubleshooting.md) | Protocol, pool, timeout, streaming, OAuth2, and failure triage |
-| [V16 to V17 Adoption Guide](docs/27-v16-to-v17-adoption.md) | Diagnostics-first strict validation rollout |
-| [Spring Boot 4 and Starter 3.x Migration](docs/28-spring-boot-4-jackson-migration.md) | Dependency/classpath diagnosis plus package, Jackson, Actuator, native, and test-helper migration |
-| [2.14.1 to 3.0.0 API Report](docs/api-report-2.14.1-to-3.0.0.md) | Reviewed cross-major public API diff |
-| [V19 3.0.0 Release Decision](docs/29-v19-release-decision.md) | Historical spike no-go decision superseded by the V20 release-prep reactor |
+| [Production Support Bundles](docs/26-support-bundles.md) | Canonical current incident-capture procedure |
+| [Operations Troubleshooting](docs/30-operations-troubleshooting.md) | Canonical current protocol, pool, timeout, streaming, OAuth2, and failure triage |
+| [V16 to V17 Adoption Guide](docs/27-v16-to-v17-adoption.md) | Immutable historical strict-validation adoption guidance |
+| [Spring Boot 4 and Starter 3.x Migration](docs/28-spring-boot-4-jackson-migration.md) | Current 2.x-to-3.x migration guidance |
+| [2.14.1 to 3.0.0 API Report](docs/api-report-2.14.1-to-3.0.0.md) | Immutable historical cross-major API evidence |
+| [V19 3.0.0 Release Decision](docs/29-v19-release-decision.md) | Immutable historical no-go evidence superseded by the V20 release-prep reactor |
 | [Configuration Properties](docs/configuration-properties.md) | Generated property reference |
 | [Examples](docs/examples/README.md) | Copy-paste snippets |
 

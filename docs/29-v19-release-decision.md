@@ -1,5 +1,10 @@
 # V19 `3.0.0` Release Decision
 
+> **Immutable historical release evidence.** This no-go records the V19 state
+> only and is not a current release or operations procedure. Use the
+> [current release workflow](20-native-release-compatibility.md) and
+> [operations troubleshooting guide](30-operations-troubleshooting.md).
+
 > **Decision:** no-go for publishing `3.0.0` on 2026-07-13.
 
 V19 proves that the starter can run on the selected Spring Boot 4 stacks, but

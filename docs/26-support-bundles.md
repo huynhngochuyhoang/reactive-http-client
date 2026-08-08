@@ -1,10 +1,14 @@
 # Production Support Bundles
 
-Use this page when opening an internal support ticket, handing an incident to an
+This is the canonical current capture procedure for an outbound client incident.
+Use it when opening an internal support ticket, handing an incident to an
 on-call teammate, or asking maintainers to help diagnose starter behavior. The
 goal is a small, support-safe bundle that explains the client configuration and
 runtime symptoms without collecting raw request bodies, response bodies, tokens,
 secrets, or customer data by default.
+
+Start triage in [Operations Troubleshooting](30-operations-troubleshooting.md),
+then return here for the bounded artifacts requested by that decision path.
 
 The commands and endpoint names on this page target published starter `3.3.0`
 on Boot 4. Boot 3.5 applications remain on `2.14.1`; use the

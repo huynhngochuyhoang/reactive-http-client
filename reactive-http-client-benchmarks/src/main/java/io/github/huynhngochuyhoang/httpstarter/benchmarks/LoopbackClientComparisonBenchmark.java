@@ -215,6 +215,12 @@ public class LoopbackClientComparisonBenchmark {
     }
 
     @Benchmark
+    public BenchmarkUser starterFeatureRateLimiterWrapperGetNoBody() {
+        return validateUser("starter rate-limiter wrapper", clients.starterRateLimiterClient.currentUser().block(),
+                LoopbackBenchmarkServer.CURRENT_USER);
+    }
+
+    @Benchmark
     public BenchmarkUser starterFeatureCircuitBreakerWrapperGetNoBody() {
         return validateUser("starter circuit breaker wrapper", clients.starterCircuitBreakerClient.currentUser().block(),
                 LoopbackBenchmarkServer.CURRENT_USER);
@@ -252,6 +258,7 @@ public class LoopbackClientComparisonBenchmark {
         starterFeatureExchangeLoggingMetadataOnlyGetNoBody();
         starterFeatureMicrometerObserverGetNoBody();
         starterFeatureRetryWrapperGetNoBody();
+        starterFeatureRateLimiterWrapperGetNoBody();
         starterFeatureCircuitBreakerWrapperGetNoBody();
     }
 

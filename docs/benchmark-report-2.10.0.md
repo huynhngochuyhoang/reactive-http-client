@@ -1,5 +1,9 @@
 # Reactive HTTP Client Benchmark Report
 
+> **Immutable historical benchmark evidence.** These numbers apply only to the
+> recorded `2.10.0` environment and scenarios. Use [Benchmarks](22-benchmarks.md)
+> for current commands and interpretation rules.
+
 ## Promotion Metadata
 
 - Report version: `2.10.0`.

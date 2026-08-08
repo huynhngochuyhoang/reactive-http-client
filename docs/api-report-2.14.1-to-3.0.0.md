@@ -1,5 +1,9 @@
 # Public API Report: 2.14.1 to 3.0.0
 
+> **Immutable historical API evidence.** This report describes only the named
+> cross-major comparison. Do not rerun its command as current compatibility
+> guidance; use [Native Image and Release Compatibility](20-native-release-compatibility.md).
+
 This source-controlled summary reviews the report-only japicmp comparison
 between published 2.14.1 artifacts and the default Boot 4 `3.0.0` reactor.
 The comparison is report-only because this is an intentional major-version
