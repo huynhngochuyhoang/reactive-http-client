@@ -8,7 +8,8 @@ branch after a go decision, or an item explicitly labeled deferred/superseded,
 is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
-`CHECKLIST.md`. V1-V24 are completed release records; no active draft is present.
+`CHECKLIST.md`. V1-V24 are completed release records; V25 is the active draft
+with an execution checklist.
 
 | Version | Roadmap | Checklist | Archive status |
 |---|---|---|---|
@@ -36,3 +37,4 @@ V2 predates the separate execution-checklist convention and intentionally has no
 | V22 | [Roadmap](v22/ROADMAP.md) | [Checklist](v22/CHECKLIST.md) | Completed and released as `3.2.0` |
 | V23 | [Roadmap](v23/ROADMAP.md) | [Checklist](v23/CHECKLIST.md) | Completed and released as `3.3.0` |
 | V24 | [Roadmap](v24/ROADMAP.md) | [Checklist](v24/CHECKLIST.md) | Completed and released as `3.4.0` |
+| V25 | [Roadmap](v25/ROADMAP.md) | [Checklist](v25/CHECKLIST.md) | Active draft |
