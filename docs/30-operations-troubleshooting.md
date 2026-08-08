@@ -7,7 +7,7 @@ logs, or application metrics.
 
 ## Current release scope
 
-Current consumer instructions apply to published starter `3.3.0` on Spring Boot
+Current consumer instructions apply to published starter `3.4.0` on Spring Boot
 4. The repository may contain a newer snapshot while the next release is being
 prepared. Use the published coordinates from the [Quick Start](01-quick-start.md)
 for applications and reserve snapshot commands for the explicitly labeled

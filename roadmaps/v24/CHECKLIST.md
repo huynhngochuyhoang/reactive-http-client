@@ -571,14 +571,14 @@ Evidence:
 
 ## Priority 12 - V24 Release Go/No-Go
 
-### [ ] 12.1 Select release scope and assemble evidence
+### [x] 12.1 Select release scope and assemble evidence
 
 - [x] Decide whether delivered scope is documentation/correctness-only or a
       backward-compatible `3.4.0` public addition.
-- [ ] Run full reactor, strict root/module API, packaging, current/published
+- [x] Run full reactor, strict root/module API, packaging, current/published
       consumer, supported matrix, transport, AOT/native, and documentation gates.
 - [x] Verify complete parent, starter, test-helper, and OTel candidate artifacts.
-- [ ] Use one immutable commit for every reproducible release gate.
+- [x] Use one immutable commit for every reproducible release gate.
 - [x] Cite a clean promoted report or make no numerical performance claim.
 
 Release-candidate preparation evidence (2026-08-08):
@@ -592,22 +592,42 @@ Release-candidate preparation evidence (2026-08-08):
 - Dated the `3.4.0` changelog section. The scoped benchmark note explicitly makes
   no numerical performance claim, so no generated target report was promoted.
 - Pre-commit checks passed: `mvn -B -ntp clean verify` ran 1,020 tests, and
-  `bash scripts/verify-generation-packaging.sh` verified the final `3.4.0` parent POM plus
-  starter, test-helper, and OTel binary, source, and Javadoc archives.
-- Remaining release work is deliberately open: commit this release-prep tree,
-  rerun the complete release matrix from that clean immutable commit, create tag
+  `bash scripts/verify-generation-packaging.sh` verified the final `3.4.0`
+  parent POM plus starter, test-helper, and OTel binary, source, and Javadoc archives.
+- At candidate preparation, remaining release work was deliberately open:
+  commit this release-prep tree, rerun the complete release matrix from that clean immutable commit, create tag
   `v3.4.0`, publish the complete companion bundle, and verify it from Maven
   Central before moving public coordinates or either baseline.
 
-### [ ] 12.2 Record the decision
+### [x] 12.2 Record the decision
 
-- [ ] For go, publish from the matching tag and verify every Central artifact.
-- [ ] After publication, move public/API/consumer/benchmark baselines and open
+- [x] For go, publish from the matching tag and verify every Central artifact.
+- [x] After publication, move public/API/consumer/benchmark baselines and open
       the next snapshot line.
 - [ ] For no-go, publish nothing and record each blocker, reproduction, and
       retained evidence path.
-- [ ] Update roadmap/checklist status only after decision evidence exists.
-- [ ] Run final release-document tests and `git diff --check`.
+- [x] Update roadmap/checklist status only after decision evidence exists.
+- [x] Run final release-document tests and `git diff --check`.
+
+Publication completion evidence (2026-08-08):
+
+- Release `3.4.0` was published from immutable tag `v3.4.0` at commit
+  `26056e5827212458cd3678e9c27441d869da328e` after the V24 reactor, strict
+  API, packaging, consumer, supported-matrix, transport, AOT/native,
+  documentation, and scoped non-gating benchmark evidence completed.
+- `scripts/verify-published-release-artifacts.sh 3.4.0` resolved the parent POM
+  plus starter, test-helper, and OTel POM, binary, source, and Javadoc artifacts
+  from a fresh Central-only repository; version, remote-marker, and SHA-256
+  provenance checks passed.
+- `scripts/verify-published-consumer.sh 3.4.0` passed the assembled Boot 4
+  consumer against only Maven Central artifacts and rejected reactor-classpath
+  leakage.
+- Public examples and published consumer, API compatibility, and benchmark
+  baselines now use `3.4.0`. Reactor-only coordinates use `3.5.0-SNAPSHOT`,
+  preserving the self-comparison guard. No numerical V24 performance claim was
+  published, so no benchmark report was promoted.
+- Final post-release verification passed all 1,020 reactor tests, the release-document
+  and configuration-metadata contracts, and `git diff --check`.
 
 ## Completion Rule
 

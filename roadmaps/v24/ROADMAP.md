@@ -1,12 +1,20 @@
 # Reactive HTTP Client - Roadmap V24
 
-> **Status:** draft
+> **Status:** completed - released as `3.4.0` on 2026-08-08
 > **Theme:** composition hardening and contract closure after the `3.3.0`
 > release
-> **Development line:** `3.4.0-SNAPSHOT`
-> **Published/API baseline:** `3.3.0`
-> **Working release direction:** `3.4.0`, subject to delivered public scope and
-> release evidence
+> **Delivered release:** `3.4.0`
+> **Post-release development line:** `3.5.0-SNAPSHOT`
+> **Published/API baseline:** `3.4.0`
+
+## Completion Record
+
+V24 shipped as `3.4.0` from immutable tag `v3.4.0` at commit
+`26056e5827212458cd3678e9c27441d869da328e`. The complete parent, starter,
+test-helper, and OTel release bundle and the assembled Boot 4 consumer were
+verified from Maven Central. Public coordinates and API, consumer, and benchmark
+baselines moved to `3.4.0`; reactor-only development moved to
+`3.5.0-SNAPSHOT`. V24 made no promoted numerical benchmark claim.
 
 ## Retrospective Audit
 
