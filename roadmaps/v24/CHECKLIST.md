@@ -426,22 +426,47 @@ Evidence:
 
 ## Priority 9 - Dependency, API, AOT, and Native Evidence
 
-### [ ] 9.1 Revalidate the supported dependency matrix
+### [x] 9.1 Revalidate the supported dependency matrix
 
-- [ ] Run minimum and forward Spring Boot 4 rows under Java 21.
-- [ ] Record resolved dependency provenance for each row.
-- [ ] Verify optional Actuator, Micrometer, OTel, Resilience4j, and auth back-off.
-- [ ] Run strict API compatibility with each row's managed classpath where
+- [x] Run minimum and forward Spring Boot 4 rows under Java 21.
+- [x] Record resolved dependency provenance for each row.
+- [x] Verify optional Actuator, Micrometer, OTel, Resilience4j, and auth back-off.
+- [x] Run strict API compatibility with each managed row classpath where
       dependency-linked public types require it.
 
-### [ ] 9.2 Keep public and native contracts complete
+### [x] 9.2 Keep public and native contracts complete
 
-- [ ] Include every V24 public addition/deprecation in strict japicmp coverage.
-- [ ] Defer incompatible changes from the `3.x` minor line.
-- [ ] Cover inherited generic and return-type reflection without deprecated
+- [x] Include every V24 public addition/deprecation in strict japicmp coverage.
+- [x] Defer incompatible changes from the `3.x` minor line.
+- [x] Cover inherited generic and return-type reflection without deprecated
       Framework 7 member categories.
-- [ ] Build and execute the GraalVM 25 fixture from a clean immutable commit.
-- [ ] Exercise at least one V24 validation or network-composition contract natively.
+- [x] Build and execute the GraalVM 25 fixture from a clean immutable commit.
+- [x] Exercise at least one V24 validation or network-composition contract natively.
+
+Evidence:
+
+- `scripts/verify-supported-matrix.sh` passed the full reactor and assembled
+  consumer on Java 21 for Boot `4.0.0` and `4.1.0`, using distinct fresh
+  temporary repositories. The V24 evidence under
+  `target/release-evidence/v24-priority9/matrix/` records effective POMs,
+  dependency trees, exact resolved versions, commands, Surefire reports, and
+  Central provenance for each row.
+- Both rows explicitly record passing absence/back-off contracts for Micrometer,
+  Resilience4j registries, Actuator diagnostics, OTel API/beans, and the
+  user-supplied OAuth2 `AuthProviderFactory` override. Strict japicmp passed
+  for starter, test helper, and OTel against published `3.3.0` with each
+  managed row classpath and verified Central artifacts.
+- The covered starter API delta is additive and compatible:
+  `MethodMetadataCache.validateDeclarativeReturnTypes(Class, String)` is new,
+  and deprecated proxy type `HTTPS` gained its `since=3.4.0` annotation.
+  Test-helper API is unchanged; no incompatible `3.x` change was accepted.
+- Exact method and type hints retain inherited public endpoint reflection and
+  return-grammar AOT validation without `MemberCategory` or introspection
+  modes. GraalVM `25.0.3` built the fixture from clean commit
+  `2e35e721d297c04bc71f7d664c789387e3d5b379`; the generated executable
+  (`d07884683a5e4c7ec6c10abddf07e784d08a78fecc25b9a82e25926cae8108fb`)
+  passed the inherited generic call plus configured `@ApiRef`, gzip,
+  Problem Detail, auth, diagnostics, health, and Micrometer loopback contracts.
 
 ---
 

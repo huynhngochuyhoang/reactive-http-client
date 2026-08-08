@@ -95,6 +95,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verifiers copy fresh Surefire evidence immediately after each test stage while
   retaining failure-safe exit traps, isolated repositories, stage provenance,
   Central markers, and reactor-leakage rejection.
+- **Dependency, API, AOT, and native evidence.** Revalidated the full Java 21
+  reactor and assembled consumer on Spring Boot 4.0 and 4.1 with resolved
+  dependency provenance, explicit optional-integration and OAuth factory
+  back-off assertions, and strict Central-backed japicmp against published
+  `3.3.0`. The covered API delta remains additive; exact AOT hints retain
+  inherited generic return validation without deprecated Framework 7 member
+  categories, and the GraalVM 25 fixture passed from a clean immutable commit.
 - **Roadmap archive integrity.** Added the V24 execution checklist, normalized
   V1-V24 archive status and sibling links without rewriting historical planning
   boxes as release evidence, and added a normal documentation test that rejects
