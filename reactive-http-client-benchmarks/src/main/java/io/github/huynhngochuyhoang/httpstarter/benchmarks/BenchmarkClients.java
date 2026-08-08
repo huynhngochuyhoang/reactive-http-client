@@ -13,6 +13,7 @@ import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBea
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.context.support.GenericApplicationContext;
@@ -49,6 +50,7 @@ final class BenchmarkClients implements AutoCloseable {
             StarterClientResources exchangeLoggingStarter,
             StarterClientResources micrometerStarter,
             StarterClientResources retryStarter,
+            StarterClientResources rateLimiterStarter,
             StarterClientResources circuitBreakerStarter) {
         this.rawConnectionProvider = rawConnectionProvider;
         this.httpExchangeConnectionProvider = httpExchangeConnectionProvider;
@@ -58,6 +60,7 @@ final class BenchmarkClients implements AutoCloseable {
                 exchangeLoggingStarter,
                 micrometerStarter,
                 retryStarter,
+                rateLimiterStarter,
                 circuitBreakerStarter);
         this.rawWebClient = rawWebClient;
         this.httpExchangeClient = httpExchangeClient;
@@ -66,6 +69,7 @@ final class BenchmarkClients implements AutoCloseable {
         this.starterExchangeLoggingClient = exchangeLoggingStarter.client;
         this.starterMicrometerClient = micrometerStarter.client;
         this.starterRetryClient = retryStarter.client;
+        this.starterRateLimiterClient = rateLimiterStarter.client;
         this.starterCircuitBreakerClient = circuitBreakerStarter.client;
     }
 
@@ -76,6 +80,7 @@ final class BenchmarkClients implements AutoCloseable {
     final StarterBenchmarkClient starterExchangeLoggingClient;
     final StarterBenchmarkClient starterMicrometerClient;
     final StarterBenchmarkClient starterRetryClient;
+    final StarterBenchmarkClient starterRateLimiterClient;
     final StarterBenchmarkClient starterCircuitBreakerClient;
 
     static BenchmarkClients create(String baseUrl) {
@@ -117,6 +122,9 @@ final class BenchmarkClients implements AutoCloseable {
             config.getResilience().setEnabled(true);
             config.getResilience().setRetryMethods(Set.of("GET"));
         }, (context, properties) -> context.registerBean(RetryRegistry.class, RetryRegistry::ofDefaults));
+        StarterClientResources rateLimiterStarter = createStarter(baseUrl, "benchmark-starter-rate-limiter", config ->
+                config.getResilience().setEnabled(true),
+                (context, properties) -> context.registerBean(RateLimiterRegistry.class, RateLimiterRegistry::ofDefaults));
         StarterClientResources circuitBreakerStarter = createStarter(baseUrl, "benchmark-starter-circuit-breaker", config ->
                 config.getResilience().setEnabled(true),
                 (context, properties) -> context.registerBean(CircuitBreakerRegistry.class, CircuitBreakerRegistry::ofDefaults));
@@ -131,6 +139,7 @@ final class BenchmarkClients implements AutoCloseable {
                 exchangeLoggingStarter,
                 micrometerStarter,
                 retryStarter,
+                rateLimiterStarter,
                 circuitBreakerStarter);
     }
 

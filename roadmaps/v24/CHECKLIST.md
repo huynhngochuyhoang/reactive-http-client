@@ -472,20 +472,53 @@ Evidence:
 
 ## Priority 10 - Benchmark and Allocation Re-Audit
 
-### [ ] 10.1 Keep benchmark comparison fair and scoped
+### [x] 10.1 Keep benchmark comparison fair and scoped
 
-- [ ] Pass discovery and fairness guards before measurements.
-- [ ] Rerun only production paths changed by V24.
-- [ ] Keep current and published `3.3.0` reports in distinct fresh repositories.
-- [ ] Compare equivalent Boot, transport, codec, and optional-feature work.
+- [x] Pass discovery and fairness guards before measurements.
+- [x] Rerun only production paths changed by V24.
+- [x] Keep current and published `3.3.0` reports in distinct fresh repositories.
+- [x] Compare equivalent Boot, transport, codec, and optional-feature work.
 
-### [ ] 10.2 Record review evidence without broad claims
+### [x] 10.2 Record review evidence without broad claims
 
-- [ ] Review movement by named scenario and allocation profile.
-- [ ] Keep smoke output out of public numerical claims.
-- [ ] Keep normal CI free of hard numeric performance gates.
-- [ ] Promote a clean report only if `3.4.0` notes make a numerical performance
+- [x] Review movement by named scenario and allocation profile.
+- [x] Keep smoke output out of public numerical claims.
+- [x] Keep normal CI free of hard numeric performance gates.
+- [x] Promote a clean report only if `3.4.0` notes make a numerical performance
       or allocation claim.
+
+Evidence:
+
+- Added `starterFeatureRateLimiterWrapperGetNoBody` with one isolated
+  `RateLimiterRegistry`, the same loopback transport and response validation as
+  the existing resilience rows, and setup-time parity checks. The published
+  baseline profile now keeps the diagnostics benchmark because published
+  `3.3.0` contains its required public APIs. Current and published-baseline
+  discovery passed all 15 report/fairness tests and discovered the same scoped
+  rows before measurement.
+- Release-quality JMH runs used GC allocation profiling and separate previously
+  absent Maven repositories under `/tmp` for current `3.4.0-SNAPSHOT` and
+  published `3.3.0`. Both resolved Boot `4.0.0`, Framework/WebFlux `7.0.1`,
+  Reactor Netty `1.3.0`, Netty `4.2.7.Final`, Jackson `3.0.2`, Micrometer
+  `1.16.0`, and OTel `1.55.0`. The current lane also passed all 936 starter
+  tests before measurement.
+- Target-only reports remain at
+  `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md` and
+  `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-3.3.0/release-jmh.md`;
+  the non-gating comparison is
+  `reactive-http-client-benchmarks/target/benchmark-reports/v24-current-vs-published-3.3.0.md`.
+  Allocation stayed below every review trigger for default unary, JSON,
+  `ResponseEntity`, retry, rate-limiter, diagnostics-disabled, and runtime
+  diagnostics-provider rows. Latency review markers moved in both directions
+  across starter and raw/framework controls, so they are treated as local-run
+  variance rather than a starter-only regression or optimization.
+- No smoke number or broad raw-`WebClient` parity statement was published. The
+  comparator ran with `benchmark.compare.fail-on-review=false`; normal CI has no
+  numeric gate. The current report records
+  `ba475e5-dirty-v24-priority10`, so it was deliberately not promoted. The
+  Unreleased notes make no numerical performance or allocation claim; a clean
+  rerun and promoted `docs/benchmark-report-3.4.0.md` remain conditional on such
+  a claim being added during release preparation.
 
 ---
 

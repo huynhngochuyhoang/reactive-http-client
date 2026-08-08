@@ -442,6 +442,14 @@ into transport comparison tables.
 The V18 scope review added no benchmark rows and promoted no report because it
 introduced no public performance claim or changed request path.
 
+Resilience wrapper rows such as `starterFeatureRetryWrapperGetNoBody`,
+`starterFeatureRateLimiterWrapperGetNoBody`, and
+`starterFeatureCircuitBreakerWrapperGetNoBody` are starter-only optional-feature
+scenarios. Each enables only the named operator around the same loopback request.
+Compare these rows release to release against the same starter scenario; do not
+compare them with raw `WebClient` unless that baseline is changed to perform the
+same resilience work.
+
 ## Metrics
 
 Loopback benchmarks use stable JMH benchmark names for release-to-release diffs

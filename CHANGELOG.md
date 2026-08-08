@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Scoped benchmark re-audit.** Added a one-feature rate-limiter loopback row,
+  kept diagnostics available in the published `3.3.0` benchmark lane, and
+  reviewed current and baseline target-only reports with the non-gating
+  comparator. No generated report was promoted and no numerical performance
+  claim is made for this development snapshot.
 - **Declarative return-type grammar.** Added one inherited-generic-aware startup
   validator for supported `Mono`, `Flux`, `ResponseEntity`, and raw
   `DataBuffer` streaming shapes; nested publishers and ambiguous response
