@@ -573,13 +573,31 @@ Evidence:
 
 ### [ ] 12.1 Select release scope and assemble evidence
 
-- [ ] Decide whether delivered scope is documentation/correctness-only or a
+- [x] Decide whether delivered scope is documentation/correctness-only or a
       backward-compatible `3.4.0` public addition.
 - [ ] Run full reactor, strict root/module API, packaging, current/published
       consumer, supported matrix, transport, AOT/native, and documentation gates.
-- [ ] Verify complete parent, starter, test-helper, and OTel candidate artifacts.
+- [x] Verify complete parent, starter, test-helper, and OTel candidate artifacts.
 - [ ] Use one immutable commit for every reproducible release gate.
-- [ ] Cite a clean promoted report or make no numerical performance claim.
+- [x] Cite a clean promoted report or make no numerical performance claim.
+
+Release-candidate preparation evidence (2026-08-08):
+
+- Selected minor release `3.4.0` for the delivered backward-compatible contract,
+  transport, composition, diagnostics, mock-parity, and operations scope. Root,
+  module, benchmark, current-consumer, and native-fixture coordinates now use
+  final `3.4.0`; public consumer snippets, `latest.published.version`, strict API
+  compatibility, published-consumer, and benchmark baselines intentionally remain
+  on published `3.3.0`.
+- Dated the `3.4.0` changelog section. The scoped benchmark note explicitly makes
+  no numerical performance claim, so no generated target report was promoted.
+- Pre-commit checks passed: `mvn -B -ntp clean verify` ran 1,020 tests, and
+  `bash scripts/verify-generation-packaging.sh` verified the final `3.4.0` parent POM plus
+  starter, test-helper, and OTel binary, source, and Javadoc archives.
+- Remaining release work is deliberately open: commit this release-prep tree,
+  rerun the complete release matrix from that clean immutable commit, create tag
+  `v3.4.0`, publish the complete companion bundle, and verify it from Maven
+  Central before moving public coordinates or either baseline.
 
 ### [ ] 12.2 Record the decision
 

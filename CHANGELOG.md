@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-08-08
+
 ### Changed
 
 - **Documentation and operations consolidation.** Added one production-facing
@@ -21,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kept diagnostics available in the published `3.3.0` benchmark lane, and
   reviewed current and baseline target-only reports with the non-gating
   comparator. No generated report was promoted and no numerical performance
-  claim is made for this development snapshot.
+  claim is made for this release candidate.
 - **Declarative return-type grammar.** Added one inherited-generic-aware startup
   validator for supported `Mono`, `Flux`, `ResponseEntity`, and raw
   `DataBuffer` streaming shapes; nested publishers and ambiguous response
@@ -1437,7 +1439,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.4.0...HEAD
+[3.4.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.3.0...v3.4.0
 [3.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.0.0...v3.1.0
