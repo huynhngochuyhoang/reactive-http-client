@@ -69,6 +69,17 @@ the canonical reviewable layout.
   sent such a request.
 - Do not add `Content-Length`, `Transfer-Encoding`, `Connection`, `Expect`, or
   `Host`; framing and authority belong to the transport.
+- A healthy unexpected body on `Mono<Void>` or `Mono<ResponseEntity<Void>>` is
+  drained, so a later pooled request can reuse the connection. Invalid or
+  conflicting `Content-Length`, invalid chunk framing, and truncated fixed-length
+  bodies fail the affected exchange and remove that socket before reuse.
+- A valid HTTP/1.1 close-delimited body can complete normally, but the connection
+  closes by definition and later demand uses replacement capacity. Correlate the
+  observed status with the concrete decoder or premature-close type; never infer
+  a failure stage from parser message text.
+- On the currently supported Reactor Netty stack, WebClient can expose a raw
+  HTTP/1.1 `103 Early Hints` block instead of the later final response. Capture
+  wire evidence before treating such metadata as the downstream's final status.
 
 See [HTTP/2, HTTP Proxy, and TLS / mTLS](12-proxy-tls.md#http2) and its
 [transport-owned request header](12-proxy-tls.md#transport-owned-request-headers)

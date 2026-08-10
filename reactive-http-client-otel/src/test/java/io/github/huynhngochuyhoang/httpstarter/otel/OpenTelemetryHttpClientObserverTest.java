@@ -80,6 +80,32 @@ class OpenTelemetryHttpClientObserverTest {
     }
 
     @Test
+    void finalRedirectAndErrorStatusesRetainTheirTerminalFacts() {
+        observer.record(new HttpClientObserverEvent(
+                "status-client", "notModified", "GET", "/cached",
+                304, 4L, null, null, null, null));
+        observer.record(new HttpClientObserverEvent(
+                "status-client", "badRequest", "GET", "/invalid",
+                400, 5L, new IllegalArgumentException("invalid"),
+                ErrorCategory.CLIENT_ERROR, null, null));
+
+        assertThat(exporter.getFinishedSpanItems()).hasSize(2);
+        SpanData redirect = exporter.getFinishedSpanItems().get(0);
+        assertThat(redirect.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_HTTP_STATUS_CODE))
+                .isEqualTo(304L);
+        assertThat(redirect.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_ERROR_TYPE)).isNull();
+        assertThat(redirect.getStatus()).isEqualTo(StatusData.unset());
+        assertThat(redirect.getEvents()).isEmpty();
+
+        SpanData clientError = exporter.getFinishedSpanItems().get(1);
+        assertThat(clientError.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_HTTP_STATUS_CODE))
+                .isEqualTo(400L);
+        assertThat(clientError.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_ERROR_TYPE))
+                .isEqualTo(ErrorCategory.CLIENT_ERROR.name());
+        assertThat(clientError.getStatus()).isEqualTo(StatusData.error());
+    }
+
+    @Test
     void urlTemplateAndServerAttributesAreRecordedWhenOptedIn() {
         ReactiveHttpClientProperties.ObservabilityConfig config =
                 new ReactiveHttpClientProperties.ObservabilityConfig();

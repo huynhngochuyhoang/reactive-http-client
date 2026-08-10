@@ -12,6 +12,7 @@ import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureSt
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.netty.channel.ConnectTimeoutException;
+import io.netty.handler.codec.DecoderException;
 import io.netty.handler.proxy.ProxyConnectException;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutException;
@@ -28,6 +29,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
+import reactor.netty.http.client.PrematureCloseException;
 import reactor.netty.http.server.HttpServer;
 
 import javax.net.ssl.SSLException;
@@ -68,6 +70,20 @@ class ReactiveHttpClientTimeoutTerminalStateContractTest {
                 .isEqualTo(HttpClientFailureStage.RESPONSE_HEADERS);
         assertThat(HttpClientFailureStage.from(ReadTimeoutException.INSTANCE, 200))
                 .isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
+        assertThat(HttpClientFailureStage.from(PrematureCloseException.TEST_EXCEPTION, null, false)).isNull();
+        assertThat(HttpClientFailureStage.from(PrematureCloseException.TEST_EXCEPTION, null, true))
+                .isEqualTo(HttpClientFailureStage.RESPONSE_HEADERS);
+        assertThat(HttpClientFailureStage.from(PrematureCloseException.TEST_EXCEPTION, 200, true))
+                .isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
+        DecoderException decoderFailure = new DecoderException(new IllegalArgumentException("framing"));
+        assertThat(HttpClientFailureStage.from(decoderFailure, null, false)).isNull();
+        assertThat(HttpClientFailureStage.from(decoderFailure, null, true))
+                .isEqualTo(HttpClientFailureStage.RESPONSE_HEADERS);
+        assertThat(HttpClientFailureStage.from(decoderFailure, 200, true))
+                .isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
+        assertThat(HttpClientFailureStage.from(
+                new DecoderException(new SSLException("handshake")), null, true))
+                .isEqualTo(HttpClientFailureStage.TLS_HANDSHAKE);
         Throwable authTimeout = new AuthProviderException("auth-client", ReadTimeoutException.INSTANCE);
         assertThat(HttpClientFailureStage.from(authTimeout, null, false)).isNull();
         assertThat(HttpClientFailureStage.from(authTimeout, null, true)).isNull();

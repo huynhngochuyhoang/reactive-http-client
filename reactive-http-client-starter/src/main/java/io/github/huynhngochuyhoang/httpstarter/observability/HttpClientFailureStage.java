@@ -2,6 +2,8 @@ package io.github.huynhngochuyhoang.httpstarter.observability;
 
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
+import io.netty.handler.codec.DecoderException;
+import reactor.netty.http.client.PrematureCloseException;
 
 import javax.net.ssl.SSLException;
 import java.net.ConnectException;
@@ -76,6 +78,8 @@ public enum HttpClientFailureStage {
      * pre-dispatch filters. Dispatch evidence disambiguates read timeouts and arbitrary
      * outer wrappers; direct concrete DNS, proxy, TLS, connection, and pool-acquire
      * failures remain attributable.
+     * Netty decoder failures and Reactor Netty premature closes use dispatch and
+     * observed-status evidence to distinguish response headers from response body.
      * Request-write attribution requires dispatch evidence.
      * Auth-provider failures are never promoted into business-request transport stages.
      *
@@ -134,6 +138,13 @@ public enum HttpClientFailureStage {
             }
             if (preResponseFailureEligible && responseStateKnown && WRITE_TIMEOUT.equals(className)) {
                 return REQUEST_WRITE;
+            }
+            if (concreteFailureEligible
+                    && (current instanceof DecoderException || current instanceof PrematureCloseException)) {
+                if (responseStateKnown && deferredStage == null) {
+                    deferredStage = statusCode != null ? RESPONSE_BODY : RESPONSE_HEADERS;
+                }
+                transportBoundarySeen = true;
             }
             if (concreteFailureEligible && READ_TIMEOUT.equals(className)) {
                 return responseStateKnown

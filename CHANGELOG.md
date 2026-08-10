@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **HTTP method, final-status, and framing semantics.** Added real HTTP/1.1 and
+  H2C coverage for `HEAD`, `OPTIONS`, `204`, `205`, `304`, visible redirects,
+  4xx/5xx mapping, and all supported unary/`ResponseEntity` no-body shapes.
+  Lifecycle, observer, exchange-log, Micrometer, health, and OTel evidence now
+  shares the exposed terminal status/category contract. Added a raw HTTP/1.1
+  peer proving healthy unexpected-body draining and reuse, close-delimited
+  replacement, malformed length/chunk/truncation quarantine, and structural
+  decoder/premature-close failure-stage attribution; documented Reactor Netty's
+  current `103 Early Hints` exposure boundary.
 - **Declarative URI and request-target contract.** Centralized annotation and
   configured `@ApiRef` path/query parsing, startup validation, and runtime
   expansion; endpoint templates that declare an authority, scheme, user-info,
