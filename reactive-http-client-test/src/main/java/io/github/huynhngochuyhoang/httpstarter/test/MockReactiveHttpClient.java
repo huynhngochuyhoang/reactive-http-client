@@ -349,6 +349,7 @@ public final class MockReactiveHttpClient<T> {
             ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
             String clientName = annotation != null ? annotation.name() : "mock-client";
             MethodMetadataCache metadataCache = new MethodMetadataCache();
+            metadataCache.validateDeclarativeRequestParameters(clientInterface, clientName);
             metadataCache.validateDeclarativeReturnTypes(clientInterface, clientName);
 
             List<RecordedExchange> exchanges = new CopyOnWriteArrayList<>();

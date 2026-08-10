@@ -10,80 +10,114 @@ promoted, versioned artifact is explicitly required.
 
 ## Priority 1 - Post-`3.4.0` Baseline and V25 Scope Integrity
 
-### [ ] 1.1 Align development and published-release lanes
+### [x] 1.1 Align development and published-release lanes
 
-- [ ] Keep root/module and reactor-only fixture coordinates on
+- [x] Keep root/module and reactor-only fixture coordinates on
       `3.5.0-SNAPSHOT`.
-- [ ] Keep public dependency snippets and `latest.published.version` on `3.4.0`.
-- [ ] Keep API compatibility, published-consumer, and benchmark baselines on
+- [x] Keep public dependency snippets and `latest.published.version` on `3.4.0`.
+- [x] Keep API compatibility, published-consumer, and benchmark baselines on
       `3.4.0`.
-- [ ] Preserve root and module guards that reject a baseline equal to the current
+- [x] Preserve root and module guards that reject a baseline equal to the current
       reactor version.
-- [ ] Keep V25 as the only active roadmap and preserve completed V1-V24 records.
+- [x] Keep V25 as the only active roadmap and preserve completed V1-V24 records.
 
-### [ ] 1.2 Prove published `3.4.0` provenance
+### [x] 1.2 Prove published `3.4.0` provenance
 
-- [ ] Resolve the parent POM plus starter, test-helper, and OTel POM/JAR/source/
+- [x] Resolve the parent POM plus starter, test-helper, and OTel POM/JAR/source/
       Javadoc artifacts from a previously absent Central-only repository.
-- [ ] Require Maven Central remote markers and record SHA-256 values for every
+- [x] Require Maven Central remote markers and record SHA-256 values for every
       required artifact.
-- [ ] Run strict root japicmp against published `3.4.0` from a fresh repository.
-- [ ] Run strict starter-module japicmp against published `3.4.0` from a separate
+- [x] Run strict root japicmp against published `3.4.0` from a fresh repository.
+- [x] Run strict starter-module japicmp against published `3.4.0` from a separate
       fresh repository.
-- [ ] Run published-baseline fixture tests for local contamination, mixed
+- [x] Run published-baseline fixture tests for local contamination, mixed
       versions, missing attachments, and self-comparison.
 
-### [ ] 1.3 Keep generated readiness honest
+### [x] 1.3 Keep generated readiness honest
 
-- [ ] Report `3.5.0-SNAPSHOT` as snapshot development and `3.4.0` as the latest
+- [x] Report `3.5.0-SNAPSHOT` as snapshot development and `3.4.0` as the latest
       published/API baseline.
-- [ ] Keep the final candidate version and promotable benchmark path deferred
+- [x] Keep the final candidate version and promotable benchmark path deferred
       until release preparation.
-- [ ] Include unresolved manual baseline, compatibility, native, benchmark, and
+- [x] Include unresolved manual baseline, compatibility, native, benchmark, and
       publication work in the generated readiness manifest.
-- [ ] Run focused release-documentation tests and `git diff --check`.
+- [x] Run focused release-documentation tests and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Verified the reactor and reactor-only fixtures at `3.5.0-SNAPSHOT`, public
+  snippets and published baselines at `3.4.0`, and V25 as the sole active roadmap.
+- Resolved the published parent plus all starter, test-helper, and OTel
+  POM/JAR/sources/Javadoc artifacts from a fresh V25 Maven Central repository;
+  recorded 13 SHA-256 entries and Central markers under
+  `target/release-evidence/v25/published-baselines/`.
+- Passed strict root and starter-module japicmp runs from separate fresh `3.4.0`
+  repositories and recorded their provenance in the V25 evidence directory.
+- Passed published-baseline provenance fixtures, including local contamination,
+  mixed versions, missing attachments, mismatched POM/JAR versions, and
+  root/module self-comparison guards; API compatibility fixtures also passed.
+- `mvn -B -ntp -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed 32 tests and regenerated an honest snapshot-development readiness
+  manifest with native and publication work visible.
+- `bash -n scripts/verify-published-baseline-fixtures.sh`, manifest assertions,
+  and `git diff --check` passed.
 
 ---
 
 ## Priority 2 - Declarative Request-Parameter Grammar
 
-### [ ] 2.1 Define one starter-owned parameter grammar
+### [x] 2.1 Define one starter-owned parameter grammar
 
-- [ ] Inventory path, query, named header, header map, idempotency-key, body,
+- [x] Inventory path, query, named header, header map, idempotency-key, body,
       form-field, and form-file parameter roles.
-- [ ] Resolve inherited and multi-level generic parameter types against the
+- [x] Resolve inherited and multi-level generic parameter types against the
       concrete client before validation.
-- [ ] Reject conflicting request-binding annotations on one parameter with the
+- [x] Reject conflicting request-binding annotations on one parameter with the
       concrete client, declaring interface, full method signature, parameter
       index/type, and conflicting roles in the message.
-- [ ] Define duplicate path/query/header/idempotency/form names, including
+- [x] Define duplicate path/query/header/idempotency/form names, including
       case-insensitive header collisions, without silently overwriting values.
-- [ ] Validate `@FormFile` parameter types at startup.
-- [ ] Inventory unannotated endpoint parameters and choose a compatibility-safe
+- [x] Validate `@FormFile` parameter types at startup.
+- [x] Inventory unannotated endpoint parameters and choose a compatibility-safe
       warning or opt-in strict policy before changing accepted published clients.
 
-### [ ] 2.2 Fail before invocation side effects and keep all consumers aligned
+### [x] 2.2 Fail before invocation side effects and keep all consumers aligned
 
-- [ ] Reject a null/missing required path variable before auth, serialization,
+- [x] Reject a null/missing required path variable before auth, serialization,
       body/resource subscription, lifecycle attempt notification, or dispatch.
-- [ ] Apply the same grammar through factory startup, effective contracts,
+- [x] Apply the same grammar through factory startup, effective contracts,
       diagnostics, AOT validation, and `MockReactiveHttpClient`.
-- [ ] Keep replacement `MethodMetadataCache` behavior and foreign `FactoryBean`
+- [x] Keep replacement `MethodMetadataCache` behavior and foreign `FactoryBean`
       clients outside starter-only validation.
-- [ ] Add direct, inherited, generic, `@ApiRef`, replacement-cache, factory-method,
+- [x] Add direct, inherited, generic, `@ApiRef`, replacement-cache, factory-method,
       AOT, diagnostics/export, and mock tests.
-- [ ] Preserve valid existing scalar, collection, array, body, streaming, and
+- [x] Preserve valid existing scalar, collection, array, body, streaming, and
       multipart declarations.
-- [ ] Run focused suites, the starter/test-helper reactor, strict starter japicmp,
+- [x] Run focused suites, the starter/test-helper reactor, strict starter japicmp,
       and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added one request-parameter grammar over `RequestPlan` metadata. It resolves
+  inherited generic parameter types against the concrete client, rejects
+  conflicting roles and duplicate path/query names, treats named headers and
+  parameter idempotency keys as one case-insensitive namespace, permits repeated
+  multipart names as ordered parts, and validates `@FormFile` shapes at startup.
+- Preserved unannotated parameters as ignored compatibility behavior with a
+  deduplicated warning. Required path variables now reject null before auth,
+  serialization, body subscription, lifecycle notification, or network dispatch;
+  dynamic header-map collisions also fail instead of overwriting prior values.
+- Applied validation through factory startup, AOT, effective-contract/diagnostic
+  export, and `MockReactiveHttpClient`; replacement metadata caches retain their
+  parsed contract and foreign `FactoryBean` clients remain outside starter-only
+  validation.
+- Focused request-grammar, invocation, AOT, diagnostics, factory, header-map, and
+  mock-helper suites passed 171 starter tests and 39 mock-helper tests.
+- `mvn -B -ntp -pl reactive-http-client-test -am test` passed 949 starter tests
+  and 42 test-helper tests, including documentation and metadata checks.
+- Strict starter japicmp passed against Central-resolved `3.4.0` from
+  `target/published-baseline-repositories/api-starter-v25-priority2-3.4.0`;
+  `git diff --check` passed.
 
 ---
 

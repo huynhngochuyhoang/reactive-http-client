@@ -149,4 +149,21 @@ if "$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
   exit 1
 fi
 
-echo "Published baseline provenance fixtures passed."
+PROJECT_VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+for scope in root module; do
+  if [[ "$scope" == root ]]; then
+    command=(mvn -q -N -Papi-compatibility
+      -Dapi.compatibility.baseline.version="$PROJECT_VERSION" validate)
+  else
+    command=(mvn -q -pl reactive-http-client-starter -Papi-compatibility
+      -Dapi.compatibility.baseline.version="$PROJECT_VERSION" validate)
+  fi
+  log="$WORK/self-comparison-$scope.log"
+  if "${command[@]}" > "$log" 2>&1; then
+    echo "$scope API compatibility unexpectedly accepted the current reactor as its baseline" >&2
+    exit 1
+  fi
+  grep -q "must point to the last published release, not the current reactor version" "$log"
+done
+
+echo "Published baseline provenance fixtures passed, including root and module self-comparison guards."

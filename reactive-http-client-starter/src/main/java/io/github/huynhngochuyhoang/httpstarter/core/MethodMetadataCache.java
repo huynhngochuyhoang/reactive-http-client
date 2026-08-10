@@ -5,10 +5,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
+import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +26,8 @@ public class MethodMetadataCache {
     private final ConcurrentHashMap<Method, MethodMetadata> cache = new ConcurrentHashMap<>();
     // Tracks which methods have already had a blank-path warning emitted so the warning fires exactly once per method.
     private final ConcurrentHashMap<Method, Boolean> blankPathWarned = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UnannotatedParameter, Boolean> unannotatedParameterWarned =
+            new ConcurrentHashMap<>();
 
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(MethodMetadataCache.class);
@@ -53,6 +52,53 @@ public class MethodMetadataCache {
             DeclarativeReturnTypeGrammar.validate(
                     clientInterface, clientName, RequestPlan.from(metadata, clientInterface));
         }
+    }
+
+    /**
+     * Validates request parameter roles after resolving inherited generic
+     * bindings against the concrete client interface.
+     *
+     * @param clientInterface concrete reactive HTTP client interface
+     * @param clientName logical client name used in validation diagnostics
+     */
+    public void validateDeclarativeRequestParameters(Class<?> clientInterface, String clientName) {
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method)) {
+                continue;
+            }
+            try {
+                RequestPlan plan = RequestPlan.from(get(method), clientInterface);
+                for (Integer index : DeclarativeRequestParameterGrammar.validate(clientInterface, clientName, plan)) {
+                    UnannotatedParameter key = new UnannotatedParameter(method, index);
+                    unannotatedParameterWarned.computeIfAbsent(key, ignored -> {
+                        Type parameterType = plan.parameterTypes().get(index);
+                        log.warn("Parameter index {} ({}) on {} is unannotated and is ignored for compatibility. "
+                                        + "Declare one request-binding annotation to include it in the outbound request.",
+                                index, parameterType.getTypeName(), method.toGenericString());
+                        return Boolean.TRUE;
+                    });
+                }
+            } catch (IllegalArgumentException ex) {
+                throw inheritedRequestParameterException(clientInterface, clientName, method, ex);
+            } catch (IllegalStateException ex) {
+                throw inheritedRequestParameterException(clientInterface, clientName, method, ex);
+            }
+        }
+    }
+
+    private static RuntimeException inheritedRequestParameterException(Class<?> clientInterface,
+                                                                       String clientName,
+                                                                       Method method,
+                                                                       RuntimeException error) {
+        if (method.getDeclaringClass() == clientInterface) {
+            return error;
+        }
+        String message = "Inherited method " + method + " from " + method.getDeclaringClass().getName()
+                + " on @ReactiveHttpClient(\"" + clientName + "\") " + clientInterface.getName()
+                + ": " + error.getMessage();
+        return error instanceof IllegalArgumentException
+                ? new IllegalArgumentException(message, error)
+                : new IllegalStateException(message, error);
     }
 
     /**
@@ -110,6 +156,7 @@ public class MethodMetadataCache {
         }
         Annotation[][] paramAnnotations = method.getParameterAnnotations();
         Class<?>[] parameterTypes = method.getParameterTypes();
+        Type[] genericParameterTypes = method.getGenericParameterTypes();
         for (int i = 0; i < paramAnnotations.length; i++) {
             for (Annotation ann : paramAnnotations[i]) {
                 if (ann instanceof PathVar pv) {
@@ -119,16 +166,19 @@ public class MethodMetadataCache {
                     requireNonBlankAnnotationValue(qp.value(), "@QueryParam", method);
                     meta.getQueryParams().put(i, qp.value());
                 } else if (ann instanceof HeaderParam hp) {
-                    if (Map.class.isAssignableFrom(parameterTypes[i])) {
-                        if (hp.value() != null && !hp.value().isBlank()) {
+                    if (hp.value() == null || hp.value().isBlank()) {
+                        if (!Map.class.isAssignableFrom(parameterTypes[i])
+                                && !(genericParameterTypes[i] instanceof TypeVariable<?>)) {
                             throw new IllegalArgumentException(
-                                    "@HeaderParam value must be blank for Map parameter at index " + i + " in method: " + method);
+                                    "@HeaderParam value must not be blank for non-Map parameter at index " + i
+                                            + " in method: " + method);
                         }
                         meta.getHeaderMapParams().add(i);
                     } else {
-                        if (hp.value() == null || hp.value().isBlank()) {
+                        if (Map.class.isAssignableFrom(parameterTypes[i])) {
                             throw new IllegalArgumentException(
-                                    "@HeaderParam value must not be blank for non-Map parameter at index " + i + " in method: " + method);
+                                    "@HeaderParam value must be blank for Map parameter at index " + i
+                                            + " in method: " + method);
                         }
                         meta.getHeaderParams().put(i, hp.value());
                     }
@@ -158,17 +208,20 @@ public class MethodMetadataCache {
             }
         }
 
+        boolean conflictingParameterRoles = hasConflictingParameterRoles(meta, method.getParameterCount());
         if (method.isAnnotationPresent(MultipartBody.class)) {
             meta.setMultipart(true);
-            if (meta.getBodyIndex() >= 0) {
+            if (meta.getBodyIndex() >= 0 && !conflictingParameterRoles) {
                 throw new IllegalStateException(
                         "@MultipartBody cannot be combined with a @Body parameter on method: " + method);
             }
-            if (meta.getFormFieldParams().isEmpty() && meta.getFormFileParams().isEmpty()) {
+            if (meta.getFormFieldParams().isEmpty() && meta.getFormFileParams().isEmpty()
+                    && !conflictingParameterRoles) {
                 throw new IllegalStateException(
                         "@MultipartBody method has no @FormField / @FormFile parameters: " + method);
             }
-        } else if (!meta.getFormFieldParams().isEmpty() || !meta.getFormFileParams().isEmpty()) {
+        } else if ((!meta.getFormFieldParams().isEmpty() || !meta.getFormFileParams().isEmpty())
+                && !conflictingParameterRoles) {
             throw new IllegalStateException(
                     "@FormField / @FormFile parameters require the method to be annotated @MultipartBody: " + method);
         }
@@ -320,10 +373,28 @@ public class MethodMetadataCache {
                 && !method.isBridge();
     }
 
+    private static boolean hasConflictingParameterRoles(MethodMetadata metadata, int parameterCount) {
+        int[] roles = new int[parameterCount];
+        metadata.getPathVars().keySet().forEach(index -> roles[index]++);
+        metadata.getQueryParams().keySet().forEach(index -> roles[index]++);
+        metadata.getHeaderParams().keySet().forEach(index -> roles[index]++);
+        metadata.getHeaderMapParams().forEach(index -> roles[index]++);
+        metadata.getIdempotencyKeyParams().keySet().forEach(index -> roles[index]++);
+        if (metadata.getBodyIndex() >= 0) {
+            roles[metadata.getBodyIndex()]++;
+        }
+        metadata.getFormFieldParams().keySet().forEach(index -> roles[index]++);
+        metadata.getFormFileParams().keySet().forEach(index -> roles[index]++);
+        return java.util.Arrays.stream(roles).anyMatch(count -> count > 1);
+    }
+
     private static void requireNonBlankAnnotationValue(String value, String annotationName, Method method) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(
                     annotationName + " value must not be blank on method: " + method);
         }
+    }
+
+    private record UnannotatedParameter(Method method, int index) {
     }
 }

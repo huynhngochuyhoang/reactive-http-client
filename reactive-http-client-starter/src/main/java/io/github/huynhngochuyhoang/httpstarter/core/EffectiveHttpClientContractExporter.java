@@ -88,6 +88,7 @@ final class EffectiveHttpClientContractExporter {
         MethodMetadata meta = metadataCache.get(method);
         RequestPlan plan = RequestPlan.from(meta, clientInterface);
         if (validateDeclarativeReturnTypes) {
+            DeclarativeRequestParameterGrammar.validate(clientInterface, clientName, plan);
             DeclarativeReturnTypeGrammar.validate(clientInterface, clientName, plan);
         }
         EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);

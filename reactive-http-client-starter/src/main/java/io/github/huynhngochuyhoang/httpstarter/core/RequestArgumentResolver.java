@@ -26,9 +26,12 @@ public class RequestArgumentResolver {
 
         for (RequestPlan.NamedArgumentBinding binding : plan.pathVars()) {
             int idx = binding.argumentIndex();
-            if (args != null && idx < args.length && args[idx] != null) {
-                pathVars.put(binding.name(), args[idx]);
+            if (args == null || idx >= args.length || args[idx] == null) {
+                throw new IllegalArgumentException("Required @PathVar(\"" + binding.name()
+                        + "\") argument at parameter index " + idx + " must not be null for "
+                        + methodDescription(plan));
             }
+            pathVars.put(binding.name(), args[idx]);
         }
 
         for (RequestPlan.NamedArgumentBinding binding : plan.queryParams()) {
@@ -41,13 +44,13 @@ public class RequestArgumentResolver {
         for (RequestPlan.NamedArgumentBinding binding : plan.headerParams()) {
             int idx = binding.argumentIndex();
             if (args != null && idx < args.length && args[idx] != null) {
-                putHeaderValues(headers, binding.name(), args[idx]);
+                putHeaderValues(headers, binding.name(), args[idx], plan);
             }
         }
         for (RequestPlan.NamedArgumentBinding binding : plan.idempotencyKeyParams()) {
             int idx = binding.argumentIndex();
             if (args != null && idx < args.length && args[idx] != null) {
-                putHeaderValues(headers, binding.name(), args[idx]);
+                putHeaderValues(headers, binding.name(), args[idx], plan);
             }
         }
         for (Integer idx : plan.headerMapParams()) {
@@ -56,7 +59,7 @@ public class RequestArgumentResolver {
                     if (headerEntry.getKey() != null && headerEntry.getValue() != null) {
                         String key = String.valueOf(headerEntry.getKey());
                         if (!key.isBlank()) {
-                            putHeaderValues(headers, key, headerEntry.getValue());
+                            putHeaderValues(headers, key, headerEntry.getValue(), plan);
                         }
                     }
                 }
@@ -93,12 +96,28 @@ public class RequestArgumentResolver {
         return List.of(value);
     }
 
-    private void putHeaderValues(Map<String, List<String>> headers, String headerName, Object rawValue) {
+    private void putHeaderValues(Map<String, List<String>> headers,
+                                 String headerName,
+                                 Object rawValue,
+                                 RequestPlan plan) {
         validateHeaderName(headerName);
         List<String> values = toHeaderValueList(headerName, rawValue);
         if (!values.isEmpty()) {
+            String existingName = headers.keySet().stream()
+                    .filter(name -> name.equalsIgnoreCase(headerName))
+                    .findFirst()
+                    .orElse(null);
+            if (existingName != null) {
+                throw new IllegalArgumentException("Duplicate outbound header '" + headerName
+                        + "' conflicts case-insensitively with '" + existingName + "' for "
+                        + methodDescription(plan));
+            }
             headers.put(headerName, values);
         }
+    }
+
+    private static String methodDescription(RequestPlan plan) {
+        return plan.method() != null ? plan.method().toGenericString() : "declarative request";
     }
 
     private List<String> toHeaderValueList(String headerName, Object value) {

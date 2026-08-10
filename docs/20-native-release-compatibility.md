@@ -701,26 +701,29 @@ manual/profile-gated smoke and release commands, generated report paths, starter
 version under test, baseline library versions, review-trigger thresholds, and the
 conditions that require refreshed numbers. The `mvn test` entry is marked
 `pass` when this test generated the manifest; compatibility, fixture, diff-check,
-and benchmark entries remain `pending` until the release maintainer runs them.
+native, benchmark, and publication-preflight entries remain `pending` until the
+release maintainer runs them.
 
 During snapshot development, `plannedFinalVersion` and the promotable report
 path are absent. The manifest keeps README and quick-start expectations on the
-latest published consumer version and reports benchmark promotion as deferred
-until an explicit release-cut transition removes the snapshot suffix.
+latest published consumer version and reports benchmark promotion and Maven
+Central publication as deferred until an explicit release-cut transition removes
+the snapshot suffix.
 The root `latest.published.version` property owns public consumer snippets;
 `api.compatibility.baseline.version` remains an independent compatibility policy.
 
 The readiness summary reports generated-test evidence separately from manual
 release evidence. Generated documentation and link checks can be marked `pass`
-by this test, while compatibility and benchmark commands remain `pending` until
-a maintainer runs them. It also surfaces the promoted benchmark report path,
-missing promoted reports, stale benchmark-report links, and the target-only
-release evidence directory.
+by this test, while baseline, compatibility, native, benchmark, and publication
+preflight commands remain `pending` until a maintainer runs them. It also
+surfaces the promoted benchmark report path, missing promoted reports, stale
+benchmark-report links, and the target-only release evidence directory.
 
 The `releasePrepChecklist` field is the concise release-prep view for humans. It
 lists the current changelog status, README and quick-start version-snippet
 status, published-baseline artifact resolution commands, root and module-scoped
-API compatibility commands, the API compatibility fixture command, benchmark
+API compatibility commands, the API compatibility fixture command, native-image
+commands, publication-preflight status, benchmark
 smoke/release/published-baseline commands, promoted benchmark report status,
 generated-doc and Markdown-link status, and the target-only evidence reminder.
 Use its `manualCommands` list as the one-place pending release-work list; the

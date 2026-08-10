@@ -55,6 +55,11 @@ class MockReactiveHttpClientTest {
         Mono<ResponseEntity<Flux<String>>> nested();
     }
 
+    interface InvalidParameterClient {
+        @GET("/items")
+        Mono<String> find(@QueryParam("item") @HeaderParam("X-Item") String item);
+    }
+
     interface SampleClient {
         @GET("/users/{id}")
         Mono<String> getUser(@PathVar("id") long id);
@@ -1083,6 +1088,16 @@ class MockReactiveHttpClientTest {
                 .hasMessageContaining("concreteClient=" + InvalidNestedResponseClient.class.getName())
                 .hasMessageContaining("ResponseEntity<reactor.core.publisher.Flux<java.lang.String>>")
                 .hasMessageContaining("the only reactive ResponseEntity body supported is Flux<DataBuffer>");
+    }
+
+    @Test
+    void buildRejectsInvalidRequestParameterGrammarBeforeAnyExchange() {
+        assertThatThrownBy(() -> MockReactiveHttpClient.forClient(InvalidParameterClient.class).build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Reactive HTTP client 'mock-client'")
+                .hasMessageContaining("concreteClient=" + InvalidParameterClient.class.getName())
+                .hasMessageContaining("parameterIndex=0")
+                .hasMessageContaining("conflicting request-binding roles");
     }
 
     @Test
