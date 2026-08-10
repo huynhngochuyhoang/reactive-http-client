@@ -182,6 +182,25 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorRejectsInvalidRequestParameterGrammar() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", InvalidAotParameterClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, InvalidAotParameterClient.class);
+        context.registerBeanDefinition(InvalidAotParameterClient.class.getName(), beanDefinition);
+
+        assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(context.getDefaultListableBeanFactory()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Reactive HTTP client 'invalid-aot-parameter'")
+                .hasMessageContaining("parameterIndex=0")
+                .hasMessageContaining("conflicting request-binding roles")
+                .hasMessageContaining("@PathVar(\"id\")")
+                .hasMessageContaining("@QueryParam(\"id\")");
+        context.close();
+    }
+
+    @Test
     void beanFactoryAotProcessorUsesReplacementMethodMetadataCache() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
@@ -281,9 +300,15 @@ class ReactiveHttpClientAotSmokeTest {
         Mono<reactor.core.publisher.Flux<String>> nested();
     }
 
+    @ReactiveHttpClient(name = "invalid-aot-parameter", baseUrl = "http://invalid-aot.test")
+    interface InvalidAotParameterClient {
+        @GET("/items/{id}")
+        Mono<String> find(@PathVar("id") @QueryParam("id") String id);
+    }
+
     @ReactiveHttpClient(name = "replacement-metadata", baseUrl = "http://replacement.test")
     interface ReplacementMetadataClient {
-        Mono<String> customEndpoint();
+        Mono<String> customEndpoint(@PathVar("id") @QueryParam("id") String ignoredByReplacement);
     }
 
     static final class ReplacementMethodMetadataCache extends MethodMetadataCache {

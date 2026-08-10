@@ -46,7 +46,8 @@ record RequestPlan(
         String rateLimiterInstanceName,
         RetrySafetyClassification retrySafety,
         RequestBodyRepeatability bodyRepeatability,
-        Type bodyType
+        Type bodyType,
+        List<Type> parameterTypes
 ) {
 
     static RequestPlan from(MethodMetadata meta) {
@@ -82,25 +83,41 @@ record RequestPlan(
                 retrySafety(meta.getHttpMethod(), meta.getHeaderParams(),
                         meta.getIdempotencyKeyParams(), meta.getGeneratedIdempotencyKeyHeader()),
                 bodyRepeatability(meta, concreteClientInterface, bodyType),
-                bodyType);
+                bodyType,
+                parameterTypes(meta, concreteClientInterface));
     }
 
     private static List<NamedArgumentBinding> namedBindings(Map<Integer, String> source) {
         return source.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
                 .map(entry -> new NamedArgumentBinding(entry.getKey(), entry.getValue()))
                 .toList();
     }
 
     private static List<FormFieldBinding> formFieldBindings(Map<Integer, String> source) {
         return source.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
                 .map(entry -> new FormFieldBinding(entry.getKey(), entry.getValue()))
                 .toList();
     }
 
     private static List<FormFileBinding> formFileBindings(Map<Integer, FormFile> source) {
         return source.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
                 .map(entry -> new FormFileBinding(entry.getKey(), entry.getValue()))
                 .toList();
+    }
+
+    private static List<Type> parameterTypes(MethodMetadata meta, Class<?> concreteClientInterface) {
+        Method method = meta.getMethod();
+        if (method == null) {
+            return List.of();
+        }
+        List<Type> types = new ArrayList<>(method.getParameterCount());
+        for (int index = 0; index < method.getParameterCount(); index++) {
+            types.add(parameterType(meta, index, concreteClientInterface));
+        }
+        return List.copyOf(types);
     }
 
     private static RetrySafetyClassification retrySafety(String httpMethod,

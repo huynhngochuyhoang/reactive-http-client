@@ -33,6 +33,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         clientInterfaces.forEach(clientInterface -> {
             ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
             if (annotation != null) {
+                metadataCache.validateDeclarativeRequestParameters(clientInterface, annotation.name());
                 metadataCache.validateDeclarativeReturnTypes(clientInterface, annotation.name());
             }
         });

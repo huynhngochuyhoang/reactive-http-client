@@ -66,39 +66,58 @@ Evidence:
 
 ## Priority 2 - Declarative Request-Parameter Grammar
 
-### [ ] 2.1 Define one starter-owned parameter grammar
+### [x] 2.1 Define one starter-owned parameter grammar
 
-- [ ] Inventory path, query, named header, header map, idempotency-key, body,
+- [x] Inventory path, query, named header, header map, idempotency-key, body,
       form-field, and form-file parameter roles.
-- [ ] Resolve inherited and multi-level generic parameter types against the
+- [x] Resolve inherited and multi-level generic parameter types against the
       concrete client before validation.
-- [ ] Reject conflicting request-binding annotations on one parameter with the
+- [x] Reject conflicting request-binding annotations on one parameter with the
       concrete client, declaring interface, full method signature, parameter
       index/type, and conflicting roles in the message.
-- [ ] Define duplicate path/query/header/idempotency/form names, including
+- [x] Define duplicate path/query/header/idempotency/form names, including
       case-insensitive header collisions, without silently overwriting values.
-- [ ] Validate `@FormFile` parameter types at startup.
-- [ ] Inventory unannotated endpoint parameters and choose a compatibility-safe
+- [x] Validate `@FormFile` parameter types at startup.
+- [x] Inventory unannotated endpoint parameters and choose a compatibility-safe
       warning or opt-in strict policy before changing accepted published clients.
 
-### [ ] 2.2 Fail before invocation side effects and keep all consumers aligned
+### [x] 2.2 Fail before invocation side effects and keep all consumers aligned
 
-- [ ] Reject a null/missing required path variable before auth, serialization,
+- [x] Reject a null/missing required path variable before auth, serialization,
       body/resource subscription, lifecycle attempt notification, or dispatch.
-- [ ] Apply the same grammar through factory startup, effective contracts,
+- [x] Apply the same grammar through factory startup, effective contracts,
       diagnostics, AOT validation, and `MockReactiveHttpClient`.
-- [ ] Keep replacement `MethodMetadataCache` behavior and foreign `FactoryBean`
+- [x] Keep replacement `MethodMetadataCache` behavior and foreign `FactoryBean`
       clients outside starter-only validation.
-- [ ] Add direct, inherited, generic, `@ApiRef`, replacement-cache, factory-method,
+- [x] Add direct, inherited, generic, `@ApiRef`, replacement-cache, factory-method,
       AOT, diagnostics/export, and mock tests.
-- [ ] Preserve valid existing scalar, collection, array, body, streaming, and
+- [x] Preserve valid existing scalar, collection, array, body, streaming, and
       multipart declarations.
-- [ ] Run focused suites, the starter/test-helper reactor, strict starter japicmp,
+- [x] Run focused suites, the starter/test-helper reactor, strict starter japicmp,
       and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added one request-parameter grammar over `RequestPlan` metadata. It resolves
+  inherited generic parameter types against the concrete client, rejects
+  conflicting roles and duplicate path/query names, treats named headers and
+  parameter idempotency keys as one case-insensitive namespace, permits repeated
+  multipart names as ordered parts, and validates `@FormFile` shapes at startup.
+- Preserved unannotated parameters as ignored compatibility behavior with a
+  deduplicated warning. Required path variables now reject null before auth,
+  serialization, body subscription, lifecycle notification, or network dispatch;
+  dynamic header-map collisions also fail instead of overwriting prior values.
+- Applied validation through factory startup, AOT, effective-contract/diagnostic
+  export, and `MockReactiveHttpClient`; replacement metadata caches retain their
+  parsed contract and foreign `FactoryBean` clients remain outside starter-only
+  validation.
+- Focused request-grammar, invocation, AOT, diagnostics, factory, header-map, and
+  mock-helper suites passed 171 starter tests and 39 mock-helper tests.
+- `mvn -B -ntp -pl reactive-http-client-test -am test` passed 949 starter tests
+  and 42 test-helper tests, including documentation and metadata checks.
+- Strict starter japicmp passed against Central-resolved `3.4.0` from
+  `target/published-baseline-repositories/api-starter-v25-priority2-3.4.0`;
+  `git diff --check` passed.
 
 ---
 

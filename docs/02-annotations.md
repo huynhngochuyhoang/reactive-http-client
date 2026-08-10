@@ -179,6 +179,32 @@ as documented in [11-streaming.md](11-streaming.md).
 
 ## Parameter annotations
 
+Each endpoint parameter may declare at most one request-binding role. The
+starter resolves inherited generic parameter types against the concrete client
+and validates this grammar before creating the proxy:
+
+| Role | Annotation and accepted shape | Name policy | Null/value policy |
+|---|---|---|---|
+| Path | `@PathVar("name")` | Unique, case-sensitive | Required; a null argument fails before auth, body subscription, lifecycle attempts, or dispatch |
+| Query | `@QueryParam("name")` | Unique, case-sensitive | Null omits the value; collections/arrays produce repeated values |
+| Named header | `@HeaderParam("Name")` | Unique across named headers and parameter `@IdempotencyKey` bindings, case-insensitive | Null omits the header; collections/arrays preserve value order |
+| Header map | `@HeaderParam Map<?, ?>` | Dynamic names are checked case-insensitively at invocation | Null entries are omitted; collisions with another method header fail instead of overwriting |
+| Idempotency key | Parameter `@IdempotencyKey("Name")` | Shares the named-header namespace | Null omits the key |
+| Body | `@Body T` | One body per method | The body type retains its documented scalar/JSON/streaming ownership |
+| Form field | `@FormField("name")` on `@MultipartBody` | Repeated names are preserved as repeated parts in parameter/value order | Null omits the part; collections/arrays produce repeated parts |
+| Form file | `@FormFile("name")` on `@MultipartBody`; `byte[]`, `Resource`, or `FileAttachment` | Repeated names are preserved as repeated parts | Null omits the part |
+
+Conflicting roles on one parameter, duplicate path/query/named-header bindings,
+and unsupported `@FormFile` types fail during startup with the concrete client,
+declaring interface, method signature, resolved parameter type, and parameter
+index. Method-level generated `@IdempotencyKey` may coexist with an explicit
+same-name parameter header because generation runs only when no explicit value
+is present.
+
+An unannotated endpoint parameter remains ignored for compatibility with
+published clients. Startup emits one warning per method parameter; add one of
+the roles above when the value must contribute to the outbound request.
+
 ### `@PathVar`
 
 Binds a method parameter to a `{name}` placeholder in the path template.
@@ -246,7 +272,8 @@ Mono<Void> publish(
 
 Method `@HeaderParam` values override same-name client default headers
 case-insensitively. For example, a method argument named `X-Tenant` replaces a
-configured default named `x-tenant` rather than appending to it.
+configured default named `x-tenant` rather than appending to it. Within method
+arguments, named and dynamic headers may not collide case-insensitively.
 
 ### `@IdempotencyKey`
 
@@ -294,7 +321,10 @@ File part of a `@MultipartBody` request.
 | `filename` | `String` | `"file"` | Fallback filename sent in `Content-Disposition` |
 | `contentType` | `String` | `"application/octet-stream"` | Fallback `Content-Type` |
 
-Accepted parameter types: `byte[]`, any `org.springframework.core.io.Resource`, or `FileAttachment` (carries bytes + filename + content-type, overriding the annotation defaults).
+Accepted parameter types: `byte[]`, any `org.springframework.core.io.Resource`,
+or `FileAttachment` (carries bytes + filename + content-type, overriding the
+annotation defaults). Unsupported declared types fail at startup, including
+after inherited generic bindings are resolved.
 
 See [10-multipart.md](10-multipart.md) for full examples.
 

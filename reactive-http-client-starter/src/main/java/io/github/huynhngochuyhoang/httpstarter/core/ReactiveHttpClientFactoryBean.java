@@ -100,6 +100,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         MethodMetadataCache metadataCache = applicationContext
                 .getBeanProvider(MethodMetadataCache.class)
                 .getIfAvailable(MethodMetadataCache::new);
+        metadataCache.validateDeclarativeRequestParameters(type, clientName);
         validateDeclarativeMethodContracts(type, clientName, metadataCache);
         validateApiRefMappings(type, metadataCache, config, clientName);
         metadataCache.validateDeclarativeReturnTypes(type, clientName);

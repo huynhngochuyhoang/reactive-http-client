@@ -122,5 +122,6 @@ Mono<ReportReceipt> submitReport(
 ## Constraints
 
 - `@MultipartBody` and `@Body` cannot appear on the same method — this is validated at startup and results in an `IllegalStateException`.
+- Unsupported `@FormFile` parameter types are rejected at startup after inherited generic bindings are resolved; supported types are `byte[]`, `Resource`, and `FileAttachment`.
 - `null` `@FormField` / `@FormFile` values: `null` scalar field values are omitted from the body. `null` file values are also omitted.
 - `byte[]` and `FileAttachment` parts are materialized and repeatable. A `Resource` part is application-owned: each retry or body-preserving redirect opens it again, and the WebClient writer closes each opened stream after that attempt. Supply a resource that can be reopened or disable request replay. See the [request-body repeatability matrix](11-streaming.md#request-body-repeatability-matrix).

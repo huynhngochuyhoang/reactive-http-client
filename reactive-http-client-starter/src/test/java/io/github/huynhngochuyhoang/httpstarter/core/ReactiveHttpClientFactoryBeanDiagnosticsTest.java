@@ -1287,6 +1287,20 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
+    void failsFastWhenRequestParameterHasConflictingRoles() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put("invalid-parameter-client", clientConfig("http://localhost:8080"));
+
+        assertThatThrownBy(() -> buildFactoryBean(properties, ConflictingParameterClient.class).getObject())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Reactive HTTP client 'invalid-parameter-client'")
+                .hasMessageContaining("parameterIndex=0")
+                .hasMessageContaining("conflicting request-binding roles")
+                .hasMessageContaining("@QueryParam(\"item\")")
+                .hasMessageContaining("@HeaderParam(\"X-Item\")");
+    }
+
+    @Test
     void failsFastWhenGeneratedIdempotencyKeyHeaderNameIsBlank() {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         properties.getClients().put("invalid-idempotency-client", clientConfig("http://localhost:8080"));
@@ -1989,6 +2003,12 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     interface BlankHeaderParamClient {
         @GET("/ping")
         Mono<String> call(@HeaderParam("") String tenant);
+    }
+
+    @ReactiveHttpClient(name = "invalid-parameter-client")
+    interface ConflictingParameterClient {
+        @GET("/items")
+        Mono<String> call(@QueryParam("item") @HeaderParam("X-Item") String item);
     }
 
     @ReactiveHttpClient(name = "invalid-idempotency-client")

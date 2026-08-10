@@ -1,9 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
-import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
-import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
-import io.github.huynhngochuyhoang.httpstarter.annotation.Retry;
+import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.auth.AwsSigV4AuthProviderFactory;
@@ -167,6 +164,23 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                     .hasMessageContaining("reactive HTTP client 'factory-method-diagnostic'")
                     .hasMessageContaining("a Mono element type cannot contain another reactive Publisher");
         }
+    }
+
+    @Test
+    void starterClientsUseRequestParameterGrammarInDiagnostics() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, InvalidParameterDiagnosticClient.class);
+        beanFactory.registerBeanDefinition("invalidParameterDiagnosticClient", definition);
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, new ReactiveHttpClientProperties(), new MethodMetadataCache());
+
+        assertThatThrownBy(provider::clientSummaries)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Reactive HTTP client 'invalid-parameter-diagnostic'")
+                .hasMessageContaining("conflicting request-binding roles")
+                .hasMessageContaining("parameterIndex=0");
     }
 
     @Test
@@ -1537,7 +1551,15 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     interface ReplacementDiagnosticClient {
 
         @GET("/nested")
-        Mono<Mono<String>> nested();
+        Mono<Mono<String>> nested(@QueryParam("item") @HeaderParam("X-Item") String item);
+    }
+
+    @ReactiveHttpClient(
+            name = "invalid-parameter-diagnostic",
+            baseUrl = "http://invalid-parameter-diagnostic.test")
+    interface InvalidParameterDiagnosticClient {
+        @GET("/items")
+        Mono<String> find(@QueryParam("item") @HeaderParam("X-Item") String item);
     }
 
     @SuppressWarnings("rawtypes")

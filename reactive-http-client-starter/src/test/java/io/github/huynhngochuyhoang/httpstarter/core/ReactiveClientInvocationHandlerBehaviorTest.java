@@ -10,6 +10,8 @@ import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +44,64 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class ReactiveClientInvocationHandlerBehaviorTest {
+
+    @Test
+    void nullRequiredPathVarFailsBeforeAuthBodyLifecycleOrDispatch() throws Exception {
+        AtomicInteger authFilters = new AtomicInteger();
+        AtomicInteger bodySubscriptions = new AtomicInteger();
+        AtomicInteger lifecycleLookups = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter((request, next) -> {
+                    authFilters.incrementAndGet();
+                    return next.exchange(request);
+                })
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body("ok").build());
+                })
+                .build();
+        ApplicationContext context = mock(ApplicationContext.class);
+        ObjectProvider<HttpClientObserver> observers = mock(ObjectProvider.class);
+        ObjectProvider<ReactiveHttpClientLifecycleHook> hooks = mock(ObjectProvider.class);
+        when(context.getBeanProvider(HttpClientObserver.class)).thenReturn(observers);
+        when(context.getBeanProvider(ReactiveHttpClientLifecycleHook.class)).thenReturn(hooks);
+        when(hooks.orderedStream()).thenAnswer(invocation -> {
+            lifecycleLookups.incrementAndGet();
+            return java.util.stream.Stream.empty();
+        });
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setAuthProvider("test-auth");
+        ReactiveClientInvocationHandler handler = ReactiveClientInvocationHandler.create(
+                webClient,
+                new MethodMetadataCache(),
+                new RequestArgumentResolver(),
+                new DefaultErrorDecoder(),
+                config,
+                "required-path",
+                RequiredPathClient.class,
+                context,
+                new NoopResilienceOperatorApplier(),
+                TestJsonCodecs.jsonCodec(),
+                new ReactiveHttpClientProperties.ObservabilityConfig());
+        Flux<DataBuffer> body = Flux.defer(() -> {
+            bodySubscriptions.incrementAndGet();
+            return Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(new byte[]{1}));
+        });
+        Method method = RequiredPathClient.class.getMethod("upload", String.class, Flux.class);
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> handler.invoke(null, method, new Object[]{null, body}));
+        assertTrue(error.getMessage().contains("Required @PathVar(\"id\")"));
+        assertTrue(error.getMessage().contains("parameter index 0"));
+        assertTrue(error.getMessage().contains(RequiredPathClient.class.getName()));
+
+        assertEquals(0, authFilters.get());
+        assertEquals(0, bodySubscriptions.get());
+        assertEquals(0, lifecycleLookups.get());
+        assertEquals(0, dispatches.get());
+    }
 
     @Test
     void shouldNotForceDefaultAcceptWhenUserProvidedOne() {
@@ -944,6 +1005,11 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     interface ClientWithPathVar {
         @GET("/files/{key}")
         Mono<String> file(@PathVar("key") String key);
+    }
+
+    interface RequiredPathClient {
+        @POST("/objects/{id}")
+        Mono<String> upload(@PathVar("id") String id, @Body Flux<DataBuffer> body);
     }
 
     interface ClientWithHead {

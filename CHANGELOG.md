@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Declarative request-parameter grammar.** Added one inherited-generic-aware
+  startup validator for path, query, named header, header map, idempotency key,
+  body, form-field, and form-file roles. Conflicting roles, duplicate path/query
+  bindings, case-insensitive named-header collisions, and unsupported
+  `@FormFile` types now fail before proxy creation across production startup,
+  effective contracts, diagnostics, AOT, and `MockReactiveHttpClient`.
+  Required null path variables fail before auth, body subscription, lifecycle
+  attempts, or dispatch; dynamic header collisions fail instead of silently
+  overwriting. Repeated multipart names remain ordered repeated parts, while
+  unannotated parameters remain ignored with a deduplicated compatibility
+  warning.
 - **Open the post-`3.4.0` development line.** Verified the complete `3.4.0` parent, starter, test-helper, and OTel release bundle plus the assembled Boot 4 consumer from Maven Central; moved public examples plus API, consumer, and benchmark baselines to `3.4.0`; and advanced reactor-only coordinates to `3.5.0-SNAPSHOT` so compatibility checks cannot compare the current reactor with itself.
 
 ## [3.4.0] - 2026-08-08

@@ -106,6 +106,21 @@ class HeaderParamMapSupportTest {
         assertTrue(ex.getMessage().contains("Invalid header value"));
     }
 
+    @Test
+    void shouldRejectCaseInsensitiveDynamicHeaderCollisionsInsteadOfOverwriting() throws Exception {
+        Method method = DynamicCollisionClient.class.getMethod("get", String.class, Map.class);
+        MethodMetadata metadata = new MethodMetadataCache().get(method);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> new RequestArgumentResolver().resolve(
+                        RequestPlan.from(metadata, DynamicCollisionClient.class),
+                        new Object[]{"named", Map.of("x-tenant", "dynamic")}));
+
+        assertTrue(ex.getMessage().contains("Duplicate outbound header 'x-tenant'"));
+        assertTrue(ex.getMessage().contains("X-Tenant"));
+        assertTrue(ex.getMessage().contains(DynamicCollisionClient.class.getName()));
+    }
+
     interface ValidClient {
         @GET("/users")
         Mono<String> get(@HeaderParam Map<String, String> headers, @HeaderParam("X-Tenant") String tenant);
@@ -119,5 +134,11 @@ class HeaderParamMapSupportTest {
     interface InvalidMapClient {
         @GET("/users")
         Mono<String> get(@HeaderParam("X-Tenant") Map<String, String> headers);
+    }
+
+    interface DynamicCollisionClient {
+        @GET("/users")
+        Mono<String> get(@HeaderParam("X-Tenant") String tenant,
+                         @HeaderParam Map<String, String> headers);
     }
 }
