@@ -4,6 +4,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.*;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategories;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
@@ -58,6 +59,19 @@ class MockReactiveHttpClientTest {
     interface InvalidParameterClient {
         @GET("/items")
         Mono<String> find(@QueryParam("item") @HeaderParam("X-Item") String item);
+    }
+
+    interface InvalidUriClient {
+        @GET("https://user:secret-value@example.test/items")
+        Mono<String> find();
+    }
+
+    interface ApiRefUriClient {
+        @ApiRef("lookup")
+        Mono<String> find(
+                @PathVar("id") String id,
+                @PathVar("template") String template,
+                @QueryParam("omitted") String omitted);
     }
 
     interface SampleClient {
@@ -1098,6 +1112,64 @@ class MockReactiveHttpClientTest {
                 .hasMessageContaining("concreteClient=" + InvalidParameterClient.class.getName())
                 .hasMessageContaining("parameterIndex=0")
                 .hasMessageContaining("conflicting request-binding roles");
+    }
+
+    @Test
+    void buildRejectsAuthorityInDeclarativeUriBeforeAnyExchange() {
+        assertThatThrownBy(() -> MockReactiveHttpClient.forClient(InvalidUriClient.class).build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("InvalidUriClient")
+                .hasMessageContaining("scheme or authority")
+                .hasMessageNotContaining("secret-value");
+    }
+
+    @Test
+    void apiRefUriUsesProductionExpansionAuthPrecedenceAndFinalObservation() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("GET");
+        api.setPath("/items/{id}?literal=yes&template={template}&repeat=template");
+        config.setApis(Map.of("lookup", api));
+        java.util.LinkedHashMap<String, List<String>> defaults = new java.util.LinkedHashMap<>();
+        defaults.put("configured", List.of("first", "second"));
+        defaults.put("repeat", List.of("default"));
+        config.setDefaultQueryParams(defaults);
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+
+        MockReactiveHttpClient<ApiRefUriClient> mock = MockReactiveHttpClient.forClient(ApiRefUriClient.class)
+                .baseUrl("http://mock.local/base")
+                .clientConfig(config)
+                .withAuthProvider(request -> Mono.just(AuthContext.builder()
+                        .queryParam("repeat", "auth one")
+                        .build()))
+                .withObserver(observed::set)
+                .fallback(MockReactiveHttpClient.json(200, "ok"))
+                .build();
+
+        assertThat(mock.proxy().find("a/b", "a%2Fb", null).block()).isEqualTo("ok");
+        assertThat(mock.lastExchange().uri().toASCIIString()).isEqualTo(
+                "http://mock.local/base/items/a%2Fb?literal=yes&template=a%252Fb"
+                        + "&configured=first&configured=second&repeat=auth%20one");
+        assertThat(observed.get().getUriPath()).isEqualTo(
+                "/items/{id}?literal=yes&template={template}&repeat=template");
+        assertThat(observed.get().getRequestUrl()).isEqualTo(mock.lastExchange().uri().toASCIIString());
+    }
+
+    @Test
+    void buildRejectsAuthorityInConfiguredApiRefUri() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("GET");
+        api.setPath("//user:secret-value@example.test/items/{id}?template={template}");
+        config.setApis(Map.of("lookup", api));
+
+        assertThatThrownBy(() -> MockReactiveHttpClient.forClient(ApiRefUriClient.class)
+                .clientConfig(config)
+                .build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("@ApiRef(\"lookup\")")
+                .hasMessageContaining("scheme or authority")
+                .hasMessageNotContaining("secret-value");
     }
 
     @Test

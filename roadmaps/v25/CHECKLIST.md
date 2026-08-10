@@ -123,39 +123,59 @@ Evidence:
 
 ## Priority 3 - URI Template, Request-Target, and Authority Contract
 
-### [ ] 3.1 Freeze structured URI construction
+### [x] 3.1 Freeze structured URI construction
 
-- [ ] Inventory base URL path-prefix behavior for empty, relative, and
+- [x] Inventory base URL path-prefix behavior for empty, relative, and
       leading-slash endpoint paths.
-- [ ] Cover annotation and `@ApiRef` paths with path/query template variables,
+- [x] Cover annotation and `@ApiRef` paths with path/query template variables,
       literal query entries, repeated values, empty values, and omitted nulls.
-- [ ] Freeze raw Unicode, reserved-character, slash, plus, percent, hash, and
+- [x] Freeze raw Unicode, reserved-character, slash, plus, percent, hash, and
       pre-encoded input behavior using Spring structured URI APIs.
-- [ ] Preserve deterministic order and precedence for template, default, method,
+- [x] Preserve deterministic order and precedence for template, default, method,
       and auth-added query values.
-- [ ] Reject or explicitly support endpoint scheme, authority, user-info, and
+- [x] Reject or explicitly support endpoint scheme, authority, user-info, and
       fragment syntax after compatibility and security review.
-- [ ] Produce method-specific startup/invocation errors without credentials or
+- [x] Produce method-specific startup/invocation errors without credentials or
       resolved sensitive values.
 
-### [ ] 3.2 Prove the real request target
+### [x] 3.2 Prove the real request target
 
-- [ ] Add real HTTP/1.1 and H2/H2C fixtures that capture exact path and query
+- [x] Add real HTTP/1.1 and H2/H2C fixtures that capture exact path and query
       request-target bytes.
-- [ ] Verify direct, TLS, and configured proxy paths retain the intended
+- [x] Verify direct, TLS, and configured proxy paths retain the intended
       authority and proxy request form.
-- [ ] Verify redirects cannot reclassify the original declarative template as a
+- [x] Verify redirects cannot reclassify the original declarative template as a
       caller-controlled configured-client fact.
-- [ ] Align final-request observation, lifecycle/log/observer metadata, effective
+- [x] Align final-request observation, lifecycle/log/observer metadata, effective
       contracts, snapshots, and mocks with what each layer can prove.
-- [ ] Add malformed-template, authority-escape, inherited, `@ApiRef`, and native
+- [x] Add malformed-template, authority-escape, inherited, `@ApiRef`, and native
       regression coverage.
-- [ ] Run focused URI/proxy tests, full starter verification, and
+- [x] Run focused URI/proxy tests, full starter verification, and
       `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added one starter-owned structured URI parser/builder for annotation and
+  configured `@ApiRef` paths. Startup, AOT, effective-contract diagnostics, the
+  runtime handler, and `MockReactiveHttpClient` now share authority/fragment,
+  template-variable, malformed-syntax, and sanitized-error rules while retaining
+  replacement metadata-cache and foreign `FactoryBean` ownership boundaries.
+- Froze Spring base-path joining and raw UTF-8/reserved-character expansion,
+  including repeated/literal/empty/omitted query values and deliberate
+  double-encoding of pre-encoded `%` input. Template, configured default, method,
+  and auth-provider query precedence remains deterministic; auth mutation no
+  longer re-encodes the already resolved request URI.
+- Added real HTTP/1.1, H2C, TLS, and HTTP CONNECT proxy fixtures that assert exact
+  request targets and authority. Redirect evidence separates both server-observed
+  dispatches from the original declarative template/request URL retained at the
+  WebClient observation boundary by lifecycle, observer, and exchange-log records.
+- Focused URI, auth, startup, AOT, exporter/diagnostic, invocation, and mock suites
+  passed 201 starter tests and 42 mock-helper tests. The full starter/test-helper
+  reactor passed 965 starter tests and 45 test-helper tests, including generated
+  documentation and metadata checks.
+- Strict starter japicmp passed against Central-resolved `3.4.0` from the fresh
+  `target/published-baseline-repositories/api-starter-v25-priority3-3.4.0`
+  repository; `git diff --check` passed.
 
 ---
 

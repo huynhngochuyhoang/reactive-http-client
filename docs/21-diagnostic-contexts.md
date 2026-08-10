@@ -44,6 +44,14 @@ new auth is resolved, then records the replay only if it reaches the final
 observation filter. Transport-owned redirects retain the original declarative
 request snapshot and the final response status.
 
+For an automatically followed redirect, `pathTemplate`/`uriPath` remains the
+configured declarative endpoint and `requestUrl` remains the final request seen
+at the starter's `WebClient` observation-filter boundary. Reactor Netty performs
+later redirect dispatches below that boundary, so lifecycle, observer, and
+exchange-log records do not claim that the redirect target is a configured
+client URL. Use transport/server evidence when the exact redirected wire target
+is required.
+
 Subscription-attempt values count reactive subscriptions, not guaranteed HTTP
 network sends. After retry exhaustion, terminal contexts retain the final emitted
 throwable and final subscription-attempt count; earlier attempt failures are not

@@ -6,9 +6,11 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.util.UriUtils;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -90,12 +92,13 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
     private URI applyQueryParams(URI sourceUri, java.util.Map<String, List<String>> authQueryParams) {
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUri(sourceUri);
         authQueryParams.forEach((name, values) -> {
-            uriBuilder.replaceQueryParam(name);
+            String encodedName = UriUtils.encodeQueryParam(name, StandardCharsets.UTF_8);
+            uriBuilder.replaceQueryParam(encodedName);
             for (String value : values) {
-                uriBuilder.queryParam(name, value);
+                uriBuilder.queryParam(encodedName, UriUtils.encodeQueryParam(value, StandardCharsets.UTF_8));
             }
         });
-        return uriBuilder.encode().build().toUri();
+        return uriBuilder.build(true).toUri();
     }
 
     private void validateHeaderValue(String headerName, String value) {

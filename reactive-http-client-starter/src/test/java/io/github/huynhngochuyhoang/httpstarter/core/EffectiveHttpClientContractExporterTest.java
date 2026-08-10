@@ -367,6 +367,17 @@ class EffectiveHttpClientContractExporterTest {
                 .hasMessageContaining("without matching @PathVar parameters");
     }
 
+    @Test
+    void failsAuthorityBearingTemplateWithoutExportingItsCredentials() {
+        assertThatThrownBy(() -> EffectiveHttpClientContractExporter.export(
+                AuthorityTemplateClient.class, "diagnostic-client",
+                new ReactiveHttpClientProperties.ClientConfig(), metadataCache))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("AuthorityTemplateClient")
+                .hasMessageContaining("scheme or authority")
+                .hasMessageNotContaining("secret-value");
+    }
+
     private static ReactiveHttpClientProperties.ClientConfig enabledResilienceConfig() {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.getResilience().setEnabled(true);
@@ -480,6 +491,12 @@ class EffectiveHttpClientContractExporterTest {
     interface DirectMissingPathVarClient {
 
         @GET("/items/{id}")
+        Mono<String> get();
+    }
+
+    interface AuthorityTemplateClient {
+
+        @GET("//user:secret-value@example.test/items")
         Mono<String> get();
     }
 

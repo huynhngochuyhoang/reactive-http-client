@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -78,6 +79,54 @@ public class MethodMetadataCache {
                         return Boolean.TRUE;
                     });
                 }
+            } catch (IllegalArgumentException ex) {
+                throw inheritedRequestParameterException(clientInterface, clientName, method, ex);
+            } catch (IllegalStateException ex) {
+                throw inheritedRequestParameterException(clientInterface, clientName, method, ex);
+            }
+        }
+    }
+
+    /**
+     * Validates annotation-owned URI templates without resolving {@code @ApiRef}
+     * configuration. This form is suitable for AOT processing.
+     */
+    public void validateDeclarativeUriTemplates(Class<?> clientInterface, String clientName) {
+        validateDeclarativeUriTemplates(clientInterface, clientName, null);
+    }
+
+    /**
+     * Validates annotation and configured {@code @ApiRef} URI templates against
+     * the concrete client contract.
+     */
+    public void validateDeclarativeUriTemplates(
+            Class<?> clientInterface,
+            String clientName,
+            Map<String, ReactiveHttpClientProperties.ApiConfig> apiConfigs) {
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method)) {
+                continue;
+            }
+            try {
+                RequestPlan plan = RequestPlan.from(get(method), clientInterface);
+                String template;
+                String context;
+                if (plan.apiRefName() == null) {
+                    template = plan.pathTemplate();
+                    context = "Method " + method.toGenericString() + " URI template";
+                } else {
+                    if (apiConfigs == null) {
+                        continue;
+                    }
+                    ReactiveHttpClientProperties.ApiConfig apiConfig = apiConfigs.get(plan.apiRefName());
+                    String configPrefix = ApiRefValidationSupport.configPrefix(clientName, plan.apiRefName());
+                    String apiRefContext = ApiRefValidationSupport.apiRefContext(method, plan.apiRefName());
+                    ReactiveHttpClientFactoryBean.validateApiRef(apiConfig, configPrefix, apiRefContext);
+                    template = apiConfig.getPath();
+                    context = apiRefContext + " URI template";
+                }
+                DeclarativeRequestUri.validate(
+                        template, ReactiveHttpClientFactoryBean.pathVarNames(plan), context);
             } catch (IllegalArgumentException ex) {
                 throw inheritedRequestParameterException(clientInterface, clientName, method, ex);
             } catch (IllegalStateException ex) {

@@ -232,19 +232,47 @@ Pass raw, unencoded values to `@PathVar` and `@QueryParam`. The starter delegate
 URI construction to Spring's `UriBuilder`, which percent-encodes path variables
 and query parameter values when the request URI is built.
 
+An annotation or configured `@ApiRef` endpoint is a path plus an optional query
+template. It cannot declare a scheme, authority, user-info, port, or fragment;
+those forms fail startup with the client and method named but without echoing the
+template. The configured client base URL is the only declarative authority.
+
+Endpoint paths append to the base URL path exactly as Spring's structured URI
+builder defines:
+
+| Base URL | Endpoint | Result path |
+|---|---|---|
+| `https://api.example/base` | `""` | `/base` |
+| `https://api.example/base` | `items` | `/baseitems` |
+| `https://api.example/base` | `/items` | `/base/items` |
+| `https://api.example/base/` | `items` | `/base/items` |
+
+Use a leading slash on endpoint paths, or a trailing slash on a base path, when
+a path-segment boundary is intended.
+
 Examples:
 
 - `@PathVar("key")` value `reports/2026 Q1+draft` is sent as
   `/reports%2F2026%20Q1%2Bdraft`; the slash remains part of the variable, not a
   path separator.
 - `@QueryParam("q")` value `a b&c=1` is sent as `q=a%20b%26c%3D1`.
+- Unicode values use UTF-8 percent encoding. Path/template-variable reserved
+  characters are encoded as variable data. For method/default/auth query values,
+  Spring retains query-safe `/`, `+`, and `?` while encoding spaces, `%`, `#`,
+  `&`, and `=`; a literal `+` therefore remains `+` on the wire.
 - Empty query values are retained as `name=`. `null` query values are omitted.
 - Collection or array query values are sent as repeated parameters.
 
 Do not pass pre-encoded values such as `a%2Fb`; the percent sign is treated as a
-literal character and encoded again. Literal query strings in annotation paths
-or `@ApiRef` paths are preserved and method/default query parameters are
-appended after them.
+literal character and encoded again (`a%252Fb` on the wire).
+
+Query entries are deterministic. Literal template entries are created first.
+Configured `default-query-params` follow in configuration order. A non-null
+method `@QueryParam` replaces a configured default with the same name; it does
+not replace a literal template entry, and repeated values remain grouped at that
+template name's first position. Auth-provider query values run after URI
+expansion, replace all earlier values with the same name, and are appended in
+provider order. The auth mutation preserves already encoded path/query bytes.
 
 ### `@HeaderParam`
 
