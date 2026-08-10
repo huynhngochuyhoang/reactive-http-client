@@ -1660,6 +1660,11 @@ class DocumentationReleaseArtifactTest {
                         .contains("benchmark.commit=$(git rev-parse --short HEAD)"));
         assertThat(pendingReleaseCommands)
                 .contains(generated.path("benchmarkEvidence").path("publishedStarterCommand").asText());
+        assertThat(pendingReleaseCommands)
+                .anySatisfy(command -> assertThat(command).contains("native:compile")
+                        .contains("reactive-http-client-native-smoke"))
+                .anySatisfy(command -> assertThat(command).contains("verify-publishable-artifacts.sh")
+                        .contains("verify-generation-packaging.sh"));
         assertThat(readiness.path("manualBenchmarkEvidence").path("status").asText()).isEqualTo("pending");
         List<String> pendingBenchmarkCommands = streamText(readiness.path("manualBenchmarkEvidence").path("pendingCommands"));
         assertThat(pendingBenchmarkCommands)
@@ -1677,6 +1682,19 @@ class DocumentationReleaseArtifactTest {
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
                 .anySatisfy(command -> assertThat(command).contains("api-root-3.4.0"))
                 .anySatisfy(command -> assertThat(command).contains("api-starter-3.4.0"));
+        assertThat(readiness.path("manualNativeEvidence").path("status").asText()).isEqualTo("pending");
+        assertThat(streamText(readiness.path("manualNativeEvidence").path("pendingCommands")))
+                .singleElement()
+                .satisfies(command -> assertThat(command)
+                        .contains("native:compile", "reactive-http-client-native-smoke"));
+        assertThat(readiness.path("manualPublicationEvidence").path("status").asText())
+                .isEqualTo("deferred-until-release-cut");
+        assertThat(readiness.path("manualPublicationEvidence").path("workflow").asText())
+                .isEqualTo(".github/workflows/publish-maven-central.yml");
+        assertThat(streamText(readiness.path("manualPublicationEvidence").path("preflightCommands")))
+                .singleElement()
+                .satisfies(command -> assertThat(command)
+                        .contains("verify-publishable-artifacts.sh", "verify-generation-packaging.sh"));
         assertThat(readiness.path("promotedBenchmarkReport").path("path").isNull()).isTrue();
         assertThat(readiness.path("promotedBenchmarkReport").path("status").asText())
                 .isEqualTo("deferred-until-release-cut");
@@ -1704,6 +1722,8 @@ class DocumentationReleaseArtifactTest {
                 "version-snippets",
                 "published-baseline-artifacts",
                 "api-compatibility",
+                "native-evidence",
+                "publication-readiness",
                 "benchmark-evidence",
                 "promoted-benchmark-report",
                 "generated-docs-and-links",
@@ -1729,6 +1749,16 @@ class DocumentationReleaseArtifactTest {
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
                 .anySatisfy(command -> assertThat(command).contains("api-root-3.4.0"))
                 .anySatisfy(command -> assertThat(command).contains("api-starter-3.4.0"));
+        assertThat(streamText(releasePrepItems.get("native-evidence").path("commands")))
+                .singleElement()
+                .satisfies(command -> assertThat(command)
+                        .contains("native:compile", "reactive-http-client-native-smoke"));
+        assertThat(releasePrepItems.get("publication-readiness").path("status").asText())
+                .isEqualTo("deferred-until-release-cut");
+        assertThat(streamText(releasePrepItems.get("publication-readiness").path("preflightCommands")))
+                .singleElement()
+                .satisfies(command -> assertThat(command)
+                        .contains("verify-publishable-artifacts.sh", "verify-generation-packaging.sh"));
         assertThat(streamText(releasePrepItems.get("benchmark-evidence").path("commands")))
                 .contains("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
                         generated.path("benchmarkEvidence").path("currentWorkspaceCommand").asText(),
@@ -1797,7 +1827,7 @@ class DocumentationReleaseArtifactTest {
                 .containsOnly("pending");
         assertThat(generated.path("checks"))
                 .extracting(check -> check.path("command").asText())
-                .hasSize(9)
+                .hasSize(11)
                 .contains(
                         "mvn test",
                         "bash scripts/verify-api-compatibility-fixtures.sh",
@@ -2362,7 +2392,18 @@ class DocumentationReleaseArtifactTest {
                 check("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify", "pending",
                         "Harness smoke only; do not publish these numbers."),
                 check("mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)", "pending",
-                        "Run when request-path behavior changed or release notes make performance claims."));
+                        "Run when request-path behavior changed or release notes make performance claims."),
+                check("mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.javadoc.skip=true install && "
+                                + "mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am "
+                                + "-Dtest=Boot4MockReactiveHttpClientTest -Dsurefire.failIfNoSpecifiedTests=false test && "
+                                + "mvn -B -ntp -s .mvn/maven-central-settings.xml -f .github/native-smoke/pom.xml "
+                                + "-Pnative -Dreactive-http-client.version=" + projectVersion + " native:compile && "
+                                + ".github/native-smoke/target/reactive-http-client-native-smoke",
+                        "pending", "Run the supported native-image smoke before release."),
+                check("mvn -B -ntp clean -Prelease -DskipTests verify && "
+                                + "bash scripts/verify-publishable-artifacts.sh && "
+                                + "bash scripts/verify-generation-packaging.sh",
+                        "pending", "Run publication preflight from the final release candidate."));
         Map<String, Object> readiness = releaseReadiness(pom.getParent(), projectVersion, baselineVersion, benchmarkEvidence,
                 publishedBaselineArtifacts, checks);
         manifest.put("readiness", readiness);
@@ -2420,6 +2461,12 @@ class DocumentationReleaseArtifactTest {
                         || command.contains("verify-api-compatibility-fixtures")
                         || command.contains("verify-published-baseline-fixtures"))
                 .toList();
+        List<String> pendingNativeCommands = pendingManualCommands.stream()
+                .filter(command -> command.contains("native:compile"))
+                .toList();
+        List<String> pendingPublicationCommands = pendingManualCommands.stream()
+                .filter(command -> command.contains("verify-publishable-artifacts"))
+                .toList();
         boolean configurationReferenceCurrent = Files.readString(root.resolve("docs/configuration-properties.md"))
                 .equals(configurationReferenceMarkdown(configurationMetadata(root)));
         List<String> brokenLinks = brokenLocalMarkdownLinks(root);
@@ -2434,6 +2481,14 @@ class DocumentationReleaseArtifactTest {
         readiness.put("manualReleaseEvidence", readinessManualStatus(pendingManualCommands));
         readiness.put("manualBenchmarkEvidence", readinessManualStatus(pendingBenchmarkCommands));
         readiness.put("manualCompatibilityEvidence", readinessManualStatus(pendingCompatibilityCommands));
+        readiness.put("manualNativeEvidence", readinessManualStatus(pendingNativeCommands));
+        LinkedHashMap<String, Object> publicationEvidence = new LinkedHashMap<>();
+        publicationEvidence.put("status", projectVersion.endsWith("-SNAPSHOT")
+                ? "deferred-until-release-cut" : "pending");
+        publicationEvidence.put("workflow", ".github/workflows/publish-maven-central.yml");
+        publicationEvidence.put("preflightCommands", pendingPublicationCommands);
+        publicationEvidence.put("note", "Publish only from a version-matched final release tag after preflight passes.");
+        readiness.put("manualPublicationEvidence", publicationEvidence);
         readiness.put("promotedBenchmarkReport", promotedReport == null
                 ? readinessPathStatus(null, "deferred-until-release-cut")
                 : readinessPathStatus(promotedReport, Files.exists(root.resolve(promotedReport)) ? "present" : "missing"));
@@ -2485,6 +2540,14 @@ class DocumentationReleaseArtifactTest {
                 .filter(command -> command.contains("benchmark"))
                 .toList());
         benchmarkCommands.add((String) benchmarkEvidence.get("publishedStarterCommand"));
+        List<String> nativeCommands = checks.stream()
+                .map(check -> check.get("command"))
+                .filter(command -> command.contains("native:compile"))
+                .toList();
+        List<String> publicationCommands = checks.stream()
+                .map(check -> check.get("command"))
+                .filter(command -> command.contains("verify-publishable-artifacts"))
+                .toList();
 
         String configurationReferenceStatus = readinessNestedStatus(readiness, "configurationReference");
         String markdownLinksStatus = readinessNestedStatus(readiness, "markdownLinks");
@@ -2507,6 +2570,13 @@ class DocumentationReleaseArtifactTest {
                 "pending", Map.of("commands", publishedBaselineCommands)));
         items.add(checklistItem("api-compatibility", "API compatibility evidence",
                 "pending", Map.of("commands", compatibilityCommands)));
+        items.add(checklistItem("native-evidence", "Native-image evidence",
+                "pending", Map.of("commands", nativeCommands)));
+        items.add(checklistItem("publication-readiness", "Publication readiness",
+                "snapshot-development".equals(versionContract.releaseState())
+                        ? "deferred-until-release-cut" : "pending", Map.of(
+                        "workflow", ".github/workflows/publish-maven-central.yml",
+                        "preflightCommands", publicationCommands)));
         items.add(checklistItem("benchmark-evidence", "Benchmark evidence",
                 "pending", Map.of(
                         "commands", benchmarkCommands,
