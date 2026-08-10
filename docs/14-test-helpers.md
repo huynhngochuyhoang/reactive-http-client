@@ -28,6 +28,13 @@ codec bytes, retry subscriptions, request-body materialization and ownership, li
 hooks, observers, exchange logging, inherited generic response types, repeated headers,
 and final resolved request metadata.
 
+`MockReactiveHttpClient` uses the same URI-template validation, Spring URI
+expansion, default/method/auth query precedence, and final-request observation
+filter as the production proxy. Supply configured `@ApiRef` entries through
+`clientConfig(...)`; invalid authority or fragment syntax then fails at mock
+construction. Recorded URIs are in-process resolved request facts, not proof of
+HTTP/1.1 request-line or HTTP/2 pseudo-header bytes.
+
 The mock does not negotiate an HTTP protocol or TLS, compress wire bytes, acquire a
 pooled connection, apply socket backpressure, measure wire or pool timing, or prove
 connection reuse. Those behaviors belong to a real client connector and server. Use the

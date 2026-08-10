@@ -96,10 +96,12 @@ final class EffectiveHttpClientContractExporter {
             validateResilienceInstances(plan, method, clientName, clientConfig, resilienceOperatorApplier);
         }
         BaseUrl effectiveBaseUrl = effectiveBaseUrl(clientInterface, clientConfig);
-        ReactiveHttpClientFactoryBean.validatePathTemplate(
-                effectiveApi.pathTemplate(),
-                ReactiveHttpClientFactoryBean.pathVarNames(plan),
-                pathTemplateContext(method, plan));
+        if (validateDeclarativeReturnTypes) {
+            ReactiveHttpClientFactoryBean.validatePathTemplate(
+                    effectiveApi.pathTemplate(),
+                    ReactiveHttpClientFactoryBean.pathVarNames(plan),
+                    pathTemplateContext(method, plan));
+        }
         return new EffectiveHttpClientContract(
                 clientName,
                 clientInterface.getName(),

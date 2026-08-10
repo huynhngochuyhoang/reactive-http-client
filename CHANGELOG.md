@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Declarative URI and request-target contract.** Centralized annotation and
+  configured `@ApiRef` path/query parsing, startup validation, and runtime
+  expansion; endpoint templates that declare an authority, scheme, user-info,
+  port, fragment, or malformed syntax now fail with sanitized client/method
+  context. Documented base-path joining, raw-value encoding, and deterministic
+  template/default/method/auth query precedence; auth query mutation now
+  preserves already encoded request bytes. Added exact HTTP/1.1, H2C, TLS, and
+  HTTP CONNECT proxy request-target evidence plus redirect, inherited, AOT,
+  effective-contract, diagnostic, and mock parity coverage.
 - **Declarative request-parameter grammar.** Added one inherited-generic-aware
   startup validator for path, query, named header, header map, idempotency key,
   body, form-field, and form-file roles. Conflicting roles, duplicate path/query

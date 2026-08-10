@@ -72,6 +72,32 @@ class OutboundAuthFilterTest {
     }
 
     @Test
+    void shouldPreserveResolvedTargetBytesAndAppendAuthValuesLast() {
+        AuthProvider authProvider = request -> Mono.just(AuthContext.builder()
+                .queryParam("repeat", "auth one")
+                .queryParam("repeat", "auth/two")
+                .queryParam("auth", "raw /+%#?&=")
+                .build());
+        OutboundAuthFilter filter = new OutboundAuthFilter("query-auth", authProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create(
+                        "https://api.test.local/base/items/a%2Fb?literal=yes&repeat=method%20value&keep=a%252Fb"))
+                .build();
+        AtomicReference<ClientRequest> capturedRequest = new AtomicReference<>();
+
+        StepVerifier.create(filter.filter(request, authorized -> {
+                    capturedRequest.set(authorized);
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+                }))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        assertEquals(
+                "https://api.test.local/base/items/a%2Fb?literal=yes&keep=a%252Fb"
+                        + "&repeat=auth%20one&repeat=auth/two&auth=raw%20/+%25%23?%26%3D",
+                capturedRequest.get().url().toASCIIString());
+    }
+
+    @Test
     void shouldExposeRequestBodyToAuthProviderForHmacSigning() {
         AtomicReference<Object> capturedBody = new AtomicReference<>();
         AuthProvider authProvider = request -> {

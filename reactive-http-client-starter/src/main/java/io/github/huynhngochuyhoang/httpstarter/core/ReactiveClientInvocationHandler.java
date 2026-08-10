@@ -29,7 +29,6 @@ import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.UriBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Signal;
@@ -507,7 +506,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             RequestBodyOwnership requestBodyOwnership) {
         WebClient.RequestBodySpec preparedRequestSpec = webClient
                 .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
-                .uri(uriBuilder -> buildRequestUri(uriBuilder, effectiveApi.pathTemplate(), resolved));
+                .uri(uriBuilder -> DeclarativeRequestUri.build(
+                        uriBuilder,
+                        effectiveApi.pathTemplate(),
+                        resolved,
+                        "Request URI for client [" + clientName + "] method " + plan.method().toGenericString()));
         if (!hasAcceptHeader) {
             preparedRequestSpec = preparedRequestSpec.accept(MediaType.APPLICATION_JSON);
         }
@@ -644,34 +647,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 .onStatus(HttpStatusCode::isError, this::decodeErrorResponse)
                 .toEntityFlux(DataBuffer.class)
                 .map(this::withDiscardRelease));
-    }
-
-    private URI buildRequestUri(
-            UriBuilder uriBuilder,
-            String pathTemplate,
-            RequestArgumentResolver.ResolvedArgs resolved) {
-        RequestUriTemplate requestUriTemplate = splitPathAndQuery(pathTemplate);
-        UriBuilder builder = uriBuilder.path(requestUriTemplate.path());
-        if (requestUriTemplate.query() != null) {
-            builder = builder.query(requestUriTemplate.query());
-        }
-        UriBuilder requestBuilder = builder;
-        resolved.queryParams().forEach((name, values) ->
-                values.forEach(value -> requestBuilder.queryParam(name, String.valueOf(value))));
-        return requestBuilder.build(resolved.pathVars());
-    }
-
-    private static RequestUriTemplate splitPathAndQuery(String pathTemplate) {
-        if (pathTemplate == null) {
-            return new RequestUriTemplate("", null);
-        }
-        int queryStart = pathTemplate.indexOf('?');
-        if (queryStart < 0) {
-            return new RequestUriTemplate(pathTemplate, null);
-        }
-        return new RequestUriTemplate(
-                pathTemplate.substring(0, queryStart),
-                pathTemplate.substring(queryStart + 1));
     }
 
     private Mono<?> buildMono(ClientResponse response, Type responseType) {
@@ -2063,8 +2038,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private record SerializedRequestBody(Object originalBody, Object bodyToWrite, byte[] rawBody) {}
-    private record RequestUriTemplate(String path, String query) {}
-
     private record FinalRequestObservation(String httpMethod, URI url, Map<String, String> headers) {
         private static FinalRequestObservation from(ClientRequest request) {
             return new FinalRequestObservation(request.method().name(), request.url(), copyRequestHeaders(request.headers()));

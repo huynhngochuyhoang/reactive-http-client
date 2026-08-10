@@ -201,6 +201,23 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorRejectsAuthorityInAnnotationTemplate() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", InvalidAotUriClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, InvalidAotUriClient.class);
+        context.registerBeanDefinition(InvalidAotUriClient.class.getName(), beanDefinition);
+
+        assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(context.getDefaultListableBeanFactory()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("InvalidAotUriClient")
+                .hasMessageContaining("scheme or authority")
+                .hasMessageNotContaining("secret-value");
+        context.close();
+    }
+
+    @Test
     void beanFactoryAotProcessorUsesReplacementMethodMetadataCache() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
@@ -304,6 +321,12 @@ class ReactiveHttpClientAotSmokeTest {
     interface InvalidAotParameterClient {
         @GET("/items/{id}")
         Mono<String> find(@PathVar("id") @QueryParam("id") String id);
+    }
+
+    @ReactiveHttpClient(name = "invalid-aot-uri", baseUrl = "http://invalid-aot.test")
+    interface InvalidAotUriClient {
+        @GET("//user:secret-value@example.test/items")
+        Mono<String> find();
     }
 
     @ReactiveHttpClient(name = "replacement-metadata", baseUrl = "http://replacement.test")

@@ -101,8 +101,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 .getBeanProvider(MethodMetadataCache.class)
                 .getIfAvailable(MethodMetadataCache::new);
         metadataCache.validateDeclarativeRequestParameters(type, clientName);
-        validateDeclarativeMethodContracts(type, clientName, metadataCache);
-        validateApiRefMappings(type, metadataCache, config, clientName);
+        metadataCache.validateDeclarativeUriTemplates(type, clientName, config.getApis());
         metadataCache.validateDeclarativeReturnTypes(type, clientName);
 
         AuthProvider authProvider = resolveAuthProvider(clientName, config);
@@ -1319,86 +1318,6 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         return StringUtils.hasText(methodLevel) ? methodLevel : clientLevel;
     }
 
-    /**
-     * Eagerly parses every abstract client method so declarative contract errors fail
-     * at proxy construction instead of first invocation.
-     */
-    private void validateDeclarativeMethodContracts(Class<?> clientInterface,
-                                                    String clientName,
-                                                    MethodMetadataCache metadataCache) {
-        for (Method method : clientInterface.getMethods()) {
-            if (!isDeclarativeClientMethod(method)) continue;
-            validateMethodContract(clientInterface, clientName, method, () -> {
-                MethodMetadata meta = metadataCache.get(method);
-                if (meta.getApiRefName() == null) {
-                    validatePathTemplate(meta.getPathTemplate(), pathVarNames(meta),
-                            "Method " + method + " path template");
-                }
-            });
-        }
-    }
-
-    /**
-     * Eagerly validates {@code @ApiRef} usage so typos in API-map keys fail fast
-     * at startup instead of throwing only when the method is first invoked.
-     */
-    private void validateApiRefMappings(Class<?> clientInterface,
-                                        MethodMetadataCache metadataCache,
-                                        ReactiveHttpClientProperties.ClientConfig clientConfig,
-                                        String clientName) {
-        for (Method method : clientInterface.getMethods()) {
-            if (!isDeclarativeClientMethod(method)) continue;
-            validateMethodContract(clientInterface, clientName, method, () -> {
-                MethodMetadata meta = metadataCache.get(method);
-                String apiRefName = meta.getApiRefName();
-                if (!StringUtils.hasText(apiRefName)) {
-                    return;
-                }
-                ReactiveHttpClientProperties.ApiConfig apiConfig = clientConfig.getApis() != null
-                        ? clientConfig.getApis().get(apiRefName)
-                        : null;
-                String configPrefix = ApiRefValidationSupport.configPrefix(clientName, apiRefName);
-                String apiRefContext = ApiRefValidationSupport.apiRefContext(method, apiRefName);
-                validateApiRef(apiConfig, configPrefix, apiRefContext);
-                validatePathTemplate(apiConfig.getPath(), pathVarNames(meta), apiRefContext + " path template");
-            });
-        }
-    }
-
-    private static void validateMethodContract(Class<?> clientInterface,
-                                               String clientName,
-                                               Method method,
-                                               Runnable validation) {
-        try {
-            validation.run();
-        } catch (IllegalArgumentException ex) {
-            throw inheritedMethodException(clientInterface, clientName, method, ex);
-        } catch (IllegalStateException ex) {
-            throw inheritedMethodException(clientInterface, clientName, method, ex);
-        }
-    }
-
-    private static RuntimeException inheritedMethodException(Class<?> clientInterface,
-                                                            String clientName,
-                                                            Method method,
-                                                            RuntimeException ex) {
-        if (method.getDeclaringClass() == clientInterface) {
-            return ex;
-        }
-        String message = "Inherited method " + method + " from "
-                + method.getDeclaringClass().getName()
-                + " on @ReactiveHttpClient(\"" + clientName + "\") "
-                + clientInterface.getName()
-                + ": " + ex.getMessage();
-        if (ex instanceof IllegalArgumentException) {
-            return new IllegalArgumentException(message, ex);
-        }
-        if (ex instanceof IllegalStateException) {
-            return new IllegalStateException(message, ex);
-        }
-        return ex;
-    }
-
     private static boolean isDeclarativeClientMethod(Method method) {
         int modifiers = method.getModifiers();
         return method.getDeclaringClass() != Object.class
@@ -1445,54 +1364,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     }
 
     static void validatePathTemplate(String pathTemplate, Set<String> declaredPathVars, String context) {
-        if (!StringUtils.hasText(pathTemplate)) {
-            return;
-        }
-        Set<String> placeholders = extractPathTemplateVariables(pathTemplate, context);
-        Set<String> missing = new LinkedHashSet<>(placeholders);
-        missing.removeAll(declaredPathVars);
-        if (!missing.isEmpty()) {
-            throw new IllegalStateException(context + " has URI template variables " + missing
-                    + " without matching @PathVar parameters.");
-        }
-        Set<String> unused = new LinkedHashSet<>(declaredPathVars);
-        unused.removeAll(placeholders);
-        if (!unused.isEmpty()) {
-            throw new IllegalStateException(context + " declares @PathVar parameters " + unused
-                    + " that are not used by the path template.");
-        }
-    }
-
-    private static Set<String> extractPathTemplateVariables(String pathTemplate, String context) {
-        Set<String> variables = new LinkedHashSet<>();
-        int index = 0;
-        while (index < pathTemplate.length()) {
-            int open = pathTemplate.indexOf('{', index);
-            if (open < 0) {
-                break;
-            }
-            int close = pathTemplate.indexOf('}', open + 1);
-            if (close < 0) {
-                throw new IllegalStateException(context + " contains an unclosed URI template variable in template ["
-                        + pathTemplate + "].");
-            }
-            String variable = pathTemplate.substring(open + 1, close);
-            int regexSeparator = variable.indexOf(':');
-            if (regexSeparator >= 0) {
-                variable = variable.substring(0, regexSeparator);
-            }
-            if (!StringUtils.hasText(variable)) {
-                throw new IllegalStateException(context + " contains a blank URI template variable in template ["
-                        + pathTemplate + "].");
-            }
-            variables.add(variable.trim());
-            index = close + 1;
-        }
-        if (pathTemplate.indexOf('}', index) >= 0) {
-            throw new IllegalStateException(context + " contains an unopened URI template variable in template ["
-                    + pathTemplate + "].");
-        }
-        return variables;
+        DeclarativeRequestUri.validate(pathTemplate, declaredPathVars, context);
     }
 
     private static void checkInstance(ResilienceOperatorApplier applier,
