@@ -28,6 +28,13 @@ automatic redirect following disabled by default, so a proxy method such as
 `Mono<ResponseEntity<T>>` can receive a visible 3xx response and inspect its
 `Location` header.
 
+Only 4xx and 5xx statuses enter the configured error decoder/mapper chain. Final
+`204`, `205`, and `304` responses remain non-error terminal results. HTTP
+informational responses are delegated to Reactor Netty; on the currently supported
+stack, a raw HTTP/1.1 `103 Early Hints` followed by `200` is surfaced to WebClient
+as `103`, so the starter records that exposed status rather than inventing a final
+status it did not receive through `ClientResponse`.
+
 Set `reactive.http.clients.<name>.follow-redirects=true` to opt in to Reactor
 Netty automatic redirect following for `301`, `302`, `303`, `307`, and `308`.
 When enabled, the transport resolves the redirect before the proxy handles the
@@ -110,6 +117,11 @@ An auth-provider failure is a hard attribution boundary, and an arbitrary custom
 wrapper is not searched without final-request dispatch evidence. Nested token-service
 or other pre-dispatch transport failures therefore keep the business-request stage unset. Generic
 timeout exceptions keep the stage unset; no phase is inferred from exception messages.
+Netty decoder failures and Reactor Netty premature-close failures use their
+concrete exception types plus final-request/status evidence: after final dispatch
+but before an observed status they can prove `RESPONSE_HEADERS`, while a premature
+close after status proves `RESPONSE_BODY`. Other parser failures remain unclassified when the
+exception type does not prove a phase.
 
 Published mapping contract:
 

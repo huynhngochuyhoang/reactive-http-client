@@ -1,15 +1,13 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import io.github.huynhngochuyhoang.httpstarter.annotation.Body;
-import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
-import io.github.huynhngochuyhoang.httpstarter.annotation.PUT;
-import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.HttpRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticApplicationContext;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
@@ -35,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class Framework7TransportCorrectnessTest {
 
     @Test
-    void starterPostThenPutUsesTransportFramingOnOnePooledHttp11Connection() {
+    void starterPostThenPutThenHeadUsesTransportFramingOnOnePooledHttp11Connection() {
         List<CapturedRequest> requests = new CopyOnWriteArrayList<>();
         DisposableServer server = HttpServer.create()
                 .port(0)
@@ -50,7 +48,9 @@ class Framework7TransportCorrectnessTest {
                                     request.requestHeaders().get("Content-Length"),
                                     request.requestHeaders().get("Transfer-Encoding"),
                                     request.requestHeaders().get("Host"))));
-                            return response.sendString(Mono.just("ok")).then();
+                            return response.header("X-Transport-Framing", "clean")
+                                    .sendString(Mono.just("ok"))
+                                    .then();
                         }))
                 .bindNow();
         ReactiveHttpClientFactoryBean<TransportClient> factory = null;
@@ -78,8 +78,13 @@ class Framework7TransportCorrectnessTest {
                     .block(Duration.ofSeconds(5))).isEqualTo("ok");
             assertThat(transportClient.update("update".getBytes(StandardCharsets.UTF_8))
                     .block(Duration.ofSeconds(5))).isEqualTo("ok");
+            ResponseEntity<Void> head = transportClient.head().block(Duration.ofSeconds(5));
+            assertThat(head).isNotNull();
+            assertThat(head.getHeaders().getFirst("X-Transport-Framing")).isEqualTo("clean");
+            assertThat(head.getBody()).isNull();
+            assertThat(transportClient.get().block(Duration.ofSeconds(5))).isEqualTo("ok");
 
-            assertThat(requests).hasSize(2);
+            assertThat(requests).hasSize(4);
             assertThat(requests.get(0)).satisfies(request -> {
                 assertThat(request.method()).isEqualTo("POST");
                 assertThat(request.uri()).isEqualTo("/orders");
@@ -93,6 +98,22 @@ class Framework7TransportCorrectnessTest {
                 assertThat(request.uri()).isEqualTo("/orders/1");
                 assertThat(request.body()).isEqualTo("update");
                 assertThat(request.contentLength()).isEqualTo("6");
+                assertThat(request.transferEncoding()).isNull();
+                assertThat(request.channelId()).isEqualTo(requests.get(0).channelId());
+            });
+            assertThat(requests.get(2)).satisfies(request -> {
+                assertThat(request.method()).isEqualTo("HEAD");
+                assertThat(request.uri()).isEqualTo("/orders/1");
+                assertThat(request.body()).isEmpty();
+                assertThat(request.contentLength()).isNull();
+                assertThat(request.transferEncoding()).isNull();
+                assertThat(request.channelId()).isEqualTo(requests.get(0).channelId());
+            });
+            assertThat(requests.get(3)).satisfies(request -> {
+                assertThat(request.method()).isEqualTo("GET");
+                assertThat(request.uri()).isEqualTo("/orders/1");
+                assertThat(request.body()).isEmpty();
+                assertThat(request.contentLength()).isNull();
                 assertThat(request.transferEncoding()).isNull();
                 assertThat(request.channelId()).isEqualTo(requests.get(0).channelId());
             });
@@ -217,6 +238,12 @@ class Framework7TransportCorrectnessTest {
 
         @PUT("/orders/1")
         Mono<String> update(@Body byte[] body);
+
+        @HEAD("/orders/1")
+        Mono<ResponseEntity<Void>> head();
+
+        @GET("/orders/1")
+        Mono<String> get();
     }
 
     private record CapturedRequest(String channelId,

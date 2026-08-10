@@ -290,11 +290,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 hasContentTypeHeader, multipartBody, lifecycleHooks, exchangeLogger, timeoutMs, shouldApplyResponseTimeout, requestBodyOwnership)
                 : statelessRequestHeadersSpec(plan, effectiveApi, resolved, hasAcceptHeader, hasContentTypeHeader,
                 multipartBody, timeoutMs, shouldApplyResponseTimeout, requestBodyOwnership);
+        boolean headRequest = HttpMethod.HEAD.matches(effectiveApi.httpMethod());
 
         if (plan.returnsFlux()) {
             Flux<?> flux = usesSubscriptionState
-                    ? exchange(requestHeadersSpecMono, response -> buildFlux(response, plan.responseType()))
-                    : exchangeStateless(requestHeadersSpecMono, response -> buildFlux(response, plan.responseType()));
+                    ? exchange(requestHeadersSpecMono, response -> buildFlux(response, plan.responseType(), headRequest))
+                    : exchangeStateless(requestHeadersSpecMono, response -> buildFlux(response, plan.responseType(), headRequest));
             flux = applyResilienceFlux(flux, plan, effectiveApi.httpMethod(), resolved);
             flux = applyLogicalCallTimeoutFlux(flux, logicalCallTimeoutMs);
             if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
@@ -334,11 +335,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         Mono<?> mono = DeclarativeReturnTypeGrammar.isStreamingResponseEntity(plan.responseType())
                 ? (usesSubscriptionState
-                ? exchangeStreamingResponseEntity(requestHeadersSpecMono)
-                : exchangeStreamingResponseEntityStateless(requestHeadersSpecMono))
+                ? exchangeStreamingResponseEntity(requestHeadersSpecMono, headRequest)
+                : exchangeStreamingResponseEntityStateless(requestHeadersSpecMono, headRequest))
                 : (usesSubscriptionState
-                ? exchange(requestHeadersSpecMono, response -> buildMono(response, plan.responseType()))
-                : exchangeStateless(requestHeadersSpecMono, response -> buildMono(response, plan.responseType())))
+                ? exchange(requestHeadersSpecMono, response -> buildMono(response, plan.responseType(), headRequest))
+                : exchangeStateless(requestHeadersSpecMono, response -> buildMono(response, plan.responseType(), headRequest)))
                 .next();
         mono = applyResilienceMono(mono, plan, effectiveApi.httpMethod(), resolved);
         mono = applyLogicalCallTimeoutMono(mono, logicalCallTimeoutMs);
@@ -618,23 +619,27 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     // this envelope shape intentionally transfers the streaming body to the caller.
     @SuppressWarnings("deprecation")
     private Mono<ResponseEntity<Flux<DataBuffer>>> exchangeStreamingResponseEntity(
-            Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono) {
+            Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono,
+            boolean headRequest) {
         return Mono.deferContextual(context -> {
             SubscriptionState state = subscriptionState(context);
             AtomicInteger attempt = new AtomicInteger();
             return requestHeadersSpecMono.flatMap(requestHeadersSpec -> {
                 attempt.set(state.activeAttemptNumber.get());
-                return requestHeadersSpec.retrieve()
+                WebClient.ResponseSpec responseSpec = requestHeadersSpec.retrieve()
                         .onStatus(HttpStatusCode::isError, response -> {
                             state.responseStatus.set(response.statusCode());
                             state.responseHeaders.set(copyHeaders(response));
                             return decodeErrorResponse(response);
-                        })
-                        .toEntityFlux(DataBuffer.class)
+                        });
+                Mono<ResponseEntity<Flux<DataBuffer>>> entity = headRequest
+                        ? responseSpec.toBodilessEntity().map(this::withEmptyStreamingBody)
+                        : responseSpec.toEntityFlux(DataBuffer.class);
+                return entity
                         .map(this::withDiscardRelease)
-                        .doOnNext(entity -> {
-                            state.responseStatus.set(entity.getStatusCode());
-                            state.responseHeaders.set(copyHeaders(entity.getHeaders()));
+                        .doOnNext(responseEntity -> {
+                            state.responseStatus.set(responseEntity.getStatusCode());
+                            state.responseHeaders.set(copyHeaders(responseEntity.getHeaders()));
                         });
             }).doFinally(ignored -> state.activeAttemptNumber.compareAndSet(attempt.get(), 0));
         });
@@ -642,14 +647,26 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     @SuppressWarnings("deprecation")
     private Mono<ResponseEntity<Flux<DataBuffer>>> exchangeStreamingResponseEntityStateless(
-            Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono) {
-        return requestHeadersSpecMono.flatMap(requestHeadersSpec -> requestHeadersSpec.retrieve()
-                .onStatus(HttpStatusCode::isError, this::decodeErrorResponse)
-                .toEntityFlux(DataBuffer.class)
-                .map(this::withDiscardRelease));
+            Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono,
+            boolean headRequest) {
+        return requestHeadersSpecMono.flatMap(requestHeadersSpec -> {
+            WebClient.ResponseSpec responseSpec = requestHeadersSpec.retrieve()
+                    .onStatus(HttpStatusCode::isError, this::decodeErrorResponse);
+            Mono<ResponseEntity<Flux<DataBuffer>>> entity = headRequest
+                    ? responseSpec.toBodilessEntity().map(this::withEmptyStreamingBody)
+                    : responseSpec.toEntityFlux(DataBuffer.class);
+            return entity.map(this::withDiscardRelease);
+        });
     }
 
-    private Mono<?> buildMono(ClientResponse response, Type responseType) {
+    private Mono<?> buildMono(ClientResponse response, Type responseType, boolean headRequest) {
+        if (headRequest) {
+            Type responseEntityBodyType = DeclarativeReturnTypeGrammar.responseEntityBodyType(responseType);
+            return responseEntityBodyType != null
+                    ? buildHeadResponseEntity(response)
+                    : response.releaseBody();
+        }
+
         // Streaming passthrough for Mono<ResponseEntity<Flux<DataBuffer>>>: skip the
         // in-memory codec entirely so large payloads aren't bound by codec-max-in-memory-size.
         if (DeclarativeReturnTypeGrammar.isStreamingResponseEntity(responseType)) {
@@ -661,6 +678,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return buildResponseEntityMono(response, responseEntityBodyType);
         }
         return bodyToMono(response, responseType);
+    }
+
+    private Mono<ResponseEntity<Void>> buildHeadResponseEntity(ClientResponse response) {
+        HttpStatusCode status = response.statusCode();
+        HttpHeaders headers = response.headers().asHttpHeaders();
+        return response.releaseBody()
+                .thenReturn(ResponseEntity.status(status).headers(headers).build());
     }
 
     private Mono<?> buildResponseEntityMono(ClientResponse response, Type bodyType) {
@@ -699,6 +723,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 .body(entity.getBody().doOnDiscard(DataBuffer.class, DataBufferUtils::release));
     }
 
+    private ResponseEntity<Flux<DataBuffer>> withEmptyStreamingBody(ResponseEntity<Void> entity) {
+        return ResponseEntity.status(entity.getStatusCode())
+                .headers(entity.getHeaders())
+                .body(Flux.empty());
+    }
+
     private Flux<DataBuffer> streamingDataBuffers(ClientResponse response) {
         return response.bodyToFlux(DataBuffer.class)
                 .doOnDiscard(DataBuffer.class, DataBufferUtils::release);
@@ -711,7 +741,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 .body(streaming));
     }
 
-    private Flux<?> buildFlux(ClientResponse response, Type responseType) {
+    private Flux<?> buildFlux(ClientResponse response, Type responseType, boolean headRequest) {
+        if (headRequest) {
+            return response.releaseBody().thenMany(Flux.empty());
+        }
         if (responseType == null) {
             return response.bodyToFlux(Object.class);
         }

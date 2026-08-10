@@ -181,37 +181,59 @@ Evidence:
 
 ## Priority 4 - HTTP Method, Final-Status, and Framing Semantics
 
-### [ ] 4.1 Add one final-status and bodiless matrix
+### [x] 4.1 Add one final-status and bodiless matrix
 
-- [ ] Cover real `HEAD` and `OPTIONS` over HTTP/1.1 and H2 where supported.
-- [ ] Cover final `204`, `205`, `304`, visible 3xx, and informational responses
+- [x] Cover real `HEAD` and `OPTIONS` over HTTP/1.1 and H2 where supported.
+- [x] Cover final `204`, `205`, `304`, visible 3xx, and informational responses
       followed by a final response where Reactor Netty exposes them.
-- [ ] Verify `Mono<Void>`, `Mono<T>`, `Mono<ResponseEntity<Void>>`, and
+- [x] Verify `Mono<Void>`, `Mono<T>`, `Mono<ResponseEntity<Void>>`, and
       `Mono<ResponseEntity<T>>` empty-body behavior.
-- [ ] Preserve status and headers for supported response envelopes.
-- [ ] Keep final 3xx out of error mappers when redirect following is disabled and
+- [x] Preserve status and headers for supported response envelopes.
+- [x] Keep final 3xx out of error mappers when redirect following is disabled and
       final 4xx/5xx inside the configured decoder/mapper chain.
-- [ ] Align lifecycle, observer, exchange-log, Micrometer, health, and OTel final
+- [x] Align lifecycle, observer, exchange-log, Micrometer, health, and OTel final
       status/category facts.
 
-### [ ] 4.2 Prove framing cleanup and connection safety
+### [x] 4.2 Prove framing cleanup and connection safety
 
-- [ ] Cover unexpected bytes on bodiless declarations without leaking buffers or
+- [x] Cover unexpected bytes on bodiless declarations without leaking buffers or
       unnecessarily discarding reusable connections.
-- [ ] Cover invalid/conflicting `Content-Length`, transfer framing, truncated
+- [x] Cover invalid/conflicting `Content-Length`, transfer framing, truncated
       responses, and close-delimited bodies with a real malformed peer.
-- [ ] Quarantine malformed connections before another pooled request can reuse
+- [x] Quarantine malformed connections before another pooled request can reuse
       decoder state or leftover bytes.
-- [ ] Retain the POST-then-PUT transport framing regression and extend it with
+- [x] Retain the POST-then-PUT transport framing regression and extend it with
       HEAD/bodiless and failure cases.
-- [ ] Verify error/failure-stage attribution follows the final protocol evidence,
+- [x] Verify error/failure-stage attribution follows the final protocol evidence,
       not parser message text.
-- [ ] Run focused framing/resource tests, full starter verification, and
+- [x] Run focused framing/resource tests, full starter verification, and
       `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Added a real HTTP/1.1/H2C status matrix for `HEAD`, `OPTIONS`, `204`, `205`,
+  `304`, visible `302`, `400`, and `503` across all supported unary and
+  `ResponseEntity` no-body shapes. Status, headers, mapper boundaries, lifecycle,
+  observer, exchange-log, Micrometer, health, and OTel terminal facts remain
+  aligned.
+- Recorded the supported-stack boundary for raw HTTP/1.1 `103 Early Hints`
+  followed by `200`: Reactor Netty exposes `103` to WebClient, so the starter
+  reports that response and cannot invent the later final status.
+- Added a bounded raw HTTP/1.1 peer proving unexpected-body drain and same-socket
+  reuse, HEAD framing, valid close-delimited completion with replacement capacity,
+  invalid/conflicting length rejection, invalid chunk and truncated-body failure,
+  and bad-socket quarantine before a following pooled probe.
+- Extended the existing same-connection POST-then-PUT regression through HEAD and
+  a following GET. Netty decoder and premature-close stages now use concrete type,
+  dispatch, and status evidence, with TLS/proxy/DNS/connect evidence retaining
+  precedence over generic framing fallback.
+- Focused status/framing/timeout/transport/OTel suites passed 23 starter tests and
+  25 OTel tests; the mTLS precedence regression suite passed another 25 tests.
+- `mvn -B -ntp -pl reactive-http-client-test,reactive-http-client-otel -am test`
+  passed 974 starter, 45 test-helper, and 43 OTel tests.
+- Strict starter japicmp passed against Central-resolved `3.4.0` from the fresh
+  `target/published-baseline-repositories/api-starter-v25-priority4-head-3.4.0`
+  repository; documentation generation and `git diff --check` passed.
 
 ---
 

@@ -169,6 +169,21 @@ For successful `Mono<Void>` and `Mono<ResponseEntity<Void>>` calls, any unexpect
 response content is drained or released before completion so pooled connections
 remain reusable.
 
+The no-body status contract is the same over HTTP/1.1 and H2/H2C:
+
+| Final response | `Mono<Void>` | `Mono<T>` | `Mono<ResponseEntity<Void>>` | `Mono<ResponseEntity<T>>` |
+|---|---|---|---|---|
+| `HEAD` | Completes after draining/releasing | Completes empty after draining/releasing | Preserves status and headers; body is null | Preserves status and headers; body is null |
+| `204`, `205`, `304` | Completes | Completes empty | Preserves status and headers; body is null | Preserves status and headers; body is null |
+| `OPTIONS` | Completes after draining/releasing | Decodes a body when present | Preserves status and headers | Preserves status, headers, and a body when present |
+
+Reactor Netty owns HTTP informational-response parsing. With the currently
+supported Reactor Netty line, a raw HTTP/1.1 `103 Early Hints` block
+followed by `200` is exposed to WebClient as the `103` response; the starter has
+no later `ClientResponse` from which it could recover the final `200`. Do not use
+starter response metadata as proof of a later final response when an intermediary
+or downstream emits `103`; capture the wire exchange when that distinction matters.
+
 4xx and 5xx responses are still decoded through the configured
 `DefaultErrorDecoder` and any registered `ErrorResponseMapper` beans before a
 `ResponseEntity` is emitted. Visible 3xx responses remain normal response values.
