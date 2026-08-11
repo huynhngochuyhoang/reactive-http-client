@@ -1700,6 +1700,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
         int fieldIndex = 0;
         int fileIndex = 0;
+        int partIndex = 0;
         while (fieldIndex < plan.formFields().size() || fileIndex < plan.formFiles().size()) {
             RequestPlan.FormFieldBinding field = fieldIndex < plan.formFields().size()
                     ? plan.formFields().get(fieldIndex)
@@ -1708,12 +1709,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     ? plan.formFiles().get(fileIndex)
                     : null;
             if (file == null || (field != null && field.argumentIndex() < file.argumentIndex())) {
-                addFormFieldParts(builder, field.name(), args[field.argumentIndex()]);
+                partIndex = addFormFieldParts(builder, partIndex, field.name(), args[field.argumentIndex()]);
                 fieldIndex++;
             } else {
                 Object value = args[file.argumentIndex()];
                 if (value != null) {
-                    addFilePart(builder, file.annotation(), value);
+                    partIndex = addFilePart(builder, partIndex, file.annotation(), value);
                 }
                 fileIndex++;
             }
@@ -1722,14 +1723,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return builder.build();
     }
 
-    private static void addFormFieldParts(MultipartBodyBuilder builder, String name, Object value) {
+    private static int addFormFieldParts(MultipartBodyBuilder builder, int partIndex, String name, Object value) {
         if (value == null) {
-            return;
+            return partIndex;
         }
         if (value instanceof java.util.Collection<?> collection) {
             for (Object item : collection) {
                 if (item != null) {
-                    builder.part(name, String.valueOf(item));
+                    partIndex = addMultipartPart(builder, partIndex, name, String.valueOf(item), null, null);
                 }
             }
         } else if (value.getClass().isArray()) {
@@ -1737,28 +1738,24 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             for (int index = 0; index < length; index++) {
                 Object item = java.lang.reflect.Array.get(value, index);
                 if (item != null) {
-                    builder.part(name, String.valueOf(item));
+                    partIndex = addMultipartPart(builder, partIndex, name, String.valueOf(item), null, null);
                 }
             }
         } else {
-            builder.part(name, String.valueOf(value));
+            partIndex = addMultipartPart(builder, partIndex, name, String.valueOf(value), null, null);
         }
+        return partIndex;
     }
 
-    private static void addFilePart(MultipartBodyBuilder builder, FormFile annotation, Object value) {
+    private static int addFilePart(
+            MultipartBodyBuilder builder, int partIndex, FormFile annotation, Object value) {
         String name = annotation.value();
         String fallbackFilename = StringUtils.hasText(annotation.filename()) ? annotation.filename() : name;
         MediaType fallbackContentType = parseMediaTypeOrOctetStream(annotation.contentType());
 
         if (value instanceof Resource resource) {
-            MultipartBodyBuilder.PartBuilder part = builder.part(name, resource, fallbackContentType);
-            if (resource.getFilename() == null) {
-                part.headers(h -> h.setContentDisposition(ContentDisposition.formData()
-                        .name(name)
-                        .filename(fallbackFilename)
-                        .build()));
-            }
-            return;
+            String filename = resource.getFilename() != null ? resource.getFilename() : fallbackFilename;
+            return addMultipartPart(builder, partIndex, name, resource, fallbackContentType, filename);
         }
         if (value instanceof byte[] bytes) {
             ByteArrayResource resource = new ByteArrayResource(bytes) {
@@ -1767,8 +1764,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return fallbackFilename;
                 }
             };
-            builder.part(name, resource, fallbackContentType);
-            return;
+            return addMultipartPart(
+                    builder, partIndex, name, resource, fallbackContentType, fallbackFilename);
         }
         if (value instanceof FileAttachment attachment) {
             byte[] content = attachment.content() != null ? attachment.content() : new byte[0];
@@ -1782,12 +1779,29 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return filename;
                 }
             };
-            builder.part(name, resource, contentType);
-            return;
+            return addMultipartPart(builder, partIndex, name, resource, contentType, filename);
         }
         throw new IllegalArgumentException(
                 "@FormFile parameter '" + name + "' must be byte[], Resource, or FileAttachment; got "
                         + value.getClass().getName());
+    }
+
+    private static int addMultipartPart(
+            MultipartBodyBuilder builder,
+            int partIndex,
+            String name,
+            Object body,
+            MediaType contentType,
+            String filename) {
+        MultipartBodyBuilder.PartBuilder part = builder.part("part-" + partIndex, body, contentType);
+        part.headers(headers -> {
+            ContentDisposition.Builder disposition = ContentDisposition.formData().name(name);
+            if (filename != null) {
+                disposition.filename(filename);
+            }
+            headers.setContentDisposition(disposition.build());
+        });
+        return partIndex + 1;
     }
 
     private static MediaType parseMediaTypeOrOctetStream(String value) {

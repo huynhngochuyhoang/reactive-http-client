@@ -65,6 +65,7 @@ class MultipartWireOwnershipContractTest {
                     byteFile,
                     Arrays.asList("red", null, "blue"),
                     attachment,
+                    "green",
                     new String[]{"one", null, "two"},
                     resource,
                     null,
@@ -75,20 +76,21 @@ class MultipartWireOwnershipContractTest {
             List<Part> parts = parseMultipart(request);
             assertThat(parts).extracting(Part::name)
                     .containsExactly("description", "bytes", "tag", "tag", "attachment",
-                            "code", "code", "resource", "unicode");
+                            "tag", "code", "code", "resource", "unicode");
             assertTextPart(parts.get(0), "alpha");
             assertFilePart(parts.get(1), "bytes.bin", "application/octet-stream", byteFile);
             assertTextPart(parts.get(2), "red");
             assertTextPart(parts.get(3), "blue");
             assertFilePart(parts.get(4), "dynamic.json", "application/json",
                     "attachment-body".getBytes(StandardCharsets.UTF_8));
-            assertTextPart(parts.get(5), "one");
-            assertTextPart(parts.get(6), "two");
-            assertFilePart(parts.get(7), "source.txt", "text/plain",
+            assertTextPart(parts.get(5), "green");
+            assertTextPart(parts.get(6), "one");
+            assertTextPart(parts.get(7), "two");
+            assertFilePart(parts.get(8), "source.txt", "text/plain",
                     "resource-body".getBytes(StandardCharsets.UTF_8));
-            assertThat(parts.get(8).contentDisposition())
+            assertThat(parts.get(9).contentDisposition())
                     .isEqualTo("form-data; name=\"unicode\"; filename=\"résumé 2026.txt\"");
-            assertThat(parts.get(8).body()).containsExactly("unicode-body".getBytes(StandardCharsets.UTF_8));
+            assertThat(parts.get(9).body()).containsExactly("unicode-body".getBytes(StandardCharsets.UTF_8));
             assertThat(resource.opens).hasValue(1);
             assertThat(resource.closes).hasValue(1);
             assertThat(unicode.opens).hasValue(1);
@@ -113,7 +115,7 @@ class MultipartWireOwnershipContractTest {
             assertThat(fixture.client().unbuffered(resource).block(CALL_TIMEOUT)).isEqualTo("ok");
 
             assertThat(server.firstPayloadObserved.getCount()).isZero();
-            assertThat(resource.secondReadStarted).isTrue();
+            assertThat(resource.gatedReadStarted).isTrue();
             assertThat(resource.opens).hasValue(1);
             assertThat(resource.closes).hasValue(1);
             assertThat(parseMultipart(server.onlyRequest("/unbuffered")).get(0).body())
@@ -347,6 +349,7 @@ class MultipartWireOwnershipContractTest {
                 @FormFile(value = "bytes", filename = "bytes.bin") byte[] bytes,
                 @FormField("tag") List<String> tags,
                 @FormFile("attachment") FileAttachment attachment,
+                @FormField("tag") String trailingTag,
                 @FormField("code") String[] codes,
                 @FormFile(value = "resource", contentType = "text/plain") Resource resource,
                 @FormField("omitted") String omitted,
@@ -518,8 +521,9 @@ class MultipartWireOwnershipContractTest {
 
     private static final class GatedResource extends TrackingResource {
         private static final byte[] PREFIX = "stream-before-complete".getBytes(StandardCharsets.UTF_8);
+        private static final int GATE_AFTER_BYTES = 1024 * 1024;
         private final CountDownLatch firstPayloadObserved;
-        private final AtomicBoolean secondReadStarted = new AtomicBoolean();
+        private final AtomicBoolean gatedReadStarted = new AtomicBoolean();
 
         private GatedResource(CountDownLatch firstPayloadObserved) {
             super(gatedBytes(), "gated.bin");
@@ -530,30 +534,34 @@ class MultipartWireOwnershipContractTest {
         public InputStream getInputStream() {
             opens.incrementAndGet();
             return tracked(new ByteArrayInputStream(bytes) {
-                private boolean firstRead = true;
+                private int delivered;
+                private boolean gatePassed;
 
                 @Override
                 public synchronized int read(byte[] destination, int offset, int length) {
-                    if (firstRead) {
-                        firstRead = false;
-                        return super.read(destination, offset, Math.min(length, PREFIX.length));
-                    }
-                    secondReadStarted.set(true);
-                    try {
-                        if (!firstPayloadObserved.await(CALL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
-                            throw new IllegalStateException("server did not observe the first multipart payload chunk");
+                    if (!gatePassed && delivered >= GATE_AFTER_BYTES) {
+                        gatedReadStarted.set(true);
+                        try {
+                            if (!firstPayloadObserved.await(CALL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
+                                throw new IllegalStateException("server did not observe the first resource payload");
+                            }
+                        } catch (InterruptedException error) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException(error);
                         }
-                    } catch (InterruptedException error) {
-                        Thread.currentThread().interrupt();
-                        throw new IllegalStateException(error);
+                        gatePassed = true;
                     }
-                    return super.read(destination, offset, length);
+                    int read = super.read(destination, offset, length);
+                    if (read > 0) {
+                        delivered += read;
+                    }
+                    return read;
                 }
             });
         }
 
         private static byte[] gatedBytes() {
-            byte[] bytes = new byte[32 * 1024];
+            byte[] bytes = new byte[4 * 1024 * 1024];
             Arrays.fill(bytes, (byte) 'x');
             System.arraycopy(PREFIX, 0, bytes, 0, PREFIX.length);
             return bytes;
@@ -742,7 +750,8 @@ class MultipartWireOwnershipContractTest {
                                 .doOnNext(chunk -> {
                                     chunkCount.incrementAndGet();
                                     body.writeBytes(chunk);
-                                    if ("/unbuffered".equals(path)) {
+                                    if ("/unbuffered".equals(path)
+                                        && indexOf(body.toByteArray(), GatedResource.PREFIX, 0) >= 0) {
                                         firstPayloadObserved.countDown();
                                     }
                                     if ("/peer-reset".equals(path)

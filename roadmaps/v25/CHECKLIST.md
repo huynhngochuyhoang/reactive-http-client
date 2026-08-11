@@ -270,10 +270,11 @@ Evidence:
 
 - Added a real HTTP/1.1/H2C multipart peer that parses exact mixed `byte[]`,
   `FileAttachment`, reopenable `Resource`, scalar, collection, and array parts.
-  Declaration order, repeated-value order, null omission, generated boundary,
-  disposition, filename, content type, and body bytes are asserted. HTTP/1.1 uses
-  chunked framing when aggregate length is unknown; H2C proves complete DATA
-  delivery without requiring a fixed content length.
+  Declaration order, including duplicate names separated by other parts,
+  repeated-value order, null omission, generated boundary, disposition, filename,
+  content type, and body bytes are asserted. HTTP/1.1 uses chunked framing when
+  aggregate length is unknown; H2C proves complete DATA delivery without requiring
+  a fixed content length.
 - Froze the configured Spring 7 writer's current non-ASCII filename behavior as a
   literal UTF-8 value in quoted `filename`, without claiming `filename*` support.
   Existing startup request-parameter grammar tests continue to reject unsupported
@@ -290,7 +291,7 @@ Evidence:
   is in-process evidence only. Focused suites passed 114 starter tests and 43
   test-helper tests; the full starter/test-helper reactor passed 980 and 46 tests.
 - Strict starter japicmp passed against Central-resolved `3.4.0` from the fresh
-  `target/published-baseline-repositories/api-starter-v25-priority5-3.4.0`
+  `target/published-baseline-repositories/api-starter-v25-priority5-followup-3.4.0`
   repository; generated documentation checks and `git diff --check` passed.
 
 ---

@@ -123,8 +123,10 @@ Mono<ReportReceipt> submitReport(
 
 Parts are written in method-parameter declaration order. A collection or array
 on one `@FormField` produces repeated parts at that position and retains element
-order; null values and null elements are omitted. The generated boundary is
-owned by Spring's multipart writer and appears in the request `Content-Type`.
+order. Separate parameters may use the same part name; parts between those
+parameters remain between them on the wire. Null values and null elements are
+omitted. The generated boundary is owned by Spring's multipart writer and
+appears in the request `Content-Type`.
 
 Multipart bodies may be streamed. With the current Reactor Netty/Spring stack,
 HTTP/1.1 uses chunked transfer encoding when the aggregate multipart length is

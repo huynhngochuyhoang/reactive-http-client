@@ -42,9 +42,11 @@ starter closes or releases it exactly once on completion, error, or cancellation
 including cancellation or logical timeout before the HTTP writer subscribes to
 the body. Once a direct `DataBuffer` write starts, ownership passes to the HTTP
 writer. A `Resource` remains lazy and is opened and closed once per request
-attempt. Publisher-emitted `DataBuffer` values are released by the HTTP writer
-after the write or when discarded because the request is cancelled. Do not
-release an emitted buffer concurrently from application code.
+attempt only when its length is available without reading it. Spring may open a
+reopenable resource once to calculate an unknown length and again to write it;
+every opened stream is closed. Publisher-emitted `DataBuffer` values are released
+by the HTTP writer after the write or when discarded because the request is
+cancelled. Do not release an emitted buffer concurrently from application code.
 
 A peer disconnect or write timeout cancels body demand. It does not make a
 partially written request replay-safe: a retry, redirect, or hidden auth replay
