@@ -239,36 +239,59 @@ Evidence:
 
 ## Priority 5 - Multipart and Form-Data Wire Ownership
 
-### [ ] 5.1 Prove multipart encoding on a real peer
+### [x] 5.1 Prove multipart encoding on a real peer
 
-- [ ] Parse mixed `@FormField` and `@FormFile` requests from `byte[]`,
+- [x] Parse mixed `@FormField` and `@FormFile` requests from `byte[]`,
       `FileAttachment`, and reopenable `Resource` inputs.
-- [ ] Assert multipart boundary, part order, repeated fields, content disposition,
+- [x] Assert multipart boundary, part order, repeated fields, content disposition,
       filename, content type, and exact body bytes.
-- [ ] Verify null scalar/file omission and collection/array ordering.
-- [ ] Record HTTP/1.1 framing and H2 data delivery without assuming aggregation
+- [x] Verify null scalar/file omission and collection/array ordering.
+- [x] Record HTTP/1.1 framing and H2 data delivery without assuming aggregation
       or one fixed content length.
-- [ ] Document non-ASCII filename behavior exactly as emitted by the configured
+- [x] Document non-ASCII filename behavior exactly as emitted by the configured
       Spring writer; do not claim an unverified encoding convention.
-- [ ] Keep unsupported part types rejected by the startup grammar.
+- [x] Keep unsupported part types rejected by the startup grammar.
 
-### [ ] 5.2 Preserve resource and replay ownership
+### [x] 5.2 Preserve resource and replay ownership
 
-- [ ] Cover cancellation before write and during a resource part.
-- [ ] Cover peer reset, request-write timeout, response timeout, retry,
+- [x] Cover cancellation before write and during a resource part.
+- [x] Cover peer reset, request-write timeout, response timeout, retry,
       body-preserving redirect, and one-time auth replay.
-- [ ] Prove every opened resource is closed once and no part is read/subscribed
+- [x] Prove every opened resource is closed once and no part is read/subscribed
       after terminal cancellation or failure.
-- [ ] Prove resource parts remain unbuffered and produce identical bytes only when
+- [x] Prove resource parts remain unbuffered and produce identical bytes only when
       the application supplies a reopenable source.
-- [ ] Preserve runtime replay warnings/strict rejection and built-in SigV4
+- [x] Preserve runtime replay warnings/strict rejection and built-in SigV4
       pre-dispatch rejection for unprovable multipart hashes.
-- [ ] Keep mock multipart assertions explicitly in-process and run focused/full
+- [x] Keep mock multipart assertions explicitly in-process and run focused/full
       starter and test-helper verification.
 
 Evidence:
 
-- Pending.
+- Added a real HTTP/1.1/H2C multipart peer that parses exact mixed `byte[]`,
+  `FileAttachment`, reopenable `Resource`, scalar, collection, and array parts.
+  Declaration order, repeated-value order, null omission, generated boundary,
+  disposition, filename, content type, and body bytes are asserted. HTTP/1.1 uses
+  chunked framing when aggregate length is unknown; H2C proves complete DATA
+  delivery without requiring a fixed content length.
+- Froze the configured Spring 7 writer's current non-ASCII filename behavior as a
+  literal UTF-8 value in quoted `filename`, without claiming `filename*` support.
+  Existing startup request-parameter grammar tests continue to reject unsupported
+  multipart part declarations.
+- Added gated, slow, and generated resource fixtures proving no pre-write open,
+  dispatch before source completion, one close per open, and no reads after
+  cancellation, peer reset, request-write timeout, or terminal completion.
+  Response-timeout cleanup is covered after a completed upload.
+- Retry, body-preserving redirect, and one-time auth replay each open a fresh
+  resource stream and send identical bytes twice. Existing repeatability warnings,
+  strict replay rejection, and built-in SigV4 pre-dispatch multipart rejection
+  remain green.
+- Added a mock-helper multipart assertion and documented that mock materialization
+  is in-process evidence only. Focused suites passed 114 starter tests and 43
+  test-helper tests; the full starter/test-helper reactor passed 980 and 46 tests.
+- Strict starter japicmp passed against Central-resolved `3.4.0` from the fresh
+  `target/published-baseline-repositories/api-starter-v25-priority5-3.4.0`
+  repository; generated documentation checks and `git diff --check` passed.
 
 ---
 

@@ -1695,38 +1695,54 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
      */
     private static MultiValueMap<String, HttpEntity<?>> buildMultipartBody(RequestPlan plan, Object[] args) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
-
-        plan.formFields().forEach(binding -> {
-            int idx = binding.argumentIndex();
-            String name = binding.name();
-            if (args == null || idx >= args.length) return;
-            Object value = args[idx];
-            if (value == null) return;
-            if (value instanceof java.util.Collection<?> collection) {
-                for (Object item : collection) {
-                    if (item != null) builder.part(name, String.valueOf(item));
-                }
-            } else if (value.getClass().isArray()) {
-                int len = java.lang.reflect.Array.getLength(value);
-                for (int i = 0; i < len; i++) {
-                    Object item = java.lang.reflect.Array.get(value, i);
-                    if (item != null) builder.part(name, String.valueOf(item));
-                }
+        if (args == null) {
+            return builder.build();
+        }
+        int fieldIndex = 0;
+        int fileIndex = 0;
+        while (fieldIndex < plan.formFields().size() || fileIndex < plan.formFiles().size()) {
+            RequestPlan.FormFieldBinding field = fieldIndex < plan.formFields().size()
+                    ? plan.formFields().get(fieldIndex)
+                    : null;
+            RequestPlan.FormFileBinding file = fileIndex < plan.formFiles().size()
+                    ? plan.formFiles().get(fileIndex)
+                    : null;
+            if (file == null || (field != null && field.argumentIndex() < file.argumentIndex())) {
+                addFormFieldParts(builder, field.name(), args[field.argumentIndex()]);
+                fieldIndex++;
             } else {
-                builder.part(name, String.valueOf(value));
+                Object value = args[file.argumentIndex()];
+                if (value != null) {
+                    addFilePart(builder, file.annotation(), value);
+                }
+                fileIndex++;
             }
-        });
-
-        plan.formFiles().forEach(binding -> {
-            int idx = binding.argumentIndex();
-            FormFile annotation = binding.annotation();
-            if (args == null || idx >= args.length) return;
-            Object value = args[idx];
-            if (value == null) return;
-            addFilePart(builder, annotation, value);
-        });
+        }
 
         return builder.build();
+    }
+
+    private static void addFormFieldParts(MultipartBodyBuilder builder, String name, Object value) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof java.util.Collection<?> collection) {
+            for (Object item : collection) {
+                if (item != null) {
+                    builder.part(name, String.valueOf(item));
+                }
+            }
+        } else if (value.getClass().isArray()) {
+            int length = java.lang.reflect.Array.getLength(value);
+            for (int index = 0; index < length; index++) {
+                Object item = java.lang.reflect.Array.get(value, index);
+                if (item != null) {
+                    builder.part(name, String.valueOf(item));
+                }
+            }
+        } else {
+            builder.part(name, String.valueOf(value));
+        }
     }
 
     private static void addFilePart(MultipartBodyBuilder builder, FormFile annotation, Object value) {
