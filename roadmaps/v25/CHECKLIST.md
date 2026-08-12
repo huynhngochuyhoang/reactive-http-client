@@ -286,8 +286,9 @@ Evidence:
 - Retry, body-preserving redirect, and one-time auth replay each open a fresh
   resource stream and send identical bytes twice. Existing repeatability warnings,
   strict replay rejection, and built-in SigV4 pre-dispatch multipart rejection
-  remain green. The auth-visible multipart map retains declared names and repeated
-  value order without exposing the wire writer's synthetic ordering keys.
+  remain green. The auth-visible multipart part list retains declared names and
+  global order, including noncontiguous repetitions, without exposing the wire
+  writer's synthetic ordering keys.
 - Added a mock-helper multipart assertion and documented that mock materialization
   is in-process evidence only. Focused suites passed 115 starter tests and 43
   test-helper tests; the full starter/test-helper reactor passed 981 and 46 tests.

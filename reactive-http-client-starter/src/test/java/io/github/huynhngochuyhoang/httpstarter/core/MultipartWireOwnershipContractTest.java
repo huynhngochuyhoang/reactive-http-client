@@ -17,7 +17,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
@@ -229,7 +228,7 @@ class MultipartWireOwnershipContractTest {
     }
 
     @Test
-    void authProviderSeesDeclaredMultipartNames() {
+    void authProviderSeesDeclaredMultipartNamesInGlobalWireOrder() {
         MultipartBodyCapturingAuthProvider authProvider = new MultipartBodyCapturingAuthProvider();
         try (MultipartServer server = new MultipartServer(WireProtocol.HTTP11);
              ClientFixture fixture = ClientFixture.create(server, false, false, authProvider, 0, 60_000)) {
@@ -249,11 +248,9 @@ class MultipartWireOwnershipContractTest {
                     null).block(CALL_TIMEOUT)).isEqualTo("ok");
 
             assertThat(authProvider.partNames()).containsExactly(
-                    "description", "bytes", "tag", "attachment", "code", "resource");
-            assertThat(authProvider.parts().get("tag"))
-                    .extracting(part -> part.getHeaders().getContentDisposition().getName())
-                    .containsExactly("tag", "tag", "tag");
-            assertThat(authProvider.parts().keySet()).noneMatch(name -> name.startsWith("part-"));
+                    "description", "bytes", "tag", "tag", "attachment", "tag",
+                    "code", "code", "resource");
+            assertThat(authProvider.partNames()).noneMatch(name -> name.startsWith("part-"));
         }
     }
 
@@ -769,12 +766,12 @@ class MultipartWireOwnershipContractTest {
     }
 
     private static final class MultipartBodyCapturingAuthProvider implements InvalidatableAuthProvider {
-        private MultiValueMap<String, HttpEntity<?>> parts;
+        private List<HttpEntity<?>> parts;
 
         @Override
         @SuppressWarnings("unchecked")
         public Mono<AuthContext> getAuth(AuthRequest request) {
-            parts = (MultiValueMap<String, HttpEntity<?>>) request.requestBody();
+            parts = (List<HttpEntity<?>>) request.requestBody();
             return Mono.just(AuthContext.empty());
         }
 
@@ -783,12 +780,10 @@ class MultipartWireOwnershipContractTest {
             return Mono.empty();
         }
 
-        private MultiValueMap<String, HttpEntity<?>> parts() {
-            return parts;
-        }
-
         private List<String> partNames() {
-            return new ArrayList<>(parts.keySet());
+            return parts.stream()
+                    .map(part -> part.getHeaders().getContentDisposition().getName())
+                    .toList();
         }
     }
 

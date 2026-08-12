@@ -22,7 +22,6 @@ import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.*;
 import org.springframework.http.client.MultipartBodyBuilder;
-import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
@@ -1698,8 +1697,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private static MultipartRequestBody buildMultipartBody(RequestPlan plan, Object[] args) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         if (args == null) {
-            MultiValueMap<String, HttpEntity<?>> empty = builder.build();
-            return new MultipartRequestBody(empty, empty);
+            return new MultipartRequestBody(builder.build(), List.of());
         }
         int fieldIndex = 0;
         int fileIndex = 0;
@@ -1724,9 +1722,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
 
         MultiValueMap<String, HttpEntity<?>> wireBody = builder.build();
-        MultiValueMap<String, HttpEntity<?>> authBody = new LinkedMultiValueMap<>();
-        wireBody.values().forEach(parts -> parts.forEach(part ->
-                authBody.add(part.getHeaders().getContentDisposition().getName(), part)));
+        List<HttpEntity<?>> authBody = wireBody.values().stream()
+                .flatMap(Collection::stream)
+                .toList();
         return new MultipartRequestBody(wireBody, authBody);
     }
 
@@ -2110,7 +2108,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private record SerializedRequestBody(Object originalBody, Object bodyToWrite, byte[] rawBody) {}
     private record MultipartRequestBody(
             MultiValueMap<String, HttpEntity<?>> wireBody,
-            MultiValueMap<String, HttpEntity<?>> authBody) {}
+            List<HttpEntity<?>> authBody) {}
     private record FinalRequestObservation(String httpMethod, URI url, Map<String, String> headers) {
         private static FinalRequestObservation from(ClientRequest request) {
             return new FinalRequestObservation(request.method().name(), request.url(), copyRequestHeaders(request.headers()));
