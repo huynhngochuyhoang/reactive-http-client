@@ -339,12 +339,15 @@ Evidence:
   each subscription. Each attempt owns one immutable observation/response value,
   and cleanup/reset operations are accepted only from the attempt that installed
   the active state, so delayed retry cleanup cannot clear a newer attempt.
+  Backoff cleanup resets the latest attempt's transport evidence in place while
+  retaining its prepared arguments for terminal lifecycle and exchange logging.
 - Mono and Flux terminal paths now create one immutable `TerminalSnapshot` through
   a single compare-and-set winner. Lifecycle hooks, exchange logging, observers,
   and observer-derived Micrometer, health, and OTel consumers read that same
   snapshot. The diagnostics-disabled stateless request path remains separate.
-- The focused race/composition suite passed 45 tests. The full starter,
-  test-helper, and OTel reactor passed 983, 46, and 43 tests respectively,
+- The focused race/composition suite passed 45 tests. A follow-up timeout,
+  idempotency-key, and subscription-state suite passed 42 tests. The full starter,
+  test-helper, and OTel reactor passed 984, 46, and 43 tests respectively,
   including streaming ownership, redirect/auth composition, failure-stage, and
   immediate-retry coverage.
 - A local diagnostics-disabled JMH smoke recorded 13,602.549 B/op before and

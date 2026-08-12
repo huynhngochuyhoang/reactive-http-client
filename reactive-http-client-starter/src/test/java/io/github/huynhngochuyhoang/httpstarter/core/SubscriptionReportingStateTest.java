@@ -43,6 +43,28 @@ class SubscriptionReportingStateTest {
     }
 
     @Test
+    void retryBackoffCleanupPreservesLatestPreparedArguments() {
+        RequestArgumentResolver.ResolvedArgs prepared = new RequestArgumentResolver.ResolvedArgs(
+                Map.of(), Map.of(), Map.of("Idempotency-Key", List.of("backoff-key")), null);
+        SubscriptionReportingState state = new SubscriptionReportingState(RESOLVED);
+        SubscriptionReportingState.Attempt attempt = state.beginAttempt(prepared);
+        attempt.observeRequestUrl(URI.create("http://test.local/attempt"));
+        attempt.recordResponse(HttpStatus.SERVICE_UNAVAILABLE, Map.of("X-Attempt", List.of("first")));
+
+        state.clearActiveAttempt(attempt);
+        state.clearEvidenceWhenNoAttemptIsActive();
+        SubscriptionReportingState.TerminalSnapshot terminal = state.complete(
+                SubscriptionReportingState.TerminalSignal.ERROR, null, new RuntimeException("timeout"));
+
+        assertThat(terminal.preparedResolved().headers())
+                .containsEntry("Idempotency-Key", List.of("backoff-key"));
+        assertThat(terminal.requestUrl()).isNull();
+        assertThat(terminal.finalRequestObservation()).isNull();
+        assertThat(terminal.responseStatus()).isNull();
+        assertThat(terminal.responseHeaders()).isEmpty();
+    }
+
+    @Test
     void exactlyOneCompetingTerminalSignalWinsWithOneImmutableSnapshot() throws InterruptedException {
         SubscriptionReportingState state = new SubscriptionReportingState(RESOLVED);
         SubscriptionReportingState.Attempt attempt = state.beginAttempt(RESOLVED);

@@ -84,7 +84,10 @@ final class SubscriptionReportingState {
 
     synchronized void clearEvidenceWhenNoAttemptIsActive() {
         if (activeAttempt.get() == null) {
-            latestAttempt.set(null);
+            Attempt attempt = latestAttempt.get();
+            if (attempt != null) {
+                attempt.resetEvidence();
+            }
         }
     }
 
