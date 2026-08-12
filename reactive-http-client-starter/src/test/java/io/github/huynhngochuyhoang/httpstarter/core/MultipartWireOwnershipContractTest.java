@@ -14,8 +14,10 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
@@ -223,6 +225,35 @@ class MultipartWireOwnershipContractTest {
             assertReplay(server.requestsFor("/auth"), resource, "auth-body");
             assertThat(authProvider.authCalls).hasValue(2);
             assertThat(authProvider.invalidations).hasValue(1);
+        }
+    }
+
+    @Test
+    void authProviderSeesDeclaredMultipartNames() {
+        MultipartBodyCapturingAuthProvider authProvider = new MultipartBodyCapturingAuthProvider();
+        try (MultipartServer server = new MultipartServer(WireProtocol.HTTP11);
+             ClientFixture fixture = ClientFixture.create(server, false, false, authProvider, 0, 60_000)) {
+            TrackingResource resource = new TrackingResource(
+                    "resource-body".getBytes(StandardCharsets.UTF_8), "source.txt");
+
+            assertThat(fixture.client().mixed(
+                    "alpha",
+                    new byte[]{1},
+                    List.of("red", "blue"),
+                    FileAttachment.of("attachment".getBytes(StandardCharsets.UTF_8), "attachment.txt"),
+                    "green",
+                    new String[]{"one", "two"},
+                    resource,
+                    null,
+                    null,
+                    null).block(CALL_TIMEOUT)).isEqualTo("ok");
+
+            assertThat(authProvider.partNames()).containsExactly(
+                    "description", "bytes", "tag", "attachment", "code", "resource");
+            assertThat(authProvider.parts().get("tag"))
+                    .extracting(part -> part.getHeaders().getContentDisposition().getName())
+                    .containsExactly("tag", "tag", "tag");
+            assertThat(authProvider.parts().keySet()).noneMatch(name -> name.startsWith("part-"));
         }
     }
 
@@ -539,23 +570,42 @@ class MultipartWireOwnershipContractTest {
 
                 @Override
                 public synchronized int read(byte[] destination, int offset, int length) {
-                    if (!gatePassed && delivered >= GATE_AFTER_BYTES) {
-                        gatedReadStarted.set(true);
-                        try {
-                            if (!firstPayloadObserved.await(CALL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
-                                throw new IllegalStateException("server did not observe the first resource payload");
-                            }
-                        } catch (InterruptedException error) {
-                            Thread.currentThread().interrupt();
-                            throw new IllegalStateException(error);
-                        }
-                        gatePassed = true;
+                    if (length == 0) {
+                        return super.read(destination, offset, length);
                     }
-                    int read = super.read(destination, offset, length);
+                    awaitGateIfNecessary();
+                    int allowed = gatePassed ? length : Math.min(length, GATE_AFTER_BYTES - delivered);
+                    int read = super.read(destination, offset, allowed);
                     if (read > 0) {
                         delivered += read;
                     }
                     return read;
+                }
+
+                @Override
+                public synchronized int read() {
+                    awaitGateIfNecessary();
+                    int read = super.read();
+                    if (read >= 0) {
+                        delivered++;
+                    }
+                    return read;
+                }
+
+                private void awaitGateIfNecessary() {
+                    if (gatePassed || delivered < GATE_AFTER_BYTES) {
+                        return;
+                    }
+                    gatedReadStarted.set(true);
+                    try {
+                        if (!firstPayloadObserved.await(CALL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
+                            throw new IllegalStateException("server did not observe the first resource payload");
+                        }
+                    } catch (InterruptedException error) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(error);
+                    }
+                    gatePassed = true;
                 }
             });
         }
@@ -715,6 +765,30 @@ class MultipartWireOwnershipContractTest {
         public Mono<Void> invalidate() {
             invalidations.incrementAndGet();
             return Mono.empty();
+        }
+    }
+
+    private static final class MultipartBodyCapturingAuthProvider implements InvalidatableAuthProvider {
+        private MultiValueMap<String, HttpEntity<?>> parts;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public Mono<AuthContext> getAuth(AuthRequest request) {
+            parts = (MultiValueMap<String, HttpEntity<?>>) request.requestBody();
+            return Mono.just(AuthContext.empty());
+        }
+
+        @Override
+        public Mono<Void> invalidate() {
+            return Mono.empty();
+        }
+
+        private MultiValueMap<String, HttpEntity<?>> parts() {
+            return parts;
+        }
+
+        private List<String> partNames() {
+            return new ArrayList<>(parts.keySet());
         }
     }
 

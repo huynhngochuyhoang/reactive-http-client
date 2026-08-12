@@ -18,8 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   content types, exact bytes, and framing, plus bounded cancellation, peer
   reset, write/response timeout, retry, redirect, and one-time auth-replay
   coverage proving every opened resource stream is closed once and reopenable
-  sources produce identical bytes across replay. Mock multipart assertions
-  remain explicitly in-process.
+  sources produce identical bytes across replay. Custom auth providers now see
+  declared multipart names instead of wire-only ordering keys. Mock multipart
+  assertions remain explicitly in-process.
 - **HTTP method, final-status, and framing semantics.** Added real HTTP/1.1 and
   H2C coverage for `HEAD`, `OPTIONS`, `204`, `205`, `304`, visible redirects,
   4xx/5xx mapping, and all supported unary/`ResponseEntity` no-body shapes.

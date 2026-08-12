@@ -22,6 +22,7 @@ import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.*;
 import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
@@ -270,7 +271,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         long timeoutMs = resolveTimeoutMs(plan, effectiveApi.timeoutMs());
         long logicalCallTimeoutMs = clientConfig.getLogicalCallTimeoutMs();
 
-        final MultiValueMap<String, HttpEntity<?>> multipartBody = plan.multipart()
+        final MultipartRequestBody multipartBody = plan.multipart()
                 ? buildMultipartBody(plan, args)
                 : null;
 
@@ -415,7 +416,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String contentTypeHeader,
             boolean hasAcceptHeader,
             boolean hasContentTypeHeader,
-            MultiValueMap<String, HttpEntity<?>> multipartBody,
+            MultipartRequestBody multipartBody,
             List<ReactiveHttpClientLifecycleHook> lifecycleHooks,
             HttpExchangeLogger exchangeLogger,
             long timeoutMs,
@@ -462,7 +463,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             RequestArgumentResolver.ResolvedArgs resolved,
             boolean hasAcceptHeader,
             boolean hasContentTypeHeader,
-            MultiValueMap<String, HttpEntity<?>> multipartBody,
+            MultipartRequestBody multipartBody,
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
             RequestBodyOwnership requestBodyOwnership) {
@@ -498,7 +499,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             SerializedRequestBody serializedRequestBody,
             boolean hasAcceptHeader,
             boolean hasContentTypeHeader,
-            MultiValueMap<String, HttpEntity<?>> multipartBody,
+            MultipartRequestBody multipartBody,
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
             AtomicReference<URI> requestUrl,
@@ -528,8 +529,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         WebClient.RequestHeadersSpec<?> requestHeadersSpec;
         if (multipartBody != null) {
-            preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, multipartBody);
-            requestHeadersSpec = preparedRequestSpec.body(BodyInserters.fromMultipartData(multipartBody));
+            preparedRequestSpec = preparedRequestSpec.attribute(
+                    AuthRequest.REQUEST_BODY_ATTRIBUTE, multipartBody.authBody());
+            requestHeadersSpec = preparedRequestSpec.body(BodyInserters.fromMultipartData(multipartBody.wireBody()));
         } else if (serializedRequestBody.bodyToWrite() instanceof Publisher<?> publisher) {
             requestHeadersSpec = requestFromPublisher(preparedRequestSpec, publisher, plan.bodyType(), hasContentTypeHeader);
         } else if (serializedRequestBody.bodyToWrite() instanceof DataBuffer dataBuffer) {
@@ -1689,14 +1691,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     /**
-     * Builds a {@link MultiValueMap} of multipart parts from {@code @FormField} /
+     * Builds wire and auth-visible multipart views from {@code @FormField} /
      * {@code @FormFile} parameter values. Unsupported value types fail fast with a
      * descriptive {@link IllegalArgumentException}; null values skip the part.
      */
-    private static MultiValueMap<String, HttpEntity<?>> buildMultipartBody(RequestPlan plan, Object[] args) {
+    private static MultipartRequestBody buildMultipartBody(RequestPlan plan, Object[] args) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         if (args == null) {
-            return builder.build();
+            MultiValueMap<String, HttpEntity<?>> empty = builder.build();
+            return new MultipartRequestBody(empty, empty);
         }
         int fieldIndex = 0;
         int fileIndex = 0;
@@ -1720,7 +1723,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             }
         }
 
-        return builder.build();
+        MultiValueMap<String, HttpEntity<?>> wireBody = builder.build();
+        MultiValueMap<String, HttpEntity<?>> authBody = new LinkedMultiValueMap<>();
+        wireBody.values().forEach(parts -> parts.forEach(part ->
+                authBody.add(part.getHeaders().getContentDisposition().getName(), part)));
+        return new MultipartRequestBody(wireBody, authBody);
     }
 
     private static int addFormFieldParts(MultipartBodyBuilder builder, int partIndex, String name, Object value) {
@@ -2101,6 +2108,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private record SerializedRequestBody(Object originalBody, Object bodyToWrite, byte[] rawBody) {}
+    private record MultipartRequestBody(
+            MultiValueMap<String, HttpEntity<?>> wireBody,
+            MultiValueMap<String, HttpEntity<?>> authBody) {}
     private record FinalRequestObservation(String httpMethod, URI url, Map<String, String> headers) {
         private static FinalRequestObservation from(ClientRequest request) {
             return new FinalRequestObservation(request.method().name(), request.url(), copyRequestHeaders(request.headers()));

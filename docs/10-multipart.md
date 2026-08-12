@@ -157,6 +157,13 @@ rejects multipart before dispatch because a stable aggregate payload hash is not
 available without consuming the parts; use a custom signing provider when the
 service requires multipart signing.
 
+Custom auth providers receive an auth-visible `MultiValueMap<String,
+HttpEntity<?>>` through `AuthRequest.requestBody()`. Its keys are the declared
+form names in first-declaration order, and repeated values retain their
+declaration order. Internal keys used by the wire writer are not exposed. This
+map describes the part metadata and bodies; it is not the final encoded
+multipart payload because the transport still owns the boundary and framing.
+
 ---
 
 ## Constraints

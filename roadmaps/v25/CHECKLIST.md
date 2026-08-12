@@ -286,10 +286,11 @@ Evidence:
 - Retry, body-preserving redirect, and one-time auth replay each open a fresh
   resource stream and send identical bytes twice. Existing repeatability warnings,
   strict replay rejection, and built-in SigV4 pre-dispatch multipart rejection
-  remain green.
+  remain green. The auth-visible multipart map retains declared names and repeated
+  value order without exposing the wire writer's synthetic ordering keys.
 - Added a mock-helper multipart assertion and documented that mock materialization
-  is in-process evidence only. Focused suites passed 114 starter tests and 43
-  test-helper tests; the full starter/test-helper reactor passed 980 and 46 tests.
+  is in-process evidence only. Focused suites passed 115 starter tests and 43
+  test-helper tests; the full starter/test-helper reactor passed 981 and 46 tests.
 - Strict starter japicmp passed against Central-resolved `3.4.0` from the fresh
   `target/published-baseline-repositories/api-starter-v25-priority5-followup-3.4.0`
   repository; generated documentation checks and `git diff --check` passed.
