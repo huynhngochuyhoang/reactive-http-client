@@ -436,6 +436,13 @@ RecordedExchangeAssertions.assertThat(mock.exchanges().get(1))
 
 The mock retry helper is intentionally small: it retries matching methods inside tests and records each outbound attempt. A publisher request body remains cold until the mock exchange runs and is materialized once for each recorded retry attempt. Application-owned `InputStream`, `Reader`, and `ReadableByteChannel` bodies are also materialized and closed by that in-process exchange. One-shot streams are not made replayable. The source must therefore be replayable, matching the runtime [request-body repeatability matrix](11-streaming.md#request-body-repeatability-matrix). The helper aggregates the body only to expose `RecordedExchange.bodyAsString()`; it does not emulate socket demand, connection-pool queues, transport cancellation, redirects, or network write ownership. Production retry semantics still come from your application Resilience4j configuration.
 
+Multipart requests are likewise materialized in-process. Tests can inspect the
+generated boundary and ordered part headers/body through `contentType()`,
+`bodyAsString()`, or `materialized()`. Those assertions do not prove HTTP/1.1
+framing, HTTP/2 DATA delivery, resource backpressure, socket cancellation, pool
+reuse, redirect replay, or peer-reset cleanup; use an HTTP server fixture for
+those transport contracts.
+
 ## Observer and lifecycle assertions
 
 Attach a custom observer and one or more lifecycle hooks when a test needs to

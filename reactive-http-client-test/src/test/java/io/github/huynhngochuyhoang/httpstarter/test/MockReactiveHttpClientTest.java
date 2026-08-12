@@ -126,6 +126,16 @@ class MockReactiveHttpClientTest {
         Mono<byte[]> bytes();
     }
 
+    interface MultipartClient {
+        @POST("/multipart")
+        @MultipartBody
+        Mono<String> upload(
+                @FormField("description") String description,
+                @FormFile(value = "file", filename = "payload.txt", contentType = "text/plain") byte[] file,
+                @FormField("tag") List<String> tags,
+                @FormFile("attachment") FileAttachment attachment);
+    }
+
     record SignedRequest(String orderId, int amount) {}
 
     @Test
@@ -1081,6 +1091,31 @@ class MockReactiveHttpClientTest {
         RecordedExchangeAssertions.assertThat(mock.lastExchange())
                 .doesNotHaveCapturedCorrelationId()
                 .doesNotHaveInboundHeader("X-Request-Id");
+    }
+
+    @Test
+    void materializesMultipartPartsForInProcessAssertionsOnly() {
+        MockReactiveHttpClient<MultipartClient> mock = MockReactiveHttpClient.forClient(MultipartClient.class)
+                .fallback(MockReactiveHttpClient.text(200, "ok"))
+                .build();
+
+        assertThat(mock.proxy().upload(
+                "alpha",
+                "file-body".getBytes(StandardCharsets.UTF_8),
+                List.of("one", "two"),
+                FileAttachment.of("attachment-body".getBytes(StandardCharsets.UTF_8),
+                        "dynamic.json", "application/json"))
+                .block()).isEqualTo("ok");
+
+        RecordedExchange exchange = mock.lastExchange();
+        assertThat(exchange.contentType()).isNotNull();
+        assertThat(exchange.contentType().toString()).startsWith("multipart/form-data;boundary=");
+        assertThat(exchange.bodyAsString()).containsSubsequence(
+                "name=\"description\"", "alpha",
+                "name=\"file\"; filename=\"payload.txt\"", "file-body",
+                "name=\"tag\"", "one",
+                "name=\"tag\"", "two",
+                "name=\"attachment\"; filename=\"dynamic.json\"", "attachment-body");
     }
 
     @Test

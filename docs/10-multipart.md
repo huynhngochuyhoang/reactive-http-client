@@ -119,9 +119,56 @@ Mono<ReportReceipt> submitReport(
 
 ---
 
+## Wire order and framing
+
+Parts are written in method-parameter declaration order. A collection or array
+on one `@FormField` produces repeated parts at that position and retains element
+order. Separate parameters may use the same part name; parts between those
+parameters remain between them on the wire. Null values and null elements are
+omitted. The generated boundary is owned by Spring's multipart writer and
+appears in the request `Content-Type`.
+
+Multipart bodies may be streamed. With the current Reactor Netty/Spring stack,
+HTTP/1.1 uses chunked transfer encoding when the aggregate multipart length is
+not known. HTTP/2 carries the same part bytes in DATA frames and does not use
+HTTP/1.1 chunk framing. Do not require one aggregate `Content-Length` at the
+receiving service.
+
+The configured Spring 7 writer emits a non-ASCII resource filename as literal
+UTF-8 bytes in the quoted `filename` parameter. For example,
+`résumé 2026.txt` is emitted as `filename="résumé 2026.txt"`; the current writer
+does not add a separate `filename*` parameter. Confirm interoperability with a
+peer that applies a different multipart filename convention.
+
+## Resource ownership and replay
+
+`byte[]` and `FileAttachment` parts are materialized and repeatable. A
+`Resource` is application-owned and is read only when the request body is
+written. Cancellation before body writing does not open it. Once opened, the
+Spring writer closes the stream on completion, cancellation, peer reset, or
+timeout.
+
+Retry, a body-preserving redirect, and one-time `401` auth replay each create a
+new body subscription. A resource part must therefore return a fresh stream from
+every `getInputStream()` call; each opened stream is closed once. The starter
+does not aggregate the resource to make it replayable. Runtime diagnostics warn
+when retry is enabled for this application-owned shape. Built-in AWS SigV4
+rejects multipart before dispatch because a stable aggregate payload hash is not
+available without consuming the parts; use a custom signing provider when the
+service requires multipart signing.
+
+Custom auth providers receive an auth-visible `List<HttpEntity<?>>` through
+`AuthRequest.requestBody()`. List order is the global wire part order, including
+noncontiguous repeated names, and each entity's `Content-Disposition` carries
+the declared form name. Internal keys used by the wire writer are not exposed.
+This list describes the part metadata and bodies; it is not the final encoded
+multipart payload because the transport still owns the boundary and framing.
+
+---
+
 ## Constraints
 
 - `@MultipartBody` and `@Body` cannot appear on the same method — this is validated at startup and results in an `IllegalStateException`.
 - Unsupported `@FormFile` parameter types are rejected at startup after inherited generic bindings are resolved; supported types are `byte[]`, `Resource`, and `FileAttachment`.
 - `null` `@FormField` / `@FormFile` values: `null` scalar field values are omitted from the body. `null` file values are also omitted.
-- `byte[]` and `FileAttachment` parts are materialized and repeatable. A `Resource` part is application-owned: each retry or body-preserving redirect opens it again, and the WebClient writer closes each opened stream after that attempt. Supply a resource that can be reopened or disable request replay. See the [request-body repeatability matrix](11-streaming.md#request-body-repeatability-matrix).
+- Supply a reopenable `Resource` or disable request replay. See the [request-body repeatability matrix](11-streaming.md#request-body-repeatability-matrix).

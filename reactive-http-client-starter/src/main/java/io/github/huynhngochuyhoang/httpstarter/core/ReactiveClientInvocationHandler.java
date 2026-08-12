@@ -270,7 +270,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         long timeoutMs = resolveTimeoutMs(plan, effectiveApi.timeoutMs());
         long logicalCallTimeoutMs = clientConfig.getLogicalCallTimeoutMs();
 
-        final MultiValueMap<String, HttpEntity<?>> multipartBody = plan.multipart()
+        final MultipartRequestBody multipartBody = plan.multipart()
                 ? buildMultipartBody(plan, args)
                 : null;
 
@@ -415,7 +415,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String contentTypeHeader,
             boolean hasAcceptHeader,
             boolean hasContentTypeHeader,
-            MultiValueMap<String, HttpEntity<?>> multipartBody,
+            MultipartRequestBody multipartBody,
             List<ReactiveHttpClientLifecycleHook> lifecycleHooks,
             HttpExchangeLogger exchangeLogger,
             long timeoutMs,
@@ -462,7 +462,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             RequestArgumentResolver.ResolvedArgs resolved,
             boolean hasAcceptHeader,
             boolean hasContentTypeHeader,
-            MultiValueMap<String, HttpEntity<?>> multipartBody,
+            MultipartRequestBody multipartBody,
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
             RequestBodyOwnership requestBodyOwnership) {
@@ -498,7 +498,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             SerializedRequestBody serializedRequestBody,
             boolean hasAcceptHeader,
             boolean hasContentTypeHeader,
-            MultiValueMap<String, HttpEntity<?>> multipartBody,
+            MultipartRequestBody multipartBody,
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
             AtomicReference<URI> requestUrl,
@@ -528,8 +528,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         WebClient.RequestHeadersSpec<?> requestHeadersSpec;
         if (multipartBody != null) {
-            preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, multipartBody);
-            requestHeadersSpec = preparedRequestSpec.body(BodyInserters.fromMultipartData(multipartBody));
+            preparedRequestSpec = preparedRequestSpec.attribute(
+                    AuthRequest.REQUEST_BODY_ATTRIBUTE, multipartBody.authBody());
+            requestHeadersSpec = preparedRequestSpec.body(BodyInserters.fromMultipartData(multipartBody.wireBody()));
         } else if (serializedRequestBody.bodyToWrite() instanceof Publisher<?> publisher) {
             requestHeadersSpec = requestFromPublisher(preparedRequestSpec, publisher, plan.bodyType(), hasContentTypeHeader);
         } else if (serializedRequestBody.bodyToWrite() instanceof DataBuffer dataBuffer) {
@@ -1689,60 +1690,77 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     /**
-     * Builds a {@link MultiValueMap} of multipart parts from {@code @FormField} /
+     * Builds wire and auth-visible multipart views from {@code @FormField} /
      * {@code @FormFile} parameter values. Unsupported value types fail fast with a
      * descriptive {@link IllegalArgumentException}; null values skip the part.
      */
-    private static MultiValueMap<String, HttpEntity<?>> buildMultipartBody(RequestPlan plan, Object[] args) {
+    private static MultipartRequestBody buildMultipartBody(RequestPlan plan, Object[] args) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
-
-        plan.formFields().forEach(binding -> {
-            int idx = binding.argumentIndex();
-            String name = binding.name();
-            if (args == null || idx >= args.length) return;
-            Object value = args[idx];
-            if (value == null) return;
-            if (value instanceof java.util.Collection<?> collection) {
-                for (Object item : collection) {
-                    if (item != null) builder.part(name, String.valueOf(item));
-                }
-            } else if (value.getClass().isArray()) {
-                int len = java.lang.reflect.Array.getLength(value);
-                for (int i = 0; i < len; i++) {
-                    Object item = java.lang.reflect.Array.get(value, i);
-                    if (item != null) builder.part(name, String.valueOf(item));
-                }
+        if (args == null) {
+            return new MultipartRequestBody(builder.build(), List.of());
+        }
+        int fieldIndex = 0;
+        int fileIndex = 0;
+        int partIndex = 0;
+        while (fieldIndex < plan.formFields().size() || fileIndex < plan.formFiles().size()) {
+            RequestPlan.FormFieldBinding field = fieldIndex < plan.formFields().size()
+                    ? plan.formFields().get(fieldIndex)
+                    : null;
+            RequestPlan.FormFileBinding file = fileIndex < plan.formFiles().size()
+                    ? plan.formFiles().get(fileIndex)
+                    : null;
+            if (file == null || (field != null && field.argumentIndex() < file.argumentIndex())) {
+                partIndex = addFormFieldParts(builder, partIndex, field.name(), args[field.argumentIndex()]);
+                fieldIndex++;
             } else {
-                builder.part(name, String.valueOf(value));
+                Object value = args[file.argumentIndex()];
+                if (value != null) {
+                    partIndex = addFilePart(builder, partIndex, file.annotation(), value);
+                }
+                fileIndex++;
             }
-        });
+        }
 
-        plan.formFiles().forEach(binding -> {
-            int idx = binding.argumentIndex();
-            FormFile annotation = binding.annotation();
-            if (args == null || idx >= args.length) return;
-            Object value = args[idx];
-            if (value == null) return;
-            addFilePart(builder, annotation, value);
-        });
-
-        return builder.build();
+        MultiValueMap<String, HttpEntity<?>> wireBody = builder.build();
+        List<HttpEntity<?>> authBody = wireBody.values().stream()
+                .flatMap(Collection::stream)
+                .toList();
+        return new MultipartRequestBody(wireBody, authBody);
     }
 
-    private static void addFilePart(MultipartBodyBuilder builder, FormFile annotation, Object value) {
+    private static int addFormFieldParts(MultipartBodyBuilder builder, int partIndex, String name, Object value) {
+        if (value == null) {
+            return partIndex;
+        }
+        if (value instanceof java.util.Collection<?> collection) {
+            for (Object item : collection) {
+                if (item != null) {
+                    partIndex = addMultipartPart(builder, partIndex, name, String.valueOf(item), null, null);
+                }
+            }
+        } else if (value.getClass().isArray()) {
+            int length = java.lang.reflect.Array.getLength(value);
+            for (int index = 0; index < length; index++) {
+                Object item = java.lang.reflect.Array.get(value, index);
+                if (item != null) {
+                    partIndex = addMultipartPart(builder, partIndex, name, String.valueOf(item), null, null);
+                }
+            }
+        } else {
+            partIndex = addMultipartPart(builder, partIndex, name, String.valueOf(value), null, null);
+        }
+        return partIndex;
+    }
+
+    private static int addFilePart(
+            MultipartBodyBuilder builder, int partIndex, FormFile annotation, Object value) {
         String name = annotation.value();
         String fallbackFilename = StringUtils.hasText(annotation.filename()) ? annotation.filename() : name;
         MediaType fallbackContentType = parseMediaTypeOrOctetStream(annotation.contentType());
 
         if (value instanceof Resource resource) {
-            MultipartBodyBuilder.PartBuilder part = builder.part(name, resource, fallbackContentType);
-            if (resource.getFilename() == null) {
-                part.headers(h -> h.setContentDisposition(ContentDisposition.formData()
-                        .name(name)
-                        .filename(fallbackFilename)
-                        .build()));
-            }
-            return;
+            String filename = resource.getFilename() != null ? resource.getFilename() : fallbackFilename;
+            return addMultipartPart(builder, partIndex, name, resource, fallbackContentType, filename);
         }
         if (value instanceof byte[] bytes) {
             ByteArrayResource resource = new ByteArrayResource(bytes) {
@@ -1751,8 +1769,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return fallbackFilename;
                 }
             };
-            builder.part(name, resource, fallbackContentType);
-            return;
+            return addMultipartPart(
+                    builder, partIndex, name, resource, fallbackContentType, fallbackFilename);
         }
         if (value instanceof FileAttachment attachment) {
             byte[] content = attachment.content() != null ? attachment.content() : new byte[0];
@@ -1766,12 +1784,29 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return filename;
                 }
             };
-            builder.part(name, resource, contentType);
-            return;
+            return addMultipartPart(builder, partIndex, name, resource, contentType, filename);
         }
         throw new IllegalArgumentException(
                 "@FormFile parameter '" + name + "' must be byte[], Resource, or FileAttachment; got "
                         + value.getClass().getName());
+    }
+
+    private static int addMultipartPart(
+            MultipartBodyBuilder builder,
+            int partIndex,
+            String name,
+            Object body,
+            MediaType contentType,
+            String filename) {
+        MultipartBodyBuilder.PartBuilder part = builder.part("part-" + partIndex, body, contentType);
+        part.headers(headers -> {
+            ContentDisposition.Builder disposition = ContentDisposition.formData().name(name);
+            if (filename != null) {
+                disposition.filename(filename);
+            }
+            headers.setContentDisposition(disposition.build());
+        });
+        return partIndex + 1;
     }
 
     private static MediaType parseMediaTypeOrOctetStream(String value) {
@@ -2071,6 +2106,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private record SerializedRequestBody(Object originalBody, Object bodyToWrite, byte[] rawBody) {}
+    private record MultipartRequestBody(
+            MultiValueMap<String, HttpEntity<?>> wireBody,
+            List<HttpEntity<?>> authBody) {}
     private record FinalRequestObservation(String httpMethod, URI url, Map<String, String> headers) {
         private static FinalRequestObservation from(ClientRequest request) {
             return new FinalRequestObservation(request.method().name(), request.url(), copyRequestHeaders(request.headers()));
