@@ -27,6 +27,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import reactor.netty.Connection;
 import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.client.HttpClient;
@@ -206,24 +207,36 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
      */
     @Override
     public void destroy() {
-        disposeConnectionProvider(connectionProvider, "business");
-        disposeConnectionProvider(tokenServiceConnectionProvider, "OAuth2 token-service");
-        disposeOwnedConnections();
+        disposeResources(CONNECTION_DISPOSAL_TIMEOUT);
         if (connectionPoolMeterRegistrar != null) {
             connectionPoolMeterRegistrar.close();
         }
     }
 
-    private void disposeConnectionProvider(ConnectionProvider provider, String owner) {
-        if (provider == null) {
-            return;
-        }
+    private void disposeResources(Duration timeout) {
+        List<Connection> connections = List.copyOf(ownedConnections);
         try {
-            provider.disposeLater().block(CONNECTION_DISPOSAL_TIMEOUT);
+            Mono.whenDelayError(
+                            disposeConnectionProvider(connectionProvider, "business"),
+                            disposeConnectionProvider(tokenServiceConnectionProvider, "OAuth2 token-service"),
+                            disposeOwnedConnections(connections))
+                    .block(timeout);
         } catch (RuntimeException error) {
-            log.warn("Error while disposing {} ConnectionProvider for client [{}]",
-                    owner, type != null ? type.getSimpleName() : "?", error);
+            log.warn("Error while disposing resources for client [{}]",
+                    type != null ? type.getSimpleName() : "?", error);
+        } finally {
+            ownedConnections.removeAll(connections);
         }
+    }
+
+    private Mono<Void> disposeConnectionProvider(ConnectionProvider provider, String owner) {
+        if (provider == null) {
+            return Mono.empty();
+        }
+        return Mono.defer(provider::disposeLater)
+                .doOnError(error -> log.warn(
+                        "Error while disposing {} ConnectionProvider for client [{}]",
+                        owner, type != null ? type.getSimpleName() : "?", error));
     }
 
     private void trackOwnedConnection(Connection connection) {
@@ -231,22 +244,16 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         connection.onDispose(() -> ownedConnections.remove(connection));
     }
 
-    private void disposeOwnedConnections() {
-        List<Connection> connections = List.copyOf(ownedConnections);
+    private Mono<Void> disposeOwnedConnections(List<Connection> connections) {
         if (connections.isEmpty()) {
-            return;
+            return Mono.empty();
         }
-        connections.forEach(connection -> connection.channel().close());
-        try {
-            reactor.core.publisher.Mono.whenDelayError(
-                            connections.stream().map(Connection::onDispose).toList())
-                    .block(CONNECTION_DISPOSAL_TIMEOUT);
-        } catch (RuntimeException error) {
-            log.warn("Error while disposing active connections for client [{}]",
-                    type != null ? type.getSimpleName() : "?", error);
-        } finally {
-            ownedConnections.removeAll(connections);
-        }
+        return Mono.defer(() -> {
+                    connections.forEach(connection -> connection.channel().close());
+                    return Mono.whenDelayError(connections.stream().map(Connection::onDispose).toList());
+                })
+                .doOnError(error -> log.warn("Error while disposing active connections for client [{}]",
+                        type != null ? type.getSimpleName() : "?", error));
     }
 
     // -------------------------------------------------------------------------

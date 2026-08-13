@@ -166,7 +166,8 @@ They must converge after replacement dispatch or bounded pool shutdown. A reset,
 compression error, timeout, or premature close is a stream/connection failure
 and should be diagnosed from its terminal error and failure stage; do not infer
 one from a graceful GOAWAY alone. Factory shutdown applies the same bounded
-five-second connection-provider disposal policy to draining and pending work.
+five-second factory-wide deadline to business and OAuth2 token-service providers,
+draining connections, active channels, and pending work.
 
 See [GOAWAY and connection retirement](12-proxy-tls.md#goaway-and-connection-retirement).
 

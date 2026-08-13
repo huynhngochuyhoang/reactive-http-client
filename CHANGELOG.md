@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request headers are sent. Only configured retry creates another subscription
   attempt under the existing method-safety, idempotency-key, and
   body-repeatability rules. Shutdown now closes tracked active channels after
-  rejecting pending acquisitions instead of relying on request/acquire timeouts.
+  rejecting pending acquisitions instead of relying on request/acquire timeouts;
+  both providers and active channels share one concurrent five-second deadline.
 - **Subscription-local terminal reporting.** Consolidated stateful request
   attempt bookkeeping into one package-private subscription state and one
   immutable terminal snapshot. Attempt-owned cleanup can no longer clear a

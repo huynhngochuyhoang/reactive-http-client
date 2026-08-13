@@ -122,7 +122,9 @@ acquire and a write. During recovery, inspect active and pending gauges together
 After the failed call terminates and replacement demand completes, the gauges
 should converge without a stranded pending acquire or duplicate dispatch. Factory
 shutdown retains the bounded five-second disposal policy: providers reject queued
-acquisitions and the factory closes its tracked active channels.
+acquisitions and the factory closes its tracked active channels. Business-provider
+disposal, OAuth2 token-service-provider disposal, and channel closure run
+concurrently under that single factory-wide deadline.
 
 ## Diagnosing saturation
 

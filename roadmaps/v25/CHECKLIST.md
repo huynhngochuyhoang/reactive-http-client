@@ -410,15 +410,19 @@ Evidence:
 - Factory shutdown with active and pending work completed exceptionally inside the
   existing five-second disposal bound while their request and acquire deadlines
   were both 30 seconds. The factory rejects pending acquisitions and closes tracked
-  active channels without dispatching queued work. Existing V24 H2
+  active channels without dispatching queued work. A stalled-resource regression
+  proves business-provider, OAuth2 token-service-provider, and active-channel
+  disposal all start concurrently under one shared deadline rather than receiving
+  three sequential timeouts. Existing V24 H2
   GOAWAY/abrupt-close coverage remained unchanged and all four retirement tests
   passed.
 - Updated `docs/05-connection-pool.md`, `docs/12-proxy-tls.md`, and
   `docs/30-operations-troubleshooting.md` to distinguish graceful retirement,
   stale-socket replacement, failed-call replay, H2 GOAWAY, gauge convergence, and
   idle/lifetime eviction limits. Added matching unreleased changelog evidence.
-- Focused pool/framing/retry/OAuth2 verification passed 119 tests; full starter
-  verification passed 991 tests, including 32 documentation/release-artifact
+- Focused pool/framing/retry/OAuth2 verification passed 119 tests, and the
+  shutdown-focused pool/H2/OAuth2 matrix passed 37 tests. Full starter
+  verification passed 992 tests, including 32 documentation/release-artifact
   tests. `git diff --check` passed.
 
 ---
