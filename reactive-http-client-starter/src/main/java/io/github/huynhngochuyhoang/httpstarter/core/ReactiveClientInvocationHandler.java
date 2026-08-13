@@ -4,6 +4,10 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.FormFile;
 import io.github.huynhngochuyhoang.httpstarter.annotation.LogHttpExchange;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.core.SubscriptionReportingState.Attempt;
+import io.github.huynhngochuyhoang.httpstarter.core.SubscriptionReportingState.FinalRequestObservation;
+import io.github.huynhngochuyhoang.httpstarter.core.SubscriptionReportingState.TerminalSignal;
+import io.github.huynhngochuyhoang.httpstarter.core.SubscriptionReportingState.TerminalSnapshot;
 import io.github.huynhngochuyhoang.httpstarter.exception.*;
 import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.CompositeHttpClientObserver;
@@ -25,7 +29,6 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -49,8 +52,6 @@ import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -222,13 +223,28 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     public static ExchangeFilterFunction finalRequestObservationFilter() {
         return (request, next) -> {
             request.attribute(OBSERVED_REQUEST_URL_ATTRIBUTE)
-                    .filter(AtomicReference.class::isInstance)
-                    .map(AtomicReference.class::cast)
-                    .ifPresent(reference -> reference.set(request.url()));
+                    .ifPresent(target -> {
+                        if (target instanceof Attempt attempt) {
+                            attempt.observeRequestUrl(request.url());
+                        } else if (target instanceof AtomicReference<?> reference) {
+                            @SuppressWarnings("unchecked")
+                            AtomicReference<URI> requestUrl = (AtomicReference<URI>) reference;
+                            requestUrl.set(request.url());
+                        }
+                    });
             request.attribute(FINAL_REQUEST_OBSERVATION_ATTRIBUTE)
-                    .filter(AtomicReference.class::isInstance)
-                    .map(AtomicReference.class::cast)
-                    .ifPresent(reference -> reference.set(FinalRequestObservation.from(request)));
+                    .ifPresent(target -> {
+                        FinalRequestObservation observation = new FinalRequestObservation(
+                                request.method().name(), request.url(), copyRequestHeaders(request.headers()));
+                        if (target instanceof Attempt attempt) {
+                            attempt.observeFinalRequest(observation);
+                        } else if (target instanceof AtomicReference<?> reference) {
+                            @SuppressWarnings("unchecked")
+                            AtomicReference<FinalRequestObservation> finalRequest =
+                                    (AtomicReference<FinalRequestObservation>) reference;
+                            finalRequest.set(observation);
+                        }
+                    });
             return next.exchange(request);
         };
     }
@@ -305,27 +321,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                             ctx.hasKey(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
                                     ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
                                     : Map.of());
-                    SubscriptionState state = subscriptionState(ctx);
-                    AtomicBoolean reported = new AtomicBoolean(false);
+                    SubscriptionReportingState state = subscriptionState(ctx);
                     return capturedFlux
-                            .doOnComplete(() -> notifyLifecycleSuccess(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), state.requestUrl.get(),
-                                    state.responseStatus.get(), state.attemptCount.get()))
-                            .doOnError(state.terminalError::set)
-                            .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), finalRequestUrl(state),
-                                    state.responseStatus.get(), error, state.attemptCount.get()))
-                            .doOnTerminate(() -> {
-                                if (reported.compareAndSet(false, true))
-                                    reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.preparedResolved.get(), state.requestUrl.get(), state.finalRequestObservation.get(), state.start.get(),
-                                            state.responseStatus.get(), state.responseHeaders.get(), null, state.terminalError.get(), inboundHeadersRef.get(), state.attemptCount.get(), requestBytes);
-                            })
+                            .doOnComplete(() -> completeAndReportTerminal(
+                                    TerminalSignal.SUCCESS, null, null, lifecycleHooks, exchangeLogger, observer,
+                                    plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes))
+                            .doOnError(error -> completeAndReportTerminal(
+                                    TerminalSignal.ERROR, null, error, lifecycleHooks, exchangeLogger, observer,
+                                    plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes))
                             .doOnCancel(() -> {
                                 CancellationException cancellation = new CancellationException("Request was cancelled");
-                                notifyLifecycleAttemptFallbackIfNeeded(lifecycleHooks, plan, effectiveApi, resolved, state, exchangeLogger);
-                                notifyLifecycleCancel(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), state.requestUrl.get(),
-                                        state.responseStatus.get(), cancellation, state.attemptCount.get());
-                                if (reported.compareAndSet(false, true))
-                                    reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.preparedResolved.get(), state.requestUrl.get(), state.finalRequestObservation.get(), state.start.get(),
-                                            state.responseStatus.get(), state.responseHeaders.get(), null, cancellation, inboundHeadersRef.get(), state.attemptCount.get(), requestBytes);
+                                completeAndReportTerminal(
+                                        TerminalSignal.CANCEL, null, cancellation, lifecycleHooks, exchangeLogger,
+                                        observer, plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes);
                             });
                 });
             }
@@ -350,31 +358,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         ctx.hasKey(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
                                 ? ctx.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
                                 : Map.of());
-                SubscriptionState state = subscriptionState(ctx);
-                AtomicReference<Object> terminalBody = new AtomicReference<>();
-                AtomicBoolean reported = new AtomicBoolean(false);
+                SubscriptionReportingState state = subscriptionState(ctx);
                 return capturedMono
-                        .doOnSuccess(body -> {
-                            terminalBody.set(body);
-                            notifyLifecycleSuccess(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), state.requestUrl.get(),
-                                    state.responseStatus.get(), state.attemptCount.get());
-                        })
-                        .doOnError(state.terminalError::set)
-                        .doOnError(error -> notifyLifecycleError(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), finalRequestUrl(state),
-                                state.responseStatus.get(), error, state.attemptCount.get()))
-                        .doOnTerminate(() -> {
-                            if (reported.compareAndSet(false, true))
-                                reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.preparedResolved.get(), state.requestUrl.get(), state.finalRequestObservation.get(), state.start.get(),
-                                        state.responseStatus.get(), state.responseHeaders.get(), terminalBody.get(), state.terminalError.get(), inboundHeadersRef.get(), state.attemptCount.get(), requestBytes);
-                        })
+                        .doOnSuccess(body -> completeAndReportTerminal(
+                                TerminalSignal.SUCCESS, body, null, lifecycleHooks, exchangeLogger, observer,
+                                plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes))
+                        .doOnError(error -> completeAndReportTerminal(
+                                TerminalSignal.ERROR, null, error, lifecycleHooks, exchangeLogger, observer,
+                                plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes))
                         .doOnCancel(() -> {
                             CancellationException cancellation = new CancellationException("Request was cancelled");
-                            notifyLifecycleAttemptFallbackIfNeeded(lifecycleHooks, plan, effectiveApi, resolved, state, exchangeLogger);
-                            notifyLifecycleCancel(lifecycleHooks, plan, effectiveApi, state.preparedResolved.get(), state.requestUrl.get(),
-                                    state.responseStatus.get(), cancellation, state.attemptCount.get());
-                            if (reported.compareAndSet(false, true))
-                                reportExchange(exchangeLogger, observer, plan, effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.preparedResolved.get(), state.requestUrl.get(), state.finalRequestObservation.get(), state.start.get(),
-                                        state.responseStatus.get(), state.responseHeaders.get(), null, cancellation, inboundHeadersRef.get(), state.attemptCount.get(), requestBytes);
+                            completeAndReportTerminal(
+                                    TerminalSignal.CANCEL, null, cancellation, lifecycleHooks, exchangeLogger,
+                                    observer, plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes);
                         });
             });
         }
@@ -424,17 +420,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         // Cache the serialized body so retries reuse the bytes without re-serializing.
         Mono<SerializedRequestBody> serializedBodyMono = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader).cache();
         return Mono.deferContextual(context -> {
-            SubscriptionState state = subscriptionState(context);
+            SubscriptionReportingState state = subscriptionState(context);
             RequestArgumentResolver.ResolvedArgs preparedResolved = applyIdempotencyKey(
-                    plan, resolved, context, state.generatedIdempotencyKey);
-            state.preparedResolved.set(preparedResolved);
-            int attempt = state.attemptCount.incrementAndGet();
-            state.start.compareAndSet(0L, System.currentTimeMillis());
-            state.resetAttemptEvidence();
-            state.activeAttemptNumber.set(attempt);
-            notifyLifecycleAttempt(lifecycleHooks, plan, effectiveApi, preparedResolved, state.requestUrl.get(), null, null, attempt);
-            if (exchangeLogger == null && state.firstAttempt.compareAndSet(true, false)) {
-                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.start.get());
+                    plan, resolved, context, state.generatedIdempotencyKey());
+            Attempt attempt = state.beginAttempt(preparedResolved);
+            notifyLifecycleAttempt(
+                    lifecycleHooks, plan, effectiveApi, preparedResolved, null, null, null, attempt.number());
+            if (exchangeLogger == null && state.markFirstAttemptStarted()) {
+                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.startMs());
             }
 
             return serializedBodyMono.map(serializedRequestBody -> buildRequestHeadersSpec(
@@ -447,12 +440,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     multipartBody,
                     timeoutMs,
                     shouldApplyResponseTimeout,
-                    state.requestUrl,
-                    state.finalRequestObservation,
-                    state::resetAttemptEvidence,
+                    state,
+                    attempt,
                     requestBodyOwnership))
-                    .doOnError(ignored -> state.activeAttemptNumber.compareAndSet(attempt, 0))
-                    .doOnCancel(() -> state.activeAttemptNumber.compareAndSet(attempt, 0));
+                    .doOnError(ignored -> state.clearActiveAttempt(attempt))
+                    .doOnCancel(() -> state.clearActiveAttempt(attempt));
         });
     }
 
@@ -486,7 +478,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     shouldApplyResponseTimeout,
                     null,
                     null,
-                    null,
                     requestBodyOwnership));
         });
     }
@@ -501,9 +492,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             MultipartRequestBody multipartBody,
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
-            AtomicReference<URI> requestUrl,
-            AtomicReference<FinalRequestObservation> finalRequestObservation,
-            Runnable requestObservationReset,
+            SubscriptionReportingState state,
+            Attempt attempt,
             RequestBodyOwnership requestBodyOwnership) {
         WebClient.RequestBodySpec preparedRequestSpec = webClient
                 .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
@@ -570,38 +560,32 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         } else {
             requestHeadersSpec = preparedRequestSpec;
         }
-        if (requestUrl != null) {
-            requestHeadersSpec = requestHeadersSpec.attribute(OBSERVED_REQUEST_URL_ATTRIBUTE, requestUrl);
-        }
-        if (finalRequestObservation != null) {
-            requestHeadersSpec = requestHeadersSpec.attribute(FINAL_REQUEST_OBSERVATION_ATTRIBUTE, finalRequestObservation);
-        }
-        if (requestObservationReset != null) {
+        if (attempt != null) {
+            requestHeadersSpec = requestHeadersSpec.attribute(OBSERVED_REQUEST_URL_ATTRIBUTE, attempt);
+            requestHeadersSpec = requestHeadersSpec.attribute(FINAL_REQUEST_OBSERVATION_ATTRIBUTE, attempt);
             requestHeadersSpec = requestHeadersSpec.attribute(
                     AuthRequest.REQUEST_OBSERVATION_RESET_ATTRIBUTE,
-                    requestObservationReset);
+                    (Runnable) () -> state.resetAttemptEvidence(attempt));
         }
-        return configureNativeRequest(requestHeadersSpec, timeoutMs, shouldApplyResponseTimeout, requestUrl);
+        return configureNativeRequest(requestHeadersSpec, timeoutMs, shouldApplyResponseTimeout, attempt);
     }
 
     private <T> Flux<T> exchange(
             Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono,
             Function<ClientResponse, Publisher<T>> successResponseHandler) {
         return Flux.deferContextual(context -> {
-            SubscriptionState state = subscriptionState(context);
-            AtomicInteger attempt = new AtomicInteger();
+            SubscriptionReportingState state = subscriptionState(context);
             return requestHeadersSpecMono.flatMapMany(requestHeadersSpec -> {
-                attempt.set(state.activeAttemptNumber.get());
+                Attempt attempt = state.activeAttempt();
                 return requestHeadersSpec.exchangeToFlux(clientResponse -> {
-                    state.responseStatus.set(clientResponse.statusCode());
-                    state.responseHeaders.set(copyHeaders(clientResponse));
+                    attempt.recordResponse(clientResponse.statusCode(), copyHeaders(clientResponse));
 
                     if (clientResponse.statusCode().isError()) {
                         return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
                     }
                     return Flux.from(successResponseHandler.apply(clientResponse));
-                });
-            }).doFinally(ignored -> state.activeAttemptNumber.compareAndSet(attempt.get(), 0));
+                }).doFinally(ignored -> state.clearActiveAttempt(attempt));
+            });
         });
     }
 
@@ -623,14 +607,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono,
             boolean headRequest) {
         return Mono.deferContextual(context -> {
-            SubscriptionState state = subscriptionState(context);
-            AtomicInteger attempt = new AtomicInteger();
+            SubscriptionReportingState state = subscriptionState(context);
             return requestHeadersSpecMono.flatMap(requestHeadersSpec -> {
-                attempt.set(state.activeAttemptNumber.get());
+                Attempt attempt = state.activeAttempt();
                 WebClient.ResponseSpec responseSpec = requestHeadersSpec.retrieve()
                         .onStatus(HttpStatusCode::isError, response -> {
-                            state.responseStatus.set(response.statusCode());
-                            state.responseHeaders.set(copyHeaders(response));
+                            attempt.recordResponse(response.statusCode(), copyHeaders(response));
                             return decodeErrorResponse(response);
                         });
                 Mono<ResponseEntity<Flux<DataBuffer>>> entity = headRequest
@@ -639,10 +621,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 return entity
                         .map(this::withDiscardRelease)
                         .doOnNext(responseEntity -> {
-                            state.responseStatus.set(responseEntity.getStatusCode());
-                            state.responseHeaders.set(copyHeaders(responseEntity.getHeaders()));
-                        });
-            }).doFinally(ignored -> state.activeAttemptNumber.compareAndSet(attempt.get(), 0));
+                            attempt.recordResponse(
+                                    responseEntity.getStatusCode(), copyHeaders(responseEntity.getHeaders()));
+                        })
+                        .doFinally(ignored -> state.clearActiveAttempt(attempt));
+            });
         });
     }
 
@@ -818,8 +801,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return mono;
         }
         return Mono.deferContextual(context -> {
-            SubscriptionState state = subscriptionState(context);
-            state.start.compareAndSet(0L, System.currentTimeMillis());
+            SubscriptionReportingState state = subscriptionState(context);
+            state.startIfNeeded();
             @SuppressWarnings("unchecked")
             Mono<Signal<Object>> sourceSignal = ((Mono<Object>) mono).materialize();
             Mono<Signal<Object>> deadline = Mono.delay(Duration.ofMillis(timeoutMs))
@@ -833,23 +816,23 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return flux;
         }
         return Flux.deferContextual(context -> {
-            SubscriptionState state = subscriptionState(context);
-            state.start.compareAndSet(0L, System.currentTimeMillis());
+            SubscriptionReportingState state = subscriptionState(context);
+            state.startIfNeeded();
             Mono<Void> deadline = Mono.delay(Duration.ofMillis(timeoutMs))
                     .flatMap(ignored -> Mono.error(logicalCallTimeout(state, timeoutMs)));
             return flux.takeUntilOther(deadline);
         });
     }
 
-    private LogicalCallTimeoutException logicalCallTimeout(SubscriptionState state, long timeoutMs) {
+    private LogicalCallTimeoutException logicalCallTimeout(SubscriptionReportingState state, long timeoutMs) {
         HttpClientFailureStage failureStage = null;
-        int activeAttempt = state.activeAttemptNumber.get();
-        if (activeAttempt > 0 && activeAttempt == state.attemptCount.get()) {
-            if (state.responseStatus.get() != null) {
+        Attempt activeAttempt = state.activeAttempt();
+        if (activeAttempt != null && activeAttempt.number() == state.attemptCount()) {
+            if (activeAttempt.responseStatus() != null) {
                 failureStage = HttpClientFailureStage.RESPONSE_BODY;
             }
         } else {
-            state.resetAttemptEvidence();
+            state.clearEvidenceWhenNoAttemptIsActive();
         }
         return new LogicalCallTimeoutException(timeoutMs, failureStage);
     }
@@ -1130,13 +1113,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             WebClient.RequestHeadersSpec<?> requestHeadersSpec,
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
-            AtomicReference<URI> requestUrl) {
-        if (!shouldApplyResponseTimeout && requestUrl == null) {
+            Attempt attempt) {
+        if (!shouldApplyResponseTimeout && attempt == null) {
             return requestHeadersSpec;
         }
         return requestHeadersSpec.httpRequest(httpRequest -> {
-            if (requestUrl != null) {
-                requestUrl.set(httpRequest.getURI());
+            if (attempt != null) {
+                attempt.observeRequestUrl(httpRequest.getURI());
             }
             Object nativeRequest = httpRequest.getNativeRequest();
             if (shouldApplyResponseTimeout && nativeRequest instanceof HttpClientRequest reactorRequest) {
@@ -1344,18 +1327,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             RequestPlan plan,
             EffectiveApi effectiveApi,
             RequestArgumentResolver.ResolvedArgs resolved,
-            SubscriptionState state,
+            SubscriptionReportingState state,
             HttpExchangeLogger exchangeLogger) {
-        if (!state.attemptCount.compareAndSet(0, 1)) {
+        Attempt attempt = state.beginFallbackAttempt(resolved);
+        if (attempt == null) {
             return;
         }
-        state.start.compareAndSet(0L, System.currentTimeMillis());
-        state.responseStatus.set(null);
-        state.responseHeaders.set(Map.of());
-        state.terminalError.set(null);
-        notifyLifecycleAttempt(hooks, plan, effectiveApi, resolved, state.requestUrl.get(), null, null, 1);
-        if (exchangeLogger == null && state.firstAttempt.compareAndSet(true, false)) {
-            logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.start.get());
+        notifyLifecycleAttempt(hooks, plan, effectiveApi, resolved, null, null, null, attempt.number());
+        if (exchangeLogger == null && state.markFirstAttemptStarted()) {
+            logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.startMs());
         }
     }
 
@@ -1542,9 +1522,48 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
     }
 
-    private URI finalRequestUrl(SubscriptionState state) {
-        FinalRequestObservation observation = state.finalRequestObservation.get();
-        return observation != null ? observation.url() : state.requestUrl.get();
+    private void completeAndReportTerminal(
+            TerminalSignal signal,
+            Object responseBody,
+            Throwable error,
+            List<ReactiveHttpClientLifecycleHook> lifecycleHooks,
+            HttpExchangeLogger exchangeLogger,
+            HttpClientObserver observer,
+            RequestPlan plan,
+            EffectiveApi effectiveApi,
+            RequestArgumentResolver.ResolvedArgs initialResolved,
+            SubscriptionReportingState state,
+            Map<String, List<String>> inboundHeaders,
+            long requestBytes) {
+        if (signal == TerminalSignal.CANCEL) {
+            notifyLifecycleAttemptFallbackIfNeeded(
+                    lifecycleHooks, plan, effectiveApi, initialResolved, state, exchangeLogger);
+        }
+        TerminalSnapshot terminal = state.complete(signal, responseBody, error);
+        if (terminal == null) {
+            return;
+        }
+
+        switch (signal) {
+            case SUCCESS -> notifyLifecycleSuccess(
+                    lifecycleHooks, plan, effectiveApi, terminal.preparedResolved(), terminal.requestUrl(),
+                    terminal.responseStatus(), terminal.attemptCount());
+            case ERROR -> notifyLifecycleError(
+                    lifecycleHooks, plan, effectiveApi, terminal.preparedResolved(), terminal.finalRequestUrl(),
+                    terminal.responseStatus(), terminal.error(), terminal.attemptCount());
+            case CANCEL -> notifyLifecycleCancel(
+                    lifecycleHooks, plan, effectiveApi, terminal.preparedResolved(), terminal.requestUrl(),
+                    terminal.responseStatus(), terminal.error(), terminal.attemptCount());
+        }
+        reportExchange(
+                exchangeLogger,
+                observer,
+                plan,
+                effectiveApi.httpMethod(),
+                effectiveApi.pathTemplate(),
+                terminal,
+                inboundHeaders,
+                requestBytes);
     }
 
     private void reportExchange(
@@ -1553,24 +1572,41 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             RequestPlan plan,
             String httpMethod,
             String pathTemplate,
-            RequestArgumentResolver.ResolvedArgs resolved,
-            URI requestUrl,
-            FinalRequestObservation finalRequestObservation,
-            long startMs,
-            HttpStatusCode statusCode,
-            Map<String, List<String>> responseHeaders,
-            Object responseBody,
-            Throwable error,
+            TerminalSnapshot terminal,
             Map<String, List<String>> inboundHeaders,
-            int attemptCount,
             long requestBytes) {
         if (exchangeLogger != null) {
-            logExchange(exchangeLogger, httpMethod, pathTemplate, resolved, finalRequestObservation, startMs, statusCode, responseHeaders, responseBody, error, inboundHeaders, attemptCount);
+            logExchange(
+                    exchangeLogger,
+                    httpMethod,
+                    pathTemplate,
+                    terminal.preparedResolved(),
+                    terminal.finalRequestObservation(),
+                    terminal.startMs(),
+                    terminal.responseStatus(),
+                    terminal.responseHeaders(),
+                    terminal.responseBody(),
+                    terminal.error(),
+                    inboundHeaders,
+                    terminal.attemptCount());
         }
         if (observer != null) {
-            long responseBytes = extractContentLengthBytes(responseHeaders);
-            URI observedRequestUrl = finalRequestObservation != null ? finalRequestObservation.url() : requestUrl;
-            notifyObserver(observer, plan, httpMethod, pathTemplate, resolved, observedRequestUrl, finalRequestObservation, startMs, statusCode, error, responseBody, attemptCount, requestBytes, responseBytes);
+            long responseBytes = extractContentLengthBytes(terminal.responseHeaders());
+            notifyObserver(
+                    observer,
+                    plan,
+                    httpMethod,
+                    pathTemplate,
+                    terminal.preparedResolved(),
+                    terminal.finalRequestUrl(),
+                    terminal.finalRequestObservation(),
+                    terminal.startMs(),
+                    terminal.responseStatus(),
+                    terminal.error(),
+                    terminal.responseBody(),
+                    terminal.attemptCount(),
+                    requestBytes,
+                    responseBytes);
         }
     }
 
@@ -1909,14 +1945,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return resolved;
     }
 
-    private static SubscriptionState subscriptionState(reactor.util.context.ContextView context) {
+    private static SubscriptionReportingState subscriptionState(reactor.util.context.ContextView context) {
         return context.get(SUBSCRIPTION_STATE_CONTEXT_KEY);
     }
 
     private static reactor.util.context.Context withSubscriptionState(
             reactor.util.context.Context context,
             RequestArgumentResolver.ResolvedArgs resolved) {
-        return context.put(SUBSCRIPTION_STATE_CONTEXT_KEY, new SubscriptionState(resolved));
+        return context.put(SUBSCRIPTION_STATE_CONTEXT_KEY, new SubscriptionReportingState(resolved));
     }
 
     private static String generatedIdempotencyKey(AtomicReference<String> generatedIdempotencyKey) {
@@ -2079,41 +2115,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
     }
 
-    private static final class SubscriptionState {
-        private final AtomicReference<String> generatedIdempotencyKey = new AtomicReference<>();
-        private final AtomicReference<RequestArgumentResolver.ResolvedArgs> preparedResolved;
-        private final AtomicInteger attemptCount = new AtomicInteger(0);
-        private final AtomicReference<FinalRequestObservation> finalRequestObservation = new AtomicReference<>();
-        private final AtomicLong start = new AtomicLong();
-        private final AtomicBoolean firstAttempt = new AtomicBoolean(true);
-        private final AtomicReference<URI> requestUrl = new AtomicReference<>();
-        private final AtomicReference<HttpStatusCode> responseStatus = new AtomicReference<>();
-        private final AtomicReference<Map<String, List<String>>> responseHeaders = new AtomicReference<>(Map.of());
-        private final AtomicReference<Throwable> terminalError = new AtomicReference<>();
-        private final AtomicInteger activeAttemptNumber = new AtomicInteger();
-
-        private SubscriptionState(RequestArgumentResolver.ResolvedArgs resolved) {
-            this.preparedResolved = new AtomicReference<>(resolved);
-        }
-
-        private void resetAttemptEvidence() {
-            requestUrl.set(null);
-            finalRequestObservation.set(null);
-            responseStatus.set(null);
-            responseHeaders.set(Map.of());
-            terminalError.set(null);
-        }
-    }
-
     private record SerializedRequestBody(Object originalBody, Object bodyToWrite, byte[] rawBody) {}
     private record MultipartRequestBody(
             MultiValueMap<String, HttpEntity<?>> wireBody,
             List<HttpEntity<?>> authBody) {}
-    private record FinalRequestObservation(String httpMethod, URI url, Map<String, String> headers) {
-        private static FinalRequestObservation from(ClientRequest request) {
-            return new FinalRequestObservation(request.method().name(), request.url(), copyRequestHeaders(request.headers()));
-        }
-    }
 
     private static Map<String, String> copyRequestHeaders(HttpHeaders headers) {
         Map<String, String> copied = new LinkedHashMap<>();

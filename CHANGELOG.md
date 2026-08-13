@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Subscription-local terminal reporting.** Consolidated stateful request
+  attempt bookkeeping into one package-private subscription state and one
+  immutable terminal snapshot. Attempt-owned cleanup can no longer clear a
+  newer retry's URL, status, or header evidence; concurrent subscriptions remain
+  isolated; and lifecycle hooks, exchange logging, observers, Micrometer,
+  health, and OTel consume one consistent terminal outcome. The stateless
+  request path remains separate. Logical-call timeout cleanup during retry
+  backoff now clears stale transport evidence without dropping the latest
+  prepared headers, including generated or Reactor-context idempotency keys.
 - **Multipart wire and resource-ownership contract.** Multipart requests now
   preserve parameter declaration order across mixed fields and files while
   retaining repeated collection/array element order and null omission. Added

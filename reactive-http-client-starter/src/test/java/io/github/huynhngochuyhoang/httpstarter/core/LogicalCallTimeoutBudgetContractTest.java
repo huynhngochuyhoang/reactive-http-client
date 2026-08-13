@@ -111,7 +111,9 @@ class LogicalCallTimeoutBudgetContractTest {
                 .build();
 
         try (ClientFixture fixture = client(webClient, config, new DelayedRetryApplier(), events)) {
-            Throwable failure = catchThrowable(() -> fixture.client().call().block(BLOCK_TIMEOUT));
+            Throwable failure = catchThrowable(() -> fixture.client().call()
+                    .contextWrite(context -> RequestContext.withIdempotencyKey(context, "backoff-key"))
+                    .block(BLOCK_TIMEOUT));
 
             assertBudgetFailure(failure, 100, null);
             assertThat(subscriptions).hasValue(1);
@@ -120,6 +122,17 @@ class LogicalCallTimeoutBudgetContractTest {
                 assertThat(event.getStatusCode()).isNull();
                 assertThat(event.getRequestUrl()).isNull();
                 assertThat(event.getRequestHeaders()).isEmpty();
+            });
+            assertThat(fixture.diagnostics().lifecycleErrors).singleElement().satisfies(context -> {
+                assertThat(context.headers()).containsEntry("Idempotency-Key", "backoff-key");
+                assertThat(context.requestUrl()).isNull();
+                assertThat(context.statusCode()).isNull();
+            });
+            assertThat(fixture.diagnostics().exchangeLogs).singleElement().satisfies(context -> {
+                assertThat(context.requestHeaders()).containsEntry("Idempotency-Key", "backoff-key");
+                assertThat(context.requestUrl()).isNull();
+                assertThat(context.responseStatus()).isNull();
+                assertThat(context.responseHeaders()).isEmpty();
             });
         }
     }

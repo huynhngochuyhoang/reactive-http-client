@@ -300,35 +300,62 @@ Evidence:
 
 ## Priority 6 - Subscription and Terminal-State Invariant Consolidation
 
-### [ ] 6.1 Characterize behavior before extraction
+### [x] 6.1 Characterize behavior before extraction
 
-- [ ] Freeze stateless/stateful unary, typed flux, raw streaming, and streaming
+- [x] Freeze stateless/stateful unary, typed flux, raw streaming, and streaming
       envelope outcomes.
-- [ ] Freeze retry subscription, redirect dispatch, auth replay, idempotency-key,
+- [x] Freeze retry subscription, redirect dispatch, auth replay, idempotency-key,
       cancellation, timeout, response status/header, and terminal-report counts.
-- [ ] Cover concurrent subscriptions and immediate retry resubscription races.
-- [ ] Record the current diagnostics-disabled allocation-sensitive path before
+- [x] Cover concurrent subscriptions and immediate retry resubscription races.
+- [x] Record the current diagnostics-disabled allocation-sensitive path before
       implementation changes.
-- [ ] Identify duplicated state transitions and cleanup paths; do not extract
+- [x] Identify duplicated state transitions and cleanup paths; do not extract
       helpers that only rename one call site.
 
-### [ ] 6.2 Centralize only proven invariants
+### [x] 6.2 Centralize only proven invariants
 
-- [ ] Keep generated key, prepared arguments, active attempt, request observation,
+- [x] Keep generated key, prepared arguments, active attempt, request observation,
       response state, error, timing, and report-once state subscription-local.
-- [ ] Guard cleanup by the attempt that installed each mutable fact.
-- [ ] Build one immutable terminal snapshot for lifecycle, observer, exchange-log,
+- [x] Guard cleanup by the attempt that installed each mutable fact.
+- [x] Build one immutable terminal snapshot for lifecycle, observer, exchange-log,
       Micrometer, health, and OTel reporting where practical.
-- [ ] Preserve established `attemptCount`, redirect/auth dispatch, failure-stage,
+- [x] Preserve established `attemptCount`, redirect/auth dispatch, failure-stage,
       and streaming-body ownership semantics.
-- [ ] Keep implementation package-private with no configurable state machine or
+- [x] Keep implementation package-private with no configurable state machine or
       unrelated request-construction rewrite.
-- [ ] Verify no regression in focused race/composition suites, full reactor,
+- [x] Verify no regression in focused race/composition suites, full reactor,
       allocation audit, strict japicmp, and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- Characterized the existing stateless/stateful unary, typed-flux, raw-stream,
+  streaming-envelope, retry, redirect, auth replay, generated-key, cancellation,
+  timeout, status/header, and one-terminal-report behavior before extraction.
+  Existing immediate-retry and composition fixtures remain the behavioral source
+  of truth; new concurrent-subscription and competing-terminal tests cover the
+  state ownership races directly.
+- Added package-private `SubscriptionReportingState`. Generated idempotency keys,
+  prepared arguments, timing, attempts, and terminal selection remain local to
+  each subscription. Each attempt owns one immutable observation/response value,
+  and cleanup/reset operations are accepted only from the attempt that installed
+  the active state, so delayed retry cleanup cannot clear a newer attempt.
+  Backoff cleanup resets the latest attempt's transport evidence in place while
+  retaining its prepared arguments for terminal lifecycle and exchange logging.
+- Mono and Flux terminal paths now create one immutable `TerminalSnapshot` through
+  a single compare-and-set winner. Lifecycle hooks, exchange logging, observers,
+  and observer-derived Micrometer, health, and OTel consumers read that same
+  snapshot. The diagnostics-disabled stateless request path remains separate.
+- The focused race/composition suite passed 45 tests. A follow-up timeout,
+  idempotency-key, and subscription-state suite passed 42 tests. The full starter,
+  test-helper, and OTel reactor passed 984, 46, and 43 tests respectively,
+  including streaming ownership, redirect/auth composition, failure-stage, and
+  immediate-retry coverage.
+- A local diagnostics-disabled JMH smoke recorded 13,602.549 B/op before and
+  13,699.036 B/op after the change (0.7% difference with overlapping uncertainty).
+  This is characterization evidence only and is not a public performance claim.
+- Strict starter japicmp passed against Central-resolved `3.4.0` from
+  `target/published-baseline-repositories/api-starter-v25-priority6-3.4.0`;
+  `git diff --check` passed.
 
 ---
 
