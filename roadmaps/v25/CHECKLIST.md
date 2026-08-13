@@ -387,33 +387,38 @@ Evidence:
 
 Evidence:
 
-- Added `StalePooledConnectionRecoveryContractTest`, a six-case raw IPv4 HTTP/1.1
+- Added `StalePooledConnectionRecoveryContractTest`, a seven-case raw IPv4 HTTP/1.1
   fixture using the real starter proxy and a one-connection Reactor Netty pool.
   It distinguishes transport-owned `Connection: close`, peer FIN after a complete
   response, a peer-closing an idle pooled socket, RST after a reused request is
-  observed, and FIN during a declared fixed-length response body.
+  observed, FIN during a declared fixed-length response body, and RST before any
+  request bytes are read.
 - The reset-on-reuse case holds the active exchange while an independent probe is
   queued, observes `active.connections=1` and `pending.connections=1`, then proves
   the failed path was dispatched once, the probe used a different connection, and
   active/pending/total/idle gauges converged to `0/0/1/1`. The partial-body case
   retains its `200`, response headers, and `RESPONSE_BODY` stage while the next
   probe carries only its own URL/status/header/success facts.
-- With resilience disabled, an observed reset fails once and is not replayed. With
-  an explicit two-attempt GET retry, the same transport failure resubscribes once,
-  uses replacement capacity, and reports subscription attempt count `2`. Existing
-  retry-safety, idempotency-key, publisher/application-owned body, and
+- Reactor Netty's one-time connection-reset retry is disabled for both starter-owned
+  business and OAuth2 token-service transports. A reset before request bytes are
+  read therefore opens one connection and records no hidden second dispatch. With
+  an explicit two-attempt GET retry, a dispatched transport failure resubscribes
+  once, uses replacement capacity, and reports subscription attempt count `2`;
+  existing retry-safety, idempotency-key, publisher/application-owned body, and
   retry/redirect/auth composition tests remain green; no transport retry or body
   buffering was added.
-- Factory shutdown with active and pending work completed inside the existing
-  five-second provider-disposal bound and disposed the owned provider without
-  dispatching queued work. Existing V24 H2 GOAWAY/abrupt-close coverage remained
-  unchanged and all four retirement tests passed.
+- Factory shutdown with active and pending work completed exceptionally inside the
+  existing five-second disposal bound while their request and acquire deadlines
+  were both 30 seconds. The factory rejects pending acquisitions and closes tracked
+  active channels without dispatching queued work. Existing V24 H2
+  GOAWAY/abrupt-close coverage remained unchanged and all four retirement tests
+  passed.
 - Updated `docs/05-connection-pool.md`, `docs/12-proxy-tls.md`, and
   `docs/30-operations-troubleshooting.md` to distinguish graceful retirement,
   stale-socket replacement, failed-call replay, H2 GOAWAY, gauge convergence, and
   idle/lifetime eviction limits. Added matching unreleased changelog evidence.
-- Focused pool/framing/retry/diagnostics verification passed 77 tests; full starter
-  verification passed 990 tests, including 32 documentation/release-artifact
+- Focused pool/framing/retry/OAuth2 verification passed 119 tests; full starter
+  verification passed 991 tests, including 32 documentation/release-artifact
   tests. `git diff --check` passed.
 
 ---

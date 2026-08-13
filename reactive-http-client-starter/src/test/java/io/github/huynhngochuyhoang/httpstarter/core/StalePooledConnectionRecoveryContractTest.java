@@ -166,6 +166,21 @@ class StalePooledConnectionRecoveryContractTest {
     }
 
     @Test
+    void resetBeforeRequestBytesDoesNotTriggerTransportOwnedRetry() {
+        try (RawHttpPeer peer = new RawHttpPeer();
+             ClientFixture fixture = ClientFixture.create(peer, false)) {
+            peer.resetNextConnectionBeforeRequest();
+
+            Throwable failure = catchThrowable(() -> fixture.client().probe().block(CALL_TIMEOUT));
+
+            assertThat(failure).isNotNull();
+            peer.awaitPreRequestReset();
+            assertThat(peer.connectionCount()).isEqualTo(1);
+            assertThat(peer.records()).isEmpty();
+        }
+    }
+
+    @Test
     void shutdownTerminatesActiveAndPendingWorkWithinTheOwnedDisposalBound() throws Exception {
         try (RawHttpPeer peer = new RawHttpPeer(); MeterFixture meters = new MeterFixture()) {
             ClientFixture fixture = ClientFixture.create(peer, false);
@@ -178,11 +193,13 @@ class StalePooledConnectionRecoveryContractTest {
             long started = System.nanoTime();
             CompletableFuture<Void> shutdown = CompletableFuture.runAsync(fixture::close);
             shutdown.get(5, TimeUnit.SECONDS);
-            Duration elapsed = Duration.ofNanos(System.nanoTime() - started);
 
-            await(active::isDone, "active request should terminate during shutdown");
-            await(pending::isDone, "pending acquire should terminate during shutdown");
+            await(() -> active.isDone() && pending.isDone(),
+                    "active request and pending acquire should terminate during shutdown");
+            Duration elapsed = Duration.ofNanos(System.nanoTime() - started);
             assertThat(elapsed).isLessThan(Duration.ofSeconds(5));
+            assertThat(active).isCompletedExceptionally();
+            assertThat(pending).isCompletedExceptionally();
             assertThat(fixture.connectionProvider().isDisposed()).isTrue();
             assertThat(peer.paths()).doesNotContain("/probe");
             peer.releaseHold();
@@ -349,6 +366,8 @@ class StalePooledConnectionRecoveryContractTest {
     }
 
     private static final class ClientFixture implements AutoCloseable {
+        private static final Duration OPERATION_TIMEOUT = Duration.ofSeconds(30);
+
         private final StaticApplicationContext context;
         private final ReactiveHttpClientFactoryBean<StalePoolClient> factory;
         private final StalePoolClient client;
@@ -376,11 +395,11 @@ class StalePooledConnectionRecoveryContractTest {
             ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
             ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
             config.setBaseUrl(peer.baseUrl());
-            config.setRequestTimeoutMs(2_000);
+            config.setRequestTimeoutMs(OPERATION_TIMEOUT.toMillis());
             ReactiveHttpClientProperties.ConnectionPoolConfig pool =
                     new ReactiveHttpClientProperties.ConnectionPoolConfig();
             pool.setMaxConnections(1);
-            pool.setPendingAcquireTimeoutMs(2_000);
+            pool.setPendingAcquireTimeoutMs(OPERATION_TIMEOUT.toMillis());
             pool.setMetricsEnabled(true);
             config.setPool(pool);
             if (retryEnabled) {
@@ -475,12 +494,14 @@ class StalePooledConnectionRecoveryContractTest {
         private final AtomicBoolean running = new AtomicBoolean(true);
         private final AtomicInteger connectionSequence = new AtomicInteger();
         private final AtomicInteger retryResetDispatches = new AtomicInteger();
+        private final AtomicBoolean resetNextConnectionBeforeRequest = new AtomicBoolean();
         private final List<WireRequest> requests = new CopyOnWriteArrayList<>();
         private final Map<Integer, Socket> connections = new ConcurrentHashMap<>();
         private final CountDownLatch resetRequest = new CountDownLatch(1);
         private final CountDownLatch resetRelease = new CountDownLatch(1);
         private final CountDownLatch holdRequest = new CountDownLatch(1);
         private final CountDownLatch holdRelease = new CountDownLatch(1);
+        private final CountDownLatch preRequestReset = new CountDownLatch(1);
 
         private RawHttpPeer() {
             try {
@@ -505,6 +526,18 @@ class StalePooledConnectionRecoveryContractTest {
 
         List<String> paths() {
             return requests.stream().map(WireRequest::path).toList();
+        }
+
+        int connectionCount() {
+            return connectionSequence.get();
+        }
+
+        void resetNextConnectionBeforeRequest() {
+            resetNextConnectionBeforeRequest.set(true);
+        }
+
+        void awaitPreRequestReset() {
+            awaitLatch(preRequestReset, "pre-request reset");
         }
 
         void awaitResetRequest() {
@@ -536,6 +569,11 @@ class StalePooledConnectionRecoveryContractTest {
                 try {
                     Socket socket = serverSocket.accept();
                     int connectionId = connectionSequence.incrementAndGet();
+                    if (resetNextConnectionBeforeRequest.compareAndSet(true, false)) {
+                        closeSocket(socket, true);
+                        preRequestReset.countDown();
+                        continue;
+                    }
                     connections.put(connectionId, socket);
                     executor.submit(() -> handleConnection(socket, connectionId));
                 } catch (SocketException error) {

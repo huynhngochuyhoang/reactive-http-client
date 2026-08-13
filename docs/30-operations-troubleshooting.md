@@ -140,6 +140,9 @@ gauges should return to zero after work completes, while total/idle reflect the
 replacement connection. If the failed request appears more than once, verify an
 explicit Resilience4j retry configuration and its method, idempotency-key, body
 repeatability, and subscription-attempt evidence before calling that replay safe.
+The starter disables Reactor Netty's separate one-time connection-reset retry, so
+a reset before request headers are sent is still one transport dispatch unless an
+explicit higher-level policy resubscribes.
 
 Idle and lifetime eviction reduce exposure to known intermediary timeouts but do
 not eliminate close-versus-reuse races. Capture a bounded packet trace or peer

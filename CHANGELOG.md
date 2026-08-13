@@ -17,8 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Proved unusable sockets release replacement capacity, queued demand is neither
   stranded nor double-dispatched, pool gauges converge, terminal facts remain
   call-local, and factory disposal stays bounded. Failed requests are not
-  transport-replayed; only configured retry creates another subscription attempt
-  under the existing method-safety, idempotency-key, and body-repeatability rules.
+  transport-replayed: Reactor Netty's one-time connection-reset retry is disabled
+  for business and OAuth2 token-service transports, including failures before
+  request headers are sent. Only configured retry creates another subscription
+  attempt under the existing method-safety, idempotency-key, and
+  body-repeatability rules. Shutdown now closes tracked active channels after
+  rejecting pending acquisitions instead of relying on request/acquire timeouts.
 - **Subscription-local terminal reporting.** Consolidated stateful request
   attempt bookkeeping into one package-private subscription state and one
   immutable terminal snapshot. Attempt-owned cleanup can no longer clear a

@@ -27,6 +27,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.Connection;
 import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
@@ -36,6 +37,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -47,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, ApplicationContextAware, DisposableBean {
 
     private static final Logger log = LoggerFactory.getLogger(ReactiveHttpClientFactoryBean.class);
+    private static final Duration CONNECTION_DISPOSAL_TIMEOUT = Duration.ofSeconds(5);
     private static final int MAX_CODEC_MAX_IN_MEMORY_SIZE_MB = Integer.MAX_VALUE / (1024 * 1024);
     private static final Set<String> SUPPORTED_OUTBOUND_HTTP_METHODS = Set.of(
             "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS");
@@ -61,6 +64,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     private ApplicationContext applicationContext;
     private ConnectionProvider connectionProvider;
     private ConnectionProvider tokenServiceConnectionProvider;
+    private final Set<Connection> ownedConnections = ConcurrentHashMap.newKeySet();
     private ProtocolAwareConnectionPoolMeterRegistrar connectionPoolMeterRegistrar;
 
     // -------------------------------------------------------------------------
@@ -204,6 +208,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     public void destroy() {
         disposeConnectionProvider(connectionProvider, "business");
         disposeConnectionProvider(tokenServiceConnectionProvider, "OAuth2 token-service");
+        disposeOwnedConnections();
         if (connectionPoolMeterRegistrar != null) {
             connectionPoolMeterRegistrar.close();
         }
@@ -214,10 +219,33 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             return;
         }
         try {
-            provider.disposeLater().block(Duration.ofSeconds(5));
+            provider.disposeLater().block(CONNECTION_DISPOSAL_TIMEOUT);
         } catch (RuntimeException error) {
             log.warn("Error while disposing {} ConnectionProvider for client [{}]",
                     owner, type != null ? type.getSimpleName() : "?", error);
+        }
+    }
+
+    private void trackOwnedConnection(Connection connection) {
+        ownedConnections.add(connection);
+        connection.onDispose(() -> ownedConnections.remove(connection));
+    }
+
+    private void disposeOwnedConnections() {
+        List<Connection> connections = List.copyOf(ownedConnections);
+        if (connections.isEmpty()) {
+            return;
+        }
+        connections.forEach(connection -> connection.channel().close());
+        try {
+            reactor.core.publisher.Mono.whenDelayError(
+                            connections.stream().map(Connection::onDispose).toList())
+                    .block(CONNECTION_DISPOSAL_TIMEOUT);
+        } catch (RuntimeException error) {
+            log.warn("Error while disposing active connections for client [{}]",
+                    type != null ? type.getSimpleName() : "?", error);
+        } finally {
+            ownedConnections.removeAll(connections);
         }
     }
 
@@ -268,9 +296,12 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         // Store the provider on the instance field so destroy() can dispose it cleanly on context shutdown.
         this.connectionProvider = providerBuilder.build();
 
+        // Retry is an explicit starter-level policy; do not let the transport replay before headers are sent.
         HttpClient httpClient = HttpClient.create(this.connectionProvider)
+                .disableRetry(true)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, resolvedNetworkConfig.getConnectTimeoutMs())
                 .doOnConnected(connection -> {
+                    trackOwnedConnection(connection);
                     // Safety-net handlers: fire if a connection gets stuck in the pool beyond the configured limit.
                     connection.addHandlerLast(new ReadTimeoutHandler(
                             resolvedNetworkConfig.getNetworkReadTimeoutMs(), TimeUnit.MILLISECONDS));
@@ -1427,6 +1458,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 .pendingAcquireTimeout(Duration.ofMillis(policy.getPendingAcquireTimeoutMs()))
                 .build();
         HttpClient tokenHttpClient = HttpClient.create(this.tokenServiceConnectionProvider)
+                .disableRetry(true)
+                .doOnConnected(this::trackOwnedConnection)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, policy.getConnectTimeoutMs());
 
         ReactiveHttpClientProperties.ProxyConfig proxy = policy.getProxy();
