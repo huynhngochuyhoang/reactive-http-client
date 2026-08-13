@@ -45,6 +45,12 @@ that a possibly processed request is safe to replay. The starter adds no
 GOAWAY-specific retry; configured retry, redirect, and auth replay retain their
 normal method, idempotency, and request-body repeatability rules.
 
+An abrupt H2 transport close is not graceful GOAWAY retirement. Affected streams
+fail according to their observed terminal state and are not replayed by the
+transport; a later independent call can use replacement capacity after the closed
+connection leaves the pool. The V24 GOAWAY boundary and replacement behavior
+remain unchanged.
+
 ## Response compression
 
 `compression-enabled` is opt-in per client. When enabled, Reactor Netty adds

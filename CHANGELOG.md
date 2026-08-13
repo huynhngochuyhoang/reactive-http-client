@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Stale pooled-connection recovery contract.** Added a bounded raw HTTP/1.1
+  one-connection fixture for `Connection: close`, peer FIN after response, idle
+  close before reuse, reset during reuse, and close during response consumption.
+  Proved unusable sockets release replacement capacity, queued demand is neither
+  stranded nor double-dispatched, pool gauges converge, terminal facts remain
+  call-local, and factory disposal stays bounded. Failed requests are not
+  transport-replayed; only configured retry creates another subscription attempt
+  under the existing method-safety, idempotency-key, and body-repeatability rules.
 - **Subscription-local terminal reporting.** Consolidated stateful request
   attempt bookkeeping into one package-private subscription state and one
   immutable terminal snapshot. Attempt-owned cleanup can no longer clear a

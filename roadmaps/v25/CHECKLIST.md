@@ -361,33 +361,60 @@ Evidence:
 
 ## Priority 7 - Stale Pooled-Connection Recovery
 
-### [ ] 7.1 Add bounded stale HTTP/1.1 fixtures
+### [x] 7.1 Add bounded stale HTTP/1.1 fixtures
 
-- [ ] Cover `Connection: close` after a successful response.
-- [ ] Cover peer FIN after response, idle close before reuse, reset during reuse,
+- [x] Cover `Connection: close` after a successful response.
+- [x] Cover peer FIN after response, idle close before reuse, reset during reuse,
       and close during response consumption.
-- [ ] Use one-connection pools to prove stale channel removal and replacement
+- [x] Use one-connection pools to prove stale channel removal and replacement
       capacity deterministically.
-- [ ] Verify active/pending gauges converge and queued demand is neither stranded
+- [x] Verify active/pending gauges converge and queued demand is neither stranded
       nor double-dispatched.
-- [ ] Verify factory shutdown remains within the existing bounded disposal policy.
+- [x] Verify factory shutdown remains within the existing bounded disposal policy.
 
-### [ ] 7.2 Separate recovery from replay
+### [x] 7.2 Separate recovery from replay
 
-- [ ] Prove a later independent call can use a replacement connection.
-- [ ] Prove a failed request is not automatically replayed outside configured
+- [x] Prove a later independent call can use a replacement connection.
+- [x] Prove a failed request is not automatically replayed outside configured
       resilience behavior.
-- [ ] Preserve safe-method, idempotency-key, body-repeatability, and subscription
+- [x] Preserve safe-method, idempotency-key, body-repeatability, and subscription
       attempt rules when explicit retry is enabled.
-- [ ] Prevent stale channel, decoder, URL, status, headers, and failure stage from
+- [x] Prevent stale channel, decoder, URL, status, headers, and failure stage from
       leaking into the next call.
-- [ ] Retain V24 GOAWAY behavior and add only missing abrupt H2 close/replacement
+- [x] Retain V24 GOAWAY behavior and add only missing abrupt H2 close/replacement
       evidence.
-- [ ] Run pool/framing/retry/diagnostics suites and full starter verification.
+- [x] Run pool/framing/retry/diagnostics suites and full starter verification.
 
 Evidence:
 
-- Pending.
+- Added `StalePooledConnectionRecoveryContractTest`, a six-case raw IPv4 HTTP/1.1
+  fixture using the real starter proxy and a one-connection Reactor Netty pool.
+  It distinguishes transport-owned `Connection: close`, peer FIN after a complete
+  response, a peer-closing an idle pooled socket, RST after a reused request is
+  observed, and FIN during a declared fixed-length response body.
+- The reset-on-reuse case holds the active exchange while an independent probe is
+  queued, observes `active.connections=1` and `pending.connections=1`, then proves
+  the failed path was dispatched once, the probe used a different connection, and
+  active/pending/total/idle gauges converged to `0/0/1/1`. The partial-body case
+  retains its `200`, response headers, and `RESPONSE_BODY` stage while the next
+  probe carries only its own URL/status/header/success facts.
+- With resilience disabled, an observed reset fails once and is not replayed. With
+  an explicit two-attempt GET retry, the same transport failure resubscribes once,
+  uses replacement capacity, and reports subscription attempt count `2`. Existing
+  retry-safety, idempotency-key, publisher/application-owned body, and
+  retry/redirect/auth composition tests remain green; no transport retry or body
+  buffering was added.
+- Factory shutdown with active and pending work completed inside the existing
+  five-second provider-disposal bound and disposed the owned provider without
+  dispatching queued work. Existing V24 H2 GOAWAY/abrupt-close coverage remained
+  unchanged and all four retirement tests passed.
+- Updated `docs/05-connection-pool.md`, `docs/12-proxy-tls.md`, and
+  `docs/30-operations-troubleshooting.md` to distinguish graceful retirement,
+  stale-socket replacement, failed-call replay, H2 GOAWAY, gauge convergence, and
+  idle/lifetime eviction limits. Added matching unreleased changelog evidence.
+- Focused pool/framing/retry/diagnostics verification passed 77 tests; full starter
+  verification passed 990 tests, including 32 documentation/release-artifact
+  tests. `git diff --check` passed.
 
 ---
 
