@@ -413,7 +413,9 @@ Evidence:
   active channels without dispatching queued work. A stalled-resource regression
   proves business-provider, OAuth2 token-service-provider, and active-channel
   disposal all start concurrently under one shared deadline rather than receiving
-  three sequential timeouts. Existing V24 H2
+  three sequential timeouts. A concurrent-registration regression also proves a
+  connection completing after shutdown crosses its lifecycle gate is closed
+  immediately and cannot escape the initial drain. Existing V24 H2
   GOAWAY/abrupt-close coverage remained unchanged and all four retirement tests
   passed.
 - Updated `docs/05-connection-pool.md`, `docs/12-proxy-tls.md`, and
@@ -421,8 +423,8 @@ Evidence:
   stale-socket replacement, failed-call replay, H2 GOAWAY, gauge convergence, and
   idle/lifetime eviction limits. Added matching unreleased changelog evidence.
 - Focused pool/framing/retry/OAuth2 verification passed 119 tests, and the
-  shutdown-focused pool/H2/OAuth2 matrix passed 37 tests. Full starter
-  verification passed 992 tests, including 32 documentation/release-artifact
+  shutdown-focused pool/H2/OAuth2 matrix passed 38 tests. Full starter
+  verification passed 993 tests, including 32 documentation/release-artifact
   tests. `git diff --check` passed.
 
 ---

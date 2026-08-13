@@ -66,6 +66,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     private ConnectionProvider connectionProvider;
     private ConnectionProvider tokenServiceConnectionProvider;
     private final Set<Connection> ownedConnections = ConcurrentHashMap.newKeySet();
+    private final Object ownedConnectionLifecycleMonitor = new Object();
+    private boolean shuttingDown;
     private ProtocolAwareConnectionPoolMeterRegistrar connectionPoolMeterRegistrar;
 
     // -------------------------------------------------------------------------
@@ -214,7 +216,11 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     }
 
     private void disposeResources(Duration timeout) {
-        List<Connection> connections = List.copyOf(ownedConnections);
+        List<Connection> connections;
+        synchronized (ownedConnectionLifecycleMonitor) {
+            shuttingDown = true;
+            connections = List.copyOf(ownedConnections);
+        }
         try {
             Mono.whenDelayError(
                             disposeConnectionProvider(connectionProvider, "business"),
@@ -240,8 +246,17 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     }
 
     private void trackOwnedConnection(Connection connection) {
-        ownedConnections.add(connection);
-        connection.onDispose(() -> ownedConnections.remove(connection));
+        boolean closeImmediately;
+        synchronized (ownedConnectionLifecycleMonitor) {
+            closeImmediately = shuttingDown;
+            if (!closeImmediately) {
+                ownedConnections.add(connection);
+                connection.onDispose(() -> ownedConnections.remove(connection));
+            }
+        }
+        if (closeImmediately) {
+            connection.channel().close();
+        }
     }
 
     private Mono<Void> disposeOwnedConnections(List<Connection> connections) {

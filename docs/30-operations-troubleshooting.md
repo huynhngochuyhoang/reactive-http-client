@@ -167,7 +167,8 @@ compression error, timeout, or premature close is a stream/connection failure
 and should be diagnosed from its terminal error and failure stage; do not infer
 one from a graceful GOAWAY alone. Factory shutdown applies the same bounded
 five-second factory-wide deadline to business and OAuth2 token-service providers,
-draining connections, active channels, and pending work.
+draining connections, active channels, and pending work. Connections that finish
+connecting after shutdown begins are closed immediately.
 
 See [GOAWAY and connection retirement](12-proxy-tls.md#goaway-and-connection-retirement).
 

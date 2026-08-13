@@ -22,6 +22,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -288,6 +291,32 @@ class Priority7HousekeepingTest {
         verify(channel).close();
     }
 
+    @Test
+    void connectionTrackedAfterShutdownStartsIsClosedImmediately() throws Exception {
+        ReactiveHttpClientFactoryBean<Object> factory = new ReactiveHttpClientFactoryBean<>();
+        ConnectionProvider business = mock(ConnectionProvider.class);
+        Connection lateConnection = mock(Connection.class);
+        Channel lateChannel = mock(Channel.class);
+        CountDownLatch disposalStarted = new CountDownLatch(1);
+        when(business.disposeLater()).thenReturn(Mono.defer(() -> {
+            disposalStarted.countDown();
+            return Mono.never();
+        }));
+        when(lateConnection.channel()).thenReturn(lateChannel);
+        setField(factory, "connectionProvider", business);
+
+        CompletableFuture<Void> shutdown = CompletableFuture.runAsync(() ->
+                assertDoesNotThrow(() -> disposeResources(factory, Duration.ofMillis(200))));
+        assertTrue(disposalStarted.await(1, TimeUnit.SECONDS), "shutdown must cross the connection gate");
+
+        trackOwnedConnection(factory, lateConnection);
+
+        verify(lateChannel).close();
+        assertFalse(ownedConnections(factory).contains(lateConnection),
+                "a connection completing after shutdown starts must not escape the drain");
+        shutdown.get(1, TimeUnit.SECONDS);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -311,6 +340,14 @@ class Priority7HousekeepingTest {
                 .getDeclaredMethod("disposeResources", Duration.class);
         method.setAccessible(true);
         method.invoke(factory, timeout);
+    }
+
+    private static void trackOwnedConnection(
+            ReactiveHttpClientFactoryBean<?> factory, Connection connection) throws Exception {
+        Method method = ReactiveHttpClientFactoryBean.class
+                .getDeclaredMethod("trackOwnedConnection", Connection.class);
+        method.setAccessible(true);
+        method.invoke(factory, connection);
     }
 
     @SuppressWarnings("unchecked")

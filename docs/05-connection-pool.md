@@ -124,7 +124,9 @@ should converge without a stranded pending acquire or duplicate dispatch. Factor
 shutdown retains the bounded five-second disposal policy: providers reject queued
 acquisitions and the factory closes its tracked active channels. Business-provider
 disposal, OAuth2 token-service-provider disposal, and channel closure run
-concurrently under that single factory-wide deadline.
+concurrently under that single factory-wide deadline. A connection that finishes
+connecting after shutdown starts is closed immediately instead of escaping the
+initial active-channel drain.
 
 ## Diagnosing saturation
 
