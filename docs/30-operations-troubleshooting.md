@@ -37,6 +37,7 @@ historical evidence.
 | Unexpected HTTP/1.1, H2, or H2C behavior; malformed-request warning | Client `http2-enabled` policy, downstream-observed protocol, complete decoder warning, ALPN/TLS mode, intermediary path | [Protocol diagnosis](#protocol-and-framing) |
 | Gzip decode failure, unexpected encoded body, or response size unknown | Client `compression-enabled` policy, presence of negotiation/content-encoding headers, post-transport response headers, exception type | [Compression diagnosis](#compression) |
 | Pending requests, acquire timeout, or connection churn | Effective pool policy, active/idle/total/pending gauges, `POOL_ACQUIRE`, health `poolAcquireFailureCount` | [Pool saturation](#pool-saturation) |
+| Reset, peer close, or replacement after an otherwise healthy HTTP/1.1 call | Final call status/stage, one-call dispatch count, active/pending/idle/total gauges, downstream connection evidence | [Stale HTTP/1.1 connections](#stale-http11-connections) |
 | DNS, proxy, connect, TLS, or certificate failure before status | Concrete exception chain, optional failure stage, sanitized resolver/proxy/TLS evidence | [Pre-response failures](#pre-response-transport-failures) |
 | Timeout before or after status | Concrete exception, final status, final-attempt dispatch evidence, optional failure stage | [Timeout phases](#timeout-phases) |
 | Upload stalls, cancellation, leaked buffers, or incomplete stream | Declared body/return shape, subscription and cancellation boundary, consumer release/forwarding path | [Streaming ownership](#streaming-ownership) |
@@ -123,6 +124,35 @@ See [Response compression](12-proxy-tls.md#response-compression) and
 
 See [Diagnosing saturation](05-connection-pool.md#diagnosing-saturation).
 
+### Stale HTTP/1.1 connections
+
+Distinguish normal retirement from a failed exchange. `Connection: close`, a
+peer FIN after a complete response, and a peer closing an idle keep-alive socket
+retire that physical connection; a later independent call should use replacement
+capacity. A reset after dispatch or a close during response consumption fails the
+affected call. The pool can remove the unusable channel and serve queued demand
+without replaying the failed request.
+
+Correlate one logical call with downstream request count and the pool gauges. A
+replacement call should have its own URL, status, response headers, error, and
+failure stage; it must not inherit facts from the stale call. Active and pending
+gauges should return to zero after work completes, while total/idle reflect the
+replacement connection. If the failed request appears more than once, verify an
+explicit Resilience4j retry configuration, a one-time `401` auth invalidation and
+refresh replay, and configured automatic redirect hops. For each enabled replay
+mechanism, inspect the method, idempotency key, body repeatability, subscription
+attempts, and downstream dispatch count before calling the replay safe. A single
+Resilience4j subscription attempt can contain an auth replay or body-preserving
+redirect dispatch. The starter disables Reactor Netty's separate one-time
+connection-reset retry, so a reset before request headers are sent is still one
+transport dispatch unless an explicit higher-level policy resubscribes or replays.
+
+Idle and lifetime eviction reduce exposure to known intermediary timeouts but do
+not eliminate close-versus-reuse races. Capture a bounded packet trace or peer
+connection log when the close ordering matters; do not infer it from a generic
+timeout alone. See
+[Stale connection retirement and replacement](05-connection-pool.md#stale-connection-retirement-and-replacement).
+
 ### HTTP/2 retirement versus connection failure
 
 A peer `GOAWAY(NO_ERROR)` is graceful retirement, not by itself a request
@@ -139,7 +169,9 @@ They must converge after replacement dispatch or bounded pool shutdown. A reset,
 compression error, timeout, or premature close is a stream/connection failure
 and should be diagnosed from its terminal error and failure stage; do not infer
 one from a graceful GOAWAY alone. Factory shutdown applies the same bounded
-five-second connection-provider disposal policy to draining and pending work.
+five-second factory-wide deadline to business and OAuth2 token-service providers,
+draining connections, active channels, and pending work. Connections that finish
+connecting after shutdown begins are closed immediately.
 
 See [GOAWAY and connection retirement](12-proxy-tls.md#goaway-and-connection-retirement).
 

@@ -98,6 +98,36 @@ capacity gauges are:
 The public H2 pool view does not prove how active streams are distributed across
 physical connections, so the starter does not publish `active.connections` for H2.
 
+## Stale connection retirement and replacement
+
+Reactor Netty owns pooled-channel validation and removal. A complete HTTP/1.1
+response with `Connection: close`, a peer FIN after a complete response, or an
+idle socket closed by the peer retires that socket. A later independent call can
+then acquire replacement capacity within `max-connections`; it does not reuse the
+closed channel or its decoder state.
+
+A reset after request dispatch or a close while the response body is incomplete
+is different: the affected logical call fails. Removing that unusable channel can
+release capacity for queued or later demand, but replacement capacity is not
+request replay. The starter disables Reactor Netty's one-time connection-reset
+retry on both business and OAuth2 token-service transports, including resets
+before request headers are sent. Only configured Resilience4j retry can create
+another business-request subscription attempt, and the existing HTTP-method
+safety, idempotency-key, body-repeatability, and application-owned resource rules
+still apply.
+
+Idle/lifetime eviction can reduce the chance that an intermediary's idle timeout
+races with reuse, but it cannot prove that a socket remains live between an
+acquire and a write. During recovery, inspect active and pending gauges together.
+After the failed call terminates and replacement demand completes, the gauges
+should converge without a stranded pending acquire or duplicate dispatch. Factory
+shutdown retains the bounded five-second disposal policy: providers reject queued
+acquisitions and the factory closes its tracked active channels. Business-provider
+disposal, OAuth2 token-service-provider disposal, and channel closure run
+concurrently under that single factory-wide deadline. A connection that finishes
+connecting after shutdown starts is closed immediately instead of escaping the
+initial active-channel drain.
+
 ## Diagnosing saturation
 
 With `max-connections: 1`, additional calls wait in the pending queue until the

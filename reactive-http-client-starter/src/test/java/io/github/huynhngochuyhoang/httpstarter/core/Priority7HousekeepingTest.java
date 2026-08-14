@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
+import io.netty.channel.Channel;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
@@ -13,13 +14,21 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.netty.Connection;
+import reactor.netty.resources.ConnectionProvider;
 import reactor.test.StepVerifier;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.time.Duration;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * Tests for Priority-7 housekeeping items:
@@ -256,9 +265,97 @@ class Priority7HousekeepingTest {
         factory.destroy(); // must not throw
     }
 
+    @Test
+    void disposalUsesOneDeadlineForBothProvidersAndActiveConnections() throws Exception {
+        ReactiveHttpClientFactoryBean<Object> factory = new ReactiveHttpClientFactoryBean<>();
+        ConnectionProvider business = mock(ConnectionProvider.class);
+        ConnectionProvider tokenService = mock(ConnectionProvider.class);
+        Connection connection = mock(Connection.class);
+        Channel channel = mock(Channel.class);
+        AtomicInteger subscriptions = new AtomicInteger();
+        when(business.disposeLater()).thenReturn(never(subscriptions));
+        when(tokenService.disposeLater()).thenReturn(never(subscriptions));
+        when(connection.channel()).thenReturn(channel);
+        when(connection.onDispose()).thenReturn(never(subscriptions));
+        setField(factory, "connectionProvider", business);
+        setField(factory, "tokenServiceConnectionProvider", tokenService);
+        ownedConnections(factory).add(connection);
+
+        long started = System.nanoTime();
+        disposeResources(factory, Duration.ofMillis(100));
+        Duration elapsed = Duration.ofNanos(System.nanoTime() - started);
+
+        assertEquals(3, subscriptions.get(), "all shutdown phases must start under one deadline");
+        assertTrue(elapsed.compareTo(Duration.ofSeconds(1)) < 0,
+                "one 100ms deadline must not become three sequential waits");
+        verify(channel).close();
+    }
+
+    @Test
+    void connectionTrackedAfterShutdownStartsIsClosedImmediately() throws Exception {
+        ReactiveHttpClientFactoryBean<Object> factory = new ReactiveHttpClientFactoryBean<>();
+        ConnectionProvider business = mock(ConnectionProvider.class);
+        Connection lateConnection = mock(Connection.class);
+        Channel lateChannel = mock(Channel.class);
+        CountDownLatch disposalStarted = new CountDownLatch(1);
+        when(business.disposeLater()).thenReturn(Mono.defer(() -> {
+            disposalStarted.countDown();
+            return Mono.never();
+        }));
+        when(lateConnection.channel()).thenReturn(lateChannel);
+        setField(factory, "connectionProvider", business);
+
+        CompletableFuture<Void> shutdown = CompletableFuture.runAsync(() ->
+                assertDoesNotThrow(() -> disposeResources(factory, Duration.ofMillis(200))));
+        assertTrue(disposalStarted.await(1, TimeUnit.SECONDS), "shutdown must cross the connection gate");
+
+        trackOwnedConnection(factory, lateConnection);
+
+        verify(lateChannel).close();
+        assertFalse(ownedConnections(factory).contains(lateConnection),
+                "a connection completing after shutdown starts must not escape the drain");
+        shutdown.get(1, TimeUnit.SECONDS);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private static Mono<Void> never(AtomicInteger subscriptions) {
+        return Mono.defer(() -> {
+            subscriptions.incrementAndGet();
+            return Mono.never();
+        });
+    }
+
+    private static void setField(Object target, String name, Object value) throws Exception {
+        Field field = ReactiveHttpClientFactoryBean.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+
+    private static void disposeResources(
+            ReactiveHttpClientFactoryBean<?> factory, Duration timeout) throws Exception {
+        Method method = ReactiveHttpClientFactoryBean.class
+                .getDeclaredMethod("disposeResources", Duration.class);
+        method.setAccessible(true);
+        method.invoke(factory, timeout);
+    }
+
+    private static void trackOwnedConnection(
+            ReactiveHttpClientFactoryBean<?> factory, Connection connection) throws Exception {
+        Method method = ReactiveHttpClientFactoryBean.class
+                .getDeclaredMethod("trackOwnedConnection", Connection.class);
+        method.setAccessible(true);
+        method.invoke(factory, connection);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Set<Connection> ownedConnections(ReactiveHttpClientFactoryBean<?> factory) throws Exception {
+        Field field = ReactiveHttpClientFactoryBean.class.getDeclaredField("ownedConnections");
+        field.setAccessible(true);
+        return (Set<Connection>) field.get(factory);
+    }
 
     private ReactiveClientInvocationHandler buildHandler(WebClient webClient) {
         ApplicationContext ctx = mock(ApplicationContext.class);

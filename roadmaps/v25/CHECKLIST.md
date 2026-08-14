@@ -361,33 +361,73 @@ Evidence:
 
 ## Priority 7 - Stale Pooled-Connection Recovery
 
-### [ ] 7.1 Add bounded stale HTTP/1.1 fixtures
+### [x] 7.1 Add bounded stale HTTP/1.1 fixtures
 
-- [ ] Cover `Connection: close` after a successful response.
-- [ ] Cover peer FIN after response, idle close before reuse, reset during reuse,
+- [x] Cover `Connection: close` after a successful response.
+- [x] Cover peer FIN after response, idle close before reuse, reset during reuse,
       and close during response consumption.
-- [ ] Use one-connection pools to prove stale channel removal and replacement
+- [x] Use one-connection pools to prove stale channel removal and replacement
       capacity deterministically.
-- [ ] Verify active/pending gauges converge and queued demand is neither stranded
+- [x] Verify active/pending gauges converge and queued demand is neither stranded
       nor double-dispatched.
-- [ ] Verify factory shutdown remains within the existing bounded disposal policy.
+- [x] Verify factory shutdown remains within the existing bounded disposal policy.
 
-### [ ] 7.2 Separate recovery from replay
+### [x] 7.2 Separate recovery from replay
 
-- [ ] Prove a later independent call can use a replacement connection.
-- [ ] Prove a failed request is not automatically replayed outside configured
+- [x] Prove a later independent call can use a replacement connection.
+- [x] Prove a failed request is not automatically replayed outside configured
       resilience behavior.
-- [ ] Preserve safe-method, idempotency-key, body-repeatability, and subscription
+- [x] Preserve safe-method, idempotency-key, body-repeatability, and subscription
       attempt rules when explicit retry is enabled.
-- [ ] Prevent stale channel, decoder, URL, status, headers, and failure stage from
+- [x] Prevent stale channel, decoder, URL, status, headers, and failure stage from
       leaking into the next call.
-- [ ] Retain V24 GOAWAY behavior and add only missing abrupt H2 close/replacement
+- [x] Retain V24 GOAWAY behavior and add only missing abrupt H2 close/replacement
       evidence.
-- [ ] Run pool/framing/retry/diagnostics suites and full starter verification.
+- [x] Run pool/framing/retry/diagnostics suites and full starter verification.
 
 Evidence:
 
-- Pending.
+- Added `StalePooledConnectionRecoveryContractTest`, a seven-case raw IPv4 HTTP/1.1
+  fixture using the real starter proxy and a one-connection Reactor Netty pool.
+  It distinguishes transport-owned `Connection: close`, peer FIN after a complete
+  response, a peer-closing an idle pooled socket, RST after a reused request is
+  observed, FIN during a declared fixed-length response body, and RST before any
+  request bytes are read. The FIN and idle-close cases wait for the tracked client
+  channel's disposal signal before issuing replacement demand, so server-side
+  close observation cannot race pool retirement.
+- The reset-on-reuse case holds the active exchange while an independent probe is
+  queued, observes `active.connections=1` and `pending.connections=1`, then proves
+  the failed path was dispatched once, the probe used a different connection, and
+  active/pending/total/idle gauges converged to `0/0/1/1`. The partial-body case
+  retains its `200`, response headers, and `RESPONSE_BODY` stage while the next
+  probe carries only its own URL/status/header/success facts.
+- Reactor Netty's one-time connection-reset retry is disabled for both starter-owned
+  business and OAuth2 token-service transports. A reset before request bytes are
+  read therefore opens one connection and records no hidden second dispatch. With
+  an explicit two-attempt GET retry, a dispatched transport failure resubscribes
+  once, uses replacement capacity, and reports subscription attempt count `2`;
+  existing retry-safety, idempotency-key, publisher/application-owned body, and
+  retry/redirect/auth composition tests remain green; no transport retry or body
+  buffering was added.
+- Factory shutdown with active and pending work completed exceptionally inside the
+  existing five-second disposal bound while their request and acquire deadlines
+  were both 30 seconds. The factory rejects pending acquisitions and closes tracked
+  active channels without dispatching queued work. A stalled-resource regression
+  proves business-provider, OAuth2 token-service-provider, and active-channel
+  disposal all start concurrently under one shared deadline rather than receiving
+  three sequential timeouts. A concurrent-registration regression also proves a
+  connection completing after shutdown crosses its lifecycle gate is closed
+  immediately and cannot escape the initial drain. Existing V24 H2
+  GOAWAY/abrupt-close coverage remained unchanged and all four retirement tests
+  passed.
+- Updated `docs/05-connection-pool.md`, `docs/12-proxy-tls.md`, and
+  `docs/30-operations-troubleshooting.md` to distinguish graceful retirement,
+  stale-socket replacement, failed-call replay, H2 GOAWAY, gauge convergence, and
+  idle/lifetime eviction limits. Added matching unreleased changelog evidence.
+- Focused pool/framing/retry/OAuth2 verification passed 119 tests, and the
+  shutdown-focused pool/H2/OAuth2 matrix passed 38 tests. Full starter
+  verification passed 993 tests, including 32 documentation/release-artifact
+  tests. `git diff --check` passed.
 
 ---
 
