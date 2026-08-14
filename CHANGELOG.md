@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Terminal diagnostics and redaction parity.** Added explicit synchronous
+  request-validation and subscribed pre-dispatch URI/serialization contracts,
+  and revalidated final-attempt status, headers, stage, error, and subscription
+  counts across auth, pool, write, response, stale-connection, cancellation,
+  retry, redirect, auth-replay, and concurrent-subscription paths. Default
+  exchange logs, Micrometer, health, and OTel retain structural error facts
+  without arbitrary exception messages. Provider-backed support snapshots no
+  longer instantiate lazy auth-provider factories to resolve strict SigV4
+  status; unresolved selection remains `null`. Added sanitized request-validation
+  and stale-connection recovery support-bundle fixtures.
 - **Stale pooled-connection recovery contract.** Added a bounded raw HTTP/1.1
   one-connection fixture for `Connection: close`, peer FIN after response, idle
   close before reuse, reset during reuse, and close during response consumption.

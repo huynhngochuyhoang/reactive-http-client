@@ -240,6 +240,35 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsDoNotInstantiateLazyAuthProviderFactories() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        AtomicInteger factoryCreations = new AtomicInteger();
+        GenericBeanDefinition authFactoryDefinition = new GenericBeanDefinition();
+        authFactoryDefinition.setBeanClass(AwsSigV4AuthProviderFactory.class);
+        authFactoryDefinition.setLazyInit(true);
+        authFactoryDefinition.setInstanceSupplier(() -> {
+            factoryCreations.incrementAndGet();
+            return new AwsSigV4AuthProviderFactory();
+        });
+        beanFactory.registerBeanDefinition("lazyAwsSigV4AuthProviderFactory", authFactoryDefinition);
+
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider(null);
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        config.setAuth(auth);
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, config)));
+
+        assertThat(client).containsEntry("strictBodySigningValidation", null);
+        assertThat(factoryCreations).hasValue(0);
+        assertThat(beanFactory.containsSingleton("lazyAwsSigV4AuthProviderFactory")).isFalse();
+        assertThat(beanFactory.containsSingleton("diagnosticClient")).isFalse();
+    }
+
+    @Test
     void providerSnapshotsDoNotInstantiateLazyClientFactories() {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         GenericBeanDefinition definition = new GenericBeanDefinition();

@@ -13,6 +13,7 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.ResolvableType;
+import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
@@ -301,7 +302,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return unresolvedRetry ? null : false;
     }
 
-    private boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+    private Boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
         if (StringUtils.hasText(clientConfig.getAuthProvider())
                 || clientConfig.getAuth() == null
                 || clientConfig.getAuth().getAwsSigV4() == null
@@ -309,12 +310,45 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 || !clientConfig.getAuth().getAwsSigV4().isStrictBodySigningValidation()) {
             return false;
         }
-        return beanFactory.getBeanProvider(AuthProviderFactory.class)
-                .orderedStream()
+        ExistingAuthProviderFactories factories = existingAuthProviderFactories(beanFactory);
+        if (factories.unresolved()) {
+            return null;
+        }
+        return factories.values().stream()
                 .filter(factory -> factory.supports(clientConfig.getAuth().getType()))
                 .findFirst()
                 .filter(AwsSigV4AuthProviderFactory.class::isInstance)
                 .isPresent();
+    }
+
+    private ExistingAuthProviderFactories existingAuthProviderFactories(
+            ConfigurableListableBeanFactory factory) {
+        String[] beanNames = factory.getBeanNamesForType(AuthProviderFactory.class, true, false);
+        if (!uninspectableFactoryBeanNames(factory, AuthProviderFactory.class, beanNames).isEmpty()) {
+            return ExistingAuthProviderFactories.unresolvedLookup();
+        }
+
+        List<AuthProviderFactory> values = new ArrayList<>();
+        for (String beanName : beanNames) {
+            Object value = existingSingletonValue(factory, AuthProviderFactory.class, beanName);
+            if (!(value instanceof AuthProviderFactory authProviderFactory)) {
+                return ExistingAuthProviderFactories.unresolvedLookup();
+            }
+            values.add(authProviderFactory);
+        }
+
+        BeanFactory parent = factory.getParentBeanFactory();
+        if (parent instanceof ConfigurableListableBeanFactory parentFactory) {
+            ExistingAuthProviderFactories parentFactories = existingAuthProviderFactories(parentFactory);
+            if (parentFactories.unresolved()) {
+                return parentFactories;
+            }
+            values.addAll(parentFactories.values());
+        } else if (parent != null) {
+            return ExistingAuthProviderFactories.unresolvedLookup();
+        }
+        AnnotationAwareOrderComparator.sort(values);
+        return ExistingAuthProviderFactories.available(values);
     }
 
     private static String diagnosticHttpMethod(MethodMetadata meta,
@@ -684,10 +718,23 @@ public class ReactiveHttpClientDiagnosticsProvider {
         }
     }
 
+    private record ExistingAuthProviderFactories(
+            List<AuthProviderFactory> values,
+            boolean unresolved) {
+
+        private static ExistingAuthProviderFactories available(List<AuthProviderFactory> values) {
+            return new ExistingAuthProviderFactories(List.copyOf(values), false);
+        }
+
+        private static ExistingAuthProviderFactories unresolvedLookup() {
+            return new ExistingAuthProviderFactories(List.of(), true);
+        }
+    }
+
     record ClientSnapshotEntry(
             ClientSummary summary,
             Boolean strictUnsafeRetryValidation,
-            boolean strictBodySigningValidation,
+            Boolean strictBodySigningValidation,
             PoolSummary pool,
             long logicalCallTimeoutMs,
             boolean compressionEnabled,

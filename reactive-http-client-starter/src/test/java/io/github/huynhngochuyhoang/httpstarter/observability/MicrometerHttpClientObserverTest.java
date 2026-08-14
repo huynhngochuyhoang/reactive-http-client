@@ -49,6 +49,39 @@ class MicrometerHttpClientObserverTest {
     }
 
     @Test
+    void arbitraryExceptionMessagesDoNotEnterMetricsOrHealthDetails() {
+        String secret = "Bearer secret-token-" + "x".repeat(10_000);
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config =
+                new ReactiveHttpClientProperties.ObservabilityConfig();
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(meterRegistry, config);
+
+        observer.record(new HttpClientObserverEvent(
+                "user-service",
+                "user.get",
+                "GET",
+                "/users/{id}",
+                null,
+                12,
+                new RuntimeException(secret),
+                ErrorCategory.UNKNOWN,
+                null,
+                null
+        ));
+
+        for (Meter meter : meterRegistry.getMeters()) {
+            assertFalse(meter.getId().toString().contains("secret-token"));
+            assertFalse(meter.getId().toString().contains(secret));
+        }
+        String healthDetails = new Boot4HttpClientHealthIndicator(meterRegistry, config)
+                .health()
+                .getDetails()
+                .toString();
+        assertFalse(healthDetails.contains("secret-token"));
+        assertFalse(healthDetails.contains(secret));
+    }
+
+    @Test
     void shouldRecordNoneErrorCategoryForSuccess() {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
         MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(
