@@ -138,11 +138,14 @@ replacement call should have its own URL, status, response headers, error, and
 failure stage; it must not inherit facts from the stale call. Active and pending
 gauges should return to zero after work completes, while total/idle reflect the
 replacement connection. If the failed request appears more than once, verify an
-explicit Resilience4j retry configuration and its method, idempotency-key, body
-repeatability, and subscription-attempt evidence before calling that replay safe.
-The starter disables Reactor Netty's separate one-time connection-reset retry, so
-a reset before request headers are sent is still one transport dispatch unless an
-explicit higher-level policy resubscribes.
+explicit Resilience4j retry configuration, a one-time `401` auth invalidation and
+refresh replay, and configured automatic redirect hops. For each enabled replay
+mechanism, inspect the method, idempotency key, body repeatability, subscription
+attempts, and downstream dispatch count before calling the replay safe. A single
+Resilience4j subscription attempt can contain an auth replay or body-preserving
+redirect dispatch. The starter disables Reactor Netty's separate one-time
+connection-reset retry, so a reset before request headers are sent is still one
+transport dispatch unless an explicit higher-level policy resubscribes or replays.
 
 Idle and lifetime eviction reduce exposure to known intermediary timeouts but do
 not eliminate close-versus-reuse races. Capture a bounded packet trace or peer

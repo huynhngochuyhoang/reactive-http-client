@@ -392,7 +392,9 @@ Evidence:
   It distinguishes transport-owned `Connection: close`, peer FIN after a complete
   response, a peer-closing an idle pooled socket, RST after a reused request is
   observed, FIN during a declared fixed-length response body, and RST before any
-  request bytes are read.
+  request bytes are read. The FIN and idle-close cases wait for the tracked client
+  channel's disposal signal before issuing replacement demand, so server-side
+  close observation cannot race pool retirement.
 - The reset-on-reuse case holds the active exchange while an independent probe is
   queued, observes `active.connections=1` and `pending.connections=1`, then proves
   the failed path was dispatched once, the probe used a different connection, and

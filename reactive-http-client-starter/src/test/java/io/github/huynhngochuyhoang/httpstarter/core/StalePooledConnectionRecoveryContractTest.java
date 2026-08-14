@@ -65,6 +65,7 @@ class StalePooledConnectionRecoveryContractTest {
              MeterFixture meters = new MeterFixture();
              ClientFixture fixture = ClientFixture.create(peer, false)) {
             assertThat(fixture.client().finAfterResponse().block(CALL_TIMEOUT)).isEqualTo("fin");
+            fixture.awaitNoOwnedConnections();
             assertThat(fixture.client().probe().block(CALL_TIMEOUT)).isEqualTo("probe");
             int replacementAfterFin = peer.records().get(1).connectionId();
             assertThat(replacementAfterFin).isNotEqualTo(peer.records().get(0).connectionId());
@@ -73,6 +74,7 @@ class StalePooledConnectionRecoveryContractTest {
             WireRequest idle = peer.records().get(2);
             assertThat(idle.connectionId()).isEqualTo(replacementAfterFin);
             peer.closeConnection(idle.connectionId());
+            fixture.awaitNoOwnedConnections();
 
             assertThat(fixture.client().probe().block(CALL_TIMEOUT)).isEqualTo("probe");
             assertThat(peer.paths()).containsExactly("/fin-after-response", "/probe", "/idle", "/probe");
@@ -438,6 +440,11 @@ class StalePooledConnectionRecoveryContractTest {
             return connectionProvider.name();
         }
 
+        void awaitNoOwnedConnections() {
+            await(() -> ownedConnections(factory).isEmpty(),
+                    "client should dispose the retired connection");
+        }
+
         @Override
         public void close() {
             if (!closed) {
@@ -452,6 +459,16 @@ class StalePooledConnectionRecoveryContractTest {
                 Field field = ReactiveHttpClientFactoryBean.class.getDeclaredField("connectionProvider");
                 field.setAccessible(true);
                 return (ConnectionProvider) field.get(factory);
+            } catch (ReflectiveOperationException error) {
+                throw new IllegalStateException(error);
+            }
+        }
+
+        private static Set<?> ownedConnections(ReactiveHttpClientFactoryBean<?> factory) {
+            try {
+                Field field = ReactiveHttpClientFactoryBean.class.getDeclaredField("ownedConnections");
+                field.setAccessible(true);
+                return (Set<?>) field.get(factory);
             } catch (ReflectiveOperationException error) {
                 throw new IllegalStateException(error);
             }
