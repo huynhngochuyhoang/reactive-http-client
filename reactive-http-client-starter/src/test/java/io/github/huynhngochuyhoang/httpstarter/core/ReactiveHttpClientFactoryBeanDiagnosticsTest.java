@@ -21,6 +21,7 @@ import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -929,6 +930,47 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
             assertThat(factoryBean.getObject()).isNotNull();
         } finally {
             factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void authFactorySelectionIgnoresNonAutowireCandidates() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            GenericBeanDefinition disabledCustom = new GenericBeanDefinition();
+            disabledCustom.setBeanClass(AuthProviderFactory.class);
+            disabledCustom.setAutowireCandidate(false);
+            disabledCustom.setInstanceSupplier(() -> new AuthProviderFactory() {
+                @Override
+                public boolean supports(String type) {
+                    return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+                }
+
+                @Override
+                public AuthProvider create(String clientName,
+                                           ReactiveHttpClientProperties.AuthConfig authConfig,
+                                           WebClient.Builder webClientBuilder) {
+                    return request -> Mono.just(AuthContext.empty());
+                }
+            });
+            context.registerBeanDefinition("disabledCustomAwsFactory", disabledCustom);
+            context.registerBean("awsSigV4AuthProviderFactory", AwsSigV4AuthProviderFactory.class);
+            ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+            properties.getClients().put(
+                    "strict-body-signing-client", awsSigV4ClientConfig(true));
+            context.registerBean(ReactiveHttpClientProperties.class, () -> properties);
+            context.refresh();
+
+            ReactiveHttpClientFactoryBean<StrictSigV4StreamingBodyClient> factoryBean =
+                    new ReactiveHttpClientFactoryBean<>();
+            factoryBean.setType(StrictSigV4StreamingBodyClient.class);
+            factoryBean.setApplicationContext(context);
+            try {
+                assertThatThrownBy(factoryBean::getObject)
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("failed strict body-signing validation");
+            } finally {
+                factoryBean.destroy();
+            }
         }
     }
 

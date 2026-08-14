@@ -8,7 +8,7 @@
       "pathTemplate": "/reset-on-reuse",
       "subscriptionAttemptCount": 1,
       "errorType": "PrematureCloseException",
-      "errorCategory": "UNKNOWN",
+      "errorCategory": "TIMEOUT",
       "failureStage": null,
       "responseStatus": null,
       "responseHeaders": {}

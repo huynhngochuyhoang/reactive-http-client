@@ -11,7 +11,9 @@ import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
+import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.core.OrderComparator;
+import org.springframework.core.Ordered;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.util.ClassUtils;
@@ -61,11 +63,13 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     List<ClientSnapshotEntry> clientSnapshotEntries() {
         ResilienceDiagnostics resilienceDiagnostics = resilienceDiagnostics();
+        ExistingAuthProviderFactories authProviderFactories = existingAuthProviderFactories(beanFactory);
         return List.of(beanFactory.getBeanDefinitionNames()).stream()
                 .map(this::clientRegistration)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(registration -> clientSnapshotEntry(registration, resilienceDiagnostics))
+                .map(registration -> clientSnapshotEntry(
+                        registration, resilienceDiagnostics, authProviderFactories))
                 .sorted(Comparator.comparing((ClientSnapshotEntry entry) -> entry.summary().clientName())
                         .thenComparing(entry -> entry.summary().clientInterface()))
                 .toList();
@@ -83,7 +87,8 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     private ClientSnapshotEntry clientSnapshotEntry(ClientRegistration registration,
-                                                    ResilienceDiagnostics resilienceDiagnostics) {
+                                                    ResilienceDiagnostics resilienceDiagnostics,
+                                                    ExistingAuthProviderFactories authProviderFactories) {
         Class<?> clientInterface = registration.clientInterface();
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         String clientName = annotation != null ? annotation.name() : "";
@@ -96,7 +101,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 summary,
                 strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceDiagnostics.operatorApplier(),
                         resilienceDiagnostics.retryRegistryUnresolved()),
-                strictBodySigningValidation(clientConfig),
+                strictBodySigningValidation(clientConfig, authProviderFactories),
                 poolSummary(clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
                 clientConfig.isCompressionEnabled(),
@@ -302,7 +307,9 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return unresolvedRetry ? null : false;
     }
 
-    private Boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+    private Boolean strictBodySigningValidation(
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            ExistingAuthProviderFactories factories) {
         if (StringUtils.hasText(clientConfig.getAuthProvider())
                 || clientConfig.getAuth() == null
                 || clientConfig.getAuth().getAwsSigV4() == null
@@ -310,11 +317,11 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 || !clientConfig.getAuth().getAwsSigV4().isStrictBodySigningValidation()) {
             return false;
         }
-        ExistingAuthProviderFactories factories = existingAuthProviderFactories(beanFactory);
         if (factories.unresolved()) {
             return null;
         }
-        return factories.values().stream()
+        return factories.candidates().stream()
+                .map(ExistingAuthProviderFactory::value)
                 .filter(factory -> factory.supports(clientConfig.getAuth().getType()))
                 .findFirst()
                 .filter(AwsSigV4AuthProviderFactory.class::isInstance)
@@ -324,17 +331,24 @@ public class ReactiveHttpClientDiagnosticsProvider {
     private ExistingAuthProviderFactories existingAuthProviderFactories(
             ConfigurableListableBeanFactory factory) {
         String[] beanNames = factory.getBeanNamesForType(AuthProviderFactory.class, true, false);
-        if (!uninspectableFactoryBeanNames(factory, AuthProviderFactory.class, beanNames).isEmpty()) {
+        List<String> uninspectableBeanNames = uninspectableFactoryBeanNames(
+                factory, AuthProviderFactory.class, beanNames).stream()
+                .filter(beanName -> isAutowireCandidate(factory, beanName))
+                .toList();
+        if (!uninspectableBeanNames.isEmpty()) {
             return ExistingAuthProviderFactories.unresolvedLookup();
         }
 
-        List<AuthProviderFactory> values = new ArrayList<>();
+        List<ExistingAuthProviderFactory> values = new ArrayList<>();
         for (String beanName : beanNames) {
+            if (!isAutowireCandidate(factory, beanName)) {
+                continue;
+            }
             Object value = existingSingletonValue(factory, AuthProviderFactory.class, beanName);
             if (!(value instanceof AuthProviderFactory authProviderFactory)) {
                 return ExistingAuthProviderFactories.unresolvedLookup();
             }
-            values.add(authProviderFactory);
+            values.add(new ExistingAuthProviderFactory(factory, beanName, authProviderFactory));
         }
 
         BeanFactory parent = factory.getParentBeanFactory();
@@ -343,12 +357,63 @@ public class ReactiveHttpClientDiagnosticsProvider {
             if (parentFactories.unresolved()) {
                 return parentFactories;
             }
-            values.addAll(parentFactories.values());
+            values.addAll(parentFactories.candidates());
         } else if (parent != null) {
             return ExistingAuthProviderFactories.unresolvedLookup();
         }
-        AnnotationAwareOrderComparator.sort(values);
+        sortAuthProviderFactories(values);
         return ExistingAuthProviderFactories.available(values);
+    }
+
+    private void sortAuthProviderFactories(List<ExistingAuthProviderFactory> candidates) {
+        Comparator<Object> dependencyComparator = beanFactory instanceof DefaultListableBeanFactory defaultFactory
+                ? defaultFactory.getDependencyComparator()
+                : null;
+        if (dependencyComparator instanceof OrderComparator orderComparator) {
+            Comparator<Object> sourceAwareComparator = orderComparator.withSourceProvider(
+                    this::authProviderFactoryOrderSource);
+            candidates.sort(sourceAwareComparator::compare);
+            return;
+        }
+        if (dependencyComparator != null) {
+            candidates.sort((left, right) -> dependencyComparator.compare(left.value(), right.value()));
+            return;
+        }
+        Comparator<Object> sourceAwareComparator = AnnotationAwareOrderComparator.INSTANCE.withSourceProvider(
+                this::authProviderFactoryOrderSource);
+        candidates.sort(sourceAwareComparator::compare);
+    }
+
+    private Object authProviderFactoryOrderSource(Object candidate) {
+        if (!(candidate instanceof ExistingAuthProviderFactory existing)) {
+            return null;
+        }
+        List<Object> sources = new ArrayList<>(4);
+        BeanDefinition definition = beanDefinition(existing.beanFactory(), existing.beanName());
+        if (definition != null) {
+            Object order = definition.getAttribute(AbstractBeanDefinition.ORDER_ATTRIBUTE);
+            if (order instanceof Integer orderValue) {
+                sources.add((Ordered) () -> orderValue);
+            }
+            if (definition instanceof RootBeanDefinition rootDefinition) {
+                Method factoryMethod = rootDefinition.getResolvedFactoryMethod();
+                if (factoryMethod != null) {
+                    sources.add(factoryMethod);
+                }
+                Class<?> targetType = rootDefinition.getTargetType();
+                if (targetType != null && targetType != existing.value().getClass()) {
+                    sources.add(targetType);
+                }
+            }
+        }
+        sources.add(existing.value());
+        return sources.toArray();
+    }
+
+    private static boolean isAutowireCandidate(ConfigurableListableBeanFactory factory,
+                                               String beanName) {
+        BeanDefinition definition = beanDefinition(factory, beanName);
+        return definition == null || definition.isAutowireCandidate();
     }
 
     private static String diagnosticHttpMethod(MethodMetadata meta,
@@ -719,16 +784,23 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     private record ExistingAuthProviderFactories(
-            List<AuthProviderFactory> values,
+            List<ExistingAuthProviderFactory> candidates,
             boolean unresolved) {
 
-        private static ExistingAuthProviderFactories available(List<AuthProviderFactory> values) {
-            return new ExistingAuthProviderFactories(List.copyOf(values), false);
+        private static ExistingAuthProviderFactories available(
+                List<ExistingAuthProviderFactory> candidates) {
+            return new ExistingAuthProviderFactories(List.copyOf(candidates), false);
         }
 
         private static ExistingAuthProviderFactories unresolvedLookup() {
             return new ExistingAuthProviderFactories(List.of(), true);
         }
+    }
+
+    private record ExistingAuthProviderFactory(
+            ConfigurableListableBeanFactory beanFactory,
+            String beanName,
+            AuthProviderFactory value) {
     }
 
     record ClientSnapshotEntry(

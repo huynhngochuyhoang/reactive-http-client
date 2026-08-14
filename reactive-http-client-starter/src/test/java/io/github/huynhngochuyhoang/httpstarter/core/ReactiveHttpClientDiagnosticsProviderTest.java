@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
@@ -266,6 +267,76 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         assertThat(factoryCreations).hasValue(0);
         assertThat(beanFactory.containsSingleton("lazyAwsSigV4AuthProviderFactory")).isFalse();
         assertThat(beanFactory.containsSingleton("diagnosticClient")).isFalse();
+    }
+
+    @Test
+    void providerSnapshotsResolveAuthFactoriesOnceForAllClients() {
+        AtomicInteger lookups = new AtomicInteger();
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory() {
+            @Override
+            public String[] getBeanNamesForType(Class<?> type,
+                                                boolean includeNonSingletons,
+                                                boolean allowEagerInit) {
+                if (type == AuthProviderFactory.class) {
+                    lookups.incrementAndGet();
+                }
+                return super.getBeanNamesForType(type, includeNonSingletons, allowEagerInit);
+            }
+        };
+        registerDiagnosticClient(beanFactory, "diagnosticClient", DiagnosticClient.class);
+        registerDiagnosticClient(beanFactory, "secondDiagnosticClient", SecondDiagnosticClient.class);
+        beanFactory.registerSingleton("awsSigV4AuthProviderFactory", new AwsSigV4AuthProviderFactory());
+
+        ReactiveHttpClientProperties.ClientConfig config = strictBodySigningClientConfig();
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of(
+                "diagnostic-client", config,
+                "second-diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>)
+                ReactiveHttpClientDiagnosticsSnapshot.toMap(provider).get("clients");
+
+        assertThat(clients)
+                .hasSize(2)
+                .allSatisfy(client -> assertThat(client)
+                        .containsEntry("strictBodySigningValidation", true));
+        assertThat(lookups).hasValue(1);
+    }
+
+    @Test
+    void providerSnapshotsIgnoreNonAutowireAuthProviderFactories() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        GenericBeanDefinition disabledCustom = new GenericBeanDefinition();
+        disabledCustom.setBeanClass(OrderedCustomAwsSigV4Factory.class);
+        disabledCustom.setAutowireCandidate(false);
+        beanFactory.registerBeanDefinition("disabledCustomAwsFactory", disabledCustom);
+        GenericBeanDefinition builtIn = new GenericBeanDefinition();
+        builtIn.setBeanClass(AwsSigV4AuthProviderFactory.class);
+        beanFactory.registerBeanDefinition("awsSigV4AuthProviderFactory", builtIn);
+        beanFactory.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", true);
+    }
+
+    @Test
+    void providerSnapshotsHonorFactoryMethodOrderMetadata() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(
+                MethodOrderedAuthFactoriesConfiguration.class)) {
+            registerDiagnosticClient(
+                    context.getDefaultListableBeanFactory(), "diagnosticClient", DiagnosticClient.class);
+
+            assertThat(context.getBeanProvider(AuthProviderFactory.class).orderedStream().findFirst().orElseThrow())
+                    .isInstanceOf(MethodOrderedCustomAwsSigV4Factory.class);
+            assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                    diagnosticsProvider(context.getDefaultListableBeanFactory(),
+                            strictBodySigningClientConfig()))))
+                    .containsEntry("strictBodySigningValidation", false);
+        }
     }
 
     @Test
@@ -1349,11 +1420,17 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         DefaultListableBeanFactory beanFactory = parent != null
                 ? new DefaultListableBeanFactory(parent)
                 : new DefaultListableBeanFactory();
+        registerDiagnosticClient(beanFactory, "diagnosticClient", DiagnosticClient.class);
+        return beanFactory;
+    }
+
+    private static void registerDiagnosticClient(DefaultListableBeanFactory beanFactory,
+                                                 String beanName,
+                                                 Class<?> clientInterface) {
         GenericBeanDefinition definition = new GenericBeanDefinition();
         definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
-        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
-        beanFactory.registerBeanDefinition("diagnosticClient", definition);
-        return beanFactory;
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, clientInterface);
+        beanFactory.registerBeanDefinition(beanName, definition);
     }
 
     private static ReactiveHttpClientProperties.ClientConfig strictRetryClientConfig() {
@@ -1363,6 +1440,16 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         resilience.setEnabled(true);
         resilience.setStrictUnsafeRetryValidation(true);
         config.setResilience(resilience);
+        return config;
+    }
+
+    private static ReactiveHttpClientProperties.ClientConfig strictBodySigningClientConfig() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider(null);
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        config.setAuth(auth);
         return config;
     }
 
@@ -1572,6 +1659,41 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         @GET("/direct")
         Mono<String> direct();
+    }
+
+    @ReactiveHttpClient(name = "second-diagnostic-client")
+    interface SecondDiagnosticClient extends SharedOperations {
+    }
+
+    static class MethodOrderedCustomAwsSigV4Factory implements AuthProviderFactory {
+
+        @Override
+        public boolean supports(String type) {
+            return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+        }
+
+        @Override
+        public AuthProvider create(String clientName,
+                                   ReactiveHttpClientProperties.AuthConfig config,
+                                   WebClient.Builder webClientBuilder) {
+            return request -> Mono.empty();
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class MethodOrderedAuthFactoriesConfiguration {
+
+        @Bean
+        @Order(Ordered.HIGHEST_PRECEDENCE)
+        AuthProviderFactory methodOrderedCustomAwsSigV4Factory() {
+            return new MethodOrderedCustomAwsSigV4Factory();
+        }
+
+        @Bean
+        @Order(Ordered.LOWEST_PRECEDENCE)
+        AuthProviderFactory methodOrderedBuiltInAwsSigV4Factory() {
+            return new AwsSigV4AuthProviderFactory();
+        }
     }
 
     @ReactiveHttpClient(

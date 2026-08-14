@@ -300,6 +300,8 @@ class DocumentationReleaseArtifactTest {
         JsonNode records = staleRecovery.path("metadataOnlyExchangeRecords");
         assertThat(records.size()).isEqualTo(2);
         assertThat(records.get(0).path("subscriptionAttemptCount").asInt()).isEqualTo(1);
+        assertThat(records.get(0).path("errorType").asText()).isEqualTo("PrematureCloseException");
+        assertThat(records.get(0).path("errorCategory").asText()).isEqualTo("TIMEOUT");
         assertThat(records.get(0).path("responseStatus").isNull()).isTrue();
         assertThat(records.get(0).path("responseHeaders").isEmpty()).isTrue();
         assertThat(records.get(1).path("subscriptionAttemptCount").asInt()).isEqualTo(1);

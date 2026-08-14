@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.core.io.Resource;
@@ -1448,8 +1449,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         }
 
         String type = config.getAuth().getType();
-        AuthProviderFactory factory = applicationContext.getBeanProvider(AuthProviderFactory.class)
-                .orderedStream()
+        AuthProviderFactory factory = authProviderFactories()
                 .filter(candidate -> candidate.supports(type))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
@@ -1464,6 +1464,26 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     .getIfAvailable(WebClient::builder);
         }
         return factory.create(clientName, config.getAuth(), builder);
+    }
+
+    private java.util.stream.Stream<AuthProviderFactory> authProviderFactories() {
+        List<AuthProviderFactory> orderedFactories = applicationContext
+                .getBeanProvider(AuthProviderFactory.class)
+                .orderedStream()
+                .toList();
+        if (!(applicationContext.getAutowireCapableBeanFactory()
+                instanceof ConfigurableListableBeanFactory beanFactory)) {
+            return orderedFactories.stream();
+        }
+
+        Set<AuthProviderFactory> excluded = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (String beanName : beanFactory.getBeanNamesForType(AuthProviderFactory.class, true, false)) {
+            if (beanFactory.containsBeanDefinition(beanName)
+                    && !beanFactory.getMergedBeanDefinition(beanName).isAutowireCandidate()) {
+                excluded.add(beanFactory.getBean(beanName, AuthProviderFactory.class));
+            }
+        }
+        return orderedFactories.stream().filter(factory -> !excluded.contains(factory));
     }
 
     private WebClient.Builder buildOAuth2TokenServiceWebClientBuilder(

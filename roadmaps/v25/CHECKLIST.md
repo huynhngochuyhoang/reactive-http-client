@@ -471,17 +471,19 @@ Evidence:
   health now explicitly reject a 10 KiB arbitrary exception message from tags
   and details; existing default-logger and OTel structural-redaction assertions
   remain green.
-- `ReactiveHttpClientDiagnosticsProvider` now inspects only existing singleton or
-  cached `AuthProviderFactory` values. An unresolved lazy factory leaves
-  `strictBodySigningValidation=null` without creating the factory, client, auth
-  provider, registry/instance, resource, pool, connection, or other network
-  state. Existing schema-v1 determinism, cardinality, text, and UTF-8 byte-limit
-  fixtures remain unchanged.
+- `ReactiveHttpClientDiagnosticsProvider` now snapshots existing singleton or
+  cached `AuthProviderFactory` candidates once per report, excludes non-autowire
+  candidates, and honors factory-method ordering metadata. An unresolved lazy
+  factory leaves `strictBodySigningValidation=null` without creating the
+  factory, client, auth provider, registry/instance, resource, pool, connection,
+  or other network state. Existing schema-v1 determinism, cardinality, text, and
+  UTF-8 byte-limit fixtures remain unchanged.
 - Added reviewable sanitized fixtures at
   `docs/fixtures/support-bundle-request-validation.json` and
   `docs/fixtures/support-bundle-stale-connection-recovery.json`, with executable
   documentation assertions rejecting credentials, concrete URLs, payload/error
-  text fields, and machine-local paths.
+  text fields, and machine-local paths. The stale-connection fixture uses the
+  published `TIMEOUT` category for `PrematureCloseException`.
 - Focused OTel verification passed 25 tests; AOT/Actuator endpoint verification
   passed 41 tests. The GraalVM native smoke compiled successfully in 4m27s and
   its executable exited `0` after checking the `rhttpclients` endpoint and schema
