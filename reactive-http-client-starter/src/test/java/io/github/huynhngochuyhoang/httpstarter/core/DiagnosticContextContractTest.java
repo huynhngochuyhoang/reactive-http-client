@@ -21,6 +21,7 @@ import reactor.test.StepVerifier;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -291,28 +292,40 @@ class DiagnosticContextContractTest {
         private final AtomicReference<ReactiveHttpClientLifecycleContext> started = new AtomicReference<>();
         private final AtomicReference<ReactiveHttpClientLifecycleContext> failed = new AtomicReference<>();
         private final AtomicReference<HttpExchangeLogContext> exchange = new AtomicReference<>();
+        private final AtomicInteger observerCount = new AtomicInteger();
+        private final AtomicInteger startedCount = new AtomicInteger();
+        private final AtomicInteger failedCount = new AtomicInteger();
+        private final AtomicInteger exchangeCount = new AtomicInteger();
 
         @Override
         public void record(HttpClientObserverEvent event) {
+            observerCount.incrementAndGet();
             observer.set(event);
         }
 
         @Override
         public void onStart(ReactiveHttpClientLifecycleContext context) {
+            startedCount.incrementAndGet();
             started.set(context);
         }
 
         @Override
         public void onError(ReactiveHttpClientLifecycleContext context) {
+            failedCount.incrementAndGet();
             failed.set(context);
         }
 
         @Override
         public void log(HttpExchangeLogContext context) {
+            exchangeCount.incrementAndGet();
             exchange.set(context);
         }
 
         private void assertNoCallStarted() {
+            assertThat(observerCount).hasValue(0);
+            assertThat(startedCount).hasValue(0);
+            assertThat(failedCount).hasValue(0);
+            assertThat(exchangeCount).hasValue(0);
             assertThat(observer).hasValue(null);
             assertThat(started).hasValue(null);
             assertThat(failed).hasValue(null);
@@ -320,6 +333,10 @@ class DiagnosticContextContractTest {
         }
 
         private void assertOnePreDispatchTerminal(Throwable terminal) {
+            assertThat(observerCount).hasValue(1);
+            assertThat(startedCount).hasValue(1);
+            assertThat(failedCount).hasValue(1);
+            assertThat(exchangeCount).hasValue(1);
             assertThat(started.get()).satisfies(context -> {
                 assertThat(context.attemptNumber()).isEqualTo(1);
                 assertThat(context.requestUrl()).isNull();

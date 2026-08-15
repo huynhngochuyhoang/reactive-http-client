@@ -22,6 +22,7 @@ import org.springframework.beans.factory.config.DependencyDescriptor;
 import org.springframework.beans.factory.support.AutowireCandidateResolver;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationContext;
@@ -40,6 +41,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -995,6 +997,36 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
             context.refresh();
 
             assertBuiltInStrictBodySigningSelected(context);
+        }
+    }
+
+    @Test
+    void authFactorySelectionPreflightsIncompatibleParentsBeforeCreatingPrototypes() {
+        DefaultListableBeanFactory beanFactory =
+                new DefaultListableBeanFactory(new StaticListableBeanFactory());
+        try (GenericApplicationContext context = new GenericApplicationContext(beanFactory)) {
+            AtomicInteger instances = new AtomicInteger();
+            GenericBeanDefinition preferredCustom = new GenericBeanDefinition();
+            preferredCustom.setBeanClass(PreferredCustomAwsSigV4Factory.class);
+            preferredCustom.setScope(BeanDefinition.SCOPE_PROTOTYPE);
+            preferredCustom.setInstanceSupplier(() -> {
+                instances.incrementAndGet();
+                return new PreferredCustomAwsSigV4Factory();
+            });
+            context.registerBeanDefinition("preferredCustomAwsFactory", preferredCustom);
+            registerStrictBuiltInAwsFactory(context);
+            context.refresh();
+
+            ReactiveHttpClientFactoryBean<StrictSigV4StreamingBodyClient> factoryBean =
+                    new ReactiveHttpClientFactoryBean<>();
+            factoryBean.setType(StrictSigV4StreamingBodyClient.class);
+            factoryBean.setApplicationContext(context);
+            try {
+                assertThat(factoryBean.getObject()).isNotNull();
+            } finally {
+                factoryBean.destroy();
+            }
+            assertThat(instances).hasValue(1);
         }
     }
 

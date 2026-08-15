@@ -290,8 +290,14 @@ class DocumentationReleaseArtifactTest {
                 .contains("(fixtures/support-bundle-stale-connection-recovery.json)")
                 .contains("illustrative sanitized records, not raw logger output");
         assertThat(validation.path("incidentType").asText()).isEqualTo("request-validation");
+        assertThat(validation.has("terminalRecordCreated")).isTrue();
+        assertThat(validation.path("terminalRecordCreated").isBoolean()).isTrue();
         assertThat(validation.path("terminalRecordCreated").asBoolean()).isFalse();
+        assertThat(validation.has("subscriptionAttemptCount")).isTrue();
+        assertThat(validation.path("subscriptionAttemptCount").isIntegralNumber()).isTrue();
         assertThat(validation.path("subscriptionAttemptCount").asInt()).isZero();
+        assertThat(validation.has("requestDispatched")).isTrue();
+        assertThat(validation.path("requestDispatched").isBoolean()).isTrue();
         assertThat(validation.path("requestDispatched").asBoolean()).isFalse();
         assertThat(validation.path("failureStage").isNull()).isTrue();
         assertThat(validation.path("responseStatus").isNull()).isTrue();

@@ -1471,16 +1471,26 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 instanceof ConfigurableListableBeanFactory beanFactory)) {
             return applicationContext.getBeanProvider(AuthProviderFactory.class).orderedStream();
         }
-
-        List<AuthProviderFactoryCandidates.Candidate> candidates = new ArrayList<>();
-        if (!collectAuthProviderFactories(beanFactory, beanFactory, Set.of(), candidates)) {
+        if (!hasConfigurableBeanFactoryHierarchy(beanFactory)) {
             return applicationContext.getBeanProvider(AuthProviderFactory.class).orderedStream();
         }
+
+        List<AuthProviderFactoryCandidates.Candidate> candidates = new ArrayList<>();
+        collectAuthProviderFactories(beanFactory, beanFactory, Set.of(), candidates);
         AuthProviderFactoryCandidates.sort(candidates, beanFactory);
         return candidates.stream().map(AuthProviderFactoryCandidates.Candidate::value);
     }
 
-    private boolean collectAuthProviderFactories(
+    private boolean hasConfigurableBeanFactoryHierarchy(ConfigurableListableBeanFactory factory) {
+        org.springframework.beans.factory.BeanFactory parent = factory.getParentBeanFactory();
+        if (parent == null) {
+            return true;
+        }
+        return parent instanceof ConfigurableListableBeanFactory parentFactory
+                && hasConfigurableBeanFactoryHierarchy(parentFactory);
+    }
+
+    private void collectAuthProviderFactories(
             ConfigurableListableBeanFactory rootFactory,
             ConfigurableListableBeanFactory factory,
             Set<String> shadowedBeanNames,
@@ -1496,13 +1506,12 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
 
         org.springframework.beans.factory.BeanFactory parent = factory.getParentBeanFactory();
         if (parent instanceof ConfigurableListableBeanFactory parentFactory) {
-            return collectAuthProviderFactories(
+            collectAuthProviderFactories(
                     rootFactory,
                     parentFactory,
                     AuthProviderFactoryCandidates.withLocalBeanNames(factory, shadowedBeanNames),
                     candidates);
         }
-        return parent == null;
     }
 
     private WebClient.Builder buildOAuth2TokenServiceWebClientBuilder(

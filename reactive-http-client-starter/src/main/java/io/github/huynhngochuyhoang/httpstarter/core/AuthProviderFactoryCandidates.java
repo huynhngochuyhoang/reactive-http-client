@@ -7,6 +7,7 @@ import org.springframework.beans.factory.config.DependencyDescriptor;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.core.MethodParameter;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.Ordered;
 import org.springframework.core.PriorityOrdered;
@@ -17,9 +18,9 @@ import java.util.*;
 
 final class AuthProviderFactoryCandidates {
 
-    private static final DependencyDescriptor AUTH_PROVIDER_FACTORY_DEPENDENCY =
-            new DependencyDescriptor(Objects.requireNonNull(ReflectionUtils.findField(
-                    DependencyMarker.class, "authProviderFactory")), false);
+    private static final Method AUTH_PROVIDER_FACTORY_LOOKUP_METHOD = Objects.requireNonNull(
+            ReflectionUtils.findMethod(AuthProviderFactoryCandidates.class,
+                    "authProviderFactoryLookup", AuthProviderFactory.class));
 
     private AuthProviderFactoryCandidates() {
     }
@@ -46,7 +47,8 @@ final class AuthProviderFactoryCandidates {
     static boolean isAutowireCandidate(ConfigurableListableBeanFactory rootFactory,
                                        String beanName) {
         return rootFactory.isAutowireCandidate(
-                beanName, new DependencyDescriptor(AUTH_PROVIDER_FACTORY_DEPENDENCY));
+                beanName, new DependencyDescriptor(
+                        new TypeOnlyMethodParameter(AUTH_PROVIDER_FACTORY_LOOKUP_METHOD, 0), false));
     }
 
     static Set<String> withLocalBeanNames(ConfigurableListableBeanFactory factory,
@@ -101,9 +103,19 @@ final class AuthProviderFactoryCandidates {
             AuthProviderFactory value) {
     }
 
-    private static final class DependencyMarker {
+    @SuppressWarnings("unused")
+    private static void authProviderFactoryLookup(AuthProviderFactory authProviderFactory) {
+    }
 
-        @SuppressWarnings("unused")
-        private AuthProviderFactory authProviderFactory;
+    private static final class TypeOnlyMethodParameter extends MethodParameter {
+
+        private TypeOnlyMethodParameter(Method method, int parameterIndex) {
+            super(method, parameterIndex);
+        }
+
+        @Override
+        public String getParameterName() {
+            return null;
+        }
     }
 }

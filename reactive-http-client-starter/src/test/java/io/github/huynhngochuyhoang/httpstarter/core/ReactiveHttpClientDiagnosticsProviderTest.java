@@ -408,6 +408,28 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsUseATypeOnlyAutowireDependencyDescriptor() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        beanFactory.setAutowireCandidateResolver(new AutowireCandidateResolver() {
+            @Override
+            public boolean isAutowireCandidate(BeanDefinitionHolder beanDefinitionHolder,
+                                               DependencyDescriptor descriptor) {
+                return (descriptor.getDependencyName() == null && descriptor.usesStandardBeanLookup())
+                        || !"orderedCustomAwsFactory".equals(beanDefinitionHolder.getBeanName());
+            }
+        });
+        beanFactory.registerBeanDefinition(
+                "orderedCustomAwsFactory", beanDefinition(OrderedCustomAwsSigV4Factory.class));
+        beanFactory.registerBeanDefinition(
+                "awsSigV4AuthProviderFactory", beanDefinition(AwsSigV4AuthProviderFactory.class));
+        beanFactory.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
     void providerSnapshotsPreservePriorityOrderedFactoryPrecedence() {
         DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
         GenericBeanDefinition ordinaryBuiltIn = new GenericBeanDefinition();
