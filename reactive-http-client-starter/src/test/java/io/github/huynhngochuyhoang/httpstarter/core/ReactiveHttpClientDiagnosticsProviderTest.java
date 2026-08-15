@@ -275,6 +275,28 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsKeepUncachedSingletonAuthFactoryProductsUnknown() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        AtomicInteger productCreations = new AtomicInteger();
+        GenericBeanDefinition customFactory = new GenericBeanDefinition();
+        customFactory.setBeanClass(ObjectTypedAuthProviderFactoryBean.class);
+        customFactory.setInstanceSupplier(
+                () -> new ObjectTypedAuthProviderFactoryBean(productCreations));
+        beanFactory.registerBeanDefinition("uncachedCustomAwsFactory", customFactory);
+        beanFactory.registerBeanDefinition(
+                "awsSigV4AuthProviderFactory", beanDefinition(AwsSigV4AuthProviderFactory.class));
+
+        assertThat(beanFactory.getBean("&uncachedCustomAwsFactory"))
+                .isInstanceOf(ObjectTypedAuthProviderFactoryBean.class);
+        beanFactory.getBean("awsSigV4AuthProviderFactory");
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", null);
+        assertThat(productCreations).hasValue(0);
+    }
+
+    @Test
     void providerSnapshotsResolveAuthFactoriesOnceForAllClients() {
         AtomicInteger lookups = new AtomicInteger();
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory() {
@@ -440,6 +462,23 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         GenericBeanDefinition priorityCustom = new GenericBeanDefinition();
         priorityCustom.setBeanClass(PriorityCustomAwsSigV4Factory.class);
         beanFactory.registerBeanDefinition("priorityCustomAwsFactory", priorityCustom);
+        beanFactory.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
+    void providerSnapshotsPreserveOrderedFactoryPrecedenceOverBeanMetadata() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        GenericBeanDefinition orderedCustom = beanDefinition(OrderedCustomAwsSigV4Factory.class);
+        orderedCustom.setAttribute(
+                AbstractBeanDefinition.ORDER_ATTRIBUTE, Ordered.LOWEST_PRECEDENCE);
+        beanFactory.registerBeanDefinition("orderedCustomAwsFactory", orderedCustom);
+        GenericBeanDefinition builtIn = beanDefinition(AwsSigV4AuthProviderFactory.class);
+        builtIn.setAttribute(AbstractBeanDefinition.ORDER_ATTRIBUTE, 0);
+        beanFactory.registerBeanDefinition("awsSigV4AuthProviderFactory", builtIn);
         beanFactory.preInstantiateSingletons();
 
         assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
@@ -1920,6 +1959,31 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         @Override
         public Class<?> getObjectType() {
             return RetryRegistry.class;
+        }
+
+        @Override
+        public boolean isSingleton() {
+            return true;
+        }
+    }
+
+    static final class ObjectTypedAuthProviderFactoryBean implements FactoryBean<Object> {
+
+        private final AtomicInteger productCreations;
+
+        ObjectTypedAuthProviderFactoryBean(AtomicInteger productCreations) {
+            this.productCreations = productCreations;
+        }
+
+        @Override
+        public Object getObject() {
+            productCreations.incrementAndGet();
+            return new OrderedCustomAwsSigV4Factory();
+        }
+
+        @Override
+        public Class<?> getObjectType() {
+            return Object.class;
         }
 
         @Override

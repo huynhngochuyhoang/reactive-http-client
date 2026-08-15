@@ -598,7 +598,12 @@ public class ReactiveHttpClientDiagnosticsProvider {
         List<String> knownNames = List.of(knownBeanNames);
         List<String> uninspectableNames = new ArrayList<>();
         for (String beanName : factory.getBeanDefinitionNames()) {
-            if (knownNames.contains(beanName) || factory.containsSingleton(beanName)) {
+            if (knownNames.contains(beanName)) {
+                continue;
+            }
+            Object singleton = factory.getSingleton(beanName);
+            if (singleton instanceof FactoryBean<?>
+                    && cachedFactoryBeanProduct(factory, beanName) != null) {
                 continue;
             }
             BeanDefinition definition = beanDefinition(factory, beanName);

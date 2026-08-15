@@ -474,10 +474,12 @@ Evidence:
 - `ReactiveHttpClientDiagnosticsProvider` now snapshots existing singleton or
   cached `AuthProviderFactory` candidates once per report, excludes non-autowire
   candidates, suppresses parent factories shadowed by child names, and honors
-  `PriorityOrdered`, Spring's non-order comparator fallback, custom autowire
-  candidate resolvers, and factory-method ordering metadata. Runtime auth-factory
-  selection uses the same name-aware candidate rules, including disabled parent
-  and prototype definitions. An unresolved lazy factory leaves
+  `PriorityOrdered`, `Ordered` instance precedence over bean metadata, Spring's
+  non-order comparator fallback, custom autowire candidate resolvers, and
+  factory-method ordering metadata. Runtime auth-factory selection uses the same
+  name-aware candidate rules, including disabled parent
+  and prototype definitions. An unresolved lazy factory or uncached singleton
+  factory product leaves
   `strictBodySigningValidation=null` without creating the factory, client, auth
   provider, registry/instance, resource, pool, connection, or other network
   state. Existing schema-v1 determinism, cardinality, text, and UTF-8 byte-limit

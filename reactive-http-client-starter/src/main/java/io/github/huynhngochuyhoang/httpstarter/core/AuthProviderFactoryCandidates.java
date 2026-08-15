@@ -69,6 +69,7 @@ final class AuthProviderFactoryCandidates {
             return null;
         }
         List<Object> sources = new ArrayList<>(4);
+        sources.add(existing.value());
         BeanDefinition definition = beanDefinition(existing.beanFactory(), existing.beanName());
         if (definition != null) {
             Object order = definition.getAttribute(AbstractBeanDefinition.ORDER_ATTRIBUTE);
@@ -86,7 +87,6 @@ final class AuthProviderFactoryCandidates {
                 }
             }
         }
-        sources.add(existing.value());
         return sources.toArray();
     }
 

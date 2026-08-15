@@ -22,8 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   status. Runtime selection and each report exclude non-autowire factories by
   bean name across parent contexts and scopes. Report selection uses one factory
   view that honors child shadowing, `PriorityOrdered`, Spring's standard
-  `orderedStream()` fallback, bean-definition ordering, and custom autowire
-  candidate resolvers; unresolved selection remains `null`. Added sanitized
+  `orderedStream()` fallback, `Ordered` instance precedence over bean metadata,
+  bean-definition ordering, and custom autowire candidate resolvers; uncached
+  singleton factory products and other unresolved selections remain `null`.
+  Added sanitized
   request-validation and stale-connection recovery support-bundle fixtures with
   the published premature-close category.
 - **Stale pooled-connection recovery contract.** Added a bounded raw HTTP/1.1
