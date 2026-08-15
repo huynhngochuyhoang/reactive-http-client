@@ -17,6 +17,9 @@ import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.BeanDefinitionHolder;
+import org.springframework.beans.factory.config.DependencyDescriptor;
+import org.springframework.beans.factory.support.AutowireCandidateResolver;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -969,6 +972,29 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
 
                 assertBuiltInStrictBodySigningSelected(child);
             }
+        }
+    }
+
+    @Test
+    void authFactorySelectionHonorsCustomAutowireCandidateResolvers() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.getDefaultListableBeanFactory().setAutowireCandidateResolver(
+                    new AutowireCandidateResolver() {
+                        @Override
+                        public boolean isAutowireCandidate(BeanDefinitionHolder beanDefinitionHolder,
+                                                           DependencyDescriptor descriptor) {
+                            return !"preferredCustomAwsFactory".equals(beanDefinitionHolder.getBeanName())
+                                    && AutowireCandidateResolver.super.isAutowireCandidate(
+                                    beanDefinitionHolder, descriptor);
+                        }
+                    });
+            GenericBeanDefinition preferredCustom = new GenericBeanDefinition();
+            preferredCustom.setBeanClass(PreferredCustomAwsSigV4Factory.class);
+            context.registerBeanDefinition("preferredCustomAwsFactory", preferredCustom);
+            registerStrictBuiltInAwsFactory(context);
+            context.refresh();
+
+            assertBuiltInStrictBodySigningSelected(context);
         }
     }
 

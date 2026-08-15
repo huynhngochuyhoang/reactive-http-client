@@ -340,7 +340,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
         List<String> uninspectableBeanNames = uninspectableFactoryBeanNames(
                 factory, AuthProviderFactory.class, beanNames).stream()
                 .filter(beanName -> !shadowedBeanNames.contains(beanName))
-                .filter(beanName -> AuthProviderFactoryCandidates.isAutowireCandidate(factory, beanName))
+                .filter(beanName -> AuthProviderFactoryCandidates.isAutowireCandidate(beanFactory, beanName))
                 .toList();
         if (!uninspectableBeanNames.isEmpty()) {
             return ExistingAuthProviderFactories.unresolvedLookup();
@@ -348,7 +348,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
         List<AuthProviderFactoryCandidates.Candidate> values = new ArrayList<>();
         for (String beanName : beanNames) {
-            if (!AuthProviderFactoryCandidates.isAutowireCandidate(factory, beanName)) {
+            if (!AuthProviderFactoryCandidates.isAutowireCandidate(beanFactory, beanName)) {
                 continue;
             }
             Object value = existingSingletonValue(factory, AuthProviderFactory.class, beanName);

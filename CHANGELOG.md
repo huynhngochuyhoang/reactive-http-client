@@ -21,8 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer instantiate lazy auth-provider factories to resolve strict SigV4
   status. Runtime selection and each report exclude non-autowire factories by
   bean name across parent contexts and scopes. Report selection uses one factory
-  view that honors child shadowing, `PriorityOrdered`, and bean-definition
-  ordering; unresolved selection remains `null`. Added sanitized
+  view that honors child shadowing, `PriorityOrdered`, Spring's standard
+  `orderedStream()` fallback, bean-definition ordering, and custom autowire
+  candidate resolvers; unresolved selection remains `null`. Added sanitized
   request-validation and stale-connection recovery support-bundle fixtures with
   the published premature-close category.
 - **Stale pooled-connection recovery contract.** Added a bounded raw HTTP/1.1

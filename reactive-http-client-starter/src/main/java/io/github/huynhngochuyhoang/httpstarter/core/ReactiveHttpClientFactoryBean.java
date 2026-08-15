@@ -1473,7 +1473,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         }
 
         List<AuthProviderFactoryCandidates.Candidate> candidates = new ArrayList<>();
-        if (!collectAuthProviderFactories(beanFactory, Set.of(), candidates)) {
+        if (!collectAuthProviderFactories(beanFactory, beanFactory, Set.of(), candidates)) {
             return applicationContext.getBeanProvider(AuthProviderFactory.class).orderedStream();
         }
         AuthProviderFactoryCandidates.sort(candidates, beanFactory);
@@ -1481,12 +1481,13 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     }
 
     private boolean collectAuthProviderFactories(
+            ConfigurableListableBeanFactory rootFactory,
             ConfigurableListableBeanFactory factory,
             Set<String> shadowedBeanNames,
             List<AuthProviderFactoryCandidates.Candidate> candidates) {
         for (String beanName : factory.getBeanNamesForType(AuthProviderFactory.class, true, true)) {
             if (shadowedBeanNames.contains(beanName)
-                    || !AuthProviderFactoryCandidates.isAutowireCandidate(factory, beanName)) {
+                    || !AuthProviderFactoryCandidates.isAutowireCandidate(rootFactory, beanName)) {
                 continue;
             }
             candidates.add(new AuthProviderFactoryCandidates.Candidate(
@@ -1496,6 +1497,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         org.springframework.beans.factory.BeanFactory parent = factory.getParentBeanFactory();
         if (parent instanceof ConfigurableListableBeanFactory parentFactory) {
             return collectAuthProviderFactories(
+                    rootFactory,
                     parentFactory,
                     AuthProviderFactoryCandidates.withLocalBeanNames(factory, shadowedBeanNames),
                     candidates);
