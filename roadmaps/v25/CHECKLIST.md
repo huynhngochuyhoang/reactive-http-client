@@ -500,34 +500,69 @@ Evidence:
 
 ## Priority 9 - Mock and Assembled-Consumer Parity
 
-### [ ] 9.1 Keep mock contracts within in-process boundaries
+### [x] 9.1 Keep mock contracts within in-process boundaries
 
-- [ ] Apply production request-parameter validation and URI expansion decisions.
-- [ ] Add stable multipart part-name/header/byte assertions without claiming wire
+- [x] Apply production request-parameter validation and URI expansion decisions.
+- [x] Add stable multipart part-name/header/byte assertions without claiming wire
       framing, pool reuse, or backpressure.
-- [ ] Preserve constructor-injected loggers, application codecs, auth providers,
+- [x] Preserve constructor-injected loggers, application codecs, auth providers,
       inherited generic clients, custom metadata caches, and ordered lifecycle
       hooks.
-- [ ] Keep retry/redirect/auth response sequencing distinct from physical socket
+- [x] Keep retry/redirect/auth response sequencing distinct from physical socket
       dispatch and transport timing.
-- [ ] Add public helper API only when a V25 assertion cannot be expressed through
+- [x] Add public helper API only when a V25 assertion cannot be expressed through
       an existing stable helper.
 
-### [ ] 9.2 Revalidate independent consumers
+### [x] 9.2 Revalidate independent consumers
 
-- [ ] Run current `3.5.0-SNAPSHOT` consumer tests from a current-only fresh
+- [x] Run current `3.5.0-SNAPSHOT` consumer tests from a current-only fresh
       repository.
-- [ ] Run published `3.4.0` consumer tests from a separate Central-only fresh
+- [x] Run published `3.4.0` consumer tests from a separate Central-only fresh
       repository.
-- [ ] Reject reactor output and locally installed candidate leakage in the
+- [x] Reject reactor output and locally installed candidate leakage in the
       published lane.
-- [ ] Preserve current-run Surefire/effective-POM/dependency/classpath provenance
+- [x] Preserve current-run Surefire/effective-POM/dependency/classpath provenance
       incrementally and identify the last completed stage on failure.
-- [ ] Reject stale evidence from earlier verifier runs.
+- [x] Reject stale evidence from earlier verifier runs.
 
 Evidence:
 
-- Pending.
+- `MockReactiveHttpClient` continues to run the production request-parameter,
+  URI-template, and return-type validators before constructing a proxy. It now
+  accepts a caller-supplied `MethodMetadataCache` for both validation and
+  invocation, preserving the documented replacement-cache extension in helper
+  tests. Existing constructor-injected logger, application Jackson 3 codec,
+  auth-provider, inherited-generic-client, and `Ordered`/`@Order` lifecycle
+  coverage remains green.
+- Added `RecordedMultipartPart`, `RecordedExchange.multipartParts()`, and
+  indexed fluent assertions for stable encoded part names, order, filenames,
+  read-only headers, and exact binary bytes. This additive public API was needed
+  because the existing UTF-8 whole-body string exposed generated boundaries and
+  could not safely assert binary part bytes. Documentation explicitly limits
+  these records to materialized in-process data and excludes wire framing,
+  backpressure, sockets, pools, and connection reuse.
+- Mock composition tests distinguish three in-process `401 -> 503 -> 200`
+  exchanges from two outer retry subscriptions. A configured
+  `followRedirects=true` test keeps the visible `302` as one exchange because
+  redirect dispatch belongs to a real connector.
+- `scripts/verify-current-consumer.sh` passed against current
+  `3.5.0-SNAPSHOT` artifacts installed into
+  `target/current-reactor-repositories/consumer-3.5.0-SNAPSHOT`. Its evidence
+  records `completedStage=evidence-verified`, 45 mock tests, one Boot 4 helper
+  smoke test, three assembled-consumer tests, effective POM, dependency tree,
+  classpath, and artifact checksums. The assembled fixture now proves its
+  replacement `MethodMetadataCache` is used alongside inherited APIs.
+- `scripts/verify-published-consumer.sh 3.4.0` passed from the separate
+  Central-only `target/published-baseline-repositories/consumer-3.4.0`
+  repository. Published provenance, remote markers, effective POMs, dependency
+  tree, classpath, and checksums reject reactor-output or locally installed
+  candidate leakage. A preserved intermediate failed current run recorded
+  `completedStage=mock-tests` and `exitStatus=1`; fixed output paths rejected
+  stale evidence before the successful reruns.
+- `mvn -B -ntp -pl reactive-http-client-test -am test` passed 1,015 starter
+  tests and 48 test-helper tests. Strict starter/test-helper japicmp against
+  published `3.4.0` passed from a new Central-only repository.
+  `git diff --check` passed.
 
 ---
 

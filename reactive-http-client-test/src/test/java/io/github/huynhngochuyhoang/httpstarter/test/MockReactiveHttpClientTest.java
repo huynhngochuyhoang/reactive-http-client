@@ -31,6 +31,7 @@ import java.io.ByteArrayInputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
@@ -524,6 +525,27 @@ class MockReactiveHttpClientTest {
             assertThat(event.getStatusCode()).isEqualTo(200);
             assertThat(event.getAttemptCount()).isEqualTo(2);
         });
+    }
+
+    @Test
+    void configuredRedirectFollowingRemainsAConnectorBoundary() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setFollowRedirects(true);
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .clientConfig(config)
+                .respondTo(HttpMethod.GET, "/users/42", exchange ->
+                        MockReactiveHttpClient.response(
+                                302, Map.of("Location", List.of("/users/43")), "visible-redirect"))
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectNext("visible-redirect")
+                .verifyComplete();
+
+        RecordedExchangeAssertions.assertThat(mock)
+                .hasAttemptCount(HttpMethod.GET, "/users/42", 1);
+        RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                .hasStatusCode(302);
     }
 
     @Test
@@ -1098,24 +1120,42 @@ class MockReactiveHttpClientTest {
         MockReactiveHttpClient<MultipartClient> mock = MockReactiveHttpClient.forClient(MultipartClient.class)
                 .fallback(MockReactiveHttpClient.text(200, "ok"))
                 .build();
+        byte[] fileBody = new byte[]{0x00, 0x01, (byte) 0xff, 0x02};
 
         assertThat(mock.proxy().upload(
                 "alpha",
-                "file-body".getBytes(StandardCharsets.UTF_8),
+                fileBody,
                 List.of("one", "two"),
                 FileAttachment.of("attachment-body".getBytes(StandardCharsets.UTF_8),
                         "dynamic.json", "application/json"))
                 .block()).isEqualTo("ok");
 
         RecordedExchange exchange = mock.lastExchange();
-        assertThat(exchange.contentType()).isNotNull();
-        assertThat(exchange.contentType().toString()).startsWith("multipart/form-data;boundary=");
-        assertThat(exchange.bodyAsString()).containsSubsequence(
-                "name=\"description\"", "alpha",
-                "name=\"file\"; filename=\"payload.txt\"", "file-body",
-                "name=\"tag\"", "one",
-                "name=\"tag\"", "two",
-                "name=\"attachment\"; filename=\"dynamic.json\"", "attachment-body");
+        RecordedExchangeAssertions.assertThat(exchange)
+                .hasMultipartPartNames("description", "file", "tag", "tag", "attachment")
+                .hasMultipartPart(0, "description", "alpha".getBytes(StandardCharsets.UTF_8))
+                .hasMultipartPart(1, "file", fileBody)
+                .hasMultipartPartHeader(1, "Content-Type", "text/plain")
+                .hasMultipartPart(2, "tag", "one".getBytes(StandardCharsets.UTF_8))
+                .hasMultipartPart(3, "tag", "two".getBytes(StandardCharsets.UTF_8))
+                .hasMultipartPart(4, "attachment", "attachment-body".getBytes(StandardCharsets.UTF_8))
+                .hasMultipartPartHeader(4, "Content-Type", "application/json");
+        assertThat(exchange.multipartParts().get(1).filename()).isEqualTo("payload.txt");
+        assertThat(exchange.multipartParts().get(4).filename()).isEqualTo("dynamic.json");
+    }
+
+    @Test
+    void usesCallerSuppliedMethodMetadataCache() {
+        CountingMethodMetadataCache metadataCache = new CountingMethodMetadataCache();
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .methodMetadataCache(metadataCache)
+                .respondTo(HttpMethod.GET, "/users/42",
+                        ex -> MockReactiveHttpClient.json(200, "alice"))
+                .build();
+
+        int validationCalls = metadataCache.getCalls;
+        assertThat(mock.proxy().getUser(42).block()).isEqualTo("alice");
+        assertThat(metadataCache.getCalls).isGreaterThan(validationCalls);
     }
 
     @Test
@@ -1257,6 +1297,16 @@ class MockReactiveHttpClientTest {
         @Override
         public void onStart(ReactiveHttpClientLifecycleContext context) {
             events.add("first:start");
+        }
+    }
+
+    private static final class CountingMethodMetadataCache extends MethodMetadataCache {
+        private int getCalls;
+
+        @Override
+        public MethodMetadata get(Method method) {
+            getCalls++;
+            return super.get(method);
         }
     }
 

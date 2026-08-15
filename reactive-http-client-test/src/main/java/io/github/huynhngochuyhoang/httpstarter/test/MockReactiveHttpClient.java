@@ -213,6 +213,7 @@ public final class MockReactiveHttpClient<T> {
                 .body("mock: no matcher for this request")
                 .build();
         private ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
+        private MethodMetadataCache methodMetadataCache = new MethodMetadataCache();
         private ResilienceOperatorApplier resilienceOperatorApplier = new NoopResilienceOperatorApplier();
         private AuthProvider authProvider;
         private ReactiveHttpClientJsonCodec jsonCodec;
@@ -265,6 +266,12 @@ public final class MockReactiveHttpClient<T> {
         /** Uses the supplied client configuration when constructing the mock proxy. */
         public Builder<T> clientConfig(ReactiveHttpClientProperties.ClientConfig clientConfig) {
             this.clientConfig = clientConfig != null ? clientConfig : new ReactiveHttpClientProperties.ClientConfig();
+            return this;
+        }
+
+        /** Uses a replacement metadata cache for validation and invocation. */
+        public Builder<T> methodMetadataCache(MethodMetadataCache methodMetadataCache) {
+            this.methodMetadataCache = Objects.requireNonNull(methodMetadataCache, "methodMetadataCache");
             return this;
         }
 
@@ -348,10 +355,9 @@ public final class MockReactiveHttpClient<T> {
         public MockReactiveHttpClient<T> build() {
             ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
             String clientName = annotation != null ? annotation.name() : "mock-client";
-            MethodMetadataCache metadataCache = new MethodMetadataCache();
-            metadataCache.validateDeclarativeRequestParameters(clientInterface, clientName);
-            metadataCache.validateDeclarativeUriTemplates(clientInterface, clientName, clientConfig.getApis());
-            metadataCache.validateDeclarativeReturnTypes(clientInterface, clientName);
+            methodMetadataCache.validateDeclarativeRequestParameters(clientInterface, clientName);
+            methodMetadataCache.validateDeclarativeUriTemplates(clientInterface, clientName, clientConfig.getApis());
+            methodMetadataCache.validateDeclarativeReturnTypes(clientInterface, clientName);
 
             List<RecordedExchange> exchanges = new CopyOnWriteArrayList<>();
             List<Matcher> liveMatchers = new CopyOnWriteArrayList<>(matchers);
@@ -424,7 +430,7 @@ public final class MockReactiveHttpClient<T> {
 
             ReactiveClientInvocationHandler handler = ReactiveClientInvocationHandler.create(
                     webClient,
-                    metadataCache,
+                    methodMetadataCache,
                     new RequestArgumentResolver(),
                     new DefaultErrorDecoder(),
                     clientConfig,
