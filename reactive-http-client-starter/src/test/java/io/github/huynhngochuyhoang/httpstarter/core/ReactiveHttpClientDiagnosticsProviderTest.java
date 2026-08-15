@@ -297,6 +297,21 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void providerSnapshotsInspectDirectlyRegisteredUncachedFactoryBeans() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        AtomicInteger productCreations = new AtomicInteger();
+        beanFactory.registerSingleton("uncachedCustomAwsFactory",
+                new ObjectTypedAuthProviderFactoryBean(productCreations));
+        beanFactory.registerSingleton(
+                "awsSigV4AuthProviderFactory", new AwsSigV4AuthProviderFactory());
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", null);
+        assertThat(productCreations).hasValue(0);
+    }
+
+    @Test
     void providerSnapshotsResolveAuthFactoriesOnceForAllClients() {
         AtomicInteger lookups = new AtomicInteger();
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory() {

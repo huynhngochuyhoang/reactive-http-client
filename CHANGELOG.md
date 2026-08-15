@@ -24,8 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   view that honors child shadowing, `PriorityOrdered`, Spring's standard
   `orderedStream()` fallback, `Ordered` instance precedence over bean metadata,
   bean-definition ordering, and custom autowire candidate resolvers; uncached
-  singleton factory products and other unresolved selections remain `null`.
-  Added sanitized
+  singleton factory products, whether definition-backed or directly registered,
+  and other unresolved selections remain `null`. Added sanitized
   request-validation and stale-connection recovery support-bundle fixtures with
   the published premature-close category.
 - **Stale pooled-connection recovery contract.** Added a bounded raw HTTP/1.1

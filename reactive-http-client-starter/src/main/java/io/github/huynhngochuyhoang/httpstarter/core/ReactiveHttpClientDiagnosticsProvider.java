@@ -597,14 +597,27 @@ public class ReactiveHttpClientDiagnosticsProvider {
             String[] knownBeanNames) {
         List<String> knownNames = List.of(knownBeanNames);
         List<String> uninspectableNames = new ArrayList<>();
-        for (String beanName : factory.getBeanDefinitionNames()) {
+        Set<String> localBeanNames = new LinkedHashSet<>(
+                Arrays.asList(factory.getBeanDefinitionNames()));
+        localBeanNames.addAll(Arrays.asList(factory.getSingletonNames()));
+        for (String beanName : localBeanNames) {
             if (knownNames.contains(beanName)) {
                 continue;
             }
             Object singleton = factory.getSingleton(beanName);
-            if (singleton instanceof FactoryBean<?>
-                    && cachedFactoryBeanProduct(factory, beanName) != null) {
-                continue;
+            if (singleton instanceof FactoryBean<?> singletonFactory) {
+                if (cachedFactoryBeanProduct(factory, beanName) != null) {
+                    continue;
+                }
+                if (!factory.containsBeanDefinition(beanName)) {
+                    Class<?> objectType = singletonFactory.getObjectType();
+                    if (objectType == null
+                            || type.isAssignableFrom(objectType)
+                            || objectType.isAssignableFrom(type)) {
+                        uninspectableNames.add(beanName);
+                    }
+                    continue;
+                }
             }
             BeanDefinition definition = beanDefinition(factory, beanName);
             if (definition == null || definition.isAbstract()) {
