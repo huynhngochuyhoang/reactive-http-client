@@ -12,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.cglib.proxy.Enhancer;
@@ -22,6 +23,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.Ordered;
+import org.springframework.core.PriorityOrdered;
 import org.springframework.core.annotation.Order;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -337,6 +339,43 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                             strictBodySigningClientConfig()))))
                     .containsEntry("strictBodySigningValidation", false);
         }
+    }
+
+    @Test
+    void providerSnapshotsSkipParentAuthFactoriesShadowedByChildNames() {
+        DefaultListableBeanFactory parent = new DefaultListableBeanFactory();
+        GenericBeanDefinition hiddenParent = new GenericBeanDefinition();
+        hiddenParent.setBeanClass(OrderedCustomAwsSigV4Factory.class);
+        parent.registerBeanDefinition("sharedAwsFactory", hiddenParent);
+        parent.preInstantiateSingletons();
+
+        DefaultListableBeanFactory child = diagnosticClientBeanFactory(parent);
+        GenericBeanDefinition visibleChild = new GenericBeanDefinition();
+        visibleChild.setBeanClass(AwsSigV4AuthProviderFactory.class);
+        child.registerBeanDefinition("sharedAwsFactory", visibleChild);
+        child.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(child, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", true);
+    }
+
+    @Test
+    void providerSnapshotsPreservePriorityOrderedFactoryPrecedence() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        GenericBeanDefinition ordinaryBuiltIn = new GenericBeanDefinition();
+        ordinaryBuiltIn.setBeanClass(AwsSigV4AuthProviderFactory.class);
+        ordinaryBuiltIn.setAttribute(
+                AbstractBeanDefinition.ORDER_ATTRIBUTE, Ordered.HIGHEST_PRECEDENCE);
+        beanFactory.registerBeanDefinition("ordinaryBuiltInAwsFactory", ordinaryBuiltIn);
+        GenericBeanDefinition priorityCustom = new GenericBeanDefinition();
+        priorityCustom.setBeanClass(PriorityCustomAwsSigV4Factory.class);
+        beanFactory.registerBeanDefinition("priorityCustomAwsFactory", priorityCustom);
+        beanFactory.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", false);
     }
 
     @Test
@@ -1590,6 +1629,26 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         @Override
         public int getOrder() {
             return Ordered.HIGHEST_PRECEDENCE;
+        }
+
+        @Override
+        public boolean supports(String type) {
+            return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+        }
+
+        @Override
+        public AuthProvider create(String clientName,
+                                   ReactiveHttpClientProperties.AuthConfig config,
+                                   WebClient.Builder webClientBuilder) {
+            return request -> Mono.empty();
+        }
+    }
+
+    static class PriorityCustomAwsSigV4Factory implements AuthProviderFactory, PriorityOrdered {
+
+        @Override
+        public int getOrder() {
+            return Ordered.LOWEST_PRECEDENCE;
         }
 
         @Override

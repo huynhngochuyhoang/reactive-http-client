@@ -19,11 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exchange logs, Micrometer, health, and OTel retain structural error facts
   without arbitrary exception messages. Provider-backed support snapshots no
   longer instantiate lazy auth-provider factories to resolve strict SigV4
-  status. Runtime selection and each report exclude non-autowire factories, and
-  report selection uses one factory view that honors bean-definition ordering;
-  unresolved selection remains `null`. Added sanitized request-validation and
-  stale-connection recovery support-bundle fixtures with the published
-  premature-close category.
+  status. Runtime selection and each report exclude non-autowire factories by
+  bean name across parent contexts and scopes. Report selection uses one factory
+  view that honors child shadowing, `PriorityOrdered`, and bean-definition
+  ordering; unresolved selection remains `null`. Added sanitized
+  request-validation and stale-connection recovery support-bundle fixtures with
+  the published premature-close category.
 - **Stale pooled-connection recovery contract.** Added a bounded raw HTTP/1.1
   one-connection fixture for `Connection: close`, peer FIN after response, idle
   close before reuse, reset during reuse, and close during response consumption.

@@ -1467,23 +1467,40 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     }
 
     private java.util.stream.Stream<AuthProviderFactory> authProviderFactories() {
-        List<AuthProviderFactory> orderedFactories = applicationContext
-                .getBeanProvider(AuthProviderFactory.class)
-                .orderedStream()
-                .toList();
         if (!(applicationContext.getAutowireCapableBeanFactory()
                 instanceof ConfigurableListableBeanFactory beanFactory)) {
-            return orderedFactories.stream();
+            return applicationContext.getBeanProvider(AuthProviderFactory.class).orderedStream();
         }
 
-        Set<AuthProviderFactory> excluded = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (String beanName : beanFactory.getBeanNamesForType(AuthProviderFactory.class, true, false)) {
-            if (beanFactory.containsBeanDefinition(beanName)
-                    && !beanFactory.getMergedBeanDefinition(beanName).isAutowireCandidate()) {
-                excluded.add(beanFactory.getBean(beanName, AuthProviderFactory.class));
-            }
+        List<AuthProviderFactoryCandidates.Candidate> candidates = new ArrayList<>();
+        if (!collectAuthProviderFactories(beanFactory, Set.of(), candidates)) {
+            return applicationContext.getBeanProvider(AuthProviderFactory.class).orderedStream();
         }
-        return orderedFactories.stream().filter(factory -> !excluded.contains(factory));
+        AuthProviderFactoryCandidates.sort(candidates, beanFactory);
+        return candidates.stream().map(AuthProviderFactoryCandidates.Candidate::value);
+    }
+
+    private boolean collectAuthProviderFactories(
+            ConfigurableListableBeanFactory factory,
+            Set<String> shadowedBeanNames,
+            List<AuthProviderFactoryCandidates.Candidate> candidates) {
+        for (String beanName : factory.getBeanNamesForType(AuthProviderFactory.class, true, true)) {
+            if (shadowedBeanNames.contains(beanName)
+                    || !AuthProviderFactoryCandidates.isAutowireCandidate(factory, beanName)) {
+                continue;
+            }
+            candidates.add(new AuthProviderFactoryCandidates.Candidate(
+                    factory, beanName, factory.getBean(beanName, AuthProviderFactory.class)));
+        }
+
+        org.springframework.beans.factory.BeanFactory parent = factory.getParentBeanFactory();
+        if (parent instanceof ConfigurableListableBeanFactory parentFactory) {
+            return collectAuthProviderFactories(
+                    parentFactory,
+                    AuthProviderFactoryCandidates.withLocalBeanNames(factory, shadowedBeanNames),
+                    candidates);
+        }
+        return parent == null;
     }
 
     private WebClient.Builder buildOAuth2TokenServiceWebClientBuilder(

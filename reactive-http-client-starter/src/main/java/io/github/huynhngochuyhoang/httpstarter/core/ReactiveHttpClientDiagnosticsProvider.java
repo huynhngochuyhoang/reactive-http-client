@@ -11,11 +11,8 @@ import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
-import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.core.OrderComparator;
-import org.springframework.core.Ordered;
 import org.springframework.core.ResolvableType;
-import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
@@ -321,7 +318,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
             return null;
         }
         return factories.candidates().stream()
-                .map(ExistingAuthProviderFactory::value)
+                .map(AuthProviderFactoryCandidates.Candidate::value)
                 .filter(factory -> factory.supports(clientConfig.getAuth().getType()))
                 .findFirst()
                 .filter(AwsSigV4AuthProviderFactory.class::isInstance)
@@ -330,30 +327,43 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     private ExistingAuthProviderFactories existingAuthProviderFactories(
             ConfigurableListableBeanFactory factory) {
-        String[] beanNames = factory.getBeanNamesForType(AuthProviderFactory.class, true, false);
+        return existingAuthProviderFactories(factory, Set.of());
+    }
+
+    private ExistingAuthProviderFactories existingAuthProviderFactories(
+            ConfigurableListableBeanFactory factory,
+            Set<String> shadowedBeanNames) {
+        String[] beanNames = Arrays.stream(
+                        factory.getBeanNamesForType(AuthProviderFactory.class, true, false))
+                .filter(beanName -> !shadowedBeanNames.contains(beanName))
+                .toArray(String[]::new);
         List<String> uninspectableBeanNames = uninspectableFactoryBeanNames(
                 factory, AuthProviderFactory.class, beanNames).stream()
-                .filter(beanName -> isAutowireCandidate(factory, beanName))
+                .filter(beanName -> !shadowedBeanNames.contains(beanName))
+                .filter(beanName -> AuthProviderFactoryCandidates.isAutowireCandidate(factory, beanName))
                 .toList();
         if (!uninspectableBeanNames.isEmpty()) {
             return ExistingAuthProviderFactories.unresolvedLookup();
         }
 
-        List<ExistingAuthProviderFactory> values = new ArrayList<>();
+        List<AuthProviderFactoryCandidates.Candidate> values = new ArrayList<>();
         for (String beanName : beanNames) {
-            if (!isAutowireCandidate(factory, beanName)) {
+            if (!AuthProviderFactoryCandidates.isAutowireCandidate(factory, beanName)) {
                 continue;
             }
             Object value = existingSingletonValue(factory, AuthProviderFactory.class, beanName);
             if (!(value instanceof AuthProviderFactory authProviderFactory)) {
                 return ExistingAuthProviderFactories.unresolvedLookup();
             }
-            values.add(new ExistingAuthProviderFactory(factory, beanName, authProviderFactory));
+            values.add(new AuthProviderFactoryCandidates.Candidate(
+                    factory, beanName, authProviderFactory));
         }
 
         BeanFactory parent = factory.getParentBeanFactory();
         if (parent instanceof ConfigurableListableBeanFactory parentFactory) {
-            ExistingAuthProviderFactories parentFactories = existingAuthProviderFactories(parentFactory);
+            ExistingAuthProviderFactories parentFactories = existingAuthProviderFactories(
+                    parentFactory,
+                    AuthProviderFactoryCandidates.withLocalBeanNames(factory, shadowedBeanNames));
             if (parentFactories.unresolved()) {
                 return parentFactories;
             }
@@ -361,59 +371,8 @@ public class ReactiveHttpClientDiagnosticsProvider {
         } else if (parent != null) {
             return ExistingAuthProviderFactories.unresolvedLookup();
         }
-        sortAuthProviderFactories(values);
+        AuthProviderFactoryCandidates.sort(values, beanFactory);
         return ExistingAuthProviderFactories.available(values);
-    }
-
-    private void sortAuthProviderFactories(List<ExistingAuthProviderFactory> candidates) {
-        Comparator<Object> dependencyComparator = beanFactory instanceof DefaultListableBeanFactory defaultFactory
-                ? defaultFactory.getDependencyComparator()
-                : null;
-        if (dependencyComparator instanceof OrderComparator orderComparator) {
-            Comparator<Object> sourceAwareComparator = orderComparator.withSourceProvider(
-                    this::authProviderFactoryOrderSource);
-            candidates.sort(sourceAwareComparator::compare);
-            return;
-        }
-        if (dependencyComparator != null) {
-            candidates.sort((left, right) -> dependencyComparator.compare(left.value(), right.value()));
-            return;
-        }
-        Comparator<Object> sourceAwareComparator = AnnotationAwareOrderComparator.INSTANCE.withSourceProvider(
-                this::authProviderFactoryOrderSource);
-        candidates.sort(sourceAwareComparator::compare);
-    }
-
-    private Object authProviderFactoryOrderSource(Object candidate) {
-        if (!(candidate instanceof ExistingAuthProviderFactory existing)) {
-            return null;
-        }
-        List<Object> sources = new ArrayList<>(4);
-        BeanDefinition definition = beanDefinition(existing.beanFactory(), existing.beanName());
-        if (definition != null) {
-            Object order = definition.getAttribute(AbstractBeanDefinition.ORDER_ATTRIBUTE);
-            if (order instanceof Integer orderValue) {
-                sources.add((Ordered) () -> orderValue);
-            }
-            if (definition instanceof RootBeanDefinition rootDefinition) {
-                Method factoryMethod = rootDefinition.getResolvedFactoryMethod();
-                if (factoryMethod != null) {
-                    sources.add(factoryMethod);
-                }
-                Class<?> targetType = rootDefinition.getTargetType();
-                if (targetType != null && targetType != existing.value().getClass()) {
-                    sources.add(targetType);
-                }
-            }
-        }
-        sources.add(existing.value());
-        return sources.toArray();
-    }
-
-    private static boolean isAutowireCandidate(ConfigurableListableBeanFactory factory,
-                                               String beanName) {
-        BeanDefinition definition = beanDefinition(factory, beanName);
-        return definition == null || definition.isAutowireCandidate();
     }
 
     private static String diagnosticHttpMethod(MethodMetadata meta,
@@ -784,23 +743,17 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     private record ExistingAuthProviderFactories(
-            List<ExistingAuthProviderFactory> candidates,
+            List<AuthProviderFactoryCandidates.Candidate> candidates,
             boolean unresolved) {
 
         private static ExistingAuthProviderFactories available(
-                List<ExistingAuthProviderFactory> candidates) {
+                List<AuthProviderFactoryCandidates.Candidate> candidates) {
             return new ExistingAuthProviderFactories(List.copyOf(candidates), false);
         }
 
         private static ExistingAuthProviderFactories unresolvedLookup() {
             return new ExistingAuthProviderFactories(List.of(), true);
         }
-    }
-
-    private record ExistingAuthProviderFactory(
-            ConfigurableListableBeanFactory beanFactory,
-            String beanName,
-            AuthProviderFactory value) {
     }
 
     record ClientSnapshotEntry(
