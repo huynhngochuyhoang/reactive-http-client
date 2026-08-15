@@ -12,9 +12,12 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.TimeoutMs;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogContext;
 import io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogger;
 import io.github.huynhngochuyhoang.httpstarter.core.Jackson3ReactiveHttpClientJsonCodec;
+import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata;
+import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientJsonCodec;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext;
@@ -57,6 +60,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collection;
@@ -84,7 +88,15 @@ class Boot4ConsumerApplicationTest {
 
     @Test
     void publishedTestHelperRecordsInheritedRequests() {
+        ReactiveHttpClientProperties.ApiConfig configuredApi = new ReactiveHttpClientProperties.ApiConfig();
+        configuredApi.setMethod("GET");
+        configuredApi.setPath("/configured/{id}");
+        ReactiveHttpClientProperties.ClientConfig clientConfig =
+                new ReactiveHttpClientProperties.ClientConfig();
+        clientConfig.setApis(java.util.Map.of("configured", configuredApi));
+
         MockReactiveHttpClient<OrdersClient> mock = MockReactiveHttpClient.forClient(OrdersClient.class)
+                .clientConfig(clientConfig)
                 .respondTo(HttpMethod.GET, "/orders/7",
                         request -> MockReactiveHttpClient.json(200, "{\"code\":\"mocked\"}"))
                 .build();
@@ -211,6 +223,9 @@ class Boot4ConsumerApplicationTest {
                     .isInstanceOf(RuntimeException.class);
 
             assertThat(context.containsBean("reactiveHttpClientHealthIndicator")).isTrue();
+            assertThat(context.getBean(MethodMetadataCache.class))
+                    .isInstanceOfSatisfying(TrackingMethodMetadataCache.class,
+                            cache -> assertThat(cache.getCalls()).isPositive());
             assertThat(context.containsBean("openTelemetryHttpClientObserver")).isTrue();
             assertThat(context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class).diagnostics())
                     .containsEntry("clientCount", 1);
@@ -333,10 +348,29 @@ class Boot4ConsumerApplicationTest {
         }
     }
 
+    static final class TrackingMethodMetadataCache extends MethodMetadataCache {
+        private int getCalls;
+
+        @Override
+        public MethodMetadata get(Method method) {
+            getCalls++;
+            return super.get(method);
+        }
+
+        int getCalls() {
+            return getCalls;
+        }
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @EnableReactiveHttpClients(basePackageClasses = OrdersClient.class)
     static class ConsumerApplication {
+        @Bean("methodMetadataCache")
+        TrackingMethodMetadataCache methodMetadataCache() {
+            return new TrackingMethodMetadataCache();
+        }
+
         @Bean
         ReactiveHttpClientJsonCodec reactiveHttpClientJsonCodec() {
             return new Jackson3ReactiveHttpClientJsonCodec(JsonMapper.builder()

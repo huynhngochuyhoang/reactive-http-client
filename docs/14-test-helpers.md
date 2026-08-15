@@ -35,6 +35,10 @@ filter as the production proxy. Supply configured `@ApiRef` entries through
 construction. Recorded URIs are in-process resolved request facts, not proof of
 HTTP/1.1 request-line or HTTP/2 pseudo-header bytes.
 
+When a test uses the documented replacement metadata-cache extension, pass that
+same cache through `methodMetadataCache(...)`. Validation and invocation then use
+the supplied parser instead of a helper-owned default.
+
 The mock does not negotiate an HTTP protocol or TLS, compress wire bytes, acquire a
 pooled connection, apply socket backpressure, measure wire or pool timing, or prove
 connection reuse. Those behaviors belong to a real client connector and server. Use the
@@ -205,6 +209,7 @@ Every call through the mock proxy is recorded. `RecordedExchange` exposes:
 | `statusCode()` | `HttpStatusCode` | HTTP status selected by the mock response handler |
 | `statusCodeValue()` | `int` | Numeric HTTP status selected by the mock response handler |
 | `bodyAsString()` | `String` | UTF-8 decoded request body; empty string if no body was written |
+| `multipartParts()` | `List<RecordedMultipartPart>` | Parsed names, headers, and exact bytes in encoded part order |
 | `requestContextSnapshot()` | `RequestContextSnapshot` | Starter-owned Reactor context captured by the mock exchange function |
 | `correlationId()` | `String` | Captured correlation ID, or `null` if absent |
 | `inboundHeaders()` | `Map<String, List<String>>` | Captured filtered inbound headers |
@@ -217,6 +222,30 @@ assertThat(exchange.uri().getPath()).isEqualTo("/users");
 assertThat(exchange.headers().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
 assertThat(exchange.bodyAsString()).contains("\"name\":\"alice\"");
 ```
+
+### Multipart part assertions
+
+`multipartParts()` parses the already materialized `multipart/form-data` body
+into immutable `RecordedMultipartPart` values in encoded order. Names,
+filenames, read-only headers, and exact bytes are available without depending on
+the generated boundary:
+
+```java
+RecordedExchange exchange = mock.lastExchange();
+
+RecordedExchangeAssertions.assertThat(exchange)
+        .hasMultipartPartNames("description", "file", "tag", "tag")
+        .hasMultipartPart(0, "description", "alpha".getBytes(StandardCharsets.UTF_8))
+        .hasMultipartPart(1, "file", expectedFileBytes)
+        .hasMultipartPartHeader(1, "Content-Type", "application/octet-stream");
+
+RecordedMultipartPart file = exchange.multipartParts().get(1);
+assertThat(file.filename()).isEqualTo("payload.bin");
+assertThat(file.bodyBytes()).containsExactly(expectedFileBytes);
+```
+
+This is an encoded in-process request record. It does not prove multipart wire
+framing, resource backpressure, socket cancellation, or connection reuse.
 
 ---
 
@@ -276,6 +305,9 @@ Available assertion methods:
 | `hasBody(String)` | Asserts the full UTF-8 request body |
 | `bodyContains(String)` | Asserts a substring of the UTF-8 request body |
 | `hasStatusCode(int)` | Asserts the served HTTP status |
+| `hasMultipartPartNames(String...)` | Asserts encoded multipart part names in order |
+| `hasMultipartPart(int, String, byte[])` | Asserts one indexed part name and exact bytes |
+| `hasMultipartPartHeader(int, String, String)` | Asserts one indexed part header |
 | `RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(int)` | Asserts total recorded attempts |
 | `RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(HttpMethod, String, int)` | Asserts attempts for one method/path |
 
@@ -358,6 +390,11 @@ recorded in-process exchanges but two outer retry subscription attempts. That
 sequence is canned-response evidence only; it is not a socket-dispatch or
 connection-count assertion.
 
+Automatic redirect following belongs to the configured client connector. The mock
+can serve and record a visible 3xx response, but `followRedirects=true` does not
+create a second in-process exchange. Use a real connector fixture to test redirect
+dispatch, replay, and transport timing.
+
 ---
 
 ### Response factories and repeated headers
@@ -436,12 +473,13 @@ RecordedExchangeAssertions.assertThat(mock.exchanges().get(1))
 
 The mock retry helper is intentionally small: it retries matching methods inside tests and records each outbound attempt. A publisher request body remains cold until the mock exchange runs and is materialized once for each recorded retry attempt. Application-owned `InputStream`, `Reader`, and `ReadableByteChannel` bodies are also materialized and closed by that in-process exchange. One-shot streams are not made replayable. The source must therefore be replayable, matching the runtime [request-body repeatability matrix](11-streaming.md#request-body-repeatability-matrix). The helper aggregates the body only to expose `RecordedExchange.bodyAsString()`; it does not emulate socket demand, connection-pool queues, transport cancellation, redirects, or network write ownership. Production retry semantics still come from your application Resilience4j configuration.
 
-Multipart requests are likewise materialized in-process. Tests can inspect the
-generated boundary and ordered part headers/body through `contentType()`,
-`bodyAsString()`, or `materialized()`. Those assertions do not prove HTTP/1.1
-framing, HTTP/2 DATA delivery, resource backpressure, socket cancellation, pool
-reuse, redirect replay, or peer-reset cleanup; use an HTTP server fixture for
-those transport contracts.
+Multipart requests are likewise materialized in-process. Prefer
+`multipartParts()`, `hasMultipartPartNames(...)`, `hasMultipartPart(...)`,
+and `hasMultipartPartHeader(...)` for stable name, header, order, and exact-byte
+assertions that do not depend on the generated boundary. These records do not
+prove HTTP/1.1 framing, HTTP/2 DATA delivery, resource backpressure, socket
+cancellation, pool reuse, redirect replay, or peer-reset cleanup; use an HTTP
+server fixture for those transport contracts.
 
 ## Observer and lifecycle assertions
 

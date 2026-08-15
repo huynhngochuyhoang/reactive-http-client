@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Mock and assembled-consumer parity.** Added stable in-process multipart
+  part-name, header, order, filename, and exact-byte records/assertions without
+  simulating wire framing or backpressure. `MockReactiveHttpClient` can now use a
+  caller-supplied `MethodMetadataCache`; retry/auth sequencing remains separate
+  from connector-owned redirect dispatch. The assembled Boot 4 consumer now
+  exercises the documented replacement-cache bean alongside inherited generics,
+  application codecs, auth, constructor-injected logging, and lifecycle hooks.
 - **Terminal diagnostics and redaction parity.** Added explicit synchronous
   request-validation and subscribed pre-dispatch URI/serialization contracts,
   and revalidated final-attempt status, headers, stage, error, and subscription

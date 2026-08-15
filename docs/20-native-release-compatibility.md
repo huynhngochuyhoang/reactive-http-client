@@ -415,7 +415,7 @@ the POM include set or lacks an explicit support status.
 | `io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot` | Request context snapshot model | Immutable context snapshot exports | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ResilienceOperatorApplier*` | Contract snapshot resilience hook | Operator availability and instance-type hook | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.SensitiveHeaders` | Header redaction helper | Custom exchange logger redaction checks | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, `RecordedExchange`, `RecordedExchangeAssertions`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, `RecordedExchange`, `RecordedExchangeAssertions`, `RecordedMultipartPart`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | `OpenTelemetryHttpClientObserver`, `OpenTelemetryContextWebFilter`, `OpenTelemetryContextExchangeFilter`, and `OpenTelemetryHttpClientAutoConfiguration` | Supported |
 
 The `3.0.0` migration replaces `HttpClientHealthIndicator` with its Boot 4
@@ -452,7 +452,7 @@ current minor line:
   components, or narrowing the render contract requires a future major release.
 - Test helper classes under `io.github.huynhngochuyhoang.httpstarter.test`,
   including `MockReactiveHttpClient`, `RecordedExchange`,
-  `RecordedExchangeAssertions`, `ErrorCategoryAssertions`, and
+  `RecordedExchangeAssertions`, `RecordedMultipartPart`, `ErrorCategoryAssertions`, and
   `MockHttpServerExtension`, are supported test APIs. Package-private
   constructors remain internal; public factory, builder, accessor, response,
   retry, auth, observer, lifecycle, exchange-logger, and assertion methods should

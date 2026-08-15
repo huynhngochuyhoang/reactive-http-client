@@ -516,6 +516,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("ConsumerExchangeLogger implements HttpExchangeLogger")
                 .contains("CapturingAuthProvider implements AuthProvider")
                 .contains("PropertyNamingStrategies.SNAKE_CASE")
+                .contains("TrackingMethodMetadataCache extends MethodMetadataCache")
                 .contains("openTelemetryHttpClientObserver");
         assertThat(releaseDocs)
                 .contains("### Boot 4 assembled consumer fixture")
@@ -529,7 +530,11 @@ class DocumentationReleaseArtifactTest {
         assertThat(testHelperDocs)
                 .contains("### Ownership boundary")
                 .contains("final resolved request metadata")
-                .contains("does not negotiate an HTTP protocol or TLS");
+                .contains("does not negotiate an HTTP protocol or TLS")
+                .contains("methodMetadataCache(...)")
+                .contains("List<RecordedMultipartPart>")
+                .contains("hasMultipartPartNames")
+                .contains("followRedirects=true");
     }
 
     @Test

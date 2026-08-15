@@ -207,6 +207,53 @@ public final class RecordedExchangeAssertions {
             return myself;
         }
 
+        public RecordedExchangeAssert hasMultipartPartNames(String... expectedNames) {
+            isNotNull();
+            List<String> actualNames = actual.multipartParts().stream()
+                    .map(RecordedMultipartPart::name)
+                    .toList();
+            List<String> expected = Arrays.asList(expectedNames);
+            if (!expected.equals(actualNames)) {
+                failWithMessage("expected multipart part names <%s> but was <%s>",
+                        expected, actualNames);
+            }
+            return myself;
+        }
+
+        public RecordedExchangeAssert hasMultipartPart(
+                int index, String expectedName, byte[] expectedBody) {
+            RecordedMultipartPart part = multipartPart(index);
+            if (!expectedName.equals(part.name()) || !Arrays.equals(expectedBody, part.bodyBytes())) {
+                failWithMessage(
+                        "expected multipart part <%s> to have name <%s> and body bytes <%s> "
+                                + "but was name <%s> and body bytes <%s>",
+                        index, expectedName, Arrays.toString(expectedBody),
+                        part.name(), Arrays.toString(part.bodyBytes()));
+            }
+            return myself;
+        }
+
+        public RecordedExchangeAssert hasMultipartPartHeader(
+                int index, String name, String expectedValue) {
+            RecordedMultipartPart part = multipartPart(index);
+            String actualValue = part.header(name);
+            if (!expectedValue.equals(actualValue)) {
+                failWithMessage("expected multipart part <%s> header <%s> to be <%s> but was <%s>",
+                        index, name, expectedValue, actualValue);
+            }
+            return myself;
+        }
+
+        private RecordedMultipartPart multipartPart(int index) {
+            isNotNull();
+            List<RecordedMultipartPart> parts = actual.multipartParts();
+            if (index < 0 || index >= parts.size()) {
+                failWithMessage("expected multipart part index <%s> but part count was <%s>",
+                        index, parts.size());
+            }
+            return parts.get(index);
+        }
+
         public RecordedExchangeAssert hasStatusCode(int expected) {
             isNotNull();
             if (actual.statusCodeValue() != expected) {

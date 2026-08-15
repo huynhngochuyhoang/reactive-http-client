@@ -1,14 +1,19 @@
 package io.github.huynhngochuyhoang.httpstarter.test;
 
 import io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
 import reactor.core.publisher.Flux;
 
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -18,11 +23,14 @@ import java.util.Map;
  *
  * <p>The request body is fully materialised via Spring's
  * {@link org.springframework.web.reactive.function.client.ExchangeStrategies},
- * so assertions can inspect the final on-wire form (including multipart boundaries
- * and form-urlencoded encodings) rather than the unresolved
- * {@link org.springframework.web.reactive.function.BodyInserter}.
+ * so assertions can inspect the encoded in-process form rather than the unresolved
+ * {@link org.springframework.web.reactive.function.BodyInserter}. This does not
+ * prove transport framing or wire delivery.
  */
 public final class RecordedExchange {
+
+    private static final byte[] CRLF = "\r\n".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] HEADER_SEPARATOR = "\r\n\r\n".getBytes(StandardCharsets.US_ASCII);
 
     private final HttpMethod method;
     private final URI uri;
@@ -30,6 +38,7 @@ public final class RecordedExchange {
     private final RequestContextSnapshot requestContextSnapshot;
     private final HttpStatusCode statusCode;
     private final String bodyAsString;
+    private final byte[] bodyBytes;
 
     RecordedExchange(HttpMethod method, URI uri, MockClientHttpRequest materialized) {
         this(method, uri, materialized, RequestContextSnapshot.empty(), null);
@@ -51,7 +60,8 @@ public final class RecordedExchange {
                 ? requestContextSnapshot
                 : RequestContextSnapshot.empty();
         this.statusCode = statusCode;
-        this.bodyAsString = readBodyAsString(materialized);
+        this.bodyBytes = readBodyBytes(materialized);
+        this.bodyAsString = new String(bodyBytes, StandardCharsets.UTF_8);
     }
 
     public HttpMethod method() { return method; }
@@ -92,13 +102,117 @@ public final class RecordedExchange {
     /** UTF-8 decoded request body. Empty string if no body was written. */
     public String bodyAsString() { return bodyAsString; }
 
-    private static String readBodyAsString(MockClientHttpRequest request) {
-        return Flux.from(request.getBody())
-                .map(buf -> buf.toString(StandardCharsets.UTF_8))
-                .collect(StringBuilder::new, StringBuilder::append)
-                .map(StringBuilder::toString)
-                .defaultIfEmpty("")
+    /**
+     * Parses materialized multipart parts in encoded order.
+     *
+     * @throws IllegalStateException when this exchange is not a valid
+     * multipart/form-data request
+     */
+    public List<RecordedMultipartPart> multipartParts() {
+        MediaType contentType = contentType();
+        if (contentType == null || !MediaType.MULTIPART_FORM_DATA.isCompatibleWith(contentType)) {
+            throw new IllegalStateException("Recorded exchange is not multipart/form-data");
+        }
+        String boundary = contentType.getParameter("boundary");
+        if (boundary == null || boundary.isBlank()) {
+            throw new IllegalStateException("Recorded multipart exchange has no boundary");
+        }
+        return parseMultipartParts(boundary);
+    }
+
+    private List<RecordedMultipartPart> parseMultipartParts(String boundary) {
+        byte[] delimiter = ("--" + boundary).getBytes(StandardCharsets.US_ASCII);
+        int cursor = 0;
+        if (!matches(bodyBytes, cursor, delimiter)) {
+            throw malformedMultipart();
+        }
+        cursor += delimiter.length;
+        List<RecordedMultipartPart> parts = new ArrayList<>();
+        while (true) {
+            if (matches(bodyBytes, cursor, new byte[]{'-', '-'})) {
+                return List.copyOf(parts);
+            }
+            if (!matches(bodyBytes, cursor, CRLF)) {
+                throw malformedMultipart();
+            }
+            cursor += CRLF.length;
+
+            int headersEnd = indexOf(bodyBytes, HEADER_SEPARATOR, cursor);
+            if (headersEnd < 0) {
+                throw malformedMultipart();
+            }
+            HttpHeaders headers = parsePartHeaders(cursor, headersEnd);
+            int bodyStart = headersEnd + HEADER_SEPARATOR.length;
+            byte[] nextDelimiter = concat(CRLF, delimiter);
+            int bodyEnd = indexOf(bodyBytes, nextDelimiter, bodyStart);
+            if (bodyEnd < 0) {
+                throw malformedMultipart();
+            }
+            parts.add(new RecordedMultipartPart(
+                    headers, Arrays.copyOfRange(bodyBytes, bodyStart, bodyEnd)));
+            cursor = bodyEnd + nextDelimiter.length;
+        }
+    }
+
+    private HttpHeaders parsePartHeaders(int start, int end) {
+        HttpHeaders headers = new HttpHeaders();
+        String block = new String(bodyBytes, start, end - start, StandardCharsets.UTF_8);
+        for (String line : block.split("\\r\\n")) {
+            int separator = line.indexOf(':');
+            if (separator <= 0) {
+                throw malformedMultipart();
+            }
+            headers.add(line.substring(0, separator), line.substring(separator + 1).trim());
+        }
+        return headers;
+    }
+
+    private static byte[] readBodyBytes(MockClientHttpRequest request) {
+        List<byte[]> chunks = Flux.from(request.getBody())
+                .map(buffer -> {
+                    ByteArrayOutputStream chunk = new ByteArrayOutputStream();
+                    try (var byteBuffers = buffer.readableByteBuffers()) {
+                        while (byteBuffers.hasNext()) {
+                            ByteBuffer byteBuffer = byteBuffers.next();
+                            byte[] bytes = new byte[byteBuffer.remaining()];
+                            byteBuffer.get(bytes);
+                            chunk.writeBytes(bytes);
+                        }
+                    }
+                    return chunk.toByteArray();
+                })
+                .collectList()
                 .block();
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        if (chunks != null) {
+            chunks.forEach(output::writeBytes);
+        }
+        return output.toByteArray();
+    }
+
+    private static int indexOf(byte[] source, byte[] target, int start) {
+        for (int index = start; index <= source.length - target.length; index++) {
+            if (matches(source, index, target)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean matches(byte[] source, int start, byte[] target) {
+        return start >= 0
+                && start + target.length <= source.length
+                && Arrays.equals(source, start, start + target.length, target, 0, target.length);
+    }
+
+    private static byte[] concat(byte[] first, byte[] second) {
+        byte[] result = Arrays.copyOf(first, first.length + second.length);
+        System.arraycopy(second, 0, result, first.length, second.length);
+        return result;
+    }
+
+    private static IllegalStateException malformedMultipart() {
+        return new IllegalStateException("Recorded multipart request body is malformed");
     }
 
     @Override
