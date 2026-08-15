@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.AotSmokeClient;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.InheritedAotSmokeClient;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata;
@@ -72,6 +73,11 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 FactoryBeanRegistrySupport.class.getDeclaredMethod(
                         "getCachedObjectForFactoryBean", String.class)))
+                .accepts(hints);
+        Class<?> candidates = Class.forName(
+                "io.github.huynhngochuyhoang.httpstarter.core.AuthProviderFactoryCandidates");
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                candidates.getDeclaredMethod("authProviderFactoryLookup", AuthProviderFactory.class)))
                 .accepts(hints);
         assertThat(RuntimeHintsPredicates.resource().forResource(ReactiveHttpClientRuntimeHints.POM_PROPERTIES_RESOURCE))
                 .accepts(hints);
