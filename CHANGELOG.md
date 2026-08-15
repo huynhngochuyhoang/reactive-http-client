@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Native auth-factory diagnostics hint.** Retained the private type-only
+  auth-factory lookup marker used by runtime and support-snapshot candidate
+  selection so GraalVM images can initialize diagnostics without a missing
+  reflection registration.
 
 - **Mock and assembled-consumer parity.** Added stable in-process multipart
   part-name, header, order, filename, and exact-byte records/assertions without

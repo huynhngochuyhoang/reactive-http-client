@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
 import org.springframework.aot.hint.ExecutableMode;
@@ -14,6 +15,8 @@ import java.lang.reflect.Modifier;
  * Runtime hints for the starter's annotation and configuration-property model.
  */
 public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
+    private static final String AUTH_PROVIDER_FACTORY_CANDIDATES =
+            "io.github.huynhngochuyhoang.httpstarter.core.AuthProviderFactoryCandidates";
 
     static final String POM_PROPERTIES_RESOURCE =
             "META-INF/maven/io.github.huynhngochuyhoang/reactive-http-client-starter/pom.properties";
@@ -80,6 +83,20 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
         registerPublicMembers(hints, ReactiveHttpClientFactoryBean.class);
         registerFactoryBeanCacheLookup(hints);
         hints.resources().registerPattern(POM_PROPERTIES_RESOURCE);
+        registerAuthProviderFactoryLookup(hints, classLoader);
+    }
+
+    private static void registerAuthProviderFactoryLookup(RuntimeHints hints, ClassLoader classLoader) {
+        try {
+            Class<?> candidates = Class.forName(
+                    AUTH_PROVIDER_FACTORY_CANDIDATES, false, classLoader);
+            hints.reflection().registerMethod(
+                    candidates.getDeclaredMethod(
+                            "authProviderFactoryLookup", AuthProviderFactory.class),
+                    ExecutableMode.INVOKE);
+        } catch (ClassNotFoundException | NoSuchMethodException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     private static void registerFactoryBeanCacheLookup(RuntimeHints hints) {

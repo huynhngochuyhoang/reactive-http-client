@@ -568,35 +568,67 @@ Evidence:
 
 ## Priority 10 - Dependency, API, AOT, and Native Evidence
 
-### [ ] 10.1 Revalidate dependency and public API contracts
+### [x] 10.1 Revalidate dependency and public API contracts
 
-- [ ] Run minimum and forward Spring Boot 4 rows under Java 21.
-- [ ] Record resolved Framework, Reactor Netty, Netty, Jackson, Micrometer, OTel,
+- [x] Run minimum and forward Spring Boot 4 rows under Java 21.
+- [x] Record resolved Framework, Reactor Netty, Netty, Jackson, Micrometer, OTel,
       Resilience4j, JUnit, and Mockito versions for each row.
-- [ ] Run full reactor and assembled consumer on each supported row.
-- [ ] Verify independent back-off for Actuator, Micrometer, OTel, Resilience4j,
+- [x] Run full reactor and assembled consumer on each supported row.
+- [x] Verify independent back-off for Actuator, Micrometer, OTel, Resilience4j,
       and auth integrations.
-- [ ] Run strict root and module japicmp against published `3.4.0` with every
+- [x] Run strict root and module japicmp against published `3.4.0` with every
       dependency-linked row that affects public types.
-- [ ] Include every V25 public addition/deprecation and defer incompatibilities.
+- [x] Include every V25 public addition/deprecation and defer incompatibilities.
 
 ### [ ] 10.2 Revalidate AOT and native behavior
 
-- [ ] Register concrete inherited request parameter types and every annotation
+- [x] Register concrete inherited request parameter types and every annotation
       queried at runtime without deprecated Framework 7 member categories.
-- [ ] Keep AOT validation scoped to starter-owned factory beans and honor a
+- [x] Keep AOT validation scoped to starter-owned factory beans and honor a
       replacement `MethodMetadataCache`.
-- [ ] Cover `@Bean` factory-method clients, inherited endpoints, and foreign
+- [x] Cover `@Bean` factory-method clients, inherited endpoints, and foreign
       factory replacements.
 - [ ] Build the GraalVM 25 fixture from a clean immutable commit.
-- [ ] Execute at least one feasible V25 grammar, URI, multipart, or stale-recovery
+- [x] Execute at least one feasible V25 grammar, URI, multipart, or stale-recovery
       path in the native binary.
-- [ ] Record command, Java/GraalVM/dependency versions, commit, executable hash,
+- [x] Record command, Java/GraalVM/dependency versions, commit, executable hash,
       and runtime result under V25 release evidence.
 
 Evidence:
 
-- Pending.
+- `scripts/verify-supported-matrix.sh` now accepts an explicit evidence root and
+  passed under Oracle JDK `21.0.8` for Spring Boot `4.0.0` and `4.1.0`. Each row
+  ran the full reactor (`1,015` starter, `48` test-helper, and `43` OTel tests),
+  the three-test assembled consumer, and the independent Micrometer,
+  Resilience4j, Actuator, OTel API/bean, and custom OAuth factory back-off
+  contracts. Evidence is under
+  `target/release-evidence/v25/priority10/matrix/`.
+- The Boot `4.0.0` row resolved Framework/WebFlux `7.0.1`, Reactor Netty `1.3.0`,
+  Netty `4.2.7.Final`, Jackson `3.0.2`, Micrometer `1.16.0`, OTel `1.55.0`,
+  Resilience4j `2.4.0`, JUnit `6.0.1`, and Mockito `5.20.0`. The Boot `4.1.0`
+  row resolved Framework/WebFlux `7.0.8`, Reactor Netty `1.3.6`, Netty
+  `4.2.15.Final`, Jackson `3.1.4`, Micrometer `1.17.0`, OTel `1.62.0`,
+  Resilience4j `2.4.0`, JUnit `6.0.3`, and Mockito `5.23.0`.
+- Strict root japicmp passed on both matrix rows. Separate starter-module runs
+  also passed against published `3.4.0` from isolated Central-only repositories;
+  reports and provenance are under
+  `target/release-evidence/v25/priority10/module-api/`. V25 adds request/URI
+  validation cache methods and multipart test-helper records/assertions; no
+  removals, deprecations, or source/binary incompatibilities were reported.
+- Existing AOT tests prove starter-factory ownership, replacement
+  `MethodMetadataCache` handling, `@Bean` factory-method clients, inherited
+  endpoints, and foreign factory replacements. No deprecated Framework 7
+  `INTROSPECT_*` member category remains in starter runtime hints.
+- The first GraalVM `25.0.3` execution exposed a native-only initializer failure:
+  the private type-only auth-factory lookup marker used by diagnostics had been
+  removed from the image. An exact invocation hint and regression assertion now
+  retain that marker. The rebuilt Boot `4.0.0` image passed inherited endpoint,
+  configured `@ApiRef`, auth, compression, Problem Detail, diagnostics, health,
+  and metrics paths.
+- The successful dirty-tree validation records commands, toolchain, resolved
+  dependencies, source commit/state, executable SHA-256, and runtime output at
+  `target/release-evidence/v25/priority10/native-smoke-dirty-validation/`. A
+  clean immutable-commit rerun remains required before closing `10.2`.
 
 ---
 
