@@ -11,7 +11,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.BeanDefinitionHolder;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.config.DependencyDescriptor;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
+import org.springframework.beans.factory.support.AutowireCandidateResolver;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.cglib.proxy.Enhancer;
@@ -22,6 +26,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.Ordered;
+import org.springframework.core.PriorityOrdered;
+import org.springframework.core.annotation.Order;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
@@ -236,6 +242,262 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         assertThat(clients).hasSize(1);
         assertThat(clients.get(0))
                 .containsEntry("authMode", "aws-sigv4")
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
+    void providerSnapshotsDoNotInstantiateLazyAuthProviderFactories() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        AtomicInteger factoryCreations = new AtomicInteger();
+        GenericBeanDefinition authFactoryDefinition = new GenericBeanDefinition();
+        authFactoryDefinition.setBeanClass(AwsSigV4AuthProviderFactory.class);
+        authFactoryDefinition.setLazyInit(true);
+        authFactoryDefinition.setInstanceSupplier(() -> {
+            factoryCreations.incrementAndGet();
+            return new AwsSigV4AuthProviderFactory();
+        });
+        beanFactory.registerBeanDefinition("lazyAwsSigV4AuthProviderFactory", authFactoryDefinition);
+
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider(null);
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        config.setAuth(auth);
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, config)));
+
+        assertThat(client).containsEntry("strictBodySigningValidation", null);
+        assertThat(factoryCreations).hasValue(0);
+        assertThat(beanFactory.containsSingleton("lazyAwsSigV4AuthProviderFactory")).isFalse();
+        assertThat(beanFactory.containsSingleton("diagnosticClient")).isFalse();
+    }
+
+    @Test
+    void providerSnapshotsKeepUncachedSingletonAuthFactoryProductsUnknown() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        AtomicInteger productCreations = new AtomicInteger();
+        GenericBeanDefinition customFactory = new GenericBeanDefinition();
+        customFactory.setBeanClass(ObjectTypedAuthProviderFactoryBean.class);
+        customFactory.setInstanceSupplier(
+                () -> new ObjectTypedAuthProviderFactoryBean(productCreations));
+        beanFactory.registerBeanDefinition("uncachedCustomAwsFactory", customFactory);
+        beanFactory.registerBeanDefinition(
+                "awsSigV4AuthProviderFactory", beanDefinition(AwsSigV4AuthProviderFactory.class));
+
+        assertThat(beanFactory.getBean("&uncachedCustomAwsFactory"))
+                .isInstanceOf(ObjectTypedAuthProviderFactoryBean.class);
+        beanFactory.getBean("awsSigV4AuthProviderFactory");
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", null);
+        assertThat(productCreations).hasValue(0);
+    }
+
+    @Test
+    void providerSnapshotsInspectDirectlyRegisteredUncachedFactoryBeans() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        AtomicInteger productCreations = new AtomicInteger();
+        beanFactory.registerSingleton("uncachedCustomAwsFactory",
+                new ObjectTypedAuthProviderFactoryBean(productCreations));
+        beanFactory.registerSingleton(
+                "awsSigV4AuthProviderFactory", new AwsSigV4AuthProviderFactory());
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", null);
+        assertThat(productCreations).hasValue(0);
+    }
+
+    @Test
+    void providerSnapshotsResolveAuthFactoriesOnceForAllClients() {
+        AtomicInteger lookups = new AtomicInteger();
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory() {
+            @Override
+            public String[] getBeanNamesForType(Class<?> type,
+                                                boolean includeNonSingletons,
+                                                boolean allowEagerInit) {
+                if (type == AuthProviderFactory.class) {
+                    lookups.incrementAndGet();
+                }
+                return super.getBeanNamesForType(type, includeNonSingletons, allowEagerInit);
+            }
+        };
+        registerDiagnosticClient(beanFactory, "diagnosticClient", DiagnosticClient.class);
+        registerDiagnosticClient(beanFactory, "secondDiagnosticClient", SecondDiagnosticClient.class);
+        beanFactory.registerSingleton("awsSigV4AuthProviderFactory", new AwsSigV4AuthProviderFactory());
+
+        ReactiveHttpClientProperties.ClientConfig config = strictBodySigningClientConfig();
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of(
+                "diagnostic-client", config,
+                "second-diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> clients = (List<Map<String, Object>>)
+                ReactiveHttpClientDiagnosticsSnapshot.toMap(provider).get("clients");
+
+        assertThat(clients)
+                .hasSize(2)
+                .allSatisfy(client -> assertThat(client)
+                        .containsEntry("strictBodySigningValidation", true));
+        assertThat(lookups).hasValue(1);
+    }
+
+    @Test
+    void providerSnapshotsIgnoreNonAutowireAuthProviderFactories() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        GenericBeanDefinition disabledCustom = new GenericBeanDefinition();
+        disabledCustom.setBeanClass(OrderedCustomAwsSigV4Factory.class);
+        disabledCustom.setAutowireCandidate(false);
+        beanFactory.registerBeanDefinition("disabledCustomAwsFactory", disabledCustom);
+        GenericBeanDefinition builtIn = new GenericBeanDefinition();
+        builtIn.setBeanClass(AwsSigV4AuthProviderFactory.class);
+        beanFactory.registerBeanDefinition("awsSigV4AuthProviderFactory", builtIn);
+        beanFactory.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", true);
+    }
+
+    @Test
+    void providerSnapshotsHonorFactoryMethodOrderMetadata() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(
+                MethodOrderedAuthFactoriesConfiguration.class)) {
+            registerDiagnosticClient(
+                    context.getDefaultListableBeanFactory(), "diagnosticClient", DiagnosticClient.class);
+
+            assertThat(context.getBeanProvider(AuthProviderFactory.class).orderedStream().findFirst().orElseThrow())
+                    .isInstanceOf(MethodOrderedCustomAwsSigV4Factory.class);
+            assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                    diagnosticsProvider(context.getDefaultListableBeanFactory(),
+                            strictBodySigningClientConfig()))))
+                    .containsEntry("strictBodySigningValidation", false);
+        }
+    }
+
+    @Test
+    void providerSnapshotsSkipParentAuthFactoriesShadowedByChildNames() {
+        DefaultListableBeanFactory parent = new DefaultListableBeanFactory();
+        GenericBeanDefinition hiddenParent = new GenericBeanDefinition();
+        hiddenParent.setBeanClass(OrderedCustomAwsSigV4Factory.class);
+        parent.registerBeanDefinition("sharedAwsFactory", hiddenParent);
+        parent.preInstantiateSingletons();
+
+        DefaultListableBeanFactory child = diagnosticClientBeanFactory(parent);
+        GenericBeanDefinition shadowingChild = new GenericBeanDefinition();
+        shadowingChild.setBeanClass(String.class);
+        child.registerBeanDefinition("sharedAwsFactory", shadowingChild);
+        GenericBeanDefinition visibleBuiltIn = new GenericBeanDefinition();
+        visibleBuiltIn.setBeanClass(AwsSigV4AuthProviderFactory.class);
+        child.registerBeanDefinition("visibleBuiltInAwsFactory", visibleBuiltIn);
+        child.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(child, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", true);
+    }
+
+    @Test
+    void providerSnapshotsIgnoreNonOrderDependencyComparators() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        beanFactory.setDependencyComparator((left, right) -> {
+            if (left instanceof AwsSigV4AuthProviderFactory) {
+                return -1;
+            }
+            if (right instanceof AwsSigV4AuthProviderFactory) {
+                return 1;
+            }
+            return 0;
+        });
+        beanFactory.registerBeanDefinition(
+                "orderedCustomAwsFactory", beanDefinition(OrderedCustomAwsSigV4Factory.class));
+        beanFactory.registerBeanDefinition(
+                "awsSigV4AuthProviderFactory", beanDefinition(AwsSigV4AuthProviderFactory.class));
+        beanFactory.preInstantiateSingletons();
+
+        assertThat(beanFactory.getBeanProvider(AuthProviderFactory.class)
+                .orderedStream().findFirst().orElseThrow())
+                .isInstanceOf(OrderedCustomAwsSigV4Factory.class);
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
+    void providerSnapshotsHonorCustomAutowireCandidateResolvers() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        rejectAutowireCandidate(beanFactory, "orderedCustomAwsFactory");
+        beanFactory.registerBeanDefinition(
+                "orderedCustomAwsFactory", beanDefinition(OrderedCustomAwsSigV4Factory.class));
+        beanFactory.registerBeanDefinition(
+                "awsSigV4AuthProviderFactory", beanDefinition(AwsSigV4AuthProviderFactory.class));
+        beanFactory.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", true);
+    }
+
+    @Test
+    void providerSnapshotsUseATypeOnlyAutowireDependencyDescriptor() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        beanFactory.setAutowireCandidateResolver(new AutowireCandidateResolver() {
+            @Override
+            public boolean isAutowireCandidate(BeanDefinitionHolder beanDefinitionHolder,
+                                               DependencyDescriptor descriptor) {
+                return (descriptor.getDependencyName() == null && descriptor.usesStandardBeanLookup())
+                        || !"orderedCustomAwsFactory".equals(beanDefinitionHolder.getBeanName());
+            }
+        });
+        beanFactory.registerBeanDefinition(
+                "orderedCustomAwsFactory", beanDefinition(OrderedCustomAwsSigV4Factory.class));
+        beanFactory.registerBeanDefinition(
+                "awsSigV4AuthProviderFactory", beanDefinition(AwsSigV4AuthProviderFactory.class));
+        beanFactory.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
+    void providerSnapshotsPreservePriorityOrderedFactoryPrecedence() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        GenericBeanDefinition ordinaryBuiltIn = new GenericBeanDefinition();
+        ordinaryBuiltIn.setBeanClass(AwsSigV4AuthProviderFactory.class);
+        ordinaryBuiltIn.setAttribute(
+                AbstractBeanDefinition.ORDER_ATTRIBUTE, Ordered.HIGHEST_PRECEDENCE);
+        beanFactory.registerBeanDefinition("ordinaryBuiltInAwsFactory", ordinaryBuiltIn);
+        GenericBeanDefinition priorityCustom = new GenericBeanDefinition();
+        priorityCustom.setBeanClass(PriorityCustomAwsSigV4Factory.class);
+        beanFactory.registerBeanDefinition("priorityCustomAwsFactory", priorityCustom);
+        beanFactory.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
+                .containsEntry("strictBodySigningValidation", false);
+    }
+
+    @Test
+    void providerSnapshotsPreserveOrderedFactoryPrecedenceOverBeanMetadata() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        GenericBeanDefinition orderedCustom = beanDefinition(OrderedCustomAwsSigV4Factory.class);
+        orderedCustom.setAttribute(
+                AbstractBeanDefinition.ORDER_ATTRIBUTE, Ordered.LOWEST_PRECEDENCE);
+        beanFactory.registerBeanDefinition("orderedCustomAwsFactory", orderedCustom);
+        GenericBeanDefinition builtIn = beanDefinition(AwsSigV4AuthProviderFactory.class);
+        builtIn.setAttribute(AbstractBeanDefinition.ORDER_ATTRIBUTE, 0);
+        beanFactory.registerBeanDefinition("awsSigV4AuthProviderFactory", builtIn);
+        beanFactory.preInstantiateSingletons();
+
+        assertThat(firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
+                diagnosticsProvider(beanFactory, strictBodySigningClientConfig()))))
                 .containsEntry("strictBodySigningValidation", false);
     }
 
@@ -1320,11 +1582,36 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         DefaultListableBeanFactory beanFactory = parent != null
                 ? new DefaultListableBeanFactory(parent)
                 : new DefaultListableBeanFactory();
+        registerDiagnosticClient(beanFactory, "diagnosticClient", DiagnosticClient.class);
+        return beanFactory;
+    }
+
+    private static void registerDiagnosticClient(DefaultListableBeanFactory beanFactory,
+                                                 String beanName,
+                                                 Class<?> clientInterface) {
         GenericBeanDefinition definition = new GenericBeanDefinition();
         definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
-        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, DiagnosticClient.class);
-        beanFactory.registerBeanDefinition("diagnosticClient", definition);
-        return beanFactory;
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, clientInterface);
+        beanFactory.registerBeanDefinition(beanName, definition);
+    }
+
+    private static GenericBeanDefinition beanDefinition(Class<?> beanClass) {
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(beanClass);
+        return definition;
+    }
+
+    private static void rejectAutowireCandidate(DefaultListableBeanFactory beanFactory,
+                                                String rejectedBeanName) {
+        beanFactory.setAutowireCandidateResolver(new AutowireCandidateResolver() {
+            @Override
+            public boolean isAutowireCandidate(BeanDefinitionHolder beanDefinitionHolder,
+                                               DependencyDescriptor descriptor) {
+                return !rejectedBeanName.equals(beanDefinitionHolder.getBeanName())
+                        && AutowireCandidateResolver.super.isAutowireCandidate(
+                        beanDefinitionHolder, descriptor);
+            }
+        });
     }
 
     private static ReactiveHttpClientProperties.ClientConfig strictRetryClientConfig() {
@@ -1334,6 +1621,16 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         resilience.setEnabled(true);
         resilience.setStrictUnsafeRetryValidation(true);
         config.setResilience(resilience);
+        return config;
+    }
+
+    private static ReactiveHttpClientProperties.ClientConfig strictBodySigningClientConfig() {
+        ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
+        config.setAuthProvider(null);
+        ReactiveHttpClientProperties.AuthConfig auth = new ReactiveHttpClientProperties.AuthConfig();
+        auth.setType(AwsSigV4AuthProviderFactory.TYPE);
+        auth.getAwsSigV4().setStrictBodySigningValidation(true);
+        config.setAuth(auth);
         return config;
     }
 
@@ -1489,6 +1786,26 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         }
     }
 
+    static class PriorityCustomAwsSigV4Factory implements AuthProviderFactory, PriorityOrdered {
+
+        @Override
+        public int getOrder() {
+            return Ordered.LOWEST_PRECEDENCE;
+        }
+
+        @Override
+        public boolean supports(String type) {
+            return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+        }
+
+        @Override
+        public AuthProvider create(String clientName,
+                                   ReactiveHttpClientProperties.AuthConfig config,
+                                   WebClient.Builder webClientBuilder) {
+            return request -> Mono.empty();
+        }
+    }
+
     static class OrderedDelegatingAwsSigV4Factory implements AuthProviderFactory, Ordered {
 
         private final AwsSigV4AuthProviderFactory delegate = new AwsSigV4AuthProviderFactory();
@@ -1543,6 +1860,41 @@ class ReactiveHttpClientDiagnosticsProviderTest {
 
         @GET("/direct")
         Mono<String> direct();
+    }
+
+    @ReactiveHttpClient(name = "second-diagnostic-client")
+    interface SecondDiagnosticClient extends SharedOperations {
+    }
+
+    static class MethodOrderedCustomAwsSigV4Factory implements AuthProviderFactory {
+
+        @Override
+        public boolean supports(String type) {
+            return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+        }
+
+        @Override
+        public AuthProvider create(String clientName,
+                                   ReactiveHttpClientProperties.AuthConfig config,
+                                   WebClient.Builder webClientBuilder) {
+            return request -> Mono.empty();
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class MethodOrderedAuthFactoriesConfiguration {
+
+        @Bean
+        @Order(Ordered.HIGHEST_PRECEDENCE)
+        AuthProviderFactory methodOrderedCustomAwsSigV4Factory() {
+            return new MethodOrderedCustomAwsSigV4Factory();
+        }
+
+        @Bean
+        @Order(Ordered.LOWEST_PRECEDENCE)
+        AuthProviderFactory methodOrderedBuiltInAwsSigV4Factory() {
+            return new AwsSigV4AuthProviderFactory();
+        }
     }
 
     @ReactiveHttpClient(
@@ -1622,6 +1974,31 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         @Override
         public Class<?> getObjectType() {
             return RetryRegistry.class;
+        }
+
+        @Override
+        public boolean isSingleton() {
+            return true;
+        }
+    }
+
+    static final class ObjectTypedAuthProviderFactoryBean implements FactoryBean<Object> {
+
+        private final AtomicInteger productCreations;
+
+        ObjectTypedAuthProviderFactoryBean(AtomicInteger productCreations) {
+            this.productCreations = productCreations;
+        }
+
+        @Override
+        public Object getObject() {
+            productCreations.incrementAndGet();
+            return new OrderedCustomAwsSigV4Factory();
+        }
+
+        @Override
+        public Class<?> getObjectType() {
+            return Object.class;
         }
 
         @Override

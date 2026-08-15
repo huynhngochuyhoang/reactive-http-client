@@ -28,6 +28,13 @@ available.
 | Resilience4j retry subscription | Re-subscribes to the request publisher inside the same logical call | Increments by `1` |
 | Outbound dispatch | Passes the request through the final observation filter toward the connector | No direct effect |
 
+Declarative argument validation can fail synchronously during Java method
+invocation, before a cold publisher and logical call exist. That failure creates
+no lifecycle, observer, exchange-log, metric, health, or OTel terminal record.
+Failures after subscription but before dispatch, including URI construction and
+auth-body serialization, create one terminal record with attempt `1`, no final
+request URL, no response status or headers, and no inferred failure stage.
+
 `attemptCount`, `subscriptionAttemptCount`, and lifecycle `attemptNumber` retain
 their established subscription-attempt meaning. They are not wire-request
 counters. A transport-followed redirect or the auth filter's one-time `401`
@@ -180,6 +187,11 @@ supertype of the requested registry keeps registry-dependent facts unknown,
 regardless of bean role or scope, unless bean-definition metadata proves selection
 is unaffected: candidate filtering excludes it, or an existing registry is the
 sole primary or non-fallback candidate.
+
+Strict built-in body-signing status follows the same side-effect-free rule. If
+selecting the effective `AuthProviderFactory` would instantiate a lazy or
+otherwise unresolved factory, `strictBodySigningValidation` is `null`; a support
+query never creates that factory merely to turn the value into `true` or `false`.
 
 Snapshots fail explicitly instead of returning partial counts when they exceed
 256 clients, 10,000 aggregate endpoints, 512 characters in an exported text

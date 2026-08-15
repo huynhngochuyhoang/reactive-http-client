@@ -16,11 +16,18 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.BeanDefinitionHolder;
+import org.springframework.beans.factory.config.DependencyDescriptor;
+import org.springframework.beans.factory.support.AutowireCandidateResolver;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.GenericApplicationContext;
+import org.springframework.core.Ordered;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -34,6 +41,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -933,6 +941,96 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     }
 
     @Test
+    void authFactorySelectionIgnoresNonAutowireCandidates() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            registerDisabledPreferredAwsFactory(context, BeanDefinition.SCOPE_SINGLETON);
+            registerStrictBuiltInAwsFactory(context);
+            context.refresh();
+
+            assertBuiltInStrictBodySigningSelected(context);
+        }
+    }
+
+    @Test
+    void authFactorySelectionIgnoresNonAutowirePrototypeCandidates() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            registerDisabledPreferredAwsFactory(context, BeanDefinition.SCOPE_PROTOTYPE);
+            registerStrictBuiltInAwsFactory(context);
+            context.refresh();
+
+            assertBuiltInStrictBodySigningSelected(context);
+        }
+    }
+
+    @Test
+    void authFactorySelectionIgnoresNonAutowireParentCandidates() {
+        try (GenericApplicationContext parent = new GenericApplicationContext()) {
+            registerDisabledPreferredAwsFactory(parent, BeanDefinition.SCOPE_SINGLETON);
+            parent.refresh();
+            try (GenericApplicationContext child = new GenericApplicationContext()) {
+                child.setParent(parent);
+                registerStrictBuiltInAwsFactory(child);
+                child.refresh();
+
+                assertBuiltInStrictBodySigningSelected(child);
+            }
+        }
+    }
+
+    @Test
+    void authFactorySelectionHonorsCustomAutowireCandidateResolvers() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.getDefaultListableBeanFactory().setAutowireCandidateResolver(
+                    new AutowireCandidateResolver() {
+                        @Override
+                        public boolean isAutowireCandidate(BeanDefinitionHolder beanDefinitionHolder,
+                                                           DependencyDescriptor descriptor) {
+                            return !"preferredCustomAwsFactory".equals(beanDefinitionHolder.getBeanName())
+                                    && AutowireCandidateResolver.super.isAutowireCandidate(
+                                    beanDefinitionHolder, descriptor);
+                        }
+                    });
+            GenericBeanDefinition preferredCustom = new GenericBeanDefinition();
+            preferredCustom.setBeanClass(PreferredCustomAwsSigV4Factory.class);
+            context.registerBeanDefinition("preferredCustomAwsFactory", preferredCustom);
+            registerStrictBuiltInAwsFactory(context);
+            context.refresh();
+
+            assertBuiltInStrictBodySigningSelected(context);
+        }
+    }
+
+    @Test
+    void authFactorySelectionPreflightsIncompatibleParentsBeforeCreatingPrototypes() {
+        DefaultListableBeanFactory beanFactory =
+                new DefaultListableBeanFactory(new StaticListableBeanFactory());
+        try (GenericApplicationContext context = new GenericApplicationContext(beanFactory)) {
+            AtomicInteger instances = new AtomicInteger();
+            GenericBeanDefinition preferredCustom = new GenericBeanDefinition();
+            preferredCustom.setBeanClass(PreferredCustomAwsSigV4Factory.class);
+            preferredCustom.setScope(BeanDefinition.SCOPE_PROTOTYPE);
+            preferredCustom.setInstanceSupplier(() -> {
+                instances.incrementAndGet();
+                return new PreferredCustomAwsSigV4Factory();
+            });
+            context.registerBeanDefinition("preferredCustomAwsFactory", preferredCustom);
+            registerStrictBuiltInAwsFactory(context);
+            context.refresh();
+
+            ReactiveHttpClientFactoryBean<StrictSigV4StreamingBodyClient> factoryBean =
+                    new ReactiveHttpClientFactoryBean<>();
+            factoryBean.setType(StrictSigV4StreamingBodyClient.class);
+            factoryBean.setApplicationContext(context);
+            try {
+                assertThat(factoryBean.getObject()).isNotNull();
+            } finally {
+                factoryBean.destroy();
+            }
+            assertThat(instances).hasValue(1);
+        }
+    }
+
+    @Test
     void strictBodySigningValidationRejectsErasedObjectBody() {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         properties.getClients().put("strict-body-signing-client", awsSigV4ClientConfig(true));
@@ -1677,6 +1775,56 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         auth.getAwsSigV4().setStrictBodySigningValidation(strictBodySigningValidation);
         config.setAuth(auth);
         return config;
+    }
+
+    private void registerDisabledPreferredAwsFactory(GenericApplicationContext context, String scope) {
+        GenericBeanDefinition disabledCustom = new GenericBeanDefinition();
+        disabledCustom.setBeanClass(PreferredCustomAwsSigV4Factory.class);
+        disabledCustom.setAutowireCandidate(false);
+        disabledCustom.setScope(scope);
+        context.registerBeanDefinition("disabledCustomAwsFactory", disabledCustom);
+    }
+
+    private void registerStrictBuiltInAwsFactory(GenericApplicationContext context) {
+        context.registerBean("awsSigV4AuthProviderFactory", AwsSigV4AuthProviderFactory.class);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getClients().put(
+                "strict-body-signing-client", awsSigV4ClientConfig(true));
+        context.registerBean(ReactiveHttpClientProperties.class, () -> properties);
+    }
+
+    private static void assertBuiltInStrictBodySigningSelected(GenericApplicationContext context) {
+        ReactiveHttpClientFactoryBean<StrictSigV4StreamingBodyClient> factoryBean =
+                new ReactiveHttpClientFactoryBean<>();
+        factoryBean.setType(StrictSigV4StreamingBodyClient.class);
+        factoryBean.setApplicationContext(context);
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("failed strict body-signing validation");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    static class PreferredCustomAwsSigV4Factory implements AuthProviderFactory, Ordered {
+
+        @Override
+        public int getOrder() {
+            return Ordered.HIGHEST_PRECEDENCE;
+        }
+
+        @Override
+        public boolean supports(String type) {
+            return AwsSigV4AuthProviderFactory.TYPE.equalsIgnoreCase(type);
+        }
+
+        @Override
+        public AuthProvider create(String clientName,
+                                   ReactiveHttpClientProperties.AuthConfig authConfig,
+                                   WebClient.Builder webClientBuilder) {
+            return request -> Mono.just(AuthContext.empty());
+        }
     }
 
     @ReactiveHttpClient(name = "diagnostic-client")

@@ -275,6 +275,52 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void supportBundleTerminalFixturesStaySanitizedAndStructurallyAccurate() throws IOException {
+        Path root = projectRoot();
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String validationText = Files.readString(
+                root.resolve("docs/fixtures/support-bundle-request-validation.json"));
+        String staleRecoveryText = Files.readString(
+                root.resolve("docs/fixtures/support-bundle-stale-connection-recovery.json"));
+        JsonNode validation = OBJECT_MAPPER.readTree(validationText);
+        JsonNode staleRecovery = OBJECT_MAPPER.readTree(staleRecoveryText);
+
+        assertThat(supportBundles)
+                .contains("(fixtures/support-bundle-request-validation.json)")
+                .contains("(fixtures/support-bundle-stale-connection-recovery.json)")
+                .contains("illustrative sanitized records, not raw logger output");
+        assertThat(validation.path("incidentType").asText()).isEqualTo("request-validation");
+        assertThat(validation.has("terminalRecordCreated")).isTrue();
+        assertThat(validation.path("terminalRecordCreated").isBoolean()).isTrue();
+        assertThat(validation.path("terminalRecordCreated").asBoolean()).isFalse();
+        assertThat(validation.has("subscriptionAttemptCount")).isTrue();
+        assertThat(validation.path("subscriptionAttemptCount").isIntegralNumber()).isTrue();
+        assertThat(validation.path("subscriptionAttemptCount").asInt()).isZero();
+        assertThat(validation.has("requestDispatched")).isTrue();
+        assertThat(validation.path("requestDispatched").isBoolean()).isTrue();
+        assertThat(validation.path("requestDispatched").asBoolean()).isFalse();
+        assertThat(validation.path("failureStage").isNull()).isTrue();
+        assertThat(validation.path("responseStatus").isNull()).isTrue();
+        assertThat(validation.path("responseHeaders").isEmpty()).isTrue();
+
+        JsonNode records = staleRecovery.path("metadataOnlyExchangeRecords");
+        assertThat(records.size()).isEqualTo(2);
+        assertThat(records.get(0).path("subscriptionAttemptCount").asInt()).isEqualTo(1);
+        assertThat(records.get(0).path("errorType").asText()).isEqualTo("PrematureCloseException");
+        assertThat(records.get(0).path("errorCategory").asText()).isEqualTo("TIMEOUT");
+        assertThat(records.get(0).path("responseStatus").isNull()).isTrue();
+        assertThat(records.get(0).path("responseHeaders").isEmpty()).isTrue();
+        assertThat(records.get(1).path("subscriptionAttemptCount").asInt()).isEqualTo(1);
+        assertThat(records.get(1).path("responseStatus").asInt()).isEqualTo(200);
+        assertThat(records.get(1).path("errorType").isNull()).isTrue();
+
+        assertThat(validationText + staleRecoveryText)
+                .doesNotContain("Authorization", "Cookie", "client-secret", "Bearer ")
+                .doesNotContain("http://", "https://", "responseBody", "errorMessage")
+                .doesNotContain("/home/", "/Users/", "/workspace/", "/tmp/", "C:\\Users\\");
+    }
+
+    @Test
     void releaseVersionContractDistinguishesSnapshotCandidateAndPublishedStates() {
         ReleaseVersionContract snapshot = releaseVersionContract(
                 "3.1.0-SNAPSHOT", "3.0.0", "## [Unreleased]\n");

@@ -93,6 +93,22 @@ the reviewable bundle. The example intentionally uses `.example.invalid`,
 placeholder instance names, and metadata-only logging. Replace any production
 header values with presence/absence notes before sharing.
 
+Two source-controlled incident fixtures show the structural facts expected for
+common terminal outcomes:
+
+- [Request validation before subscription](fixtures/support-bundle-request-validation.json)
+  creates no lifecycle, observer, or exchange-log terminal record because no
+  logical call starts and no request is dispatched.
+- [Stale connection followed by a healthy replacement](fixtures/support-bundle-stale-connection-recovery.json)
+  keeps the failed and replacement calls separate. A missing status or failure
+  stage remains unknown; the example does not infer transport facts from an
+  exception message.
+
+Both fixtures are illustrative sanitized records, not raw logger output. They
+contain fake client and path-template metadata only. Default support output must
+not copy arbitrary exception messages, concrete request URLs, header values, or
+payloads into either record.
+
 ## Diagnostics Snapshot
 
 For a one-off JSON or Markdown snapshot, inject

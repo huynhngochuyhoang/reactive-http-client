@@ -433,33 +433,68 @@ Evidence:
 
 ## Priority 8 - Terminal Diagnostics and Redaction Parity
 
-### [ ] 8.1 Align final-attempt facts
+### [x] 8.1 Align final-attempt facts
 
-- [ ] Cover validation, URI, serialization, auth, pool, write, response-header,
+- [x] Cover validation, URI, serialization, auth, pool, write, response-header,
       response-body, stale-connection, and cancellation terminal paths.
-- [ ] Expose a failure stage only when final-attempt evidence proves it.
-- [ ] Keep pre-dispatch errors free of stale URL, status, and response headers.
-- [ ] Align lifecycle, observer, exchange log, Micrometer, health, and OTel on all
+- [x] Expose a failure stage only when final-attempt evidence proves it.
+- [x] Keep pre-dispatch errors free of stale URL, status, and response headers.
+- [x] Align lifecycle, observer, exchange log, Micrometer, health, and OTel on all
       fields each contract exposes.
-- [ ] Preserve one terminal result and subscription-attempt count under retry,
+- [x] Preserve one terminal result and subscription-attempt count under retry,
       redirect, auth replay, and concurrent subscriptions.
 
-### [ ] 8.2 Preserve bounded, side-effect-free support output
+### [x] 8.2 Preserve bounded, side-effect-free support output
 
-- [ ] Prevent arbitrary mapper, codec, auth, filter, multipart, or transport
+- [x] Prevent arbitrary mapper, codec, auth, filter, multipart, or transport
       messages from entering default diagnostics unsanitized.
-- [ ] Keep schema v1 additive, deterministic, request-fact-free, and within
+- [x] Keep schema v1 additive, deterministic, request-fact-free, and within
       client/endpoint/text/UTF-8 size bounds.
-- [ ] Prove support queries instantiate no lazy client, auth provider, resilience
+- [x] Prove support queries instantiate no lazy client, auth provider, resilience
       registry/instance, resource, pool, or connection.
-- [ ] Add sanitized support-bundle fixtures for one request-validation failure and
+- [x] Add sanitized support-bundle fixtures for one request-validation failure and
       one stale-connection recovery.
-- [ ] Run starter/OTel diagnostics suites, schema fixtures, native endpoint checks,
+- [x] Run starter/OTel diagnostics suites, schema fixtures, native endpoint checks,
       strict japicmp, and `git diff --check`.
 
 Evidence:
 
-- Pending.
+- `DiagnosticContextContractTest` now proves required request-argument validation
+  creates no logical-call terminal record, while URI construction and auth-body
+  serialization failures create exactly one attempt-1, stage-unknown terminal
+  outcome with no final URL, status, or response headers across lifecycle,
+  observer, and exchange-log surfaces.
+- Existing real-transport and composition suites were re-run for auth/filter,
+  pool acquisition, request write, response headers/body, cancellation,
+  stale-socket recovery, retry, redirect, one-time auth replay, and concurrent
+  subscriptions. The focused starter matrix passed 192 tests. Micrometer and
+  health now explicitly reject a 10 KiB arbitrary exception message from tags
+  and details; existing default-logger and OTel structural-redaction assertions
+  remain green.
+- `ReactiveHttpClientDiagnosticsProvider` now snapshots existing singleton or
+  cached `AuthProviderFactory` candidates once per report, excludes non-autowire
+  candidates, suppresses parent factories shadowed by child names, and honors
+  `PriorityOrdered`, `Ordered` instance precedence over bean metadata, Spring's
+  non-order comparator fallback, custom autowire candidate resolvers, and
+  factory-method ordering metadata. Runtime auth-factory selection uses the same
+  name-aware candidate rules, including disabled parent and prototype
+  definitions. An unresolved lazy factory or uncached singleton factory product,
+  whether definition-backed or directly registered, leaves
+  `strictBodySigningValidation=null` without creating the factory, client, auth
+  provider, registry/instance, resource, pool, connection, or other network
+  state. Existing schema-v1 determinism, cardinality, text, and UTF-8 byte-limit
+  fixtures remain unchanged.
+- Added reviewable sanitized fixtures at
+  `docs/fixtures/support-bundle-request-validation.json` and
+  `docs/fixtures/support-bundle-stale-connection-recovery.json`, with executable
+  documentation assertions rejecting credentials, concrete URLs, payload/error
+  text fields, and machine-local paths. The stale-connection fixture uses the
+  published `TIMEOUT` category for `PrematureCloseException`.
+- Focused OTel verification passed 25 tests; AOT/Actuator endpoint verification
+  passed 41 tests. The GraalVM native smoke compiled successfully in 4m27s and
+  its executable exited `0` after checking the `rhttpclients` endpoint and schema
+  outputs. Strict reactor japicmp against published `3.4.0` passed for starter,
+  test helper, and OTel modules. `git diff --check` passed.
 
 ---
 

@@ -1,0 +1,14 @@
+{
+  "incidentType": "request-validation",
+  "clientName": "inventory-api",
+  "apiName": "getOrder",
+  "httpMethod": "GET",
+  "pathTemplate": "/orders/{orderId}",
+  "terminalRecordCreated": false,
+  "subscriptionAttemptCount": 0,
+  "requestDispatched": false,
+  "errorType": "IllegalArgumentException",
+  "failureStage": null,
+  "responseStatus": null,
+  "responseHeaders": {}
+}

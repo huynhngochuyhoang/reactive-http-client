@@ -1,12 +1,10 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
-import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
-import io.github.huynhngochuyhoang.httpstarter.annotation.HeaderParam;
-import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
-import io.github.huynhngochuyhoang.httpstarter.annotation.QueryParam;
+import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
+import io.github.huynhngochuyhoang.httpstarter.exception.RequestSerializationException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.junit.jupiter.api.Test;
@@ -22,9 +20,8 @@ import reactor.test.StepVerifier;
 
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -149,6 +146,74 @@ class DiagnosticContextContractTest {
                 .doesNotContain("getResponseHeaders");
     }
 
+    @Test
+    void invocationValidationDoesNotCreateATerminalCall() throws Throwable {
+        TerminalDiagnostics diagnostics = new TerminalDiagnostics();
+        ReactiveClientInvocationHandler handler = createHandler(
+                WebClient.builder().baseUrl("http://test.local").build(),
+                new DefaultErrorDecoder(), diagnostics, diagnostics, diagnostics);
+        Method method = RequiredPathClient.class.getMethod("get", String.class);
+
+        Throwable failure = org.assertj.core.api.Assertions.catchThrowable(
+                () -> handler.invoke(null, method, new Object[]{null}));
+
+        assertThat(failure)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Required @PathVar");
+        diagnostics.assertNoCallStarted();
+    }
+
+    @Test
+    void uriConstructionFailureReportsOneStageUnknownPreDispatchTerminal() throws Throwable {
+        TerminalDiagnostics diagnostics = new TerminalDiagnostics();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> Mono.error(new AssertionError("request must not dispatch")))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(
+                webClient, new DefaultErrorDecoder(), diagnostics, diagnostics, diagnostics);
+
+        Method method = InvalidUriClient.class.getMethod("get");
+        @SuppressWarnings("unchecked")
+        Mono<String> request = (Mono<String>) handler.invoke(null, method, null);
+        AtomicReference<Throwable> terminal = new AtomicReference<>();
+        StepVerifier.create(request)
+                .expectErrorSatisfies(terminal::set)
+                .verify();
+
+        assertThat(terminal.get()).isInstanceOf(IllegalStateException.class);
+        diagnostics.assertOnePreDispatchTerminal(terminal.get());
+    }
+
+    @Test
+    void serializationFailureReportsOneStageUnknownPreDispatchTerminal() throws Throwable {
+        TerminalDiagnostics diagnostics = new TerminalDiagnostics();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> Mono.error(new AssertionError("request must not dispatch")))
+                .build();
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setAuthProvider("configured-auth");
+        ReactiveClientInvocationHandler handler = createHandler(
+                webClient, new DefaultErrorDecoder(), diagnostics, diagnostics, diagnostics,
+                config, TestJsonCodecs.jsonCodec());
+        Map<String, Object> cyclic = new HashMap<>();
+        cyclic.put("self", cyclic);
+
+        Method method = SerializationClient.class.getMethod("create", Object.class);
+        @SuppressWarnings("unchecked")
+        Mono<String> request = (Mono<String>) handler.invoke(null, method, new Object[]{cyclic});
+        AtomicReference<Throwable> terminal = new AtomicReference<>();
+        StepVerifier.create(request)
+                .expectErrorSatisfies(terminal::set)
+                .verify();
+
+        assertThat(terminal.get()).isInstanceOf(RequestSerializationException.class);
+        diagnostics.assertOnePreDispatchTerminal(terminal.get());
+    }
+
     private static ReactiveHttpClientLifecycleHook successHook(
             AtomicReference<ReactiveHttpClientLifecycleContext> succeeded) {
         return new ReactiveHttpClientLifecycleHook() {
@@ -176,6 +241,21 @@ class DiagnosticContextContractTest {
             DefaultHttpExchangeLogger exchangeLogger,
             HttpClientObserver observer,
             ReactiveHttpClientLifecycleHook lifecycleHook) {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setExchangeLoggingEnabled(true);
+        return createHandler(webClient, errorDecoder, exchangeLogger, observer, lifecycleHook,
+                config, TestJsonCodecs.jsonCodec());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ReactiveClientInvocationHandler createHandler(
+            WebClient webClient,
+            DefaultErrorDecoder errorDecoder,
+            DefaultHttpExchangeLogger exchangeLogger,
+            HttpClientObserver observer,
+            ReactiveHttpClientLifecycleHook lifecycleHook,
+            ReactiveHttpClientProperties.ClientConfig config,
+            ReactiveHttpClientJsonCodec jsonCodec) {
         ApplicationContext context = mock(ApplicationContext.class);
         ObjectProvider<HttpClientObserver> observerProvider = mock(ObjectProvider.class);
         when(context.getBeanProvider(HttpClientObserver.class)).thenReturn(observerProvider);
@@ -189,7 +269,6 @@ class DiagnosticContextContractTest {
         when(context.getBeanProvider(DefaultHttpExchangeLogger.class)).thenReturn(loggerProvider);
         when(loggerProvider.getIfAvailable()).thenReturn(exchangeLogger);
 
-        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.setExchangeLoggingEnabled(true);
         ReactiveHttpClientProperties.ObservabilityConfig observability =
                 new ReactiveHttpClientProperties.ObservabilityConfig();
@@ -203,8 +282,90 @@ class DiagnosticContextContractTest {
                 "test-client",
                 context,
                 new NoopResilienceOperatorApplier(),
-                TestJsonCodecs.jsonCodec(),
+                jsonCodec,
                 observability);
+    }
+
+    private static final class TerminalDiagnostics extends DefaultHttpExchangeLogger
+            implements HttpClientObserver, ReactiveHttpClientLifecycleHook {
+        private final AtomicReference<HttpClientObserverEvent> observer = new AtomicReference<>();
+        private final AtomicReference<ReactiveHttpClientLifecycleContext> started = new AtomicReference<>();
+        private final AtomicReference<ReactiveHttpClientLifecycleContext> failed = new AtomicReference<>();
+        private final AtomicReference<HttpExchangeLogContext> exchange = new AtomicReference<>();
+        private final AtomicInteger observerCount = new AtomicInteger();
+        private final AtomicInteger startedCount = new AtomicInteger();
+        private final AtomicInteger failedCount = new AtomicInteger();
+        private final AtomicInteger exchangeCount = new AtomicInteger();
+
+        @Override
+        public void record(HttpClientObserverEvent event) {
+            observerCount.incrementAndGet();
+            observer.set(event);
+        }
+
+        @Override
+        public void onStart(ReactiveHttpClientLifecycleContext context) {
+            startedCount.incrementAndGet();
+            started.set(context);
+        }
+
+        @Override
+        public void onError(ReactiveHttpClientLifecycleContext context) {
+            failedCount.incrementAndGet();
+            failed.set(context);
+        }
+
+        @Override
+        public void log(HttpExchangeLogContext context) {
+            exchangeCount.incrementAndGet();
+            exchange.set(context);
+        }
+
+        private void assertNoCallStarted() {
+            assertThat(observerCount).hasValue(0);
+            assertThat(startedCount).hasValue(0);
+            assertThat(failedCount).hasValue(0);
+            assertThat(exchangeCount).hasValue(0);
+            assertThat(observer).hasValue(null);
+            assertThat(started).hasValue(null);
+            assertThat(failed).hasValue(null);
+            assertThat(exchange).hasValue(null);
+        }
+
+        private void assertOnePreDispatchTerminal(Throwable terminal) {
+            assertThat(observerCount).hasValue(1);
+            assertThat(startedCount).hasValue(1);
+            assertThat(failedCount).hasValue(1);
+            assertThat(exchangeCount).hasValue(1);
+            assertThat(started.get()).satisfies(context -> {
+                assertThat(context.attemptNumber()).isEqualTo(1);
+                assertThat(context.requestUrl()).isNull();
+                assertThat(context.statusCode()).isNull();
+            });
+            assertThat(observer.get()).satisfies(event -> {
+                assertThat(event.getError()).isSameAs(terminal);
+                assertThat(event.getAttemptCount()).isEqualTo(1);
+                assertThat(event.getRequestUrl()).isNull();
+                assertThat(event.getRequestHeaders()).isEmpty();
+                assertThat(event.getStatusCode()).isNull();
+                assertThat(event.getFailureStage()).isNull();
+            });
+            assertThat(failed.get()).satisfies(context -> {
+                assertThat(context.error()).isSameAs(terminal);
+                assertThat(context.attemptNumber()).isEqualTo(1);
+                assertThat(context.requestUrl()).isNull();
+                assertThat(context.statusCode()).isNull();
+                assertThat(context.failureStage()).isNull();
+            });
+            assertThat(exchange.get()).satisfies(context -> {
+                assertThat(context.error()).isSameAs(terminal);
+                assertThat(context.subscriptionAttemptCount()).isEqualTo(1);
+                assertThat(context.requestUrl()).isNull();
+                assertThat(context.responseStatus()).isNull();
+                assertThat(context.responseHeaders()).isEmpty();
+                assertThat(context.failureStage()).isNull();
+            });
+        }
     }
 
     private static final class RecordingLogger extends DefaultHttpExchangeLogger {
@@ -226,5 +387,20 @@ class DiagnosticContextContractTest {
                 @PathVar("id") String id,
                 @QueryParam("view") String view,
                 @HeaderParam("X-Declared") String declaredHeader);
+    }
+
+    interface RequiredPathClient {
+        @GET("/items/{id}")
+        Mono<String> get(@PathVar("id") String id);
+    }
+
+    interface InvalidUriClient {
+        @GET("https://user:secret@example.test/items")
+        Mono<String> get();
+    }
+
+    interface SerializationClient {
+        @POST("/items")
+        Mono<String> create(@Body Object body);
     }
 }

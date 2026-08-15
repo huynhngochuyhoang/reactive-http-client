@@ -1,0 +1,28 @@
+{
+  "incidentType": "stale-connection-recovery",
+  "clientName": "inventory-api",
+  "metadataOnlyExchangeRecords": [
+    {
+      "apiName": "resetOnReuse",
+      "httpMethod": "GET",
+      "pathTemplate": "/reset-on-reuse",
+      "subscriptionAttemptCount": 1,
+      "errorType": "PrematureCloseException",
+      "errorCategory": "TIMEOUT",
+      "failureStage": null,
+      "responseStatus": null,
+      "responseHeaders": {}
+    },
+    {
+      "apiName": "probe",
+      "httpMethod": "GET",
+      "pathTemplate": "/probe",
+      "subscriptionAttemptCount": 1,
+      "errorType": null,
+      "errorCategory": "NONE",
+      "failureStage": null,
+      "responseStatus": 200,
+      "responseHeaders": {}
+    }
+  ]
+}

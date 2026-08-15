@@ -60,11 +60,13 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     List<ClientSnapshotEntry> clientSnapshotEntries() {
         ResilienceDiagnostics resilienceDiagnostics = resilienceDiagnostics();
+        ExistingAuthProviderFactories authProviderFactories = existingAuthProviderFactories(beanFactory);
         return List.of(beanFactory.getBeanDefinitionNames()).stream()
                 .map(this::clientRegistration)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(registration -> clientSnapshotEntry(registration, resilienceDiagnostics))
+                .map(registration -> clientSnapshotEntry(
+                        registration, resilienceDiagnostics, authProviderFactories))
                 .sorted(Comparator.comparing((ClientSnapshotEntry entry) -> entry.summary().clientName())
                         .thenComparing(entry -> entry.summary().clientInterface()))
                 .toList();
@@ -82,7 +84,8 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     private ClientSnapshotEntry clientSnapshotEntry(ClientRegistration registration,
-                                                    ResilienceDiagnostics resilienceDiagnostics) {
+                                                    ResilienceDiagnostics resilienceDiagnostics,
+                                                    ExistingAuthProviderFactories authProviderFactories) {
         Class<?> clientInterface = registration.clientInterface();
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         String clientName = annotation != null ? annotation.name() : "";
@@ -95,7 +98,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 summary,
                 strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceDiagnostics.operatorApplier(),
                         resilienceDiagnostics.retryRegistryUnresolved()),
-                strictBodySigningValidation(clientConfig),
+                strictBodySigningValidation(clientConfig, authProviderFactories),
                 poolSummary(clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
                 clientConfig.isCompressionEnabled(),
@@ -301,7 +304,9 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return unresolvedRetry ? null : false;
     }
 
-    private boolean strictBodySigningValidation(ReactiveHttpClientProperties.ClientConfig clientConfig) {
+    private Boolean strictBodySigningValidation(
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            ExistingAuthProviderFactories factories) {
         if (StringUtils.hasText(clientConfig.getAuthProvider())
                 || clientConfig.getAuth() == null
                 || clientConfig.getAuth().getAwsSigV4() == null
@@ -309,12 +314,65 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 || !clientConfig.getAuth().getAwsSigV4().isStrictBodySigningValidation()) {
             return false;
         }
-        return beanFactory.getBeanProvider(AuthProviderFactory.class)
-                .orderedStream()
+        if (factories.unresolved()) {
+            return null;
+        }
+        return factories.candidates().stream()
+                .map(AuthProviderFactoryCandidates.Candidate::value)
                 .filter(factory -> factory.supports(clientConfig.getAuth().getType()))
                 .findFirst()
                 .filter(AwsSigV4AuthProviderFactory.class::isInstance)
                 .isPresent();
+    }
+
+    private ExistingAuthProviderFactories existingAuthProviderFactories(
+            ConfigurableListableBeanFactory factory) {
+        return existingAuthProviderFactories(factory, Set.of());
+    }
+
+    private ExistingAuthProviderFactories existingAuthProviderFactories(
+            ConfigurableListableBeanFactory factory,
+            Set<String> shadowedBeanNames) {
+        String[] beanNames = Arrays.stream(
+                        factory.getBeanNamesForType(AuthProviderFactory.class, true, false))
+                .filter(beanName -> !shadowedBeanNames.contains(beanName))
+                .toArray(String[]::new);
+        List<String> uninspectableBeanNames = uninspectableFactoryBeanNames(
+                factory, AuthProviderFactory.class, beanNames).stream()
+                .filter(beanName -> !shadowedBeanNames.contains(beanName))
+                .filter(beanName -> AuthProviderFactoryCandidates.isAutowireCandidate(beanFactory, beanName))
+                .toList();
+        if (!uninspectableBeanNames.isEmpty()) {
+            return ExistingAuthProviderFactories.unresolvedLookup();
+        }
+
+        List<AuthProviderFactoryCandidates.Candidate> values = new ArrayList<>();
+        for (String beanName : beanNames) {
+            if (!AuthProviderFactoryCandidates.isAutowireCandidate(beanFactory, beanName)) {
+                continue;
+            }
+            Object value = existingSingletonValue(factory, AuthProviderFactory.class, beanName);
+            if (!(value instanceof AuthProviderFactory authProviderFactory)) {
+                return ExistingAuthProviderFactories.unresolvedLookup();
+            }
+            values.add(new AuthProviderFactoryCandidates.Candidate(
+                    factory, beanName, authProviderFactory));
+        }
+
+        BeanFactory parent = factory.getParentBeanFactory();
+        if (parent instanceof ConfigurableListableBeanFactory parentFactory) {
+            ExistingAuthProviderFactories parentFactories = existingAuthProviderFactories(
+                    parentFactory,
+                    AuthProviderFactoryCandidates.withLocalBeanNames(factory, shadowedBeanNames));
+            if (parentFactories.unresolved()) {
+                return parentFactories;
+            }
+            values.addAll(parentFactories.candidates());
+        } else if (parent != null) {
+            return ExistingAuthProviderFactories.unresolvedLookup();
+        }
+        AuthProviderFactoryCandidates.sort(values, beanFactory);
+        return ExistingAuthProviderFactories.available(values);
     }
 
     private static String diagnosticHttpMethod(MethodMetadata meta,
@@ -539,9 +597,27 @@ public class ReactiveHttpClientDiagnosticsProvider {
             String[] knownBeanNames) {
         List<String> knownNames = List.of(knownBeanNames);
         List<String> uninspectableNames = new ArrayList<>();
-        for (String beanName : factory.getBeanDefinitionNames()) {
-            if (knownNames.contains(beanName) || factory.containsSingleton(beanName)) {
+        Set<String> localBeanNames = new LinkedHashSet<>(
+                Arrays.asList(factory.getBeanDefinitionNames()));
+        localBeanNames.addAll(Arrays.asList(factory.getSingletonNames()));
+        for (String beanName : localBeanNames) {
+            if (knownNames.contains(beanName)) {
                 continue;
+            }
+            Object singleton = factory.getSingleton(beanName);
+            if (singleton instanceof FactoryBean<?> singletonFactory) {
+                if (cachedFactoryBeanProduct(factory, beanName) != null) {
+                    continue;
+                }
+                if (!factory.containsBeanDefinition(beanName)) {
+                    Class<?> objectType = singletonFactory.getObjectType();
+                    if (objectType == null
+                            || type.isAssignableFrom(objectType)
+                            || objectType.isAssignableFrom(type)) {
+                        uninspectableNames.add(beanName);
+                    }
+                    continue;
+                }
             }
             BeanDefinition definition = beanDefinition(factory, beanName);
             if (definition == null || definition.isAbstract()) {
@@ -684,10 +760,24 @@ public class ReactiveHttpClientDiagnosticsProvider {
         }
     }
 
+    private record ExistingAuthProviderFactories(
+            List<AuthProviderFactoryCandidates.Candidate> candidates,
+            boolean unresolved) {
+
+        private static ExistingAuthProviderFactories available(
+                List<AuthProviderFactoryCandidates.Candidate> candidates) {
+            return new ExistingAuthProviderFactories(List.copyOf(candidates), false);
+        }
+
+        private static ExistingAuthProviderFactories unresolvedLookup() {
+            return new ExistingAuthProviderFactories(List.of(), true);
+        }
+    }
+
     record ClientSnapshotEntry(
             ClientSummary summary,
             Boolean strictUnsafeRetryValidation,
-            boolean strictBodySigningValidation,
+            Boolean strictBodySigningValidation,
             PoolSummary pool,
             long logicalCallTimeoutMs,
             boolean compressionEnabled,

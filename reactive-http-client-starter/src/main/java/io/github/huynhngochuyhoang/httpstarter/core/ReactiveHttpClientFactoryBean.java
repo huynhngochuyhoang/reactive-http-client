@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.core.io.Resource;
@@ -1448,8 +1449,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         }
 
         String type = config.getAuth().getType();
-        AuthProviderFactory factory = applicationContext.getBeanProvider(AuthProviderFactory.class)
-                .orderedStream()
+        AuthProviderFactory factory = authProviderFactories()
                 .filter(candidate -> candidate.supports(type))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
@@ -1464,6 +1464,54 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     .getIfAvailable(WebClient::builder);
         }
         return factory.create(clientName, config.getAuth(), builder);
+    }
+
+    private java.util.stream.Stream<AuthProviderFactory> authProviderFactories() {
+        if (!(applicationContext.getAutowireCapableBeanFactory()
+                instanceof ConfigurableListableBeanFactory beanFactory)) {
+            return applicationContext.getBeanProvider(AuthProviderFactory.class).orderedStream();
+        }
+        if (!hasConfigurableBeanFactoryHierarchy(beanFactory)) {
+            return applicationContext.getBeanProvider(AuthProviderFactory.class).orderedStream();
+        }
+
+        List<AuthProviderFactoryCandidates.Candidate> candidates = new ArrayList<>();
+        collectAuthProviderFactories(beanFactory, beanFactory, Set.of(), candidates);
+        AuthProviderFactoryCandidates.sort(candidates, beanFactory);
+        return candidates.stream().map(AuthProviderFactoryCandidates.Candidate::value);
+    }
+
+    private boolean hasConfigurableBeanFactoryHierarchy(ConfigurableListableBeanFactory factory) {
+        org.springframework.beans.factory.BeanFactory parent = factory.getParentBeanFactory();
+        if (parent == null) {
+            return true;
+        }
+        return parent instanceof ConfigurableListableBeanFactory parentFactory
+                && hasConfigurableBeanFactoryHierarchy(parentFactory);
+    }
+
+    private void collectAuthProviderFactories(
+            ConfigurableListableBeanFactory rootFactory,
+            ConfigurableListableBeanFactory factory,
+            Set<String> shadowedBeanNames,
+            List<AuthProviderFactoryCandidates.Candidate> candidates) {
+        for (String beanName : factory.getBeanNamesForType(AuthProviderFactory.class, true, true)) {
+            if (shadowedBeanNames.contains(beanName)
+                    || !AuthProviderFactoryCandidates.isAutowireCandidate(rootFactory, beanName)) {
+                continue;
+            }
+            candidates.add(new AuthProviderFactoryCandidates.Candidate(
+                    factory, beanName, factory.getBean(beanName, AuthProviderFactory.class)));
+        }
+
+        org.springframework.beans.factory.BeanFactory parent = factory.getParentBeanFactory();
+        if (parent instanceof ConfigurableListableBeanFactory parentFactory) {
+            collectAuthProviderFactories(
+                    rootFactory,
+                    parentFactory,
+                    AuthProviderFactoryCandidates.withLocalBeanNames(factory, shadowedBeanNames),
+                    candidates);
+        }
     }
 
     private WebClient.Builder buildOAuth2TokenServiceWebClientBuilder(
