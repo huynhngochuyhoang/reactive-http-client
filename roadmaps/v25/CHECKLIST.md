@@ -778,18 +778,18 @@ Evidence:
       cut.
 - [x] Record whether public performance claims require a promoted report.
 
-### [ ] 13.2 Assemble immutable release evidence
+### [x] 13.2 Assemble immutable release evidence
 
-- [ ] Run `mvn -B -ntp clean verify` from the release-prep tree.
-- [ ] Run strict root and module API compatibility from isolated Central-only
+- [x] Run `mvn -B -ntp clean verify` from the release-prep tree.
+- [x] Run strict root and module API compatibility from isolated Central-only
       repositories.
-- [ ] Run generation packaging, current/published consumer, supported matrix,
+- [x] Run generation packaging, current/published consumer, supported matrix,
       request/framing/multipart/pool composition, AOT/native, and documentation
       gates.
-- [ ] Verify complete candidate parent, starter, test-helper, and OTel POM,
+- [x] Verify complete candidate parent, starter, test-helper, and OTel POM,
       binary, source, and Javadoc artifacts.
-- [ ] Re-run every reproducible release gate from one clean immutable commit.
-- [ ] Cite a clean promoted benchmark report or keep changelog wording
+- [x] Re-run every reproducible release gate from one clean immutable commit.
+- [x] Cite a clean promoted benchmark report or keep changelog wording
       non-numerical.
 
 ### [ ] 13.3 Record the mutually exclusive decision
@@ -823,7 +823,36 @@ Evidence:
   `3.4.0`. Preparing the candidate does not publish or move any baseline.
 - V25 makes no public numerical performance or allocation claim. Target-only JMH
   evidence remains release-review input, so no promoted `3.5.0` benchmark report
-  is required. Sections 13.2 and 13.3 remain pending.
+  is required.
+- Froze the final release-prep tree at clean commit
+  `c0140340c9a49a51ef32cc0739f9663850c0cf62`. From that commit,
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml clean verify` passed 1,016
+  starter, 48 test-helper, and 43 OTel tests, including request-target, framing,
+  multipart, stale-pool, retry/redirect/auth composition, diagnostics,
+  documentation, and AOT coverage.
+- Passed the Java 21 supported matrix for Spring Boot `4.0.0` and `4.1.0`,
+  including assembled consumers, optional integrations, dependency captures,
+  and strict root API comparisons against Central-resolved `3.4.0`. The separate
+  starter-module japicmp lane and API/published-baseline contamination fixtures
+  also passed. Evidence is under
+  `target/release-evidence/v25/priority13/matrix/` and
+  `target/release-evidence/v25/priority13/api-starter-3.4.0/`.
+- Passed isolated current-candidate and published-`3.4.0` assembled-consumer
+  verification. Their dependency trees, classpaths, artifact hashes, Central
+  markers, and clean-commit provenance are under
+  `target/release-evidence/current-consumer/current-3.5.0/` and
+  `target/release-evidence/published-consumer/published-3.4.0/`.
+- Built the complete candidate attachment set with the release profile, verified
+  generation packaging, and recorded 13 parent/module POM, binary, source, and
+  Javadoc SHA-256 values under
+  `target/release-evidence/v25/priority13/candidate-artifacts/`. Local GPG
+  signing remains part of the publication workflow in 13.3.
+- GraalVM `25.0.3` compiled and executed the assembled `3.5.0` native fixture;
+  binary hash and provenance are under
+  `target/release-evidence/v25/priority13/native/`. Benchmark smoke also passed
+  from the immutable commit; its target-only checksum/provenance records that no
+  report promotion is required because the changelog remains non-numerical.
+  Section 13.3 remains pending.
 
 ## Completion Rule
 
