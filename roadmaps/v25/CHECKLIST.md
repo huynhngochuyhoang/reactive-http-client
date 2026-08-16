@@ -767,16 +767,16 @@ Evidence:
 
 ## Priority 13 - V25 Release Go/No-Go
 
-### [ ] 13.1 Select release scope and candidate version
+### [x] 13.1 Select release scope and candidate version
 
-- [ ] Inventory delivered internal fixes, public additions, deprecations, and
+- [x] Inventory delivered internal fixes, public additions, deprecations, and
       diagnostics schema effects.
-- [ ] Select a `3.4.x` patch for internal correctness/docs only, or `3.5.0` for a
+- [x] Select a `3.4.x` patch for internal correctness/docs only, or `3.5.0` for a
       backward-compatible public addition.
-- [ ] Reject/defer binary or source incompatible changes and schema-v1 breaks.
-- [ ] Keep the reactor snapshot and published baseline separate until the release
+- [x] Reject/defer binary or source incompatible changes and schema-v1 breaks.
+- [x] Keep the reactor snapshot and published baseline separate until the release
       cut.
-- [ ] Record whether public performance claims require a promoted report.
+- [x] Record whether public performance claims require a promoted report.
 
 ### [ ] 13.2 Assemble immutable release evidence
 
@@ -807,7 +807,23 @@ Evidence:
 
 Evidence:
 
-- Pending.
+- V25 is selected as the backward-compatible `3.5.0` minor candidate. Internal
+  correctness work covers request declarations and URI construction, terminal
+  status/framing, multipart ownership/order, subscription-local reporting,
+  stale pooled-connection recovery, and sanitized diagnostics/support evidence.
+- The public additions are confined to test-helper multipart records/assertions,
+  caller-supplied `MethodMetadataCache` support, and additive validation-cache
+  methods already covered by strict japicmp. No public removals, deprecations,
+  source incompatibilities, or binary incompatibilities were accepted.
+- Diagnostics schema v1 retains its existing key/type contract, deterministic
+  ordering, nullable unknown semantics, and size/cardinality bounds. The new
+  support-bundle fixtures are documentation evidence, not schema-v1 fields.
+- The reactor remains `3.5.0-SNAPSHOT`; `latest.published.version` and
+  `api.compatibility.baseline.version` remain `3.4.0` until the explicit release
+  cut. Selecting the candidate does not publish or move any baseline.
+- V25 makes no public numerical performance or allocation claim. Target-only JMH
+  evidence remains release-review input, so no promoted `3.5.0` benchmark report
+  is required. Sections 13.2 and 13.3 remain pending.
 
 ## Completion Rule
 
