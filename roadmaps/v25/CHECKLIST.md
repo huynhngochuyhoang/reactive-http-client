@@ -818,9 +818,9 @@ Evidence:
 - Diagnostics schema v1 retains its existing key/type contract, deterministic
   ordering, nullable unknown semantics, and size/cardinality bounds. The new
   support-bundle fixtures are documentation evidence, not schema-v1 fields.
-- The reactor remains `3.5.0-SNAPSHOT`; `latest.published.version` and
-  `api.compatibility.baseline.version` remain `3.4.0` until the explicit release
-  cut. Selecting the candidate does not publish or move any baseline.
+- The release cut moves reactor-only coordinates to final `3.5.0`;
+  `latest.published.version` and `api.compatibility.baseline.version` remain
+  `3.4.0`. Preparing the candidate does not publish or move any baseline.
 - V25 makes no public numerical performance or allocation claim. Target-only JMH
   evidence remains release-review input, so no promoted `3.5.0` benchmark report
   is required. Sections 13.2 and 13.3 remain pending.
