@@ -16,7 +16,7 @@ reactive:
   http:
     clients:
       bus-api:
-        base-url: https://bus-api.example.com
+        base-url: https://bus-api.example.invalid
         request-timeout-ms: 1500
         follow-redirects: false
         apis:
@@ -25,7 +25,7 @@ reactive:
             path: /api/order
             timeout-ms: 1200
       train-api:
-        base-url: https://train-api.example.com
+        base-url: https://train-api.example.invalid
         request-timeout-ms: 2500
         follow-redirects: true
         apis:
@@ -60,7 +60,7 @@ reactive:
   http:
     clients:
       inventory-aws:
-        base-url: https://abc123.execute-api.us-east-1.amazonaws.com/prod
+        base-url: https://EXAMPLE_API_ID.execute-api.us-east-1.amazonaws.com/prod
         default-headers:
           Content-Type: application/json
         auth:
@@ -82,7 +82,7 @@ reactive:
     network:
       proxy:
         type: HTTP
-        host: proxy.corp.example
+        host: proxy.corp.example.invalid
         port: 3128
         username: ${PROXY_USERNAME}
         password: ${PROXY_PASSWORD}
@@ -93,7 +93,7 @@ reactive:
         trust-store-type: PKCS12
     clients:
       partner-api:
-        base-url: https://partner.example.com
+        base-url: https://partner.example.invalid
         proxy:
           type: NONE
         tls:
@@ -114,7 +114,7 @@ reactive:
   http:
     clients:
       payment-command:
-        base-url: https://payments.example.com
+        base-url: https://payments.example.invalid
         default-headers:
           Idempotency-Key: ${PAYMENT_IDEMPOTENCY_KEY}
         resilience:

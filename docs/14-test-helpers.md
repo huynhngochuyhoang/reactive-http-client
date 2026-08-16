@@ -50,7 +50,7 @@ when a test depends on transport ownership.
 
 ```java
 MockReactiveHttpClient<UserService> mock = MockReactiveHttpClient.forClient(UserService.class)
-        .baseUrl("http://mock.local")
+        .baseUrl("http://mock.example.invalid")
         .respondTo(HttpMethod.GET, "/users/42",
                 ex -> MockReactiveHttpClient.json(200, "{\"id\":42,\"name\":\"alice\"}"))
         .respondTo(HttpMethod.POST, "/users",
@@ -595,7 +595,7 @@ HTTP exceptions that carry a status.
 
 ```java
 MockReactiveHttpClient<UserService> mock = MockReactiveHttpClient.forClient(UserService.class)
-        .baseUrl("http://mock.local")
+        .baseUrl("http://mock.example.invalid")
         .respondTo(HttpMethod.GET, "/users/99",
                 ex -> MockReactiveHttpClient.json(404, "{\"error\":\"not found\"}"))
         .respondTo(HttpMethod.GET, "/users/1",
@@ -626,7 +626,7 @@ class UserServiceTest {
     void delegatesToUserApiClient() {
         MockReactiveHttpClient<UserApiClient> mock = MockReactiveHttpClient
                 .forClient(UserApiClient.class)
-                .baseUrl("http://mock.local")
+                .baseUrl("http://mock.example.invalid")
                 .respondTo(HttpMethod.GET, "/users/42",
                         ex -> MockReactiveHttpClient.json(200, "{\"id\":42,\"name\":\"alice\"}"))
                 .build();
@@ -666,12 +666,12 @@ interface SharedUserOperations {
 @Test
 void sharedContractSnapshot() {
     ClientConfig internal = new ClientConfig();
-    internal.setBaseUrl("https://internal.example");
+    internal.setBaseUrl("https://internal.example.invalid");
     internal.setRequestTimeoutMs(1000);
     internal.setApis(Map.of("users.get", api("GET", "/internal/users/{id}")));
 
     ClientConfig partner = new ClientConfig();
-    partner.setBaseUrl("https://partner.example");
+    partner.setBaseUrl("https://partner.example.invalid");
     partner.setRequestTimeoutMs(2000);
     partner.setApis(Map.of("users.get", api("GET", "/partner/users/{id}")));
 

@@ -135,7 +135,7 @@ reactive:
       network-write-timeout-ms: 60000
     clients:
       user-service:
-        base-url: https://api.example.com
+        base-url: https://api.example.invalid
         logical-call-timeout-ms: 12000 # total budget across all attempts
         request-timeout-ms: 5000   # per-request default for this client
 ```

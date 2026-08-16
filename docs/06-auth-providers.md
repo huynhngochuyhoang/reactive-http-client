@@ -250,7 +250,7 @@ reactive:
   http:
     clients:
       inventory-api:
-        base-url: https://abc123.execute-api.us-east-1.amazonaws.com/prod
+        base-url: https://EXAMPLE_API_ID.execute-api.us-east-1.amazonaws.com/prod
         auth:
           type: aws-sigv4
           aws-sig-v4:

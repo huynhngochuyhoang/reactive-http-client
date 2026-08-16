@@ -48,7 +48,7 @@
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.tls.trust-store-type` | `java.lang.String` |  | Token-service truststore format override. Default: PKCS12. |  |
 | `reactive.http.clients.[name].auth.oauth2-client-credentials.token-uri` | `java.lang.String` |  | OAuth2 token endpoint URI for type oauth2-client-credentials. |  |
 | `reactive.http.clients.[name].auth.type` | `java.lang.String` |  | Object-style auth provider type. Built-in values: oauth2-client-credentials, aws-sigv4. Ignored when auth-provider bean name is set. |  |
-| `reactive.http.clients.[name].base-url` | `java.lang.String` |  | Base URL for this client (e.g. https://api.example.com). |  |
+| `reactive.http.clients.[name].base-url` | `java.lang.String` |  | Base URL for this client (e.g. https://api.example.invalid). |  |
 | `reactive.http.clients.[name].codec-max-in-memory-size-mb` | `java.lang.Integer` | `2` | Maximum decoded unary response aggregation size in MiB after transport decompression. Applies to codec-decoded values and ResponseEntity values, not bounded error retention or DataBuffer streams. 0 means unlimited. Default: 2. |  |
 | `reactive.http.clients.[name].compression-enabled` | `java.lang.Boolean` | `false` | Enable Reactor Netty response compression negotiation and incremental decompression (Accept-Encoding: gzip). Request bodies are not compressed. Default: false. |  |
 | `reactive.http.clients.[name].default-headers` | `java.util.Map<java.lang.String,java.lang.String>` |  | Static headers added to every request for this client. Method-level @HeaderParam values with the same header name override configured defaults. |  |

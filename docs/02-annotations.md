@@ -58,10 +58,10 @@ reactive:
   http:
     clients:
       internal-user-service:
-        base-url: https://internal-users.example.com
+        base-url: https://internal-users.example.invalid
         request-timeout-ms: 2000
       partner-user-service:
-        base-url: https://partner-users.example.com
+        base-url: https://partner-users.example.invalid
         request-timeout-ms: 8000
 ```
 
@@ -220,6 +220,14 @@ An unannotated endpoint parameter remains ignored for compatibility with
 published clients. Startup emits one warning per method parameter; add one of
 the roles above when the value must contribute to the outbound request.
 
+Startup validation checks the declaration: parameter roles, static names,
+declared shapes, and URI-template bindings. It does not subscribe to a body or
+dispatch a request. Per-invocation validation checks values unavailable at
+startup, including a null required path variable, expanded header values, and
+case-insensitive collisions introduced by a dynamic header map. Those failures
+occur before auth, body subscription, lifecycle attempt callbacks, or transport
+dispatch.
+
 ### `@PathVar`
 
 Binds a method parameter to a `{name}` placeholder in the path template.
@@ -257,10 +265,10 @@ builder defines:
 
 | Base URL | Endpoint | Result path |
 |---|---|---|
-| `https://api.example/base` | `""` | `/base` |
-| `https://api.example/base` | `items` | `/baseitems` |
-| `https://api.example/base` | `/items` | `/base/items` |
-| `https://api.example/base/` | `items` | `/base/items` |
+| `https://api.example.invalid/base` | `""` | `/base` |
+| `https://api.example.invalid/base` | `items` | `/baseitems` |
+| `https://api.example.invalid/base` | `/items` | `/base/items` |
+| `https://api.example.invalid/base/` | `items` | `/base/items` |
 
 Use a leading slash on endpoint paths, or a trailing slash on a base path, when
 a path-segment boundary is intended.

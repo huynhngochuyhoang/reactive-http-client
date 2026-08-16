@@ -13,7 +13,7 @@ reactive:
   http:
     clients:
       inventory-service:
-        base-url: https://inventory.example.com
+        base-url: https://inventory.example.invalid
         http2-enabled: true
 ```
 
@@ -151,7 +151,7 @@ reactive:
     network:
       proxy:
         type: HTTP                             # HTTP | SOCKS4 | SOCKS5 | NONE; HTTPS is a deprecated HTTP alias
-        host: proxy.corp.example
+        host: proxy.corp.example.invalid
         port: 3128
         username: ${PROXY_USER}               # optional
         password: ${PROXY_PASS}               # optional
@@ -167,7 +167,7 @@ reactive:
       partner-api:
         proxy:
           type: HTTP
-          host: partner-proxy.example.com
+          host: partner-proxy.example.invalid
           port: 8080
 ```
 
@@ -181,7 +181,7 @@ reactive:
     network:
       proxy:
         type: HTTP
-        host: proxy.corp.example
+        host: proxy.corp.example.invalid
         port: 3128
     clients:
       internal-service:
@@ -194,7 +194,7 @@ reactive:
 `non-proxy-hosts` is a Java `java.util.regex.Pattern`, not a glob. Pipe (`|`) separates alternatives:
 
 ```yaml
-non-proxy-hosts: "localhost|127\\.0\\.0\\.1|.*\\.internal|.*\\.corp\\.example"
+non-proxy-hosts: "localhost|127\\.0\\.0\\.1|.*\\.internal|.*\\.corp\\.example.invalid"
 ```
 
 Use `.*\.internal` (regex) — **not** `*.internal` (glob). The pattern is
@@ -302,7 +302,7 @@ reactive:
     network:
       proxy:
         type: HTTP
-        host: proxy.corp.example
+        host: proxy.corp.example.invalid
         port: 3128
         username: ${PROXY_USER}
         password: ${PROXY_PASS}
@@ -315,11 +315,11 @@ reactive:
         protocols: [TLSv1.3, TLSv1.2]
     clients:
       internal-service:
-        base-url: https://internal.corp.example
+        base-url: https://internal.corp.example.invalid
         proxy:
           type: NONE          # bypass global proxy
       partner-api:
-        base-url: https://partner.example.com
+        base-url: https://partner.example.invalid
         tls:
           trust-store: classpath:certs/partner-ts.p12
           trust-store-password: ${PARTNER_TS_PWD}

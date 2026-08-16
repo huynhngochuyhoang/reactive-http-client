@@ -151,7 +151,9 @@ Idle and lifetime eviction reduce exposure to known intermediary timeouts but do
 not eliminate close-versus-reuse races. Capture a bounded packet trace or peer
 connection log when the close ordering matters; do not infer it from a generic
 timeout alone. See
-[Stale connection retirement and replacement](05-connection-pool.md#stale-connection-retirement-and-replacement).
+[Stale connection retirement and replacement](05-connection-pool.md#stale-connection-retirement-and-replacement)
+and use the bounded [stale-connection support bundle](26-support-bundles.md#stale-connection-recovery-incidents)
+when sharing incident evidence.
 
 ### HTTP/2 retirement versus connection failure
 

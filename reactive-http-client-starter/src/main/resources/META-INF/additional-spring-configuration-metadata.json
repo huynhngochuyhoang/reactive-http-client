@@ -329,7 +329,7 @@
     {
       "name": "reactive.http.clients.[name].base-url",
       "type": "java.lang.String",
-      "description": "Base URL for this client (e.g. https://api.example.com).",
+      "description": "Base URL for this client (e.g. https://api.example.invalid).",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig"
     },
     {

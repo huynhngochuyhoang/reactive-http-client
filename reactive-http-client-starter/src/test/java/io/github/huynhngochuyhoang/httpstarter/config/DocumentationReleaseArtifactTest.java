@@ -275,6 +275,102 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v25DocumentationConsolidatesRequestAndOperationsContracts() throws IOException {
+        Path root = projectRoot();
+        String annotations = Files.readString(root.resolve("docs/02-annotations.md"));
+        String multipart = Files.readString(root.resolve("docs/10-multipart.md"));
+        String pool = Files.readString(root.resolve("docs/05-connection-pool.md"));
+        String mock = Files.readString(root.resolve("docs/14-test-helpers.md"));
+        String production = Files.readString(root.resolve("docs/16-production-checklist.md"));
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
+        String readme = Files.readString(root.resolve("README.md"));
+
+        assertThat(annotations)
+                .contains("## Parameter annotations")
+                .contains("| Path | `@PathVar(\"name\")` |")
+                .contains("| Header map | `@HeaderParam Map<?, ?>` |")
+                .contains("Startup validation checks the declaration")
+                .contains("Per-invocation validation checks values unavailable at")
+                .contains("The no-body status contract is the same over HTTP/1.1 and H2/H2C")
+                .contains("The configured client base URL is the only declarative authority");
+        assertThat(multipart)
+                .contains("Parts are written in method-parameter declaration order")
+                .contains("each opened stream is closed once")
+                .contains("List order is the global wire part order");
+        assertThat(pool)
+                .contains("disables Reactor Netty's one-time connection-reset")
+                .contains("but replacement capacity is not\nrequest replay");
+        assertThat(mock)
+                .contains("Recorded URIs are in-process resolved request facts")
+                .contains("does not negotiate an HTTP protocol or TLS")
+                .contains("These records do not\nprove HTTP/1.1 framing");
+        assertThat(production)
+                .contains("[request-parameter grammar](02-annotations.md#parameter-annotations)")
+                .contains("[wire-order and resource-ownership contract](10-multipart.md#wire-order-and-framing)");
+        assertThat(supportBundles)
+                .contains("## Stale Connection Recovery Incidents")
+                .contains("Do not merge the replacement URL, status, headers, error, or failure stage")
+                .contains("complete first Reactor Netty decoder exception")
+                .contains("EXAMPLE_MANAGEMENT_URL")
+                .contains(".example.invalid");
+        assertThat(operations)
+                .contains("GET /bad-request HTTP/1.0")
+                .contains("[stale-connection support bundle](26-support-bundles.md#stale-connection-recovery-incidents)")
+                .contains("one-time `401` auth invalidation and\nrefresh replay");
+        assertThat(readme)
+                .contains("[Annotation Reference](docs/02-annotations.md)")
+                .contains("[Multipart Uploads](docs/10-multipart.md)")
+                .contains("[Streaming Requests and Responses](docs/11-streaming.md)")
+                .contains("[Production Checklist](docs/16-production-checklist.md)")
+                .contains("[Operations Troubleshooting](docs/30-operations-troubleshooting.md)");
+
+        Pattern remoteUrlHost = Pattern.compile("https?://([^\\s/\\\"'`)>]+)");
+        Pattern configuredHost = Pattern.compile("(?m)^\\s*(?:host|server-name):\\s*[\\\"']?([^\\s#\\\"']+)");
+        Pattern unsupportedExampleSuffix = Pattern.compile("\\.example(?!\\.invalid)");
+        Set<String> publicDocumentationHosts = Set.of(
+                "github.com", "img.shields.io", "opentelemetry.io", "search.maven.org");
+        List<Path> documentationPaths = new ArrayList<>();
+        documentationPaths.add(root.resolve("README.md"));
+        try (Stream<Path> paths = Files.walk(root.resolve("docs"))) {
+            paths.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".md"))
+                    .forEach(documentationPaths::add);
+        }
+
+        for (Path documentationPath : documentationPaths) {
+            String path = root.relativize(documentationPath).toString();
+            String source = Files.readString(documentationPath);
+            assertThat(unsupportedExampleSuffix.matcher(source).find())
+                    .as("%s contains a non-.example.invalid placeholder", path)
+                    .isFalse();
+
+            List<String> documentedHosts = new ArrayList<>();
+            Matcher urlMatcher = remoteUrlHost.matcher(source);
+            while (urlMatcher.find()) {
+                documentedHosts.add(urlMatcher.group(1));
+            }
+            Matcher hostMatcher = configuredHost.matcher(source);
+            while (hostMatcher.find()) {
+                documentedHosts.add(hostMatcher.group(1));
+            }
+
+            for (String host : documentedHosts) {
+                String normalized = host.toLowerCase(Locale.ROOT).replaceFirst(":\\d+$", "");
+                boolean safe = normalized.endsWith(".example.invalid")
+                        || normalized.equals("localhost")
+                        || normalized.equals("127.0.0.1")
+                        || host.contains("EXAMPLE_")
+                        || host.startsWith("<")
+                        || publicDocumentationHosts.contains(normalized);
+                assertThat(safe)
+                        .as("%s contains an unapproved copyable remote host: %s", path, host)
+                        .isTrue();
+            }
+        }
+    }
+
+    @Test
     void supportBundleTerminalFixturesStaySanitizedAndStructurallyAccurate() throws IOException {
         Path root = projectRoot();
         String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
@@ -303,16 +399,66 @@ class DocumentationReleaseArtifactTest {
         assertThat(validation.path("responseStatus").isNull()).isTrue();
         assertThat(validation.path("responseHeaders").isEmpty()).isTrue();
 
+        JsonNode captureWindow = staleRecovery.path("captureWindow");
+        assertThat(captureWindow.path("startedAt").asText()).isEqualTo("EXAMPLE_WINDOW_START");
+        assertThat(captureWindow.path("durationMs").isIntegralNumber()).isTrue();
+        assertThat(captureWindow.path("durationMs").asInt()).isPositive();
+        assertThat(staleRecovery.path("httpProtocol").asText()).isEqualTo("HTTP/1.1");
+
+        JsonNode downstreamEvidence = staleRecovery.path("downstreamEvidence");
+        assertThat(downstreamEvidence.path("requestCount").isIntegralNumber()).isTrue();
+        assertThat(downstreamEvidence.path("requestCount").asInt()).isEqualTo(2);
+        assertThat(downstreamEvidence.path("connectionSequenceMarkers").size()).isEqualTo(2);
+
+        JsonNode replayPolicy = staleRecovery.path("replayPolicy");
+        assertThat(replayPolicy.path("resilienceRetryEnabled").isBoolean()).isTrue();
+        assertThat(replayPolicy.path("resilienceRetryEnabled").asBoolean()).isFalse();
+        assertThat(replayPolicy.path("authReplayEnabled").isBoolean()).isTrue();
+        assertThat(replayPolicy.path("authReplayEnabled").asBoolean()).isFalse();
+        assertThat(replayPolicy.path("automaticRedirectsEnabled").isBoolean()).isTrue();
+        assertThat(replayPolicy.path("automaticRedirectsEnabled").asBoolean()).isFalse();
+        assertThat(replayPolicy.path("idempotencyKeyPresent").isBoolean()).isTrue();
+        assertThat(replayPolicy.path("idempotencyKeyPresent").asBoolean()).isFalse();
+        assertThat(replayPolicy.path("bodyRepeatability").asText()).isEqualTo("REPEATABLE");
+
+        JsonNode poolGaugeSamples = staleRecovery.path("poolGaugeSamples");
+        assertThat(poolGaugeSamples.size()).isEqualTo(3);
+        assertThat(poolGaugeSamples.get(0).path("phase").asText()).isEqualTo("before-failure");
+        assertThat(poolGaugeSamples.get(1).path("phase").asText()).isEqualTo("replacement-waiting");
+        assertThat(poolGaugeSamples.get(2).path("phase").asText()).isEqualTo("after-termination");
+        for (JsonNode sample : poolGaugeSamples) {
+            assertThat(sample.path("activeConnections").isIntegralNumber()).isTrue();
+            assertThat(sample.path("pendingConnections").isIntegralNumber()).isTrue();
+            assertThat(sample.path("idleConnections").isIntegralNumber()).isTrue();
+            assertThat(sample.path("totalConnections").isIntegralNumber()).isTrue();
+        }
+
         JsonNode records = staleRecovery.path("metadataOnlyExchangeRecords");
         assertThat(records.size()).isEqualTo(2);
+        assertThat(records.get(0).path("terminalOffsetMs").isIntegralNumber()).isTrue();
+        assertThat(records.get(0).path("terminalOffsetMs").asInt())
+                .isLessThanOrEqualTo(captureWindow.path("durationMs").asInt());
+        assertThat(records.get(0).path("connectionSequenceMarker").asText())
+                .isEqualTo(downstreamEvidence.path("connectionSequenceMarkers").get(0).asText());
+        assertThat(records.get(0).path("requestDispatched").isBoolean()).isTrue();
+        assertThat(records.get(0).path("requestDispatched").asBoolean()).isTrue();
         assertThat(records.get(0).path("subscriptionAttemptCount").asInt()).isEqualTo(1);
         assertThat(records.get(0).path("errorType").asText()).isEqualTo("PrematureCloseException");
+        assertThat(records.get(0).path("causeTypes").get(0).asText()).isEqualTo("PrematureCloseException");
         assertThat(records.get(0).path("errorCategory").asText()).isEqualTo("TIMEOUT");
         assertThat(records.get(0).path("responseStatus").isNull()).isTrue();
         assertThat(records.get(0).path("responseHeaders").isEmpty()).isTrue();
+        assertThat(records.get(1).path("terminalOffsetMs").isIntegralNumber()).isTrue();
+        assertThat(records.get(1).path("terminalOffsetMs").asInt())
+                .isLessThanOrEqualTo(captureWindow.path("durationMs").asInt());
+        assertThat(records.get(1).path("connectionSequenceMarker").asText())
+                .isEqualTo(downstreamEvidence.path("connectionSequenceMarkers").get(1).asText());
+        assertThat(records.get(1).path("requestDispatched").isBoolean()).isTrue();
+        assertThat(records.get(1).path("requestDispatched").asBoolean()).isTrue();
         assertThat(records.get(1).path("subscriptionAttemptCount").asInt()).isEqualTo(1);
         assertThat(records.get(1).path("responseStatus").asInt()).isEqualTo(200);
         assertThat(records.get(1).path("errorType").isNull()).isTrue();
+        assertThat(records.get(1).path("causeTypes").isEmpty()).isTrue();
 
         assertThat(validationText + staleRecoveryText)
                 .doesNotContain("Authorization", "Cookie", "client-secret", "Bearer ")

@@ -22,7 +22,7 @@ import java.util.*;
  *         pending-acquire-timeout-ms: 5000
  *     clients:
  *       user-service:
- *         base-url: https://api.example.com
+ *         base-url: https://api.example.invalid
  *         codec-max-in-memory-size-mb: 2
  *         compression-enabled: false
  *         log-exchange: false
