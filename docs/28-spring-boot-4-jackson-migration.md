@@ -6,7 +6,7 @@
 
 This guide migrates published Spring Boot 3.5 starter 2.x applications to the
 Spring Boot 4 starter 3.x line. The current reactor version is
-`3.5.0-SNAPSHOT`; use published `3.4.0` when consuming it from a release
+`3.5.0`; use published `3.4.0` when consuming it from a release
 repository.
 
 Annotations, exception categories, lifecycle hooks, observers, retry and
@@ -377,7 +377,7 @@ for snapshot-development changes. To verify released public coordinates from a
 fresh Maven Central repository, use
 [Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline).
 The latter is the adoption check for starter `3.4.0`; it does not consume
-reactor classes or `3.5.0-SNAPSHOT` development artifacts.
+reactor classes or `3.5.0` release-candidate artifacts.
 
 ## Migration checklist
 
