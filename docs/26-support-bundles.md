@@ -430,6 +430,31 @@ Do not add concrete upstream addresses to the bundle by default. The stage and
 pool policy are sufficient for saturation triage; enable server-address reporting
 only under the existing opt-in and sanitize it before sharing.
 
+## Stale Connection Recovery Incidents
+
+Keep the failed call and a later independent replacement call as separate
+records. Capture only:
+
+- A bounded time window, logical client and method, HTTP protocol, and sanitized
+  path template for each call.
+- Terminal status, `ErrorCategory`, optional `failure.stage`,
+  `requestDispatched`, subscription-attempt count, and exception/cause class
+  names. A missing status or stage remains unknown.
+- Downstream-observed request count and a sanitized connection-sequence marker
+  that can distinguish the retired socket from replacement capacity without
+  exposing a peer address.
+- Active, pending, idle, and total pool gauges immediately before the failure,
+  while replacement demand waits, and after both calls terminate.
+- Whether Resilience4j retry, one-time `401` auth replay, or automatic redirects
+  were enabled, plus idempotency-key presence and body-repeatability class. Do
+  not include key values or request bodies.
+
+Do not merge the replacement URL, status, headers, error, or failure stage into
+the failed call. A removed socket and newly available pool capacity are not
+proof that the failed request was replayed. Use the sanitized
+[stale-connection fixture](fixtures/support-bundle-stale-connection-recovery.json)
+as the structural example and correlate it with downstream connection evidence.
+
 ## DNS, Proxy, Connect, and TLS Incidents
 
 Minimal safe bundle:

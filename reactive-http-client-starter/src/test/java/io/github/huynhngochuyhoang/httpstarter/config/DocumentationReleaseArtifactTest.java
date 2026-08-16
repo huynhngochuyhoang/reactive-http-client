@@ -275,6 +275,74 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v25DocumentationConsolidatesRequestAndOperationsContracts() throws IOException {
+        Path root = projectRoot();
+        String annotations = Files.readString(root.resolve("docs/02-annotations.md"));
+        String multipart = Files.readString(root.resolve("docs/10-multipart.md"));
+        String pool = Files.readString(root.resolve("docs/05-connection-pool.md"));
+        String mock = Files.readString(root.resolve("docs/14-test-helpers.md"));
+        String production = Files.readString(root.resolve("docs/16-production-checklist.md"));
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
+        String readme = Files.readString(root.resolve("README.md"));
+
+        assertThat(annotations)
+                .contains("## Parameter annotations")
+                .contains("| Path | `@PathVar(\"name\")` |")
+                .contains("| Header map | `@HeaderParam Map<?, ?>` |")
+                .contains("Startup validation checks the declaration")
+                .contains("Per-invocation validation checks values unavailable at")
+                .contains("The no-body status contract is the same over HTTP/1.1 and H2/H2C")
+                .contains("The configured client base URL is the only declarative authority");
+        assertThat(multipart)
+                .contains("Parts are written in method-parameter declaration order")
+                .contains("each opened stream is closed once")
+                .contains("List order is the global wire part order");
+        assertThat(pool)
+                .contains("disables Reactor Netty's one-time connection-reset")
+                .contains("but replacement capacity is not\nrequest replay");
+        assertThat(mock)
+                .contains("Recorded URIs are in-process resolved request facts")
+                .contains("does not negotiate an HTTP protocol or TLS")
+                .contains("These records do not\nprove HTTP/1.1 framing");
+        assertThat(production)
+                .contains("[request-parameter grammar](02-annotations.md#parameter-annotations)")
+                .contains("[wire-order and resource-ownership contract](10-multipart.md#wire-order-and-framing)");
+        assertThat(supportBundles)
+                .contains("## Stale Connection Recovery Incidents")
+                .contains("Do not merge the replacement URL, status, headers, error, or failure stage")
+                .contains("complete first Reactor Netty decoder exception")
+                .contains("EXAMPLE_MANAGEMENT_URL")
+                .contains(".example.invalid");
+        assertThat(operations)
+                .contains("GET /bad-request HTTP/1.0")
+                .contains("[stale-connection support bundle](26-support-bundles.md#stale-connection-recovery-incidents)")
+                .contains("one-time `401` auth invalidation and\nrefresh replay");
+        assertThat(readme)
+                .contains("[Annotation Reference](docs/02-annotations.md)")
+                .contains("[Multipart Uploads](docs/10-multipart.md)")
+                .contains("[Streaming Requests and Responses](docs/11-streaming.md)")
+                .contains("[Production Checklist](docs/16-production-checklist.md)")
+                .contains("[Operations Troubleshooting](docs/30-operations-troubleshooting.md)");
+
+        for (String path : List.of(
+                "README.md",
+                "docs/01-quick-start.md",
+                "docs/02-annotations.md",
+                "docs/04-timeouts.md",
+                "docs/12-proxy-tls.md",
+                "docs/16-production-checklist.md",
+                "docs/17-migration-from-webclient.md",
+                "docs/examples/README.md",
+                "docs/examples/effective-configuration.md")) {
+            assertThat(Files.readString(root.resolve(path)))
+                    .as(path)
+                    .contains(".example.invalid")
+                    .doesNotContain(".example.com");
+        }
+    }
+
+    @Test
     void supportBundleTerminalFixturesStaySanitizedAndStructurallyAccurate() throws IOException {
         Path root = projectRoot();
         String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));

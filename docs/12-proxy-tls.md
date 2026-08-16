@@ -13,7 +13,7 @@ reactive:
   http:
     clients:
       inventory-service:
-        base-url: https://inventory.example.com
+        base-url: https://inventory.example.invalid
         http2-enabled: true
 ```
 
@@ -167,7 +167,7 @@ reactive:
       partner-api:
         proxy:
           type: HTTP
-          host: partner-proxy.example.com
+          host: partner-proxy.example.invalid
           port: 8080
 ```
 
@@ -319,7 +319,7 @@ reactive:
         proxy:
           type: NONE          # bypass global proxy
       partner-api:
-        base-url: https://partner.example.com
+        base-url: https://partner.example.invalid
         tls:
           trust-store: classpath:certs/partner-ts.p12
           trust-store-password: ${PARTNER_TS_PWD}

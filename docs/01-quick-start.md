@@ -97,10 +97,10 @@ reactive:
   http:
     clients:
       internal-user-service:
-        base-url: https://internal-users.example.com
+        base-url: https://internal-users.example.invalid
         request-timeout-ms: 2000
       partner-user-service:
-        base-url: https://partner-users.example.com
+        base-url: https://partner-users.example.invalid
         request-timeout-ms: 8000
 ```
 
@@ -118,7 +118,7 @@ reactive:
   http:
     clients:
       internal-user-service:
-        base-url: https://internal-users.example.com
+        base-url: https://internal-users.example.invalid
         request-timeout-ms: 2000
         default-headers:
           X-Client: internal-users
@@ -129,7 +129,7 @@ reactive:
           retry: internal-users
           circuit-breaker: internal-users
       partner-user-service:
-        base-url: https://partner-users.example.com
+        base-url: https://partner-users.example.invalid
         request-timeout-ms: 8000
         default-headers:
           X-Client: partner-users
@@ -162,7 +162,7 @@ reactive:
   http:
     clients:
       user-service:
-        base-url: https://api.example.com
+        base-url: https://api.example.invalid
         apis:
           user-get-by-id:
             method: GET
@@ -186,7 +186,7 @@ reactive:
   http:
     clients:
       user-service:
-        base-url: https://api.example.com
+        base-url: https://api.example.invalid
         apis:
           "[user.getById]":
             method: GET
@@ -201,7 +201,7 @@ reactive:
   http:
     clients:
       user-service:
-        base-url: https://api.example.com
+        base-url: https://api.example.invalid
         default-headers:
           X-Client: my-service
           X-Tenant: public
@@ -258,13 +258,13 @@ reactive:
         evict-in-background-ms: 60000
     clients:
       user-service:
-        base-url: https://api.example.com
+        base-url: https://api.example.invalid
         auth-provider: userServiceAuthProvider
         # Or use a built-in provider:
         # auth:
         #   type: oauth2-client-credentials
         #   oauth2-client-credentials:
-        #     token-uri: https://auth.example.com/oauth/token
+        #     token-uri: https://auth.example.invalid/oauth/token
         #     client-id: user-service
         #     client-secret: ${USER_SERVICE_CLIENT_SECRET}
         codec-max-in-memory-size-mb: 2

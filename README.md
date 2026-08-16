@@ -122,7 +122,7 @@ reactive:
         pending-acquire-timeout-ms: 5000
     clients:
       user-service:
-        base-url: https://api.example.com
+        base-url: https://api.example.invalid
         codec-max-in-memory-size-mb: 2
         compression-enabled: false
         http2-enabled: false
@@ -204,7 +204,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | Guide | Topic |
 |---|---|
 | [Quick Start](docs/01-quick-start.md) | Full setup walkthrough |
-| [Annotation Reference](docs/02-annotations.md) | Supported annotations |
+| [Annotation Reference](docs/02-annotations.md) | Request/return grammar, URI rules, and supported annotations |
 | [Error Handling](docs/03-error-handling.md) | Exceptions and categories |
 | [Timeouts](docs/04-timeouts.md) | Timeout layers and precedence |
 | [Connection Pool](docs/05-connection-pool.md) | Pool tuning and metrics |

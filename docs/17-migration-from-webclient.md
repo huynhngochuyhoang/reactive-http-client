@@ -19,7 +19,7 @@ class UserGateway {
 
     UserGateway(WebClient.Builder builder) {
         this.webClient = builder
-                .baseUrl("https://users.example.com")
+                .baseUrl("https://users.example.invalid")
                 .defaultHeader("X-Client", "orders")
                 .build();
     }
@@ -55,7 +55,7 @@ reactive:
   http:
     clients:
       users:
-        base-url: https://users.example.com
+        base-url: https://users.example.invalid
         default-headers:
           X-Client: orders
 ```
@@ -97,7 +97,7 @@ class UserHttpExchangeConfig {
     @Bean
     UserHttpExchangeClient userHttpExchangeClient(WebClient.Builder builder) {
         WebClient webClient = builder
-                .baseUrl("https://users.example.com")
+                .baseUrl("https://users.example.invalid")
                 .build();
 
         HttpServiceProxyFactory factory = HttpServiceProxyFactory
@@ -125,7 +125,7 @@ reactive:
   http:
     clients:
       users:
-        base-url: https://users.example.com
+        base-url: https://users.example.invalid
         resilience:
           enabled: true
           retry: users

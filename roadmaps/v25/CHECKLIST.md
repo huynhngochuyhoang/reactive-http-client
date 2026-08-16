@@ -634,67 +634,130 @@ Evidence:
 
 ## Priority 11 - Targeted Benchmark and Allocation Re-Audit
 
-### [ ] 11.1 Keep measurements fair and scoped
+### [x] 11.1 Keep measurements fair and scoped
 
-- [ ] Run benchmark discovery and fairness guards before measurement.
-- [ ] Add or change a benchmark row only for production paths modified by V25.
-- [ ] Keep equivalent raw `WebClient`, Spring HTTP Interface, and starter work for
+- [x] Run benchmark discovery and fairness guards before measurement.
+- [x] Add or change a benchmark row only for production paths modified by V25.
+- [x] Keep equivalent raw `WebClient`, Spring HTTP Interface, and starter work for
       comparable loopback rows.
-- [ ] Keep multipart/stale-recovery setup out of timed regions or retain those
+- [x] Keep multipart/stale-recovery setup out of timed regions or retain those
       paths as correctness fixtures only.
-- [ ] Keep logging output redirected and diagnostics no-network rows separately
+- [x] Keep logging output redirected and diagnostics no-network rows separately
       classified.
 
-### [ ] 11.2 Compare current work with published `3.4.0`
+### [x] 11.2 Compare current work with published `3.4.0`
 
-- [ ] Run current and published-baseline release JMH from distinct fresh
+- [x] Run current and published-baseline release JMH from distinct fresh
       repositories.
-- [ ] Record project, starter, baseline, dependency, JVM, OS, and clean commit
+- [x] Record project, starter, baseline, dependency, JVM, OS, and clean commit
       metadata.
-- [ ] Review request expansion, URI construction, unary/JSON success,
+- [x] Review request expansion, URI construction, unary/JSON success,
       diagnostics-disabled, and terminal-reporting scenarios only when changed.
-- [ ] Run the non-gating comparison with review thresholds and inspect allocation
+- [x] Run the non-gating comparison with review thresholds and inspect allocation
       profiles for named movements.
-- [ ] Keep normal CI free of numeric hard gates and make no broad raw-WebClient
+- [x] Keep normal CI free of numeric hard gates and make no broad raw-WebClient
       parity claim.
-- [ ] Promote a versioned report only if release notes make a numerical
+- [x] Promote a versioned report only if release notes make a numerical
       performance/allocation claim.
 
 Evidence:
 
-- Pending.
+- Current and published-`3.4.0` benchmark discovery/fairness profiles passed
+  before measurement. The selected loopback scenarios retain one raw
+  `WebClient`, one Spring HTTP Interface, and one starter implementation for Get
+  No Body, Get Path Query Header, and Post JSON. No benchmark source or scenario
+  was added: multipart ordering/ownership and stale pooled-connection recovery
+  remain deterministic wire-contract fixtures rather than timed work.
+- Release-quality current and baseline runs used the same JDK 25.0.3, Spring Boot
+  4.0.0, Spring Framework/WebFlux 7.0.1, Reactor Netty 1.3.0, Netty 4.2.7.Final,
+  Jackson 3.0.2, Micrometer 1.16.0, OpenTelemetry 1.55.0, Linux host, eight-CPU
+  allocation, JMH settings, redirected logger, and benchmark sources. The current
+  report records clean commit `0e44c8ed0caae5d1b254e02812605daa5e41d744`;
+  the baseline resolves published starter `3.4.0` through a distinct fresh
+  Central-only repository with verified POM/JAR provenance.
+- The target-only paired reports and non-gating comparison are under
+  `target/release-evidence/v25/priority11/`. Both inputs contain the same 31 JMH
+  result rows covering request expansion/URI construction, diagnostics-disabled
+  execution, terminal reporting, and equivalent unary/JSON loopback controls.
+- GC-normalized allocation review found `+188 B/op` on both argument-expansion
+  paths, about `+2.4 KiB/op` on diagnostics-disabled execution, and about
+  `+3.0 KiB/op` on the full no-network proxy invocation. These cross the
+  percentage review trigger but stay below its `4 KiB/op` absolute trigger and
+  are retained as bounded costs of V25 request validation and immutable
+  subscription/terminal reporting. No measured row crossed the absolute
+  allocation trigger, so this audit does not justify a speculative hot-path
+  refactor.
+- Loopback latency review rows moved across raw `WebClient`, Spring HTTP
+  Interface, and starter controls, including contradictory mode/fork movement;
+  allocations for raw and Spring controls stayed approximately flat. The timing
+  rows are classified as run-level noise, not evidence of broad raw-`WebClient`
+  parity or a production optimization.
+- Normal CI remains free of numeric benchmark gates. No source-controlled report
+  was promoted and no numerical release-note claim was added; the scoped evidence
+  remains target-only for release review. Benchmark report/comparator tests and
+  `git diff --check` passed.
 
 ---
 
 ## Priority 12 - Documentation and Operations Consolidation
 
-### [ ] 12.1 Align request-side public guidance
+### [x] 12.1 Align request-side public guidance
 
-- [ ] Add one concise request-parameter role/compatibility table.
-- [ ] Distinguish startup declaration validation from per-invocation null/value
+- [x] Add one concise request-parameter role/compatibility table.
+- [x] Distinguish startup declaration validation from per-invocation null/value
       validation.
-- [ ] Align URI encoding/authority, final-status/bodiless, multipart ownership,
+- [x] Align URI encoding/authority, final-status/bodiless, multipart ownership,
       and stale-connection wording with real fixtures.
-- [ ] Keep README concise and point to canonical annotation, multipart,
+- [x] Keep README concise and point to canonical annotation, multipart,
       streaming, production, and operations guides.
-- [ ] Keep mock documentation explicit about in-process versus transport-owned
+- [x] Keep mock documentation explicit about in-process versus transport-owned
       evidence.
 
-### [ ] 12.2 Preserve generated and operational evidence
+### [x] 12.2 Preserve generated and operational evidence
 
-- [ ] Update operations troubleshooting and support-bundle capture for malformed
+- [x] Update operations troubleshooting and support-bundle capture for malformed
       framing and stale-connection recovery using bounded sanitized facts.
-- [ ] Keep historical migration, API, benchmark, and release-decision documents
+- [x] Keep historical migration, API, benchmark, and release-decision documents
       immutable and labeled as historical evidence.
-- [ ] Use `EXAMPLE_` and `.example.invalid` placeholders in copyable examples.
-- [ ] Regenerate configuration reference only when property metadata changes.
-- [ ] Run configuration metadata, example-property, anchor, local-link,
+- [x] Use `EXAMPLE_` and `.example.invalid` placeholders in copyable examples.
+- [x] Regenerate configuration reference only when property metadata changes.
+- [x] Run configuration metadata, example-property, anchor, local-link,
       roadmap-link, public-version, and release-artifact documentation tests.
-- [ ] Run `git diff --check`.
+- [x] Run `git diff --check`.
 
 Evidence:
 
-- Pending.
+- The annotation reference retains one parameter-role table for path, query,
+  named/dynamic headers, idempotency keys, body, form field, and form file
+  bindings. It now states explicitly which declaration facts fail at startup and
+  which null, expanded-header, and dynamic-collision facts are checked per
+  invocation before auth, body subscription, lifecycle attempts, or dispatch.
+- Canonical URI authority/encoding, final-status and bodiless response,
+  multipart global order/resource ownership, and stale-connection retirement
+  wording remains tied to the V25 real-wire fixtures. The production checklist
+  now links directly to the request grammar and multipart ownership sections.
+- The support-bundle guide now has a bounded stale-connection recovery section
+  that keeps the failed call and replacement call separate, captures only
+  structural terminal/pool/replay facts, and links the sanitized fixture.
+  Operations troubleshooting links to that capture procedure and continues to
+  require the complete decoder exception rather than only the synthetic
+  `GET /bad-request HTTP/1.0` text.
+- README remains an index to the canonical annotation, multipart, streaming,
+  test-helper, production, support-bundle, and operations guides. The mock guide
+  continues to distinguish encoded in-process request evidence from protocol,
+  framing, backpressure, cancellation, pool-reuse, and peer-reset evidence that
+  requires a real connector.
+- Current copyable remote examples in README, quick start, annotation, timeout,
+  proxy/TLS, production, WebClient migration, and current example guides now use
+  `.example.invalid`; support capture commands retain `EXAMPLE_` variables.
+  Generated `docs/configuration-properties.md` was not regenerated because no
+  property metadata changed. Immutable historical migration, API, benchmark, and
+  release-decision artifacts were not modified.
+- `DocumentationReleaseArtifactTest` and
+  `ReactiveHttpClientConfigurationMetadataTest` passed 50 tests, covering
+  metadata/example properties, generated reference parity, anchors, local and
+  roadmap links, public versions, and release artifacts. The companion `OpenTelemetryConfigurationMetadataTest` passed four
+  tests. `git diff --check` passed.
 
 ---
 

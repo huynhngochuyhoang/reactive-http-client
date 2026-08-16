@@ -19,11 +19,11 @@ reactive:
   http:
     clients:
       user-service:
-        base-url: https://api.example.com
+        base-url: https://api.example.invalid
         auth:
           type: oauth2-client-credentials
           oauth2-client-credentials:
-            token-uri: https://auth.example.com/oauth/token
+            token-uri: https://auth.example.invalid/oauth/token
             client-id: user-service
             client-secret: ${USER_SERVICE_CLIENT_SECRET}
 ```
@@ -37,7 +37,7 @@ reactive:
   http:
     clients:
       user-service:
-        base-url: https://api.example.com
+        base-url: https://api.example.invalid
         resilience:
           enabled: true
           retry: user-service

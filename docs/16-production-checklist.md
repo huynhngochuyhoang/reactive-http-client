@@ -9,6 +9,11 @@ Use this checklist before putting a `@ReactiveHttpClient` client on a production
 - Keep method paths, HTTP verbs, path variables, query parameters, and body types explicit.
 - Use `@ApiRef` only when method/path/timeout must be controlled from configuration.
 
+Use the canonical [request-parameter grammar](02-annotations.md#parameter-annotations)
+for startup declaration checks and per-invocation value checks. For multipart
+methods, apply the [wire-order and resource-ownership contract](10-multipart.md#wire-order-and-framing)
+before enabling retry, redirect, or auth replay.
+
 ### Supported return shapes
 
 | Return shape | Contract |
@@ -45,7 +50,7 @@ reactive:
   http:
     clients:
       inventory:
-        base-url: https://inventory.example.com
+        base-url: https://inventory.example.invalid
         http2-enabled: true
 ```
 
