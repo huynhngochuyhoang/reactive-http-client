@@ -1,13 +1,61 @@
 {
   "incidentType": "stale-connection-recovery",
   "clientName": "inventory-api",
+  "captureWindow": {
+    "startedAt": "EXAMPLE_WINDOW_START",
+    "durationMs": 5000
+  },
+  "httpProtocol": "HTTP/1.1",
+  "downstreamEvidence": {
+    "requestCount": 2,
+    "connectionSequenceMarkers": [
+      "EXAMPLE_CONNECTION_RETIRED",
+      "EXAMPLE_CONNECTION_REPLACEMENT"
+    ]
+  },
+  "replayPolicy": {
+    "resilienceRetryEnabled": false,
+    "authReplayEnabled": false,
+    "automaticRedirectsEnabled": false,
+    "idempotencyKeyPresent": false,
+    "bodyRepeatability": "REPEATABLE"
+  },
+  "poolGaugeSamples": [
+    {
+      "phase": "before-failure",
+      "activeConnections": 1,
+      "pendingConnections": 0,
+      "idleConnections": 0,
+      "totalConnections": 1
+    },
+    {
+      "phase": "replacement-waiting",
+      "activeConnections": 0,
+      "pendingConnections": 1,
+      "idleConnections": 0,
+      "totalConnections": 0
+    },
+    {
+      "phase": "after-termination",
+      "activeConnections": 0,
+      "pendingConnections": 0,
+      "idleConnections": 1,
+      "totalConnections": 1
+    }
+  ],
   "metadataOnlyExchangeRecords": [
     {
       "apiName": "resetOnReuse",
       "httpMethod": "GET",
       "pathTemplate": "/reset-on-reuse",
+      "terminalOffsetMs": 1250,
+      "connectionSequenceMarker": "EXAMPLE_CONNECTION_RETIRED",
+      "requestDispatched": true,
       "subscriptionAttemptCount": 1,
       "errorType": "PrematureCloseException",
+      "causeTypes": [
+        "PrematureCloseException"
+      ],
       "errorCategory": "TIMEOUT",
       "failureStage": null,
       "responseStatus": null,
@@ -17,8 +65,12 @@
       "apiName": "probe",
       "httpMethod": "GET",
       "pathTemplate": "/probe",
+      "terminalOffsetMs": 1800,
+      "connectionSequenceMarker": "EXAMPLE_CONNECTION_REPLACEMENT",
+      "requestDispatched": true,
       "subscriptionAttemptCount": 1,
       "errorType": null,
+      "causeTypes": [],
       "errorCategory": "NONE",
       "failureStage": null,
       "responseStatus": 200,

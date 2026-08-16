@@ -60,7 +60,7 @@ reactive:
   http:
     clients:
       inventory-aws:
-        base-url: https://abc123.execute-api.us-east-1.amazonaws.com/prod
+        base-url: https://EXAMPLE_API_ID.execute-api.us-east-1.amazonaws.com/prod
         default-headers:
           Content-Type: application/json
         auth:
@@ -82,7 +82,7 @@ reactive:
     network:
       proxy:
         type: HTTP
-        host: proxy.corp.example
+        host: proxy.corp.example.invalid
         port: 3128
         username: ${PROXY_USERNAME}
         password: ${PROXY_PASSWORD}

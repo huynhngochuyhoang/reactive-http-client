@@ -737,8 +737,10 @@ Evidence:
   wording remains tied to the V25 real-wire fixtures. The production checklist
   now links directly to the request grammar and multipart ownership sections.
 - The support-bundle guide now has a bounded stale-connection recovery section
-  that keeps the failed call and replacement call separate, captures only
-  structural terminal/pool/replay facts, and links the sanitized fixture.
+  that keeps the failed call and replacement call separate. Its sanitized fixture
+  includes the capture window, protocol, downstream request count, connection
+  sequence markers, pool samples, replay/idempotency/repeatability policy, and
+  correlated per-record dispatch and terminal facts.
   Operations troubleshooting links to that capture procedure and continues to
   require the complete decoder exception rather than only the synthetic
   `GET /bad-request HTTP/1.0` text.
@@ -747,12 +749,14 @@ Evidence:
   continues to distinguish encoded in-process request evidence from protocol,
   framing, backpressure, cancellation, pool-reuse, and peer-reset evidence that
   requires a real connector.
-- Current copyable remote examples in README, quick start, annotation, timeout,
-  proxy/TLS, production, WebClient migration, and current example guides now use
-  `.example.invalid`; support capture commands retain `EXAMPLE_` variables.
-  Generated `docs/configuration-properties.md` was not regenerated because no
-  property metadata changed. Immutable historical migration, API, benchmark, and
-  release-decision artifacts were not modified.
+- Copyable remote examples now use `.example.invalid` or `EXAMPLE_`
+  placeholders. The documentation gate parses each URL and configured host in
+  README and every public Markdown file under `docs/`, rejecting values outside
+  reserved placeholders, loopback, and an explicit public-documentation
+  allow-list. The generated `docs/configuration-properties.md` remains in sync
+  with its metadata source after normalizing that description; no bindable
+  property semantics changed. Immutable historical migration, API, benchmark,
+  and release-decision artifacts were not otherwise modified.
 - `DocumentationReleaseArtifactTest` and
   `ReactiveHttpClientConfigurationMetadataTest` passed 50 tests, covering
   metadata/example properties, generated reference parity, anchors, local and

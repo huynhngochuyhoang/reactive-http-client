@@ -265,10 +265,10 @@ builder defines:
 
 | Base URL | Endpoint | Result path |
 |---|---|---|
-| `https://api.example/base` | `""` | `/base` |
-| `https://api.example/base` | `items` | `/baseitems` |
-| `https://api.example/base` | `/items` | `/base/items` |
-| `https://api.example/base/` | `items` | `/base/items` |
+| `https://api.example.invalid/base` | `""` | `/base` |
+| `https://api.example.invalid/base` | `items` | `/baseitems` |
+| `https://api.example.invalid/base` | `/items` | `/base/items` |
+| `https://api.example.invalid/base/` | `items` | `/base/items` |
 
 Use a leading slash on endpoint paths, or a trailing slash on a base path, when
 a path-segment boundary is intended.
