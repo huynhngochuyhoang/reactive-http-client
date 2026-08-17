@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **V26 release-readiness consumer lane.** Added the published `3.5.0`
+  assembled-consumer verification command to generated manual release evidence
+  and the concise release-prep checklist, alongside compatibility, native,
+  benchmark, and publication work.
+
 ## [3.5.0] - 2026-08-16
 
 ### Changed

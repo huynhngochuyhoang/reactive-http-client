@@ -1851,6 +1851,8 @@ class DocumentationReleaseArtifactTest {
                 .filteredOn(command -> command.contains("verify-published-release-artifacts.sh"))
                 .containsExactly("scripts/verify-published-release-artifacts.sh 3.5.0");
         assertThat(pendingReleaseCommands)
+                .contains("scripts/verify-published-consumer.sh 3.5.0");
+        assertThat(pendingReleaseCommands)
                 .anySatisfy(command -> assertThat(command)
                         .contains("benchmark-release")
                         .contains("benchmark.commit=$(git rev-parse --short HEAD)"));
@@ -1878,6 +1880,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
                 .anySatisfy(command -> assertThat(command).contains("api-root-3.5.0"))
                 .anySatisfy(command -> assertThat(command).contains("api-starter-3.5.0"));
+        assertThat(readiness.path("manualConsumerEvidence").path("status").asText()).isEqualTo("pending");
+        assertThat(streamText(readiness.path("manualConsumerEvidence").path("pendingCommands")))
+                .containsExactly("scripts/verify-published-consumer.sh 3.5.0");
         assertThat(readiness.path("manualNativeEvidence").path("status").asText()).isEqualTo("pending");
         assertThat(streamText(readiness.path("manualNativeEvidence").path("pendingCommands")))
                 .singleElement()
@@ -1918,6 +1923,7 @@ class DocumentationReleaseArtifactTest {
                 "version-snippets",
                 "published-baseline-artifacts",
                 "api-compatibility",
+                "published-consumer",
                 "native-evidence",
                 "publication-readiness",
                 "benchmark-evidence",
@@ -1945,6 +1951,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
                 .anySatisfy(command -> assertThat(command).contains("api-root-3.5.0"))
                 .anySatisfy(command -> assertThat(command).contains("api-starter-3.5.0"));
+        assertThat(streamText(releasePrepItems.get("published-consumer").path("commands")))
+                .containsExactly("scripts/verify-published-consumer.sh 3.5.0");
         assertThat(streamText(releasePrepItems.get("native-evidence").path("commands")))
                 .singleElement()
                 .satisfies(command -> assertThat(command)
@@ -2023,9 +2031,10 @@ class DocumentationReleaseArtifactTest {
                 .containsOnly("pending");
         assertThat(generated.path("checks"))
                 .extracting(check -> check.path("command").asText())
-                .hasSize(11)
+                .hasSize(12)
                 .contains(
                         "mvn test",
+                        "scripts/verify-published-consumer.sh 3.5.0",
                         "bash scripts/verify-api-compatibility-fixtures.sh",
                         "bash scripts/verify-published-baseline-fixtures.sh",
                         "git diff --check",
@@ -2582,6 +2591,8 @@ class DocumentationReleaseArtifactTest {
                 check("bash scripts/verify-api-compatibility-fixtures.sh", "pending", "Run before release."),
                 check("bash scripts/verify-published-baseline-fixtures.sh", "pending",
                         "Run before release to reject local and candidate-contaminated baselines."),
+                check("scripts/verify-published-consumer.sh " + latestPublishedVersion, "pending",
+                        "Run the assembled consumer against the latest published release."),
                 check("git diff --check", "pending", "Run before release."),
                 check("mvn -Pbenchmarks -pl reactive-http-client-benchmarks -am package", "pending",
                         "Lightweight benchmark compile check; does not run JMH."),
@@ -2657,6 +2668,9 @@ class DocumentationReleaseArtifactTest {
                         || command.contains("verify-api-compatibility-fixtures")
                         || command.contains("verify-published-baseline-fixtures"))
                 .toList();
+        List<String> pendingConsumerCommands = pendingManualCommands.stream()
+                .filter(command -> command.contains("verify-published-consumer.sh"))
+                .toList();
         List<String> pendingNativeCommands = pendingManualCommands.stream()
                 .filter(command -> command.contains("native:compile"))
                 .toList();
@@ -2677,6 +2691,7 @@ class DocumentationReleaseArtifactTest {
         readiness.put("manualReleaseEvidence", readinessManualStatus(pendingManualCommands));
         readiness.put("manualBenchmarkEvidence", readinessManualStatus(pendingBenchmarkCommands));
         readiness.put("manualCompatibilityEvidence", readinessManualStatus(pendingCompatibilityCommands));
+        readiness.put("manualConsumerEvidence", readinessManualStatus(pendingConsumerCommands));
         readiness.put("manualNativeEvidence", readinessManualStatus(pendingNativeCommands));
         LinkedHashMap<String, Object> publicationEvidence = new LinkedHashMap<>();
         publicationEvidence.put("status", projectVersion.endsWith("-SNAPSHOT")
@@ -2731,6 +2746,10 @@ class DocumentationReleaseArtifactTest {
                         || command.contains("verify-api-compatibility-fixtures")
                         || command.contains("verify-published-baseline-fixtures"))
                 .toList();
+        List<String> consumerCommands = checks.stream()
+                .map(check -> check.get("command"))
+                .filter(command -> command.contains("verify-published-consumer.sh"))
+                .toList();
         List<String> benchmarkCommands = new ArrayList<>(checks.stream()
                 .map(check -> check.get("command"))
                 .filter(command -> command.contains("benchmark"))
@@ -2766,6 +2785,8 @@ class DocumentationReleaseArtifactTest {
                 "pending", Map.of("commands", publishedBaselineCommands)));
         items.add(checklistItem("api-compatibility", "API compatibility evidence",
                 "pending", Map.of("commands", compatibilityCommands)));
+        items.add(checklistItem("published-consumer", "Published assembled-consumer evidence",
+                "pending", Map.of("commands", consumerCommands)));
         items.add(checklistItem("native-evidence", "Native-image evidence",
                 "pending", Map.of("commands", nativeCommands)));
         items.add(checklistItem("publication-readiness", "Publication readiness",
