@@ -580,7 +580,7 @@ Evidence:
       dependency-linked row that affects public types.
 - [x] Include every V25 public addition/deprecation and defer incompatibilities.
 
-### [ ] 10.2 Revalidate AOT and native behavior
+### [x] 10.2 Revalidate AOT and native behavior
 
 - [x] Register concrete inherited request parameter types and every annotation
       queried at runtime without deprecated Framework 7 member categories.
@@ -588,7 +588,7 @@ Evidence:
       replacement `MethodMetadataCache`.
 - [x] Cover `@Bean` factory-method clients, inherited endpoints, and foreign
       factory replacements.
-- [ ] Build the GraalVM 25 fixture from a clean immutable commit.
+- [x] Build the GraalVM 25 fixture from a clean immutable commit.
 - [x] Execute at least one feasible V25 grammar, URI, multipart, or stale-recovery
       path in the native binary.
 - [x] Record command, Java/GraalVM/dependency versions, commit, executable hash,
@@ -628,7 +628,12 @@ Evidence:
 - The successful dirty-tree validation records commands, toolchain, resolved
   dependencies, source commit/state, executable SHA-256, and runtime output at
   `target/release-evidence/v25/priority10/native-smoke-dirty-validation/`. A
-  clean immutable-commit rerun remains required before closing `10.2`.
+  clean immutable-commit rerun remained required before release closure.
+- Priority 13.2 supplied that final proof from clean immutable commit
+  `c0140340c9a49a51ef32cc0739f9663850c0cf62`: GraalVM `25.0.3` compiled and
+  executed the assembled `3.5.0` fixture successfully. The command, dependency
+  metadata, executable SHA-256, clean source state, and runtime result are under
+  `target/release-evidence/v25/priority13/native/`.
 
 ---
 
@@ -792,18 +797,18 @@ Evidence:
 - [x] Cite a clean promoted benchmark report or keep changelog wording
       non-numerical.
 
-### [ ] 13.3 Record the mutually exclusive decision
+### [x] 13.3 Record the mutually exclusive decision
 
-- [ ] **Go path:** tag and publish the selected version from the matching
+- [x] **Go path:** tag and publish the selected version from the matching
       immutable commit.
-- [ ] **Go path:** verify every Maven Central artifact and assembled published
+- [x] **Go path:** verify every Maven Central artifact and assembled published
       consumer before moving public/API/consumer/benchmark baselines.
-- [ ] **Go path:** open the next snapshot line and archive V25 only after Central
+- [x] **Go path:** open the next snapshot line and archive V25 only after Central
       verification succeeds.
 - [ ] **No-go path:** publish nothing and record each blocker, reproduction, and
       retained evidence path.
-- [ ] Update roadmap/checklist/index/changelog status to match the selected path.
-- [ ] Run final release-document tests and `git diff --check`.
+- [x] Update roadmap/checklist/index/changelog status to match the selected path.
+- [x] Run final release-document tests and `git diff --check`.
 
 Evidence:
 
@@ -852,7 +857,26 @@ Evidence:
   `target/release-evidence/v25/priority13/native/`. Benchmark smoke also passed
   from the immutable commit; its target-only checksum/provenance records that no
   report promotion is required because the changelog remains non-numerical.
-  Section 13.3 remains pending.
+  Section 13.3 was completed through the go path after publication.
+- Release `3.5.0` was published from tag `v3.5.0` at commit
+  `b09bc2858801e40ae9d3560c9360eb2471d1b6fb`; the tag contains the immutable
+  candidate source plus its source-controlled release-evidence record.
+- `scripts/verify-published-release-artifacts.sh 3.5.0` resolved and verified the
+  parent POM plus starter, test-helper, and OTel POM, binary, source, and Javadoc
+  artifacts from a fresh Central-only repository. Version, remote-marker, and
+  SHA-256 provenance checks passed under
+  `target/release-evidence/published-baselines/release-artifacts-3.5.0/`.
+- `scripts/verify-published-consumer.sh 3.5.0` passed the assembled Boot 4
+  consumer against only Maven Central artifacts, rejected reactor-classpath
+  leakage, and retained evidence under
+  `target/release-evidence/published-consumer/published-3.5.0/`.
+- Public examples and published consumer, API compatibility, and benchmark
+  baselines now use `3.5.0`. Reactor-only coordinates use `3.6.0-SNAPSHOT`,
+  preserving the API self-comparison guard. No numerical V25 performance claim
+  was published, so no benchmark report was promoted.
+- Final post-release verification passed 34 release-document tests, 16 starter
+  configuration-metadata tests, four OTel metadata tests, reactor model validation,
+  and `git diff --check`.
 
 ## Completion Rule
 

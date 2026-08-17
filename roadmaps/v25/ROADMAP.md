@@ -1,13 +1,22 @@
 # Reactive HTTP Client - Roadmap V25
 
-> **Status:** draft
+> **Status:** completed - released as `3.5.0` on 2026-08-16
 > **Theme:** request-boundary correctness and recoverable execution after the
 > `3.4.0` composition release
-> **Development line:** `3.5.0-SNAPSHOT`
-> **Published/API baseline:** `3.4.0`
-> **Release target:** to be selected from delivered scope and evidence
+> **Delivered release:** `3.5.0`
+> **Post-release development line:** `3.6.0-SNAPSHOT`
+> **Published/API baseline:** `3.5.0`
 
-## Current State
+## Completion Record
+
+V25 shipped as `3.5.0` from immutable tag `v3.5.0` at commit
+`b09bc2858801e40ae9d3560c9360eb2471d1b6fb`. The parent, starter, test-helper,
+and OTel release bundle and the assembled Boot 4 consumer were verified from
+Maven Central. Public coordinates and API, consumer, and benchmark baselines
+moved to `3.5.0`; reactor-only development moved to `3.6.0-SNAPSHOT`. V25 made
+no promoted numerical benchmark claim.
+
+## Starting State
 
 V24 shipped `3.4.0` and moved the reactor to `3.5.0-SNAPSHOT`. The published
 parent, starter, test-helper, and OTel bundle plus an assembled Boot 4 consumer
