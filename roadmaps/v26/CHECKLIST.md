@@ -10,41 +10,64 @@ promoted, versioned artifact is explicitly required.
 
 ## Priority 1 - Post-`3.5.0` Baseline and V26 Scope Integrity
 
-### [ ] 1.1 Align development and published-release lanes
+### [x] 1.1 Align development and published-release lanes
 
-- [ ] Keep root/module and reactor-only fixture coordinates on
+- [x] Keep root/module and reactor-only fixture coordinates on
       `3.6.0-SNAPSHOT`.
-- [ ] Keep public dependency snippets and `latest.published.version` on
+- [x] Keep public dependency snippets and `latest.published.version` on
       published `3.5.0`.
-- [ ] Keep API compatibility, published-consumer, and benchmark baselines on
+- [x] Keep API compatibility, published-consumer, and benchmark baselines on
       published `3.5.0`.
-- [ ] Preserve root and module guards that reject a baseline equal to the
+- [x] Preserve root and module guards that reject a baseline equal to the
       current reactor version.
-- [ ] Keep V26 as the only active roadmap and preserve completed V1-V25 records.
+- [x] Keep V26 as the only active roadmap and preserve completed V1-V25 records.
 
-### [ ] 1.2 Prove published `3.5.0` provenance
+### [x] 1.2 Prove published `3.5.0` provenance
 
-- [ ] Resolve the parent POM plus starter, test-helper, and OTel
+- [x] Resolve the parent POM plus starter, test-helper, and OTel
       POM/JAR/source/Javadoc artifacts from a previously absent Central-only
       repository.
-- [ ] Require Maven Central remote markers and record SHA-256 values for every
+- [x] Require Maven Central remote markers and record SHA-256 values for every
       required artifact.
-- [ ] Run strict root japicmp against published `3.5.0` from an isolated
+- [x] Run strict root japicmp against published `3.5.0` from an isolated
       repository.
-- [ ] Run strict starter-module japicmp against published `3.5.0` from a
+- [x] Run strict starter-module japicmp against published `3.5.0` from a
       separate isolated repository.
-- [ ] Run published-baseline fixtures for contamination, mixed versions, missing
+- [x] Run published-baseline fixtures for contamination, mixed versions, missing
       attachments, and self-comparison.
 
-### [ ] 1.3 Keep generated readiness honest
+### [x] 1.3 Keep generated readiness honest
 
-- [ ] Report `3.6.0-SNAPSHOT` as snapshot development and `3.5.0` as the
+- [x] Report `3.6.0-SNAPSHOT` as snapshot development and `3.5.0` as the
       latest published/API baseline.
-- [ ] Keep candidate version and promotable benchmark output deferred until
+- [x] Keep candidate version and promotable benchmark output deferred until
       release preparation.
-- [ ] Include unresolved compatibility, native, consumer, benchmark, and
+- [x] Include unresolved compatibility, native, consumer, benchmark, and
       publication work in the release-readiness manifest.
-- [ ] Run release-documentation tests and `git diff --check`.
+- [x] Run release-documentation tests and `git diff --check`.
+
+Evidence:
+
+- Verified root/module and reactor-only fixture coordinates at
+  `3.6.0-SNAPSHOT`, public snippets and published baselines at `3.5.0`, the
+  root/module self-comparison guards, and V26 as the sole active roadmap.
+- Resolved the published parent plus starter, test-helper, and OTel
+  POM/JAR/sources/Javadoc artifacts from a fresh Central-only repository;
+  recorded 13 SHA-256 entries and Maven Central remote markers under
+  `target/release-evidence/v26/published-baselines/release-artifacts-3.5.0/`.
+- Passed strict root and starter-module japicmp from separate isolated `3.5.0`
+  repositories and recorded provenance under the matching V26 `api-root-3.5.0/` and `api-starter-3.5.0/`
+  evidence directories.
+- Passed published-baseline provenance fixtures for local contamination, mixed
+  versions, missing POM/source/Javadoc artifacts, mismatched POM/JAR versions,
+  and root/module self-comparison; API compatibility fixtures also passed.
+- `mvn -B -ntp -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed and regenerated snapshot-development readiness with candidate/report
+  promotion deferred and compatibility, native, consumer, benchmark, and
+  publication work still visible as pending.
+- `bash -n scripts/verify-published-baseline-fixtures.sh`,
+  `bash -n scripts/verify-api-compatibility-fixtures.sh`, readiness assertions,
+  and `git diff --check` passed.
 
 ---
 
