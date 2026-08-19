@@ -9,10 +9,7 @@ import io.github.huynhngochuyhoang.httpstarter.auth.OAuth2ClientCredentialsAuthP
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsSnapshot;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
-import io.github.huynhngochuyhoang.httpstarter.observability.Boot4HttpClientHealthIndicator;
-import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
-import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
-import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
+import io.github.huynhngochuyhoang.httpstarter.observability.*;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.micrometer.tagged.TaggedBulkheadMetrics;
@@ -481,6 +478,46 @@ class ReactiveHttpClientAutoConfigurationTest {
                             .isInstanceOf(TaggedBulkheadMetrics.class);
                     assertThat(binders.get("reactiveHttpRateLimiterMeterBinder"))
                             .isInstanceOf(TaggedRateLimiterMetrics.class);
+                });
+    }
+
+    @Test
+    void resilience4jOperatorMetersStaySeparateFromStarterLogicalCallMeters() {
+        runner.withUserConfiguration(Resilience4jRegistriesConfig.class, SimpleMeterRegistryConfig.class)
+                .run(context -> {
+                    context.getBean(CircuitBreakerRegistry.class).circuitBreaker("metrics-contract");
+                    context.getBean(RetryRegistry.class).retry("metrics-contract");
+                    context.getBean(BulkheadRegistry.class).bulkhead("metrics-contract");
+                    context.getBean(RateLimiterRegistry.class).rateLimiter("metrics-contract");
+                    MeterRegistry meterRegistry = context.getBean(MeterRegistry.class);
+                    context.getBeansOfType(MeterBinder.class).values()
+                            .forEach(binder -> binder.bindTo(meterRegistry));
+
+                    context.getBean(MicrometerHttpClientObserver.class).record(new HttpClientObserverEvent(
+                            "metrics-client", "get", "GET", "/get",
+                            200, 5, null, null, null, null, 1,
+                            HttpClientObserverEvent.UNKNOWN_SIZE, HttpClientObserverEvent.UNKNOWN_SIZE,
+                            null, null));
+
+                    List<String> meterNames = meterRegistry.getMeters().stream()
+                            .map(meter -> meter.getId().getName())
+                            .distinct()
+                            .toList();
+                    assertThat(meterNames).contains(
+                            "reactive.http.client.requests",
+                            "reactive.http.client.requests.attempts");
+                    assertThat(meterNames.stream().anyMatch(
+                            name -> name.startsWith("resilience4j.circuitbreaker."))).isTrue();
+                    assertThat(meterNames.stream().anyMatch(
+                            name -> name.startsWith("resilience4j.retry."))).isTrue();
+                    assertThat(meterNames.stream().anyMatch(
+                            name -> name.startsWith("resilience4j.bulkhead."))).isTrue();
+                    assertThat(meterNames.stream().anyMatch(
+                            name -> name.startsWith("resilience4j.ratelimiter."))).isTrue();
+                    assertThat(meterRegistry.find("reactive.http.client.requests").timer().count())
+                            .isEqualTo(1);
+                    assertThat(meterRegistry.find("reactive.http.client.requests.attempts").summary().count())
+                            .isEqualTo(1);
                 });
     }
 

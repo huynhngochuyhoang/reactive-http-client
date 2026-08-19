@@ -956,6 +956,28 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void resilienceAdmissionDocsMatchCompositionContract() throws IOException {
+        Path root = projectRoot();
+        String resilienceDocs = Files.readString(root.resolve("docs/07-resilience4j.md"));
+        String observabilityDocs = Files.readString(root.resolve("docs/08-observability.md"));
+
+        assertThat(resilienceDocs)
+                .contains("logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt")
+                .contains("| Open circuit | `0` | `http.status_code=NONE`, `outcome=UNKNOWN`")
+                .contains("| Exhausted rate limiter | `0` | `http.status_code=NONE`, `outcome=UNKNOWN`")
+                .contains("| Saturated zero-wait bulkhead | `0` | `http.status_code=NONE`, `outcome=UNKNOWN`")
+                .contains("included once in\nthe logical-call duration")
+                .contains("only one terminal starter timer sample")
+                .contains("Resilience4j retry | Yes")
+                .contains("One-time `401` auth refresh | No")
+                .contains("Automatic `307`/`308` redirect | No");
+        assertThat(observabilityDocs)
+                .contains("Logical subscription attempts (`0` before request subscription")
+                .contains("This is not a downstream dispatch count")
+                .doesNotContain("| `rhttp.attempt.count` | Total attempts");
+    }
+
+    @Test
     void documentedPublicSurfaceMapMatchesApiCompatibilityIncludes() throws IOException {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
