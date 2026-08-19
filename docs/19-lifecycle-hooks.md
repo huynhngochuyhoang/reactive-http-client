@@ -53,7 +53,9 @@ and `onError`.
 after retries finish, with `HttpClientObserverEvent.getAttemptCount()` set to the
 total number of subscription attempts. Exchange logging follows the same
 logical-call boundary and exposes the same meaning through
-`HttpExchangeLogContext.subscriptionAttemptCount()`.
+`HttpExchangeLogContext.subscriptionAttemptCount()`. Observer and exchange-log
+durations come from one immutable monotonic terminal snapshot. Lifecycle
+contexts intentionally do not add a duration field.
 
 Hook failures are isolated. If a hook throws from `supports(...)` or a callback,
 the starter logs a warning and continues the client call and the remaining hooks.

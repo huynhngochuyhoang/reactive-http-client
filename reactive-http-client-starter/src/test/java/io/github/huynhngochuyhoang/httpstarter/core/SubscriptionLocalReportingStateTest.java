@@ -72,6 +72,22 @@ class SubscriptionLocalReportingStateTest {
     }
 
     @Test
+    void emptyMonoCompletionUsesTheSubscriptionTerminalBoundary() throws Throwable {
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        RecordingLogger logger = new RecordingLogger();
+        RecordingHook hook = new RecordingHook();
+        WebClient webClient = reportingWebClient(request -> Mono.just(
+                response(HttpStatus.NO_CONTENT, "empty", Flux.empty())));
+        ReactiveClientInvocationHandler handler = createHandler(webClient, logger, observed::add, hook);
+
+        StepVerifier.create(invokeMono(handler)
+                        .contextWrite(context -> context.put("subscriber", "empty")))
+                .verifyComplete();
+
+        assertTerminalState(observed, logger.contexts, hook.successes, 204, "empty");
+    }
+
+    @Test
     void cancellationDoesNotOverwriteAnotherMonoSubscriptionsTerminalStateOrDuration() throws Throwable {
         CountDownLatch cancelledRequestStarted = new CountDownLatch(1);
         List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
@@ -110,6 +126,7 @@ class SubscriptionLocalReportingStateTest {
 
         HttpExchangeLogContext cancelledLog = logContext(logger.contexts, "cancel");
         assertNull(cancelledLog.responseStatus());
+        assertEquals(cancelledEvent.getDurationMs(), cancelledLog.durationMs());
         assertInstanceOf(java.util.concurrent.CancellationException.class, cancelledLog.error());
         assertEquals(List.of(200), hook.successes.stream().map(ReactiveHttpClientLifecycleContext::statusCode).toList());
         assertEquals(1, hook.cancellations.size());
@@ -149,7 +166,6 @@ class SubscriptionLocalReportingStateTest {
         assertTerminalState(observed, logger.contexts, List.of(), 206, "first");
         assertTerminalState(observed, logger.contexts, List.of(), 200, "second");
     }
-
 
     @Test
     void concurrentStreamingEnvelopeSubscriptionsReportTheirOwnTerminalState() throws Throwable {
@@ -232,11 +248,13 @@ class SubscriptionLocalReportingStateTest {
         assertEquals("http://test.local/items/" + subscriber, event.getRequestUrl());
         assertEquals(subscriber, event.getRequestHeaders().get("X-Subscriber"));
         assertEquals(1, event.getAttemptCount());
+        assertTrue(event.getDurationMs() >= 0 && event.getDurationMs() < 5_000);
 
         HttpExchangeLogContext context = logContext(logged, subscriber);
         assertEquals(status, context.responseStatus());
         assertEquals(List.of(subscriber), context.responseHeaders().get("X-Response"));
         assertEquals("http://test.local/items/" + subscriber, context.requestUrl().toString());
+        assertEquals(event.getDurationMs(), context.durationMs());
         if (!successes.isEmpty()) {
             assertEquals(1, successes.stream().filter(success -> Integer.valueOf(status).equals(success.statusCode())).count());
         }

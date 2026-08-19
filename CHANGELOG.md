@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the concise release-prep checklist, alongside compatibility, native,
   benchmark, and publication work.
 
+### Fixed
+- **Logical-call duration foundation.** Started one monotonic clock for every public
+  publisher subscription before resilience admission, froze elapsed time once at
+  the logical terminal boundary, and shared it across exchange logs, observers,
+  Micrometer, and OTel. Open-circuit, exhausted-rate-limiter, saturated-bulkhead,
+  and admission-cancellation outcomes now report finite zero-attempt durations
+  without invented lifecycle starts or transport stages.
+
 ## [3.5.0] - 2026-08-16
 
 ### Changed

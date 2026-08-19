@@ -73,49 +73,72 @@ Evidence:
 
 ## Priority 2 - Logical-Call Duration Foundation
 
-### [ ] 2.1 Reproduce every zero-origin duration path
+### [x] 2.1 Reproduce every zero-origin duration path
 
-- [ ] Add a deterministic open-circuit test that terminates before the
+- [x] Add a deterministic open-circuit test that terminates before the
       request-attempt publisher subscribes and first demonstrates the
       epoch-sized duration defect.
-- [ ] Cover exhausted rate limiter and saturated bulkhead rejection before the
+- [x] Cover exhausted rate limiter and saturated bulkhead rejection before the
       first attempt.
-- [ ] Cover cancellation, auth failure, request serialization failure, and a
+- [x] Cover cancellation, auth failure, request serialization failure, and a
       custom-filter failure before transport dispatch.
-- [ ] Assert `attemptCount=0`, no status, no response headers, no request URL,
+- [x] Assert `attemptCount=0`, no status, no response headers, no request URL,
       `ErrorCategory.RESILIENCE_ERROR` where applicable, and no invented
       transport failure stage.
-- [ ] Inventory every use of wall-clock start/duration in terminal state,
+- [x] Inventory every use of wall-clock start/duration in terminal state,
       exchange logging, observer events, logical-call timeout, and OTel.
 
-### [ ] 2.2 Establish one monotonic subscription clock
+### [x] 2.2 Establish one monotonic subscription clock
 
-- [ ] Start timing once for each subscription to the public returned
+- [x] Start timing once for each subscription to the public returned
       `Mono`/`Flux`, before logical timeout and resilience admission.
-- [ ] Store monotonic elapsed-time state separately from any epoch timestamp
+- [x] Store monotonic elapsed-time state separately from any epoch timestamp
       needed for tracing.
-- [ ] Remove elapsed calculations that subtract an uninitialized zero or depend
+- [x] Remove elapsed calculations that subtract an uninitialized zero or depend
       on wall-clock adjustments.
-- [ ] Preserve one fresh clock per independent subscription to the same cold
+- [x] Preserve one fresh clock per independent subscription to the same cold
       publisher.
-- [ ] Include rate-limiter/bulkhead admission and retry delay once in the
+- [x] Include rate-limiter/bulkhead admission and retry delay once in the
       logical-call duration without changing per-attempt response timeouts.
-- [ ] Do not cap valid slow calls as a substitute for correct initialization.
+- [x] Do not cap valid slow calls as a substitute for correct initialization.
 
-### [ ] 2.3 Preserve terminal timing boundaries
+### [x] 2.3 Preserve terminal timing boundaries
 
-- [ ] Verify unary `Mono<T>` duration reaches value, empty completion, error, or
+- [x] Verify unary `Mono<T>` duration reaches value, empty completion, error, or
       cancellation.
-- [ ] Verify direct `Flux<T>` duration reaches stream completion, error, or
+- [x] Verify direct `Flux<T>` duration reaches stream completion, error, or
       cancellation.
-- [ ] Keep `Mono<ResponseEntity<Flux<DataBuffer>>>` timing at outer envelope
+- [x] Keep `Mono<ResponseEntity<Flux<DataBuffer>>>` timing at outer envelope
       delivery; later inner-body consumption remains owned by its subscriber.
-- [ ] Derive observer, exchange-log, Micrometer, and OTel durations from one
+- [x] Derive observer, exchange-log, Micrometer, and OTel durations from one
       immutable terminal snapshot within a bounded tolerance.
-- [ ] Keep lifecycle callbacks on the same one-terminal boundary without adding
+- [x] Keep lifecycle callbacks on the same one-terminal boundary without adding
       a duration field to their public context.
-- [ ] Run focused subscription-state, timeout, resilience-composition, streaming,
+- [x] Run focused subscription-state, timeout, resilience-composition, streaming,
       exchange-log, Micrometer, and OTel tests.
+
+Evidence:
+
+- Reproduced the former epoch-sized duration on open-circuit, exhausted-rate-limiter,
+  and saturated-bulkhead rejection before request-attempt subscription; all now
+  report one finite `RESILIENCE_ERROR` terminal with `attemptCount=0`, no status,
+  response headers, request URL, or invented transport stage.
+- Added zero-attempt cancellation during rate-limiter admission and subscribed
+  pre-dispatch auth, serialization, URI, and custom-filter failure coverage.
+  Cancellation no longer fabricates lifecycle attempt `1`; subscribed failures
+  that enter request preparation retain attempt `1`.
+- `SubscriptionReportingState` now creates one `System.nanoTime()` clock per public
+  cold-publisher subscription and freezes elapsed milliseconds in its immutable
+  terminal snapshot. Exchange logging and observer reporting consume that exact
+  value; Micrometer records it and OTel derives its span interval from the event.
+- Revalidated unary value, empty, error, and cancellation boundaries; direct Flux
+  completion, error, and cancellation; retry delay and rate-limit admission; and
+  streaming-envelope completion before caller-owned inner-body consumption.
+- `mvn -B -ntp -pl reactive-http-client-starter -Dtest=SubscriptionReportingStateTest,SubscriptionLocalReportingStateTest,DiagnosticContextContractTest,ReactiveHttpClientLifecycleHookTest,ResilienceOperatorCompositionContractTest,ReactiveHttpClientTimeoutTerminalStateContractTest,StreamingResponseTest test`
+  passed with 64 tests.
+- `mvn -B -ntp -pl reactive-http-client-starter test` passed with 1,022 tests.
+- `mvn -B -ntp -pl reactive-http-client-otel -am -Dtest=OpenTelemetryHttpClientObserverTest -Dsurefire.failIfNoSpecifiedTests=false test`
+  passed with 25 OTel tests.
 
 ---
 

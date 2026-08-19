@@ -15,6 +15,8 @@ import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import org.junit.jupiter.api.Test;
@@ -269,8 +271,7 @@ class ReactiveHttpClientLifecycleHookTest {
 
         assertEquals(List.of("hook:error:0:null:BulkheadFullException"), events);
         assertEquals(1, observed.size());
-        assertEquals(ErrorCategory.RESILIENCE_ERROR, observed.get(0).getErrorCategory());
-        assertEquals(0, observed.get(0).getAttemptCount());
+        assertZeroAttemptResilienceEvent(observed.get(0), BulkheadFullException.class);
     }
 
     @Test
@@ -287,7 +288,26 @@ class ReactiveHttpClientLifecycleHookTest {
 
         assertEquals(List.of("hook:error:0:null:RequestNotPermitted"), events);
         assertEquals(1, observed.size());
-        assertEquals(ErrorCategory.RESILIENCE_ERROR, observed.get(0).getErrorCategory());
+        assertZeroAttemptResilienceEvent(observed.get(0), RequestNotPermitted.class);
+    }
+
+    @Test
+    void shouldNotifyLifecycleAndObserverOnceWhenCircuitBreakerRejects() throws Throwable {
+        List<String> events = new ArrayList<>();
+        List<HttpClientObserverEvent> observed = new ArrayList<>();
+        CircuitBreaker circuitBreaker = CircuitBreaker.ofDefaults("orders");
+        circuitBreaker.transitionToOpenState();
+        Throwable rejection = CallNotPermittedException.createCallNotPermittedException(circuitBreaker);
+        ReactiveClientInvocationHandler handler = createHandler(okWebClient(), List.of(new RecordingHook("hook", events)),
+                circuitBreakerRejectingApplier(rejection), retryConfig(), observed::add);
+
+        StepVerifier.create(invokeGet(handler, "42"))
+                .expectError(CallNotPermittedException.class)
+                .verify();
+
+        assertEquals(List.of("hook:error:0:null:CallNotPermittedException"), events);
+        assertEquals(1, observed.size());
+        assertZeroAttemptResilienceEvent(observed.get(0), CallNotPermittedException.class);
     }
 
     @Test
@@ -563,6 +583,29 @@ class ReactiveHttpClientLifecycleHookTest {
                 return Mono.error(rejection);
             }
         };
+    }
+
+    private static ResilienceOperatorApplier circuitBreakerRejectingApplier(Throwable rejection) {
+        return new NoopResilienceOperatorApplier() {
+            @Override
+            public <T> Mono<T> applyCircuitBreaker(Mono<T> mono, String instanceName) {
+                return Mono.error(rejection);
+            }
+        };
+    }
+
+    private static void assertZeroAttemptResilienceEvent(
+            HttpClientObserverEvent event,
+            Class<? extends Throwable> errorType) {
+        assertEquals(ErrorCategory.RESILIENCE_ERROR, event.getErrorCategory());
+        assertInstanceOf(errorType, event.getError());
+        assertEquals(0, event.getAttemptCount());
+        assertNull(event.getStatusCode());
+        assertNull(event.getRequestUrl());
+        assertTrue(event.getRequestHeaders().isEmpty());
+        assertNull(event.getFailureStage());
+        assertTrue(event.getDurationMs() >= 0 && event.getDurationMs() < 5_000,
+                "pre-attempt rejection duration must be finite and near-immediate");
     }
 
     interface LifecycleClient {
