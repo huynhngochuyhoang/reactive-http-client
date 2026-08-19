@@ -10,7 +10,7 @@ fired is critical to avoiding hard-to-debug incidents.
 
 | Layer | Property / annotation | Default | Scope | Fires when |
 |---|---|---|---|---|
-| Logical-call budget | `reactive.http.clients.<name>.logical-call-timeout-ms` | disabled | One caller subscription | Total wall-clock time from subscription through resilience admission, serialization, auth, pool acquisition, redirects, retries, and starter-owned response consumption reaches the budget |
+| Logical-call budget | `reactive.http.clients.<name>.logical-call-timeout-ms` | disabled | One caller subscription | Total monotonic elapsed time from subscription through resilience admission, serialization, auth, pool acquisition, redirects, retries, and starter-owned response consumption reaches the budget |
 | TCP connect timeout | `reactive.http.network.connect-timeout-ms` | 2 000 ms | TCP handshake only | A new connection cannot be established within the limit |
 | Per-request response timeout | `@TimeoutMs(ms)` (method), `@ApiRef timeout-ms`, or `request-timeout-ms` (client) | disabled | Per attempt | No response headers or body data arrive within the configured read interval; retries each install their own timeout |
 | Safety-net read timeout | `reactive.http.network.network-read-timeout-ms` | 60 000 ms | Per pooled connection | No inbound bytes for this duration — catches stuck sockets |
@@ -107,6 +107,10 @@ stay visible before the timeout error.
 For `Mono<ResponseEntity<Flux<DataBuffer>>>`, terminal reporting measures only the
 response envelope. A later inner-body timeout is delivered to the inner subscriber
 and does not rewrite the successful envelope lifecycle/observer/exchange-log record.
+Observer events and exchange logs consume the same immutable terminal duration;
+Micrometer records that event duration, and OTel derives its span interval from it.
+Lifecycle contexts keep their existing terminal boundary and do not expose a duration
+field.
 See [Production Support Bundles](26-support-bundles.md) for a safe timeout incident
 bundle.
 

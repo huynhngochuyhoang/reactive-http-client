@@ -307,7 +307,8 @@ class ReactiveHttpClientTimeoutTerminalStateContractTest {
                 assertThat(context.responseHeaders()).isEmpty();
                 assertThat(context.subscriptionAttemptCount()).isEqualTo(1);
                 assertThat(context.failureStage()).isNull();
-                assertThat(context.durationMs()).isGreaterThanOrEqualTo(0);
+                assertThat(context.durationMs()).isEqualTo(
+                        fixture.recording().observerEvents.getFirst().getDurationMs());
                 assertFinalRequest(context.requestUrl().toString(), context.requestHeaders(), "/cancel");
             });
         }
@@ -352,7 +353,7 @@ class ReactiveHttpClientTimeoutTerminalStateContractTest {
 
         long observerDuration = recording.observerEvents.getFirst().getDurationMs();
         long logDuration = recording.exchangeLogs.getFirst().durationMs();
-        assertThat(Math.abs(observerDuration - logDuration)).isLessThanOrEqualTo(100);
+        assertThat(logDuration).isEqualTo(observerDuration);
     }
 
     private static void assertFinalRequest(

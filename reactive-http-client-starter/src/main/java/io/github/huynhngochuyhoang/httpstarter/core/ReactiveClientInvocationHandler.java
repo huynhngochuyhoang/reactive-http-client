@@ -325,15 +325,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return capturedFlux
                             .doOnComplete(() -> completeAndReportTerminal(
                                     TerminalSignal.SUCCESS, null, null, lifecycleHooks, exchangeLogger, observer,
-                                    plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes))
+                                    plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes))
                             .doOnError(error -> completeAndReportTerminal(
                                     TerminalSignal.ERROR, null, error, lifecycleHooks, exchangeLogger, observer,
-                                    plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes))
+                                    plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes))
                             .doOnCancel(() -> {
                                 CancellationException cancellation = new CancellationException("Request was cancelled");
                                 completeAndReportTerminal(
                                         TerminalSignal.CANCEL, null, cancellation, lifecycleHooks, exchangeLogger,
-                                        observer, plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes);
+                                        observer, plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes);
                             });
                 });
             }
@@ -362,15 +362,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 return capturedMono
                         .doOnSuccess(body -> completeAndReportTerminal(
                                 TerminalSignal.SUCCESS, body, null, lifecycleHooks, exchangeLogger, observer,
-                                plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes))
+                                plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes))
                         .doOnError(error -> completeAndReportTerminal(
                                 TerminalSignal.ERROR, null, error, lifecycleHooks, exchangeLogger, observer,
-                                plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes))
+                                plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes))
                         .doOnCancel(() -> {
                             CancellationException cancellation = new CancellationException("Request was cancelled");
                             completeAndReportTerminal(
                                     TerminalSignal.CANCEL, null, cancellation, lifecycleHooks, exchangeLogger,
-                                    observer, plan, effectiveApi, resolved, state, inboundHeadersRef.get(), requestBytes);
+                                    observer, plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes);
                         });
             });
         }
@@ -427,7 +427,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             notifyLifecycleAttempt(
                     lifecycleHooks, plan, effectiveApi, preparedResolved, null, null, null, attempt.number());
             if (exchangeLogger == null && state.markFirstAttemptStarted()) {
-                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.startMs());
+                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.elapsedMillis());
             }
 
             return serializedBodyMono.map(serializedRequestBody -> buildRequestHeadersSpec(
@@ -460,8 +460,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             RequestBodyOwnership requestBodyOwnership) {
         return Mono.deferContextual(context -> {
             if (log.isDebugEnabled()) {
-                long startMs = System.currentTimeMillis();
-                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), startMs);
+                logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), 0L);
             }
             RequestArgumentResolver.ResolvedArgs preparedResolved = applyContextIdempotencyKey(plan, resolved, context);
             SerializedRequestBody requestBody = new SerializedRequestBody(
@@ -802,7 +801,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
         return Mono.deferContextual(context -> {
             SubscriptionReportingState state = subscriptionState(context);
-            state.startIfNeeded();
             @SuppressWarnings("unchecked")
             Mono<Signal<Object>> sourceSignal = ((Mono<Object>) mono).materialize();
             Mono<Signal<Object>> deadline = Mono.delay(Duration.ofMillis(timeoutMs))
@@ -817,7 +815,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
         return Flux.deferContextual(context -> {
             SubscriptionReportingState state = subscriptionState(context);
-            state.startIfNeeded();
             Mono<Void> deadline = Mono.delay(Duration.ofMillis(timeoutMs))
                     .flatMap(ignored -> Mono.error(logicalCallTimeout(state, timeoutMs)));
             return flux.takeUntilOther(deadline);
@@ -1322,23 +1319,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 operatorType, instanceName, error.getMessage());
     }
 
-    private void notifyLifecycleAttemptFallbackIfNeeded(
-            List<ReactiveHttpClientLifecycleHook> hooks,
-            RequestPlan plan,
-            EffectiveApi effectiveApi,
-            RequestArgumentResolver.ResolvedArgs resolved,
-            SubscriptionReportingState state,
-            HttpExchangeLogger exchangeLogger) {
-        Attempt attempt = state.beginFallbackAttempt(resolved);
-        if (attempt == null) {
-            return;
-        }
-        notifyLifecycleAttempt(hooks, plan, effectiveApi, resolved, null, null, null, attempt.number());
-        if (exchangeLogger == null && state.markFirstAttemptStarted()) {
-            logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.startMs());
-        }
-    }
-
     private void notifyLifecycleAttempt(
             List<ReactiveHttpClientLifecycleHook> hooks,
             RequestPlan plan,
@@ -1444,11 +1424,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
     }
 
-    private void logRequest(String httpMethod, String pathTemplate, long startMs) {
+    private void logRequest(String httpMethod, String pathTemplate, long elapsedMs) {
         if (log.isDebugEnabled()) {
             log.debug("[{}] {} {} (resolved in {}ms)",
-                    clientName, httpMethod, pathTemplate,
-                    System.currentTimeMillis() - startMs);
+                    clientName, httpMethod, pathTemplate, elapsedMs);
         }
     }
 
@@ -1531,14 +1510,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             HttpClientObserver observer,
             RequestPlan plan,
             EffectiveApi effectiveApi,
-            RequestArgumentResolver.ResolvedArgs initialResolved,
             SubscriptionReportingState state,
             Map<String, List<String>> inboundHeaders,
             long requestBytes) {
-        if (signal == TerminalSignal.CANCEL) {
-            notifyLifecycleAttemptFallbackIfNeeded(
-                    lifecycleHooks, plan, effectiveApi, initialResolved, state, exchangeLogger);
-        }
         TerminalSnapshot terminal = state.complete(signal, responseBody, error);
         if (terminal == null) {
             return;
@@ -1582,7 +1556,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     pathTemplate,
                     terminal.preparedResolved(),
                     terminal.finalRequestObservation(),
-                    terminal.startMs(),
+                    terminal.durationMs(),
                     terminal.responseStatus(),
                     terminal.responseHeaders(),
                     terminal.responseBody(),
@@ -1600,7 +1574,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     terminal.preparedResolved(),
                     terminal.finalRequestUrl(),
                     terminal.finalRequestObservation(),
-                    terminal.startMs(),
+                    terminal.durationMs(),
                     terminal.responseStatus(),
                     terminal.error(),
                     terminal.responseBody(),
@@ -1616,7 +1590,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String pathTemplate,
             RequestArgumentResolver.ResolvedArgs resolved,
             FinalRequestObservation finalRequestObservation,
-            long startMs,
+            long durationMs,
             HttpStatusCode statusCode,
             Map<String, List<String>> responseHeaders,
             Object responseBody,
@@ -1636,7 +1610,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 statusCode != null ? statusCode.value() : null,
                 responseHeaders == null ? Map.of() : responseHeaders,
                 responseBody,
-                System.currentTimeMillis() - startMs,
+                durationMs,
                 subscriptionAttemptCount,
                 error,
                 clientConfig.getLogPreset()
@@ -1674,7 +1648,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             RequestArgumentResolver.ResolvedArgs resolved,
             URI requestUrl,
             FinalRequestObservation finalRequestObservation,
-            long startMs,
+            long durationMs,
             HttpStatusCode statusCode,
             Throwable error,
             Object responseBody,
@@ -1690,7 +1664,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     httpMethod,
                     pathTemplate,
                     statusCode != null ? statusCode.value() : null,
-                    System.currentTimeMillis() - startMs,
+                    durationMs,
                     error,
                     resolveErrorCategory(statusCode, error),
                     logBody ? resolved.body() : null,

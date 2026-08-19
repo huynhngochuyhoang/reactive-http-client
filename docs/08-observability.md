@@ -15,7 +15,11 @@ When a `MeterRegistry` bean is present, `MicrometerHttpClientObserver` records f
 
 ### `reactive.http.client.requests` (Timer)
 
-End-to-end duration from first attempt to final completion (after all retries).
+Logical-call elapsed duration from subscription to terminal completion, measured
+with a monotonic clock. It includes resilience admission and retry delays, auth
+and request preparation, transport dispatch, and starter-owned response
+consumption. A rejection or cancellation before the first attempt therefore has
+a finite duration and an attempt count of `0`.
 
 | Tag | Values |
 |---|---|

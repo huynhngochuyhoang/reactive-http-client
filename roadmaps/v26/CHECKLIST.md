@@ -73,49 +73,72 @@ Evidence:
 
 ## Priority 2 - Logical-Call Duration Foundation
 
-### [ ] 2.1 Reproduce every zero-origin duration path
+### [x] 2.1 Reproduce every zero-origin duration path
 
-- [ ] Add a deterministic open-circuit test that terminates before the
+- [x] Add a deterministic open-circuit test that terminates before the
       request-attempt publisher subscribes and first demonstrates the
       epoch-sized duration defect.
-- [ ] Cover exhausted rate limiter and saturated bulkhead rejection before the
+- [x] Cover exhausted rate limiter and saturated bulkhead rejection before the
       first attempt.
-- [ ] Cover cancellation, auth failure, request serialization failure, and a
+- [x] Cover cancellation, auth failure, request serialization failure, and a
       custom-filter failure before transport dispatch.
-- [ ] Assert `attemptCount=0`, no status, no response headers, no request URL,
+- [x] Assert `attemptCount=0`, no status, no response headers, no request URL,
       `ErrorCategory.RESILIENCE_ERROR` where applicable, and no invented
       transport failure stage.
-- [ ] Inventory every use of wall-clock start/duration in terminal state,
+- [x] Inventory every use of wall-clock start/duration in terminal state,
       exchange logging, observer events, logical-call timeout, and OTel.
 
-### [ ] 2.2 Establish one monotonic subscription clock
+### [x] 2.2 Establish one monotonic subscription clock
 
-- [ ] Start timing once for each subscription to the public returned
+- [x] Start timing once for each subscription to the public returned
       `Mono`/`Flux`, before logical timeout and resilience admission.
-- [ ] Store monotonic elapsed-time state separately from any epoch timestamp
+- [x] Store monotonic elapsed-time state separately from any epoch timestamp
       needed for tracing.
-- [ ] Remove elapsed calculations that subtract an uninitialized zero or depend
+- [x] Remove elapsed calculations that subtract an uninitialized zero or depend
       on wall-clock adjustments.
-- [ ] Preserve one fresh clock per independent subscription to the same cold
+- [x] Preserve one fresh clock per independent subscription to the same cold
       publisher.
-- [ ] Include rate-limiter/bulkhead admission and retry delay once in the
+- [x] Include rate-limiter/bulkhead admission and retry delay once in the
       logical-call duration without changing per-attempt response timeouts.
-- [ ] Do not cap valid slow calls as a substitute for correct initialization.
+- [x] Do not cap valid slow calls as a substitute for correct initialization.
 
-### [ ] 2.3 Preserve terminal timing boundaries
+### [x] 2.3 Preserve terminal timing boundaries
 
-- [ ] Verify unary `Mono<T>` duration reaches value, empty completion, error, or
+- [x] Verify unary `Mono<T>` duration reaches value, empty completion, error, or
       cancellation.
-- [ ] Verify direct `Flux<T>` duration reaches stream completion, error, or
+- [x] Verify direct `Flux<T>` duration reaches stream completion, error, or
       cancellation.
-- [ ] Keep `Mono<ResponseEntity<Flux<DataBuffer>>>` timing at outer envelope
+- [x] Keep `Mono<ResponseEntity<Flux<DataBuffer>>>` timing at outer envelope
       delivery; later inner-body consumption remains owned by its subscriber.
-- [ ] Derive observer, exchange-log, Micrometer, and OTel durations from one
+- [x] Derive observer, exchange-log, Micrometer, and OTel durations from one
       immutable terminal snapshot within a bounded tolerance.
-- [ ] Keep lifecycle callbacks on the same one-terminal boundary without adding
+- [x] Keep lifecycle callbacks on the same one-terminal boundary without adding
       a duration field to their public context.
-- [ ] Run focused subscription-state, timeout, resilience-composition, streaming,
+- [x] Run focused subscription-state, timeout, resilience-composition, streaming,
       exchange-log, Micrometer, and OTel tests.
+
+Evidence:
+
+- Reproduced the former epoch-sized duration on open-circuit, exhausted-rate-limiter,
+  and saturated-bulkhead rejection before request-attempt subscription; all now
+  report one finite `RESILIENCE_ERROR` terminal with `attemptCount=0`, no status,
+  response headers, request URL, or invented transport stage.
+- Added zero-attempt cancellation during rate-limiter admission and subscribed
+  pre-dispatch auth, serialization, URI, and custom-filter failure coverage.
+  Cancellation no longer fabricates lifecycle attempt `1`; subscribed failures
+  that enter request preparation retain attempt `1`.
+- `SubscriptionReportingState` now creates one `System.nanoTime()` clock per public
+  cold-publisher subscription and freezes elapsed milliseconds in its immutable
+  terminal snapshot. Exchange logging and observer reporting consume that exact
+  value; Micrometer records it and OTel derives its span interval from the event.
+- Revalidated unary value, empty, error, and cancellation boundaries; direct Flux
+  completion, error, and cancellation; retry delay and rate-limit admission; and
+  streaming-envelope completion before caller-owned inner-body consumption.
+- `mvn -B -ntp -pl reactive-http-client-starter -Dtest=SubscriptionReportingStateTest,SubscriptionLocalReportingStateTest,DiagnosticContextContractTest,ReactiveHttpClientLifecycleHookTest,ResilienceOperatorCompositionContractTest,ReactiveHttpClientTimeoutTerminalStateContractTest,StreamingResponseTest test`
+  passed with 64 tests.
+- `mvn -B -ntp -pl reactive-http-client-starter test` passed with 1,022 tests.
+- `mvn -B -ntp -pl reactive-http-client-otel -am -Dtest=OpenTelemetryHttpClientObserverTest -Dsurefire.failIfNoSpecifiedTests=false test`
+  passed with 25 OTel tests.
 
 ---
 
@@ -168,9 +191,52 @@ Evidence:
 
 ---
 
-## Priority 4 - Resilience Admission and Attempt Semantics
+## Priority 4 - Opt-In Resilience Activation and Admission Semantics
 
-### [ ] 4.1 Prove each admission outcome
+### [ ] 4.1 Make every operator explicit by intent
+
+- [ ] Add failing compatibility fixtures proving that `resilience.enabled=true`
+      currently activates retry, rate limiter, circuit breaker, and bulkhead
+      through their implicit `default` instance names.
+- [ ] Keep `resilience.enabled` as the client-level master gate, but make
+      client-level `retry`, `rate-limiter`, `circuit-breaker`, and `bulkhead`
+      absent/disabled by default.
+- [ ] Activate an operator only from a non-blank client-level instance property
+      or the matching method annotation. Preserve explicit `default` as a valid
+      instance name; do not infer activation from registry availability.
+- [ ] Define and test method-level selection over client-level selection while
+      retaining the master gate. A blank client-level property must not suppress
+      an explicit method annotation.
+- [ ] Keep `retry-methods` as Retry eligibility rather than activation, and keep
+      strict unsafe-retry validation dormant when Retry is not effectively
+      selected or cannot make another attempt.
+- [ ] Prove `enabled: true` alone applies no operator for `Mono` and `Flux`.
+- [ ] Prove retry-only, rate-limiter-only, circuit-breaker-only, and
+      bulkhead-only configurations apply exactly the selected operator and leave
+      the other three absent.
+
+### [ ] 4.2 Align every effective-policy surface
+
+- [ ] Centralize the effective operator-selection rule used by invocation,
+      startup validation/logging, `EffectiveHttpClientContractExporter`, and
+      `ReactiveHttpClientDiagnosticsProvider` without creating operators or
+      registries from diagnostics.
+- [ ] Report unselected operators as `disabled`, selected but unavailable
+      operators as `unavailable`, and unresolved lazy candidates as `unknown`
+      where the diagnostics schema already permits it.
+- [ ] Update configuration metadata defaults and descriptions so IDEs and
+      generated references do not advertise implicit `default` activation.
+- [ ] Update annotations, resilience docs, quick start, production examples,
+      support bundles, mock helpers, and assembled consumers with retry-only and
+      mixed explicit-selection examples.
+- [ ] Add a migration table covering `enabled` alone, one explicitly named
+      operator, explicit `default`, method annotations, blank values,
+      `retry-methods`, and strict retry validation.
+- [ ] Add documentation/configuration drift tests that reject a return to
+      all-operators-on behavior or examples that imply registry presence is
+      activation.
+
+### [ ] 4.3 Prove each admission outcome
 
 - [ ] Exercise open circuit, exhausted rate limiter, saturated zero-wait
       bulkhead, delayed rate-limit permission, and delayed bulkhead admission.
@@ -185,7 +251,7 @@ Evidence:
       `logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt`
       composition.
 
-### [ ] 4.2 Preserve retry and hidden-replay boundaries
+### [ ] 4.4 Preserve retry and hidden-replay boundaries
 
 - [ ] Verify retry delay and each retry subscription contribute to one logical
       duration and final attempt count.
@@ -199,6 +265,9 @@ Evidence:
       record and no late metric update.
 - [ ] Run the full resilience, retry/redirect/auth composition, idempotency, and
       body-repeatability suites.
+- [ ] Record the change as SemVer-major release scope. Do not ship these
+      semantics under `3.6.0`; either prepare a deliberate `4.0.0` candidate or
+      defer the opt-in activation change intact.
 
 ---
 
@@ -436,6 +505,9 @@ Evidence:
       correctness/documentation and the maintenance lane is intentionally used.
 - [ ] Select `3.6.0` for backward-compatible metric, configuration, diagnostics,
       or test-helper additions on the current reactor line.
+- [ ] Select `4.0.0` if opt-in resilience activation is delivered, with a
+      migration guide and explicit evidence that implicit `default` operators
+      no longer activate.
 - [ ] Reject/defer binary/source incompatible changes and diagnostics schema-v1
       breaks.
 - [ ] Record whether numerical performance claims require a promoted benchmark

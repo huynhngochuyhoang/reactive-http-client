@@ -5,9 +5,9 @@ import org.springframework.http.HttpStatusCode;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /** Subscription-local mutable state and its immutable terminal projection. */
@@ -16,7 +16,7 @@ final class SubscriptionReportingState {
     private final AtomicReference<String> generatedIdempotencyKey = new AtomicReference<>();
     private final RequestArgumentResolver.ResolvedArgs initialResolved;
     private final AtomicInteger attemptCount = new AtomicInteger();
-    private final AtomicLong start = new AtomicLong();
+    private final long startedAtNanos;
     private final AtomicBoolean firstAttempt = new AtomicBoolean(true);
     private final AtomicReference<Attempt> activeAttempt = new AtomicReference<>();
     private final AtomicReference<Attempt> latestAttempt = new AtomicReference<>();
@@ -24,6 +24,7 @@ final class SubscriptionReportingState {
 
     SubscriptionReportingState(RequestArgumentResolver.ResolvedArgs initialResolved) {
         this.initialResolved = initialResolved;
+        this.startedAtNanos = System.nanoTime();
     }
 
     AtomicReference<String> generatedIdempotencyKey() {
@@ -32,19 +33,7 @@ final class SubscriptionReportingState {
 
     synchronized Attempt beginAttempt(RequestArgumentResolver.ResolvedArgs preparedResolved) {
         int number = attemptCount.incrementAndGet();
-        start.compareAndSet(0L, System.currentTimeMillis());
         Attempt attempt = new Attempt(number, preparedResolved);
-        latestAttempt.set(attempt);
-        activeAttempt.set(attempt);
-        return attempt;
-    }
-
-    synchronized Attempt beginFallbackAttempt(RequestArgumentResolver.ResolvedArgs resolved) {
-        if (!attemptCount.compareAndSet(0, 1)) {
-            return null;
-        }
-        start.compareAndSet(0L, System.currentTimeMillis());
-        Attempt attempt = new Attempt(1, resolved);
         latestAttempt.set(attempt);
         activeAttempt.set(attempt);
         return attempt;
@@ -58,12 +47,9 @@ final class SubscriptionReportingState {
         return attemptCount.get();
     }
 
-    long startMs() {
-        return start.get();
-    }
-
-    void startIfNeeded() {
-        start.compareAndSet(0L, System.currentTimeMillis());
+    long elapsedMillis() {
+        long elapsedNanos = System.nanoTime() - startedAtNanos;
+        return TimeUnit.NANOSECONDS.toMillis(Math.max(0L, elapsedNanos));
     }
 
     boolean markFirstAttemptStarted() {
@@ -99,7 +85,7 @@ final class SubscriptionReportingState {
                 attempt != null ? attempt.preparedResolved() : initialResolved,
                 evidence.requestUrl(),
                 evidence.finalRequestObservation(),
-                start.get(),
+                elapsedMillis(),
                 evidence.responseStatus(),
                 evidence.responseHeaders(),
                 responseBody,
@@ -193,7 +179,7 @@ final class SubscriptionReportingState {
             RequestArgumentResolver.ResolvedArgs preparedResolved,
             URI requestUrl,
             FinalRequestObservation finalRequestObservation,
-            long startMs,
+            long durationMs,
             HttpStatusCode responseStatus,
             Map<String, List<String>> responseHeaders,
             Object responseBody,

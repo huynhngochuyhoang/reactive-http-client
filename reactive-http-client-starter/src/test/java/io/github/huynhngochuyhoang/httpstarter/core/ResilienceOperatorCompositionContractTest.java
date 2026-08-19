@@ -44,6 +44,7 @@ import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -98,6 +99,43 @@ class ResilienceOperatorCompositionContractTest {
                 assertThat(diagnostics.cancellations).hasValue(0);
                 diagnostics.assertOneTerminalResult(3);
             }
+        }
+    }
+
+    @Test
+    void callerCancellationDuringRateLimiterAdmissionRemainsAZeroAttemptTerminal() {
+        OperatorFixture operators = operators(
+                Duration.ofMillis(20),
+                RateLimiterConfig.custom()
+                        .limitForPeriod(1)
+                        .limitRefreshPeriod(Duration.ofSeconds(1))
+                        .timeoutDuration(Duration.ofSeconds(2))
+                        .build());
+        assertThat(operators.rateLimiter().acquirePermission()).isTrue();
+        AtomicInteger dispatches = new AtomicInteger();
+        WebClient webClient = webClient(request -> Mono.fromSupplier(() -> {
+            dispatches.incrementAndGet();
+            return ClientResponse.create(HttpStatus.OK).body("ok").build();
+        }));
+
+        try (ClientFixture fixture = client(webClient, config(500, 2_000), operators, null)) {
+            Disposable subscription = fixture.client().call().subscribe();
+            await(() -> operators.bulkhead().getMetrics().getAvailableConcurrentCalls() == 0,
+                    "bulkhead admission was not held");
+
+            subscription.dispose();
+
+            await(() -> operators.bulkhead().getMetrics().getAvailableConcurrentCalls() == 1,
+                    "bulkhead permit was not released after admission cancellation");
+            sleep(Duration.ofMillis(100));
+            assertThat(dispatches).hasValue(0);
+            assertThat(operators.circuitBreaker().getMetrics().getNumberOfBufferedCalls()).isZero();
+            assertThat(fixture.diagnostics().starts).hasValue(0);
+            assertThat(fixture.diagnostics().retries).hasValue(0);
+            assertThat(fixture.diagnostics().errors).hasValue(0);
+            assertThat(fixture.diagnostics().successes).hasValue(0);
+            assertThat(fixture.diagnostics().cancellations).hasValue(1);
+            fixture.diagnostics().assertOneTerminalResult(0);
         }
     }
 
@@ -458,13 +496,19 @@ class ResilienceOperatorCompositionContractTest {
         private void assertOneTerminalResult(int attemptCount) {
             await(() -> observerEvents.size() == 1 && exchangeLogs.size() == 1,
                     "terminal diagnostics did not converge");
-            assertThat(observerEvents).singleElement()
-                    .satisfies(event -> assertThat(event.getAttemptCount()).isEqualTo(attemptCount));
-            assertThat(exchangeLogs).singleElement()
-                    .satisfies(log -> assertThat(log.subscriptionAttemptCount()).isEqualTo(attemptCount));
+            HttpClientObserverEvent event = observerEvents.getFirst();
+            HttpExchangeLogContext exchange = exchangeLogs.getFirst();
+            assertThat(event.getAttemptCount()).isEqualTo(attemptCount);
+            assertThat(exchange.subscriptionAttemptCount()).isEqualTo(attemptCount);
+            assertThat(event.getDurationMs()).isBetween(0L, BLOCK_TIMEOUT.toMillis() - 1L);
+            assertThat(exchange.durationMs()).isEqualTo(event.getDurationMs());
             assertThat(meterRegistry.find("reactive.http.client.requests").timers())
                     .singleElement()
-                    .satisfies(timer -> assertThat(timer.count()).isEqualTo(1));
+                    .satisfies(timer -> {
+                        assertThat(timer.count()).isEqualTo(1);
+                        assertThat(timer.totalTime(TimeUnit.MILLISECONDS))
+                                .isCloseTo(event.getDurationMs(), org.assertj.core.data.Offset.offset(0.001));
+                    });
             assertThat(meterRegistry.find("reactive.http.client.requests.attempts").summaries())
                     .singleElement()
                     .satisfies(summary -> {

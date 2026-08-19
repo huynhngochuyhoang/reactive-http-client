@@ -1,7 +1,9 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.HttpClientException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RequestSerializationException;
@@ -21,6 +23,7 @@ import reactor.test.StepVerifier;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -73,6 +76,7 @@ class DiagnosticContextContractTest {
         assertThat(observerEvent.getStatusCode()).isEqualTo(201);
         assertThat(observerEvent.getResponseBody()).isEqualTo("ok");
         assertThat(observerEvent.getDurationMs()).isGreaterThanOrEqualTo(0);
+        assertThat(observerEvent.getDurationMs()).isEqualTo(logContext.durationMs());
         assertThat(observerEvent.getAttemptCount()).isEqualTo(1);
 
         ReactiveHttpClientLifecycleContext lifecycleContext = succeeded.get();
@@ -214,6 +218,67 @@ class DiagnosticContextContractTest {
         diagnostics.assertOnePreDispatchTerminal(terminal.get());
     }
 
+    @Test
+    void authFailureReportsOneFiniteStageUnknownPreDispatchTerminal() throws Throwable {
+        TerminalDiagnostics diagnostics = new TerminalDiagnostics();
+        AuthProviderException authFailure = new AuthProviderException("test-client", "token unavailable");
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter(new OutboundAuthFilter("test-client", request -> Mono.error(authFailure)))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> Mono.error(new AssertionError("request must not dispatch")))
+                .build();
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.setAuthProvider("configured-auth");
+        ReactiveClientInvocationHandler handler = createHandler(
+                webClient, new DefaultErrorDecoder(), diagnostics, diagnostics, diagnostics,
+                config, TestJsonCodecs.jsonCodec());
+
+        StepVerifier.create(invoke(handler, "42", "full", "declared"))
+                .expectErrorMatches(error -> error == authFailure)
+                .verify();
+
+        diagnostics.assertOnePreDispatchTerminal(authFailure);
+    }
+
+    @Test
+    void customFilterFailureReportsOneFiniteStageUnknownPreDispatchTerminal() throws Throwable {
+        TerminalDiagnostics diagnostics = new TerminalDiagnostics();
+        IllegalStateException filterFailure = new IllegalStateException("custom filter failed");
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter((request, next) -> Mono.error(filterFailure))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> Mono.error(new AssertionError("request must not dispatch")))
+                .build();
+
+        StepVerifier.create(invoke(createHandler(webClient, new DefaultErrorDecoder(),
+                        diagnostics, diagnostics, diagnostics), "42", "full", "declared"))
+                .expectErrorMatches(error -> error == filterFailure)
+                .verify();
+
+        diagnostics.assertOnePreDispatchTerminal(filterFailure);
+    }
+
+    @Test
+    void cancellationBeforeDispatchReportsOneFiniteTerminal() throws Throwable {
+        TerminalDiagnostics diagnostics = new TerminalDiagnostics();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .filter((request, next) -> Mono.never())
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> Mono.error(new AssertionError("request must not dispatch")))
+                .build();
+
+        StepVerifier.create(invoke(createHandler(webClient, new DefaultErrorDecoder(),
+                        diagnostics, diagnostics, diagnostics), "42", "full", "declared"))
+                .expectSubscription()
+                .thenCancel()
+                .verify();
+
+        diagnostics.assertOnePreDispatchCancellation();
+    }
+
     private static ReactiveHttpClientLifecycleHook successHook(
             AtomicReference<ReactiveHttpClientLifecycleContext> succeeded) {
         return new ReactiveHttpClientLifecycleHook() {
@@ -291,10 +356,12 @@ class DiagnosticContextContractTest {
         private final AtomicReference<HttpClientObserverEvent> observer = new AtomicReference<>();
         private final AtomicReference<ReactiveHttpClientLifecycleContext> started = new AtomicReference<>();
         private final AtomicReference<ReactiveHttpClientLifecycleContext> failed = new AtomicReference<>();
+        private final AtomicReference<ReactiveHttpClientLifecycleContext> cancelled = new AtomicReference<>();
         private final AtomicReference<HttpExchangeLogContext> exchange = new AtomicReference<>();
         private final AtomicInteger observerCount = new AtomicInteger();
         private final AtomicInteger startedCount = new AtomicInteger();
         private final AtomicInteger failedCount = new AtomicInteger();
+        private final AtomicInteger cancelledCount = new AtomicInteger();
         private final AtomicInteger exchangeCount = new AtomicInteger();
 
         @Override
@@ -316,6 +383,12 @@ class DiagnosticContextContractTest {
         }
 
         @Override
+        public void onCancel(ReactiveHttpClientLifecycleContext context) {
+            cancelledCount.incrementAndGet();
+            cancelled.set(context);
+        }
+
+        @Override
         public void log(HttpExchangeLogContext context) {
             exchangeCount.incrementAndGet();
             exchange.set(context);
@@ -325,10 +398,12 @@ class DiagnosticContextContractTest {
             assertThat(observerCount).hasValue(0);
             assertThat(startedCount).hasValue(0);
             assertThat(failedCount).hasValue(0);
+            assertThat(cancelledCount).hasValue(0);
             assertThat(exchangeCount).hasValue(0);
             assertThat(observer).hasValue(null);
             assertThat(started).hasValue(null);
             assertThat(failed).hasValue(null);
+            assertThat(cancelled).hasValue(null);
             assertThat(exchange).hasValue(null);
         }
 
@@ -336,6 +411,7 @@ class DiagnosticContextContractTest {
             assertThat(observerCount).hasValue(1);
             assertThat(startedCount).hasValue(1);
             assertThat(failedCount).hasValue(1);
+            assertThat(cancelledCount).hasValue(0);
             assertThat(exchangeCount).hasValue(1);
             assertThat(started.get()).satisfies(context -> {
                 assertThat(context.attemptNumber()).isEqualTo(1);
@@ -349,6 +425,7 @@ class DiagnosticContextContractTest {
                 assertThat(event.getRequestHeaders()).isEmpty();
                 assertThat(event.getStatusCode()).isNull();
                 assertThat(event.getFailureStage()).isNull();
+                assertThat(event.getDurationMs()).isBetween(0L, 4_999L);
             });
             assertThat(failed.get()).satisfies(context -> {
                 assertThat(context.error()).isSameAs(terminal);
@@ -364,6 +441,40 @@ class DiagnosticContextContractTest {
                 assertThat(context.responseStatus()).isNull();
                 assertThat(context.responseHeaders()).isEmpty();
                 assertThat(context.failureStage()).isNull();
+                assertThat(context.durationMs()).isEqualTo(observer.get().getDurationMs());
+            });
+        }
+
+        private void assertOnePreDispatchCancellation() {
+            assertThat(observerCount).hasValue(1);
+            assertThat(startedCount).hasValue(1);
+            assertThat(failedCount).hasValue(0);
+            assertThat(cancelledCount).hasValue(1);
+            assertThat(exchangeCount).hasValue(1);
+            assertThat(observer.get()).satisfies(event -> {
+                assertThat(event.getError()).isInstanceOf(CancellationException.class);
+                assertThat(event.getAttemptCount()).isEqualTo(1);
+                assertThat(event.getRequestUrl()).isNull();
+                assertThat(event.getRequestHeaders()).isEmpty();
+                assertThat(event.getStatusCode()).isNull();
+                assertThat(event.getFailureStage()).isNull();
+                assertThat(event.getDurationMs()).isBetween(0L, 4_999L);
+            });
+            assertThat(cancelled.get()).satisfies(context -> {
+                assertThat(context.error()).isInstanceOf(CancellationException.class);
+                assertThat(context.attemptNumber()).isEqualTo(1);
+                assertThat(context.requestUrl()).isNull();
+                assertThat(context.statusCode()).isNull();
+                assertThat(context.failureStage()).isNull();
+            });
+            assertThat(exchange.get()).satisfies(context -> {
+                assertThat(context.error()).isInstanceOf(CancellationException.class);
+                assertThat(context.subscriptionAttemptCount()).isEqualTo(1);
+                assertThat(context.requestUrl()).isNull();
+                assertThat(context.responseStatus()).isNull();
+                assertThat(context.responseHeaders()).isEmpty();
+                assertThat(context.failureStage()).isNull();
+                assertThat(context.durationMs()).isEqualTo(observer.get().getDurationMs());
             });
         }
     }
