@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Micrometer timer and export contract.** Added Prometheus scrape coverage for
+  seconds-based logical-call timer count, sum, and time-window maximum; opt-in
+  latency SLO buckets; conditional size meters; and custom metric names. Clarified
+  attempts-summary `0`/`1`/`>1` subscription semantics and kept default
+  percentiles and histogram buckets disabled.
 - **V26 release-readiness consumer lane.** Added the published `3.5.0`
   assembled-consumer verification command to generated manual release evidence
   and the concise release-prep checklist, alongside compatibility, native,
