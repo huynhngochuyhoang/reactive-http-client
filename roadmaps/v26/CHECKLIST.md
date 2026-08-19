@@ -144,50 +144,71 @@ Evidence:
 
 ## Priority 3 - Micrometer Timer and Export Contract
 
-### [ ] 3.1 Freeze main timer and latency-histogram exports
+### [x] 3.1 Freeze main timer and latency-histogram exports
 
-- [ ] Add a Prometheus-compatible scrape fixture for the default main timer.
-- [ ] Verify `_count`, `_sum`, and `_max` values and their seconds base unit
+- [x] Add a Prometheus-compatible scrape fixture for the default main timer.
+- [x] Verify `_count`, `_sum`, and `_max` values and their seconds base unit
       for success, HTTP error, timeout, cancellation, and open-circuit outcomes.
-- [ ] Prove the main timer and opt-in latency timer never record epoch-sized or
+- [x] Prove the main timer and opt-in latency timer never record epoch-sized or
       negative values.
-- [ ] Verify the main timer retains final status/error tags while the latency
+- [x] Verify the main timer retains final status/error tags while the latency
       timer retains only its documented low-cardinality tags.
-- [ ] Verify configured SLO boundaries and histogram buckets without adding
+- [x] Verify configured SLO boundaries and histogram buckets without adding
       status, exception, category, or failure-stage tags.
-- [ ] Characterize Micrometer time-window maximum expiry/reset behavior in tests
+- [x] Characterize Micrometer time-window maximum expiry/reset behavior in tests
       where the registry permits deterministic clock control.
 
-### [ ] 3.2 Correct the attempts-summary contract
+### [x] 3.2 Correct the attempts-summary contract
 
-- [ ] Verify the default attempts summary exports only the distribution
+- [x] Verify the default attempts summary exports only the distribution
       statistics supported by its current registry configuration; do not claim
       p95/p99.
-- [ ] Keep `publishPercentiles(0.95, 0.99)` disabled by default because
+- [x] Keep `publishPercentiles(0.95, 0.99)` disabled by default because
       per-instance client-side quantiles are not aggregable across replicas.
-- [ ] Document `0` as pre-subscription rejection, `1` as one attempt
+- [x] Document `0` as pre-subscription rejection, `1` as one attempt
       regardless of outcome, and `>1` as retry resubscription.
-- [ ] Remove the unsupported “p95 above 1” guidance from the default meter
+- [x] Remove the unsupported “p95 above 1” guidance from the default meter
       contract.
-- [ ] Recommend Resilience4j retry counters and explicitly labeled
+- [x] Recommend Resilience4j retry counters and explicitly labeled
       `attempts_sum / attempts_count` mean-attempt queries for the default
       summary without presenting either as a percentile.
-- [ ] Add an attempts histogram only if V26 records a separate opt-in property,
-      bounded integer buckets, metadata, scrape tests, multi-instance
-      `histogram_quantile` evidence, and overhead/cardinality review.
+- [x] Keep the attempts histogram absent because V26 adds no opt-in property,
+      bounded integer buckets, metadata, multi-instance `histogram_quantile`
+      evidence, or reviewed overhead/cardinality contract.
 
-### [ ] 3.3 Inventory conditional meter creation
+### [x] 3.3 Inventory conditional meter creation
 
-- [ ] Verify the main timer and attempts summary are recorded for every observer
+- [x] Verify the main timer and attempts summary are recorded for every observer
       event accepted by the built-in observer.
-- [ ] Verify request-size and response-size summaries are absent when size is
+- [x] Verify request-size and response-size summaries are absent when size is
       unknown and record explicit zero where zero is known.
-- [ ] Verify the separate latency timer exists only when histogram support is
+- [x] Verify the separate latency timer exists only when histogram support is
       enabled.
-- [ ] Keep custom metric-name behavior consistent across main, attempts, size,
+- [x] Keep custom metric-name behavior consistent across main, attempts, size,
       histogram, and health lookups.
-- [ ] Add documentation assertions that prevent “four meters per exchange” and
+- [x] Add documentation assertions that prevent “four meters per exchange” and
       unsupported attempts-percentile wording from returning.
+
+Evidence:
+
+- `MicrometerPrometheusExportContractTest` covers all five terminal outcomes,
+  seconds-based timer count/sum/max samples, opt-in SLO buckets and tag shape,
+  deterministic time-window maximum expiry, attempts-summary statistics without
+  quantiles or buckets, conditional size/latency meters, and custom-name health
+  lookup parity.
+- The Priority 2 integration suite supplies real nonnegative, finite
+  logical-call durations for zero-attempt resilience outcomes; the scrape fixture
+  also bounds every exported terminal duration away from epoch-sized values.
+- `DocumentationReleaseArtifactTest.observabilityMeterDocsMatchPrometheusExportContract`
+  prevents the removed fixed-meter-count, success-only attempt, and unsupported
+  attempts-percentile claims from returning.
+- `mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter
+  -Dtest=MicrometerPrometheusExportContractTest,MicrometerHttpClientObserverTest,Boot4HttpClientHealthIndicatorTest,DocumentationReleaseArtifactTest
+  test` passed with 86 tests.
+- `mvn -B -ntp -s .mvn/maven-central-settings.xml
+  -pl reactive-http-client-starter test` passed with 1,028 tests.
+- This priority adds a test-scoped Prometheus registry only; production observer
+  configuration and default meter creation remain unchanged.
 
 ---
 

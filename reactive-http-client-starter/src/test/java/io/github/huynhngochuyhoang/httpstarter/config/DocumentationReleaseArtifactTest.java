@@ -937,6 +937,25 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void observabilityMeterDocsMatchPrometheusExportContract() throws IOException {
+        String observabilityDocs = Files.readString(projectRoot().resolve("docs/08-observability.md"));
+
+        assertThat(observabilityDocs)
+                .contains("always\nrecords the main logical-call timer and attempts summary")
+                .contains("reactive_http_client_requests_seconds_count")
+                .contains("time-window maximum, not a lifetime maximum")
+                .contains("`0` means resilience rejected or admission was cancelled")
+                .contains("`1` means one subscription attempt, regardless of success")
+                .contains("Values greater than `1` mean Resilience4j retry resubscribed")
+                .contains("does not enable `publishPercentiles(0.95, 0.99)`")
+                .contains("This query is a mean, not a percentile")
+                .contains("Use Resilience4j retry counters")
+                .doesNotContain("records four meters per exchange")
+                .doesNotContain("`1` = succeeded on first try")
+                .doesNotContain("A p95 above `1`");
+    }
+
+    @Test
     void documentedPublicSurfaceMapMatchesApiCompatibilityIncludes() throws IOException {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

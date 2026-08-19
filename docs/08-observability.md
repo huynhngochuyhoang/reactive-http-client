@@ -11,7 +11,10 @@ native-image changes.
 
 ## Micrometer metrics
 
-When a `MeterRegistry` bean is present, `MicrometerHttpClientObserver` records four meters per exchange.
+When a `MeterRegistry` bean is present, `MicrometerHttpClientObserver` always
+records the main logical-call timer and attempts summary for each accepted
+terminal event. Request/response size summaries are created only when the
+corresponding size is known. The separate latency histogram timer is opt-in.
 
 ### `reactive.http.client.requests` (Timer)
 
@@ -21,12 +24,22 @@ and request preparation, transport dispatch, and starter-owned response
 consumption. A rejection or cancellation before the first attempt therefore has
 a finite duration and an attempt count of `0`.
 
+The public observer event carries milliseconds. A Prometheus registry exports
+timer values in seconds as `reactive_http_client_requests_seconds_count`,
+`reactive_http_client_requests_seconds_sum`, and
+`reactive_http_client_requests_seconds_max`. Count and sum are cumulative. Max is
+a Micrometer time-window maximum, not a lifetime maximum: it resets to `0` after
+no observations remain in the configured expiry window. With the Prometheus
+registry default, that window is the registry step multiplied by the distribution
+buffer length (three slots by default); registry or meter-filter configuration can
+change it.
+
 | Tag | Values |
 |---|---|
 | `client.name` | Logical client name from `@ReactiveHttpClient(name)` |
 | `api.name` | `@ApiName` value, `@ApiRef` value, or the Java method name |
 | `http.method` | `GET`, `POST`, … |
-| `http.status_code` | Numeric HTTP status code, or `NONE` on network failure |
+| `http.status_code` | Numeric HTTP status code, or `NONE` when no response status is known |
 | `outcome` | `SUCCESS`, `REDIRECTION`, `CLIENT_ERROR`, `SERVER_ERROR`, `UNKNOWN` |
 | `exception` | Simple class name of the thrown exception, or `none` |
 | `error.category` | `ErrorCategory` value — see [03-error-handling.md](03-error-handling.md) |
@@ -37,18 +50,50 @@ a finite duration and an attempt count of `0`.
 
 ### `reactive.http.client.requests.attempts` (DistributionSummary)
 
-Number of subscription attempts per invocation. `1` = succeeded on first try; `>1` = Resilience4j retry fired. A p95 above `1` signals degradation in a downstream service.
+Number of subscriptions to the retryable request publisher within one logical
+call:
 
-Tags: `client.name`, `api.name`, `http.method`, `uri`.
+- `0` means resilience rejected or admission was cancelled before the initial
+  request subscription.
+- `1` means one subscription attempt, regardless of success, HTTP error,
+  transport error, or cancellation.
+- Values greater than `1` mean Resilience4j retry resubscribed.
+
+This is not a downstream request count. Redirects and one-time auth replay can
+create additional wire requests inside one subscription attempt.
+
+The default summary exports count, sum, and max statistics supported by the
+registry. It does not enable `publishPercentiles(0.95, 0.99)` or a percentile
+histogram, so no default p95/p99 attempts series exists. For a rolling mean
+attempt count in Prometheus, use:
+
+```promql
+sum by (client_name, api_name) (
+  rate(reactive_http_client_requests_attempts_sum[5m])
+)
+/
+sum by (client_name, api_name) (
+  rate(reactive_http_client_requests_attempts_count[5m])
+)
+```
+
+This query is a mean, not a percentile. Use Resilience4j retry counters when the
+question is whether Retry fired or exhausted; those operator meters are distinct
+from this starter-owned logical-call summary.
+
+Tags: `client.name`, `api.name`, `http.method`, `uri`; optional
+`server.address` and `server.port` are added only when their explicit cardinality
+gate is enabled.
 
 ### `reactive.http.client.requests.request.size` (DistributionSummary)
 
 Application request body bytes before transport content coding. Recorded only
 for cheaply measurable types: `byte[]`, `String`, or `null` (`0`). POJO bodies
-are not measured to avoid double-serialization cost. The starter's
+are not measured to avoid double-serialization cost. The starter
 `compression-enabled` option does not compress request bodies.
 
-Tags: `client.name`, `api.name`, `http.method`, `uri`.
+Tags: `client.name`, `api.name`, `http.method`, `uri`; optional server-address
+tags follow the same explicit gate.
 
 ### `reactive.http.client.requests.response.size` (DistributionSummary)
 
@@ -62,11 +107,14 @@ boundaries, **advertised** is the surviving header value, **consumed** is actual
 body demand, and **unknown** means no trustworthy advertised count exists. This
 metric records only advertised bytes; it is not a decoded or consumed byte counter.
 
-Tags: `client.name`, `api.name`, `http.method`, `uri`.
+Tags: `client.name`, `api.name`, `http.method`, `uri`; optional server-address
+tags follow the same explicit gate.
 
 ### `reactive.http.client.requests.latency` (Timer with SLO histogram) *(opt-in)*
 
-A separate latency Timer configured with `serviceLevelObjectives(...)` buckets, enabling P99/SLO-style analysis in Prometheus/Grafana without tag-cardinality explosion.  Disabled by default — enable via configuration.
+A separate latency timer configured with `serviceLevelObjectives(...)` buckets.
+Prometheus exports aggregable `_bucket`, `_count`, and `_sum` series suitable for
+SLO analysis and `histogram_quantile`. It is disabled by default.
 
 | Tag | Values |
 |---|---|
@@ -74,8 +122,12 @@ A separate latency Timer configured with `serviceLevelObjectives(...)` buckets, 
 | `api.name` | `@ApiName` value, `@ApiRef` value, or the Java method name |
 | `http.method` | `GET`, `POST`, … |
 | `uri` | Path template (e.g. `/users/{id}`), or `NONE` |
+| `server.address` | Resolved upstream host when explicitly enabled |
+| `server.port` | Resolved upstream port when explicitly enabled |
 
-> The histogram deliberately omits `http.status_code`, `outcome`, `exception`, and `error.category` to keep label-set cardinality low and avoid Prometheus time-series explosion.
+> The histogram deliberately omits `http.status_code`, `outcome`, `exception`,
+> `error.category`, and `failure.stage` to keep its label set bounded. Enabling
+> server-address labels remains a separate explicit cardinality decision.
 
 ---
 
