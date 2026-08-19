@@ -11,6 +11,10 @@ V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V25 are completed release records. V26 is the active draft
 with an execution checklist.
 
+Deferred design work that is not part of an active execution roadmap is kept
+under [`proposals/`](proposals/). These proposals do not add release gates until
+they are deliberately adopted by a future roadmap.
+
 | Version | Roadmap | Checklist | Archive status |
 |---|---|---|---|
 | V1 | [Roadmap](v1/ROADMAP.md) | [Checklist](v1/CHECKLIST.md) | Completed before V2 |

@@ -191,52 +191,9 @@ Evidence:
 
 ---
 
-## Priority 4 - Opt-In Resilience Activation and Admission Semantics
+## Priority 4 - Resilience Admission and Attempt Semantics
 
-### [ ] 4.1 Make every operator explicit by intent
-
-- [ ] Add failing compatibility fixtures proving that `resilience.enabled=true`
-      currently activates retry, rate limiter, circuit breaker, and bulkhead
-      through their implicit `default` instance names.
-- [ ] Keep `resilience.enabled` as the client-level master gate, but make
-      client-level `retry`, `rate-limiter`, `circuit-breaker`, and `bulkhead`
-      absent/disabled by default.
-- [ ] Activate an operator only from a non-blank client-level instance property
-      or the matching method annotation. Preserve explicit `default` as a valid
-      instance name; do not infer activation from registry availability.
-- [ ] Define and test method-level selection over client-level selection while
-      retaining the master gate. A blank client-level property must not suppress
-      an explicit method annotation.
-- [ ] Keep `retry-methods` as Retry eligibility rather than activation, and keep
-      strict unsafe-retry validation dormant when Retry is not effectively
-      selected or cannot make another attempt.
-- [ ] Prove `enabled: true` alone applies no operator for `Mono` and `Flux`.
-- [ ] Prove retry-only, rate-limiter-only, circuit-breaker-only, and
-      bulkhead-only configurations apply exactly the selected operator and leave
-      the other three absent.
-
-### [ ] 4.2 Align every effective-policy surface
-
-- [ ] Centralize the effective operator-selection rule used by invocation,
-      startup validation/logging, `EffectiveHttpClientContractExporter`, and
-      `ReactiveHttpClientDiagnosticsProvider` without creating operators or
-      registries from diagnostics.
-- [ ] Report unselected operators as `disabled`, selected but unavailable
-      operators as `unavailable`, and unresolved lazy candidates as `unknown`
-      where the diagnostics schema already permits it.
-- [ ] Update configuration metadata defaults and descriptions so IDEs and
-      generated references do not advertise implicit `default` activation.
-- [ ] Update annotations, resilience docs, quick start, production examples,
-      support bundles, mock helpers, and assembled consumers with retry-only and
-      mixed explicit-selection examples.
-- [ ] Add a migration table covering `enabled` alone, one explicitly named
-      operator, explicit `default`, method annotations, blank values,
-      `retry-methods`, and strict retry validation.
-- [ ] Add documentation/configuration drift tests that reject a return to
-      all-operators-on behavior or examples that imply registry presence is
-      activation.
-
-### [ ] 4.3 Prove each admission outcome
+### [ ] 4.1 Prove each admission outcome
 
 - [ ] Exercise open circuit, exhausted rate limiter, saturated zero-wait
       bulkhead, delayed rate-limit permission, and delayed bulkhead admission.
@@ -251,7 +208,7 @@ Evidence:
       `logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt`
       composition.
 
-### [ ] 4.4 Preserve retry and hidden-replay boundaries
+### [ ] 4.2 Preserve retry and hidden-replay boundaries
 
 - [ ] Verify retry delay and each retry subscription contribute to one logical
       duration and final attempt count.
@@ -265,9 +222,6 @@ Evidence:
       record and no late metric update.
 - [ ] Run the full resilience, retry/redirect/auth composition, idempotency, and
       body-repeatability suites.
-- [ ] Record the change as SemVer-major release scope. Do not ship these
-      semantics under `3.6.0`; either prepare a deliberate `4.0.0` candidate or
-      defer the opt-in activation change intact.
 
 ---
 
@@ -505,9 +459,6 @@ Evidence:
       correctness/documentation and the maintenance lane is intentionally used.
 - [ ] Select `3.6.0` for backward-compatible metric, configuration, diagnostics,
       or test-helper additions on the current reactor line.
-- [ ] Select `4.0.0` if opt-in resilience activation is delivered, with a
-      migration guide and explicit evidence that implicit `default` operators
-      no longer activate.
 - [ ] Reject/defer binary/source incompatible changes and diagnostics schema-v1
       breaks.
 - [ ] Record whether numerical performance claims require a promoted benchmark

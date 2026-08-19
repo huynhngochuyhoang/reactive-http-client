@@ -46,14 +46,6 @@ audit found one concrete duration defect and several documentation mismatches:
 - String request-size measurement always uses UTF-8, while an explicit outbound
   `Content-Type` can select another charset. Calling that value the wire-aligned
   application byte count is therefore not always correct.
-- Resilience activation is broader than its configuration suggests.
-  `ResilienceConfig` initializes retry, rate limiter, circuit breaker, and
-  bulkhead instance names to `default`; once `resilience.enabled=true`, the
-  invocation handler applies all available operators even when the user named
-  only one. Registry defaults should remain reusable configuration, not implicit
-  client activation. This violates the fail-safe rule that each behavior is off
-  until selected explicitly and can unexpectedly reject, throttle, queue, or
-  replay production traffic.
 
 The same audit confirmed that API-name precedence, default cardinality gates,
 status/outcome/error tags, advertised response-size behavior, histogram tag
@@ -71,7 +63,6 @@ or expose unbounded request data.
 |---|---|
 | Timing fix, tests, and documentation alignment only | `3.5.x` or include in `3.6.0` |
 | Backward-compatible metric, diagnostic, or test-helper addition | `3.6.0` |
-| Make each Resilience4j operator opt-in instead of implicitly using `default` | `4.0.0` major candidate; do not ship silently in `3.6.0` |
 | Existing metric/tag removal, semantic rename, or diagnostics schema break | Defer to a future major |
 
 Keep the reactor on `3.6.0-SNAPSHOT` and public consumer examples on published
@@ -91,9 +82,6 @@ Keep the reactor on `3.6.0-SNAPSHOT` and public consumer examples on published
    raw URLs, or unbounded payloads.
 6. Preserve API, AOT, native, dependency, benchmark, and release-evidence
    discipline against published `3.5.0`.
-7. Make Resilience4j activation fail-safe: a global registry or master switch
-   does not activate retry, rate limiting, circuit breaking, or bulkheading
-   without an explicit client- or method-level operator selection.
 
 ## Non-Goals
 
@@ -110,8 +98,6 @@ Keep the reactor on `3.6.0-SNAPSHOT` and public consumer examples on published
 - Do not change established `ErrorCategory`, `HttpClientFailureStage`,
   diagnostics schema v1, or subscription-attempt semantics silently.
 - Do not change Resilience4j operator ordering as part of the timing fix.
-- Do not infer operator activation from registry presence, an instance named
-  `default`, `retry-methods`, or strict-validation flags alone.
 - Do not promote benchmark numbers from smoke runs, dirty commits, or local
   unpublished baselines.
 
@@ -191,53 +177,13 @@ boundaries.
 - Histogram SLO buckets remain low-cardinality and are not confused with the main
   timer's status/error-tagged series.
 
-## 4. Opt-In Resilience Activation and Admission Semantics
+## 4. Resilience Admission and Attempt Semantics
 
-Replace the current all-operators-on master switch with fail-safe, explicit
-selection, then make the admission boundary understandable without turning
-attempts into a wire request count.
-
-A retry-only client must be expressible without activating any other operator:
-
-```yaml
-resilience:
-  enabled: true
-  retry: default
-  retry-methods: [GET, HEAD]
-```
-
-Here `default` is explicit intent to use the named Retry instance. Omitted
-`rate-limiter`, `circuit-breaker`, and `bulkhead` properties remain disabled even
-when matching registries contain instances named `default`.
+Make the operator boundary understandable without turning attempts into a wire
+request count.
 
 **Acceptance:**
 
-- Keep `resilience.enabled` as the client-level master gate, but default the
-  client-level retry, rate-limiter, circuit-breaker, and bulkhead selections to
-  absent/disabled rather than the instance name `default`.
-- Activate an operator only when its client-level instance property is
-  non-blank or the endpoint explicitly selects an instance with `@Retry`,
-  `@RateLimiter`, `@CircuitBreaker`, or `@Bulkhead`. The explicit value
-  `default` remains valid; registry presence alone does not activate it.
-- Treat `retry-methods` as eligibility only. It cannot activate Retry without an
-  explicit retry instance, and strict unsafe-retry validation remains dormant
-  when Retry is not selected or cannot make another attempt.
-- Define precedence as method-level selection over client-level selection, both
-  still gated by `resilience.enabled`. Blank client-level values disable only
-  that client-level operator and do not erase an explicit method annotation.
-- Prove `enabled: true` alone applies no operators; configuring only `retry`,
-  only `rate-limiter`, only `circuit-breaker`, or only `bulkhead` applies exactly
-  that operator for both `Mono` and `Flux` contracts.
-- Align startup logs, effective-contract exports, diagnostics snapshots,
-  strict-validation flags, configuration metadata, examples, mock helpers, and
-  assembled consumers with the same effective activation decision.
-- Publish a migration table for every old configuration shape. Existing users
-  relying on implicit `default` operators must add each intended property
-  explicitly; users already naming one operator must not inherit the other
-  three after migration.
-- Classify the behavior change as SemVer-major. Keep `3.6.0-SNAPSHOT` until the
-  release decision deliberately opens a `4.0.0` candidate or defer this scope;
-  never publish the changed semantics as an undocumented minor or patch.
 - Document `attemptCount=0` as rejection before source subscription, `1` as one
   subscription regardless of success, and `>1` as retry resubscription.
 - Real composition tests cover open circuit, exhausted rate limiter, saturated
@@ -391,13 +337,10 @@ closed with immutable evidence.
 
 **Acceptance:**
 
-- Select patch, minor, or major scope from the actual delivered API and
-  configuration behavior, not from the roadmap label alone. Opt-in resilience
-  activation requires a major candidate.
+- Select patch versus minor scope from the actual delivered API/configuration
+  surface, not from the roadmap label alone.
 - Changelog and release notes name the epoch-duration defect, affected terminal
   surfaces, corrected timing boundary, and any documentation-only corrections.
-  If delivered, they also identify the resilience activation break and link its
-  migration table.
 - Clean tests cover open circuit, rate limiter, bulkhead, retry delay, cancellation,
   OTel timing, Prometheus units, health details, mock parity, and assembled
   consumer behavior.
@@ -425,9 +368,5 @@ V26 is complete when:
    failure.
 5. API, dependency, AOT/native, consumer, benchmark, and release evidence is
    reproducible against published `3.5.0`.
-6. Every resilience operator is inactive until explicitly selected, and all
-   runtime, startup, diagnostic, metadata, mock, and consumer surfaces agree.
-7. The opt-in resilience behavior ships only in a major release, or remains
-   deferred without partially changing the `3.x` contract.
-8. The selected release is published and verified, or V26 closes with an explicit
+6. The selected release is published and verified, or V26 closes with an explicit
    no-go record and no misleading release claim.
