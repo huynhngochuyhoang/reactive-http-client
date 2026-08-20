@@ -9,7 +9,11 @@ import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnostic
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientJsonCodec;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
 import io.github.huynhngochuyhoang.httpstarter.exception.ProblemDetailRemoteServiceException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
@@ -26,6 +30,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPOutputStream;
 
@@ -39,13 +45,15 @@ public class NativeSmokeApplication {
     public static void main(String[] args) {
         AtomicReference<String> observedAuth = new AtomicReference<>();
         AtomicReference<String> observedAcceptEncoding = new AtomicReference<>();
-        DisposableServer server = loopbackServer(observedAuth, observedAcceptEncoding);
+        AtomicInteger dispatchCount = new AtomicInteger();
+        DisposableServer server = loopbackServer(observedAuth, observedAcceptEncoding, dispatchCount);
         SpringApplication application = new SpringApplication(NativeSmokeApplication.class);
         application.setWebApplicationType(WebApplicationType.NONE);
         application.setDefaultProperties(Map.of(
                 "reactive.http.clients.native-smoke.base-url", "http://127.0.0.1:" + server.port(),
                 "reactive.http.clients.native-smoke.auth-provider", "nativeAuthProvider",
                 "reactive.http.clients.native-smoke.compression-enabled", "true",
+                "reactive.http.clients.native-smoke.resilience.enabled", "true",
                 "reactive.http.clients.native-smoke.apis.native-problem.method", "GET",
                 "reactive.http.clients.native-smoke.apis.native-problem.path", "/api/problem",
                 "reactive.http.observability.diagnostics-endpoint.enabled", "true"));
@@ -70,6 +78,15 @@ public class NativeSmokeApplication {
                 require(error.getStatusCode() == 502, "Problem Detail status was not preserved");
                 require("native problem".equals(error.getProblemDetail().getTitle()),
                         "Problem Detail payload was not decoded");
+            }
+
+            int dispatchedBeforeOpenCircuit = dispatchCount.get();
+            try {
+                client.getOpenCircuit().block(Duration.ofSeconds(5));
+                throw new IllegalStateException("Open circuit did not reject the native call");
+            } catch (CallNotPermittedException expected) {
+                require(dispatchCount.get() == dispatchedBeforeOpenCircuit,
+                        "Open-circuit rejection unexpectedly reached the loopback server");
             }
 
             require(context.containsBean("reactiveHttpClientDiagnosticsEndpoint"),
@@ -155,6 +172,20 @@ public class NativeSmokeApplication {
             MeterRegistry meterRegistry = context.getBean(MeterRegistry.class);
             require(meterRegistry.find("reactive.http.client.requests").timer() != null,
                     "Micrometer observer did not record the native calls");
+            Timer rejectedTimer = meterRegistry.find("reactive.http.client.requests")
+                    .tag("api.name", "getOpenCircuit")
+                    .tag("exception", "CallNotPermittedException")
+                    .timer();
+            require(rejectedTimer != null && rejectedTimer.count() == 1
+                            && rejectedTimer.max(TimeUnit.SECONDS) >= 0
+                            && rejectedTimer.max(TimeUnit.SECONDS) < 5,
+                    "Open-circuit terminal duration was missing or invalid");
+            DistributionSummary rejectedAttempts = meterRegistry.find("reactive.http.client.requests.attempts")
+                    .tag("api.name", "getOpenCircuit")
+                    .summary();
+            require(rejectedAttempts != null && rejectedAttempts.count() == 1
+                            && rejectedAttempts.totalAmount() == 0,
+                    "Open-circuit terminal did not record zero subscription attempts");
         } finally {
             server.disposeNow(Duration.ofSeconds(5));
         }
@@ -170,18 +201,30 @@ public class NativeSmokeApplication {
         return new ProblemDetailErrorResponseMapper(codec);
     }
 
+    @Bean
+    CircuitBreakerRegistry circuitBreakerRegistry() {
+        CircuitBreakerRegistry registry = CircuitBreakerRegistry.ofDefaults();
+        registry.circuitBreaker("default");
+        registry.circuitBreaker("native-open").transitionToOpenState();
+        return registry;
+    }
+
     private static DisposableServer loopbackServer(
-            AtomicReference<String> observedAuth, AtomicReference<String> observedAcceptEncoding) {
+            AtomicReference<String> observedAuth,
+            AtomicReference<String> observedAcceptEncoding,
+            AtomicInteger dispatchCount) {
         return HttpServer.create()
                 .port(0)
                 .route(routes -> routes
                         .get("/api/order", (request, response) -> {
+                            dispatchCount.incrementAndGet();
                             observedAuth.set(request.requestHeaders().get("X-Native-Auth"));
                             return response.header("Content-Type", "application/json")
                                     .sendString(Mono.just("{\"code\":\"ok\",\"message\":\"native\"}"))
                                     .then();
                         })
                         .get("/api/compressed-order", (request, response) -> {
+                            dispatchCount.incrementAndGet();
                             observedAcceptEncoding.set(request.requestHeaders().get("Accept-Encoding"));
                             return response.header("Content-Type", "application/json")
                                     .header("Content-Encoding", "gzip")
@@ -189,10 +232,13 @@ public class NativeSmokeApplication {
                                             "{\"code\":\"ok\",\"message\":\"compressed\"}")))
                                     .then();
                         })
-                        .get("/api/problem", (request, response) -> response.status(502)
-                                .header("Content-Type", "application/problem+json")
-                                .sendString(Mono.just("{\"status\":502,\"title\":\"native problem\",\"detail\":\"smoke\"}"))
-                                .then()))
+                        .get("/api/problem", (request, response) -> {
+                            dispatchCount.incrementAndGet();
+                            return response.status(502)
+                                    .header("Content-Type", "application/problem+json")
+                                    .sendString(Mono.just("{\"status\":502,\"title\":\"native problem\",\"detail\":\"smoke\"}"))
+                                    .then();
+                        }))
                 .bindNow(Duration.ofSeconds(5));
     }
 

@@ -594,36 +594,67 @@ Evidence:
 
 ## Priority 11 - Dependency, API, AOT, and Native Evidence
 
-### [ ] 11.1 Review supported dependency rows
+### [x] 11.1 Review supported dependency rows
 
-- [ ] Review Spring Boot, Spring Framework, Reactor Netty, Micrometer,
+- [x] Review Spring Boot, Spring Framework, Reactor Netty, Micrometer,
       Resilience4j, OTel, Jackson, and native-build versions.
-- [ ] Run the supported minimum/forward matrix without mixing Boot generations.
-- [ ] Preserve evidence incrementally when a later matrix row fails.
-- [ ] Keep published-baseline resolution isolated from locally installed reactor
+- [x] Run the supported minimum/forward matrix without mixing Boot generations.
+- [x] Preserve evidence incrementally when a later matrix row fails.
+- [x] Keep published-baseline resolution isolated from locally installed reactor
       artifacts.
 
-### [ ] 11.2 Preserve public API compatibility
+### [x] 11.2 Preserve public API compatibility
 
-- [ ] Inventory touched public observer, event, health, diagnostics, and
+- [x] Inventory touched public observer, event, health, diagnostics, and
       test-helper types.
-- [ ] Prefer package-private timing changes and avoid adding a public clock or
+- [x] Prefer package-private timing changes and avoid adding a public clock or
       mutable timing model.
-- [ ] Add any intentional public addition to japicmp includes and documentation.
-- [ ] Run strict root and starter-module API compatibility against published
+- [x] Add any intentional public addition to japicmp includes and documentation.
+- [x] Run strict root and starter-module API compatibility against published
       `3.5.0`.
-- [ ] Run API and published-baseline contamination fixtures.
+- [x] Run API and published-baseline contamination fixtures.
 
 ### [ ] 11.3 Revalidate AOT and native behavior
 
-- [ ] Run AOT generation for direct, inherited, generic, and `@ApiRef` clients
+- [x] Run AOT generation for direct, inherited, generic, and `@ApiRef` clients
       with Micrometer and the diagnostics endpoint present.
-- [ ] Compile and execute the native smoke fixture with the corrected
+- [x] Compile and execute the native smoke fixture with the corrected
       zero-attempt terminal path.
-- [ ] Verify no reflection fallback or missing resource hint is introduced.
+- [x] Verify no reflection fallback or missing resource hint is introduced.
 - [ ] Record clean commit, GraalVM/JDK versions, binary hash, and evidence path.
-- [ ] Run generation packaging, full reactor verification, and
+- [x] Run generation packaging, full reactor verification, and
       `git diff --check`.
+
+Evidence:
+
+- The isolated supported matrix passed Spring Boot `4.0.0` and `4.1.0` with
+  Spring Framework `7.0.1`/`7.0.8`, Reactor Netty `1.3.0`/`1.3.6`,
+  Netty `4.2.7.Final`/`4.2.15.Final`, Jackson `3.0.2`/`3.1.4`,
+  Micrometer `1.16.0`/`1.17.0`, OTel `1.55.0`/`1.62.0`, and
+  Resilience4j `2.4.0`. Incremental evidence is under
+  `target/release-evidence/v26/priority11/supported-matrix/`.
+- The public-surface inventory found no new observer, event, health,
+  diagnostics, or test-helper type. Timing remains in package-private
+  `SubscriptionReportingState`; no public clock or mutable model was added and
+  the japicmp include set needs no change.
+- Strict root and starter-module compatibility passed against published `3.5.0`
+  from separate target-local repositories under
+  `target/release-evidence/v26/priority11/api-{root,starter}-3.5.0/`.
+  API and published-baseline contamination fixtures also passed.
+- Focused AOT, Boot 4 auto-configuration, release compatibility, and
+  documentation suites passed 63 tests for direct, inherited generic, and
+  `@ApiRef` clients with Micrometer and diagnostics.
+- The native fixture now proves a pre-dispatch open CircuitBreaker call has no
+  loopback dispatch, one finite timer sample, and attempts value `0`. It
+  compiled and ran on Oracle GraalVM/JDK `25.0.3`; the binary SHA-256 is
+  `055b68ddf33550349f0081e8b0cd6ce19d60534f1d420b4c05fcf1182950a56c`.
+  Functional provenance is under
+  `target/release-evidence/v26/priority11/native-smoke/`.
+- Full verification passed 1,047 starter, 49 test-helper, and 52 OTel tests.
+  Generation packaging and `git diff --check` passed.
+- The immutable native-evidence item remains open because this functional run
+  records `sourceState=dirty` while these Priority 11 changes are uncommitted.
+  Re-run the native proof from the resulting clean commit before closing it.
 
 ---
 
