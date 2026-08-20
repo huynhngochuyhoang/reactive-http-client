@@ -426,43 +426,63 @@ Evidence:
 
 ## Priority 8 - Observability Documentation and Dashboard Recipes
 
-### [ ] 8.1 Reconcile the canonical observability reference
+### [x] 8.1 Reconcile the canonical observability reference
 
-- [ ] Rewrite the meter introduction to list always-recorded, conditionally
+- [x] Rewrite the meter introduction to list always-recorded, conditionally
       recorded, and opt-in meters separately.
-- [ ] Correct logical-call duration, zero/one/multiple attempt, hidden replay,
+- [x] Correct logical-call duration, zero/one/multiple attempt, hidden replay,
       and wire-dispatch wording.
-- [ ] Correct attempts percentile availability and distinguish average,
+- [x] Correct attempts percentile availability and distinguish average,
       percentile, and retry-event queries.
-- [ ] Add timer base-unit and time-window `_max` semantics.
-- [ ] Correct health detail fields, OTel logical-call span wording, and body
+- [x] Add timer base-unit and time-window `_max` semantics.
+- [x] Correct health detail fields, OTel logical-call span wording, and body
       option behavior.
-- [ ] Retain verified API-name, tag, response-size, diagnostics, pool-gauge, and
+- [x] Retain verified API-name, tag, response-size, diagnostics, pool-gauge, and
       propagation contracts.
 
-### [ ] 8.2 Add unit-safe operational queries
+### [x] 8.2 Add unit-safe operational queries
 
-- [ ] Add PromQL examples for request rate and error ratio from the main timer.
-- [ ] Add a zero-attempt resilience rejection query only if the exported summary
+- [x] Add PromQL examples for request rate and error ratio from the main timer.
+- [x] Add a zero-attempt resilience rejection query only if the exported summary
       permits it truthfully; otherwise direct operators to Resilience4j counters.
-- [ ] Add p95/p99 latency queries only for the opt-in latency histogram.
-- [ ] Add average-attempt and pool-pressure queries with explicit limitations.
-- [ ] State seconds versus milliseconds on every duration query and avoid
+- [x] Add p95/p99 latency queries only for the opt-in latency histogram.
+- [x] Add average-attempt and pool-pressure queries with explicit limitations.
+- [x] State seconds versus milliseconds on every duration query and avoid
       interpreting `_max` as a permanent maximum.
-- [ ] Distinguish starter logical-call, Resilience4j operator, Reactor Netty
+- [x] Distinguish starter logical-call, Resilience4j operator, Reactor Netty
       transport, and OTel telemetry in one table.
 
-### [ ] 8.3 Prevent documentation drift
+### [x] 8.3 Prevent documentation drift
 
-- [ ] Cross-check error handling, resilience, cardinality, support bundles,
+- [x] Cross-check error handling, resilience, cardinality, support bundles,
       production checklist, configuration reference, and operations
       troubleshooting.
-- [ ] Add focused documentation assertions for conditional meters, attempts
+- [x] Add focused documentation assertions for conditional meters, attempts
       semantics, percentile availability, health fields, body options, and units.
-- [ ] Keep local links, anchors, placeholders, generated metadata, and public
+- [x] Keep local links, anchors, placeholders, generated metadata, and public
       version snippets valid.
-- [ ] Run documentation and configuration-metadata tests plus
+- [x] Run documentation and configuration-metadata tests plus
       `git diff --check`.
+
+Evidence:
+
+- `docs/08-observability.md` now separates always-recorded logical-call meters,
+  conditional known-size summaries, the opt-in latency histogram, and opt-in
+  protocol-aware pool gauges. It preserves API-name, tag, response-size,
+  diagnostics, OTel propagation, and body-gate contracts.
+- Unit-safe PromQL recipes cover logical-call request rate, error ratio,
+  histogram-backed p95/p99 in seconds, average subscription attempts, and H1/H2
+  pending-pool counts. The guide explains why count/sum cannot identify
+  zero-attempt calls and directs operator-event questions to Resilience4j.
+- The telemetry ownership table separates starter logical calls, Resilience4j
+  operators, Reactor Netty transport meters, and one terminal OTel span.
+- Error handling, resilience, production, cardinality, diagnostics, support
+  bundle, and operations guides now link back to the canonical recipes and use
+  the same health, unit, attempt, body, and cardinality terminology.
+- `DocumentationReleaseArtifactTest` guards meter availability, units, queries,
+  unsupported attempts percentiles, health inputs, body gates, cross-guide links,
+  and local Markdown anchors. The focused documentation, metadata, Micrometer,
+  and Prometheus contract suite passed 96 tests; `git diff --check` passed.
 
 ---
 

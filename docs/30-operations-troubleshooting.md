@@ -29,7 +29,11 @@ historical evidence.
    attempt count.
 3. Select the matching row below. A missing status or failure stage means
    unknown; do not infer a transport phase from elapsed time alone.
-4. Correlate client evidence with the downstream, proxy, ingress, service mesh,
+4. For metrics, start with the
+   [unit-safe dashboard recipes](08-observability.md#dashboard-recipes). Keep
+   seconds, counts, ratios, and gauge values distinct, and do not infer
+   zero-attempt rejection from the attempts summary.
+5. Correlate client evidence with the downstream, proxy, ingress, service mesh,
    DNS, and TLS path before assigning ownership.
 
 | Symptom | First bounded evidence | Next check |

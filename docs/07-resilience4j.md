@@ -388,6 +388,11 @@ the starter-owned `reactive.http.client.requests` logical-call timer and
 produce multiple Retry operator events but only one terminal starter timer sample
 and one final subscription-attempt sample.
 
+The starter attempts summary has no default percentiles and cannot identify
+zero-attempt calls from count and sum alone. Use the
+[dashboard recipes](08-observability.md#dashboard-recipes) to select the
+starter logical-call or Resilience4j operator signal that answers the question.
+
 To disable the binding for a specific registry, declare your own `MeterBinder` bean named `reactiveHttpCircuitBreakerMeterBinder` (or the retry / bulkhead / rate-limiter equivalent).
 
 ---

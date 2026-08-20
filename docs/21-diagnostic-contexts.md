@@ -112,7 +112,11 @@ redaction policy.
 
 ## Health, diagnostics, and exchange logs
 
-The Actuator health indicator is a status signal derived from Micrometer request timers. It reports bounded per-client sample counts, error counts, error rates, thresholds, and reasons for the latest health-probe window. It does not describe configured endpoints or per-call payload metadata.
+The Actuator health indicator is a status signal derived from Micrometer request
+timer count deltas. It reports bounded per-client sample counts, error counts,
+error rates, thresholds, and reasons for the latest health-probe window. Duration
+sums, time-window maxima, percentiles, and histogram buckets are not health
+inputs. It does not describe configured endpoints or per-call payload metadata.
 Pool-acquire failures add a bounded `poolAcquireFailureCount` for the same probe window.
 
 Use exchange logging for per-call request/response metadata, and use the diagnostics provider when support output needs configured-client summaries.

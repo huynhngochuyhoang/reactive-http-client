@@ -277,7 +277,10 @@ For error-rate incidents, include the affected client entry from
 `sampleCount`, `errorCount`, `poolAcquireFailureCount`, `minSamples`,
 `errorRateThreshold`, `errorRate`, `status`, and `reason`. The integer
 counters cover the same probe-to-probe window; `errorRate` is omitted when
-that window has no samples.
+that window has no samples. Health does not consume duration sums, time-window
+maxima, percentiles, or histogram buckets. When a bundle includes Prometheus
+screenshots or queries, use the
+[unit-safe dashboard recipes](08-observability.md#dashboard-recipes).
 
 The source-controlled [health fixture](fixtures/support-bundle-health.json) is
 the complete sanitized structural example:
