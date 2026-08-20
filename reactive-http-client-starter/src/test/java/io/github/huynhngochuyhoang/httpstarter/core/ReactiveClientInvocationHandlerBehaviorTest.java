@@ -46,6 +46,28 @@ import static org.mockito.Mockito.*;
 class ReactiveClientInvocationHandlerBehaviorTest {
 
     @Test
+    void diagnosticsDisabledUnaryRequestDoesNotInstallSubscriptionReportingState() {
+        AtomicReference<Boolean> reportingStatePresent = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> Mono.deferContextual(context -> {
+                    reportingStatePresent.set(context.stream()
+                            .anyMatch(entry -> entry.getValue() instanceof SubscriptionReportingState));
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build());
+                }))
+                .build();
+
+        StepVerifier.create(invokeGet(createHandler(webClient), null))
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertEquals(Boolean.FALSE, reportingStatePresent.get());
+    }
+
+    @Test
     void nullRequiredPathVarFailsBeforeAuthBodyLifecycleOrDispatch() throws Exception {
         AtomicInteger authFilters = new AtomicInteger();
         AtomicInteger bodySubscriptions = new AtomicInteger();

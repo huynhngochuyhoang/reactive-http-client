@@ -65,6 +65,10 @@ class BenchmarkMarkdownReportTest {
                         "avgt", 42.0, "us/op"),
                 result("io.github.huynhngochuyhoang.httpstarter.benchmarks.StarterDiagnosticsOverheadBenchmark.diagnosticsNoNetworkOneObserverGetNoBody",
                         "thrpt", 123000.0, "ops/s"),
+                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.StarterDiagnosticsOverheadBenchmark.micrometerObserverPrometheusHistogramGetNoBody",
+                        "avgt", 51.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.StarterDiagnosticsOverheadBenchmark.diagnosticsNoNetworkOpenCircuitRejection",
+                        "sample", 67.0, "us/op"),
                 result("io.github.huynhngochuyhoang.httpstarter.benchmarks.StarterDiagnosticsOverheadBenchmark.runtimeDiagnosticsProviderClientSummaries",
                         "avgt", 5.0, "us/op"));
 
@@ -72,6 +76,8 @@ class BenchmarkMarkdownReportTest {
                 .doesNotContain("## Starter-Only and Optional Feature Rows")
                 .contains("| metadataOnlyExchangeLoggingGetNoBody | No-network starter invocation | `avgt` | 42 us/op |")
                 .contains("| diagnosticsNoNetworkOneObserverGetNoBody | No-network starter invocation | `thrpt` | 123000 ops/s |")
+                .contains("| micrometerObserverPrometheusHistogramGetNoBody | No-network starter invocation | `avgt` | 51 us/op |")
+                .contains("| diagnosticsNoNetworkOpenCircuitRejection | No-network starter invocation | `sample` | 67 us/op |")
                 .contains("| runtimeDiagnosticsProviderClientSummaries | No-network starter invocation | `avgt` | 5 us/op |")
                 .doesNotContain("| metadataOnlyExchangeLoggingGetNoBody | Optional starter feature |")
                 .doesNotContain("| diagnosticsNoNetworkOneObserverGetNoBody | Optional starter feature |")

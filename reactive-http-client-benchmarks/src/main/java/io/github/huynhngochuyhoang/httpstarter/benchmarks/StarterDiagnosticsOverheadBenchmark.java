@@ -12,16 +12,28 @@ import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnostic
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook;
+import io.github.huynhngochuyhoang.httpstarter.core.Resilience4jOperatorApplier;
+import io.github.huynhngochuyhoang.httpstarter.core.ResilienceOperatorApplier;
 import io.github.huynhngochuyhoang.httpstarter.core.RequestArgumentResolver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Measurement;
+import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
+import org.openjdk.jmh.annotations.Warmup;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.support.GenericApplicationContext;
@@ -37,8 +49,13 @@ import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
+@BenchmarkMode({Mode.Throughput, Mode.AverageTime, Mode.SampleTime})
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
+@Warmup(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 public class StarterDiagnosticsOverheadBenchmark {
 
     private static final String CLIENT_NAME = "benchmark-starter";
@@ -49,6 +66,9 @@ public class StarterDiagnosticsOverheadBenchmark {
     private StarterBenchmarkClient diagnosticsDisabledClient;
     private StarterBenchmarkClient exchangeLoggingClient;
     private StarterBenchmarkClient micrometerClient;
+    private StarterBenchmarkClient prometheusMicrometerClient;
+    private StarterBenchmarkClient prometheusHistogramClient;
+    private StarterBenchmarkClient openCircuitClient;
     private StarterBenchmarkClient oneObserverClient;
     private StarterBenchmarkClient multipleObserversClient;
     private StarterBenchmarkClient oneLifecycleHookClient;
@@ -64,6 +84,17 @@ public class StarterDiagnosticsOverheadBenchmark {
         }, context -> context.registerBean(DefaultHttpExchangeLogger.class, DefaultHttpExchangeLogger::new));
         micrometerClient = createClient(config -> {}, context -> context.registerBean(HttpClientObserver.class, () ->
                 new MicrometerHttpClientObserver(new SimpleMeterRegistry(), new ReactiveHttpClientProperties.ObservabilityConfig())));
+        prometheusMicrometerClient = createClient(config -> {}, context -> registerPrometheusObserver(context, false));
+        prometheusHistogramClient = createClient(config -> {}, context -> registerPrometheusObserver(context, true));
+
+        CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.ofDefaults();
+        CircuitBreaker openCircuit = circuitBreakerRegistry.circuitBreaker("open");
+        openCircuit.transitionToOpenState();
+        openCircuitClient = createClient(config -> {
+            config.getResilience().setEnabled(true);
+            config.getResilience().setCircuitBreaker("open");
+        }, context -> context.registerBean(HttpClientObserver.class, NoopObserver::new),
+                new Resilience4jOperatorApplier(circuitBreakerRegistry, null, null, null));
         oneObserverClient = createClient(config -> {}, context ->
                 context.registerBean("noopObserver", HttpClientObserver.class, NoopObserver::new));
         multipleObserversClient = createClient(config -> {}, context -> {
@@ -105,6 +136,26 @@ public class StarterDiagnosticsOverheadBenchmark {
     }
 
     @Benchmark
+    public BenchmarkUser micrometerObserverPrometheusGetNoBody() {
+        return validateUser(prometheusMicrometerClient.currentUser().block());
+    }
+
+    @Benchmark
+    public BenchmarkUser micrometerObserverPrometheusHistogramGetNoBody() {
+        return validateUser(prometheusHistogramClient.currentUser().block());
+    }
+
+    @Benchmark
+    public Class<?> diagnosticsNoNetworkOpenCircuitRejection() {
+        try {
+            openCircuitClient.currentUser().block();
+            throw new IllegalStateException("Open circuit unexpectedly allowed the benchmark request");
+        } catch (CallNotPermittedException expected) {
+            return expected.getClass();
+        }
+    }
+
+    @Benchmark
     public BenchmarkUser diagnosticsNoNetworkOneObserverGetNoBody() {
         return validateUser(oneObserverClient.currentUser().block());
     }
@@ -135,6 +186,12 @@ public class StarterDiagnosticsOverheadBenchmark {
 
     private StarterBenchmarkClient createClient(ClientConfigCustomizer configCustomizer,
                                                 ContextCustomizer contextCustomizer) {
+        return createClient(configCustomizer, contextCustomizer, new NoopResilienceOperatorApplier());
+    }
+
+    private StarterBenchmarkClient createClient(ClientConfigCustomizer configCustomizer,
+                                                ContextCustomizer contextCustomizer,
+                                                ResilienceOperatorApplier resilienceOperatorApplier) {
         ReactiveHttpClientProperties.ClientConfig clientConfig = new ReactiveHttpClientProperties.ClientConfig();
         configCustomizer.customize(clientConfig);
 
@@ -152,7 +209,7 @@ public class StarterDiagnosticsOverheadBenchmark {
                 CLIENT_NAME,
                 StarterBenchmarkClient.class,
                 context,
-                new NoopResilienceOperatorApplier(),
+                resilienceOperatorApplier,
                 new BenchmarkJsonCodecFactory().create(),
                 new ReactiveHttpClientProperties.ObservabilityConfig());
 
@@ -160,6 +217,17 @@ public class StarterDiagnosticsOverheadBenchmark {
                 StarterBenchmarkClient.class.getClassLoader(),
                 new Class<?>[]{StarterBenchmarkClient.class},
                 handler);
+    }
+
+    private static void registerPrometheusObserver(GenericApplicationContext context, boolean histogramEnabled) {
+        context.registerBean(PrometheusMeterRegistry.class,
+                () -> new PrometheusMeterRegistry(PrometheusConfig.DEFAULT));
+        context.registerBean(HttpClientObserver.class, () -> {
+            ReactiveHttpClientProperties.ObservabilityConfig config =
+                    new ReactiveHttpClientProperties.ObservabilityConfig();
+            config.getHistogram().setEnabled(histogramEnabled);
+            return new MicrometerHttpClientObserver(context.getBean(PrometheusMeterRegistry.class), config);
+        });
     }
 
     private ReactiveHttpClientDiagnosticsProvider createDiagnosticsProvider() {

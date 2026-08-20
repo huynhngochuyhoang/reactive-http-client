@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Observability overhead audit harness.** Added separately classified
+  no-network benchmark rows for Prometheus observation, opt-in latency
+  histograms, and zero-dispatch open-circuit rejection, plus structural coverage
+  that keeps inactive unary calls off subscription reporting state.
 - **Mock, consumer, and support-bundle parity.** Added no-network mock coverage
   for zero-attempt open-circuit terminal reporting; assembled Boot 4 checks for
   success, HTTP error, resilience rejection, Micrometer duration and attempts,
