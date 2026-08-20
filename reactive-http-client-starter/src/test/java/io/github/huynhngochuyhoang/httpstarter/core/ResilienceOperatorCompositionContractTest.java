@@ -140,10 +140,10 @@ class ResilienceOperatorCompositionContractTest {
                         .limitRefreshPeriod(Duration.ofMillis(200))
                         .timeoutDuration(Duration.ofSeconds(1))
                         .build());
-        assertThat(operators.rateLimiter().acquirePermission()).isTrue();
         AtomicInteger dispatches = new AtomicInteger();
 
         try (ClientFixture fixture = client(successWebClient(dispatches), config(500, 2_000), operators, null)) {
+            assertThat(operators.rateLimiter().acquirePermission()).isTrue();
             assertThat(fixture.client().call().block(BLOCK_TIMEOUT)).isEqualTo("ok");
 
             assertThat(dispatches).hasValue(1);
@@ -161,30 +161,30 @@ class ResilienceOperatorCompositionContractTest {
                         .maxConcurrentCalls(1)
                         .maxWaitDuration(Duration.ofSeconds(1))
                         .build());
-        operators.bulkhead().acquirePermission();
         AtomicBoolean heldPermitReleased = new AtomicBoolean();
-        Disposable release = Mono.delay(Duration.ofMillis(150))
-                .doOnNext(ignored -> {
-                    if (heldPermitReleased.compareAndSet(false, true)) {
-                        operators.bulkhead().releasePermission();
-                    }
-                })
-                .subscribe();
         AtomicInteger dispatches = new AtomicInteger();
 
-        try {
-            try (ClientFixture fixture = client(
-                    successWebClient(dispatches), config(500, 2_000), operators, null)) {
+        try (ClientFixture fixture = client(
+                successWebClient(dispatches), config(500, 2_000), operators, null)) {
+            operators.bulkhead().acquirePermission();
+            Disposable release = Mono.delay(Duration.ofMillis(150))
+                    .doOnNext(ignored -> {
+                        if (heldPermitReleased.compareAndSet(false, true)) {
+                            operators.bulkhead().releasePermission();
+                        }
+                    })
+                    .subscribe();
+            try {
                 assertThat(fixture.client().call().block(BLOCK_TIMEOUT)).isEqualTo("ok");
 
                 assertThat(dispatches).hasValue(1);
                 assertThat(fixture.diagnostics().assertOneTerminalResult(1).getDurationMs())
                         .isGreaterThanOrEqualTo(100L);
-            }
-        } finally {
-            release.dispose();
-            if (heldPermitReleased.compareAndSet(false, true)) {
-                operators.bulkhead().releasePermission();
+            } finally {
+                release.dispose();
+                if (heldPermitReleased.compareAndSet(false, true)) {
+                    operators.bulkhead().releasePermission();
+                }
             }
         }
         assertBulkheadReleased(operators.bulkhead());
