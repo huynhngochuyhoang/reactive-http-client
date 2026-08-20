@@ -277,28 +277,52 @@ Evidence:
 
 ## Priority 5 - Request and Response Size Semantics
 
-### [ ] 5.1 Align String measurement with outbound encoding
+### [x] 5.1 Align String measurement with outbound encoding
 
-- [ ] Add real-wire UTF-8 and explicit non-UTF-8 String request fixtures.
-- [ ] Compare `HttpClientObserverEvent.requestBytes`, Micrometer summary, and
+- [x] Add real-wire UTF-8 and explicit non-UTF-8 String request fixtures.
+- [x] Compare `HttpClientObserverEvent.requestBytes`, Micrometer summary, and
       OTel attribute with bytes observed by the server.
-- [ ] Use the effective outbound charset for String measurement, or explicitly
+- [x] Use the effective outbound charset for String measurement, or explicitly
       relabel the value as a UTF-8 estimate if exact alignment cannot be proved.
-- [ ] Keep null at zero and `byte[]` at exact array length.
-- [ ] Preserve auth signing and WebClient codec ownership; metrics must not
+- [x] Keep null at zero and `byte[]` at exact array length.
+- [x] Preserve auth signing and WebClient codec ownership; metrics must not
       independently re-encode the payload differently from the request path.
 
-### [ ] 5.2 Preserve unknown and advertised-size boundaries
+### [x] 5.2 Preserve unknown and advertised-size boundaries
 
-- [ ] Keep POJO, publisher, resource, multipart, and streaming request bodies
+- [x] Keep POJO, publisher, resource, multipart, and streaming request bodies
       unknown unless bytes already exist on the normal request path.
-- [ ] Do not buffer, consume, reopen, or serialize a body solely for metrics.
-- [ ] Keep response size equal to surviving advertised `Content-Length`, not
+- [x] Do not buffer, consume, reopen, or serialize a body solely for metrics.
+- [x] Keep response size equal to surviving advertised `Content-Length`, not
       decoded or consumed bytes.
-- [ ] Cover chunked, compressed, malformed-length, streaming-cancellation,
+- [x] Cover chunked, compressed, malformed-length, streaming-cancellation,
       bodiless, and `ResponseEntity` outcomes.
-- [ ] Verify Micrometer and OTel publish the same known value or both omit an
+- [x] Verify Micrometer and OTel publish the same known value or both omit an
       unknown value.
+
+Evidence:
+
+- `ReactiveClientInvocationHandler` now measures String bodies with the charset
+  selected from the effective outbound `Content-Type`, falling back to UTF-8,
+  while null and `byte[]` retain exact zero/array-length semantics. Other
+  request shapes, including multipart, remain unknown without metrics-only
+  serialization, subscription, reopening, aggregation, or buffering.
+- `RequestResponseSizeObservabilityContractTest` uses a real loopback server to
+  compare wire bytes with observer events, Micrometer summaries, and OTel span
+  attributes for UTF-8, ISO-8859-1, null, `byte[]`, POJO, publisher, resource,
+  stream, multipart, fixed-length, chunked, compressed, `ResponseEntity`, and
+  cancelled streaming outcomes. Its ownership assertions prove opaque request
+  bodies are consumed only by the normal request path.
+- `HttpResponseFramingContractTest` now preserves and verifies surviving
+  advertised response lengths for malformed/truncated framing and unexpected
+  bodiless responses.
+- `mvn -B -ntp -s .mvn/maven-central-settings.xml
+  -pl reactive-http-client-starter
+  -Dtest=HttpResponseFramingContractTest,ReactiveHttpClientCompressionContractTest,StreamingResponseTest,StreamingUploadOwnershipTest,MultipartWireOwnershipContractTest,MicrometerHttpClientObserverTest,MicrometerPrometheusExportContractTest,DocumentationReleaseArtifactTest
+  test` passed with 126 tests.
+- `mvn -B -ntp -s .mvn/maven-central-settings.xml
+  -pl reactive-http-client-otel -am test` passed with 1,037 starter tests and 46
+  OTel tests.
 
 ---
 

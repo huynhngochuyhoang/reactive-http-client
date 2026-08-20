@@ -274,13 +274,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
                 applyDefaultQueryParams(argumentResolver.resolve(plan, args)));
-        long requestBytes = measureRequestBodyBytes(resolved.body());
+        String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
+        long requestBytes = plan.multipart()
+                ? HttpClientObserverEvent.UNKNOWN_SIZE
+                : measureRequestBodyBytes(resolved.body(), contentTypeHeader);
         RequestBodyOwnership requestBodyOwnership = new RequestBodyOwnership(resolved.body());
 
         HttpExchangeLogger exchangeLogger = resolveExchangeLogger(proxy, method, meta);
 
         boolean hasAcceptHeader = resolved.headersIgnoreCase().containsKey(HttpHeaders.ACCEPT);
-        String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         boolean hasContentTypeHeader = contentTypeHeader != null;
 
         long timeoutMs = resolveTimeoutMs(plan, effectiveApi.timeoutMs());
@@ -1834,17 +1836,18 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
      * Best-effort application request body size before transport content coding. Returns
      * the byte count for {@code byte[]} and {@code String} bodies, {@code 0} for {@code null}, and
      * {@link HttpClientObserverEvent#UNKNOWN_SIZE} for arbitrary objects whose
-     * serialised form isn't materialised synchronously on the invocation path.
+     * serialised form is not materialised synchronously on the invocation path. String bodies use
+     * the effective declared content-type charset, falling back to UTF-8.
      */
-    private static long measureRequestBodyBytes(Object body) {
+    private long measureRequestBodyBytes(Object body, String contentTypeHeader) {
         if (body == null) {
             return 0L;
         }
         if (body instanceof byte[] bytes) {
             return bytes.length;
         }
-        if (body instanceof CharSequence charSequence) {
-            return charSequence.toString().getBytes(StandardCharsets.UTF_8).length;
+        if (body instanceof String text) {
+            return text.getBytes(rawBodyCharset(contentTypeHeader)).length;
         }
         return HttpClientObserverEvent.UNKNOWN_SIZE;
     }

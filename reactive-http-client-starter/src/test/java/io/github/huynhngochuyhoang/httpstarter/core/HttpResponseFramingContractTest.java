@@ -70,8 +70,9 @@ class HttpResponseFramingContractTest {
 
     @Test
     void unexpectedBodilessBytesAreDrainedBeforeHeadAndProbeReuse() {
+        FramingDiagnostics diagnostics = new FramingDiagnostics();
         try (RawHttpPeer peer = new RawHttpPeer();
-             ClientFixture fixture = ClientFixture.create(peer.baseUrl(), new FramingDiagnostics())) {
+             ClientFixture fixture = ClientFixture.create(peer.baseUrl(), diagnostics)) {
             fixture.client.unexpectedVoid().block(CALL_TIMEOUT);
 
             ResponseEntity<Void> head = fixture.client.head().block(CALL_TIMEOUT);
@@ -84,6 +85,8 @@ class HttpResponseFramingContractTest {
             assertThat(peer.requests()).extracting(WireRequest::path)
                     .containsExactly("/unexpected-void", "/head", "/probe");
             assertThat(peer.requests()).extracting(WireRequest::connectionId).containsOnly(1);
+            assertThat(diagnostics.observerEvents).extracting(HttpClientObserverEvent::getResponseBytes)
+                    .containsExactly(10L, 9L, 5L);
         }
     }
 
@@ -110,6 +113,7 @@ class HttpResponseFramingContractTest {
             assertThat(failed.getError()).isSameAs(terminalFailure);
             assertThat(containsCauseOfType(terminalFailure, framing.failureType)).isTrue();
             assertThat(failed.getFailureStage()).isEqualTo(framing.failureStage);
+            assertThat(failed.getResponseBytes()).isEqualTo(framing.responseBytes);
             assertThat(diagnostics.lifecycleContexts.get(0).statusCode()).isEqualTo(framing.statusCode);
             assertThat(diagnostics.lifecycleContexts.get(0).error()).isSameAs(terminalFailure);
             assertThat(diagnostics.lifecycleContexts.get(0).failureStage()).isEqualTo(framing.failureStage);
@@ -134,25 +138,28 @@ class HttpResponseFramingContractTest {
     }
 
     private enum MalformedFraming {
-        INVALID_CONTENT_LENGTH("/invalid-content-length", null, null, IllegalArgumentException.class),
-        CONFLICTING_CONTENT_LENGTH("/conflicting-content-length", null, null, IllegalArgumentException.class),
-        INVALID_CHUNK("/invalid-chunk", 200, null, NumberFormatException.class),
+        INVALID_CONTENT_LENGTH("/invalid-content-length", null, null, -1L, IllegalArgumentException.class),
+        CONFLICTING_CONTENT_LENGTH("/conflicting-content-length", null, null, -1L, IllegalArgumentException.class),
+        INVALID_CHUNK("/invalid-chunk", 200, null, -1L, NumberFormatException.class),
         TRUNCATED_CONTENT_LENGTH(
                 "/truncated-content-length", 200,
-                HttpClientFailureStage.RESPONSE_BODY, PrematureCloseException.class);
+                HttpClientFailureStage.RESPONSE_BODY, 12L, PrematureCloseException.class);
 
         private final String path;
         private final Integer statusCode;
         private final HttpClientFailureStage failureStage;
+        private final long responseBytes;
         private final Class<? extends Throwable> failureType;
 
         MalformedFraming(String path,
                          Integer statusCode,
                          HttpClientFailureStage failureStage,
+                         long responseBytes,
                          Class<? extends Throwable> failureType) {
             this.path = path;
             this.statusCode = statusCode;
             this.failureStage = failureStage;
+            this.responseBytes = responseBytes;
             this.failureType = failureType;
         }
     }

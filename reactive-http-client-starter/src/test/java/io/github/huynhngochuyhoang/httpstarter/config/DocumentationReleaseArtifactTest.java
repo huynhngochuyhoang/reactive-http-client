@@ -956,6 +956,22 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void requestResponseSizeDocsMatchWireContract() throws IOException {
+        String observabilityDocs = Files.readString(projectRoot().resolve("docs/08-observability.md"));
+
+        assertThat(observabilityDocs)
+                .contains("String measurement uses the charset declared by the effective outbound")
+                .contains("charset-free value falls back to UTF-8")
+                .contains("Other `CharSequence`, POJO")
+                .contains("Observability never serializes, subscribes, consumes, reopens, or")
+                .contains("An advertised `0` is recorded as zero")
+                .contains("drained bodiless responses, `ResponseEntity`")
+                .contains("malformed framing with no trustworthy")
+                .contains("`String` uses the effective declared charset, and opaque bodies are absent")
+                .doesNotContain("POJO bodies are not measured to avoid double-serialization cost");
+    }
+
+    @Test
     void resilienceAdmissionDocsMatchCompositionContract() throws IOException {
         Path root = projectRoot();
         String resilienceDocs = Files.readString(root.resolve("docs/07-resilience4j.md"));

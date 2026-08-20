@@ -230,10 +230,10 @@ public final class HttpClientObserverEvent {
 
     /**
      * Size of the application request body before transport content coding, or
-     * {@link #UNKNOWN_SIZE} when the starter could not measure it cheaply (i.e. body is a
-     * non-{@code byte[]}/{@code String} object whose serialized form isn't materialised
-     * synchronously on the invocation path). The built-in response-compression option does
-     * not compress request bodies.
+     * {@link #UNKNOWN_SIZE} when the starter could not measure it cheaply (for example, a
+     * non-{@code byte[]}/{@code String} object or multipart body). String values use the charset
+     * declared by the effective outbound {@code Content-Type}, with UTF-8 as the fallback. The
+     * built-in response-compression option does not compress request bodies.
      */
     public long getRequestBytes() { return requestBytes; }
 

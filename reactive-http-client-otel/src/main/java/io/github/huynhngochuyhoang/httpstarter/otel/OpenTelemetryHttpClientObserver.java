@@ -46,7 +46,7 @@ import java.util.concurrent.TimeUnit;
  *   <li>{@code rhttp.api.name} — {@code @ApiName} value, {@code @ApiRef} value, or method name</li>
  *   <li>{@code rhttp.attempt.count} — total subscription attempts (>1 = retried)</li>
  *   <li>{@code rhttp.request.bytes} - application request bytes before transport content coding,
- *       when measurable</li>
+ *       when measurable; String uses the effective declared content-type charset</li>
  *   <li>{@code rhttp.response.bytes} - post-transport advertised {@code Content-Length};
  *       absent for automatically decompressed or chunked responses</li>
  *   <li>{@code rhttp.failure.stage} - concrete DNS, proxy, TLS, connection, pool, write, or response

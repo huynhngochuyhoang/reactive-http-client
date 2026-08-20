@@ -32,7 +32,8 @@ import java.util.concurrent.TimeUnit;
  *   <tr>
  *     <td>{@code <metricName>.request.size}</td>
  *     <td>DistributionSummary (application request body bytes before transport content coding;
- *         only recorded when measurable - byte[]/String/null bodies)</td>
+ *         only recorded when measurable - byte[]/String/null bodies; String uses the effective
+ *         declared content-type charset)</td>
  *     <td>client.name, api.name, http.method, uri</td>
  *   </tr>
  *   <tr>
