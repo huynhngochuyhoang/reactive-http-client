@@ -11,20 +11,23 @@ native-image changes.
 
 ## Micrometer metrics
 
-When observability is enabled and a `MeterRegistry` bean is present,
-`MicrometerHttpClientObserver` records one sample for each accepted terminal
-logical-call event. Meter availability is:
+When `reactive.http.observability.enabled=true` and a `MeterRegistry` bean is
+present, `MicrometerHttpClientObserver` records one sample for each accepted
+terminal logical-call event. Its meter availability is:
 
 | Availability | Meters | Contract |
 |---|---|---|
 | Always recorded | `reactive.http.client.requests`, `reactive.http.client.requests.attempts` | One duration and one subscription-attempt sample per terminal logical call. |
 | Conditionally recorded | `reactive.http.client.requests.request.size`, `reactive.http.client.requests.response.size` | Created and recorded only when the corresponding size is known without consuming or independently encoding a body. |
 | Opt-in | `reactive.http.client.requests.latency` | Created only when `observability.histogram.enabled=true`; publishes configured SLO histogram buckets. |
-| Opt-in | `reactive.http.client.connection.pool.*` | Protocol-aware address-free gauges created only when global or per-client pool metrics are enabled. |
 
 Every `reactive.http.client.requests*` meter name follows a customized
-`metric-name`; the pool namespace is fixed. Resilience4j and Reactor Netty meter families are separate integrations,
-not additional samples from `MicrometerHttpClientObserver`.
+`metric-name`. Protocol-aware `reactive.http.client.connection.pool.*` gauges
+have an independent switch: global `network.connection-pool.metrics-enabled`
+or per-client `pool.metrics-enabled`. They can remain active when
+`reactive.http.observability.enabled=false`, and their namespace is fixed.
+Resilience4j and Reactor Netty meter families are separate integrations, not
+additional samples from `MicrometerHttpClientObserver`.
 
 ### `reactive.http.client.requests` (Timer)
 
@@ -330,8 +333,16 @@ increment this count independently.
 ### Error ratio (dimensionless)
 
 ```promql
-sum by (client_name, api_name) (
-  rate(reactive_http_client_requests_seconds_count{error_category!="none"}[5m])
+(
+  sum by (client_name, api_name) (
+    rate(reactive_http_client_requests_seconds_count{error_category!="none"}[5m])
+  )
+  or
+  (
+    0 * sum by (client_name, api_name) (
+      rate(reactive_http_client_requests_seconds_count[5m])
+    )
+  )
 )
 /
 sum by (client_name, api_name) (
@@ -341,8 +352,10 @@ sum by (client_name, api_name) (
 
 The result is a ratio from `0` to `1`, not a percentage. It mirrors the
 health indicator's error classification, but uses a Prometheus range rather than
-health probe-to-probe deltas. Protect dashboards against a zero denominator when
-there are no calls in the selected window.
+health probe-to-probe deltas. The `or` branch supplies a zero numerator for
+client/API groups that have calls but no error series, so healthy groups remain
+visible. Protect dashboards against a zero denominator when there are no calls
+in the selected window.
 
 ### Zero-attempt resilience rejection
 
@@ -352,11 +365,20 @@ multiple-attempt values; for example, one zero-attempt call plus one two-attempt
 call has the same count and sum as two one-attempt calls. Do not derive a
 zero-attempt rate from those series.
 
-Use the relevant Resilience4j CircuitBreaker, RateLimiter, or Bulkhead rejection
-counters to answer which admission operator rejected calls. Use Resilience4j
-Retry counters to answer whether Retry fired or exhausted. Confirm the exact
-`resilience4j_*` series and `kind` labels in your Prometheus scrape because
-they are owned by the Resilience4j Micrometer integration, not by this starter.
+Use the starter timer for built-in admission rejections:
+
+```promql
+sum by (client_name, api_name, exception) (
+  rate(reactive_http_client_requests_seconds_count{error_category="RESILIENCE_ERROR"}[5m])
+)
+```
+
+The result is rejected logical calls per second, with `exception`
+distinguishing CircuitBreaker, RateLimiter, and Bulkhead rejection types.
+Resilience4j CircuitBreaker call counters provide operator-specific call history,
+and Retry counters show whether Retry fired or exhausted. The auto-bound
+RateLimiter and Bulkhead meters expose current-state gauges, not rejection
+counters, so do not use them as historical rejection counts.
 
 ### p95/p99 logical-call latency (seconds; histogram required)
 
@@ -380,6 +402,13 @@ histogram_quantile(
   )
 )
 ```
+
+Configure a highest finite `slo-boundaries-ms` value above the latency range
+whose quantiles you need to distinguish. Prometheus also exports a `+Inf`
+bucket; when a requested quantile falls into it, `histogram_quantile` returns
+the highest finite boundary rather than the actual tail. With the documented
+5-second highest default boundary, p95 is pinned at 5 seconds when more than 5%
+of calls exceed it, and p99 is pinned when more than 1% exceed it.
 
 The default main timer does not publish percentile or histogram buckets. Its
 `_seconds_max` is a time-window maximum and can reset to zero; it is neither

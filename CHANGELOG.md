@@ -11,13 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Observability documentation and dashboard recipes.** Classified
-  logical-call, conditional-size, latency-histogram, and pool meters by
-  availability; documented Prometheus seconds and time-window maximum
-  semantics; and added unit-safe request-rate, error-ratio, p95/p99 latency,
-  average-attempt, and protocol-aware pool-pressure recipes. Clarified that the
-  attempts summary has no default percentiles and cannot identify zero-attempt
-  calls from count and sum, and separated starter logical-call, Resilience4j,
-  Reactor Netty, and OTel telemetry ownership.
+  logical-call, conditional-size, and latency-histogram meters while documenting
+  pool gauges as independently activated. Added unit-safe request-rate,
+  zero-preserving error-ratio, admission-rejection, p95/p99 latency,
+  average-attempt, and protocol-aware pool-pressure recipes; documented histogram
+  saturation; and separated starter logical-call, Resilience4j, Reactor Netty,
+  and OTel telemetry ownership.
 - **OpenTelemetry logical-call contract.** Documented and tested one terminal
   `CLIENT` span per logical call, including finite current timestamps for
   zero-attempt resilience rejection and response-envelope timing for streaming

@@ -975,6 +975,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("| Always recorded |")
                 .contains("| Conditionally recorded |")
                 .contains("| Opt-in |")
+                .contains("They can remain active when\n"
+                        + "`reactive.http.observability.enabled=false`")
                 .contains("reactive_http_client_requests_seconds_count")
                 .contains("time-window maximum, not a lifetime maximum")
                 .contains("`0` means resilience rejected or admission was cancelled")
@@ -983,9 +985,15 @@ class DocumentationReleaseArtifactTest {
                 .contains("does not enable `publishPercentiles(0.95, 0.99)`")
                 .contains("### Request rate (logical calls per second)")
                 .contains("### Error ratio (dimensionless)")
+                .contains("0 * sum by (client_name, api_name)")
+                .contains("so healthy groups remain\nvisible")
                 .contains("The attempts summary cannot produce this count truthfully")
+                .contains("error_category=\"RESILIENCE_ERROR\"")
+                .contains("RateLimiter and Bulkhead meters expose current-state gauges")
                 .contains("### p95/p99 logical-call latency (seconds; histogram required)")
                 .contains("reactive_http_client_requests_latency_seconds_bucket")
+                .contains("when a requested quantile falls into it, `histogram_quantile` returns\n"
+                        + "the highest finite boundary rather than the actual tail")
                 .contains("### Average subscription attempts (attempts per logical call)")
                 .contains("rolling arithmetic mean, not a percentile or retry-event rate")
                 .contains("### Pool pressure (gauge counts, not utilization percentages)")
@@ -997,7 +1005,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("| OpenTelemetry companion |")
                 .doesNotContain("records four meters per exchange")
                 .doesNotContain("`1` = succeeded on first try")
-                .doesNotContain("A p95 above `1`");
+                .doesNotContain("A p95 above `1`")
+                .doesNotContain("RateLimiter, or Bulkhead rejection\n"
+                        + "counters");
     }
 
     @Test

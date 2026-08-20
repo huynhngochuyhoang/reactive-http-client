@@ -467,13 +467,14 @@ Evidence:
 Evidence:
 
 - `docs/08-observability.md` now separates always-recorded logical-call meters,
-  conditional known-size summaries, the opt-in latency histogram, and opt-in
-  protocol-aware pool gauges. It preserves API-name, tag, response-size,
+  conditional known-size summaries, and the opt-in latency histogram from
+  independently activated protocol-aware pool gauges. It preserves API-name, tag, response-size,
   diagnostics, OTel propagation, and body-gate contracts.
-- Unit-safe PromQL recipes cover logical-call request rate, error ratio,
-  histogram-backed p95/p99 in seconds, average subscription attempts, and H1/H2
-  pending-pool counts. The guide explains why count/sum cannot identify
-  zero-attempt calls and directs operator-event questions to Resilience4j.
+- Unit-safe PromQL recipes cover logical-call request rate, zero-preserving error
+  ratio, starter-timer admission rejections, histogram-backed p95/p99 in seconds,
+  average subscription attempts, and H1/H2 pending-pool counts. The guide warns
+  about highest-bucket saturation and explains why attempts count/sum cannot
+  identify zero-attempt calls.
 - The telemetry ownership table separates starter logical calls, Resilience4j
   operators, Reactor Netty transport meters, and one terminal OTel span.
 - Error handling, resilience, production, cardinality, diagnostics, support
