@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **OpenTelemetry logical-call contract.** Documented and tested one terminal
+  `CLIENT` span per logical call, including finite current timestamps for
+  zero-attempt resilience rejection and response-envelope timing for streaming
+  `ResponseEntity` bodies. Clarified that `log-request-body` and
+  `log-response-body` expose payload fields only on terminal observer events for
+  custom observers; built-in Micrometer and OTel observers continue to emit no
+  raw bodies, headers, URLs, exception messages, or stack traces.
 - **Health indicator metric parity.** Documented the complete bounded per-client
   detail shape, including `poolAcquireFailureCount`, and added a sanitized
   support fixture. Health remains count-based on the configured main timer's

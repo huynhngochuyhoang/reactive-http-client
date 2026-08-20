@@ -870,14 +870,14 @@
     {
       "name": "reactive.http.observability.log-request-body",
       "type": "java.lang.Boolean",
-      "description": "Include the request body in span events. Caution: may expose PII or large payloads. Default: false.",
+      "description": "Include the request body on the terminal HttpClientObserverEvent for custom observers. Built-in Micrometer and OpenTelemetry observers do not export it. Caution: custom observers may expose PII, credentials, or large payloads. Default: false.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
       "defaultValue": false
     },
     {
       "name": "reactive.http.observability.log-response-body",
       "type": "java.lang.Boolean",
-      "description": "Include the response body in span events. Caution: may expose PII or large payloads. Default: false.",
+      "description": "Include the decoded success response body on the terminal HttpClientObserverEvent for custom observers. Built-in Micrometer and OpenTelemetry observers do not export it. Caution: custom observers may expose PII, credentials, or large payloads. Default: false.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ObservabilityConfig",
       "defaultValue": false
     },

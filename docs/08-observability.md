@@ -150,14 +150,17 @@ reactive:
       metric-name: reactive.http.client.requests   # custom timer/counter name
       include-url-path: false             # opt-in path template metric tags and span attributes
       include-server-address: false       # opt-in server.address/server.port tags and span attributes
-      log-request-body: false             # include body in span events (PII risk)
-      log-response-body: false
+      log-request-body: false             # expose request body to custom observer events
+      log-response-body: false            # expose decoded success body to custom observer events
       histogram:
         enabled: false                    # opt-in latency histogram (SLO buckets)
         slo-boundaries-ms: [50, 100, 200, 500, 1000, 2000, 5000]
 ```
 
-> **Production recommendation:** keep path, server address, and body dimensions disabled unless you have verified they are bounded. See [18-conflict-cardinality-guardrails.md](18-conflict-cardinality-guardrails.md).
+> **Production recommendation:** keep path and server-address dimensions disabled,
+> and keep observer body fields disabled, unless the resulting values and custom
+> observer handling are bounded and reviewed. See
+> [18-conflict-cardinality-guardrails.md](18-conflict-cardinality-guardrails.md).
 
 ---
 
@@ -307,7 +310,10 @@ for the complete protocol-aware interpretation.
 
 ## OpenTelemetry tracing (`reactive-http-client-otel`)
 
-The optional OTel companion records each outbound exchange as a span using the [HTTP client semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-spans/).
+The optional OTel companion records one terminal `CLIENT` span per logical
+client call using the [HTTP client semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-spans/).
+Retries, redirects, one-time auth replay, and transport dispatches remain inside
+that span; they do not create starter-owned child spans.
 
 ### Add the dependency
 
@@ -372,6 +378,19 @@ reactive:
 | `rhttp.response.bytes` | Post-transport advertised representation bytes from `Content-Length`; absent for automatically decompressed or chunked responses |
 | `rhttp.failure.stage` | Proven `DNS_RESOLUTION`, `PROXY_CONNECT`, `CONNECT`, `TLS_HANDSHAKE`, `POOL_ACQUIRE`, `REQUEST_WRITE`, `RESPONSE_HEADERS`, or `RESPONSE_BODY`; absent when unknown |
 
+The span ends when the terminal `HttpClientObserverEvent` is reported. Its start
+is derived from that event's monotonic logical-call duration, so Micrometer,
+exchange logging, and OTel describe the same elapsed interval within one
+millisecond of timestamp conversion granularity. Admission rejection before the
+first request subscription produces one current, finite span with attempt `0`,
+no invented HTTP status, and no invented transport failure stage. Retry delay
+and resilience admission are included once in the logical duration.
+
+For `Mono<ResponseEntity<Flux<DataBuffer>>>`, the span describes response-envelope
+completion. Later subscription, completion, failure, or cancellation of the
+caller-owned inner body does not extend or rewrite that span. Direct streaming
+`Flux` methods retain their normal full-stream terminal boundary.
+
 `HttpClientObserverEvent` is the only reporting contract with byte counters.
 `ReactiveHttpClientLifecycleContext` has neither response headers nor byte
 fields. `HttpExchangeLogContext` exposes post-transport response headers but no
@@ -381,8 +400,31 @@ bodies to infer encoded or decoded sizes.
 Errors set `StatusCode.ERROR` and add one structural `exception` event containing
 only `exception.type`. The built-in observer intentionally omits exception
 messages and stack traces so arbitrary auth-provider or custom-filter payload
-text is not exported. The structural `error.type` and `rhttp.failure.stage`
-attributes retain the diagnostic classification.
+text is not exported. It also omits request and response bodies, request and
+response header values, and raw request URLs. The structural `error.type` and
+`rhttp.failure.stage` attributes retain the diagnostic classification.
+
+### Observer body gates
+
+`reactive.http.observability.log-request-body` and
+`reactive.http.observability.log-response-body` are terminal
+`HttpClientObserverEvent` payload gates for custom observers. They do not create
+OpenTelemetry span events:
+
+- With the default `false`, the corresponding event body field is `null`.
+- With `log-request-body: true`, every custom observer in the active composite
+  can inspect the resolved request body object.
+- With `log-response-body: true`, every custom observer in the active composite
+  can inspect the decoded successful response body when one exists. It is not an
+  error-body capture mechanism and does not consume streaming bodies.
+- Built-in Micrometer and OpenTelemetry observers ignore both body fields. The
+  OTel observer never emits raw body span attributes or events.
+
+These settings are global rather than per-observer. Enabling either one transfers
+redaction, bounding, retention, and asynchronous ownership responsibility to
+each custom observer that reads the field. Keep both disabled unless that custom
+observer contract has been reviewed for credentials, PII, large payloads, and
+mutable or pooled body objects.
 
 ### Trace context and baggage propagation
 
@@ -410,7 +452,7 @@ wired.
 
 ### Running with Micrometer
 
-`MicrometerHttpClientObserver` and `OpenTelemetryHttpClientObserver` are named built-in beans. When both modules are present, the invocation handler records through all available `HttpClientObserver` beans, so one exchange can produce both a Micrometer timer and an OTel `CLIENT` span.
+`MicrometerHttpClientObserver` and `OpenTelemetryHttpClientObserver` are named built-in beans. When both modules are present, the invocation handler records through all available `HttpClientObserver` beans, so one logical call can produce both a Micrometer timer and one OTel `CLIENT` span.
 
 Custom `HttpClientObserver` beans now run alongside the built-ins. To replace a built-in, register a bean with the same name: `micrometerHttpClientObserver` or `openTelemetryHttpClientObserver`. To take complete control over delegation, expose your own observer and exclude or override the built-in bean names.
 

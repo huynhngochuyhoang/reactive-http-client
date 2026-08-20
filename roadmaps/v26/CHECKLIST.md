@@ -375,30 +375,52 @@ Evidence:
 
 ## Priority 7 - OpenTelemetry Logical-Call Contract
 
-### [ ] 7.1 Align span timing and terminal semantics
+### [x] 7.1 Align span timing and terminal semantics
 
-- [ ] Document and test one terminal `CLIENT` span per logical client call, not
+- [x] Document and test one terminal `CLIENT` span per logical client call, not
       per retry, redirect, auth replay, or transport dispatch.
-- [ ] Verify open-circuit and other zero-attempt failures produce finite current
+- [x] Verify open-circuit and other zero-attempt failures produce finite current
       start/end timestamps matching the shared logical duration.
-- [ ] Verify status, `error.type`, `rhttp.failure.stage`, attempt count,
+- [x] Verify status, `error.type`, `rhttp.failure.stage`, attempt count,
       byte attributes, and cardinality gates remain aligned with the observer
       event.
-- [ ] Preserve response-envelope timing for streaming `ResponseEntity` bodies.
-- [ ] Ensure observer failures remain isolated from business publishers.
+- [x] Preserve response-envelope timing for streaming `ResponseEntity` bodies.
+- [x] Ensure observer failures remain isolated from business publishers.
 
-### [ ] 7.2 Resolve body-option documentation drift
+### [x] 7.2 Resolve body-option documentation drift
 
-- [ ] Characterize exactly how `log-request-body` and `log-response-body`
+- [x] Characterize exactly how `log-request-body` and `log-response-body`
       affect `HttpClientObserverEvent` for custom and composite observers.
-- [ ] Confirm the built-in OTel observer emits no raw body, header, URL,
+- [x] Confirm the built-in OTel observer emits no raw body, header, URL,
       exception-message, or stack-trace span events.
-- [ ] Update property metadata, generated configuration reference, Javadocs, and
+- [x] Update property metadata, generated configuration reference, Javadocs, and
       public docs to describe the selected behavior.
-- [ ] Do not add built-in body span events without a separately reviewed bounded
+- [x] Do not add built-in body span events without a separately reviewed bounded
       redaction and size contract.
-- [ ] Preserve OTel master/spans/propagation switches, inbound extraction,
+- [x] Preserve OTel master/spans/propagation switches, inbound extraction,
       outbound injection, and caller-header precedence.
+
+Evidence:
+
+- `OpenTelemetryHttpClientObserverTest` proves one `CLIENT` span for a terminal
+  event with multiple subscription attempts, current finite zero-attempt
+  timestamps within the documented one-millisecond conversion tolerance,
+  terminal status/error/stage/attempt/byte/cardinality attributes, structural-only
+  exception events, and observer-failure isolation.
+- `RequestResponseSizeObservabilityContractTest` uses a real starter-built client
+  to prove streaming `ResponseEntity<Flux<DataBuffer>>` spans end at envelope
+  completion and remain single after inner-body consumption. It also proves the
+  default body fields are null, opt-in fields reach custom/composite observers,
+  and the built-in OTel span never contains those payloads.
+- `ReactiveHttpClientProperties`, configuration metadata, generated property
+  reference, observer Javadocs, and public observability/cardinality/context docs
+  now describe the body settings as custom-observer event gates rather than span
+  events. Documentation tests reject the former wording.
+- Existing auto-configuration and propagation tests retain the OTel master, spans,
+  and propagation switches, inbound extraction, outbound injection, and
+  caller-header precedence. The focused starter/OTel contract run passed 108
+  tests. The full starter suite passed 1,045 tests and the full OTel suite passed
+  52 tests.
 
 ---
 

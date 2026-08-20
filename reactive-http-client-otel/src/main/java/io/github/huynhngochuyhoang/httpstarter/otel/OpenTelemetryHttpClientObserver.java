@@ -14,8 +14,9 @@ import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 /**
- * {@link HttpClientObserver} that records each outbound HTTP exchange as an
- * OpenTelemetry span using the
+ * {@link HttpClientObserver} that records one terminal OpenTelemetry span for
+ * each logical client call. Retries, redirects, one-time auth replay, and
+ * transport dispatches do not create additional spans. Spans use the
  * <a href="https://opentelemetry.io/docs/specs/semconv/http/http-spans/">HTTP
  * client semantic conventions</a>.
  *
@@ -24,10 +25,10 @@ import java.util.concurrent.TimeUnit;
  *   <li><b>Name:</b> {@code <METHOD> <api.name>} — e.g. {@code GET getUserById}.
  *       Matches OTel's recommendation that span names be low-cardinality.</li>
  *   <li><b>Kind:</b> {@link SpanKind#CLIENT}.</li>
- *   <li><b>Timestamps:</b> derived from the event — start = {@code now − durationMs},
- *       end = {@code now}. The starter only fires this observer on completion,
- *       so the span exists strictly to anchor metadata; consumers are expected
- *       to combine with their own server-side spans for full trace context.</li>
+ *   <li><b>Timestamps:</b> derived from the terminal event — end is the current
+ *       observation time and start is {@code end - durationMs}. Duration is the
+ *       subscription-local logical-call duration shared with other terminal
+ *       observers.</li>
  * </ul>
  *
  * <h3>Standard attributes</h3>
@@ -53,6 +54,12 @@ import java.util.concurrent.TimeUnit;
  *   <li>{@code rhttp.failure.stage} - concrete DNS, proxy, TLS, connection, pool, write, or response
  *       phase only when terminal evidence proves it</li>
  * </ul>
+ *
+ * <p>The built-in observer does not export request or response bodies, headers,
+ * raw request URLs, exception messages, or stack traces. The shared
+ * {@code log-request-body} and {@code log-response-body} settings only control
+ * body availability on {@link HttpClientObserverEvent} for custom observers;
+ * they do not add body events to these spans.
  */
 public class OpenTelemetryHttpClientObserver implements HttpClientObserver {
 

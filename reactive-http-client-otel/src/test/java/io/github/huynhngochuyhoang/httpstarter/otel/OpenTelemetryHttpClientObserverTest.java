@@ -23,10 +23,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import java.net.UnknownHostException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
  * Integration tests for {@link OpenTelemetryHttpClientObserver} using the OTel
@@ -150,7 +153,7 @@ class OpenTelemetryHttpClientObserverTest {
     }
 
     @Test
-    void errorEventTaggedWithErrorTypeAndStatusError() {
+    void multipleSubscriptionAttemptsProduceOneTerminalSpan() {
         observer.record(new HttpClientObserverEvent(
                 "user-service", "user.get", "GET", "/users/{id}",
                 429, 8L,
@@ -175,6 +178,76 @@ class OpenTelemetryHttpClientObserverTest {
                     .containsExactly(OpenTelemetryHttpClientObserver.ATTR_EXCEPTION_TYPE);
             assertThat(exception.getAttributes().toString()).doesNotContain("rate limited");
         });
+    }
+
+    @Test
+    void zeroAttemptResilienceFailureUsesFiniteCurrentLogicalCallTimestamps() {
+        Instant before = Instant.now();
+        observer.record(new HttpClientObserverEvent(
+                "inventory-service", "inventory.get", "GET", "/inventory/{id}",
+                null, 25L, new IllegalStateException("circuit open"),
+                ErrorCategory.RESILIENCE_ERROR, null, null,
+                0, HttpClientObserverEvent.UNKNOWN_SIZE, HttpClientObserverEvent.UNKNOWN_SIZE));
+        Instant after = Instant.now();
+
+        SpanData span = onlySpan();
+        long durationNanos = span.getEndEpochNanos() - span.getStartEpochNanos();
+        long beforeNanos = TimeUnit.MILLISECONDS.toNanos(before.toEpochMilli());
+        long afterNanos = TimeUnit.MILLISECONDS.toNanos(after.toEpochMilli() + 1L);
+
+        assertThat(TimeUnit.NANOSECONDS.toMillis(durationNanos)).isBetween(24L, 25L);
+        assertThat(span.getStartEpochNanos())
+                .isGreaterThanOrEqualTo(beforeNanos - TimeUnit.MILLISECONDS.toNanos(26L));
+        assertThat(span.getEndEpochNanos()).isBetween(beforeNanos, afterNanos);
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_ATTEMPT_COUNT)).isZero();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_HTTP_STATUS_CODE)).isNull();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_ERROR_TYPE))
+                .isEqualTo(ErrorCategory.RESILIENCE_ERROR.name());
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_FAILURE_STAGE)).isNull();
+        assertThat(span.getStatus()).isEqualTo(StatusData.error());
+    }
+
+    @Test
+    void bodyOptionsDoNotExportPayloadHeadersRawUrlOrExceptionText() {
+        String secret = "secret-body-value";
+        ReactiveHttpClientProperties.ObservabilityConfig config =
+                new ReactiveHttpClientProperties.ObservabilityConfig();
+        config.setLogRequestBody(true);
+        config.setLogResponseBody(true);
+        config.setIncludeUrlPath(true);
+        config.setIncludeServerAddress(true);
+        observer = new OpenTelemetryHttpClientObserver(OpenTelemetrySdk.builder()
+                .setTracerProvider(tracerProvider)
+                .build(), config);
+
+        observer.record(new HttpClientObserverEvent(
+                "secure-service", "secure.create", "POST", "/secure/{id}",
+                500, 7L, new IllegalStateException("failure-" + secret),
+                ErrorCategory.SERVER_ERROR, secret, "response-" + secret,
+                1, 17L, 23L, "api.example.invalid", 443,
+                "https://user:token@api.example.invalid/secure/raw-id?key=" + secret,
+                Map.of("Authorization", "Bearer " + secret)));
+
+        SpanData span = onlySpan();
+        assertThat(span.getEvents()).singleElement().satisfies(exception ->
+                assertThat(exception.getAttributes().asMap().keySet())
+                        .containsExactly(OpenTelemetryHttpClientObserver.ATTR_EXCEPTION_TYPE));
+        assertThat(span.toString())
+                .doesNotContain(secret, "response-" + secret, "Bearer", "user:token", "raw-id");
+    }
+
+    @Test
+    void compositeObserverFailureDoesNotSuppressTheTerminalSpan() {
+        CompositeHttpClientObserver composite = new CompositeHttpClientObserver(List.of(
+                event -> { throw new IllegalStateException("custom observer failed"); },
+                observer));
+
+        assertThatCode(() -> composite.record(new HttpClientObserverEvent(
+                "user-service", "user.get", "GET", "/users/{id}",
+                200, 4L, null, null, null, null)))
+                .doesNotThrowAnyException();
+
+        assertThat(onlySpan().getKind()).isEqualTo(io.opentelemetry.api.trace.SpanKind.CLIENT);
     }
 
     @Test

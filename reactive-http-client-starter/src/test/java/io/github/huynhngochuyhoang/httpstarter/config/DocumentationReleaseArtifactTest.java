@@ -1005,6 +1005,31 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void openTelemetryDocsMatchLogicalCallAndObserverBodyContracts() throws IOException {
+        Path root = projectRoot();
+        String observabilityDocs = Files.readString(root.resolve("docs/08-observability.md"));
+        String contextDocs = Files.readString(root.resolve("docs/21-diagnostic-contexts.md"));
+        String cardinalityDocs = Files.readString(root.resolve("docs/18-conflict-cardinality-guardrails.md"));
+
+        assertThat(observabilityDocs)
+                .contains("one terminal `CLIENT` span per logical\nclient call")
+                .contains("transport dispatches remain inside\nthat span")
+                .contains("current, finite span with attempt `0`")
+                .contains("the span describes response-envelope\ncompletion")
+                .contains("They do not create\nOpenTelemetry span events")
+                .contains("Built-in Micrometer and OpenTelemetry observers ignore both body fields")
+                .contains("omits request and response bodies")
+                .doesNotContain("include body in span events (PII risk)")
+                .doesNotContain("records each outbound exchange as a span");
+        assertThat(contextDocs)
+                .contains("gate body fields on the\nsingle terminal `HttpClientObserverEvent`")
+                .contains("do not add OpenTelemetry span\nevents");
+        assertThat(cardinalityDocs)
+                .contains("Request and decoded success bodies on custom observer events")
+                .doesNotContain("Request and response bodies in spans");
+    }
+
+    @Test
     void requestResponseSizeDocsMatchWireContract() throws IOException {
         String observabilityDocs = Files.readString(projectRoot().resolve("docs/08-observability.md"));
 

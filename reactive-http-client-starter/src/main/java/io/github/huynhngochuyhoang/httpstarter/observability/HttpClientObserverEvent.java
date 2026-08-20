@@ -210,12 +210,18 @@ public final class HttpClientObserverEvent {
         return HttpClientFailureStage.from(error, statusCode, requestUrl != null);
     }
 
-    /** The serialised request body (may be {@code null} for GET/DELETE). */
+    /**
+     * The resolved request body when {@code log-request-body} is enabled, otherwise
+     * {@code null}. Custom observers own redaction, bounds, retention, and safe
+     * handling of mutable or pooled values.
+     */
     public Object getRequestBody() { return requestBody; }
 
     /**
-     * The deserialised response body (may be {@code null} for empty or error responses).
-     * For {@code Flux<T>} responses this field is always {@code null}.
+     * The decoded successful response body when {@code log-response-body} is enabled,
+     * otherwise {@code null}. Empty, error, and {@code Flux<T>} responses do not expose
+     * a body through this field. Custom observers own redaction, bounds, retention, and
+     * safe handling of mutable or pooled values.
      */
     public Object getResponseBody() { return responseBody; }
 
