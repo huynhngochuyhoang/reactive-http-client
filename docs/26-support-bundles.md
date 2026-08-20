@@ -103,8 +103,12 @@ common terminal outcomes:
   keeps the failed and replacement calls separate. A missing status or failure
   stage remains unknown; the example does not infer transport facts from an
   exception message.
+- [Terminal outcome comparison](fixtures/support-bundle-terminal-outcomes.json)
+  uses milliseconds explicitly and separates a zero-attempt resilience
+  rejection, a dispatched transport failure, and a downstream HTTP failure by
+  structural status, category, stage, attempt, and dispatch facts.
 
-Both fixtures are illustrative sanitized records, not raw logger output. They
+These fixtures are illustrative sanitized records, not raw logger output. They
 contain fake client and path-template metadata only. Default support output must
 not copy arbitrary exception messages, concrete request URLs, header values, or
 payloads into either record.

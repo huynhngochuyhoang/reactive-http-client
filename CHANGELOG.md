@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Mock, consumer, and support-bundle parity.** Added no-network mock coverage
+  for zero-attempt open-circuit terminal reporting; assembled Boot 4 checks for
+  success, HTTP error, resilience rejection, Micrometer duration and attempts,
+  health details, and OpenTelemetry timing; and a bounded sanitized support
+  fixture that distinguishes resilience, transport, and downstream HTTP
+  failures by structural facts.
 - **Observability documentation and dashboard recipes.** Classified
   logical-call, conditional-size, and latency-histogram meters while documenting
   pool gauges as independently activated. Added unit-safe request-rate,

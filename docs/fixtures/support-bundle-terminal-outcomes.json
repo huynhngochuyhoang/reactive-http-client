@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "durationUnit": "milliseconds",
+  "records": [
+    {
+      "incidentClass": "fast-resilience-rejection",
+      "clientName": "inventory-api",
+      "apiName": "getOrder",
+      "httpMethod": "GET",
+      "pathTemplate": "/orders/{orderId}",
+      "logicalCallDuration": {
+        "value": 3,
+        "unit": "milliseconds"
+      },
+      "subscriptionAttemptCount": 0,
+      "requestDispatched": false,
+      "outcome": "UNKNOWN",
+      "errorType": "CallNotPermittedException",
+      "errorCategory": "RESILIENCE_ERROR",
+      "failureStage": null,
+      "responseStatus": null,
+      "responseHeaders": {}
+    },
+    {
+      "incidentClass": "transport-failure",
+      "clientName": "inventory-api",
+      "apiName": "getOrder",
+      "httpMethod": "GET",
+      "pathTemplate": "/orders/{orderId}",
+      "logicalCallDuration": {
+        "value": 1200,
+        "unit": "milliseconds"
+      },
+      "subscriptionAttemptCount": 1,
+      "requestDispatched": true,
+      "outcome": "UNKNOWN",
+      "errorType": "ConnectTimeoutException",
+      "errorCategory": "TIMEOUT",
+      "failureStage": "CONNECT",
+      "responseStatus": null,
+      "responseHeaders": {}
+    },
+    {
+      "incidentClass": "downstream-http-failure",
+      "clientName": "inventory-api",
+      "apiName": "getOrder",
+      "httpMethod": "GET",
+      "pathTemplate": "/orders/{orderId}",
+      "logicalCallDuration": {
+        "value": 45,
+        "unit": "milliseconds"
+      },
+      "subscriptionAttemptCount": 1,
+      "requestDispatched": true,
+      "outcome": "SERVER_ERROR",
+      "errorType": "RemoteServiceException",
+      "errorCategory": "SERVER_ERROR",
+      "failureStage": null,
+      "responseStatus": 503,
+      "responseHeaders": {}
+    }
+  ]
+}

@@ -489,43 +489,53 @@ Evidence:
 
 ## Priority 9 - Mock, Consumer, and Support-Bundle Parity
 
-### [ ] 9.1 Extend mock observability assertions
+### [x] 9.1 Extend mock observability assertions
 
-- [ ] Exercise configured open-circuit/pre-subscription rejection through
+- [x] Exercise configured open-circuit/pre-subscription rejection through
       `MockReactiveHttpClient`.
-- [ ] Assert one lifecycle terminal callback and one observer/exchange-log
+- [x] Assert one lifecycle terminal callback and one observer/exchange-log
       record; compare attempt, status, category, and failure-stage facts where
       each contract exposes them, and compare duration only between observer and
       exchange logging.
-- [ ] Add helper assertions only when they remove repeated test logic and match
+- [x] Add helper assertions only when they remove repeated test logic and match
       production terminology.
-- [ ] Keep mock evidence labeled no-network and avoid transport/pool/scrape
+- [x] Keep mock evidence labeled no-network and avoid transport/pool/scrape
       claims.
-- [ ] Preserve custom observer, lifecycle ordering, auth, inherited client, and
+- [x] Preserve custom observer, lifecycle ordering, auth, inherited client, and
       custom logger support.
 
-### [ ] 9.2 Extend assembled-consumer evidence
+### [x] 9.2 Extend assembled-consumer evidence
 
-- [ ] Add success, HTTP error, and open-circuit calls to the current Boot 4
+- [x] Add success, HTTP error, and open-circuit calls to the current Boot 4
       consumer fixture.
-- [ ] Inspect or scrape main timer duration and attempts from the assembled app.
-- [ ] Verify corrected health details and OTel span timing.
-- [ ] Reject reactor-classpath leakage and retain effective POM, dependency tree,
+- [x] Inspect or scrape main timer duration and attempts from the assembled app.
+- [x] Verify corrected health details and OTel span timing.
+- [x] Reject reactor-classpath leakage and retain effective POM, dependency tree,
       classpath, test reports, and stage/provenance evidence.
-- [ ] Run the published `3.5.0` consumer lane unchanged as the compatibility
+- [x] Run the published `3.5.0` consumer lane unchanged as the compatibility
       baseline.
 
-### [ ] 9.3 Update bounded support evidence
+### [x] 9.3 Update bounded support evidence
 
-- [ ] Add units and structural fields needed to distinguish fast resilience
+- [x] Add units and structural fields needed to distinguish fast resilience
       rejection, transport failure, and downstream HTTP failure.
-- [ ] Keep support fixtures bounded, deterministic, sanitized, and free of raw
+- [x] Keep support fixtures bounded, deterministic, sanitized, and free of raw
       URLs, headers, credentials, bodies, and exception messages.
-- [ ] Validate required false, zero, and null fields by presence and JSON type.
+- [x] Validate required false, zero, and null fields by presence and JSON type.
+
+Evidence:
+
+- `MockReactiveHttpClientTest.openCircuitReportsOneNoNetworkTerminalAcrossMockDiagnostics` uses the existing client-config and resilience-applier hooks to reject before request subscription. It records no in-process exchange and proves one lifecycle error, one observer event, and one exchange-log record with attempt `0`, no status or failure stage, `RESILIENCE_ERROR`, and one shared observer/log duration.
+- The complete mock-helper suite retained custom observers, ordered lifecycle hooks, auth replay/signing, inherited clients, constructor-injected custom loggers, retry, and no-network terminal behavior: the isolated current-consumer verifier passed 47 tests.
+- The assembled Boot 4 fixture now makes real success, retried HTTP-error, and open-circuit calls. The current-reactor lane inspects finite main-timer duration, attempts `1`/`2`/`0`, corrected health counts/aliases, and one OTel span whose timing matches each terminal observer event within 1 ms.
+- `scripts/verify-current-consumer.sh` passed from a fresh target-local repository and preserved effective POM, dependency tree, classpath, mock/consumer Surefire reports, artifact hashes, completed-stage provenance, and a successful reactor-classpath leakage check under `target/release-evidence/current-consumer/current-3.6.0-SNAPSHOT/`.
+- The unchanged `scripts/verify-published-consumer.sh 3.5.0` lane passed against fresh Maven Central artifacts and recorded published provenance, effective POMs, dependency/classpath evidence, and 3 consumer tests under `target/release-evidence/published-consumer/published-3.5.0/`.
+- Added the bounded, sanitized `support-bundle-terminal-outcomes.json` fixture for fast resilience rejection, transport failure, and downstream HTTP failure. Documentation tests require duration units and the presence/type of every false, zero, and null structural field; all 40 release-documentation tests passed.
 
 ---
 
 ## Priority 10 - Observability Overhead Re-Audit
+
 
 ### [ ] 10.1 Preserve benchmark fairness
 
