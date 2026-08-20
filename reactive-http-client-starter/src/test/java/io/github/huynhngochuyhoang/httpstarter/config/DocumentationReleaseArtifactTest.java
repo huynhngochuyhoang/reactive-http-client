@@ -377,15 +377,19 @@ class DocumentationReleaseArtifactTest {
                 root.resolve("docs/fixtures/support-bundle-request-validation.json"));
         String staleRecoveryText = Files.readString(
                 root.resolve("docs/fixtures/support-bundle-stale-connection-recovery.json"));
+        String terminalOutcomesText = Files.readString(
+                root.resolve("docs/fixtures/support-bundle-terminal-outcomes.json"));
         String healthText = Files.readString(
                 root.resolve("docs/fixtures/support-bundle-health.json"));
         JsonNode validation = OBJECT_MAPPER.readTree(validationText);
         JsonNode staleRecovery = OBJECT_MAPPER.readTree(staleRecoveryText);
+        JsonNode terminalOutcomes = OBJECT_MAPPER.readTree(terminalOutcomesText);
         JsonNode health = OBJECT_MAPPER.readTree(healthText);
 
         assertThat(supportBundles)
                 .contains("(fixtures/support-bundle-request-validation.json)")
                 .contains("(fixtures/support-bundle-stale-connection-recovery.json)")
+                .contains("(fixtures/support-bundle-terminal-outcomes.json)")
                 .contains("(fixtures/support-bundle-health.json)")
                 .contains("illustrative sanitized records, not raw logger output");
         assertThat(validation.path("incidentType").asText()).isEqualTo("request-validation");
@@ -463,6 +467,62 @@ class DocumentationReleaseArtifactTest {
         assertThat(records.get(1).path("errorType").isNull()).isTrue();
         assertThat(records.get(1).path("causeTypes").isEmpty()).isTrue();
 
+        assertThat(terminalOutcomes.path("schemaVersion").isIntegralNumber()).isTrue();
+        assertThat(terminalOutcomes.path("schemaVersion").asInt()).isEqualTo(1);
+        assertThat(terminalOutcomes.path("durationUnit").asText()).isEqualTo("milliseconds");
+        JsonNode terminalRecords = terminalOutcomes.path("records");
+        assertThat(terminalRecords.size()).isEqualTo(3);
+        for (JsonNode record : terminalRecords) {
+            for (String field : List.of(
+                    "incidentClass", "clientName", "apiName", "httpMethod",
+                    "pathTemplate", "outcome", "errorType", "errorCategory")) {
+                assertThat(record.has(field)).as("terminal fixture field %s", field).isTrue();
+                assertThat(record.path(field).isTextual()).isTrue();
+            }
+            JsonNode duration = record.path("logicalCallDuration");
+            assertThat(duration.isObject()).isTrue();
+            assertThat(duration.has("value")).isTrue();
+            assertThat(duration.path("value").isIntegralNumber()).isTrue();
+            assertThat(duration.path("value").asLong()).isBetween(0L, 60_000L);
+            assertThat(duration.has("unit")).isTrue();
+            assertThat(duration.path("unit").asText()).isEqualTo("milliseconds");
+            assertThat(record.has("subscriptionAttemptCount")).isTrue();
+            assertThat(record.path("subscriptionAttemptCount").isIntegralNumber()).isTrue();
+            assertThat(record.has("requestDispatched")).isTrue();
+            assertThat(record.path("requestDispatched").isBoolean()).isTrue();
+            assertThat(record.has("failureStage")).isTrue();
+            assertThat(record.has("responseStatus")).isTrue();
+            assertThat(record.has("responseHeaders")).isTrue();
+            assertThat(record.path("responseHeaders").isObject()).isTrue();
+            assertThat(record.path("responseHeaders").isEmpty()).isTrue();
+        }
+
+        JsonNode resilienceRejection = terminalRecords.get(0);
+        assertThat(resilienceRejection.path("incidentClass").asText())
+                .isEqualTo("fast-resilience-rejection");
+        assertThat(resilienceRejection.path("subscriptionAttemptCount").asInt()).isZero();
+        assertThat(resilienceRejection.path("requestDispatched").asBoolean()).isFalse();
+        assertThat(resilienceRejection.path("errorCategory").asText()).isEqualTo("RESILIENCE_ERROR");
+        assertThat(resilienceRejection.path("failureStage").isNull()).isTrue();
+        assertThat(resilienceRejection.path("responseStatus").isNull()).isTrue();
+
+        JsonNode transportFailure = terminalRecords.get(1);
+        assertThat(transportFailure.path("incidentClass").asText()).isEqualTo("transport-failure");
+        assertThat(transportFailure.path("subscriptionAttemptCount").asInt()).isEqualTo(1);
+        assertThat(transportFailure.path("requestDispatched").asBoolean()).isTrue();
+        assertThat(transportFailure.path("errorCategory").asText()).isEqualTo("TIMEOUT");
+        assertThat(transportFailure.path("failureStage").asText()).isEqualTo("CONNECT");
+        assertThat(transportFailure.path("responseStatus").isNull()).isTrue();
+
+        JsonNode httpFailure = terminalRecords.get(2);
+        assertThat(httpFailure.path("incidentClass").asText()).isEqualTo("downstream-http-failure");
+        assertThat(httpFailure.path("subscriptionAttemptCount").asInt()).isEqualTo(1);
+        assertThat(httpFailure.path("requestDispatched").asBoolean()).isTrue();
+        assertThat(httpFailure.path("errorCategory").asText()).isEqualTo("SERVER_ERROR");
+        assertThat(httpFailure.path("failureStage").isNull()).isTrue();
+        assertThat(httpFailure.path("responseStatus").isIntegralNumber()).isTrue();
+        assertThat(httpFailure.path("responseStatus").asInt()).isEqualTo(503);
+
         assertThat(health.path("status").asText()).isEqualTo("DOWN");
         JsonNode healthDetails = health.path("details");
         assertThat(healthDetails.size()).isEqualTo(3);
@@ -490,7 +550,7 @@ class DocumentationReleaseArtifactTest {
                 "NO_SAMPLES", "INSUFFICIENT_SAMPLES",
                 "ERROR_RATE_WITHIN_THRESHOLD", "ERROR_RATE_ABOVE_THRESHOLD");
 
-        assertThat(validationText + staleRecoveryText + healthText)
+        assertThat(validationText + staleRecoveryText + terminalOutcomesText + healthText)
                 .doesNotContain("Authorization", "Cookie", "client-secret", "Bearer ")
                 .doesNotContain("http://", "https://", "responseBody", "errorMessage")
                 .doesNotContain("/home/", "/Users/", "/workspace/", "/tmp/", "C:\\Users\\");

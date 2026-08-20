@@ -72,7 +72,8 @@ stage="reactor-install"
 stage="mock-tests"
 copy_mock_reports
 
-"${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" clean test
+"${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
+  -Dconsumer.v26.observability=true clean test
 stage="consumer-tests"
 copy_consumer_reports
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \

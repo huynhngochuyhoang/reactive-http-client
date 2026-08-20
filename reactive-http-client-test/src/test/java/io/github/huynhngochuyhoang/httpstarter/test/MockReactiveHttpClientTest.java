@@ -11,6 +11,8 @@ import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.netty.handler.timeout.ReadTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;
@@ -770,6 +772,82 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void openCircuitReportsOneNoNetworkTerminalAcrossMockDiagnostics() {
+        CircuitBreaker circuitBreaker = CircuitBreaker.ofDefaults("mock-open");
+        circuitBreaker.transitionToOpenState();
+        CallNotPermittedException rejection =
+                CallNotPermittedException.createCallNotPermittedException(circuitBreaker);
+        ReactiveHttpClientProperties.ResilienceConfig resilience =
+                new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setCircuitBreaker("mock-open");
+        ReactiveHttpClientProperties.ClientConfig clientConfig =
+                new ReactiveHttpClientProperties.ClientConfig();
+        clientConfig.setResilience(resilience);
+
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        List<String> lifecycleSignals = new CopyOnWriteArrayList<>();
+        List<ReactiveHttpClientLifecycleContext> lifecycleErrors = new CopyOnWriteArrayList<>();
+        InterfaceInjectedExchangeLogger logger = new InterfaceInjectedExchangeLogger(new Object());
+        MockReactiveHttpClient<InterfaceLoggedClient> mock = MockReactiveHttpClient
+                .forClient(InterfaceLoggedClient.class)
+                .clientConfig(clientConfig)
+                .resilienceOperatorApplier(new OpenCircuitResilienceOperatorApplier(rejection))
+                .withObserver(observed::add)
+                .withLifecycleHook(new ReactiveHttpClientLifecycleHook() {
+                    @Override
+                    public void onStart(ReactiveHttpClientLifecycleContext context) {
+                        lifecycleSignals.add("start");
+                    }
+
+                    @Override
+                    public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+                        lifecycleSignals.add("success");
+                    }
+
+                    @Override
+                    public void onError(ReactiveHttpClientLifecycleContext context) {
+                        lifecycleSignals.add("error");
+                        lifecycleErrors.add(context);
+                    }
+                })
+                .withExchangeLogger(logger)
+                .build();
+
+        StepVerifier.create(mock.proxy().get())
+                .expectError(CallNotPermittedException.class)
+                .verify();
+
+        assertThat(mock.exchanges()).as("no-network mock exchanges").isEmpty();
+        assertThat(lifecycleSignals).containsExactly("error");
+        assertThat(lifecycleErrors).singleElement().satisfies(context -> {
+            assertThat(context.attemptNumber()).isZero();
+            assertThat(context.statusCode()).isNull();
+            assertThat(context.requestUrl()).isNull();
+            assertThat(context.error()).isSameAs(rejection);
+            assertThat(context.failureStage()).isNull();
+        });
+        assertThat(observed).singleElement().satisfies(event -> {
+            assertThat(event.getAttemptCount()).isZero();
+            assertThat(event.getStatusCode()).isNull();
+            assertThat(event.getError()).isSameAs(rejection);
+            assertThat(event.getErrorCategory()).isEqualTo(ErrorCategory.RESILIENCE_ERROR);
+            assertThat(event.getFailureStage()).isNull();
+            assertThat(event.getDurationMs()).isBetween(0L, 5_000L);
+        });
+        assertThat(logger.contexts).singleElement().satisfies(context -> {
+            HttpClientObserverEvent event = observed.getFirst();
+            assertThat(context.subscriptionAttemptCount()).isZero();
+            assertThat(context.responseStatus()).isNull();
+            assertThat(context.requestUrl()).isNull();
+            assertThat(context.error()).isSameAs(rejection);
+            assertThat(ErrorCategories.from(context.error())).isEqualTo(ErrorCategory.RESILIENCE_ERROR);
+            assertThat(context.failureStage()).isNull();
+            assertThat(context.durationMs()).isEqualTo(event.getDurationMs());
+        });
+    }
+
+    @Test
     void annotatedClientNameAndFinalRequestMetadataMatchProductionBehavior() {
         List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
         List<String> supportedClientNames = new CopyOnWriteArrayList<>();
@@ -1307,6 +1385,24 @@ class MockReactiveHttpClientTest {
         public MethodMetadata get(Method method) {
             getCalls++;
             return super.get(method);
+        }
+    }
+
+    private static final class OpenCircuitResilienceOperatorApplier extends NoopResilienceOperatorApplier {
+        private final RuntimeException rejection;
+
+        private OpenCircuitResilienceOperatorApplier(RuntimeException rejection) {
+            this.rejection = rejection;
+        }
+
+        @Override
+        public <V> Mono<V> applyCircuitBreaker(Mono<V> mono, String instanceName) {
+            return Mono.error(rejection);
+        }
+
+        @Override
+        public boolean isOperatorAvailable(InstanceType type) {
+            return type == InstanceType.CIRCUIT_BREAKER;
         }
     }
 

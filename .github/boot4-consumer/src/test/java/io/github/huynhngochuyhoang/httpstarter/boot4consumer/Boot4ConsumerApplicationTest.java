@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.boot4consumer;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.ApiRef;
 import io.github.huynhngochuyhoang.httpstarter.annotation.Body;
+import io.github.huynhngochuyhoang.httpstarter.annotation.CircuitBreaker;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.HeaderParam;
 import io.github.huynhngochuyhoang.httpstarter.annotation.LogHttpExchange;
@@ -31,16 +32,26 @@ import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverE
 import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
 import io.github.huynhngochuyhoang.httpstarter.test.MockReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.test.RecordedExchangeAssertions;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.propagation.ContextPropagators;
 import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.context.propagation.TextMapPropagator;
 import io.opentelemetry.context.propagation.TextMapSetter;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.data.SpanData;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.WebApplicationType;
@@ -65,7 +76,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -117,6 +131,7 @@ class Boot4ConsumerApplicationTest {
         AtomicReference<List<String>> repeatedHeaders = new AtomicReference<>();
         AtomicReference<String> propagatedTraceparent = new AtomicReference<>();
         AtomicReference<String> customJsonBody = new AtomicReference<>();
+        AtomicInteger openCircuitDispatches = new AtomicInteger();
         DisposableServer server = HttpServer.create().port(0)
                 .route(routes -> routes
                         .get("/direct", (request, response) -> {
@@ -156,6 +171,11 @@ class Boot4ConsumerApplicationTest {
                         .get("/stream", (request, response) -> response
                                 .header("Content-Type", "application/octet-stream")
                                 .sendString(Mono.just("stream-body")).then())
+                        .get("/open-circuit", (request, response) -> {
+                            openCircuitDispatches.incrementAndGet();
+                            return response.header("Content-Type", "application/json")
+                                    .sendString(Mono.just("{\"code\":\"unexpected\"}")).then();
+                        })
                         .get("/slow", (request, response) -> response
                                 .sendString(Mono.delay(Duration.ofMillis(250)).map(ignored -> "late")).then())
                         .get("/problem", (request, response) -> response
@@ -176,9 +196,13 @@ class Boot4ConsumerApplicationTest {
                         "reactive.http.clients.orders.follow-redirects=true",
                         "reactive.http.clients.orders.resilience.enabled=true",
                         "reactive.http.clients.orders.resilience.strict-unsafe-retry-validation=true",
+                        "reactive.http.observability.health.min-samples=1",
+                        "reactive.http.observability.health.error-rate-threshold=0.2",
                         "reactive.http.observability.diagnostics-endpoint.enabled=true")
                 .run()) {
             OrdersClient client = context.getBean(OrdersClient.class);
+            InMemorySpanExporter spanExporter = context.getBean(InMemorySpanExporter.class);
+            spanExporter.reset();
             assertThat(client.direct().block(Duration.ofSeconds(5)))
                     .isEqualTo(new OrderResponse("direct"));
             assertThat(propagatedTraceparent.get()).isEqualTo(TRACEPARENT);
@@ -221,6 +245,9 @@ class Boot4ConsumerApplicationTest {
                             .getProblemDetail().getTitle()).isEqualTo("Invalid order"));
             assertThatThrownBy(() -> client.timeout().block(Duration.ofSeconds(5)))
                     .isInstanceOf(RuntimeException.class);
+            assertThatThrownBy(() -> client.openCircuit().block(Duration.ofSeconds(5)))
+                    .isInstanceOf(CallNotPermittedException.class);
+            assertThat(openCircuitDispatches).hasValue(0);
 
             assertThat(context.containsBean("reactiveHttpClientHealthIndicator")).isTrue();
             assertThat(context.getBean(MethodMetadataCache.class))
@@ -229,10 +256,16 @@ class Boot4ConsumerApplicationTest {
             assertThat(context.containsBean("openTelemetryHttpClientObserver")).isTrue();
             assertThat(context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class).diagnostics())
                     .containsEntry("clientCount", 1);
-            assertThat(context.getBean(MeterRegistry.class)
-                    .find("reactive.http.client.requests").timer()).isNotNull();
-            assertThat(context.getBean(Boot4HttpClientHealthIndicator.class).health().getDetails())
-                    .containsKey("orders");
+            MeterRegistry meterRegistry = context.getBean(MeterRegistry.class);
+            assertThat(meterRegistry.find("reactive.http.client.requests").timer()).isNotNull();
+            Boot4HttpClientHealthIndicator healthIndicator =
+                    context.getBean(Boot4HttpClientHealthIndicator.class);
+            if (Boolean.getBoolean("consumer.v26.observability")) {
+                assertCurrentObservabilityContract(meterRegistry, healthIndicator, spanExporter);
+            }
+            else {
+                assertThat(healthIndicator.health().getDetails()).containsKey("orders");
+            }
             ConsumerExchangeLogger exchangeLogger = context.getBean(ConsumerExchangeLogger.class);
             assertThat(exchangeLogger.dependency()).isSameAs(context.getBean(LoggerDependency.class));
             assertThat(exchangeLogger.contexts()).singleElement().satisfies(logContext -> {
@@ -264,6 +297,86 @@ class Boot4ConsumerApplicationTest {
         finally {
             server.disposeNow(Duration.ofSeconds(5));
         }
+    }
+
+    private static void assertCurrentObservabilityContract(
+            MeterRegistry meterRegistry,
+            Boot4HttpClientHealthIndicator healthIndicator,
+            InMemorySpanExporter spanExporter) {
+        assertTerminalMeter(meterRegistry, "direct", "200", "none", 1);
+        assertTerminalMeter(meterRegistry, "problem", "400", "CLIENT_ERROR", 2);
+        assertTerminalMeter(meterRegistry, "openCircuit", "NONE", "RESILIENCE_ERROR", 0);
+
+        HttpClientObserverEvent openCircuit = observedEvent("openCircuit");
+        assertThat(openCircuit.getAttemptCount()).isZero();
+        assertThat(openCircuit.getStatusCode()).isNull();
+        assertThat(openCircuit.getErrorCategory()).isEqualTo(ErrorCategory.RESILIENCE_ERROR);
+        assertThat(openCircuit.getFailureStage()).isNull();
+        assertThat(openCircuit.getDurationMs()).isBetween(0L, 60_000L);
+
+        Map<String, Object> healthDetails = healthIndicator.health().getDetails();
+        assertThat(healthDetails).containsKeys("orders", "errorRateThreshold", "minSamples");
+        assertThat(healthDetails.get("orders")).isInstanceOf(Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> orders = (Map<String, Object>) healthDetails.get("orders");
+        assertThat(orders).containsKeys(
+                "samples", "errors", "sampleCount", "errorCount",
+                "poolAcquireFailureCount", "minSamples", "errorRateThreshold",
+                "errorRate", "status", "reason");
+        assertThat(orders.get("samples")).isEqualTo(orders.get("sampleCount"));
+        assertThat(orders.get("errors")).isEqualTo(orders.get("errorCount"));
+        assertThat(((Number) orders.get("samples")).longValue()).isEqualTo(OBSERVED.size());
+        assertThat(((Number) orders.get("errors")).longValue()).isEqualTo(3L);
+        assertThat(((Number) orders.get("poolAcquireFailureCount")).longValue()).isZero();
+
+        List<SpanData> spans = spanExporter.getFinishedSpanItems();
+        assertThat(spans).hasSize(OBSERVED.size());
+        assertSpanTiming(spans, "GET direct", observedEvent("direct"), 200L);
+        assertSpanTiming(spans, "GET problem", observedEvent("problem"), 400L);
+        assertSpanTiming(spans, "GET openCircuit", openCircuit, null);
+    }
+
+    private static void assertTerminalMeter(
+            MeterRegistry registry, String apiName, String status, String category, int attempts) {
+        Timer timer = registry.find("reactive.http.client.requests")
+                .tag("client.name", "orders")
+                .tag("api.name", apiName)
+                .tag("http.status_code", status)
+                .tag("error.category", category)
+                .timer();
+        assertThat(timer).isNotNull();
+        assertThat(timer.count()).isEqualTo(1L);
+        assertThat(timer.totalTime(TimeUnit.MILLISECONDS)).isBetween(0.0, 60_000.0);
+
+        DistributionSummary attemptSummary = registry.find("reactive.http.client.requests.attempts")
+                .tag("client.name", "orders")
+                .tag("api.name", apiName)
+                .summary();
+        assertThat(attemptSummary).isNotNull();
+        assertThat(attemptSummary.count()).isEqualTo(1L);
+        assertThat(attemptSummary.totalAmount()).isEqualTo(attempts);
+    }
+
+    private static HttpClientObserverEvent observedEvent(String apiName) {
+        return OBSERVED.stream()
+                .filter(event -> apiName.equals(event.getApiName()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private static void assertSpanTiming(
+            List<SpanData> spans, String spanName, HttpClientObserverEvent event, Long statusCode) {
+        SpanData span = spans.stream()
+                .filter(candidate -> spanName.equals(candidate.getName()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(TimeUnit.NANOSECONDS.toMillis(
+                span.getEndEpochNanos() - span.getStartEpochNanos()))
+                .isBetween(Math.max(0L, event.getDurationMs() - 1L), event.getDurationMs());
+        assertThat(span.getAttributes().get(AttributeKey.longKey("http.response.status_code")))
+                .isEqualTo(statusCode);
+        assertThat(span.getAttributes().get(AttributeKey.longKey("rhttp.attempt.count")))
+                .isEqualTo((long) event.getAttemptCount());
     }
 
     interface SharedOrders<T> {
@@ -301,6 +414,10 @@ class Boot4ConsumerApplicationTest {
         @GET("/slow")
         @TimeoutMs(50)
         Mono<String> timeout();
+
+        @GET("/open-circuit")
+        @CircuitBreaker("open")
+        Mono<OrderResponse> openCircuit();
     }
 
     record OrderResponse(String code) {
@@ -399,7 +516,19 @@ class Boot4ConsumerApplicationTest {
         }
 
         @Bean
-        OpenTelemetry openTelemetry() {
+        InMemorySpanExporter spanExporter() {
+            return InMemorySpanExporter.create();
+        }
+
+        @Bean(destroyMethod = "close")
+        SdkTracerProvider tracerProvider(InMemorySpanExporter exporter) {
+            return SdkTracerProvider.builder()
+                    .addSpanProcessor(SimpleSpanProcessor.create(exporter))
+                    .build();
+        }
+
+        @Bean
+        OpenTelemetry openTelemetry(SdkTracerProvider tracerProvider) {
             TextMapPropagator propagator = new TextMapPropagator() {
                 @Override
                 public Collection<String> fields() {
@@ -416,7 +545,10 @@ class Boot4ConsumerApplicationTest {
                     return context;
                 }
             };
-            return OpenTelemetry.propagating(ContextPropagators.create(propagator));
+            return OpenTelemetrySdk.builder()
+                    .setTracerProvider(tracerProvider)
+                    .setPropagators(ContextPropagators.create(propagator))
+                    .build();
         }
 
         @Bean
@@ -450,6 +582,14 @@ class Boot4ConsumerApplicationTest {
             RetryRegistry registry = RetryRegistry.of(
                     RetryConfig.custom().maxAttempts(2).build());
             registry.retry("default");
+            return registry;
+        }
+
+        @Bean
+        CircuitBreakerRegistry circuitBreakerRegistry() {
+            CircuitBreakerRegistry registry = CircuitBreakerRegistry.ofDefaults();
+            registry.circuitBreaker("default");
+            registry.circuitBreaker("open").transitionToOpenState();
             return registry;
         }
     }
