@@ -88,9 +88,14 @@ gate is enabled.
 ### `reactive.http.client.requests.request.size` (DistributionSummary)
 
 Application request body bytes before transport content coding. Recorded only
-for cheaply measurable types: `byte[]`, `String`, or `null` (`0`). POJO bodies
-are not measured to avoid double-serialization cost. The starter
-`compression-enabled` option does not compress request bodies.
+for cheaply measurable types: `byte[]` (exact array length), `String`, or `null`
+(`0`). String measurement uses the charset declared by the final outbound
+`Content-Type` after auth and client-customizer filters; an absent, invalid, or
+charset-free value falls back to UTF-8, matching the standard WebClient String
+writer behavior. Other `CharSequence`, POJO, publisher, direct `DataBuffer`,
+resource, application stream, and multipart bodies remain unknown. Observability never serializes, subscribes, consumes, reopens, or
+aggregates a body solely to measure it. The starter `compression-enabled` option
+does not compress request bodies.
 
 Tags: `client.name`, `api.name`, `http.method`, `uri`; optional server-address
 tags follow the same explicit gate.
@@ -106,6 +111,10 @@ calculate this metric. Here, **encoded** and **decoded** describe representation
 boundaries, **advertised** is the surviving header value, **consumed** is actual
 body demand, and **unknown** means no trustworthy advertised count exists. This
 metric records only advertised bytes; it is not a decoded or consumed byte counter.
+An advertised `0` is recorded as zero. A surviving valid length remains the
+advertised value for HEAD, drained bodiless responses, `ResponseEntity`, and a
+body that later fails or is cancelled; malformed framing with no trustworthy
+surviving length remains unknown.
 
 Tags: `client.name`, `api.name`, `http.method`, `uri`; optional server-address
 tags follow the same explicit gate.
@@ -342,7 +351,7 @@ reactive:
 | `rhttp.client.name` | Logical client name |
 | `rhttp.api.name` | `@ApiName` value, `@ApiRef` value, or method name |
 | `rhttp.attempt.count` | Logical subscription attempts (`0` before request subscription; `>1` means Retry resubscribed). This is not a downstream dispatch count. |
-| `rhttp.request.bytes` | Application request body bytes before transport content coding, when measurable |
+| `rhttp.request.bytes` | Application request body bytes before transport content coding; `String` uses the final outbound declared charset after auth/client-customizer filters; opaque bodies are absent |
 | `rhttp.response.bytes` | Post-transport advertised representation bytes from `Content-Length`; absent for automatically decompressed or chunked responses |
 | `rhttp.failure.stage` | Proven `DNS_RESOLUTION`, `PROXY_CONNECT`, `CONNECT`, `TLS_HANDSHAKE`, `POOL_ACQUIRE`, `REQUEST_WRITE`, `RESPONSE_HEADERS`, or `RESPONSE_BODY`; absent when unknown |
 

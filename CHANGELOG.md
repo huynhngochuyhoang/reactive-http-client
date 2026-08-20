@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   benchmark, and publication work.
 
 ### Fixed
+- **Request and response size semantics.** String request sizes now use the final
+  outbound `Content-Type` charset after auth and client-customizer filters instead of always assuming UTF-8,
+  while multipart and other opaque request bodies remain unknown without
+  metrics-only buffering or consumption. Added real-wire Micrometer/OTel parity
+  evidence for known and omitted sizes and explicit advertised
+  `Content-Length` boundaries across compressed, chunked, streaming, bodiless,
+  malformed, truncated, and `ResponseEntity` responses.
 - **Logical-call duration foundation.** Started one monotonic clock for every public
   publisher subscription before resilience admission, froze elapsed time once at
   the logical terminal boundary, and shared it across exchange logs, observers,

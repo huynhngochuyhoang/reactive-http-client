@@ -274,13 +274,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
                 applyDefaultQueryParams(argumentResolver.resolve(plan, args)));
-        long requestBytes = measureRequestBodyBytes(resolved.body());
+        String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         RequestBodyOwnership requestBodyOwnership = new RequestBodyOwnership(resolved.body());
 
         HttpExchangeLogger exchangeLogger = resolveExchangeLogger(proxy, method, meta);
 
         boolean hasAcceptHeader = resolved.headersIgnoreCase().containsKey(HttpHeaders.ACCEPT);
-        String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         boolean hasContentTypeHeader = contentTypeHeader != null;
 
         long timeoutMs = resolveTimeoutMs(plan, effectiveApi.timeoutMs());
@@ -325,15 +324,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     return capturedFlux
                             .doOnComplete(() -> completeAndReportTerminal(
                                     TerminalSignal.SUCCESS, null, null, lifecycleHooks, exchangeLogger, observer,
-                                    plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes))
+                                    plan, effectiveApi, state, inboundHeadersRef.get()))
                             .doOnError(error -> completeAndReportTerminal(
                                     TerminalSignal.ERROR, null, error, lifecycleHooks, exchangeLogger, observer,
-                                    plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes))
+                                    plan, effectiveApi, state, inboundHeadersRef.get()))
                             .doOnCancel(() -> {
                                 CancellationException cancellation = new CancellationException("Request was cancelled");
                                 completeAndReportTerminal(
                                         TerminalSignal.CANCEL, null, cancellation, lifecycleHooks, exchangeLogger,
-                                        observer, plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes);
+                                        observer, plan, effectiveApi, state, inboundHeadersRef.get());
                             });
                 });
             }
@@ -362,15 +361,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 return capturedMono
                         .doOnSuccess(body -> completeAndReportTerminal(
                                 TerminalSignal.SUCCESS, body, null, lifecycleHooks, exchangeLogger, observer,
-                                plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes))
+                                plan, effectiveApi, state, inboundHeadersRef.get()))
                         .doOnError(error -> completeAndReportTerminal(
                                 TerminalSignal.ERROR, null, error, lifecycleHooks, exchangeLogger, observer,
-                                plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes))
+                                plan, effectiveApi, state, inboundHeadersRef.get()))
                         .doOnCancel(() -> {
                             CancellationException cancellation = new CancellationException("Request was cancelled");
                             completeAndReportTerminal(
                                     TerminalSignal.CANCEL, null, cancellation, lifecycleHooks, exchangeLogger,
-                                    observer, plan, effectiveApi, state, inboundHeadersRef.get(), requestBytes);
+                                    observer, plan, effectiveApi, state, inboundHeadersRef.get());
                         });
             });
         }
@@ -1511,8 +1510,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             RequestPlan plan,
             EffectiveApi effectiveApi,
             SubscriptionReportingState state,
-            Map<String, List<String>> inboundHeaders,
-            long requestBytes) {
+            Map<String, List<String>> inboundHeaders) {
         TerminalSnapshot terminal = state.complete(signal, responseBody, error);
         if (terminal == null) {
             return;
@@ -1536,8 +1534,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 effectiveApi.httpMethod(),
                 effectiveApi.pathTemplate(),
                 terminal,
-                inboundHeaders,
-                requestBytes);
+                inboundHeaders);
     }
 
     private void reportExchange(
@@ -1547,8 +1544,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String httpMethod,
             String pathTemplate,
             TerminalSnapshot terminal,
-            Map<String, List<String>> inboundHeaders,
-            long requestBytes) {
+            Map<String, List<String>> inboundHeaders) {
         if (exchangeLogger != null) {
             logExchange(
                     exchangeLogger,
@@ -1565,6 +1561,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     terminal.attemptCount());
         }
         if (observer != null) {
+            long requestBytes = measureRequestBodyBytes(plan, terminal);
             long responseBytes = extractContentLengthBytes(terminal.responseHeaders());
             notifyObserver(
                     observer,
@@ -1831,20 +1828,33 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     /**
-     * Best-effort application request body size before transport content coding. Returns
-     * the byte count for {@code byte[]} and {@code String} bodies, {@code 0} for {@code null}, and
-     * {@link HttpClientObserverEvent#UNKNOWN_SIZE} for arbitrary objects whose
-     * serialised form isn't materialised synchronously on the invocation path.
+     * Best-effort application request body size before transport content coding. String bodies
+     * use the declared content-type charset of the final dispatched attempt. Pre-dispatch failures
+     * fall back to the prepared request headers. Arbitrary and multipart bodies remain unknown.
      */
-    private static long measureRequestBodyBytes(Object body) {
+    private long measureRequestBodyBytes(RequestPlan plan, TerminalSnapshot terminal) {
+        if (plan.multipart()) {
+            return HttpClientObserverEvent.UNKNOWN_SIZE;
+        }
+        Object body = terminal.preparedResolved().body();
         if (body == null) {
             return 0L;
         }
         if (body instanceof byte[] bytes) {
             return bytes.length;
         }
-        if (body instanceof CharSequence charSequence) {
-            return charSequence.toString().getBytes(StandardCharsets.UTF_8).length;
+        if (body instanceof String text) {
+            String contentTypeHeader = terminal.preparedResolved()
+                    .headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
+            FinalRequestObservation finalRequest = terminal.finalRequestObservation();
+            if (finalRequest != null) {
+                contentTypeHeader = finalRequest.headers().entrySet().stream()
+                        .filter(entry -> HttpHeaders.CONTENT_TYPE.equalsIgnoreCase(entry.getKey()))
+                        .map(Map.Entry::getValue)
+                        .findFirst()
+                        .orElse(null);
+            }
+            return text.getBytes(rawBodyCharset(contentTypeHeader)).length;
         }
         return HttpClientObserverEvent.UNKNOWN_SIZE;
     }
