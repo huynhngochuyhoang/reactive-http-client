@@ -297,4 +297,7 @@ unbounded response bodies.
 
 The `error.category` tag on the `reactive.http.client.requests` timer and the `error.type` attribute on OTel spans both reflect `ErrorCategory`. This makes error-rate dashboards and alerts easy to slice by failure type (e.g. alert on `SERVER_ERROR` rate > 5 %, ignore `RATE_LIMITED` from alert but feed it into a backpressure dashboard).
 
-See [08-observability.md](08-observability.md) for the full metrics reference.
+Each terminal logical call contributes once to the timer. Use the
+[unit-safe error-ratio recipe](08-observability.md#error-ratio-dimensionless)
+rather than mixing timer counts with retry or transport events. See
+[08-observability.md](08-observability.md) for the full metrics reference.

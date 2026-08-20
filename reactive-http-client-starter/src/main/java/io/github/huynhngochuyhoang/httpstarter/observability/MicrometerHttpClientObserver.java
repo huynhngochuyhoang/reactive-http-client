@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * {@link HttpClientObserver} implementation that records Micrometer metrics for
- * every HTTP exchange performed by a {@code @ReactiveHttpClient} proxy.
+ * each terminal logical call observed from a {@code @ReactiveHttpClient} proxy.
  *
  * <h3>Metrics produced</h3>
  * <table border="1">
@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
  *   </tr>
  *   <tr>
  *     <td>{@code <metricName>.attempts}</td>
- *     <td>DistributionSummary (subscription attempts per invocation)</td>
+ *     <td>DistributionSummary (subscription attempts per logical call)</td>
  *     <td>client.name, api.name, http.method, uri</td>
  *   </tr>
  *   <tr>
@@ -55,15 +55,14 @@ import java.util.concurrent.TimeUnit;
  *   <li><b>api.name</b> – logical API name from {@code @ApiName}, then {@code @ApiRef}, or Java method name by default.</li>
  *   <li><b>http.method</b> – uppercase HTTP verb (GET, POST, …).</li>
  *   <li><b>uri</b> – path template (e.g. {@code /users/{id}}) when
- *       {@code reactive.http.observability.include-url-path=true} (default); {@code NONE} otherwise.</li>
+ *       {@code reactive.http.observability.include-url-path=true}; {@code NONE} by default.</li>
  *   <li><b>http.status_code</b> – numeric status (200, 404, …) or {@code NONE}
  *       when the response was never received.</li>
  *   <li><b>outcome</b> – one of SUCCESS, REDIRECTION, CLIENT_ERROR, SERVER_ERROR, UNKNOWN.</li>
  *   <li><b>exception</b> – simple class name of the error, or {@code none}.</li>
- *   <li><b>error.category</b> – one of {@code RATE_LIMITED}, {@code CLIENT_ERROR}, {@code SERVER_ERROR},
- *       {@code TIMEOUT}, {@code CANCELLED}, {@code AUTH_PROVIDER_ERROR},
- *       {@code RESPONSE_DECODE_ERROR}, {@code UNKNOWN},
- *       or {@code none} for successful calls.</li>
+ *   <li><b>error.category</b> – a public
+ *       {@link io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory}
+ *       enum name, or {@code none} for successful calls.</li>
  * </ul>
  *
  * <p>This bean is auto-configured by

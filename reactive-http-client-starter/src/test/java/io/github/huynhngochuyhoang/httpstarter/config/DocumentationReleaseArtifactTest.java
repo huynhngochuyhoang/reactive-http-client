@@ -972,18 +972,83 @@ class DocumentationReleaseArtifactTest {
         String observabilityDocs = Files.readString(projectRoot().resolve("docs/08-observability.md"));
 
         assertThat(observabilityDocs)
-                .contains("always\nrecords the main logical-call timer and attempts summary")
+                .contains("| Always recorded |")
+                .contains("| Conditionally recorded |")
+                .contains("| Opt-in |")
+                .contains("They can remain active when\n"
+                        + "`reactive.http.observability.enabled=false`")
                 .contains("reactive_http_client_requests_seconds_count")
                 .contains("time-window maximum, not a lifetime maximum")
                 .contains("`0` means resilience rejected or admission was cancelled")
                 .contains("`1` means one subscription attempt, regardless of success")
                 .contains("Values greater than `1` mean Resilience4j retry resubscribed")
                 .contains("does not enable `publishPercentiles(0.95, 0.99)`")
-                .contains("This query is a mean, not a percentile")
-                .contains("Use Resilience4j retry counters")
+                .contains("### Request rate (logical calls per second)")
+                .contains("### Error ratio (dimensionless)")
+                .contains("0 * sum by (client_name, api_name)")
+                .contains("so healthy groups remain\nvisible")
+                .contains("The attempts summary cannot produce this count truthfully")
+                .contains("error_category=\"RESILIENCE_ERROR\"")
+                .contains("RateLimiter and Bulkhead meters expose current-state gauges")
+                .contains("### p95/p99 logical-call latency (seconds; histogram required)")
+                .contains("reactive_http_client_requests_latency_seconds_bucket")
+                .contains("when a requested quantile falls into it, `histogram_quantile` returns\n"
+                        + "the highest finite boundary rather than the actual tail")
+                .contains("### Average subscription attempts (attempts per logical call)")
+                .contains("rolling arithmetic mean, not a percentile or retry-event rate")
+                .contains("### Pool pressure (gauge counts, not utilization percentages)")
+                .contains("reactive_http_client_connection_pool_pending_connections")
+                .contains("reactive_http_client_connection_pool_pending_streams")
+                .contains("| Starter logical-call Micrometer |")
+                .contains("| Resilience4j operator meters |")
+                .contains("RateLimiter/Bulkhead current-state gauges")
+                .contains("RateLimiter/Bulkhead rejection history; use the starter "
+                        + "`RESILIENCE_ERROR` timer instead")
+                .contains("| Reactor Netty transport meters |")
+                .contains("| OpenTelemetry companion |")
                 .doesNotContain("records four meters per exchange")
                 .doesNotContain("`1` = succeeded on first try")
-                .doesNotContain("A p95 above `1`");
+                .doesNotContain("A p95 above `1`")
+                .doesNotContain("RateLimiter, or Bulkhead rejection\n"
+                        + "counters")
+                .doesNotContain("| Admission rejection, retry execution/exhaustion, operator state |");
+    }
+
+    @Test
+    void operationsDocsUseCanonicalObservabilityRecipes() throws IOException {
+        Path root = projectRoot();
+        String errorDocs = Files.readString(root.resolve("docs/03-error-handling.md"));
+        String resilienceDocs = Files.readString(root.resolve("docs/07-resilience4j.md"));
+        String productionDocs = Files.readString(root.resolve("docs/16-production-checklist.md"));
+        String cardinalityDocs = Files.readString(root.resolve("docs/18-conflict-cardinality-guardrails.md"));
+        String contextDocs = Files.readString(root.resolve("docs/21-diagnostic-contexts.md"));
+        String supportDocs = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String operationsDocs = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
+
+        assertThat(errorDocs).contains(
+                "[unit-safe error-ratio recipe](08-observability.md#error-ratio-dimensionless)");
+        assertThat(resilienceDocs)
+                .contains("attempts summary has no default percentiles")
+                .contains("[dashboard recipes](08-observability.md#dashboard-recipes)");
+        assertThat(productionDocs)
+                .contains("[unit-safe dashboard recipes](08-observability.md#dashboard-recipes)")
+                .contains("Do not use attempts `_max` as p95/p99")
+                .contains("error_category=\"RESILIENCE_ERROR\"")
+                .contains("Reserve Resilience4j counters for CircuitBreaker call history and Retry")
+                .contains("RateLimiter and Bulkhead metrics are current-state gauges")
+                .doesNotContain("attempts count/sum; use the relevant Resilience4j operator counters");
+        assertThat(cardinalityDocs)
+                .contains("[telemetry ownership table and dashboard recipes]"
+                        + "(08-observability.md#dashboard-recipes)");
+        assertThat(contextDocs)
+                .contains("timer count deltas")
+                .contains("Duration\nsums, time-window maxima, percentiles, and histogram buckets are not health");
+        assertThat(supportDocs)
+                .contains("Health does not consume duration sums, time-window\nmaxima, percentiles")
+                .contains("[unit-safe dashboard recipes](08-observability.md#dashboard-recipes)");
+        assertThat(operationsDocs)
+                .contains("[unit-safe dashboard recipes](08-observability.md#dashboard-recipes)")
+                .contains("do not infer\n   zero-attempt rejection from the attempts summary");
     }
 
     @Test

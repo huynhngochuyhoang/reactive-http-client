@@ -75,3 +75,6 @@ Potentially high-cardinality dimensions are opt-in:
 The latency histogram meter is also opt-in. When enabled, it intentionally uses
 only `client.name`, `api.name`, `http.method`, and `uri`, and follows the same
 `include-url-path` gate for the `uri` value.
+
+Use the [telemetry ownership table and dashboard recipes](08-observability.md#dashboard-recipes)
+before combining starter, Resilience4j, Reactor Netty, or OTel series.
