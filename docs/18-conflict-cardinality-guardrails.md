@@ -69,7 +69,7 @@ Potentially high-cardinality dimensions are opt-in:
 |---|---|---|
 | Path template / URI | `reactive.http.observability.include-url-path: true` | Safe only when templates are bounded, such as `/users/{id}`. Do not enable when raw IDs or dynamic paths can appear. |
 | Resolved server host and port | `reactive.http.observability.include-server-address: true` | Hostnames can vary per tenant, region, shard, or service discovery result. |
-| Request and response bodies in spans | `log-request-body` / `log-response-body` | Bodies can contain PII, secrets, and large values. They are disabled by default. |
+| Request and decoded success bodies on custom observer events | `log-request-body` / `log-response-body` | Global payload gates for custom observers; bodies can contain PII, credentials, mutable/pooled objects, and large values. Built-in Micrometer and OTel observers do not export them. |
 | Connection pool metrics | `network.connection-pool.metrics-enabled` or client `pool.metrics-enabled` | Pool names include the client name. Keep client names bounded and do not encode tenant IDs. |
 
 The latency histogram meter is also opt-in. When enabled, it intentionally uses

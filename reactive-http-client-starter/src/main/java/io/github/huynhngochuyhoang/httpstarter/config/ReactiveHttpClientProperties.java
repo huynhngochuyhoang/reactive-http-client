@@ -847,10 +847,18 @@ public class ReactiveHttpClientProperties {
          */
         private boolean includeServerAddress = false;
 
-        /** Log request body in span events (caution: PII / large payloads). */
+        /**
+         * Include the request body on the terminal observer event for custom observers.
+         * Built-in Micrometer and OpenTelemetry observers do not export it.
+         * Caution: custom observers may expose PII, credentials, or large payloads.
+         */
         private boolean logRequestBody = false;
 
-        /** Log response body in span events (caution: PII / large payloads). */
+        /**
+         * Include the decoded success response body on the terminal observer event for custom observers.
+         * Built-in Micrometer and OpenTelemetry observers do not export it.
+         * Caution: custom observers may expose PII, credentials, or large payloads.
+         */
         private boolean logResponseBody = false;
 
         private HealthConfig health = new HealthConfig();

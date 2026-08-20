@@ -196,6 +196,66 @@ class RequestResponseSizeObservabilityContractTest {
         }
     }
 
+    @Test
+    void bodyOptionsGateCompositeObserverEventsButNeverBuiltInOtelPayloads() {
+        String secret = "observer-body-secret";
+        try (SizeServer server = new SizeServer();
+             SizeDiagnostics diagnostics = new SizeDiagnostics();
+             ClientFixture fixture = ClientFixture.create(server, diagnostics)) {
+            assertThat(fixture.client.utf8("text/plain;charset=UTF-8", secret).block(CALL_TIMEOUT))
+                    .isEqualTo(secret);
+
+            HttpClientObserverEvent event = diagnostics.onlyEvent("utf8");
+            assertThat(event.getRequestBody()).isNull();
+            assertThat(event.getResponseBody()).isNull();
+        }
+
+        ReactiveHttpClientProperties.ObservabilityConfig observability =
+                new ReactiveHttpClientProperties.ObservabilityConfig();
+        observability.setLogRequestBody(true);
+        observability.setLogResponseBody(true);
+        try (SizeServer server = new SizeServer();
+             SizeDiagnostics diagnostics = new SizeDiagnostics(observability);
+             ClientFixture fixture = ClientFixture.create(server, diagnostics, null, null, observability)) {
+            assertThat(fixture.client.utf8("text/plain;charset=UTF-8", secret).block(CALL_TIMEOUT))
+                    .isEqualTo(secret);
+
+            HttpClientObserverEvent event = diagnostics.onlyEvent("utf8");
+            assertThat(event.getRequestBody()).isEqualTo(secret);
+            assertThat(event.getResponseBody()).isEqualTo(secret);
+            SpanData span = diagnostics.onlySpan("utf8");
+            assertThat(span.getEvents()).isEmpty();
+            assertThat(span.toString()).doesNotContain(secret);
+        }
+    }
+
+    @Test
+    void streamingEntitySpanEndsAtEnvelopeBeforeCallerConsumesTheInnerBody() {
+        try (SizeServer server = new SizeServer();
+             SizeDiagnostics diagnostics = new SizeDiagnostics();
+             ClientFixture fixture = ClientFixture.create(server, diagnostics)) {
+            ResponseEntity<Flux<DataBuffer>> entity = fixture.client.streamEntity().block(CALL_TIMEOUT);
+
+            assertThat(entity).isNotNull();
+            assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
+            diagnostics.assertTerminalCount("streamEntity", 1);
+            assertThat(diagnostics.onlyEvent("streamEntity").getStatusCode()).isEqualTo(200);
+
+            String body = entity.getBody()
+                    .map(buffer -> {
+                        byte[] bytes = new byte[buffer.readableByteCount()];
+                        buffer.read(bytes);
+                        DataBufferUtils.release(buffer);
+                        return new String(bytes, StandardCharsets.UTF_8);
+                    })
+                    .reduce("", String::concat)
+                    .block(CALL_TIMEOUT);
+
+            assertThat(body).isEqualTo("first-second");
+            diagnostics.assertTerminalCount("streamEntity", 1);
+        }
+    }
+
     @ReactiveHttpClient(name = "size-contract")
     interface SizeClient {
         @POST("/utf8")
@@ -243,6 +303,9 @@ class RequestResponseSizeObservabilityContractTest {
 
         @GET("/stream")
         Flux<DataBuffer> stream();
+
+        @GET("/stream-envelope")
+        Mono<ResponseEntity<Flux<DataBuffer>>> streamEntity();
     }
 
     record Payload(String value) {
@@ -269,8 +332,18 @@ class RequestResponseSizeObservabilityContractTest {
                                             SizeDiagnostics diagnostics,
                                             ReactiveHttpClientCustomizer customizer,
                                             AuthProvider authProvider) {
+            return create(server, diagnostics, customizer, authProvider,
+                    new ReactiveHttpClientProperties.ObservabilityConfig());
+        }
+
+        private static ClientFixture create(SizeServer server,
+                                            SizeDiagnostics diagnostics,
+                                            ReactiveHttpClientCustomizer customizer,
+                                            AuthProvider authProvider,
+                                            ReactiveHttpClientProperties.ObservabilityConfig observability) {
             StaticApplicationContext context = new StaticApplicationContext();
             ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+            properties.setObservability(observability);
             ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
             config.setBaseUrl("http://127.0.0.1:" + server.port());
             config.setCompressionEnabled(true);
@@ -314,35 +387,54 @@ class RequestResponseSizeObservabilityContractTest {
         private final HttpClientObserver observer;
 
         private SizeDiagnostics() {
+            this(new ReactiveHttpClientProperties.ObservabilityConfig());
+        }
+
+        private SizeDiagnostics(ReactiveHttpClientProperties.ObservabilityConfig observability) {
             OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
                     .setTracerProvider(tracerProvider)
                     .build();
             observer = new CompositeHttpClientObserver(List.of(
                     events::add,
-                    new MicrometerHttpClientObserver(
-                            meterRegistry, new ReactiveHttpClientProperties.ObservabilityConfig()),
-                    new OpenTelemetryHttpClientObserver(openTelemetry)));
+                    new MicrometerHttpClientObserver(meterRegistry, observability),
+                    new OpenTelemetryHttpClientObserver(openTelemetry, observability)));
         }
 
         private HttpClientObserver observer() {
             return observer;
         }
 
-        private void assertSizes(String apiName, long requestBytes, long responseBytes) {
-            HttpClientObserverEvent event = events.stream()
+        private HttpClientObserverEvent onlyEvent(String apiName) {
+            List<HttpClientObserverEvent> matching = events.stream()
                     .filter(candidate -> apiName.equals(candidate.getApiName()))
-                    .findFirst()
-                    .orElseThrow();
+                    .toList();
+            assertThat(matching).hasSize(1);
+            return matching.get(0);
+        }
+
+        private SpanData onlySpan(String apiName) {
+            List<SpanData> matching = exporter.getFinishedSpanItems().stream()
+                    .filter(candidate -> apiName.equals(candidate.getAttributes().get(
+                            OpenTelemetryHttpClientObserver.ATTR_API_NAME)))
+                    .toList();
+            assertThat(matching).hasSize(1);
+            return matching.get(0);
+        }
+
+        private void assertTerminalCount(String apiName, int expected) {
+            assertThat(events).filteredOn(event -> apiName.equals(event.getApiName())).hasSize(expected);
+            assertThat(exporter.getFinishedSpanItems()).filteredOn(span -> apiName.equals(span.getAttributes().get(
+                    OpenTelemetryHttpClientObserver.ATTR_API_NAME))).hasSize(expected);
+        }
+
+        private void assertSizes(String apiName, long requestBytes, long responseBytes) {
+            HttpClientObserverEvent event = onlyEvent(apiName);
             assertThat(event.getRequestBytes()).isEqualTo(requestBytes);
             assertThat(event.getResponseBytes()).isEqualTo(responseBytes);
             assertSummary(METRIC_NAME + ".request.size", apiName, requestBytes);
             assertSummary(METRIC_NAME + ".response.size", apiName, responseBytes);
 
-            SpanData span = exporter.getFinishedSpanItems().stream()
-                    .filter(candidate -> apiName.equals(candidate.getAttributes().get(
-                            OpenTelemetryHttpClientObserver.ATTR_API_NAME)))
-                    .findFirst()
-                    .orElseThrow();
+            SpanData span = onlySpan(apiName);
             assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_REQUEST_BYTES))
                     .isEqualTo(requestBytes >= 0 ? requestBytes : null);
             assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_RESPONSE_BYTES))
@@ -412,6 +504,14 @@ class RequestResponseSizeObservabilityContractTest {
                                                     .take(20)
                                                     .map(index -> ("chunk-" + index)
                                                             .getBytes(StandardCharsets.UTF_8)))
+                                            .then();
+                                    case "/stream-envelope" -> response.chunkedTransfer(true)
+                                            .header(HttpHeaders.CONTENT_TYPE, "application/octet-stream")
+                                            .sendByteArray(Flux.concat(
+                                                    Mono.just("first-".getBytes(StandardCharsets.UTF_8)),
+                                                    Mono.delay(Duration.ofMillis(50))
+                                                            .map(ignored -> "second".getBytes(
+                                                                    StandardCharsets.UTF_8))))
                                             .then();
                                     default -> send(response, OK, "text/plain", true);
                                 };

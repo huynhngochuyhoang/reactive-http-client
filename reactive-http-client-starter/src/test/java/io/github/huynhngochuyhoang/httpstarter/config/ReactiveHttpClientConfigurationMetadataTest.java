@@ -86,6 +86,22 @@ class ReactiveHttpClientConfigurationMetadataTest {
     }
 
     @Test
+    void observerBodyOptionsDescribeEventGatesInsteadOfBuiltInSpanEvents() throws IOException {
+        JsonNode metadata = starterMetadata();
+
+        assertThat(findProperty(metadata, "reactive.http.observability.log-request-body")
+                .path("description").asText())
+                .contains("terminal HttpClientObserverEvent", "custom observers")
+                .contains("Built-in Micrometer and OpenTelemetry observers do not export it")
+                .doesNotContain("body in span events");
+        assertThat(findProperty(metadata, "reactive.http.observability.log-response-body")
+                .path("description").asText())
+                .contains("decoded success response body", "terminal HttpClientObserverEvent")
+                .contains("Built-in Micrometer and OpenTelemetry observers do not export it")
+                .doesNotContain("body in span events");
+    }
+
+    @Test
     void configurationMetadataGroupsDoNotUseScalarValueTypes() throws IOException {
         List<String> scalarGroups = new ArrayList<>();
         for (Path metadataFile : metadataFiles(projectRoot())) {

@@ -12,7 +12,7 @@
 
     <artifactId>reactive-http-client-otel</artifactId>
     <name>reactive-http-client-otel</name>
-    <description>OpenTelemetry observer + auto-configuration for reactive-http-client-starter. Records each outbound HTTP exchange as a span using OTel semantic conventions.</description>
+    <description>OpenTelemetry observer + auto-configuration for reactive-http-client-starter. Records one terminal client span per logical call using OTel semantic conventions.</description>
     <url>https://github.com/huynhngochuyhoang/reactive-http-client</url>
 
     <scm>

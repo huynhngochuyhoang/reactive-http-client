@@ -96,6 +96,15 @@ and OpenTelemetry observers do not log request-header values. Micrometer tags
 only the exception class name; OpenTelemetry emits only a structural
 exception-type event, without exception message or stack trace.
 
+The `log-request-body` and `log-response-body` settings gate body fields on the
+single terminal `HttpClientObserverEvent`; they do not add OpenTelemetry span
+events. When enabled, every custom observer in the active composite can inspect
+the resolved request body or decoded successful response body. The built-in
+Micrometer and OTel observers ignore those fields. Response-body gating does not
+capture bounded error bodies and does not consume a streaming body. Custom
+observers own redaction, bounds, retention, and safe handling of mutable or
+pooled objects.
+
 Lifecycle hooks receive prepared resolved request headers before later
 `WebClient` filters run. Error mappers receive read-only raw response headers.
 Custom extension points that persist header values must apply their own
