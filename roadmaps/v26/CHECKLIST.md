@@ -303,13 +303,15 @@ Evidence:
 Evidence:
 
 - `ReactiveClientInvocationHandler` now measures String bodies with the charset
-  selected from the effective outbound `Content-Type`, falling back to UTF-8,
-  while null and `byte[]` retain exact zero/array-length semantics. Other
-  request shapes, including multipart, remain unknown without metrics-only
+  selected from the final outbound `Content-Type` after auth and
+  client-customizer filters, falling back to UTF-8, while null and `byte[]`
+  retain exact zero/array-length semantics. Other request shapes, including
+  multipart, remain unknown without metrics-only
   serialization, subscription, reopening, aggregation, or buffering.
 - `RequestResponseSizeObservabilityContractTest` uses a real loopback server to
   compare wire bytes with observer events, Micrometer summaries, and OTel span
-  attributes for UTF-8, ISO-8859-1, null, `byte[]`, POJO, publisher, resource,
+  attributes after direct, auth, and client-customizer header resolution for
+  UTF-8, ISO-8859-1, null, `byte[]`, POJO, publisher, resource,
   stream, multipart, fixed-length, chunked, compressed, `ResponseEntity`, and
   cancelled streaming outcomes. Its ownership assertions prove opaque request
   bodies are consumed only by the normal request path.
@@ -321,7 +323,7 @@ Evidence:
   -Dtest=HttpResponseFramingContractTest,ReactiveHttpClientCompressionContractTest,StreamingResponseTest,StreamingUploadOwnershipTest,MultipartWireOwnershipContractTest,MicrometerHttpClientObserverTest,MicrometerPrometheusExportContractTest,DocumentationReleaseArtifactTest
   test` passed with 126 tests.
 - `mvn -B -ntp -s .mvn/maven-central-settings.xml
-  -pl reactive-http-client-otel -am test` passed with 1,037 starter tests and 46
+  -pl reactive-http-client-otel -am test` passed with 1,037 starter tests and 47
   OTel tests.
 
 ---

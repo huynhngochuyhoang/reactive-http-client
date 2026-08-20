@@ -1,8 +1,11 @@
 package io.github.huynhngochuyhoang.httpstarter.otel;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.Jackson3ReactiveHttpClientJsonCodec;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import io.github.huynhngochuyhoang.httpstarter.observability.CompositeHttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
@@ -24,7 +27,9 @@ import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -79,6 +84,40 @@ class RequestResponseSizeObservabilityContractTest {
             fixture.client.nullBody(null).block(CALL_TIMEOUT);
             assertThat(server.onlyRequest("/null").body()).isEmpty();
             diagnostics.assertSizes("nullBody", 0L, 0L);
+        }
+    }
+
+    @Test
+    void stringSizeUsesContentTypeFinalizedByCustomizerAndAuthFilters() {
+        String value = "caf\u00e9";
+        byte[] expected = value.getBytes(StandardCharsets.ISO_8859_1);
+        MediaType latin1 = new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.ISO_8859_1);
+        ReactiveHttpClientCustomizer customizer = builder -> builder.filter((request, next) -> {
+            ClientRequest finalized = ClientRequest.from(request)
+                    .headers(headers -> headers.setContentType(latin1))
+                    .build();
+            return next.exchange(finalized);
+        });
+
+        try (SizeServer server = new SizeServer();
+             SizeDiagnostics diagnostics = new SizeDiagnostics();
+             ClientFixture fixture = ClientFixture.create(server, diagnostics, customizer, null)) {
+            assertThat(fixture.client.utf8("text/plain;charset=UTF-8", value).block(CALL_TIMEOUT))
+                    .isEqualTo(value);
+            assertThat(server.onlyRequest("/utf8").body()).containsExactly(expected);
+            diagnostics.assertSizes("utf8", expected.length, expected.length);
+        }
+
+        AuthProvider authProvider = request -> Mono.just(AuthContext.builder()
+                .header(HttpHeaders.CONTENT_TYPE, latin1.toString())
+                .build());
+        try (SizeServer server = new SizeServer();
+             SizeDiagnostics diagnostics = new SizeDiagnostics();
+             ClientFixture fixture = ClientFixture.create(server, diagnostics, null, authProvider)) {
+            assertThat(fixture.client.utf8("text/plain;charset=UTF-8", value).block(CALL_TIMEOUT))
+                    .isEqualTo(value);
+            assertThat(server.onlyRequest("/utf8").body()).containsExactly(expected);
+            diagnostics.assertSizes("utf8", expected.length, expected.length);
         }
     }
 
@@ -223,17 +262,33 @@ class RequestResponseSizeObservabilityContractTest {
         }
 
         private static ClientFixture create(SizeServer server, SizeDiagnostics diagnostics) {
+            return create(server, diagnostics, null, null);
+        }
+
+        private static ClientFixture create(SizeServer server,
+                                            SizeDiagnostics diagnostics,
+                                            ReactiveHttpClientCustomizer customizer,
+                                            AuthProvider authProvider) {
             StaticApplicationContext context = new StaticApplicationContext();
             ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
             ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
             config.setBaseUrl("http://127.0.0.1:" + server.port());
             config.setCompressionEnabled(true);
+            if (authProvider != null) {
+                config.setAuthProvider("sizeAuthProvider");
+            }
             properties.getClients().put("size-contract", config);
             context.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
             context.getBeanFactory().registerSingleton("starterWebClientBuilder", WebClient.builder());
             context.getBeanFactory().registerSingleton("reactiveHttpClientJsonCodec",
                     new Jackson3ReactiveHttpClientJsonCodec(JsonMapper.builder().build()));
             context.getBeanFactory().registerSingleton("sizeObserver", diagnostics.observer());
+            if (customizer != null) {
+                context.getBeanFactory().registerSingleton("sizeCustomizer", customizer);
+            }
+            if (authProvider != null) {
+                context.getBeanFactory().registerSingleton("sizeAuthProvider", authProvider);
+            }
 
             ReactiveHttpClientFactoryBean<SizeClient> factory = new ReactiveHttpClientFactoryBean<>();
             factory.setType(SizeClient.class);

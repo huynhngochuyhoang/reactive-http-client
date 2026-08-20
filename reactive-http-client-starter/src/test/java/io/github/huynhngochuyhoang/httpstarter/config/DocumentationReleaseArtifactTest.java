@@ -960,14 +960,16 @@ class DocumentationReleaseArtifactTest {
         String observabilityDocs = Files.readString(projectRoot().resolve("docs/08-observability.md"));
 
         assertThat(observabilityDocs)
-                .contains("String measurement uses the charset declared by the effective outbound")
+                .contains("String measurement uses the charset declared by the final outbound")
+                .contains("after auth and client-customizer filters")
                 .contains("charset-free value falls back to UTF-8")
                 .contains("Other `CharSequence`, POJO")
                 .contains("Observability never serializes, subscribes, consumes, reopens, or")
                 .contains("An advertised `0` is recorded as zero")
                 .contains("drained bodiless responses, `ResponseEntity`")
                 .contains("malformed framing with no trustworthy")
-                .contains("`String` uses the effective declared charset, and opaque bodies are absent")
+                .contains("`String` uses the final outbound declared charset")
+                .contains("after auth/client-customizer filters; opaque bodies are absent")
                 .doesNotContain("POJO bodies are not measured to avoid double-serialization cost");
     }
 
