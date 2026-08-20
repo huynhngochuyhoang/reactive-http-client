@@ -20,6 +20,7 @@ import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
+import io.github.resilience4j.ratelimiter.internal.AtomicRateLimiter;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
@@ -133,17 +134,21 @@ class ResilienceOperatorCompositionContractTest {
 
     @Test
     void delayedRateLimiterAdmissionCountsTowardDurationWithoutAddingAnAttempt() {
+        RateLimiterConfig rateLimiterConfig = RateLimiterConfig.custom()
+                .limitForPeriod(1)
+                .limitRefreshPeriod(Duration.ofMillis(200))
+                .timeoutDuration(Duration.ofSeconds(1))
+                .build();
         OperatorFixture operators = operators(
                 Duration.ofMillis(10),
-                RateLimiterConfig.custom()
-                        .limitForPeriod(1)
-                        .limitRefreshPeriod(Duration.ofMillis(200))
-                        .timeoutDuration(Duration.ofSeconds(1))
-                        .build());
+                rateLimiterConfig);
         AtomicInteger dispatches = new AtomicInteger();
 
         try (ClientFixture fixture = client(successWebClient(dispatches), config(500, 2_000), operators, null)) {
-            assertThat(operators.rateLimiter().acquirePermission()).isTrue();
+            RateLimiter rateLimiter = new AtomicRateLimiter(INSTANCE, rateLimiterConfig, () -> 0L);
+            assertThat(operators.rateLimiterRegistry().replace(INSTANCE, rateLimiter))
+                    .contains(operators.rateLimiter());
+            assertThat(rateLimiter.acquirePermission()).isTrue();
             assertThat(fixture.client().call().block(BLOCK_TIMEOUT)).isEqualTo("ok");
 
             assertThat(dispatches).hasValue(1);
@@ -519,6 +524,7 @@ class ResilienceOperatorCompositionContractTest {
                 circuitBreaker,
                 bulkhead,
                 rateLimiter,
+                rateLimiterRegistry,
                 new Resilience4jOperatorApplier(
                         circuitBreakerRegistry, retryRegistry, bulkheadRegistry, rateLimiterRegistry));
     }
@@ -611,6 +617,7 @@ class ResilienceOperatorCompositionContractTest {
             CircuitBreaker circuitBreaker,
             Bulkhead bulkhead,
             RateLimiter rateLimiter,
+            RateLimiterRegistry rateLimiterRegistry,
             ResilienceOperatorApplier applier) {
     }
 
