@@ -3,19 +3,24 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.LogHttpExchange;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadConfig;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
+import io.github.resilience4j.ratelimiter.internal.AtomicRateLimiter;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
@@ -45,6 +50,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -57,6 +63,137 @@ class ResilienceOperatorCompositionContractTest {
     private static final String INSTANCE = "composition";
     private static final Duration BLOCK_TIMEOUT = Duration.ofSeconds(5);
     private static final AtomicInteger POOL_SEQUENCE = new AtomicInteger();
+
+    @Test
+    void openCircuitRejectsBeforeTheInitialRequestAttempt() {
+        OperatorFixture operators = operators(
+                Duration.ofMillis(10),
+                immediateRateLimiter());
+        operators.circuitBreaker().transitionToOpenState();
+        AtomicInteger dispatches = new AtomicInteger();
+
+        try (ClientFixture fixture = client(successWebClient(dispatches), config(500, 1_000), operators, null)) {
+            Throwable failure = catchThrowable(() -> fixture.client().call().block(BLOCK_TIMEOUT));
+
+            assertThat(findCause(failure, CallNotPermittedException.class)).isNotNull();
+            assertThat(dispatches).hasValue(0);
+            assertThat(operators.circuitBreaker().getMetrics().getNumberOfNotPermittedCalls()).isEqualTo(1);
+            assertThat(operators.rateLimiter().getMetrics().getAvailablePermissions()).isEqualTo(10);
+            assertBulkheadReleased(operators.bulkhead());
+            fixture.diagnostics().assertZeroAttemptRejection(CallNotPermittedException.class);
+        }
+    }
+
+    @Test
+    void exhaustedRateLimiterRejectsBeforeTheInitialRequestAttempt() {
+        OperatorFixture operators = operators(
+                Duration.ofMillis(10),
+                RateLimiterConfig.custom()
+                        .limitForPeriod(1)
+                        .limitRefreshPeriod(Duration.ofMinutes(1))
+                        .timeoutDuration(Duration.ZERO)
+                        .build());
+        assertThat(operators.rateLimiter().acquirePermission()).isTrue();
+        AtomicInteger dispatches = new AtomicInteger();
+
+        try (ClientFixture fixture = client(successWebClient(dispatches), config(500, 1_000), operators, null)) {
+            Throwable failure = catchThrowable(() -> fixture.client().call().block(BLOCK_TIMEOUT));
+
+            assertThat(findCause(failure, RequestNotPermitted.class)).isNotNull();
+            assertThat(dispatches).hasValue(0);
+            assertThat(operators.circuitBreaker().getMetrics().getNumberOfBufferedCalls()).isEqualTo(1);
+            assertBulkheadReleased(operators.bulkhead());
+            fixture.diagnostics().assertZeroAttemptRejection(RequestNotPermitted.class);
+        }
+    }
+
+    @Test
+    void saturatedZeroWaitBulkheadRejectsBeforeTheInitialRequestAttempt() {
+        OperatorFixture operators = operators(
+                Duration.ofMillis(10),
+                immediateRateLimiter());
+        operators.bulkhead().acquirePermission();
+        AtomicInteger dispatches = new AtomicInteger();
+
+        try {
+            try (ClientFixture fixture = client(
+                    successWebClient(dispatches), config(500, 1_000), operators, null)) {
+                Throwable failure = catchThrowable(() -> fixture.client().call().block(BLOCK_TIMEOUT));
+
+                assertThat(findCause(failure, BulkheadFullException.class)).isNotNull();
+                assertThat(dispatches).hasValue(0);
+                assertThat(operators.circuitBreaker().getMetrics().getNumberOfBufferedCalls()).isZero();
+                assertThat(operators.rateLimiter().getMetrics().getAvailablePermissions()).isEqualTo(10);
+                fixture.diagnostics().assertZeroAttemptRejection(BulkheadFullException.class);
+            }
+        } finally {
+            operators.bulkhead().releasePermission();
+        }
+        assertBulkheadReleased(operators.bulkhead());
+    }
+
+    @Test
+    void delayedRateLimiterAdmissionCountsTowardDurationWithoutAddingAnAttempt() {
+        RateLimiterConfig rateLimiterConfig = RateLimiterConfig.custom()
+                .limitForPeriod(1)
+                .limitRefreshPeriod(Duration.ofMillis(200))
+                .timeoutDuration(Duration.ofSeconds(1))
+                .build();
+        OperatorFixture operators = operators(
+                Duration.ofMillis(10),
+                rateLimiterConfig);
+        AtomicInteger dispatches = new AtomicInteger();
+
+        try (ClientFixture fixture = client(successWebClient(dispatches), config(500, 2_000), operators, null)) {
+            RateLimiter rateLimiter = new AtomicRateLimiter(INSTANCE, rateLimiterConfig, () -> 0L);
+            assertThat(operators.rateLimiterRegistry().replace(INSTANCE, rateLimiter))
+                    .contains(operators.rateLimiter());
+            assertThat(rateLimiter.acquirePermission()).isTrue();
+            assertThat(fixture.client().call().block(BLOCK_TIMEOUT)).isEqualTo("ok");
+
+            assertThat(dispatches).hasValue(1);
+            assertThat(fixture.diagnostics().assertOneTerminalResult(1).getDurationMs())
+                    .isGreaterThanOrEqualTo(100L);
+        }
+    }
+
+    @Test
+    void delayedBulkheadAdmissionCountsTowardDurationWithoutAddingAnAttempt() {
+        OperatorFixture operators = operators(
+                Duration.ofMillis(10),
+                immediateRateLimiter(),
+                BulkheadConfig.custom()
+                        .maxConcurrentCalls(1)
+                        .maxWaitDuration(Duration.ofSeconds(1))
+                        .build());
+        AtomicBoolean heldPermitReleased = new AtomicBoolean();
+        AtomicInteger dispatches = new AtomicInteger();
+
+        try (ClientFixture fixture = client(
+                successWebClient(dispatches), config(500, 2_000), operators, null)) {
+            operators.bulkhead().acquirePermission();
+            Disposable release = Mono.delay(Duration.ofMillis(150))
+                    .doOnNext(ignored -> {
+                        if (heldPermitReleased.compareAndSet(false, true)) {
+                            operators.bulkhead().releasePermission();
+                        }
+                    })
+                    .subscribe();
+            try {
+                assertThat(fixture.client().call().block(BLOCK_TIMEOUT)).isEqualTo("ok");
+
+                assertThat(dispatches).hasValue(1);
+                assertThat(fixture.diagnostics().assertOneTerminalResult(1).getDurationMs())
+                        .isGreaterThanOrEqualTo(100L);
+            } finally {
+                release.dispose();
+                if (heldPermitReleased.compareAndSet(false, true)) {
+                    operators.bulkhead().releasePermission();
+                }
+            }
+        }
+        assertBulkheadReleased(operators.bulkhead());
+    }
 
     @Test
     void retryExhaustionIsOneOuterAdmissionWithPerAttemptTimeoutsAndOneTerminalResult() {
@@ -203,6 +340,34 @@ class ResilienceOperatorCompositionContractTest {
     }
 
     @Test
+    void callerCancellationDuringRetryDelayProducesOneTerminalWithoutLateUpdate() {
+        OperatorFixture operators = operators(
+                Duration.ofMillis(300),
+                immediateRateLimiter());
+        AtomicInteger dispatches = new AtomicInteger();
+        WebClient webClient = webClient(request -> Mono.defer(() -> {
+            dispatches.incrementAndGet();
+            return Mono.error(new IOException("retry later"));
+        }));
+
+        try (ClientFixture fixture = client(webClient, config(500, 1_000), operators, null)) {
+            Disposable subscription = fixture.client().call().subscribe(ignored -> { }, ignored -> { });
+
+            await(() -> dispatches.get() == 1, "first retry source subscription was not observed");
+            assertThat(operators.bulkhead().getMetrics().getAvailableConcurrentCalls()).isZero();
+            subscription.dispose();
+
+            await(() -> operators.bulkhead().getMetrics().getAvailableConcurrentCalls() == 1,
+                    "bulkhead permit was not released after retry-delay cancellation");
+            sleep(Duration.ofMillis(400));
+            assertThat(dispatches).hasValue(1);
+            assertThat(operators.circuitBreaker().getMetrics().getNumberOfBufferedCalls()).isZero();
+            assertThat(fixture.diagnostics().cancellations).hasValue(1);
+            fixture.diagnostics().assertOneTerminalResult(1);
+        }
+    }
+
+    @Test
     void callerCancellationDuringExecutionReleasesOuterAdmissionWithoutRetry() {
         OperatorFixture operators = operators(
                 Duration.ofMillis(50),
@@ -282,6 +447,21 @@ class ResilienceOperatorCompositionContractTest {
         }
     }
 
+    private static WebClient successWebClient(AtomicInteger dispatches) {
+        return webClient(request -> Mono.fromSupplier(() -> {
+            dispatches.incrementAndGet();
+            return ClientResponse.create(HttpStatus.OK).body("ok").build();
+        }));
+    }
+
+    private static RateLimiterConfig immediateRateLimiter() {
+        return RateLimiterConfig.custom()
+                .limitForPeriod(10)
+                .limitRefreshPeriod(Duration.ofMinutes(1))
+                .timeoutDuration(Duration.ZERO)
+                .build();
+    }
+
     private static WebClient webClient(ExchangeFunction exchangeFunction) {
         return WebClient.builder()
                 .baseUrl("http://composition.test")
@@ -310,6 +490,19 @@ class ResilienceOperatorCompositionContractTest {
 
     private static OperatorFixture operators(
             Duration retryDelay, RateLimiterConfig rateLimiterConfig) {
+        return operators(
+                retryDelay,
+                rateLimiterConfig,
+                BulkheadConfig.custom()
+                        .maxConcurrentCalls(1)
+                        .maxWaitDuration(Duration.ZERO)
+                        .build());
+    }
+
+    private static OperatorFixture operators(
+            Duration retryDelay,
+            RateLimiterConfig rateLimiterConfig,
+            BulkheadConfig bulkheadConfig) {
         RetryRegistry retryRegistry = RetryRegistry.of(RetryConfig.custom()
                 .maxAttempts(3)
                 .waitDuration(retryDelay)
@@ -320,10 +513,7 @@ class ResilienceOperatorCompositionContractTest {
                         .minimumNumberOfCalls(1)
                         .failureRateThreshold(50)
                         .build());
-        BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(BulkheadConfig.custom()
-                .maxConcurrentCalls(1)
-                .maxWaitDuration(Duration.ZERO)
-                .build());
+        BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(bulkheadConfig);
         RateLimiterRegistry rateLimiterRegistry = RateLimiterRegistry.of(rateLimiterConfig);
         Retry retry = retryRegistry.retry(INSTANCE);
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(INSTANCE);
@@ -334,6 +524,7 @@ class ResilienceOperatorCompositionContractTest {
                 circuitBreaker,
                 bulkhead,
                 rateLimiter,
+                rateLimiterRegistry,
                 new Resilience4jOperatorApplier(
                         circuitBreakerRegistry, retryRegistry, bulkheadRegistry, rateLimiterRegistry));
     }
@@ -426,6 +617,7 @@ class ResilienceOperatorCompositionContractTest {
             CircuitBreaker circuitBreaker,
             Bulkhead bulkhead,
             RateLimiter rateLimiter,
+            RateLimiterRegistry rateLimiterRegistry,
             ResilienceOperatorApplier applier) {
     }
 
@@ -493,7 +685,7 @@ class ResilienceOperatorCompositionContractTest {
             exchangeLogs.add(context);
         }
 
-        private void assertOneTerminalResult(int attemptCount) {
+        private HttpClientObserverEvent assertOneTerminalResult(int attemptCount) {
             await(() -> observerEvents.size() == 1 && exchangeLogs.size() == 1,
                     "terminal diagnostics did not converge");
             HttpClientObserverEvent event = observerEvents.getFirst();
@@ -515,6 +707,39 @@ class ResilienceOperatorCompositionContractTest {
                         assertThat(summary.count()).isEqualTo(1);
                         assertThat(summary.totalAmount()).isEqualTo(attemptCount);
                     });
+            return event;
+        }
+
+        private void assertZeroAttemptRejection(Class<? extends Throwable> errorType) {
+            HttpClientObserverEvent event = assertOneTerminalResult(0);
+            HttpExchangeLogContext exchange = exchangeLogs.getFirst();
+            assertThat(starts).hasValue(0);
+            assertThat(retries).hasValue(0);
+            assertThat(errors).hasValue(1);
+            assertThat(successes).hasValue(0);
+            assertThat(cancellations).hasValue(0);
+            assertThat(event.getStatusCode()).isNull();
+            assertThat(event.getError()).isInstanceOf(errorType);
+            assertThat(event.getErrorCategory()).isEqualTo(ErrorCategory.RESILIENCE_ERROR);
+            assertThat(event.getFailureStage()).isNull();
+            assertThat(event.getRequestUrl()).isNull();
+            assertThat(event.getRequestHeaders()).isEmpty();
+            assertThat(exchange.responseStatus()).isNull();
+            assertThat(exchange.responseHeaders()).isEmpty();
+            assertThat(exchange.error()).isInstanceOf(errorType);
+            assertThat(exchange.failureStage()).isNull();
+            assertThat(exchange.requestUrl()).isNull();
+            assertThat(exchange.requestHeaders()).isEmpty();
+
+            var timer = meterRegistry.find("reactive.http.client.requests")
+                    .tag("http.status_code", "NONE")
+                    .tag("outcome", "UNKNOWN")
+                    .tag("exception", errorType.getSimpleName())
+                    .tag("error.category", "RESILIENCE_ERROR")
+                    .tag("failure.stage", "none")
+                    .timer();
+            assertThat(timer).isNotNull();
+            assertThat(timer.count()).isEqualTo(1);
         }
     }
 

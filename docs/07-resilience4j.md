@@ -282,6 +282,20 @@ The boundaries have these semantics:
 | Retry | Coordinates the configured source subscriptions and delay between them |
 | Request attempt | Rebuilds and dispatches one request subscription; the native request timeout is applied independently to every attempt |
 
+Immediate admission rejection happens before the retryable request publisher is
+subscribed:
+
+| Rejection | Starter attempt count | Terminal metric tags |
+|---|---:|---|
+| Open circuit | `0` | `http.status_code=NONE`, `outcome=UNKNOWN`, `exception=CallNotPermittedException`, `error.category=RESILIENCE_ERROR` |
+| Exhausted rate limiter | `0` | `http.status_code=NONE`, `outcome=UNKNOWN`, `exception=RequestNotPermitted`, `error.category=RESILIENCE_ERROR` |
+| Saturated zero-wait bulkhead | `0` | `http.status_code=NONE`, `outcome=UNKNOWN`, `exception=BulkheadFullException`, `error.category=RESILIENCE_ERROR` |
+
+A rate-limiter permission delay or configured semaphore-bulkhead wait starts
+before the request publisher subscription. That admission time is included once in
+the logical-call duration, while the request that follows is still subscription
+attempt `1`. Admission cancellation before that point stays at attempt `0`.
+
 Retry exhaustion therefore records multiple Retry attempts but one failed
 CircuitBreaker call, one RateLimiter permission, one Bulkhead occupancy interval,
 and one terminal starter observer, lifecycle, exchange-log, and metrics result.
@@ -367,6 +381,12 @@ When both `micrometer-core` and `resilience4j-micrometer` are on the classpath, 
 | `resilience4j.retry.*` | Successful / failed attempts, with / without retry |
 | `resilience4j.bulkhead.*` | Available concurrent calls, max concurrent calls |
 | `resilience4j.ratelimiter.*` | Available permissions, waiting threads |
+
+These `resilience4j.*` series describe operator behavior and remain separate from
+the starter-owned `reactive.http.client.requests` logical-call timer and
+`reactive.http.client.requests.attempts` summary. One logical call can therefore
+produce multiple Retry operator events but only one terminal starter timer sample
+and one final subscription-attempt sample.
 
 To disable the binding for a specific registry, declare your own `MeterBinder` bean named `reactiveHttpCircuitBreakerMeterBinder` (or the retry / bulkhead / rate-limiter equivalent).
 

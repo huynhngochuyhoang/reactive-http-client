@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Resilience admission and attempt semantics.** Added real-operator contract
+  evidence for open-circuit, exhausted-rate-limiter, saturated-bulkhead, and
+  delayed-admission outcomes. Immediate admission rejection remains attempt `0`;
+  admission and retry delays contribute to one logical duration; Retry alone
+  increments subscription attempts; and Resilience4j operator meters remain
+  separate from starter-owned terminal metrics.
 - **Micrometer timer and export contract.** Added Prometheus scrape coverage for
   seconds-based logical-call timer count, sum, and time-window maximum; opt-in
   latency SLO buckets; conditional size meters; and custom metric names. Clarified

@@ -341,7 +341,7 @@ reactive:
 | `error.type` | `ErrorCategory` name; falls back to the exception's simple class name |
 | `rhttp.client.name` | Logical client name |
 | `rhttp.api.name` | `@ApiName` value, `@ApiRef` value, or method name |
-| `rhttp.attempt.count` | Total attempts (>1 = retried) |
+| `rhttp.attempt.count` | Logical subscription attempts (`0` before request subscription; `>1` means Retry resubscribed). This is not a downstream dispatch count. |
 | `rhttp.request.bytes` | Application request body bytes before transport content coding, when measurable |
 | `rhttp.response.bytes` | Post-transport advertised representation bytes from `Content-Length`; absent for automatically decompressed or chunked responses |
 | `rhttp.failure.stage` | Proven `DNS_RESOLUTION`, `PROXY_CONNECT`, `CONNECT`, `TLS_HANDSHAKE`, `POOL_ACQUIRE`, `REQUEST_WRITE`, `RESPONSE_HEADERS`, or `RESPONSE_BODY`; absent when unknown |

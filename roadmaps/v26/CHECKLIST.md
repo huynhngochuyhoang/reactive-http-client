@@ -214,35 +214,64 @@ Evidence:
 
 ## Priority 4 - Resilience Admission and Attempt Semantics
 
-### [ ] 4.1 Prove each admission outcome
+### [x] 4.1 Prove each admission outcome
 
-- [ ] Exercise open circuit, exhausted rate limiter, saturated zero-wait
+- [x] Exercise open circuit, exhausted rate limiter, saturated zero-wait
       bulkhead, delayed rate-limit permission, and delayed bulkhead admission.
-- [ ] Verify zero-attempt rejections record `http.status_code=NONE`,
+- [x] Verify zero-attempt rejections record `http.status_code=NONE`,
       `outcome=UNKNOWN`, the concrete exception, and
       `error.category=RESILIENCE_ERROR`.
-- [ ] Verify delayed admission is included in logical-call duration and does not
+- [x] Verify delayed admission is included in logical-call duration and does not
       increment subscription attempts.
-- [ ] Verify Resilience4j's own operator meters remain separate from the
+- [x] Verify Resilience4j's own operator meters remain separate from the
       starter's one-terminal-record metrics.
-- [ ] Preserve the established
+- [x] Preserve the established
       `logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt`
       composition.
 
-### [ ] 4.2 Preserve retry and hidden-replay boundaries
+### [x] 4.2 Preserve retry and hidden-replay boundaries
 
-- [ ] Verify retry delay and each retry subscription contribute to one logical
+- [x] Verify retry delay and each retry subscription contribute to one logical
       duration and final attempt count.
-- [ ] Verify one-time auth replay and automatic redirect dispatch do not
+- [x] Verify one-time auth replay and automatic redirect dispatch do not
       increment the subscription-attempt summary.
-- [ ] Verify no metric or guide equates subscription attempts with downstream
+- [x] Verify no metric or guide equates subscription attempts with downstream
       request count.
-- [ ] Ensure prior attempt URL, status, headers, error, failure stage, and timing
+- [x] Ensure prior attempt URL, status, headers, error, failure stage, and timing
       cannot leak into an outer terminal rejection.
-- [ ] Cover cancellation during admission and retry delay with one terminal
+- [x] Cover cancellation during admission and retry delay with one terminal
       record and no late metric update.
-- [ ] Run the full resilience, retry/redirect/auth composition, idempotency, and
+- [x] Run the full resilience, retry/redirect/auth composition, idempotency, and
       body-repeatability suites.
+
+Evidence:
+
+- `ResilienceOperatorCompositionContractTest` now uses real Resilience4j
+  registries for open-circuit, exhausted-rate-limiter, saturated zero-wait
+  bulkhead, delayed permission, and delayed bulkhead admission. The three
+  immediate rejections retain no status, URL, headers, or failure stage and emit
+  one `RESILIENCE_ERROR` terminal with attempt `0`.
+- Delayed admissions are included in the shared logical duration while the
+  successful request remains attempt `1`. Retry exhaustion still records three
+  request subscriptions under one outer Bulkhead, CircuitBreaker, and
+  RateLimiter admission.
+- Caller cancellation during rate-limit admission and Retry delay emits one
+  terminal record; waits beyond the admission/retry window prove no late source
+  subscription or metric update occurs.
+- `ReactiveHttpClientAutoConfigurationTest` binds all four tagged Resilience4j
+  meter families and the starter observer to one registry, proving
+  `resilience4j.*` operator meters remain distinct from
+  `reactive.http.client.requests*` logical-call meters.
+- `RetryRedirectAuthReplayCompositionContractTest` retains one subscription
+  attempt across auth replay and redirect dispatch, isolates concurrent outer
+  subscriptions, and proves a terminal pre-dispatch auth rejection cannot reuse
+  prior URL, status, headers, error, failure-stage, or timing evidence.
+- `mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter
+  -Dtest=ResilienceOperatorCompositionContractTest,RetryRedirectAuthReplayCompositionContractTest,ReactiveClientInvocationHandlerRetrySafetyTest,ReactiveClientInvocationHandlerRetryMethodsTest,ResilienceOperatorApplierTest,PerMethodResilienceTest,IdempotencyKeySupportTest,ReactiveHttpClientLifecycleHookTest,ReactiveHttpClientAutoConfigurationTest,DocumentationReleaseArtifactTest
+  test` passed with 167 tests.
+- `mvn -B -ntp -s .mvn/maven-central-settings.xml
+  -pl reactive-http-client-starter test` passed with 1,036 tests.
+- No production operator composition or metric creation changed in this priority.
 
 ---
 
