@@ -1001,13 +1001,17 @@ class DocumentationReleaseArtifactTest {
                 .contains("reactive_http_client_connection_pool_pending_streams")
                 .contains("| Starter logical-call Micrometer |")
                 .contains("| Resilience4j operator meters |")
+                .contains("RateLimiter/Bulkhead current-state gauges")
+                .contains("RateLimiter/Bulkhead rejection history; use the starter "
+                        + "`RESILIENCE_ERROR` timer instead")
                 .contains("| Reactor Netty transport meters |")
                 .contains("| OpenTelemetry companion |")
                 .doesNotContain("records four meters per exchange")
                 .doesNotContain("`1` = succeeded on first try")
                 .doesNotContain("A p95 above `1`")
                 .doesNotContain("RateLimiter, or Bulkhead rejection\n"
-                        + "counters");
+                        + "counters")
+                .doesNotContain("| Admission rejection, retry execution/exhaustion, operator state |");
     }
 
     @Test

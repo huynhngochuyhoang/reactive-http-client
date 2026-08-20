@@ -460,7 +460,7 @@ limit are not exported in these gauge series. Correlate pending work with
 | Layer | Scope | Use it for | Do not infer |
 |---|---|---|---|
 | Starter logical-call Micrometer | One terminal timer/attempt sample per caller subscription; conditional size samples | User-visible duration, outcome, category, final attempt count, known sizes | Wire dispatch count or which resilience operator emitted an event |
-| Resilience4j operator meters | CircuitBreaker, RateLimiter, Bulkhead, and Retry events for configured instances | Admission rejection, retry execution/exhaustion, operator state | HTTP status/body ownership or downstream dispatch count |
+| Resilience4j operator meters | CircuitBreaker call history, Retry events, and RateLimiter/Bulkhead current-state gauges | CircuitBreaker history, Retry execution/exhaustion, and current permission, waiter, or concurrency state | RateLimiter/Bulkhead rejection history; use the starter `RESILIENCE_ERROR` timer instead. Do not infer HTTP status/body ownership or downstream dispatch count. |
 | Reactor Netty transport meters | Connection-provider and remote-address transport state | Connector-level connection/pool activity and transport diagnosis | Starter logical-call outcome or bounded client API identity |
 | OpenTelemetry companion | One terminal `CLIENT` span per logical call plus inbound/outbound context propagation | Trace correlation and terminal logical-call attributes | Starter-owned child spans for retry, redirect, auth replay, or each dispatch |
 
