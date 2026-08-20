@@ -475,6 +475,22 @@ endpoint rendering is also support-path work, not request-path work; add a
 dedicated endpoint-rendering row only if support-bundle adoption shows that JSON
 serialization is a real bottleneck.
 
+The no-network request-path rows run in throughput, average-time, and sample-time
+modes. Release-profile audits also record allocation per operation. Keep the
+following Micrometer shapes separate because they answer different questions:
+
+- `micrometerObserverGetNoBody` records into `SimpleMeterRegistry`.
+- `micrometerObserverPrometheusGetNoBody` records into the Prometheus registry
+  with latency histograms disabled.
+- `micrometerObserverPrometheusHistogramGetNoBody` enables the opt-in latency
+  histogram on the same Prometheus path.
+- `diagnosticsNoNetworkOpenCircuitRejection` measures one zero-dispatch,
+  pre-subscription resilience rejection; it is not a downstream HTTP benchmark.
+
+Prometheus scrape rendering is an on-demand registry/export operation rather
+than per-request observation. Do not mix it into these invocation rows; add a
+separate scrape row only when a concrete scrape bottleneck needs investigation.
+
 Strict unsafe-retry validation and strict built-in SigV4 body-signing validation
 are startup/proxy-construction checks. Do not measure them with request-path
 loopback rows. Add a dedicated startup-construction benchmark only if adoption
@@ -486,7 +502,9 @@ app needs request auditing, use `METADATA_ONLY` before enabling body capture, an
 leave extra Micrometer body/histogram settings disabled unless the operational
 question needs them. The local audit notes live in
 [`roadmaps/v12/DIAGNOSTICS_OVERHEAD_AUDIT.md`](../roadmaps/v12/DIAGNOSTICS_OVERHEAD_AUDIT.md)
-and remain smoke-only evidence.
+and
+[`roadmaps/v26/OBSERVABILITY_OVERHEAD_AUDIT.md`](../roadmaps/v26/OBSERVABILITY_OVERHEAD_AUDIT.md).
+They remain local, target-only evidence rather than promoted performance claims.
 
 ## Fairness Guardrails
 

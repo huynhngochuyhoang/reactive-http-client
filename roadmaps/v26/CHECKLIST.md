@@ -537,28 +537,58 @@ Evidence:
 ## Priority 10 - Observability Overhead Re-Audit
 
 
-### [ ] 10.1 Preserve benchmark fairness
+### [x] 10.1 Preserve benchmark fairness
 
-- [ ] Re-run default no-network invocation and Micrometer observer rows against
+- [x] Re-run default no-network invocation and Micrometer observer rows against
       current `3.6.0-SNAPSHOT` and published `3.5.0` under equivalent
       dependencies and environment metadata.
-- [ ] Confirm the diagnostics-disabled unary path does not allocate reporting
+- [x] Confirm the diagnostics-disabled unary path does not allocate reporting
       state for inactive features.
-- [ ] Measure any new Prometheus/histogram path separately from default
+- [x] Measure any new Prometheus/histogram path separately from default
       observation.
-- [ ] Add a pre-subscription rejection benchmark only if it answers a concrete
+- [x] Add a pre-subscription rejection benchmark only if it answers a concrete
       allocation/latency question; label it no-network.
-- [ ] Keep smoke output non-promotable and release output tied to a clean commit.
+- [x] Keep smoke output non-promotable and release output tied to a clean commit.
 
-### [ ] 10.2 Review movement without hard gates
+### [x] 10.2 Review movement without hard gates
 
-- [ ] Compare current and baseline throughput, average/sample latency, and
+- [x] Compare current and baseline throughput, average/sample latency, and
       allocation for named equivalent scenarios.
-- [ ] Investigate material movement using the documented review thresholds.
-- [ ] Optimize only measured regressions attributable to V26 changes.
-- [ ] Record expected costs for any opt-in histogram or scrape fixture.
-- [ ] Promote a versioned report only if release notes make numerical
+- [x] Investigate material movement using the documented review thresholds.
+- [x] Optimize only measured regressions attributable to V26 changes.
+- [x] Record expected costs for any opt-in histogram or scrape fixture.
+- [x] Promote a versioned report only if release notes make numerical
       performance claims.
+
+Evidence:
+
+- `ReactiveClientInvocationHandlerBehaviorTest.diagnosticsDisabledUnaryRequestDoesNotInstallSubscriptionReportingState`
+  proves structurally that an inactive unary call reaches the exchange without a
+  `SubscriptionReportingState` in Reactor context; this conclusion is not
+  inferred from allocation noise.
+- `StarterDiagnosticsOverheadBenchmark` now keeps Simple-registry,
+  Prometheus-registry, opt-in Prometheus histogram, and zero-dispatch
+  open-circuit rows distinct. The class records throughput, average time, and
+  sample time; release-profile runs add normalized allocation.
+- Current and published `3.5.0` runs used Spring Boot `4.0.0`, Spring WebFlux
+  `7.0.1`, Reactor Netty `1.3.0`, Netty `4.2.7.Final`, Micrometer `1.16.0`, and
+  the same JDK/machine. The published lane used an isolated Maven repository and
+  passed `verify-published-baseline-provenance.sh`.
+- Target-only reports are under
+  `target/release-evidence/v26/priority10/{current-3.6.0-SNAPSHOT,published-3.5.0}/`;
+  their comparison is
+  `target/release-evidence/v26/priority10/current-vs-published-3.5.0.md`.
+  Every allocation row stayed below the documented review triggers. The initial
+  histogram sample p95/p99 improvement crossed the directional latency trigger,
+  but an equivalent focused rerun reduced both differences below 4%, identifying
+  local tail variance rather than a V26 regression.
+- The target-only audit records the measured opt-in histogram cost separately
+  from default observation. No scrape row was added because scrape rendering is
+  not request-path work and no concrete scrape bottleneck was identified.
+- No production optimization or versioned report promotion was warranted. The
+  reports are explicitly non-promotable dirty-worktree audit evidence; any future
+  public numerical claim still requires a clean-commit release run and promoted
+  report.
 
 ---
 
