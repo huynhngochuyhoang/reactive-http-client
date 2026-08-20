@@ -274,7 +274,13 @@ response bodies, and customer data.
 
 For error-rate incidents, include the affected client entry from
 `/actuator/health`. A useful detail block contains `samples`, `errors`,
-`minSamples`, `errorRateThreshold`, `errorRate`, `status`, and `reason`.
+`sampleCount`, `errorCount`, `poolAcquireFailureCount`, `minSamples`,
+`errorRateThreshold`, `errorRate`, `status`, and `reason`. The integer
+counters cover the same probe-to-probe window; `errorRate` is omitted when
+that window has no samples.
+
+The source-controlled [health fixture](fixtures/support-bundle-health.json) is
+the complete sanitized structural example:
 
 ```json
 {
@@ -283,12 +289,17 @@ For error-rate incidents, include the affected client entry from
     "user-service": {
       "samples": 10,
       "errors": 8,
+      "sampleCount": 10,
+      "errorCount": 8,
+      "poolAcquireFailureCount": 2,
       "minSamples": 10,
       "errorRateThreshold": 0.5,
       "errorRate": 0.8,
       "status": "DOWN",
       "reason": "ERROR_RATE_ABOVE_THRESHOLD"
-    }
+    },
+    "errorRateThreshold": 0.5,
+    "minSamples": 10
   }
 }
 ```

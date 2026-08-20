@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.observability;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.health.contributor.Health;
@@ -9,6 +10,7 @@ import org.springframework.boot.health.contributor.Status;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.UnknownHostException;
+import java.time.Duration;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,10 +61,15 @@ class Boot4HttpClientHealthIndicatorTest {
                 .containsEntry("errors", 7L)
                 .containsEntry("sampleCount", 10L)
                 .containsEntry("errorCount", 7L)
+                .containsEntry("poolAcquireFailureCount", 0L)
                 .containsEntry("minSamples", 5L)
                 .containsEntry("errorRateThreshold", 0.5d)
                 .containsEntry("errorRate", 0.7d)
                 .containsEntry("reason", "ERROR_RATE_ABOVE_THRESHOLD");
+        assertThat(clientDetails(health, "failing-client").keySet()).containsExactly(
+                "samples", "errors", "sampleCount", "errorCount",
+                "poolAcquireFailureCount", "minSamples", "errorRateThreshold",
+                "errorRate", "status", "reason");
     }
 
     @Test
@@ -87,6 +94,27 @@ class Boot4HttpClientHealthIndicatorTest {
                 .containsEntry("minSamples", 5L)
                 .containsEntry("errorRateThreshold", 0.5d)
                 .containsEntry("errorRate", 0.1d)
+                .containsEntry("reason", "ERROR_RATE_WITHIN_THRESHOLD");
+    }
+
+    @Test
+    void reportsUpWhenErrorRateEqualsThreshold() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        config.getHealth().setMinSamples(10);
+        config.getHealth().setErrorRateThreshold(0.5);
+        Boot4HttpClientHealthIndicator indicator = indicator(registry, config);
+
+        record(registry, config, "threshold-client", 5, 5);
+
+        Health health = indicator.health();
+
+        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        assertThat(clientDetails(health, "threshold-client"))
+                .containsEntry("sampleCount", 10L)
+                .containsEntry("errorCount", 5L)
+                .containsEntry("errorRate", 0.5d)
+                .containsEntry("status", "UP")
                 .containsEntry("reason", "ERROR_RATE_WITHIN_THRESHOLD");
     }
 
@@ -165,6 +193,80 @@ class Boot4HttpClientHealthIndicatorTest {
                 .containsEntry("errors", 8L)
                 .containsEntry("errorRate", 0.8d)
                 .containsEntry("reason", "ERROR_RATE_ABOVE_THRESHOLD");
+    }
+
+    @Test
+    void recreatedMetersStartANewProbeBaseline() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        config.getHealth().setMinSamples(5);
+        config.getHealth().setErrorRateThreshold(0.5);
+        Boot4HttpClientHealthIndicator indicator = indicator(registry, config);
+
+        record(registry, config, "recreated-client", 3, 7);
+        indicator.health();
+        registry.clear();
+        record(registry, config, "recreated-client", 4, 8);
+        Health recreated = indicator.health();
+
+        assertThat(recreated.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(clientDetails(recreated, "recreated-client"))
+                .containsEntry("sampleCount", 12L)
+                .containsEntry("errorCount", 8L)
+                .containsEntry("errorRate", 8.0d / 12.0d)
+                .containsEntry("reason", "ERROR_RATE_ABOVE_THRESHOLD");
+    }
+
+    @Test
+    void durationSumMaxAndHistogramDoNotChangeCountBasedHealth() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        config.getHealth().setMinSamples(1);
+        Timer timer = Timer.builder(config.getMetricName())
+                .tags(
+                        "client.name", "slow-client",
+                        "error.category", "none",
+                        "failure.stage", "none")
+                .publishPercentileHistogram()
+                .register(registry);
+        timer.record(Duration.ofDays(365));
+
+        Health health = indicator(registry, config).health();
+
+        assertThat(timer.count()).isEqualTo(1L);
+        assertThat(timer.max(java.util.concurrent.TimeUnit.DAYS)).isEqualTo(365.0d);
+        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        assertThat(clientDetails(health, "slow-client"))
+                .containsEntry("sampleCount", 1L)
+                .containsEntry("errorCount", 0L)
+                .containsEntry("status", "UP");
+    }
+
+    @Test
+    void aggregatesTaggedSeriesOnlyFromConfiguredMetricName() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        config.setMetricName("custom.client.calls");
+        config.getHealth().setMinSamples(6);
+        config.getHealth().setErrorRateThreshold(0.5);
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(registry, config);
+
+        record(registry, config, "multi-series-client", 3, 3);
+        observer.record(new HttpClientObserverEvent(
+                "multi-series-client", "other-op", "POST", "/other",
+                200, 2L, null, null, null, null));
+
+        ReactiveHttpClientProperties.ObservabilityConfig defaultMetric = defaults();
+        record(registry, defaultMetric, "multi-series-client", 0, 10);
+
+        Health health = indicator(registry, config).health();
+
+        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        assertThat(clientDetails(health, "multi-series-client"))
+                .containsEntry("sampleCount", 7L)
+                .containsEntry("errorCount", 3L)
+                .containsEntry("errorRate", 3.0d / 7.0d)
+                .containsEntry("reason", "ERROR_RATE_WITHIN_THRESHOLD");
     }
 
     @Test

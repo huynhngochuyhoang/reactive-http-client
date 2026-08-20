@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.observability;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.springframework.boot.health.contributor.Health;
@@ -19,10 +20,13 @@ import java.util.concurrent.atomic.AtomicReference;
  * {@link MicrometerHttpClientObserver}.
  *
  * <p>On each {@link #health()} call, the indicator snapshots every matching timer,
- * groups the counts by {@code client.name}, and compares the new snapshot against
- * the one from the previous invocation. A client reports DOWN when its delta
- * sample count meets {@link ReactiveHttpClientProperties.HealthConfig#getMinSamples()}
- * and the error ratio exceeds
+ * groups timer-count deltas by {@code client.name}, and classifies errors from the
+ * {@code error.category} and {@code failure.stage} tags. Duration sums, maxima,
+ * percentiles, and histogram buckets are not health inputs. Unchanged timer
+ * instances are compared with the previous invocation; a removed and recreated
+ * timer starts a new count baseline. A client reports DOWN when its delta sample
+ * count meets {@link ReactiveHttpClientProperties.HealthConfig#getMinSamples()} and
+ * the error ratio exceeds
  * {@link ReactiveHttpClientProperties.HealthConfig#getErrorRateThreshold()}; the
  * overall status is DOWN if any tracked client is DOWN. Between probes the
  * indicator holds no per-invocation state, so it does not interfere with the
@@ -64,18 +68,10 @@ public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
             ClientCounts current = entry.getValue();
             ClientCounts previous = previousSnapshot.getOrDefault(clientName, ClientCounts.ZERO);
 
-            long deltaTotal = current.total - previous.total;
-            long deltaErrors = current.errors - previous.errors;
-            long deltaPoolAcquireFailures = current.poolAcquireFailures - previous.poolAcquireFailures;
-            if (deltaTotal < 0 || deltaErrors < 0) {
-                // Counters should only increase; a registry restart can reset them.
-                // Treat as an inconclusive probe rather than reporting DOWN.
-                deltaTotal = current.total;
-                deltaErrors = current.errors;
-            }
-            if (deltaPoolAcquireFailures < 0) {
-                deltaPoolAcquireFailures = current.poolAcquireFailures;
-            }
+            ClientCounts delta = current.deltaFrom(previous);
+            long deltaTotal = delta.total;
+            long deltaErrors = delta.errors;
+            long deltaPoolAcquireFailures = delta.poolAcquireFailures;
 
             Map<String, Object> perClient = new LinkedHashMap<>();
             perClient.put("samples", deltaTotal);
@@ -134,13 +130,9 @@ public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
             String failureStage = timer.getId().getTag("failure.stage");
             long count = timer.count();
             ClientCounts counts = snapshot.computeIfAbsent(clientName, n -> new ClientCounts());
-            counts.total += count;
-            if (errorCategory != null && !ERROR_CATEGORY_NONE.equals(errorCategory)) {
-                counts.errors += count;
-            }
-            if (POOL_ACQUIRE_STAGE.equals(failureStage)) {
-                counts.poolAcquireFailures += count;
-            }
+            counts.add(timer, count,
+                    errorCategory != null && !ERROR_CATEGORY_NONE.equals(errorCategory),
+                    POOL_ACQUIRE_STAGE.equals(failureStage));
         }
         if (snapshot.size() > MAX_CLIENTS) {
             throw new IllegalStateException("Reactive HTTP client health detail exceeds the "
@@ -151,8 +143,53 @@ public final class Boot4HttpClientHealthIndicator implements HealthIndicator {
 
     private static final class ClientCounts {
         static final ClientCounts ZERO = new ClientCounts();
+        private final Map<Meter.Id, SeriesCounts> series = new LinkedHashMap<>();
         long total = 0L;
         long errors = 0L;
         long poolAcquireFailures = 0L;
+
+        void add(Timer timer, long count, boolean error, boolean poolAcquireFailure) {
+            long errorCount = error ? count : 0L;
+            long poolAcquireFailureCount = poolAcquireFailure ? count : 0L;
+            series.put(timer.getId(),
+                    new SeriesCounts(timer, count, errorCount, poolAcquireFailureCount));
+            total += count;
+            errors += errorCount;
+            poolAcquireFailures += poolAcquireFailureCount;
+        }
+
+        ClientCounts deltaFrom(ClientCounts previous) {
+            ClientCounts delta = new ClientCounts();
+            for (Map.Entry<Meter.Id, SeriesCounts> entry : series.entrySet()) {
+                SeriesCounts current = entry.getValue();
+                SeriesCounts prior = previous.series.get(entry.getKey());
+                boolean sameMeter = prior != null && prior.timer == current.timer;
+                delta.total += counterDelta(current.total, sameMeter ? prior.total : 0L);
+                delta.errors += counterDelta(current.errors, sameMeter ? prior.errors : 0L);
+                delta.poolAcquireFailures += counterDelta(
+                        current.poolAcquireFailures,
+                        sameMeter ? prior.poolAcquireFailures : 0L);
+            }
+            return delta;
+        }
+
+        private static long counterDelta(long current, long previous) {
+            long delta = current - previous;
+            return delta >= 0L ? delta : current;
+        }
+    }
+
+    private static final class SeriesCounts {
+        private final Timer timer;
+        private final long total;
+        private final long errors;
+        private final long poolAcquireFailures;
+
+        private SeriesCounts(Timer timer, long total, long errors, long poolAcquireFailures) {
+            this.timer = timer;
+            this.total = total;
+            this.errors = errors;
+            this.poolAcquireFailures = poolAcquireFailures;
+        }
     }
 }

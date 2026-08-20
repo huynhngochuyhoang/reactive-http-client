@@ -330,27 +330,46 @@ Evidence:
 
 ## Priority 6 - Health Indicator Metric Parity
 
-### [ ] 6.1 Align health detail schema and documentation
+### [x] 6.1 Align health detail schema and documentation
 
-- [ ] Add `poolAcquireFailureCount` to the documented per-client field inventory
+- [x] Add `poolAcquireFailureCount` to the documented per-client field inventory
       and sample Actuator response.
-- [ ] Verify field names, JSON types, bounds, status values, and reasons against
+- [x] Verify field names, JSON types, bounds, status values, and reasons against
       `Boot4HttpClientHealthIndicator`.
-- [ ] Update support-bundle fixtures and assertions to require the complete
+- [x] Update support-bundle fixtures and assertions to require the complete
       health detail shape without sensitive fields.
-- [ ] Preserve the documented replacement bean name and conditional
+- [x] Preserve the documented replacement bean name and conditional
       auto-configuration behavior.
 
-### [ ] 6.2 Prove count-based probe semantics
+### [x] 6.2 Prove count-based probe semantics
 
-- [ ] Verify health uses main-timer count plus error-category/failure-stage tags;
+- [x] Verify health uses main-timer count plus error-category/failure-stage tags;
       max, sum, and histogram buckets cannot independently mark a client DOWN.
-- [ ] Cover no samples, insufficient samples, threshold equality, above-threshold
+- [x] Cover no samples, insufficient samples, threshold equality, above-threshold
       errors, and pool-acquire failures.
-- [ ] Cover registry reset and meter removal/recreation without negative deltas.
-- [ ] Cover multiple tagged timers for one client and the configured custom
+- [x] Cover registry reset and meter removal/recreation without negative deltas.
+- [x] Cover multiple tagged timers for one client and the configured custom
       metric name.
-- [ ] Retain client-count/name bounds and sanitized output.
+- [x] Retain client-count/name bounds and sanitized output.
+
+Evidence:
+
+- `Boot4HttpClientHealthIndicator` now snapshots each tagged timer generation.
+  Stable meters use probe-to-probe count deltas; removed/recreated meters start
+  from their own current counts, preventing negative or cross-generation deltas.
+- `Boot4HttpClientHealthIndicatorTest` covers no samples, insufficient samples,
+  threshold equality, above-threshold errors, pool-acquire failures, multiple
+  tagged series, custom metric names, registry recreation, duration/histogram
+  independence, deterministic ordering, client/name bounds, and UTF-8 output size.
+- `docs/08-observability.md` and `docs/26-support-bundles.md` now document the
+  complete field/type/status/reason contract and link the sanitized
+  `docs/fixtures/support-bundle-health.json` fixture. Release-documentation tests
+  require the complete shape and reject sensitive values.
+- `Boot4AutoConfigurationTest` proves the health contributor remains conditional
+  on `MeterRegistry`, honors `health.enabled=false`, and backs off for a
+  replacement named `reactiveHttpClientHealthIndicator`.
+- The focused health, Prometheus, auto-configuration, and documentation suite
+  passed with 70 tests. The full starter suite passed with 1,043 tests.
 
 ---
 

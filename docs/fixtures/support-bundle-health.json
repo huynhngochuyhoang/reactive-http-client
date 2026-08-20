@@ -1,0 +1,19 @@
+{
+  "status": "DOWN",
+  "details": {
+    "inventory-api": {
+      "samples": 10,
+      "errors": 8,
+      "sampleCount": 10,
+      "errorCount": 8,
+      "poolAcquireFailureCount": 2,
+      "minSamples": 10,
+      "errorRateThreshold": 0.5,
+      "errorRate": 0.8,
+      "status": "DOWN",
+      "reason": "ERROR_RATE_ABOVE_THRESHOLD"
+    },
+    "errorRateThreshold": 0.5,
+    "minSamples": 10
+  }
+}

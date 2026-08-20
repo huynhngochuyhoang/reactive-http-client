@@ -377,12 +377,16 @@ class DocumentationReleaseArtifactTest {
                 root.resolve("docs/fixtures/support-bundle-request-validation.json"));
         String staleRecoveryText = Files.readString(
                 root.resolve("docs/fixtures/support-bundle-stale-connection-recovery.json"));
+        String healthText = Files.readString(
+                root.resolve("docs/fixtures/support-bundle-health.json"));
         JsonNode validation = OBJECT_MAPPER.readTree(validationText);
         JsonNode staleRecovery = OBJECT_MAPPER.readTree(staleRecoveryText);
+        JsonNode health = OBJECT_MAPPER.readTree(healthText);
 
         assertThat(supportBundles)
                 .contains("(fixtures/support-bundle-request-validation.json)")
                 .contains("(fixtures/support-bundle-stale-connection-recovery.json)")
+                .contains("(fixtures/support-bundle-health.json)")
                 .contains("illustrative sanitized records, not raw logger output");
         assertThat(validation.path("incidentType").asText()).isEqualTo("request-validation");
         assertThat(validation.has("terminalRecordCreated")).isTrue();
@@ -459,7 +463,34 @@ class DocumentationReleaseArtifactTest {
         assertThat(records.get(1).path("errorType").isNull()).isTrue();
         assertThat(records.get(1).path("causeTypes").isEmpty()).isTrue();
 
-        assertThat(validationText + staleRecoveryText)
+        assertThat(health.path("status").asText()).isEqualTo("DOWN");
+        JsonNode healthDetails = health.path("details");
+        assertThat(healthDetails.size()).isEqualTo(3);
+        assertThat(healthDetails.path("errorRateThreshold").isNumber()).isTrue();
+        assertThat(healthDetails.path("minSamples").isIntegralNumber()).isTrue();
+        JsonNode clientHealth = healthDetails.path("inventory-api");
+        assertThat(clientHealth.size()).isEqualTo(10);
+        for (String field : List.of(
+                "samples",
+                "errors",
+                "sampleCount",
+                "errorCount",
+                "poolAcquireFailureCount",
+                "minSamples")) {
+            assertThat(clientHealth.has(field)).as("health fixture field %s", field).isTrue();
+            assertThat(clientHealth.path(field).isIntegralNumber()).isTrue();
+            assertThat(clientHealth.path(field).asLong()).isGreaterThanOrEqualTo(0L);
+        }
+        assertThat(clientHealth.path("errorRateThreshold").isNumber()).isTrue();
+        assertThat(clientHealth.path("errorRate").isNumber()).isTrue();
+        assertThat(clientHealth.path("status").isTextual()).isTrue();
+        assertThat(clientHealth.path("status").asText()).isIn("UP", "DOWN", "INSUFFICIENT_SAMPLES");
+        assertThat(clientHealth.path("reason").isTextual()).isTrue();
+        assertThat(clientHealth.path("reason").asText()).isIn(
+                "NO_SAMPLES", "INSUFFICIENT_SAMPLES",
+                "ERROR_RATE_WITHIN_THRESHOLD", "ERROR_RATE_ABOVE_THRESHOLD");
+
+        assertThat(validationText + staleRecoveryText + healthText)
                 .doesNotContain("Authorization", "Cookie", "client-secret", "Bearer ")
                 .doesNotContain("http://", "https://", "responseBody", "errorMessage")
                 .doesNotContain("/home/", "/Users/", "/workspace/", "/tmp/", "C:\\Users\\");
@@ -953,6 +984,24 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("records four meters per exchange")
                 .doesNotContain("`1` = succeeded on first try")
                 .doesNotContain("A p95 above `1`");
+    }
+
+    @Test
+    void healthIndicatorDocsMatchCountAndDetailContract() throws IOException {
+        Path root = projectRoot();
+        String observabilityDocs = Files.readString(root.resolve("docs/08-observability.md"));
+        String supportDocs = Files.readString(root.resolve("docs/26-support-bundles.md"));
+
+        assertThat(observabilityDocs)
+                .contains("Health reads only the configured main timer's count")
+                .contains("histogram buckets do not affect health status")
+                .contains("`poolAcquireFailureCount`")
+                .contains("Registry resets and meter\nremoval/recreation start a new count baseline")
+                .contains("At most 256\nclients with names up to 512 characters")
+                .contains("reactiveHttpClientHealthIndicator");
+        assertThat(supportDocs)
+                .contains("[health fixture](fixtures/support-bundle-health.json)")
+                .contains("`sampleCount`, `errorCount`, `poolAcquireFailureCount`");
     }
 
     @Test
