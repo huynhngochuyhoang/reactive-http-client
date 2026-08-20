@@ -1028,7 +1028,11 @@ class DocumentationReleaseArtifactTest {
                 .contains("[dashboard recipes](08-observability.md#dashboard-recipes)");
         assertThat(productionDocs)
                 .contains("[unit-safe dashboard recipes](08-observability.md#dashboard-recipes)")
-                .contains("Do not use attempts `_max` as p95/p99");
+                .contains("Do not use attempts `_max` as p95/p99")
+                .contains("error_category=\"RESILIENCE_ERROR\"")
+                .contains("Reserve Resilience4j counters for CircuitBreaker call history and Retry")
+                .contains("RateLimiter and Bulkhead metrics are current-state gauges")
+                .doesNotContain("attempts count/sum; use the relevant Resilience4j operator counters");
         assertThat(cardinalityDocs)
                 .contains("[telemetry ownership table and dashboard recipes]"
                         + "(08-observability.md#dashboard-recipes)");

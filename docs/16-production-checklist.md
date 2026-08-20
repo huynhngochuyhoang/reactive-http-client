@@ -146,7 +146,10 @@ for the detailed ownership rules.
   timer durations are seconds, attempts are counts per logical call, and pool
   gauges are counts rather than percentages.
 - Do not use attempts `_max` as p95/p99 or derive zero-attempt rejection from
-  attempts count/sum; use the relevant Resilience4j operator counters.
+  attempts count/sum. Use the starter timer's `error_category="RESILIENCE_ERROR"`
+  recipe for every built-in admission rejection.
+- Reserve Resilience4j counters for CircuitBreaker call history and Retry
+  activity. Auto-bound RateLimiter and Bulkhead metrics are current-state gauges.
 - Enable OpenTelemetry with the `reactive-http-client-otel` module when traces are required.
 - For async handoff through sinks, queues, or callbacks, restore request context explicitly before outbound calls.
 - Prefer explicit envelope fields for durable events: correlation ID, request ID, tenant-like low-cardinality keys, and trace context.
