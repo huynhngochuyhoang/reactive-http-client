@@ -154,6 +154,36 @@ class Boot4AutoConfigurationTest {
     }
 
     @Test
+    void healthIndicatorRetainsItsConditionsAndReplacementBeanName() {
+        contextRunner.run(context ->
+                assertThat(context).doesNotHaveBean("reactiveHttpClientHealthIndicator"));
+
+        contextRunner
+                .withBean(SimpleMeterRegistry.class, SimpleMeterRegistry::new)
+                .withPropertyValues("reactive.http.observability.health.enabled=false")
+                .run(context ->
+                        assertThat(context).doesNotHaveBean("reactiveHttpClientHealthIndicator"));
+
+        HealthIndicator replacement = () -> org.springframework.boot.health.contributor.Health.up()
+                .withDetail("replacement", true)
+                .build();
+        contextRunner
+                .withBean(SimpleMeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(
+                        "reactiveHttpClientHealthIndicator",
+                        HealthIndicator.class,
+                        () -> replacement)
+                .run(context -> {
+                    assertThat(context.getBean(
+                            "reactiveHttpClientHealthIndicator",
+                            HealthIndicator.class))
+                            .isSameAs(replacement);
+                    assertThat(context.getBeansOfType(HealthIndicator.class))
+                            .containsOnlyKeys("reactiveHttpClientHealthIndicator");
+                });
+    }
+
+    @Test
     void activatesEachResilienceMetricsBinderWhenRegistriesArePresent() {
         contextRunner
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)

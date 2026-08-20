@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Health indicator metric parity.** Documented the complete bounded per-client
+  detail shape, including `poolAcquireFailureCount`, and added a sanitized
+  support fixture. Health remains count-based on the configured main timer's
+  error-category/failure-stage series; duration sums, maxima, and histograms do
+  not affect status. Meter removal/recreation now starts a fresh series baseline
+  without negative or cross-generation deltas.
 - **Resilience admission and attempt semantics.** Added real-operator contract
   evidence for open-circuit, exhausted-rate-limiter, saturated-bulkhead, and
   delayed-admission outcomes. Immediate admission rejection remains attempt `0`;

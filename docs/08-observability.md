@@ -169,6 +169,10 @@ It reads the `reactive.http.client.requests` timer and reports per-client error
 rates computed from probe-to-probe deltas. The bean name remains
 `reactiveHttpClientHealthIndicator` across the migration.
 
+Health reads only the configured main timer's count and its `error.category`
+and `failure.stage` tags. Timer duration sum, maximum, percentiles, and
+histogram buckets do not affect health status.
+
 ```yaml
 reactive:
   http:
@@ -183,11 +187,22 @@ reactive:
 
 | Condition | Status |
 |---|---|
-| `delta-count < min-samples` | `INSUFFICIENT_SAMPLES` (no DOWN reported) |
+| `delta-count = 0` | `INSUFFICIENT_SAMPLES`, reason `NO_SAMPLES` |
+| `0 < delta-count < min-samples` | `INSUFFICIENT_SAMPLES`, reason `INSUFFICIENT_SAMPLES` |
 | `errorRate <= error-rate-threshold` | `UP` |
 | `errorRate > error-rate-threshold` | `DOWN` — overall indicator is `DOWN` |
 
-Each client detail is keyed only by `client.name`. It contains bounded counters and policy context: `samples`/`sampleCount`, `errors`/`errorCount`, `minSamples`, `errorRateThreshold`, `status`, and `reason`. `errorRate` is present when the probe window has at least one sample. Reasons are `NO_SAMPLES`, `INSUFFICIENT_SAMPLES`, `ERROR_RATE_WITHIN_THRESHOLD`, or `ERROR_RATE_ABOVE_THRESHOLD`. The health indicator does not expose URLs, headers, auth configuration, proxy values, request bodies, or response bodies.
+Each client detail is keyed only by `client.name`. It contains non-negative
+integer `samples`/`sampleCount`, `errors`/`errorCount`, and
+`poolAcquireFailureCount`; integer `minSamples`; numeric
+`errorRateThreshold`; and string `status` and `reason`. `errorRate` is a
+number from `0.0` to `1.0` and is present only when the probe window has at
+least one sample. Reasons are `NO_SAMPLES`, `INSUFFICIENT_SAMPLES`,
+`ERROR_RATE_WITHIN_THRESHOLD`, or `ERROR_RATE_ABOVE_THRESHOLD`. At most 256
+clients with names up to 512 characters are rendered. Registry resets and meter
+removal/recreation start a new count baseline instead of producing negative
+deltas. The health indicator does not expose URLs, headers, auth configuration,
+proxy values, request bodies, or response bodies.
 
 ### Sample actuator response
 
@@ -200,6 +215,7 @@ Each client detail is keyed only by `client.name`. It contains bounded counters 
       "errors": 8,
       "sampleCount": 10,
       "errorCount": 8,
+      "poolAcquireFailureCount": 2,
       "minSamples": 10,
       "errorRateThreshold": 0.5,
       "errorRate": 0.8,
@@ -211,6 +227,7 @@ Each client detail is keyed only by `client.name`. It contains bounded counters 
       "errors": 1,
       "sampleCount": 20,
       "errorCount": 1,
+      "poolAcquireFailureCount": 0,
       "minSamples": 10,
       "errorRateThreshold": 0.5,
       "errorRate": 0.05,
