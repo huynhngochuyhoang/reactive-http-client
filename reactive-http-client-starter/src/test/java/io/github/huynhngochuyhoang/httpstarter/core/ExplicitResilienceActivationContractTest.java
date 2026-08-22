@@ -27,6 +27,7 @@ class ExplicitResilienceActivationContractTest {
         RecordingApplier applier = new RecordingApplier(true);
 
         try (ClientFixture fixture = client(enabledOnlyConfig(), applier)) {
+            applier.clearLookups();
             Mono<String> call = fixture.client().mono();
 
             assertThat(applier.applications()).isEmpty();
@@ -44,6 +45,7 @@ class ExplicitResilienceActivationContractTest {
         RecordingApplier applier = new RecordingApplier(true);
 
         try (ClientFixture fixture = client(enabledOnlyConfig(), applier)) {
+            applier.clearLookups();
             Flux<String> call = fixture.client().flux();
 
             assertThat(applier.applications()).isEmpty();
@@ -205,7 +207,7 @@ class ExplicitResilienceActivationContractTest {
     }
 
     @Test
-    void explicitSelectionsRemainPassThroughWhenOperatorsAreUnavailable() {
+    void explicitSelectionsRemainPassThroughWithoutApplyingUnavailableOperators() {
         ReactiveHttpClientProperties.ClientConfig config = enabledOnlyConfig();
         config.getResilience().setRetry("default");
         config.getResilience().setRateLimiter("default");
@@ -216,11 +218,7 @@ class ExplicitResilienceActivationContractTest {
         try (ClientFixture fixture = client(config, applier)) {
             assertThat(fixture.client().mono().block()).isEqualTo("ok");
 
-            assertThat(applier.applications()).containsExactly(
-                    "mono:retry=default",
-                    "mono:rate-limiter=default",
-                    "mono:circuit-breaker=default",
-                    "mono:bulkhead=default");
+            assertThat(applier.applications()).isEmpty();
             assertThat(applier.subscriptions()).isEmpty();
             assertThat(fixture.dispatches()).hasValue(1);
         }
@@ -351,6 +349,10 @@ class ExplicitResilienceActivationContractTest {
 
         private List<String> lookups() {
             return lookups;
+        }
+
+        private void clearLookups() {
+            lookups.clear();
         }
 
         @Override

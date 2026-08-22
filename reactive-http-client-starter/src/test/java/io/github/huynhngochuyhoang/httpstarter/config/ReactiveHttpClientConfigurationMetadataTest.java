@@ -579,6 +579,32 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.correlation-id.mdc-keys", List.of("correlationId", "X-Correlation-Id", "traceId"));
     }
 
+    @Test
+    void resilienceActivationMetadataAndMigrationEvidenceStayExplicit() throws IOException {
+        JsonNode metadata = starterMetadata();
+        JsonNode enabled = findProperty(
+                metadata, "reactive.http.clients.[name].resilience.enabled");
+        String migration = Files.readString(
+                projectRoot().resolve("docs/31-3x-to-4x-resilience-migration.md"));
+
+        assertThat(enabled.path("description").asText())
+                .contains("does not select Retry, CircuitBreaker, Bulkhead, or RateLimiter")
+                .contains("select each intended operator explicitly");
+        assertNoDefaultValue(metadata, "reactive.http.clients.[name].resilience.retry");
+        assertNoDefaultValue(metadata, "reactive.http.clients.[name].resilience.circuit-breaker");
+        assertNoDefaultValue(metadata, "reactive.http.clients.[name].resilience.bulkhead");
+        assertNoDefaultValue(metadata, "reactive.http.clients.[name].resilience.rate-limiter");
+        assertThat(migration)
+                .contains("`resilience.enabled: true` with no instance properties")
+                .contains("No operator is selected")
+                .contains("`unavailable`")
+                .contains("`unknown`")
+                .contains("retry: default")
+                .contains("rate-limiter: default")
+                .contains("circuit-breaker: default")
+                .contains("bulkhead: default");
+    }
+
     private static String markdownSection(String markdown, String heading, String nextHeading) {
         int start = markdown.indexOf(heading);
         if (start < 0) {

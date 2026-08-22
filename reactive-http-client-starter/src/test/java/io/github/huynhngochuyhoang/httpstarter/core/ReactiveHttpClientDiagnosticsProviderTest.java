@@ -553,7 +553,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider));
 
         assertThat(client)
-                .containsEntry("retry", "unavailable")
+                .containsEntry("retry", "unknown")
                 .containsEntry("strictUnsafeRetryValidation", null);
 
         resilience.setRetryMethods(Set.of());
@@ -615,7 +615,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(
                 diagnosticsProvider(beanFactory, strictRetryClientConfig())));
 
-        assertThat(client).containsEntry("strictUnsafeRetryValidation", null);
+        assertThat(client)
+                .containsEntry("retry", "unknown")
+                .containsEntry("strictUnsafeRetryValidation", null);
         assertThat(productCreations).hasValue(0);
     }
 
@@ -697,7 +699,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 diagnosticsProvider(beanFactory, strictRetryClientConfig())));
 
         assertThat(client)
-                .containsEntry("retry", "unavailable")
+                .containsEntry("retry", "unknown")
                 .containsEntry("strictUnsafeRetryValidation", null);
         assertThat(factoryCreations).hasValue(0);
         assertThat(productCreations).hasValue(0);
@@ -723,7 +725,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                     diagnosticsProvider(beanFactory, strictRetryClientConfig())));
 
             assertThat(client)
-                    .containsEntry("retry", "unavailable")
+                    .containsEntry("retry", "unknown")
                     .containsEntry("strictUnsafeRetryValidation", null);
             assertThat(factoryCreations).hasValue(0);
             assertThat(productCreations).hasValue(0);
@@ -754,7 +756,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                     diagnosticsProvider(beanFactory, strictRetryClientConfig())));
 
             assertThat(client)
-                    .containsEntry("retry", "unavailable")
+                    .containsEntry("retry", "unknown")
                     .containsEntry("strictUnsafeRetryValidation", null);
             assertThat(factoryCreations).hasValue(0);
             assertThat(productCreations).hasValue(0);
@@ -780,7 +782,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 diagnosticsProvider(beanFactory, strictRetryClientConfig())));
 
         assertThat(client)
-                .containsEntry("retry", "unavailable")
+                .containsEntry("retry", "unknown")
                 .containsEntry("strictUnsafeRetryValidation", null);
         assertThat(factoryCreations).hasValue(0);
         assertThat(productCreations).hasValue(0);
@@ -809,7 +811,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 diagnosticsProvider(beanFactory, strictRetryClientConfig())));
 
         assertThat(client)
-                .containsEntry("retry", "unavailable")
+                .containsEntry("retry", "unknown")
                 .containsEntry("strictUnsafeRetryValidation", null);
         assertThat(factoryCreations).hasValue(0);
         assertThat(productCreations).hasValue(0);

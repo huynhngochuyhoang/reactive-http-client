@@ -38,16 +38,29 @@ class PerMethodResilienceTest {
     }
 
     @Test
-    void perMethodOverrideWinsOverClientLevelInstance() {
-        // method asks for "hot-retry"; client-level config says "default-retry"
-        String resolved = invokeResolveResilienceInstanceName("hot-retry", "default-retry");
-        assertThat(resolved).isEqualTo("hot-retry");
+    void perMethodOverrideWinsOverClientLevelInstance() throws Exception {
+        ReactiveHttpClientProperties.ResilienceConfig resilience = enabledRetry("default-retry");
+        RequestPlan plan = RequestPlan.from(
+                new MethodMetadataCache().get(SampleClient.class.getMethod("hotPath")), SampleClient.class);
+
+        EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
+                plan, "GET", resilience, (type, publisherType) -> true);
+
+        assertThat(policy.retry().instanceName()).isEqualTo("hot-retry");
+        assertThat(policy.retry().source()).isEqualTo(EffectiveResiliencePolicy.Source.METHOD);
     }
 
     @Test
-    void clientLevelInstanceIsUsedWhenNoMethodOverride() {
-        String resolved = invokeResolveResilienceInstanceName(null, "default-retry");
-        assertThat(resolved).isEqualTo("default-retry");
+    void clientLevelInstanceIsUsedWhenNoMethodOverride() throws Exception {
+        ReactiveHttpClientProperties.ResilienceConfig resilience = enabledRetry("default-retry");
+        RequestPlan plan = RequestPlan.from(
+                new MethodMetadataCache().get(SampleClient.class.getMethod("coldPath")), SampleClient.class);
+
+        EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
+                plan, "GET", resilience, (type, publisherType) -> true);
+
+        assertThat(policy.retry().instanceName()).isEqualTo("default-retry");
+        assertThat(policy.retry().source()).isEqualTo(EffectiveResiliencePolicy.Source.CLIENT);
     }
 
     @Test
@@ -217,24 +230,12 @@ class PerMethodResilienceTest {
         ctx.close();
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Reflectively invokes the package-private static helper
-     * {@code resolveResilienceInstanceName} on {@link ReactiveClientInvocationHandler}
-     * so we don't have to spin up a full proxy to test the priority rule.
-     */
-    private static String invokeResolveResilienceInstanceName(String methodLevel, String clientLevel) {
-        try {
-            Method m = ReactiveClientInvocationHandler.class.getDeclaredMethod(
-                    "resolveResilienceInstanceName", String.class, String.class);
-            m.setAccessible(true);
-            return (String) m.invoke(null, methodLevel, clientLevel);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException(e);
-        }
+    private static ReactiveHttpClientProperties.ResilienceConfig enabledRetry(String instanceName) {
+        ReactiveHttpClientProperties.ResilienceConfig resilience =
+                new ReactiveHttpClientProperties.ResilienceConfig();
+        resilience.setEnabled(true);
+        resilience.setRetry(instanceName);
+        return resilience;
     }
 
     interface SampleClient {
@@ -244,6 +245,9 @@ class PerMethodResilienceTest {
         @Bulkhead("hot-bulkhead")
         @RateLimiter("hot-rate-limiter")
         Mono<String> hotPath();
+
+        @GET("/cold")
+        Mono<String> coldPath();
     }
 
     interface InvalidClient {

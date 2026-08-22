@@ -66,11 +66,25 @@ final class EffectiveHttpClientContractExporter {
                                                     Predicate<Method> methodFilter,
                                                     boolean validateResilienceInstances,
                                                     boolean validateDeclarativeReturnTypes) {
+        return export(clientInterface, clientName, clientConfig, metadataCache, resilienceOperatorApplier,
+                EffectiveResiliencePolicy.availability(resilienceOperatorApplier), methodFilter,
+                validateResilienceInstances, validateDeclarativeReturnTypes);
+    }
+
+    static List<EffectiveHttpClientContract> export(Class<?> clientInterface,
+                                                    String clientName,
+                                                    ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                                    MethodMetadataCache metadataCache,
+                                                    ResilienceOperatorApplier resilienceOperatorApplier,
+                                                    EffectiveResiliencePolicy.OperatorAvailability operatorAvailability,
+                                                    Predicate<Method> methodFilter,
+                                                    boolean validateResilienceInstances,
+                                                    boolean validateDeclarativeReturnTypes) {
         return Arrays.stream(clientInterface.getMethods())
                 .filter(EffectiveHttpClientContractExporter::isDeclarativeClientMethod)
                 .filter(method -> methodFilter == null || methodFilter.test(method))
                 .map(method -> contract(clientInterface, clientName, clientConfig, metadataCache,
-                        resilienceOperatorApplier, method, validateResilienceInstances,
+                        resilienceOperatorApplier, operatorAvailability, method, validateResilienceInstances,
                         validateDeclarativeReturnTypes))
                 .sorted(Comparator.comparing(EffectiveHttpClientContract::declaringInterface)
                         .thenComparing(EffectiveHttpClientContract::javaMethodSignature))
@@ -82,6 +96,7 @@ final class EffectiveHttpClientContractExporter {
                                                         ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                         MethodMetadataCache metadataCache,
                                                         ResilienceOperatorApplier resilienceOperatorApplier,
+                                                        EffectiveResiliencePolicy.OperatorAvailability operatorAvailability,
                                                         Method method,
                                                         boolean validateResilienceInstances,
                                                         boolean validateDeclarativeReturnTypes) {
@@ -92,8 +107,10 @@ final class EffectiveHttpClientContractExporter {
             DeclarativeReturnTypeGrammar.validate(clientInterface, clientName, plan);
         }
         EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);
+        EffectiveResiliencePolicy resiliencePolicy = EffectiveResiliencePolicy.resolve(
+                plan, effectiveApi.httpMethod(), clientConfig.getResilience(), operatorAvailability);
         if (validateResilienceInstances) {
-            validateResilienceInstances(plan, method, clientName, clientConfig, resilienceOperatorApplier);
+            validateResilienceInstances(resiliencePolicy, method, clientName, resilienceOperatorApplier);
         }
         BaseUrl effectiveBaseUrl = effectiveBaseUrl(clientInterface, clientConfig);
         if (validateDeclarativeReturnTypes) {
@@ -119,7 +136,7 @@ final class EffectiveHttpClientContractExporter {
                 plan.apiRefName(),
                 timeoutPolicy(plan, effectiveApi, clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
-                resiliencePolicy(plan, effectiveApi.httpMethod(), clientConfig, resilienceOperatorApplier),
+                resiliencePolicy(resiliencePolicy),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 authMode(clientConfig),
                 plan.bodyRepeatability());
@@ -135,37 +152,32 @@ final class EffectiveHttpClientContractExporter {
         return "none";
     }
 
-    private static void validateResilienceInstances(RequestPlan plan,
+    private static void validateResilienceInstances(EffectiveResiliencePolicy policy,
                                                     Method method,
                                                     String clientName,
-                                                    ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                     ResilienceOperatorApplier applier) {
-        if (applier == null || clientConfig.getResilience() == null
-                || !clientConfig.getResilience().isEnabled()) {
+        if (applier == null) {
             return;
         }
-        validateResilienceInstance(applier, ResilienceOperatorApplier.InstanceType.RETRY,
-                plan.retryInstanceName(), method, clientName, "@Retry");
-        validateResilienceInstance(applier, ResilienceOperatorApplier.InstanceType.RATE_LIMITER,
-                plan.rateLimiterInstanceName(), method, clientName, "@RateLimiter");
-        validateResilienceInstance(applier, ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER,
-                plan.circuitBreakerInstanceName(), method, clientName, "@CircuitBreaker");
-        validateResilienceInstance(applier, ResilienceOperatorApplier.InstanceType.BULKHEAD,
-                plan.bulkheadInstanceName(), method, clientName, "@Bulkhead");
+        validateResilienceInstance(applier, policy.retry(), method, clientName, "@Retry");
+        validateResilienceInstance(applier, policy.rateLimiter(), method, clientName, "@RateLimiter");
+        validateResilienceInstance(applier, policy.circuitBreaker(), method, clientName, "@CircuitBreaker");
+        validateResilienceInstance(applier, policy.bulkhead(), method, clientName, "@Bulkhead");
     }
 
     private static void validateResilienceInstance(ResilienceOperatorApplier applier,
-                                                   ResilienceOperatorApplier.InstanceType type,
-                                                   String instanceName,
+                                                   EffectiveResiliencePolicy.Operator operator,
                                                    Method method,
                                                    String clientName,
                                                    String annotationName) {
-        if (!StringUtils.hasText(instanceName) || applier.isInstanceConfigured(type, instanceName)) {
+        if (!operator.active()
+                || operator.source() != EffectiveResiliencePolicy.Source.METHOD
+                || applier.isInstanceConfigured(operator.type(), operator.instanceName())) {
             return;
         }
         throw new IllegalStateException("Reactive HTTP client '" + clientName
                 + "' references undefined Resilience4j instance " + annotationName + "(\""
-                + instanceName + "\") on " + method.getDeclaringClass().getSimpleName()
+                + operator.instanceName() + "\") on " + method.getDeclaringClass().getSimpleName()
                 + "#" + method.getName());
     }
 
@@ -244,54 +256,12 @@ final class EffectiveHttpClientContractExporter {
     }
 
     private static EffectiveHttpClientContract.ResiliencePolicy resiliencePolicy(
-            RequestPlan plan,
-            String httpMethod,
-            ReactiveHttpClientProperties.ClientConfig clientConfig,
-            ResilienceOperatorApplier resilienceOperatorApplier) {
-        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
-        if (resilience == null || !resilience.isEnabled()) {
-            return new EffectiveHttpClientContract.ResiliencePolicy(
-                    "disabled", "disabled", "disabled", "disabled");
-        }
-        String retry = isRetryableMethod(httpMethod, resilience)
-                ? operatorInstance(resilienceOperatorApplier, ResilienceOperatorApplier.InstanceType.RETRY,
-                        plan.retryInstanceName(), resilience.getRetry())
-                : "disabled";
+            EffectiveResiliencePolicy policy) {
         return new EffectiveHttpClientContract.ResiliencePolicy(
-                retry,
-                operatorInstance(resilienceOperatorApplier, ResilienceOperatorApplier.InstanceType.RATE_LIMITER,
-                        plan.rateLimiterInstanceName(), resilience.getRateLimiter()),
-                operatorInstance(resilienceOperatorApplier, ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER,
-                        plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker()),
-                operatorInstance(resilienceOperatorApplier, ResilienceOperatorApplier.InstanceType.BULKHEAD,
-                        plan.bulkheadInstanceName(), resilience.getBulkhead()));
-    }
-
-    private static String operatorInstance(ResilienceOperatorApplier resilienceOperatorApplier,
-                                           ResilienceOperatorApplier.InstanceType type,
-                                           String methodLevel,
-                                           String clientLevel) {
-        String instanceName = resolve(methodLevel, clientLevel);
-        if (!StringUtils.hasText(instanceName)) {
-            return "disabled";
-        }
-        if (resilienceOperatorApplier != null && !resilienceOperatorApplier.isOperatorAvailable(type)) {
-            return "unavailable";
-        }
-        return instanceName;
-    }
-
-    private static boolean isRetryableMethod(String httpMethod, ReactiveHttpClientProperties.ResilienceConfig resilience) {
-        return httpMethod != null
-                && resilience.getRetryMethods() != null
-                && resilience.getRetryMethods().contains(httpMethod.toUpperCase(Locale.ROOT));
-    }
-
-    private static String resolve(String methodLevel, String clientLevel) {
-        if (StringUtils.hasText(methodLevel)) {
-            return methodLevel;
-        }
-        return StringUtils.hasText(clientLevel) ? clientLevel : null;
+                policy.retry().diagnosticValue(),
+                policy.rateLimiter().diagnosticValue(),
+                policy.circuitBreaker().diagnosticValue(),
+                policy.bulkhead().diagnosticValue());
     }
 
     static String genericBindings(Class<?> clientInterface, Method method) {

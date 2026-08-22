@@ -22,7 +22,18 @@ operator composition order, retry-method eligibility, or master-gate meaning.
 | Method-level resilience annotation | Selects that method's instance under the enabled master gate. | Unchanged explicit selection and precedence. | None. |
 | Blank or absent client-level instance | A blank configured value is forwarded to the operator applier rather than treated as disabled. An absent property retains the constructor value `default`; blank method annotations are rejected. | Disabled for that operator. | Use explicit `default` instead of relying on absence or a blank value. |
 | `retry-methods` only | Restricts eligibility for the Retry selected by the default property. | Remains eligibility only and does not activate Retry. | Add `retry: default` or a named Retry when retry is intended. |
+| Selected operator with no matching registry/adapter | The configured operator is passed through a no-op application boundary. | The effective policy is `unavailable`; no operator is applied or subscribed. | Add the matching Resilience4j registry and Reactor adapter, or remove the selection. |
+| Selected operator with a lazy registry that diagnostics cannot inspect safely | Runtime client creation resolves the registry; support snapshots can otherwise understate the selection as unavailable. | Support snapshots report `unknown` without creating the lazy registry or `FactoryBean` product. | Treat `unknown` as unproven and inspect the application-context lifecycle before changing policy. |
 | Strict unsafe-retry validation | Runs only when an effective Retry can make another attempt. | Same rule; an unselected Retry keeps validation dormant. | None unless the client relied on implicit Retry activation. |
+
+The effective policy uses four stable states on every starter surface:
+
+| State | Meaning |
+|---|---|
+| `disabled` | The master gate is off, the instance selection is blank/absent, or Retry is not eligible for the resolved HTTP method. |
+| `unavailable` | An instance is selected, but the matching operator registry or adapter is not available. |
+| instance name | The selected operator is available and active. |
+| `unknown` | Diagnostics cannot prove availability without creating a lazy registry or `FactoryBean` product. Runtime client construction still resolves its normal dependencies. |
 
 Equivalent explicit single-operator configuration:
 
@@ -38,6 +49,22 @@ reactive:
 
 Do not add CircuitBreaker, Bulkhead, or RateLimiter properties unless those
 operators are intended for this client.
+
+To retain the published `3.6.0` enabled-only behavior exactly, select all four
+default instances explicitly:
+
+```yaml
+reactive:
+  http:
+    clients:
+      legacy-all-operators:
+        resilience:
+          enabled: true
+          retry: default
+          rate-limiter: default
+          circuit-breaker: default
+          bulkhead: default
+```
 
 ## Initial API report
 

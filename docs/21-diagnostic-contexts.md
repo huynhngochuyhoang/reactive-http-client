@@ -246,6 +246,12 @@ validation flags, endpoint count, and inherited endpoint count. Strict flags are
 true only when the corresponding validation path is active for the resolved
 client configuration.
 
+Resilience fields use the same effective policy as invocation and startup:
+`disabled` means no effective selection, `unavailable` means selected without a
+matching runtime operator, an instance name means active, and `unknown` means a
+lazy registry or `FactoryBean` product cannot be inspected without side effects.
+Reading diagnostics does not create those lazy components.
+
 This endpoint is for support-safe configured-client diagnostics. It uses the
 same sanitized fields as `ReactiveHttpClientDiagnosticsSnapshot`; it does not
 include concrete base URL values, header values, auth-provider bean names, proxy

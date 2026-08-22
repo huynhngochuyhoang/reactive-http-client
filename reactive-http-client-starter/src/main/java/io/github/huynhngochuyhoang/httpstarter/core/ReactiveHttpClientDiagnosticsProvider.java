@@ -52,7 +52,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 .map(this::clientRegistration)
                 .filter(Objects::nonNull)
                 .distinct()
-                .map(registration -> clientSummaryEntry(registration, resilienceDiagnostics.operatorApplier()))
+                .map(registration -> clientSummaryEntry(registration, resilienceDiagnostics))
                 .sorted(Comparator.comparing(ClientSummary::clientName)
                         .thenComparing(ClientSummary::clientInterface))
                 .toList();
@@ -73,14 +73,15 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     private ClientSummary clientSummaryEntry(ClientRegistration registration,
-                                             ResilienceOperatorApplier resilienceOperatorApplier) {
+                                             ResilienceDiagnostics resilienceDiagnostics) {
         Class<?> clientInterface = registration.clientInterface();
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         String clientName = annotation != null ? annotation.name() : "";
         ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
         return clientSummary(clientInterface, clientName, clientConfig, metadataCache,
-                resilienceOperatorApplier, registration.starterFactory());
+                resilienceDiagnostics.operatorApplier(), resilienceDiagnostics.operatorAvailability(),
+                registration.starterFactory());
     }
 
     private ClientSnapshotEntry clientSnapshotEntry(ClientRegistration registration,
@@ -93,11 +94,11 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
         ClientSummary summary = clientSummary(
                 clientInterface, clientName, clientConfig, metadataCache, resilienceDiagnostics.operatorApplier(),
+                resilienceDiagnostics.operatorAvailability(),
                 registration.starterFactory());
         return new ClientSnapshotEntry(
                 summary,
-                strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceDiagnostics.operatorApplier(),
-                        resilienceDiagnostics.retryRegistryUnresolved()),
+                strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceDiagnostics),
                 strictBodySigningValidation(clientConfig, authProviderFactories),
                 poolSummary(clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
@@ -111,7 +112,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                                        MethodMetadataCache metadataCache,
                                        ResilienceOperatorApplier resilienceOperatorApplier) {
         return clientSummary(clientInterface, clientName, clientConfig, metadataCache,
-                resilienceOperatorApplier, true);
+                resilienceOperatorApplier, EffectiveResiliencePolicy.availability(resilienceOperatorApplier), true);
     }
 
     private static ClientSummary clientSummary(Class<?> clientInterface,
@@ -119,6 +120,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                                                ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                MethodMetadataCache metadataCache,
                                                ResilienceOperatorApplier resilienceOperatorApplier,
+                                               EffectiveResiliencePolicy.OperatorAvailability operatorAvailability,
                                                boolean validateDeclarativeReturnTypes) {
         ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
         ReactiveHttpClientProperties.ClientConfig resolvedConfig = clientConfig != null
@@ -126,7 +128,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 : new ReactiveHttpClientProperties.ClientConfig();
         List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
                 clientInterface, clientName, resolvedConfig, metadataCache, resilienceOperatorApplier,
-                null, false, validateDeclarativeReturnTypes);
+                operatorAvailability, null, false, validateDeclarativeReturnTypes);
         long inherited = contracts.stream()
                 .filter(EffectiveHttpClientContract::inherited)
                 .count();
@@ -264,16 +266,13 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     private Boolean strictUnsafeRetryValidation(Class<?> clientInterface,
                                                 ReactiveHttpClientProperties.ClientConfig clientConfig,
-                                                ResilienceOperatorApplier resilienceOperatorApplier,
-                                                boolean retryRegistryUnresolved) {
+                                                ResilienceDiagnostics resilienceDiagnostics) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null
                 || !resilience.isEnabled()
                 || !resilience.isStrictUnsafeRetryValidation()) {
             return false;
         }
-        boolean retryOperatorAvailable = resilienceOperatorApplier.isOperatorAvailable(
-                ResilienceOperatorApplier.InstanceType.RETRY);
         boolean unresolvedRetry = false;
         for (Method method : clientInterface.getMethods()) {
             if (!isDeclarativeClientMethod(method)) {
@@ -281,26 +280,25 @@ public class ReactiveHttpClientDiagnosticsProvider {
             }
             MethodMetadata meta = metadataCache.get(method);
             String httpMethod = diagnosticHttpMethod(meta, clientConfig);
-            if (!isRetryMethodEnabled(resilience, httpMethod)) {
-                continue;
-            }
             RequestPlan plan = RequestPlan.from(meta, clientInterface);
-            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
-            if (!StringUtils.hasText(retryInstance)) {
+            EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
+                    plan, httpMethod, resilience, resilienceDiagnostics.operatorAvailability());
+            if (policy.retry().state() == EffectiveResiliencePolicy.State.DISABLED) {
                 continue;
             }
-            if (retryRegistryUnresolved) {
+            if (policy.retry().state() == EffectiveResiliencePolicy.State.UNKNOWN) {
                 return null;
             }
-            if (!retryOperatorAvailable) {
+            if (policy.retry().state() == EffectiveResiliencePolicy.State.SELECTED_UNAVAILABLE) {
                 return false;
             }
-            if (!resilienceOperatorApplier.isInstanceConfigured(
+            String retryInstance = policy.retry().instanceName();
+            if (!resilienceDiagnostics.operatorApplier().isInstanceConfigured(
                     ResilienceOperatorApplier.InstanceType.RETRY, retryInstance)) {
                 unresolvedRetry = true;
                 continue;
             }
-            if (resilienceOperatorApplier.canRetryMoreThanOnce(retryInstance)) {
+            if (resilienceDiagnostics.operatorApplier().canRetryMoreThanOnce(retryInstance)) {
                 return true;
             }
         }
@@ -392,20 +390,6 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return null;
     }
 
-    private static boolean isRetryMethodEnabled(ReactiveHttpClientProperties.ResilienceConfig resilience,
-                                                String httpMethod) {
-        return httpMethod != null
-                && resilience.getRetryMethods() != null
-                && resilience.getRetryMethods().contains(httpMethod.toUpperCase(Locale.ROOT));
-    }
-
-    private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {
-        if (StringUtils.hasText(methodLevel)) {
-            return methodLevel;
-        }
-        return StringUtils.hasText(clientLevel) ? clientLevel : null;
-    }
-
     private static boolean isDeclarativeClientMethod(Method method) {
         int modifiers = method.getModifiers();
         return method.getDeclaringClass() != Object.class
@@ -431,7 +415,20 @@ public class ReactiveHttpClientDiagnosticsProvider {
         } catch (LinkageError error) {
             operatorApplier = new NoopResilienceOperatorApplier();
         }
-        return new ResilienceDiagnostics(operatorApplier, retryRegistry.unresolved());
+        ResilienceOperatorApplier resolvedApplier = operatorApplier;
+        EffectiveResiliencePolicy.OperatorAvailability operatorAvailability = (type, publisherShape) -> {
+            ExistingBeanLookup lookup = switch (type) {
+                case RETRY -> retryRegistry;
+                case CIRCUIT_BREAKER -> circuitBreakerRegistry;
+                case BULKHEAD -> bulkheadRegistry;
+                case RATE_LIMITER -> rateLimiterRegistry;
+            };
+            return lookup.unresolved()
+                    ? null
+                    : EffectiveResiliencePolicy.isOperatorAvailable(
+                            resolvedApplier, type, publisherShape);
+        };
+        return new ResilienceDiagnostics(operatorApplier, operatorAvailability);
     }
 
     private ExistingBeanLookup existingBean(String className) {
@@ -748,7 +745,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
 
     private record ResilienceDiagnostics(
             ResilienceOperatorApplier operatorApplier,
-            boolean retryRegistryUnresolved) {
+            EffectiveResiliencePolicy.OperatorAvailability operatorAvailability) {
     }
 
     private record ExistingBeanLookup(Object value, boolean unresolved) {

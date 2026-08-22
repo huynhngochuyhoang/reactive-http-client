@@ -653,7 +653,7 @@
     {
       "name": "reactive.http.clients.[name].resilience.enabled",
       "type": "java.lang.Boolean",
-      "description": "Master switch for Resilience4j operators (retry, circuit-breaker, bulkhead, rate-limiter) on this client. Default: false.",
+      "description": "Master switch for Resilience4j operators on this client. Enabling it does not select Retry, CircuitBreaker, Bulkhead, or RateLimiter; select each intended operator explicitly. Default: false.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
       "defaultValue": false
     },

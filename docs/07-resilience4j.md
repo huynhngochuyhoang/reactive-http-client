@@ -365,7 +365,14 @@ resilience4j:
 
 ### Important: instance validation at startup
 
-All instance names referenced by `@Retry`, `@RateLimiter`, `@CircuitBreaker`, and `@Bulkhead` are validated when the proxy is constructed. If any instance is missing, the starter fails fast with an `IllegalStateException` that lists every missing instance name. This prevents typos from silently falling back to a default-configured instance.
+Effective method-level instance names referenced by `@Retry`, `@RateLimiter`,
+`@CircuitBreaker`, and `@Bulkhead` are validated when the matching operator is
+available and the proxy is constructed. Retry must also be eligible for the
+resolved HTTP method. If an active method-level instance is missing, the starter
+fails fast with an `IllegalStateException` that lists every missing instance
+name. An unavailable operator cannot validate names and remains pass-through;
+diagnostics report it as `unavailable` rather than claiming the instance is
+active.
 
 Per-method annotations are still gated on the client having `resilience.enabled: true`. Methods without an override inherit the client-level config.
 
