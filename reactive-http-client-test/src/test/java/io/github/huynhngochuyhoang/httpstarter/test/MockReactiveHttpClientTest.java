@@ -758,6 +758,38 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void customNoopSubclassApplyOverrideRemainsActiveWithoutAvailabilityOverride() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("legacy-custom");
+        config.getResilience().setRetryMethods(Set.of("GET"));
+        AtomicInteger served = new AtomicInteger();
+        AtomicInteger applications = new AtomicInteger();
+        ResilienceOperatorApplier custom = new NoopResilienceOperatorApplier() {
+            @Override
+            public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
+                applications.incrementAndGet();
+                return mono.retry(1);
+            }
+        };
+
+        MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .clientConfig(config)
+                .resilienceOperatorApplier(custom)
+                .respondTo(HttpMethod.GET, "/users/42", exchange -> served.incrementAndGet() == 1
+                        ? MockReactiveHttpClient.text(503, "retry")
+                        : MockReactiveHttpClient.text(200, "alice"))
+                .build();
+
+        StepVerifier.create(mock.proxy().getUser(42))
+                .expectNext("alice")
+                .verifyComplete();
+
+        assertThat(applications).hasValue(1);
+        RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(HttpMethod.GET, "/users/42", 2);
+    }
+
+    @Test
     void mockBuildUsesProductionStrictUnsafeRetryValidation() {
         ReactiveHttpClientProperties.ClientConfig config = strictMockRetryConfig();
 

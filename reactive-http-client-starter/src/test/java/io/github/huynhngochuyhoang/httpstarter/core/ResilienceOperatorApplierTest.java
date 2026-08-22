@@ -16,6 +16,8 @@ import reactor.test.StepVerifier;
 
 import java.time.Duration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 class ResilienceOperatorApplierTest {
 
     // -------------------------------------------------------------------------
@@ -109,6 +111,46 @@ class ResilienceOperatorApplierTest {
             StepVerifier.create(applier.applyRateLimiter(Mono.error(new RuntimeException("err")), "rl"))
                     .expectErrorMessage("err")
                     .verify();
+        }
+
+        @Test
+        void exactNoopReportsEveryOperatorUnavailable() {
+            assertThat(ResilienceOperatorApplier.InstanceType.values())
+                    .allSatisfy(type -> assertThat(applier.isOperatorAvailable(type)).isFalse());
+        }
+
+        @Test
+        void subclassApplyOverridesDeclareOnlyImplementedOperatorsAvailable() {
+            ResilienceOperatorApplier custom = new NoopResilienceOperatorApplier() {
+                @Override
+                public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
+                    return mono.retry(1);
+                }
+
+                @Override
+                public <T> Flux<T> applyBulkhead(Flux<T> flux, String instanceName) {
+                    return flux;
+                }
+            };
+
+            assertThat(custom.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)).isTrue();
+            assertThat(custom.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.BULKHEAD)).isTrue();
+            assertThat(custom.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER)).isFalse();
+            assertThat(custom.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RATE_LIMITER)).isFalse();
+
+            ResilienceOperatorApplier explicitlyUnavailable = new NoopResilienceOperatorApplier() {
+                @Override
+                public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
+                    return mono.retry(1);
+                }
+
+                @Override
+                public boolean isOperatorAvailable(InstanceType type) {
+                    return false;
+                }
+            };
+            assertThat(explicitlyUnavailable.isOperatorAvailable(
+                    ResilienceOperatorApplier.InstanceType.RETRY)).isFalse();
         }
     }
 

@@ -494,6 +494,12 @@ Mono<User> createUser(@Body NewUser body);
 Mono<User> createUser(@Body NewUser body);
 ```
 
-Per-method annotations take precedence over `resilience.retry` / `.rate-limiter` / `.circuit-breaker` / `.bulkhead`. The starter validates all referenced instances at proxy-construction time and fails fast with a descriptive `IllegalStateException` for every missing instance, so typos cannot silently fall back to a default-configured instance.
+Per-method annotations take precedence over `resilience.retry` /
+`.rate-limiter` / `.circuit-breaker` / `.bulkhead`. At proxy construction, the
+starter validates an effective method-level instance only when the master gate
+is enabled and the matching operator is available. `@Retry` must also be
+eligible for the resolved HTTP method. A missing active instance fails fast
+with a descriptive `IllegalStateException`; an unavailable operator is reported
+as `unavailable` and cannot validate its instance name.
 
 See [07-resilience4j.md](07-resilience4j.md) for full usage and configuration.
