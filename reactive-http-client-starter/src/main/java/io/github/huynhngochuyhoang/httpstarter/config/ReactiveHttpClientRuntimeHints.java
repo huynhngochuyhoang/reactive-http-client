@@ -46,6 +46,8 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
             CircuitBreaker.class,
             Bulkhead.class,
             RateLimiter.class,
+            CacheResponse.class,
+            CacheDisabled.class,
             LogHttpExchange.class
     };
 
@@ -63,6 +65,9 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
             ReactiveHttpClientProperties.OAuth2TokenServiceConfig.class,
             ReactiveHttpClientProperties.AwsSigV4AuthConfig.class,
             ReactiveHttpClientProperties.ApiConfig.class,
+            ReactiveHttpClientProperties.CacheConfig.class,
+            ReactiveHttpClientProperties.CachePolicyConfig.class,
+            ReactiveHttpClientProperties.CacheCustomizationSafety.class,
             ReactiveHttpClientProperties.ResilienceConfig.class,
             ReactiveHttpClientProperties.ObservabilityConfig.class,
             ReactiveHttpClientProperties.HistogramConfig.class,

@@ -717,6 +717,9 @@ class ReactiveHttpClientConfigurationMetadataTest {
             value = value.replaceAll("\\.apis\\.\\[[^]]+]$", ".apis");
             value = value.replaceAll("\\.apis\\.[^.]+$", ".apis");
         }
+        value = value.replaceAll("\\.cache\\.policies\\.[^.]+(?=\\.)",
+                ".cache.policies.[policy-name]");
+        value = value.replaceAll("\\.cache\\.customizations\\..+$", ".cache.customizations");
         value = value.replaceAll("\\.default-headers\\..+$", ".default-headers");
         value = value.replaceAll("\\.default-query-params\\..+$", ".default-query-params");
         return value;

@@ -18,6 +18,7 @@ record EffectiveHttpClientContract(
         TimeoutPolicy timeout,
         long logicalCallTimeoutMs,
         ResiliencePolicy resilience,
+        CachePolicy cache,
         String redirectPolicy,
         String authMode,
         RequestBodyRepeatability bodyRepeatability
@@ -27,5 +28,8 @@ record EffectiveHttpClientContract(
     }
 
     record ResiliencePolicy(String retry, String rateLimiter, String circuitBreaker, String bulkhead) {
+    }
+
+    record CachePolicy(boolean enabled, String source, long ttlMs, long maximumSize) {
     }
 }

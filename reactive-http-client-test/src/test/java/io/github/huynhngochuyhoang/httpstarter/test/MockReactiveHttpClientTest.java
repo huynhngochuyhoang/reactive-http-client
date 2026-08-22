@@ -80,6 +80,12 @@ class MockReactiveHttpClientTest {
         Mono<String> find();
     }
 
+    interface InvalidCacheMockClient {
+        @POST("/cached")
+        @CacheResponse("selected")
+        Mono<String> create();
+    }
+
     interface ApiRefUriClient {
         @ApiRef("lookup")
         Mono<String> find(
@@ -806,6 +812,23 @@ class MockReactiveHttpClientTest {
                 .hasMessageContaining("strict unsafe retry validation")
                 .hasMessageContaining("StrictUnsafeMockClient#create")
                 .hasMessageContaining("retry=mock");
+    }
+
+    @Test
+    void mockBuildUsesProductionCacheEligibilityGrammar() {
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+
+        assertThatThrownBy(() -> MockReactiveHttpClient.forClient(InvalidCacheMockClient.class)
+                .clientConfig(config)
+                .build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("InvalidCacheMockClient")
+                .hasMessageContaining("method=")
+                .hasMessageContaining("only GET methods");
     }
 
     @Test

@@ -130,8 +130,8 @@ public final class ReactiveHttpClientContractSnapshot {
                     .toList();
 
             StringBuilder markdown = new StringBuilder();
-            markdown.append("| Client | Interface | Declared By | Inherited | Method | Generic Bindings | Response Type | Body Type | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Response Timeout | Logical-Call Budget | Resilience | Redirect | Auth | Body |\n");
-            markdown.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+            markdown.append("| Client | Interface | Declared By | Inherited | Method | Generic Bindings | Response Type | Body Type | HTTP | Path | Base URL | Base URL Source | API Name | API Ref | Response Timeout | Logical-Call Budget | Resilience | Cache | Redirect | Auth | Body |\n");
+            markdown.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
             for (EffectiveHttpClientContract contract : contracts) {
                 markdown.append("| ")
                         .append(cell(contract.clientName())).append(" | ")
@@ -151,6 +151,7 @@ public final class ReactiveHttpClientContractSnapshot {
                         .append(cell(timeout(contract.timeout()))).append(" | ")
                         .append(cell(contract.logicalCallTimeoutMs() + "ms")).append(" | ")
                         .append(cell(resilience(contract.resilience()))).append(" | ")
+                        .append(cell(cache(contract.cache()))).append(" | ")
                         .append(cell(contract.redirectPolicy())).append(" | ")
                         .append(cell(contract.authMode())).append(" | ")
                         .append(cell(contract.bodyRepeatability())).append(" |\n");
@@ -170,6 +171,13 @@ public final class ReactiveHttpClientContractSnapshot {
             return methodNameFilters.contains(method.getName())
                     || methodNameFilters.contains(signature);
         }
+    }
+
+    private static String cache(EffectiveHttpClientContract.CachePolicy cache) {
+        if (cache == null || !cache.enabled()) {
+            return cache != null ? cache.source() : "disabled";
+        }
+        return cache.source() + ":ttl=" + cache.ttlMs() + "ms,max=" + cache.maximumSize();
     }
 
     private static String methodSignature(Method method) {

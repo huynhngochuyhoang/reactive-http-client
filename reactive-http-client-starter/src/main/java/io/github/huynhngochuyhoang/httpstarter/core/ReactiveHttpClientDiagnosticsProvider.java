@@ -79,6 +79,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
         String clientName = annotation != null ? annotation.name() : "";
         ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
+        validateCacheCustomizations(registration, clientInterface, clientName, clientConfig);
         return clientSummary(clientInterface, clientName, clientConfig, metadataCache,
                 resilienceDiagnostics.operatorApplier(), resilienceDiagnostics.operatorAvailability(),
                 registration.starterFactory());
@@ -92,6 +93,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
         String clientName = annotation != null ? annotation.name() : "";
         ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                 .getOrDefault(clientName, new ReactiveHttpClientProperties.ClientConfig());
+        validateCacheCustomizations(registration, clientInterface, clientName, clientConfig);
         ClientSummary summary = clientSummary(
                 clientInterface, clientName, clientConfig, metadataCache, resilienceDiagnostics.operatorApplier(),
                 resilienceDiagnostics.operatorAvailability(),
@@ -104,6 +106,16 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 clientConfig.getLogicalCallTimeoutMs(),
                 clientConfig.isCompressionEnabled(),
                 clientConfig.getCodecMaxInMemorySizeMb());
+    }
+
+    private void validateCacheCustomizations(ClientRegistration registration,
+                                             Class<?> clientInterface,
+                                             String clientName,
+                                             ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (registration.starterFactory()) {
+            metadataCache.validateDeclarativeCacheCustomizations(
+                    beanFactory, clientInterface, clientName, clientConfig);
+        }
     }
 
     static ClientSummary clientSummary(Class<?> clientInterface,

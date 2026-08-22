@@ -191,6 +191,31 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void starterClientsUseCacheEligibilityGrammarInDiagnostics() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, InvalidCacheDiagnosticClient.class);
+        beanFactory.registerBeanDefinition("invalidCacheDiagnosticClient", definition);
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("invalid-cache-diagnostic", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        assertThatThrownBy(provider::clientSummaries)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("invalid-cache-diagnostic")
+                .hasMessageContaining("concreteClient=" + InvalidCacheDiagnosticClient.class.getName())
+                .hasMessageContaining("method=")
+                .hasMessageContaining("only GET methods");
+    }
+
+    @Test
     void clientSummariesDoNotResolveStrictAuthProviders() {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         GenericBeanDefinition definition = new GenericBeanDefinition();
@@ -1913,6 +1938,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     interface ReplacementDiagnosticClient {
 
         @GET("/nested")
+        @CacheResponse("foreign-policy")
         Mono<Mono<String>> nested(@QueryParam("item") @HeaderParam("X-Item") String item);
     }
 
@@ -1922,6 +1948,15 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     interface InvalidParameterDiagnosticClient {
         @GET("/items")
         Mono<String> find(@QueryParam("item") @HeaderParam("X-Item") String item);
+    }
+
+    @ReactiveHttpClient(
+            name = "invalid-cache-diagnostic",
+            baseUrl = "http://invalid-cache-diagnostic.test")
+    interface InvalidCacheDiagnosticClient {
+        @POST("/items")
+        @CacheResponse("selected")
+        Mono<String> create();
     }
 
     @SuppressWarnings("rawtypes")

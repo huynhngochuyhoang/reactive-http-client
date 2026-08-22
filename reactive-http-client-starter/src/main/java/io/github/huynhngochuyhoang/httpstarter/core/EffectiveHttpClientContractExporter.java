@@ -107,6 +107,10 @@ final class EffectiveHttpClientContractExporter {
             DeclarativeReturnTypeGrammar.validate(clientInterface, clientName, plan);
         }
         EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);
+        EffectiveCachePolicy.Selection cachePolicy = validateDeclarativeReturnTypes
+                ? EffectiveCachePolicy.validate(
+                        clientInterface, clientName, plan, clientConfig, effectiveApi.httpMethod())
+                : EffectiveCachePolicy.resolve(plan, clientConfig);
         EffectiveResiliencePolicy resiliencePolicy = EffectiveResiliencePolicy.resolve(
                 plan, effectiveApi.httpMethod(), clientConfig.getResilience(), operatorAvailability);
         if (validateResilienceInstances) {
@@ -137,9 +141,20 @@ final class EffectiveHttpClientContractExporter {
                 timeoutPolicy(plan, effectiveApi, clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
                 resiliencePolicy(resiliencePolicy),
+                cachePolicy(cachePolicy),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 authMode(clientConfig),
                 plan.bodyRepeatability());
+    }
+
+    private static EffectiveHttpClientContract.CachePolicy cachePolicy(
+            EffectiveCachePolicy.Selection selection) {
+        ReactiveHttpClientProperties.CachePolicyConfig policy = selection.policy();
+        return new EffectiveHttpClientContract.CachePolicy(
+                selection.enabled(),
+                selection.source().value(),
+                policy != null && policy.getTtlMs() != null ? policy.getTtlMs() : 0,
+                policy != null && policy.getMaximumSize() != null ? policy.getMaximumSize() : 0);
     }
 
     private static String authMode(ReactiveHttpClientProperties.ClientConfig clientConfig) {

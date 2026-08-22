@@ -364,6 +364,7 @@ public final class MockReactiveHttpClient<T> {
             methodMetadataCache.validateDeclarativeRequestParameters(clientInterface, clientName);
             methodMetadataCache.validateDeclarativeUriTemplates(clientInterface, clientName, clientConfig.getApis());
             methodMetadataCache.validateDeclarativeReturnTypes(clientInterface, clientName);
+            methodMetadataCache.validateDeclarativeCachePolicies(clientInterface, clientName, clientConfig);
 
             List<RecordedExchange> exchanges = new CopyOnWriteArrayList<>();
             List<Matcher> liveMatchers = new CopyOnWriteArrayList<>(matchers);
@@ -423,6 +424,8 @@ public final class MockReactiveHttpClient<T> {
                 appCtx.getBeanFactory().registerSingleton("mockReactiveHttpClientLifecycleHook" + i, lifecycleHooks.get(i));
             }
             appCtx.refresh();
+            methodMetadataCache.validateDeclarativeCacheCustomizations(
+                    appCtx, clientInterface, clientName, clientConfig);
 
             ReactiveHttpClientJsonCodec effectiveJsonCodec = jsonCodec;
             if (authProvider != null) {

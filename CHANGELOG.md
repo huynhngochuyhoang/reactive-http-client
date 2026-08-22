@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Cache opt-in and declarative eligibility grammar.** Added inert named cache
+  policies, explicit client/method selection, `@CacheDisabled` method exclusion,
+  finite TTL/capacity validation, and startup rejection for non-GET, streaming,
+  unresolved, application-owned, and unclassified-customization contracts.
+  This change freezes the cache contract only; it does not store or reuse
+  responses before V27 key and isolation work is complete.
 - **Open the V27 major development lane.** Moved reactor-only coordinates and
   assembled current-consumer/native fixtures to `4.0.0-SNAPSHOT` while keeping
   public examples plus API, consumer, and benchmark baselines on published

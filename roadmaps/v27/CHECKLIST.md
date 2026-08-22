@@ -240,51 +240,84 @@ Evidence recorded on 2026-08-22:
 
 ## Priority 4 - Cache Opt-In and Declarative Eligibility Grammar
 
-### [ ] 4.1 Freeze the public cache policy model
+### [x] 4.1 Freeze the public cache policy model
 
-- [ ] Choose and document the final client-level and method-level activation
+- [x] Choose and document the final client-level and method-level activation
       API before adding it to public compatibility filters.
-- [ ] Keep caching disabled when no client or method explicitly selects a
+- [x] Keep caching disabled when no client or method explicitly selects a
       policy; adding the cache dependency or declaring defaults activates
       nothing.
-- [ ] Define method-over-client precedence and an explicit method exclusion for
+- [x] Define method-over-client precedence and an explicit method exclusion for
       client-wide caching.
-- [ ] Require positive finite TTL and maximum size for every selected policy.
-- [ ] Reject missing, zero, negative, overflow, and impractical bounds at
+- [x] Require positive finite TTL and maximum size for every selected policy.
+- [x] Reject missing, zero, negative, overflow, and impractical bounds at
       startup with client and method/policy identity.
 
-### [ ] 4.2 Define eligible response contracts
+### [x] 4.2 Define eligible response contracts
 
-- [ ] Initially accept only explicitly selected `GET` methods returning finite
+- [x] Initially accept only explicitly selected `GET` methods returning finite
       `Mono<T>` or `Mono<ResponseEntity<T>>` values.
-- [ ] Reject `Flux`, `Mono<Void>`, streaming envelopes, `DataBuffer`, Publisher,
+- [x] Reject `Flux`, `Mono<Void>`, streaming envelopes, `DataBuffer`, Publisher,
       Resource, multipart/stream bodies, and unresolved generic values at
       startup when caching is selected.
-- [ ] Cache only successful non-null emissions after decoding.
-- [ ] Never cache empty completion, cancellation, redirect, auth/decode/
+- [x] Cache only successful non-null emissions after decoding.
+- [x] Never cache empty completion, cancellation, redirect, auth/decode/
       transport/resilience error, or mapped 4xx/5xx failure.
-- [ ] Document cached `ResponseEntity` status/header semantics without claiming
+- [x] Document cached `ResponseEntity` status/header semantics without claiming
       a new wire response on a hit.
 
-### [ ] 4.3 Apply eligibility consistently
+### [x] 4.3 Apply eligibility consistently
 
-- [ ] Define a cache-aware pre-lookup policy boundary that runs authorization,
+- [x] Define a cache-aware pre-lookup policy boundary that runs authorization,
       tenant, and other required per-invocation gates before every hit or miss.
-- [ ] Inventory every applicable Boot `WebClientCustomizer` and per-client
+- [x] Inventory every applicable Boot `WebClientCustomizer` and per-client
       `ReactiveHttpClientCustomizer`, including filters, `defaultRequest`,
       exchange-function replacement, codecs/connectors, and other builder
       mutations.
-- [ ] Classify each customization as cache-safe, represented by a pre-lookup
+- [x] Classify each customization as cache-safe, represented by a pre-lookup
       gate or key/variant contribution, or cache-incompatible; reject caching
       when any applicable customization or later builder mutation is unknown.
-- [ ] Resolve inherited methods, overloads, nested generic bindings, and
+- [x] Resolve inherited methods, overloads, nested generic bindings, and
       `@ApiRef` cache metadata against the concrete client.
-- [ ] Run the same validation during starter proxy startup, effective-contract
+- [x] Run the same validation during starter proxy startup, effective-contract
       export, diagnostics, AOT, and mock construction.
-- [ ] Respect replacement `MethodMetadataCache` behavior and skip starter-only
+- [x] Respect replacement `MethodMetadataCache` behavior and skip starter-only
       grammar for foreign `FactoryBean` clients.
-- [ ] Add startup failure-message tests naming the concrete client, method, and
+- [x] Add startup failure-message tests naming the concrete client, method, and
       rejected cache shape.
+
+Evidence recorded on 2026-08-22:
+
+- `CacheResponse`, `CacheDisabled`, and the client `cache.policy` configuration
+  freeze explicit method/client selection with method exclusion first, method
+  selection second, client selection third, and disabled-by-default behavior.
+  Named policy definitions remain inert. Selected policies require TTL in the
+  range `1..31536000000` milliseconds and maximum size in `1..1000000` entries;
+  failures include concrete client, Java method, policy source, and `@ApiRef`
+  identity when present.
+- Package-private `EffectiveCachePolicy` resolves inherited methods, overloads,
+  nested generic bindings, and configured `@ApiRef` methods against the concrete
+  interface. It accepts only finite `GET` `Mono<T>` and
+  `Mono<ResponseEntity<T>>` contracts and rejects raw/unresolved values,
+  streaming or application-owned response/request shapes, multipart requests,
+  and every non-GET method before dispatch.
+- `CacheCustomizationValidator` inventories Boot and per-client customizers plus
+  replacement `WebClient.Builder` beans. Unknown and `INCOMPATIBLE` mutations
+  reject selection; `SAFE` is an explicit whole-builder assertion. Pre-lookup
+  gates and key/variant contributions remain intentionally unavailable until
+  their later V27 contracts exist, so they cannot be asserted without an
+  implementation.
+- Starter proxy startup, contract export/snapshots, provider-backed diagnostics,
+  AOT processing, and `MockReactiveHttpClient` use the same
+  `MethodMetadataCache`-backed policy grammar. Tests prove replacement metadata
+  caches remain authoritative and annotated foreign `FactoryBean` clients skip
+  starter-only validation.
+- `docs/32-response-caching.md`, annotation docs, generated configuration
+  metadata/reference, runtime hints, and the unreleased changelog document the
+  frozen contract and explicitly state that Priority 4 stores no responses.
+  Focused cache, diagnostics, AOT, snapshot, metadata, and mock tests passed;
+  the complete starter suite and complete `MockReactiveHttpClientTest` passed;
+  `git diff --check` passed.
 
 ---
 

@@ -111,6 +111,9 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         metadataCache.validateDeclarativeRequestParameters(type, clientName);
         metadataCache.validateDeclarativeUriTemplates(type, clientName, config.getApis());
         metadataCache.validateDeclarativeReturnTypes(type, clientName);
+        metadataCache.validateDeclarativeCachePolicies(type, clientName, config);
+        metadataCache.validateDeclarativeCacheCustomizations(
+                applicationContext, type, clientName, config);
 
         AuthProvider authProvider = resolveAuthProvider(clientName, config);
         WebClient webClient = buildWebClient(
