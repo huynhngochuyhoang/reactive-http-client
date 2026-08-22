@@ -113,20 +113,6 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         metadataCache.validateDeclarativeReturnTypes(type, clientName);
 
         AuthProvider authProvider = resolveAuthProvider(clientName, config);
-        logStartupConfiguration(
-                clientName,
-                baseUrl,
-                annotationBaseUrl ? "annotation" : "property",
-                config,
-                properties.getNetwork(),
-                properties.getObservability());
-        logMethodPolicyDiagnostics(
-                type,
-                metadataCache,
-                config,
-                clientName,
-                baseUrl,
-                annotationBaseUrl ? "annotation" : "property");
         WebClient webClient = buildWebClient(
                 baseUrl,
                 config,
@@ -146,15 +132,8 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         Object rateLimiterRegistry = resolveSafely("io.github.resilience4j.ratelimiter.RateLimiterRegistry");
         ResilienceOperatorApplier resilienceOperatorApplier = resolveResilienceOperatorApplier(
                 circuitBreakerRegistry, retryRegistry, bulkheadRegistry, rateLimiterRegistry);
-        logStartupSummary(type, clientName, config, metadataCache, resilienceOperatorApplier, properties.getObservability());
         ReactiveHttpClientJsonCodec jsonCodec = applicationContext.getBeanProvider(ReactiveHttpClientJsonCodec.class).getIfAvailable();
         validateStrictBodySigningContracts(type, metadataCache, config, authProvider, jsonCodec, clientName);
-
-        if (config.getResilience() != null && config.getResilience().isEnabled()) {
-            validatePerMethodResilienceInstances(type, metadataCache, resilienceOperatorApplier, clientName);
-            validateStrictUnsafeRetryContracts(type, metadataCache, config, resilienceOperatorApplier, clientName);
-            logMethodResilienceDiagnostics(type, metadataCache, config, resilienceOperatorApplier, clientName);
-        }
 
         ReactiveClientInvocationHandler handler = ReactiveClientInvocationHandler.create(
                 webClient,
@@ -169,6 +148,23 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 jsonCodec,
                 properties.getObservability()
         );
+
+        logStartupConfiguration(
+                clientName,
+                baseUrl,
+                annotationBaseUrl ? "annotation" : "property",
+                config,
+                properties.getNetwork(),
+                properties.getObservability());
+        logMethodPolicyDiagnostics(
+                type,
+                metadataCache,
+                config,
+                clientName,
+                baseUrl,
+                annotationBaseUrl ? "annotation" : "property");
+        logStartupSummary(type, clientName, config, metadataCache, resilienceOperatorApplier, properties.getObservability());
+        logMethodResilienceDiagnostics(type, metadataCache, config, resilienceOperatorApplier, clientName);
 
         log.info("Creating reactive HTTP client proxy for [{}] → {}", clientName, baseUrl);
 
@@ -846,17 +842,10 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         if (resilience == null || !resilience.isEnabled()) {
             return "disabled";
         }
-        return "configured(retry=" + configuredOperator(resilience.getRetry())
+        return "configured(effectiveOperators=reported-per-method"
                 + ", retryMethods=" + resilience.getRetryMethods()
-                + ", rateLimiter=" + configuredOperator(resilience.getRateLimiter())
-                + ", circuitBreaker=" + configuredOperator(resilience.getCircuitBreaker())
-                + ", bulkhead=" + configuredOperator(resilience.getBulkhead())
                 + ", operatorOrder=" + ReactiveClientInvocationHandler.RESILIENCE_OPERATOR_ORDER
                 + ")";
-    }
-
-    private static String configuredOperator(String instanceName) {
-        return StringUtils.hasText(instanceName) ? instanceName : "disabled";
     }
 
     private ReactiveHttpClientProperties.ConnectionPoolConfig resolveConnectionPool(
@@ -948,22 +937,49 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
      * registry. Fails fast at proxy construction time so a typo doesn't silently
      * fall back to default-configured behaviour.
      */
-    private void validatePerMethodResilienceInstances(Class<?> clientInterface,
+    static void validateEffectiveResilienceContracts(
+            Class<?> clientInterface,
+            MethodMetadataCache metadataCache,
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            String clientName) {
+        if (clientInterface == null || clientConfig == null) {
+            return;
+        }
+        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
+        if (resilience == null || !resilience.isEnabled()) {
+            return;
+        }
+        ResilienceOperatorApplier applier = resilienceOperatorApplier != null
+                ? resilienceOperatorApplier
+                : new NoopResilienceOperatorApplier();
+        validatePerMethodResilienceInstances(
+                clientInterface, metadataCache, clientConfig, applier, clientName);
+        validateStrictUnsafeRetryContracts(
+                clientInterface, metadataCache, clientConfig, applier, clientName);
+    }
+
+    private static void validatePerMethodResilienceInstances(
+                                                      Class<?> clientInterface,
                                                       MethodMetadataCache metadataCache,
+                                                      ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                       ResilienceOperatorApplier applier,
                                                       String clientName) {
         List<String> missing = new ArrayList<>();
+        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         for (Method method : clientInterface.getMethods()) {
             if (!isDeclarativeClientMethod(method)) continue;
             MethodMetadata meta = metadataCache.get(method);
-            checkInstance(applier, ResilienceOperatorApplier.InstanceType.RETRY,
-                    meta.getRetryInstanceName(), method, "@Retry", missing);
-            checkInstance(applier, ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER,
-                    meta.getCircuitBreakerInstanceName(), method, "@CircuitBreaker", missing);
-            checkInstance(applier, ResilienceOperatorApplier.InstanceType.BULKHEAD,
-                    meta.getBulkheadInstanceName(), method, "@Bulkhead", missing);
-            checkInstance(applier, ResilienceOperatorApplier.InstanceType.RATE_LIMITER,
-                    meta.getRateLimiterInstanceName(), method, "@RateLimiter", missing);
+            RequestPlan plan = RequestPlan.from(meta, clientInterface);
+            EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
+                    plan,
+                    diagnosticHttpMethod(meta, clientConfig),
+                    resilience,
+                    EffectiveResiliencePolicy.availability(applier));
+            checkInstance(applier, policy.retry(), method, "@Retry", missing);
+            checkInstance(applier, policy.circuitBreaker(), method, "@CircuitBreaker", missing);
+            checkInstance(applier, policy.bulkhead(), method, "@Bulkhead", missing);
+            checkInstance(applier, policy.rateLimiter(), method, "@RateLimiter", missing);
         }
         if (!missing.isEmpty()) {
             throw new IllegalStateException(
@@ -1148,7 +1164,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         }
     }
 
-    private void validateStrictUnsafeRetryContracts(Class<?> clientInterface,
+    private static void validateStrictUnsafeRetryContracts(Class<?> clientInterface,
                                                     MethodMetadataCache metadataCache,
                                                     ReactiveHttpClientProperties.ClientConfig clientConfig,
                                                     ResilienceOperatorApplier resilienceOperatorApplier,
@@ -1156,8 +1172,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
         if (resilience == null
                 || !resilience.isEnabled()
-                || !resilience.isStrictUnsafeRetryValidation()
-                || !resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)) {
+                || !resilience.isStrictUnsafeRetryValidation()) {
             return;
         }
 
@@ -1167,13 +1182,15 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             MethodMetadata meta = metadataCache.get(method);
             RequestPlan plan = RequestPlan.from(meta, clientInterface);
             String httpMethod = diagnosticHttpMethod(meta, clientConfig);
-            if (!isRetryMethodEnabled(resilience, httpMethod)) {
+            EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
+                    plan,
+                    httpMethod,
+                    resilience,
+                    EffectiveResiliencePolicy.availability(resilienceOperatorApplier));
+            if (!policy.retry().active()) {
                 continue;
             }
-            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
-            if (!StringUtils.hasText(retryInstance)) {
-                continue;
-            }
+            String retryInstance = policy.retry().instanceName();
             if (!resilienceOperatorApplier.canRetryMoreThanOnce(retryInstance)) {
                 continue;
             }
@@ -1185,7 +1202,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     + ", endpointSource=" + diagnosticEndpointSource(plan)
                     + ", httpMethod=" + httpMethod
                     + ", retry=" + retryInstance
-                    + ", retrySource=" + (StringUtils.hasText(plan.retryInstanceName())
+                    + ", retrySource=" + (policy.retry().source() == EffectiveResiliencePolicy.Source.METHOD
                     ? "method-level @Retry" : "client resilience.retry")
                     + ", retryMethods=" + resilience.getRetryMethods()
                     + strictRetryDiagnostic(plan, clientConfig));
@@ -1290,22 +1307,11 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             MethodMetadata meta = metadataCache.get(method);
             RequestPlan plan = RequestPlan.from(meta, clientInterface);
             String httpMethod = diagnosticHttpMethod(meta, clientConfig);
-            boolean retryConfiguredForMethod = isRetryMethodEnabled(resilience, httpMethod);
-            String retryInstance = retryConfiguredForMethod
-                    ? operatorDiagnostic(resilienceOperatorApplier,
-                    ResilienceOperatorApplier.InstanceType.RETRY,
-                    plan.retryInstanceName(),
-                    resilience.getRetry())
-                    : "disabled";
-            String rateLimiterInstance = operatorDiagnostic(resilienceOperatorApplier,
-                    ResilienceOperatorApplier.InstanceType.RATE_LIMITER,
-                    plan.rateLimiterInstanceName(), resilience.getRateLimiter());
-            String circuitBreakerInstance = operatorDiagnostic(resilienceOperatorApplier,
-                    ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER,
-                    plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker());
-            String bulkheadInstance = operatorDiagnostic(resilienceOperatorApplier,
-                    ResilienceOperatorApplier.InstanceType.BULKHEAD,
-                    plan.bulkheadInstanceName(), resilience.getBulkhead());
+            EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
+                    plan,
+                    httpMethod,
+                    resilience,
+                    EffectiveResiliencePolicy.availability(resilienceOperatorApplier));
             log.debug("Reactive HTTP client [{}] method [{}#{}] resilience: httpMethod={}, retry={}, "
                             + "rateLimiter={}, circuitBreaker={}, bulkhead={}, retrySafety={}, bodyRepeatability={}, "
                             + "operatorOrder={}, subscriptionOrder={}",
@@ -1313,10 +1319,10 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                     method.getDeclaringClass().getSimpleName(),
                     method.getName(),
                     httpMethod != null ? httpMethod : "unresolved",
-                    retryInstance,
-                    rateLimiterInstance,
-                    circuitBreakerInstance,
-                    bulkheadInstance,
+                    policy.retry().diagnosticValue(),
+                    policy.rateLimiter().diagnosticValue(),
+                    policy.circuitBreaker().diagnosticValue(),
+                    policy.bulkhead().diagnosticValue(),
                     diagnosticRetrySafety(plan, httpMethod, clientConfig),
                     plan.bodyRepeatability(),
                     ReactiveClientInvocationHandler.RESILIENCE_OPERATOR_ORDER,
@@ -1335,12 +1341,6 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             }
         }
         return null;
-    }
-
-    private static boolean isRetryMethodEnabled(ReactiveHttpClientProperties.ResilienceConfig resilience, String httpMethod) {
-        return httpMethod != null
-                && resilience.getRetryMethods() != null
-                && resilience.getRetryMethods().contains(httpMethod.toUpperCase(Locale.ROOT));
     }
 
     private static RetrySafetyClassification diagnosticRetrySafety(RequestPlan plan,
@@ -1363,27 +1363,6 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         return clientConfig.getDefaultHeaders().entrySet().stream()
                 .anyMatch(entry -> "Idempotency-Key".equalsIgnoreCase(entry.getKey())
                         && StringUtils.hasText(entry.getValue()));
-    }
-
-    private static String operatorDiagnostic(ResilienceOperatorApplier resilienceOperatorApplier,
-                                             ResilienceOperatorApplier.InstanceType type,
-                                             String methodLevel,
-                                             String clientLevel) {
-        String instanceName = resolveResilienceInstanceName(methodLevel, clientLevel);
-        if (!StringUtils.hasText(instanceName)) {
-            return "disabled";
-        }
-        if (!resilienceOperatorApplier.isOperatorAvailable(type)) {
-            return "unavailable";
-        }
-        return instanceName;
-    }
-
-    private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {
-        if (StringUtils.hasText(methodLevel)) {
-            return methodLevel;
-        }
-        return StringUtils.hasText(clientLevel) ? clientLevel : null;
     }
 
     private static boolean isDeclarativeClientMethod(Method method) {
@@ -1436,14 +1415,13 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     }
 
     private static void checkInstance(ResilienceOperatorApplier applier,
-                                      ResilienceOperatorApplier.InstanceType type,
-                                      String instanceName,
+                                      EffectiveResiliencePolicy.Operator operator,
                                       Method method,
                                       String annotationName,
                                       List<String> missing) {
-        if (instanceName == null || instanceName.isBlank()) return;
-        if (!applier.isInstanceConfigured(type, instanceName)) {
-            missing.add(annotationName + "(\"" + instanceName + "\") on "
+        if (!operator.active() || operator.source() != EffectiveResiliencePolicy.Source.METHOD) return;
+        if (!applier.isInstanceConfigured(operator.type(), operator.instanceName())) {
+            missing.add(annotationName + "(\"" + operator.instanceName() + "\") on "
                     + method.getDeclaringClass().getSimpleName() + "#" + method.getName());
         }
     }

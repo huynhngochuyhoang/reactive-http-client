@@ -139,6 +139,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             ResilienceOperatorApplier resilienceOperatorApplier,
             ReactiveHttpClientJsonCodec jsonCodec,
             ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
+        ReactiveHttpClientFactoryBean.validateEffectiveResilienceContracts(
+                clientInterface, metadataCache, clientConfig, resilienceOperatorApplier, clientName);
         return new ReactiveClientInvocationHandler(webClient, metadataCache, argumentResolver, errorDecoder,
                 clientConfig, clientName, clientInterface, applicationContext, resilienceOperatorApplier,
                 jsonCodec, observabilityConfig);
@@ -747,37 +749,29 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                          String httpMethod,
                                          RequestArgumentResolver.ResolvedArgs resolved) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
-        if (resilience == null || !resilience.isEnabled()) return mono;
+        EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
+                plan, httpMethod, resilience,
+                EffectiveResiliencePolicy.availability(resilienceOperatorApplier));
 
-        if (isRetryableMethod(httpMethod)) {
-            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
-            if (StringUtils.hasText(retryInstance)) {
-                if (isRetryOperatorAvailable()) {
-                    Mono<?> retryCandidate = mono;
-                    mono = Mono.deferContextual(context -> {
-                        RequestArgumentResolver.ResolvedArgs safetyResolved = applyContextIdempotencyKey(plan, resolved, context);
-                        logUnsafeRetryIfNeeded(plan, resilience, httpMethod, safetyResolved, retryInstance);
-                        logRetryBodyRiskIfNeeded(plan, httpMethod, retryInstance, resolved.body());
-                        return retryCandidate;
-                    });
-                }
-                mono = applyRetryMono(mono, retryInstance);
-            }
+        if (policy.retry().active()) {
+            String retryInstance = policy.retry().instanceName();
+            Mono<?> retryCandidate = mono;
+            mono = Mono.deferContextual(context -> {
+                RequestArgumentResolver.ResolvedArgs safetyResolved = applyContextIdempotencyKey(plan, resolved, context);
+                logUnsafeRetryIfNeeded(plan, resilience, httpMethod, safetyResolved, retryInstance);
+                logRetryBodyRiskIfNeeded(plan, httpMethod, retryInstance, resolved.body());
+                return retryCandidate;
+            });
+            mono = applyRetryMono(mono, retryInstance);
         }
-        String rateLimiterInstance = resolveResilienceInstanceName(
-                plan.rateLimiterInstanceName(), resilience.getRateLimiter());
-        if (StringUtils.hasText(rateLimiterInstance)) {
-            mono = applyRateLimiterMono(mono, rateLimiterInstance);
+        if (policy.rateLimiter().active()) {
+            mono = applyRateLimiterMono(mono, policy.rateLimiter().instanceName());
         }
-        String circuitBreakerInstance = resolveResilienceInstanceName(
-                plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker());
-        if (StringUtils.hasText(circuitBreakerInstance)) {
-            mono = applyCircuitBreakerMono(mono, circuitBreakerInstance);
+        if (policy.circuitBreaker().active()) {
+            mono = applyCircuitBreakerMono(mono, policy.circuitBreaker().instanceName());
         }
-        String bulkheadInstance = resolveResilienceInstanceName(
-                plan.bulkheadInstanceName(), resilience.getBulkhead());
-        if (StringUtils.hasText(bulkheadInstance)) {
-            mono = applyBulkheadMono(mono, bulkheadInstance);
+        if (policy.bulkhead().active()) {
+            mono = applyBulkheadMono(mono, policy.bulkhead().instanceName());
         }
         return mono;
     }
@@ -787,37 +781,29 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                         String httpMethod,
                                         RequestArgumentResolver.ResolvedArgs resolved) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
-        if (resilience == null || !resilience.isEnabled()) return flux;
+        EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
+                plan, httpMethod, resilience,
+                EffectiveResiliencePolicy.availability(resilienceOperatorApplier));
 
-        if (isRetryableMethod(httpMethod)) {
-            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
-            if (StringUtils.hasText(retryInstance)) {
-                if (isRetryOperatorAvailable()) {
-                    Flux<?> retryCandidate = flux;
-                    flux = Flux.deferContextual(context -> {
-                        RequestArgumentResolver.ResolvedArgs safetyResolved = applyContextIdempotencyKey(plan, resolved, context);
-                        logUnsafeRetryIfNeeded(plan, resilience, httpMethod, safetyResolved, retryInstance);
-                        logRetryBodyRiskIfNeeded(plan, httpMethod, retryInstance, resolved.body());
-                        return retryCandidate;
-                    });
-                }
-                flux = applyRetryFlux(flux, retryInstance);
-            }
+        if (policy.retry().active()) {
+            String retryInstance = policy.retry().instanceName();
+            Flux<?> retryCandidate = flux;
+            flux = Flux.deferContextual(context -> {
+                RequestArgumentResolver.ResolvedArgs safetyResolved = applyContextIdempotencyKey(plan, resolved, context);
+                logUnsafeRetryIfNeeded(plan, resilience, httpMethod, safetyResolved, retryInstance);
+                logRetryBodyRiskIfNeeded(plan, httpMethod, retryInstance, resolved.body());
+                return retryCandidate;
+            });
+            flux = applyRetryFlux(flux, retryInstance);
         }
-        String rateLimiterInstance = resolveResilienceInstanceName(
-                plan.rateLimiterInstanceName(), resilience.getRateLimiter());
-        if (StringUtils.hasText(rateLimiterInstance)) {
-            flux = applyRateLimiterFlux(flux, rateLimiterInstance);
+        if (policy.rateLimiter().active()) {
+            flux = applyRateLimiterFlux(flux, policy.rateLimiter().instanceName());
         }
-        String circuitBreakerInstance = resolveResilienceInstanceName(
-                plan.circuitBreakerInstanceName(), resilience.getCircuitBreaker());
-        if (StringUtils.hasText(circuitBreakerInstance)) {
-            flux = applyCircuitBreakerFlux(flux, circuitBreakerInstance);
+        if (policy.circuitBreaker().active()) {
+            flux = applyCircuitBreakerFlux(flux, policy.circuitBreaker().instanceName());
         }
-        String bulkheadInstance = resolveResilienceInstanceName(
-                plan.bulkheadInstanceName(), resilience.getBulkhead());
-        if (StringUtils.hasText(bulkheadInstance)) {
-            flux = applyBulkheadFlux(flux, bulkheadInstance);
+        if (policy.bulkhead().active()) {
+            flux = applyBulkheadFlux(flux, policy.bulkhead().instanceName());
         }
         return flux;
     }
@@ -861,14 +847,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return new LogicalCallTimeoutException(timeoutMs, failureStage);
     }
 
-    /** Per-method override wins; otherwise the client-level config applies. */
-    private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {
-        if (StringUtils.hasText(methodLevel)) {
-            return methodLevel;
-        }
-        return StringUtils.hasText(clientLevel) ? clientLevel : null;
-    }
-
     private void logUnsafeRetryIfNeeded(RequestPlan plan,
                                         ReactiveHttpClientProperties.ResilienceConfig resilience,
                                         String httpMethod,
@@ -891,10 +869,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     resilience.getRetryMethods(),
                     IDEMPOTENCY_KEY_HEADER);
         }
-    }
-
-    private boolean isRetryOperatorAvailable() {
-        return resilienceOperatorApplier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY);
     }
 
     private void logRetryBodyRiskIfNeeded(RequestPlan plan, String httpMethod, String retryInstance, Object body) {
@@ -1263,15 +1237,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             logResilienceOperatorFailure("bulkhead", instanceName, e);
             return flux;
         }
-    }
-
-
-    private boolean isRetryableMethod(String method) {
-        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
-        if (resilience == null || resilience.getRetryMethods() == null || resilience.getRetryMethods().isEmpty()) {
-            return false;
-        }
-        return method != null && resilience.getRetryMethods().contains(method.toUpperCase(Locale.ROOT));
     }
 
     private Mono<SerializedRequestBody> serializeRequestBodyForAuth(Object body, String contentTypeHeader) {

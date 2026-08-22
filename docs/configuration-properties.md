@@ -73,7 +73,7 @@
 | `reactive.http.clients.[name].request-timeout-ms` | `java.lang.Long` | `0` | Canonical per-request response timeout in milliseconds applied via HttpClientRequest.responseTimeout(). 0 disables the timeout. Wins over deprecated resilience.timeout-ms. Default: 0. |  |
 | `reactive.http.clients.[name].resilience.bulkhead` | `java.lang.String` |  | Name of the Resilience4j Bulkhead instance from application config. Blank or absent disables this operator. |  |
 | `reactive.http.clients.[name].resilience.circuit-breaker` | `java.lang.String` |  | Name of the Resilience4j CircuitBreaker instance from application config. Blank or absent disables this operator. |  |
-| `reactive.http.clients.[name].resilience.enabled` | `java.lang.Boolean` | `false` | Master switch for Resilience4j operators (retry, circuit-breaker, bulkhead, rate-limiter) on this client. Default: false. |  |
+| `reactive.http.clients.[name].resilience.enabled` | `java.lang.Boolean` | `false` | Master switch for Resilience4j operators on this client. Enabling it does not select Retry, CircuitBreaker, Bulkhead, or RateLimiter; select each intended operator explicitly. Default: false. |  |
 | `reactive.http.clients.[name].resilience.rate-limiter` | `java.lang.String` |  | Name of the Resilience4j RateLimiter instance from application config. Blank or absent disables this operator. |  |
 | `reactive.http.clients.[name].resilience.retry` | `java.lang.String` |  | Name of the Resilience4j Retry instance from application config. Blank or absent disables this operator. |  |
 | `reactive.http.clients.[name].resilience.retry-methods` | `java.util.Set<java.lang.String>` | `["GET","HEAD"]` | HTTP methods eligible for retry. Values are upper-cased. Default: [GET, HEAD]. |  |

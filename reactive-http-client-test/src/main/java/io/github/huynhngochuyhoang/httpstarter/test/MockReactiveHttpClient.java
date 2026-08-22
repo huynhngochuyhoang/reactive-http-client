@@ -472,6 +472,11 @@ public final class MockReactiveHttpClient<T> {
         public boolean isOperatorAvailable(ResilienceOperatorApplier.InstanceType type) {
             return type == ResilienceOperatorApplier.InstanceType.RETRY;
         }
+
+        @Override
+        public boolean canRetryMoreThanOnce(String instanceName) {
+            return retryCount > 0;
+        }
     }
 
     private record Matcher(java.util.function.Predicate<RecordedExchange> predicate,

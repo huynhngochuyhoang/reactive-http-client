@@ -169,38 +169,72 @@ Evidence recorded on 2026-08-22:
 
 ## Priority 3 - One Effective Resilience Policy Everywhere
 
-### [ ] 3.1 Centralize effective selection
+### [x] 3.1 Centralize effective selection
 
-- [ ] Introduce one package-private effective resilience policy used by
+- [x] Introduce one package-private effective resilience policy used by
       invocation, startup validation/logging, contract export, and diagnostics.
-- [ ] Resolve client/method precedence, blank values, Retry eligibility, and
+- [x] Resolve client/method precedence, blank values, Retry eligibility, and
       operator availability once without creating lazy registries.
-- [ ] Remove duplicated activation decisions made obsolete by the resolver.
-- [ ] Keep the resolver internal unless a concrete public extension contract is
+- [x] Remove duplicated activation decisions made obsolete by the resolver.
+- [x] Keep the resolver internal unless a concrete public extension contract is
       reviewed and required.
 
-### [ ] 3.2 Align diagnostics, mocks, and startup output
+### [x] 3.2 Align diagnostics, mocks, and startup output
 
-- [ ] Report disabled, selected-but-unavailable, active, and unknown lazy
+- [x] Report disabled, selected-but-unavailable, active, and unknown lazy
       registry states without inventing `default` instances.
-- [ ] Keep startup summaries from naming operators that cannot be applied.
-- [ ] Make `MockReactiveHttpClient` use the same effective policy and strict
+- [x] Keep startup summaries from naming operators that cannot be applied.
+- [x] Make `MockReactiveHttpClient` use the same effective policy and strict
       retry rules as production.
-- [ ] Cover parent/child factories, primary/priority/default candidates,
+- [x] Cover parent/child factories, primary/priority/default candidates,
       `FactoryBean` products, and lazy registries without diagnostics side
       effects.
 
-### [ ] 3.3 Publish configuration and migration evidence
+### [x] 3.3 Publish configuration and migration evidence
 
-- [ ] Update generated configuration metadata so no instance property defaults
+- [x] Update generated configuration metadata so no instance property defaults
       to implicit `default`.
-- [ ] Add drift tests rejecting enabled-only examples that claim operators are
+- [x] Add drift tests rejecting enabled-only examples that claim operators are
       active.
-- [ ] Generate a migration matrix for enabled-only, explicit `default`, named
+- [x] Generate a migration matrix for enabled-only, explicit `default`, named
       instance, method annotation, blank, unavailable, retry-method, and strict
       validation cases.
-- [ ] Verify existing users can retain the old all-four behavior only by
+- [x] Verify existing users can retain the old all-four behavior only by
       explicitly selecting all four `default` instances.
+
+Evidence recorded on 2026-08-22:
+
+- Package-private `EffectiveResiliencePolicy` is now the only core class that
+  reads the four client-level instance properties. It resolves the master gate,
+  method-over-client precedence, blank values, Retry HTTP-method eligibility,
+  source, and tri-state operator availability into `disabled`, `unavailable`,
+  active instance, or `unknown` states. Focused resolver tests cover every
+  state without adding a public compatibility surface.
+- `ReactiveClientInvocationHandler`, factory startup validation and method
+  logging, `EffectiveHttpClientContractExporter`, and provider-backed
+  diagnostics consume that policy. Startup output reports only effective
+  per-method states; selected operators with no adapter are not applied or
+  printed as active. Strict Retry validation runs only for an active Retry that
+  can make another attempt.
+- Diagnostics reuse one side-effect-free registry availability snapshot per
+  report. The complete diagnostics suite retains parent/child, primary,
+  priority, default/fallback candidate, cached/uncached `FactoryBean`, lazy,
+  prototype, and uninspectable-registry coverage while proving lazy products
+  are not created and rendering unprovable selected operators as `unknown`.
+- `MockReactiveHttpClient` reaches the production validation path and its mock
+  Retry applier reports whether more than one attempt is possible. New tests
+  prove production-equivalent strict unsafe-retry failure and the dormant
+  single-attempt case.
+- Generated metadata and the configuration reference describe `enabled` as a
+  master gate that selects nothing and retain absent defaults for all four
+  instance properties. The 3.x-to-4.x migration matrix covers enabled-only,
+  explicit `default`, named, method-level, blank, Retry-method, unavailable,
+  lazy/unknown, and strict-validation cases, including the explicit four-
+  `default` configuration required to retain the published behavior.
+- Focused resilience, diagnostics, startup, metadata, release-document, and
+  lifecycle suites passed. The complete starter suite passed `1073` tests and
+  the complete test-helper suite passed `51` tests with zero failures, errors,
+  or skips. A final direct-read audit and `git diff --check` passed.
 
 ---
 

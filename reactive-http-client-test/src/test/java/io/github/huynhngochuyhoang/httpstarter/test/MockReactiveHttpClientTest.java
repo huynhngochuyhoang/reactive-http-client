@@ -39,6 +39,7 @@ import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -53,6 +54,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * library errors.
  */
 class MockReactiveHttpClientTest {
+
+    interface StrictUnsafeMockClient {
+        @POST("/strict")
+        Mono<String> create();
+    }
 
     interface InvalidNestedResponseClient {
         @GET("/nested")
@@ -752,6 +758,33 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void mockBuildUsesProductionStrictUnsafeRetryValidation() {
+        ReactiveHttpClientProperties.ClientConfig config = strictMockRetryConfig();
+
+        assertThatThrownBy(() -> MockReactiveHttpClient.forClient(StrictUnsafeMockClient.class)
+                .clientConfig(config)
+                .resilienceOperatorApplier(new StrictRetryApplier(true))
+                .build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("strict unsafe retry validation")
+                .hasMessageContaining("StrictUnsafeMockClient#create")
+                .hasMessageContaining("retry=mock");
+    }
+
+    @Test
+    void mockBuildKeepsStrictValidationDormantForSingleAttemptRetry() {
+        MockReactiveHttpClient<StrictUnsafeMockClient> mock = MockReactiveHttpClient
+                .forClient(StrictUnsafeMockClient.class)
+                .clientConfig(strictMockRetryConfig())
+                .resilienceOperatorApplier(new StrictRetryApplier(false))
+                .respondTo(HttpMethod.POST, "/strict", exchange -> MockReactiveHttpClient.text(200, "ok"))
+                .build();
+
+        assertThat(mock.proxy().create().block()).isEqualTo("ok");
+        RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(1);
+    }
+
+    @Test
     void observerReceivesOneTerminalEventForSuccessfulCall() {
         List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class)
@@ -1364,6 +1397,15 @@ class MockReactiveHttpClientTest {
     private record EventEnvelope(RequestContextSnapshot context) {
     }
 
+    private static ReactiveHttpClientProperties.ClientConfig strictMockRetryConfig() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("mock");
+        config.getResilience().setRetryMethods(Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        return config;
+    }
+
     @Order(10)
     private static final class FirstAnnotationOrderedHook implements ReactiveHttpClientLifecycleHook {
         private final List<String> events;
@@ -1403,6 +1445,24 @@ class MockReactiveHttpClientTest {
         @Override
         public boolean isOperatorAvailable(InstanceType type) {
             return type == InstanceType.CIRCUIT_BREAKER;
+        }
+    }
+
+    private static final class StrictRetryApplier extends NoopResilienceOperatorApplier {
+        private final boolean canRetryMoreThanOnce;
+
+        private StrictRetryApplier(boolean canRetryMoreThanOnce) {
+            this.canRetryMoreThanOnce = canRetryMoreThanOnce;
+        }
+
+        @Override
+        public boolean isOperatorAvailable(InstanceType type) {
+            return type == InstanceType.RETRY;
+        }
+
+        @Override
+        public boolean canRetryMoreThanOnce(String instanceName) {
+            return canRetryMoreThanOnce;
         }
     }
 

@@ -292,10 +292,12 @@ class EffectiveHttpClientContractExporterTest {
     @Test
     void failsExportWhenMethodLevelResilienceInstanceIsMissing() {
         ResilienceOperatorApplier applier = mock(ResilienceOperatorApplier.class);
+        when(applier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)).thenReturn(true);
         when(applier.isInstanceConfigured(ResilienceOperatorApplier.InstanceType.RETRY, "method-retry"))
                 .thenReturn(false);
 
         ReactiveHttpClientProperties.ClientConfig config = enabledResilienceConfig();
+        config.getResilience().setRetryMethods(Set.of("POST"));
         assertThatThrownBy(() -> EffectiveHttpClientContractExporter.export(
                 DirectClient.class, "diagnostic-client", config, metadataCache, applier))
                 .isInstanceOf(IllegalStateException.class)

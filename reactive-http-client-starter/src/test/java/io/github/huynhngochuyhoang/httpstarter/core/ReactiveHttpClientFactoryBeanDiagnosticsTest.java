@@ -95,8 +95,10 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                     .contains("resilience=configured")
                     .contains("retryMethods=")
                     .contains("operatorOrder=retry -> rate-limiter -> circuit-breaker -> bulkhead")
+                    .contains("retry=unavailable")
                     .contains("exchangeLogging=enabled")
                     .contains("logPreset=metadata-only")
+                    .doesNotContain("retry=diagnostic-retry")
                     .doesNotContain("proxy-secret");
         } finally {
             logger.setLevel(previousLevel);

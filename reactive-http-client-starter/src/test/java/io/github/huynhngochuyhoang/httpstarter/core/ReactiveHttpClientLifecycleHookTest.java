@@ -564,6 +564,11 @@ class ReactiveHttpClientLifecycleHookTest {
     private static ResilienceOperatorApplier retryOnceApplier() {
         return new NoopResilienceOperatorApplier() {
             @Override
+            public boolean isOperatorAvailable(InstanceType type) {
+                return type == InstanceType.RETRY;
+            }
+
+            @Override
             public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
                 return mono.retry(1);
             }
@@ -572,6 +577,11 @@ class ReactiveHttpClientLifecycleHookTest {
 
     private static ResilienceOperatorApplier bulkheadRejectingApplier(Throwable rejection) {
         return new NoopResilienceOperatorApplier() {
+            @Override
+            public boolean isOperatorAvailable(InstanceType type) {
+                return type == InstanceType.BULKHEAD;
+            }
+
             @Override
             public <T> Mono<T> applyBulkhead(Mono<T> mono, String instanceName) {
                 return Mono.error(rejection);
@@ -582,6 +592,11 @@ class ReactiveHttpClientLifecycleHookTest {
     private static ResilienceOperatorApplier rateLimiterRejectingApplier(Throwable rejection) {
         return new NoopResilienceOperatorApplier() {
             @Override
+            public boolean isOperatorAvailable(InstanceType type) {
+                return type == InstanceType.RATE_LIMITER;
+            }
+
+            @Override
             public <T> Mono<T> applyRateLimiter(Mono<T> mono, String instanceName) {
                 return Mono.error(rejection);
             }
@@ -590,6 +605,11 @@ class ReactiveHttpClientLifecycleHookTest {
 
     private static ResilienceOperatorApplier circuitBreakerRejectingApplier(Throwable rejection) {
         return new NoopResilienceOperatorApplier() {
+            @Override
+            public boolean isOperatorAvailable(InstanceType type) {
+                return type == InstanceType.CIRCUIT_BREAKER;
+            }
+
             @Override
             public <T> Mono<T> applyCircuitBreaker(Mono<T> mono, String instanceName) {
                 return Mono.error(rejection);

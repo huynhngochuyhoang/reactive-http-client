@@ -271,6 +271,11 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
         ResilienceOperatorApplier retryOnce = new NoopResilienceOperatorApplier() {
             @Override
+            public boolean isOperatorAvailable(InstanceType type) {
+                return type == InstanceType.RETRY;
+            }
+
+            @Override
             public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
                 return mono.retry(1);
             }
