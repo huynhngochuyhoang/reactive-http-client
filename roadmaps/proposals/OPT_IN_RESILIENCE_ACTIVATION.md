@@ -1,6 +1,7 @@
 # Opt-In Resilience Activation Proposal
 
-> **Status:** deferred proposal; not part of V26 execution or release scope
+> **Status:** adopted by [Roadmap V27](../v27/ROADMAP.md); not part of V26
+> execution or release scope
 > **Compatibility:** SemVer-major behavior change
 
 ## Problem

@@ -52,14 +52,15 @@ class DocumentationReleaseArtifactTest {
         }
 
         List<Integer> expectedVersions = new ArrayList<>();
-        for (int version = 1; version <= 26; version++) {
+        for (int version = 1; version <= 27; version++) {
             expectedVersions.add(version);
         }
-        assertThat(versions).as("contiguous V1-V26 roadmap directories").isEqualTo(expectedVersions);
+        assertThat(versions).as("contiguous V1-V27 roadmap directories").isEqualTo(expectedVersions);
         assertThat(index)
                 .contains("acceptance boxes preserve the proposal")
                 .contains("V2 predates the separate execution-checklist convention")
-                .contains("V1-V26 are completed release records. No V27 execution roadmap is active.");
+                .contains("V1-V26 are completed release records. V27 is the active roadmap")
+                .contains("with an execution checklist.");
 
         for (int version : versions) {
             Path directory = archive.resolve("v" + version);
@@ -79,7 +80,12 @@ class DocumentationReleaseArtifactTest {
                     .filter(line -> line.startsWith("> **Status:**"))
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("Missing V" + version + " roadmap status"));
-            if (version == 19) {
+            if (version == 27) {
+                String statusValue = roadmapStatus.substring("> **Status:**".length()).trim();
+                assertThat(statusValue).isEqualTo("active");
+                assertThat(indexRow).endsWith("| Active |");
+            }
+            else if (version == 19) {
                 assertThat(roadmapStatus).containsIgnoringCase("no-go");
                 assertThat(indexRow).containsIgnoringCase("no-go");
             }
