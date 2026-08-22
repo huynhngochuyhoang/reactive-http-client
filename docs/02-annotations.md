@@ -503,3 +503,38 @@ with a descriptive `IllegalStateException`; an unavailable operator is reported
 as `unavailable` and cannot validate its instance name.
 
 See [07-resilience4j.md](07-resilience4j.md) for full usage and configuration.
+
+---
+
+## Response-cache selection
+
+Response caching is explicit. Policy definitions alone are inert, and client-
+wide selection can be overridden or excluded per method.
+
+### `@CacheResponse`
+
+Selects one named policy from
+`reactive.http.clients.[name].cache.policies` and takes precedence over the
+client-wide `cache.policy` value. It can be used with annotation-owned `@GET`
+methods and configured `@ApiRef` methods.
+
+```java
+@GET("/catalog/{id}")
+@CacheResponse("catalog-read")
+Mono<CatalogItem> getItem(@PathVar("id") String id);
+```
+
+### `@CacheDisabled`
+
+Explicitly excludes a method when its client selects a policy for all eligible
+methods. It cannot be combined with `@CacheResponse`.
+
+```java
+@GET("/catalog/live")
+@CacheDisabled
+Mono<CatalogState> liveState();
+```
+
+Selected caching is restricted to `GET` methods returning a finite `Mono<T>` or
+`Mono<ResponseEntity<T>>`. See [Response Caching](32-response-caching.md) for
+the full eligibility and customization-safety contract.

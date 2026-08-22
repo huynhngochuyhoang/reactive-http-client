@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import org.springframework.beans.factory.ListableBeanFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -53,6 +54,44 @@ public class MethodMetadataCache {
             DeclarativeReturnTypeGrammar.validate(
                     clientInterface, clientName, RequestPlan.from(metadata, clientInterface));
         }
+    }
+
+    /**
+     * Validates explicitly selected response-cache policies and endpoint shapes
+     * against one concrete client interface.
+     */
+    public void validateDeclarativeCachePolicies(
+            Class<?> clientInterface,
+            String clientName,
+            ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        ReactiveHttpClientProperties.ClientConfig resolvedConfig = clientConfig != null
+                ? clientConfig
+                : new ReactiveHttpClientProperties.ClientConfig();
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method)) {
+                continue;
+            }
+            RequestPlan plan = RequestPlan.from(get(method), clientInterface);
+            EffectiveCachePolicy.validate(
+                    clientInterface,
+                    clientName,
+                    plan,
+                    resolvedConfig,
+                    EffectiveCachePolicy.effectiveHttpMethod(plan, resolvedConfig));
+        }
+    }
+
+    /**
+     * Validates applicable builder customizations for a client that explicitly
+     * selects response caching.
+     */
+    public void validateDeclarativeCacheCustomizations(
+            ListableBeanFactory beanFactory,
+            Class<?> clientInterface,
+            String clientName,
+            ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        CacheCustomizationValidator.validate(
+                beanFactory, clientInterface, clientName, this, clientConfig);
     }
 
     /**
@@ -347,6 +386,18 @@ public class MethodMetadataCache {
             requireNonBlankAnnotationValue(rateLimiter.value(), "@RateLimiter", method);
             meta.setRateLimiterInstanceName(rateLimiter.value());
         }
+
+        CacheResponse cacheResponse = method.getAnnotation(CacheResponse.class);
+        CacheDisabled cacheDisabled = method.getAnnotation(CacheDisabled.class);
+        if (cacheResponse != null && cacheDisabled != null) {
+            throw new IllegalStateException(
+                    "@CacheResponse cannot be combined with @CacheDisabled on method: " + method);
+        }
+        if (cacheResponse != null) {
+            requireNonBlankAnnotationValue(cacheResponse.value(), "@CacheResponse", method);
+            meta.setCachePolicyName(cacheResponse.value().trim());
+        }
+        meta.setCacheDisabled(cacheDisabled != null);
 
         meta.freezeCollections();
         meta.setRequestPlan(RequestPlan.from(meta));

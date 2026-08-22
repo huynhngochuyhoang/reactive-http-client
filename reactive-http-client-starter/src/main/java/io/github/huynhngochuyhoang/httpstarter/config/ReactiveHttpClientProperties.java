@@ -402,6 +402,8 @@ public class ReactiveHttpClientProperties {
          */
         private AuthConfig auth;
         private ResilienceConfig resilience = new ResilienceConfig();
+        /** Explicit response-cache selection and named policy definitions. */
+        private CacheConfig cache = new CacheConfig();
         /**
          * Static headers added to every request for this client. Method-level
          * {@code @HeaderParam} values with the same name override these defaults.
@@ -507,6 +509,11 @@ public class ReactiveHttpClientProperties {
 
         public ResilienceConfig getResilience() { return resilience; }
         public void setResilience(ResilienceConfig resilience) { this.resilience = resilience; }
+
+        public CacheConfig getCache() { return cache; }
+        public void setCache(CacheConfig cache) {
+            this.cache = cache != null ? cache : new CacheConfig();
+        }
 
         public Map<String, String> getDefaultHeaders() { return defaultHeaders; }
         public void setDefaultHeaders(Map<String, String> defaultHeaders) {
@@ -723,6 +730,57 @@ public class ReactiveHttpClientProperties {
             }
             this.timeoutMs = timeoutMs;
         }
+    }
+
+    // ---- response cache sub-config ----
+
+    /**
+     * Per-client response-cache selection.
+     *
+     * <p>Policy definitions are inert. Caching is selected only by a non-blank
+     * {@link #policy} or a method-level
+     * {@link io.github.huynhngochuyhoang.httpstarter.annotation.CacheResponse @CacheResponse}.
+     */
+    public static class CacheConfig {
+        private String policy;
+        private Map<String, CachePolicyConfig> policies = new HashMap<>();
+        /** Explicit cache-safety classification keyed by Spring bean name. */
+        private Map<String, CacheCustomizationSafety> customizations = new HashMap<>();
+
+        public String getPolicy() { return policy; }
+        public void setPolicy(String policy) { this.policy = policy; }
+
+        public Map<String, CachePolicyConfig> getPolicies() { return policies; }
+        public void setPolicies(Map<String, CachePolicyConfig> policies) {
+            this.policies = policies != null ? policies : new HashMap<>();
+        }
+
+        public Map<String, CacheCustomizationSafety> getCustomizations() { return customizations; }
+        public void setCustomizations(Map<String, CacheCustomizationSafety> customizations) {
+            this.customizations = customizations != null ? customizations : new HashMap<>();
+        }
+    }
+
+    /** Cache-safety decision for an applicable WebClient builder customization. */
+    public enum CacheCustomizationSafety {
+        /** The customization cannot change per-caller authorization, response variants, or decoded value semantics. */
+        SAFE,
+        /** The customization is intentionally incompatible with local response caching. */
+        INCOMPATIBLE
+    }
+
+    /** Bounds for one explicitly selected local response-cache policy. */
+    public static class CachePolicyConfig {
+        /** Hard expiry in milliseconds. {@code null} means missing. */
+        private Long ttlMs;
+        /** Maximum number of entries. {@code null} means missing. */
+        private Long maximumSize;
+
+        public Long getTtlMs() { return ttlMs; }
+        public void setTtlMs(Long ttlMs) { this.ttlMs = ttlMs; }
+
+        public Long getMaximumSize() { return maximumSize; }
+        public void setMaximumSize(Long maximumSize) { this.maximumSize = maximumSize; }
     }
 
     // ---- resilience sub-config ----

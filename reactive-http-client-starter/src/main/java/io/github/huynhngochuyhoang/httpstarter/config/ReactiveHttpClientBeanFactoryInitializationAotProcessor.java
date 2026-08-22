@@ -30,12 +30,20 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         }
         MethodMetadataCache metadataCache = beanFactory.getBeanProvider(MethodMetadataCache.class)
                 .getIfAvailable(MethodMetadataCache::new);
+        ReactiveHttpClientProperties properties = beanFactory.getBeanProvider(ReactiveHttpClientProperties.class)
+                .getIfAvailable(ReactiveHttpClientProperties::new);
         clientInterfaces.forEach(clientInterface -> {
             ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
             if (annotation != null) {
+                ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
+                        .getOrDefault(annotation.name(), new ReactiveHttpClientProperties.ClientConfig());
                 metadataCache.validateDeclarativeRequestParameters(clientInterface, annotation.name());
                 metadataCache.validateDeclarativeUriTemplates(clientInterface, annotation.name());
                 metadataCache.validateDeclarativeReturnTypes(clientInterface, annotation.name());
+                metadataCache.validateDeclarativeCachePolicies(
+                        clientInterface, annotation.name(), clientConfig);
+                metadataCache.validateDeclarativeCacheCustomizations(
+                        beanFactory, clientInterface, annotation.name(), clientConfig);
             }
         });
         return (generationContext, beanFactoryInitializationCode) -> clientInterfaces.forEach(clientInterface -> {

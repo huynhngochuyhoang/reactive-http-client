@@ -46,6 +46,18 @@
       "sourceMethod": "getApis()"
     },
     {
+      "name": "reactive.http.clients.[name].cache",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
+      "sourceMethod": "getCache()"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies",
+      "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties.CachePolicyConfig>",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheConfig",
+      "sourceMethod": "getPolicies()"
+    },
+    {
       "name": "reactive.http.clients.[name].auth",
       "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$AuthConfig",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
@@ -387,6 +399,36 @@
       "description": "Optional end-to-end timeout budget for one subscription, including resilience admission, retries, redirects, auth, pool acquisition, and starter-owned response consumption. 0 disables the budget. Default: 0.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
       "defaultValue": 0
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policy",
+      "type": "java.lang.String",
+      "description": "Optional client-wide named response-cache policy selection. Blank or absent disables client-wide caching; method-level @CacheResponse overrides it.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies",
+      "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties.CachePolicyConfig>",
+      "description": "Named local response-cache policy definitions. Definitions are inert until selected by cache.policy or @CacheResponse.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].ttl-ms",
+      "type": "java.lang.Long",
+      "description": "Required hard TTL for a selected response-cache policy in milliseconds. Must be between 1 and 31536000000 (365 days).",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].maximum-size",
+      "type": "java.lang.Long",
+      "description": "Required maximum entry count for a selected response-cache policy. Must be between 1 and 1000000.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.customizations",
+      "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties.CacheCustomizationSafety>",
+      "description": "Explicit cache-safety decisions keyed by applicable Boot WebClientCustomizer, ReactiveHttpClientCustomizer, or replacement WebClient.Builder bean name. Unknown and INCOMPATIBLE customizations reject selected caching.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheConfig"
     },
     {
       "name": "reactive.http.clients.[name].default-headers",

@@ -26,6 +26,7 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,6 +47,9 @@ class ReactiveHttpClientAotSmokeTest {
                 .accepts(hints);
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(OPTIONS.class, "value")))
                 .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(CacheResponse.class, "value")))
+                .accepts(hints);
+        assertThat(hints.reflection().getTypeHint(CacheDisabled.class)).isNotNull();
         assertThat(hints.reflection().getTypeHint(Body.class)).isNotNull();
         assertThat(hints.reflection().getTypeHint(MultipartBody.class)).isNotNull();
         assertThat(hints.reflection().getTypeHint(Body.class).getMemberCategories()).isEmpty();
@@ -64,6 +68,9 @@ class ReactiveHttpClientAotSmokeTest {
                 .accepts(hints);
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 ReactiveHttpClientProperties.DiagnosticsEndpointConfig.class.getMethod("setEnabled", boolean.class)))
+                .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                ReactiveHttpClientProperties.CachePolicyConfig.class.getMethod("setTtlMs", Long.class)))
                 .accepts(hints);
         assertThat(ReactiveHttpClientProperties.class.getDeclaredClasses())
                 .filteredOn(type -> Modifier.isPublic(type.getModifiers()))
@@ -224,6 +231,32 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorRejectsSelectedCacheOnIneligibleMethod() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", InvalidAotCacheClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, InvalidAotCacheClient.class);
+        context.registerBeanDefinition(InvalidAotCacheClient.class.getName(), beanDefinition);
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("invalid-aot-cache", config));
+        context.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
+
+        assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(context.getDefaultListableBeanFactory()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("invalid-aot-cache")
+                .hasMessageContaining("concreteClient=" + InvalidAotCacheClient.class.getName())
+                .hasMessageContaining("method=")
+                .hasMessageContaining("only GET methods");
+        context.close();
+    }
+
+    @Test
     void beanFactoryAotProcessorUsesReplacementMethodMetadataCache() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
@@ -335,6 +368,13 @@ class ReactiveHttpClientAotSmokeTest {
         Mono<String> find();
     }
 
+    @ReactiveHttpClient(name = "invalid-aot-cache", baseUrl = "http://invalid-aot.test")
+    interface InvalidAotCacheClient {
+        @POST("/items")
+        @CacheResponse("selected")
+        Mono<String> create();
+    }
+
     @ReactiveHttpClient(name = "replacement-metadata", baseUrl = "http://replacement.test")
     interface ReplacementMetadataClient {
         Mono<String> customEndpoint(@PathVar("id") @QueryParam("id") String ignoredByReplacement);
@@ -356,6 +396,7 @@ class ReactiveHttpClientAotSmokeTest {
 
     @ReactiveHttpClient(name = "foreign-replacement", baseUrl = "http://replacement.test")
     interface ForeignReplacementClient {
+        @CacheResponse("foreign-policy")
         String synchronousEndpoint();
     }
 

@@ -68,6 +68,10 @@ public class MethodMetadata {
     private String circuitBreakerInstanceName;
     private String bulkheadInstanceName;
     private String rateLimiterInstanceName;
+    /** Method-level named response-cache policy; {@code null} means inherit the client selection. */
+    private String cachePolicyName;
+    /** Explicit method exclusion from a client-wide response-cache policy. */
+    private boolean cacheDisabled;
     private RequestPlan requestPlan;
 
     /**
@@ -158,6 +162,12 @@ public class MethodMetadata {
     public void setRateLimiterInstanceName(String rateLimiterInstanceName) {
         this.rateLimiterInstanceName = rateLimiterInstanceName;
     }
+
+    public String getCachePolicyName() { return cachePolicyName; }
+    public void setCachePolicyName(String cachePolicyName) { this.cachePolicyName = cachePolicyName; }
+
+    public boolean isCacheDisabled() { return cacheDisabled; }
+    public void setCacheDisabled(boolean cacheDisabled) { this.cacheDisabled = cacheDisabled; }
 
     RequestPlan getRequestPlan() { return requestPlan; }
     void setRequestPlan(RequestPlan requestPlan) { this.requestPlan = requestPlan; }
