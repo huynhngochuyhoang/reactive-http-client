@@ -7,10 +7,10 @@ current section; historical sections remain for provenance only.
 
 ## Supported Spring Boot baseline
 
-The `3.x` line requires Java 21 and Spring Boot `4.0.0` or later. Default
-dependency management uses Spring Boot `4.0.0`; CI also exercises the current
-`4.1.0` line. The published `2.x` line remains the separate Spring Boot 3.5
-maintenance lane.
+The published `3.x` line and current `4.x` development line require Java 21 and
+Spring Boot `4.0.0` or later. Default dependency management uses Spring Boot
+`4.0.0`; CI also exercises the current `4.1.0` line. The published `2.x` line
+remains the separate Spring Boot 3.5 maintenance lane.
 
 ## Dependency baseline readiness
 

@@ -591,7 +591,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(majorReleaseCandidate("3.1.0", published))
                 .containsEntry("version", "3.1.0")
                 .containsEntry("status", "published")
-                .containsEntry("published", true);
+                .containsEntry("published", true)
+                .containsEntry("pendingWork", List.of());
 
         assertThat(benchmarkEvidence("3.1.0-SNAPSHOT", "3.0.0", snapshot, false).get("promotedReport")).isNull();
         // A non-snapshot release without the report on disk stays deferred/pending.
@@ -673,6 +674,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("<version>3.6.0</version>")
                 .doesNotContain("<version>4.0.0-SNAPSHOT");
         assertThat(releaseDocs)
+                .contains("The published `3.x` line and current `4.x` development line require Java 21")
                 .contains("### V20 default Spring Boot 4 reactor\n\n"
                         + "The default reactor now declares `3.7.0-SNAPSHOT`")
                 .contains("### V27 major development lane")
@@ -699,6 +701,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("api-root-3.6.0")
                 .contains("api-starter-3.6.0")
                 .contains("api-major-report-3.6.0")
+                .contains("- name: Compare starter API to 3.6.0 from a separate repository\n        if: always()")
                 .contains("- name: Generate report-only 4.0.0 major API evidence\n        if: always()")
                 .contains("-Papi-compatibility -DskipTests verify")
                 .contains("-Papi-compatibility,major-api-report -DskipTests verify");
@@ -3063,13 +3066,16 @@ class DocumentationReleaseArtifactTest {
             case "post-publication" -> "published";
             default -> throw new IllegalStateException("Unsupported release state: " + versionContract.releaseState());
         };
+        List<String> pendingWork = "post-publication".equals(versionContract.releaseState())
+                ? List.of()
+                : List.of("resilience migration", "cache phases", "API compatibility",
+                        "assembled consumers", "benchmarks", "AOT", "native image", "publication");
         return Map.of(
                 "version", candidateVersion,
                 "status", status,
                 "published", "post-publication".equals(versionContract.releaseState()),
                 "migrationReport", "docs/31-3x-to-4x-resilience-migration.md",
-                "pendingWork", List.of("resilience migration", "cache phases", "API compatibility",
-                        "assembled consumers", "benchmarks", "AOT", "native image", "publication"));
+                "pendingWork", pendingWork);
     }
 
     private static Map<String, Object> releasePrepChecklist(Path root,
