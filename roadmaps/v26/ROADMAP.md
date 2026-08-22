@@ -1,8 +1,8 @@
 # Reactive HTTP Client - Roadmap V26
 
-> **Status:** draft
+> **Status:** release candidate
 > **Theme:** trustworthy logical-call observability after the `3.5.0` request-boundary release
-> **Current development line:** `3.6.0-SNAPSHOT`
+> **Release candidate:** `3.6.0`
 > **Published/API baseline:** `3.5.0`
 
 ## Starting State
