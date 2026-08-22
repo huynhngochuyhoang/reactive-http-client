@@ -291,7 +291,8 @@ public final class MockReactiveHttpClient<T> {
          * Uses the supplied resilience operator applier when constructing the mock proxy.
          * A {@link NoopResilienceOperatorApplier} subclass may override only the
          * relevant {@code apply*} methods; those operators are inferred as available
-         * for the matching Mono or Flux shape.
+         * for the matching Mono or Flux shape. Retry capacity remains non-duplicating
+         * unless the subclass overrides {@code canRetryMoreThanOnce}.
          */
         public Builder<T> resilienceOperatorApplier(ResilienceOperatorApplier resilienceOperatorApplier) {
             this.resilienceOperatorApplier = resilienceOperatorApplier != null

@@ -149,6 +149,20 @@ class ResilienceOperatorApplierTest {
                     EffectiveResiliencePolicy.PublisherShape.FLUX)).isTrue();
             assertThat(custom.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER)).isFalse();
             assertThat(custom.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RATE_LIMITER)).isFalse();
+            assertThat(custom.canRetryMoreThanOnce("retry")).isFalse();
+
+            ResilienceOperatorApplier duplicateRetry = new NoopResilienceOperatorApplier() {
+                @Override
+                public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
+                    return mono.retry(1);
+                }
+
+                @Override
+                public boolean canRetryMoreThanOnce(String instanceName) {
+                    return true;
+                }
+            };
+            assertThat(duplicateRetry.canRetryMoreThanOnce("retry")).isTrue();
 
             ResilienceOperatorApplier explicitlyUnavailable = new NoopResilienceOperatorApplier() {
                 @Override

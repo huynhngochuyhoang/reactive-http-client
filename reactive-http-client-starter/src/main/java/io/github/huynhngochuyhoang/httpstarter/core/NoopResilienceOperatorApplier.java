@@ -14,7 +14,9 @@ import java.util.Set;
  * that operator for the matching Mono or Flux publisher shape unless they
  * override {@link #isOperatorAvailable(InstanceType)} explicitly. This
  * preserves lightweight custom appliers used by test helpers without claiming
- * that a Mono-only override also applies to Flux.
+ * that a Mono-only override also applies to Flux. Inferred Retry availability
+ * does not imply duplicate-attempt capacity; subclasses that model retries
+ * must override {@link #canRetryMoreThanOnce(String)} explicitly.
  */
 public class NoopResilienceOperatorApplier implements ResilienceOperatorApplier {
 
@@ -83,6 +85,11 @@ public class NoopResilienceOperatorApplier implements ResilienceOperatorApplier 
         }
         OverrideContract contract = OVERRIDE_CONTRACTS.get(getClass());
         return contract.monoOperators().contains(type) || contract.fluxOperators().contains(type);
+    }
+
+    @Override
+    public boolean canRetryMoreThanOnce(String instanceName) {
+        return false;
     }
 
     boolean isOperatorAvailable(

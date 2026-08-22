@@ -822,6 +822,33 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void inferredRetryAvailabilityDoesNotImplyDuplicateAttemptCapacity() {
+        AtomicInteger applications = new AtomicInteger();
+        ResilienceOperatorApplier passThroughRetry = new NoopResilienceOperatorApplier() {
+            @Override
+            public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
+                applications.incrementAndGet();
+                return mono;
+            }
+        };
+
+        MockReactiveHttpClient<StrictUnsafeMockClient> mock = MockReactiveHttpClient
+                .forClient(StrictUnsafeMockClient.class)
+                .clientConfig(strictMockRetryConfig())
+                .resilienceOperatorApplier(passThroughRetry)
+                .respondTo(HttpMethod.POST, "/strict",
+                        exchange -> MockReactiveHttpClient.text(200, "ok"))
+                .build();
+
+        StepVerifier.create(mock.proxy().create())
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(applications).hasValue(1);
+        RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(1);
+    }
+
+    @Test
     void monoOnlyNoopOverrideDoesNotActivateFluxRetryOrStrictValidation() {
         AtomicInteger applications = new AtomicInteger();
         ResilienceOperatorApplier monoOnly = new NoopResilienceOperatorApplier() {
