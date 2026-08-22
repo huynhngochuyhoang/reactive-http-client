@@ -93,7 +93,28 @@ jobs:
             -Papi-compatibility -DskipTests verify && \
           scripts/verify-published-baseline-provenance.sh api-root 3.6.0 \
             target/release-evidence/published-baselines/api-root-3.6.0 \
-            reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
+            reactive-http-client reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
+
+      - name: Compare starter API to 3.6.0 from a separate repository
+        run: |
+          test ! -e target/published-baseline-repositories/api-starter-3.6.0 && \
+          mvn -B -ntp -s .mvn/maven-central-settings.xml \
+            -Dmaven.repo.local=target/published-baseline-repositories/api-starter-3.6.0 \
+            -pl reactive-http-client-starter \
+            -Papi-compatibility -DskipTests verify && \
+          scripts/verify-published-baseline-provenance.sh api-starter 3.6.0 \
+            target/release-evidence/published-baselines/api-starter-3.6.0 \
+            reactive-http-client-starter
+
+      - name: Generate report-only 4.0.0 major API evidence
+        run: |
+          test ! -e target/published-baseline-repositories/api-major-report-3.6.0 && \
+          mvn -B -ntp -s .mvn/maven-central-settings.xml \
+            -Dmaven.repo.local=target/published-baseline-repositories/api-major-report-3.6.0 \
+            -Papi-compatibility,major-api-report -DskipTests verify && \
+          scripts/verify-published-baseline-provenance.sh api-major-report 3.6.0 \
+            target/release-evidence/published-baselines/api-major-report-3.6.0 \
+            reactive-http-client reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
 
       - name: Verify published baseline provenance fixtures
         run: bash scripts/verify-published-baseline-fixtures.sh
@@ -109,6 +130,8 @@ jobs:
           path: |
             **/target/japicmp/*
             target/release-evidence/published-baselines/api-root-3.6.0/
+            target/release-evidence/published-baselines/api-starter-3.6.0/
+            target/release-evidence/published-baselines/api-major-report-3.6.0/
           retention-days: 7
 
   release-smoke:

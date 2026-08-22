@@ -1,6 +1,6 @@
 # Native Image and Release Compatibility
 
-Sections without a version label describe the current `3.7.0-SNAPSHOT`
+Sections without a version label describe the current `4.0.0-SNAPSHOT`
 development line. Sections labeled V18, V19, or V20 preserve release-era
 evidence and are not current commands. Use the command in the first applicable
 current section; historical sections remain for provenance only.
@@ -94,7 +94,7 @@ change.
 
 ### V20 default Spring Boot 4 reactor
 
-The default reactor now declares `3.7.0-SNAPSHOT`, imports Spring Boot `4.0.0`,
+The default reactor now declares `4.0.0-SNAPSHOT`, imports Spring Boot `4.0.0`,
 and uses published `3.6.0` as its strict compatibility baseline. Boot 4
 WebClient, health, Jackson 3, OTel, test-helper, and benchmark adapters live in
 normal source roots. The old `boot4-spike` profile, compiler exclusions,
@@ -111,6 +111,20 @@ mvn -s .mvn/maven-central-settings.xml \
 The Central-only settings file is optional when the configured Maven mirror
 already contains Boot 4. It changes repository resolution only; it does not
 select source sets or alter publishing.
+
+### V27 major development lane
+
+V27 keeps published `3.6.0` as the strict API and consumer baseline while the
+reactor develops as `4.0.0-SNAPSHOT`. The
+[3.x to 4.x resilience migration report](31-3x-to-4x-resilience-migration.md)
+records the behavior reason for the major version and the initial API result.
+The report-only `major-api-report` profile is additional classification
+evidence. It never replaces strict root and starter-module compatibility runs,
+which continue to fail on any unreviewed binary or source incompatibility.
+
+`4.0.0` is not a release candidate during snapshot development. Generated
+readiness keeps publication deferred and lists the remaining resilience,
+caching, API, consumer, benchmark, AOT, native, and publication work.
 
 ### Publishable module staging
 
@@ -314,7 +328,7 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `3.7.0-SNAPSHOT` development line compares
+from the current reactor version. The `4.0.0-SNAPSHOT` development line compares
 strictly against published `3.6.0`:
 
 ```bash
@@ -654,7 +668,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=3.7.0-SNAPSHOT native:compile
+  -Dreactive-http-client.version=4.0.0-SNAPSHOT native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
@@ -807,7 +821,7 @@ runs the complete mock parity classes, then runs the assembled consumer against
 the installed jars. It rejects reactor `target/classes` leakage and records
 separate mock and real-server test reports, the consumer classpath, dependency
 tree, effective POM, artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-3.7.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
+`target/release-evidence/current-consumer/current-4.0.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
 test stage. An `EXIT` trap repeats that filtered copy before preserving the original
 verifier status, including when either test stage fails.
 It also records the last completed stage and exit status when a later
