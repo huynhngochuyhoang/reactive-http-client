@@ -27,8 +27,12 @@ one candidate release.
 
 ### [ ] 1.2 Establish the `4.0.0` development lane
 
+- [ ] Generate and source-control the initial `3.x` to `4.0.0` resilience
+      migration report, including enabled-only and explicit `default` behavior,
+      before changing the reactor version.
 - [ ] Move root, modules, benchmark harness, assembled consumer, and native
-      fixture from `3.7.0-SNAPSHOT` to `4.0.0-SNAPSHOT` in one reviewed change.
+      fixture from `3.7.0-SNAPSHOT` to `4.0.0-SNAPSHOT` in the same reviewed
+      change that updates the baseline guard, migration report, and release lane.
 - [ ] Keep `latest.published.version`, API compatibility, published consumer,
       and benchmark baselines on published `3.6.0`.
 - [ ] Add a report-only major API lane without weakening strict checks for
@@ -153,6 +157,12 @@ one candidate release.
 
 ### [ ] 4.3 Apply eligibility consistently
 
+- [ ] Define a cache-aware pre-lookup policy boundary that runs authorization,
+      tenant, and other required per-invocation gates before every hit or miss.
+- [ ] Inventory custom `ExchangeFilterFunction` filters installed through
+      `ReactiveHttpClientCustomizer`; reject cache activation unless each is
+      explicitly cache-safe or its required gate exists at the pre-lookup
+      boundary.
 - [ ] Resolve inherited methods, overloads, nested generic bindings, and
       `@ApiRef` cache metadata against the concrete client.
 - [ ] Run the same validation during starter proxy startup, effective-contract
@@ -225,8 +235,9 @@ one candidate release.
       invocations.
 - [ ] Require the validated Priority 5 key/variant decision before any cache
       lookup or response storage can occur.
-- [ ] Return an unexpired hit without auth resolution, resilience admission,
-      redirect, pool acquisition, or HTTP dispatch.
+- [ ] Return an unexpired hit without downstream resilience admission, redirect,
+      pool acquisition, or HTTP dispatch only after all mandatory pre-lookup
+      policy/auth/key-partition gates succeed.
 - [ ] Execute the existing logical-call pipeline once for a phase-one miss and
       store only its final successful decoded value.
 - [ ] Preserve phase-one behavior where concurrent misses may execute separate
@@ -300,6 +311,8 @@ one candidate release.
 
 - [ ] Keep refresh disabled unless explicitly selected for a cache policy.
 - [ ] Require positive `refresh-after` strictly below the hard TTL.
+- [ ] Require a positive finite refresh timeout and cap each refresh at the
+      earliest of that deadline, hard expiry, and factory shutdown.
 - [ ] Return the current value after refresh-after and trigger at most one
       access-driven refresh for that key.
 - [ ] Keep concurrent stale callers on the current value without starting
@@ -310,10 +323,17 @@ one candidate release.
 
 - [ ] Use the live triggering invocation's validated key/variant context rather
       than retaining arbitrary argument graphs or scheduling invented requests.
+- [ ] Run refresh through the same pre-lookup gates, auth, selected resilience
+      operators, redirects, request/response timeouts, and transport pipeline as
+      a miss while bypassing recursive cache lookup.
 - [ ] Atomically replace on refresh success and restart entry age.
 - [ ] Preserve the current value on refresh failure only until hard TTL.
 - [ ] Never serve stale after hard expiry; a later caller follows normal miss
       and single-flight behavior.
+- [ ] Cancel a refresh at hard expiry and prevent its late result from
+      repopulating the cache.
+- [ ] Use a non-terminating refresh fixture to prove deadline cancellation and
+      release of invocation/auth/key state after the stale caller completes.
 - [ ] Cover refresh failure, cancellation, late completion, hard-expiry race,
       and eviction during refresh deterministically.
 
@@ -333,10 +353,16 @@ one candidate release.
 
 ### [ ] 9.1 Freeze operator boundaries
 
-- [ ] Place lookup outside the existing auth/resilience/redirect/transport load
-      pipeline so a hit consumes none of those resources.
+- [ ] Place lookup after mandatory cache-aware policy, authorization, tenant,
+      and key-partition gates but before downstream resilience, redirect, pool,
+      and transport work.
+- [ ] Reject caching for a client with an unclassified custom WebClient filter;
+      a hit cannot bypass a filter that could reject the current invocation.
 - [ ] Keep a miss leader behaviorally identical to an uncached invocation until
       its final successful decoded value is stored.
+- [ ] Make refresh bypass lookup only and reuse the miss auth/resilience/
+      redirect/timeout/transport pipeline, with separate hidden-refresh terminal
+      reporting.
 - [ ] Include lookup and each caller's coalesced wait in that caller's logical
       timeout without placing any caller-specific outer deadline inside the
       shared load publisher.
@@ -382,6 +408,8 @@ one candidate release.
       compatibility constructors are reviewed.
 - [ ] Keep raw keys, values, arguments, headers, bodies, URLs, tenant values,
       and credentials out of every outcome model.
+- [ ] Add a separate cache-observability opt-in that defaults false and remains
+      subordinate to the existing global observability master gate.
 
 ### [ ] 10.2 Implement and verify Micrometer meters
 
@@ -394,6 +422,9 @@ one candidate release.
       under starter-specific names that cannot collide with cache-library meters.
 - [ ] Verify meter absence when caching is unselected and prove metrics enablement
       cannot activate caching.
+- [ ] Verify a cache-enabled, cache-observability-disabled client records no
+      cache-library stats, cache meters, cache OTel attributes, or cache-specific
+      log/context fields.
 - [ ] Add Prometheus scrape tests for names, types, tags, zero-series behavior,
       hit ratio, coalescing ratio, refresh failure rate, and capacity pressure.
 

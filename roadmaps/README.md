@@ -43,4 +43,4 @@ they are deliberately adopted by a future roadmap.
 | V24 | [Roadmap](v24/ROADMAP.md) | [Checklist](v24/CHECKLIST.md) | Completed and released as `3.4.0` |
 | V25 | [Roadmap](v25/ROADMAP.md) | [Checklist](v25/CHECKLIST.md) | Completed and released as `3.5.0` |
 | V26 | [Roadmap](v26/ROADMAP.md) | [Checklist](v26/CHECKLIST.md) | Completed and released as `3.6.0` |
-| V27 | [Roadmap](v27/ROADMAP.md) | [Checklist](v27/CHECKLIST.md) | Active; targeting the `4.0.0` major line |
+| V27 | [Roadmap](v27/ROADMAP.md) | [Checklist](v27/CHECKLIST.md) | Active |

@@ -54,8 +54,8 @@ endpoint is cacheable.
 
 V27 targets `4.0.0`. Keep public consumer examples on published `3.6.0` until
 release preparation verifies the major candidate. Move the reactor from
-`3.7.0-SNAPSHOT` to `4.0.0-SNAPSHOT` only when the baseline guard, migration
-report, and release lane are updated together.
+`3.7.0-SNAPSHOT` to `4.0.0-SNAPSHOT` only when the baseline guard, an initial
+source-controlled migration report, and the release lane are updated together.
 
 ## Goals
 
@@ -199,6 +199,13 @@ behavior.
   the client and method/policy identity.
 - Method-level activation works for inherited endpoints, overloads, `@ApiRef`,
   AOT validation, effective-contract export, diagnostics, and mocks.
+- Define one cache-aware pre-lookup policy boundary that runs for every hit and
+  miss before a value can be returned. Authorization, tenant, and other required
+  per-invocation gates belong at this boundary.
+- Because `ReactiveHttpClientCustomizer` can install arbitrary
+  `ExchangeFilterFunction` behavior, reject cache activation for clients with
+  unclassified custom filters unless each filter is explicitly declared
+  cache-safe or its required gate is represented at the pre-lookup boundary.
 - Initial eligibility is restricted to explicitly selected `GET` methods that
   return finite, materialized `Mono<T>` or `Mono<ResponseEntity<T>>` values.
 - `Flux`, `Mono<Void>`, streaming envelopes, `DataBuffer`, publishers,
@@ -254,8 +261,10 @@ defined: local, bounded, expiring, and opt-in.
   cannot make entries immortal or immediately stale.
 - No response can be stored until Priority 5 has produced its validated,
   isolated key and variant decision.
-- A hit returns the cached materialized value without auth resolution,
-  Resilience4j admission, redirect handling, or transport dispatch.
+- A hit runs the mandatory cache-aware pre-lookup policy gates, then returns the
+  cached materialized value without downstream Resilience4j admission, redirect
+  handling, pool acquisition, or transport dispatch. Auth/tenant resolution
+  required for authorization or key partitioning cannot be skipped.
 - A miss executes the existing logical-call pipeline once for that caller and
   stores only a successful eligible result after full decoding.
 - Phase one intentionally does not coalesce concurrent misses: two simultaneous
@@ -314,6 +323,9 @@ context.
 
 - Refresh is separately opt-in and requires a positive refresh-after duration
   strictly less than the hard TTL.
+- Every refresh has a mandatory finite refresh timeout. Its effective deadline
+  is the earliest of that timeout, the entry's hard expiry, and factory shutdown;
+  a non-terminating refresh cannot outlive all caller subscriptions indefinitely.
 - An access after refresh-after but before hard expiry returns the current value
   and triggers at most one refresh load for that key.
 - Concurrent accesses during refresh receive the current value and do not create
@@ -322,11 +334,15 @@ context.
 - Refresh uses the live triggering invocation's validated key/variant context.
   The cache does not retain a request publisher, auth token, Reactor context, or
   arbitrary argument graph for scheduled replay.
+- Refresh bypasses recursive cache lookup but otherwise uses the same pre-lookup
+  gates, auth, selected Resilience4j operators, redirect handling, request/
+  response timeout, and transport pipeline as a miss load. Those operator calls
+  and permits are real hidden refresh work and are reported as such.
 - Refresh success atomically replaces the value and restarts its age. Refresh
   failure preserves the current value only until hard expiry and is observable
   without failing callers that already received the stale value.
 - After hard expiry, no stale value is served. The next caller follows the normal
-  miss/load contract even when an older refresh is late or failed.
+  miss/load contract; the expired refresh is cancelled and cannot publish late.
 - Factory shutdown cancels/awaits refresh work under the existing aggregate
   shutdown bound and cannot leave cache-owned tasks or references alive.
 - Tests cover refresh success, failure, cancellation, hard-expiry races, eviction
@@ -340,10 +356,17 @@ side effects.
 **Acceptance:**
 
 - Lookup wraps the existing load pipeline: a hit consumes no retry permit,
-  circuit-breaker call, rate-limit permit, bulkhead slot, auth token request,
-  redirect, pool acquisition, or HTTP dispatch.
+  circuit-breaker call, rate-limit permit, bulkhead slot, redirect, pool
+  acquisition, or HTTP dispatch after mandatory pre-lookup policy/auth/key gates
+  have succeeded.
+- Every configured `ReactiveHttpClientCustomizer` filter is classified before
+  caching is allowed. A cache hit cannot bypass an authorization, tenant, or
+  other required pre-dispatch filter.
 - A miss leader uses the selected resilience operators exactly as an uncached
   call does. Cache storage occurs only after the final successful decoded result.
+- A refresh load bypasses lookup only and otherwise uses that same miss pipeline,
+  including auth, resilience, redirects, timeouts, and transport; refresh failure
+  remains hidden from the stale caller but visible as refresh work.
 - Logical-call timeout includes lookup and each caller's wait. A waiter timeout
   does not rewrite or clear shared-load state, and the first caller's timeout
   cannot truncate a later waiter's fresh budget while that waiter remains
@@ -372,6 +395,10 @@ telemetry and the established one-terminal-record contract.
   schemas: fresh hit, miss loader, coalesced waiter, stale hit with refresh,
   load success/failure/cancellation, refresh success/failure/cancellation, TTL
   expiry, and size eviction.
+- Cache metrics and cache-specific terminal observability are separately opt-in
+  and disabled by default. Selecting caching alone records no cache-library
+  statistics, cache meters, cache OTel attributes, or cache-specific log/context
+  exports; the existing global observability gate must also permit them.
 - Micrometer exposes a lookup counter by client, API name, and `hit`/`miss`.
   Coalescing and stale-serving remain separate bounded outcomes so hit ratio is
   not made ambiguous by phase-two or phase-three behavior.
@@ -409,8 +436,9 @@ telemetry and the established one-terminal-record contract.
 - Deterministic tests prove exactly one caller terminal record for hits, misses,
   coalesced waiters, stale hits, timeout, cancellation, load failure, and refresh
   failure while hidden work has separate aggregate telemetry.
-- Cache metrics remain absent when no cache policy is selected. Enabling cache
-  metrics does not enable caching.
+- Cache metrics remain absent when no cache policy is selected and when caching
+  is selected but cache observability is disabled. Enabling cache metrics does
+  not enable caching.
 
 ## 11. Mock, Consumer, AOT, Native, and Shutdown Parity
 

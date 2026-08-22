@@ -81,8 +81,9 @@ class DocumentationReleaseArtifactTest {
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("Missing V" + version + " roadmap status"));
             if (version == 27) {
-                assertThat(roadmapStatus).containsIgnoringCase("active");
-                assertThat(indexRow).contains("Active");
+                String statusValue = roadmapStatus.substring("> **Status:**".length()).trim();
+                assertThat(statusValue).isEqualTo("active");
+                assertThat(indexRow).endsWith("| Active |");
             }
             else if (version == 19) {
                 assertThat(roadmapStatus).containsIgnoringCase("no-go");
