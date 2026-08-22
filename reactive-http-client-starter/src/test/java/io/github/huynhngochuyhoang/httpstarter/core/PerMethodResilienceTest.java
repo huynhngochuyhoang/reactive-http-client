@@ -121,6 +121,8 @@ class PerMethodResilienceTest {
         clientConfig.setBaseUrl("http://test.local");
         ReactiveHttpClientProperties.ResilienceConfig resilienceConfig = new ReactiveHttpClientProperties.ResilienceConfig();
         resilienceConfig.setEnabled(true);
+        resilienceConfig.setRetryMethods(java.util.Set.of("POST"));
+        resilienceConfig.setStrictUnsafeRetryValidation(true);
         clientConfig.setResilience(resilienceConfig);
         properties.getClients().put("ghost-client", clientConfig);
         ctx.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
@@ -133,7 +135,8 @@ class PerMethodResilienceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("undefined Resilience4j instances")
                 .hasMessageContaining("@Retry(\"ghost-retry\")")
-                .hasMessageContaining("@RateLimiter(\"ghost-rate-limiter\")");
+                .hasMessageContaining("@RateLimiter(\"ghost-rate-limiter\")")
+                .hasMessageNotContaining("strict unsafe retry validation");
 
         ctx.close();
     }
@@ -251,7 +254,7 @@ class PerMethodResilienceTest {
 
     @ReactiveHttpClient(name = "ghost-client", baseUrl = "http://test.local")
     interface MissingInstanceClient {
-        @GET("/x")
+        @POST("/x")
         @Retry("ghost-retry")
         @RateLimiter("ghost-rate-limiter")
         Mono<String> ghost();

@@ -733,9 +733,9 @@ public class ReactiveHttpClientProperties {
 
         private boolean enabled = false;
         /** Name of the Resilience4j CircuitBreaker instance (from application config). */
-        private String circuitBreaker = "default";
+        private String circuitBreaker;
         /** Name of the Resilience4j Retry instance. */
-        private String retry = "default";
+        private String retry;
         /**
          * HTTP methods eligible for retry.
          * Defaults to idempotent-safe methods.
@@ -744,9 +744,9 @@ public class ReactiveHttpClientProperties {
         /** Fail startup when a retryable unsafe method has no startup-provable idempotency key. */
         private boolean strictUnsafeRetryValidation = false;
         /** Name of the Resilience4j Bulkhead instance. */
-        private String bulkhead = "default";
+        private String bulkhead;
         /** Name of the Resilience4j RateLimiter instance. */
-        private String rateLimiter = "default";
+        private String rateLimiter;
         /** @deprecated use client-level request-timeout-ms. */
         @Deprecated
         private Long timeoutMs;

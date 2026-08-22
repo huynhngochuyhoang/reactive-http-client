@@ -284,14 +284,17 @@ public class ReactiveHttpClientDiagnosticsProvider {
             if (!isRetryMethodEnabled(resilience, httpMethod)) {
                 continue;
             }
+            RequestPlan plan = RequestPlan.from(meta, clientInterface);
+            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
+            if (!StringUtils.hasText(retryInstance)) {
+                continue;
+            }
             if (retryRegistryUnresolved) {
                 return null;
             }
             if (!retryOperatorAvailable) {
                 return false;
             }
-            RequestPlan plan = RequestPlan.from(meta, clientInterface);
-            String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
             if (!resilienceOperatorApplier.isInstanceConfigured(
                     ResilienceOperatorApplier.InstanceType.RETRY, retryInstance)) {
                 unresolvedRetry = true;
@@ -397,7 +400,10 @@ public class ReactiveHttpClientDiagnosticsProvider {
     }
 
     private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {
-        return StringUtils.hasText(methodLevel) ? methodLevel : clientLevel;
+        if (StringUtils.hasText(methodLevel)) {
+            return methodLevel;
+        }
+        return StringUtils.hasText(clientLevel) ? clientLevel : null;
     }
 
     private static boolean isDeclarativeClientMethod(Method method) {

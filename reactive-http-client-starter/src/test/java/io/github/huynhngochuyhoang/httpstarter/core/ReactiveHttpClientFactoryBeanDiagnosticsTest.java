@@ -443,6 +443,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("GET", "POST", "PUT"));
         properties.getClients().put("diagnostic-client", config);
 
@@ -477,6 +478,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.setDefaultHeaders(Map.of("Idempotency-Key", "configured-key"));
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         properties.getClients().put("diagnostic-client", config);
 
@@ -503,6 +505,10 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
+        config.getResilience().setRateLimiter("default");
+        config.getResilience().setCircuitBreaker("default");
+        config.getResilience().setBulkhead("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         properties.getClients().put("diagnostic-client", config);
 
@@ -525,6 +531,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
         properties.getClients().put("strict-retry-client", config);
@@ -556,6 +563,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         properties.getClients().put("strict-retry-client", config);
 
@@ -573,6 +581,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
         properties.getClients().put("strict-retry-client", config);
@@ -581,6 +590,26 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
                 buildFactoryBean(properties, StrictUnsafeRetryClient.class);
         try {
             assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void strictUnsafeRetryValidationDoesNotRunWhenRetryIsUnselected() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-retry-client", config);
+        RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
+
+        ReactiveHttpClientFactoryBean<StrictUnsafeRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictUnsafeRetryClient.class, retryRegistry);
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+            assertThat(retryRegistry.getAllRetries()).isEmpty();
         } finally {
             factoryBean.destroy();
         }
@@ -612,6 +641,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.setDefaultHeaders(Map.of("Idempotency-Key", "configured-key"));
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
         properties.getClients().put("strict-retry-client", config);
@@ -639,6 +669,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.setDefaultHeaders(Map.of("Idempotency-Key", "configured-key"));
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
         properties.getClients().put("strict-retry-client", config);
@@ -668,6 +699,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         api.setPath("/orders");
         config.setApis(Map.of("orders.create", api));
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
         properties.getClients().put("strict-api-ref-retry-client", config);
@@ -698,6 +730,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         api.setPath("/orders");
         config.setApis(Map.of("orders.create", api));
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
         properties.getClients().put("strict-api-ref-retry-client", config);
@@ -717,6 +750,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.setDefaultHeaders(Map.of("Idempotency-Key", "configured-key"));
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
         properties.getClients().put("strict-retry-client", config);
@@ -735,6 +769,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
         properties.getClients().put("strict-retry-client", config);
@@ -753,6 +788,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("PUT"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
         properties.getClients().put("strict-retry-client", config);
@@ -771,6 +807,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
         config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
         config.getResilience().setRetryMethods(java.util.Set.of("POST"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
         properties.getClients().put("strict-inherited-retry-client", config);

@@ -660,16 +660,14 @@
     {
       "name": "reactive.http.clients.[name].resilience.circuit-breaker",
       "type": "java.lang.String",
-      "description": "Name of the Resilience4j CircuitBreaker instance from application config. Default: default.",
-      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
-      "defaultValue": "default"
+      "description": "Name of the Resilience4j CircuitBreaker instance from application config. Blank or absent disables this operator.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig"
     },
     {
       "name": "reactive.http.clients.[name].resilience.retry",
       "type": "java.lang.String",
-      "description": "Name of the Resilience4j Retry instance from application config. Default: default.",
-      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
-      "defaultValue": "default"
+      "description": "Name of the Resilience4j Retry instance from application config. Blank or absent disables this operator.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig"
     },
     {
       "name": "reactive.http.clients.[name].resilience.retry-methods",
@@ -691,16 +689,14 @@
     {
       "name": "reactive.http.clients.[name].resilience.bulkhead",
       "type": "java.lang.String",
-      "description": "Name of the Resilience4j Bulkhead instance from application config. Default: default.",
-      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
-      "defaultValue": "default"
+      "description": "Name of the Resilience4j Bulkhead instance from application config. Blank or absent disables this operator.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig"
     },
     {
       "name": "reactive.http.clients.[name].resilience.rate-limiter",
       "type": "java.lang.String",
-      "description": "Name of the Resilience4j RateLimiter instance from application config. Default: default.",
-      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig",
-      "defaultValue": "default"
+      "description": "Name of the Resilience4j RateLimiter instance from application config. Blank or absent disables this operator.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ResilienceConfig"
     },
     {
       "name": "reactive.http.clients.[name].resilience.timeout-ms",

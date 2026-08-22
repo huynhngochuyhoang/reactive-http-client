@@ -268,7 +268,7 @@ class EffectiveHttpClientContractExporterTest {
         EffectiveHttpClientContract contract = onlyContract(PostWithoutRetryMethodClient.class, config);
 
         assertThat(contract.resilience().retry()).isEqualTo("disabled");
-        assertThat(contract.resilience().rateLimiter()).isEqualTo("default");
+        assertThat(contract.resilience().rateLimiter()).isEqualTo("disabled");
     }
 
     @Test

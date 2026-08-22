@@ -846,13 +846,17 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         if (resilience == null || !resilience.isEnabled()) {
             return "disabled";
         }
-        return "configured(retry=" + resilience.getRetry()
+        return "configured(retry=" + configuredOperator(resilience.getRetry())
                 + ", retryMethods=" + resilience.getRetryMethods()
-                + ", rateLimiter=" + resilience.getRateLimiter()
-                + ", circuitBreaker=" + resilience.getCircuitBreaker()
-                + ", bulkhead=" + resilience.getBulkhead()
+                + ", rateLimiter=" + configuredOperator(resilience.getRateLimiter())
+                + ", circuitBreaker=" + configuredOperator(resilience.getCircuitBreaker())
+                + ", bulkhead=" + configuredOperator(resilience.getBulkhead())
                 + ", operatorOrder=" + ReactiveClientInvocationHandler.RESILIENCE_OPERATOR_ORDER
                 + ")";
+    }
+
+    private static String configuredOperator(String instanceName) {
+        return StringUtils.hasText(instanceName) ? instanceName : "disabled";
     }
 
     private ReactiveHttpClientProperties.ConnectionPoolConfig resolveConnectionPool(
@@ -1167,6 +1171,9 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 continue;
             }
             String retryInstance = resolveResilienceInstanceName(plan.retryInstanceName(), resilience.getRetry());
+            if (!StringUtils.hasText(retryInstance)) {
+                continue;
+            }
             if (!resilienceOperatorApplier.canRetryMoreThanOnce(retryInstance)) {
                 continue;
             }
@@ -1362,14 +1369,21 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                                              ResilienceOperatorApplier.InstanceType type,
                                              String methodLevel,
                                              String clientLevel) {
+        String instanceName = resolveResilienceInstanceName(methodLevel, clientLevel);
+        if (!StringUtils.hasText(instanceName)) {
+            return "disabled";
+        }
         if (!resilienceOperatorApplier.isOperatorAvailable(type)) {
             return "unavailable";
         }
-        return resolveResilienceInstanceName(methodLevel, clientLevel);
+        return instanceName;
     }
 
     private static String resolveResilienceInstanceName(String methodLevel, String clientLevel) {
-        return StringUtils.hasText(methodLevel) ? methodLevel : clientLevel;
+        if (StringUtils.hasText(methodLevel)) {
+            return methodLevel;
+        }
+        return StringUtils.hasText(clientLevel) ? clientLevel : null;
     }
 
     private static boolean isDeclarativeClientMethod(Method method) {

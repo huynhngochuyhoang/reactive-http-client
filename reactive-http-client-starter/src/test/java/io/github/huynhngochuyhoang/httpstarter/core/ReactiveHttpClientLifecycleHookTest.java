@@ -553,6 +553,9 @@ class ReactiveHttpClientLifecycleHookTest {
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setEnabled(true);
         resilience.setRetry("retry-test");
+        resilience.setRateLimiter("rate-limiter-test");
+        resilience.setCircuitBreaker("circuit-breaker-test");
+        resilience.setBulkhead("bulkhead-test");
         resilience.setRetryMethods(Set.of("GET"));
         config.setResilience(resilience);
         return config;

@@ -20,7 +20,7 @@ operator composition order, retry-method eligibility, or master-gate meaning.
 | `retry: default` | Selects the `default` Retry when available and the method is retry-eligible. | Unchanged explicit selection. | Keep the property when Retry is intended. |
 | Named client-level instance | Selects that operator instance when available. | Unchanged explicit selection. | None. |
 | Method-level resilience annotation | Selects that method's instance under the enabled master gate. | Unchanged explicit selection and precedence. | None. |
-| Blank or absent client-level instance | Does not name a usable instance. The published defaults can still supply `default` when the property is absent. | Disabled for that operator. | Use explicit `default` instead of relying on absence. |
+| Blank or absent client-level instance | A blank configured value is forwarded to the operator applier rather than treated as disabled. An absent property retains the constructor value `default`; blank method annotations are rejected. | Disabled for that operator. | Use explicit `default` instead of relying on absence or a blank value. |
 | `retry-methods` only | Restricts eligibility for the Retry selected by the default property. | Remains eligibility only and does not activate Retry. | Add `retry: default` or a named Retry when retry is intended. |
 | Strict unsafe-retry validation | Runs only when an effective Retry can make another attempt. | Same rule; an unselected Retry keeps validation dormant. | None unless the client relied on implicit Retry activation. |
 

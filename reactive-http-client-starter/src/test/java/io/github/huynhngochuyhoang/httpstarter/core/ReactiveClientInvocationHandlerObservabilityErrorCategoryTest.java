@@ -601,6 +601,7 @@ class ReactiveClientInvocationHandlerObservabilityErrorCategoryTest {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilienceConfig = new ReactiveHttpClientProperties.ResilienceConfig();
         resilienceConfig.setEnabled(true);
+        resilienceConfig.setRetry("default");
         resilienceConfig.setTimeoutMs(resilienceTimeoutMs);
         config.setResilience(resilienceConfig);
         config.setAuthProvider(authProviderName);
