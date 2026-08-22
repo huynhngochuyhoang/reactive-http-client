@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-08-22
+
 ### Changed
 - **Observability overhead audit harness.** Added separately classified
   no-network benchmark rows for Prometheus observation, opt-in latency
@@ -1597,7 +1599,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.5.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.6.0...HEAD
+[3.6.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.5.0...v3.6.0
 [3.5.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.3.0...v3.4.0
 [3.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.2.0...v3.3.0

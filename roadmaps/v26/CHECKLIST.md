@@ -661,32 +661,102 @@ Evidence:
 
 ## Priority 12 - V26 Release Go/No-Go
 
-### [ ] 12.1 Select release scope and candidate version
+### [x] 12.1 Select release scope and candidate version
 
-- [ ] Inventory delivered timing fixes, metric/config additions, documentation
+- [x] Inventory delivered timing fixes, metric/config additions, documentation
       corrections, public API effects, and diagnostics schema effects.
-- [ ] Select a `3.5.x` maintenance release only if the work is internal
+- [x] Select a `3.5.x` maintenance release only if the work is internal
       correctness/documentation and the maintenance lane is intentionally used.
-- [ ] Select `3.6.0` for backward-compatible metric, configuration, diagnostics,
+- [x] Select `3.6.0` for backward-compatible metric, configuration, diagnostics,
       or test-helper additions on the current reactor line.
-- [ ] Reject/defer binary/source incompatible changes and diagnostics schema-v1
+- [x] Reject/defer binary/source incompatible changes and diagnostics schema-v1
       breaks.
-- [ ] Record whether numerical performance claims require a promoted benchmark
+- [x] Record whether numerical performance claims require a promoted benchmark
       report.
 
-### [ ] 12.2 Assemble immutable release evidence
+Evidence:
 
-- [ ] Run clean full reactor verification from the release-prep tree.
-- [ ] Run strict root/module API compatibility from isolated Central-only
+- V26 fixes subscription-local logical-call timing, final-outbound-charset
+  request-size measurement, and health-series reset handling. It aligns
+  Micrometer, OTel, resilience admission, health, support-bundle, consumer,
+  mock, AOT, and native evidence with those terminal facts.
+- No configuration property was added. Existing request/response body property
+  metadata was corrected to describe custom-observer exposure rather than OTel
+  span events. No diagnostics schema-v1 field or semantic contract changed.
+- The public-surface audit found no new public type, constructor, or mutable
+  model. Strict root and starter-module japicmp checks against published `3.5.0`
+  passed, so V26 contains no known binary/source incompatible change to defer.
+- A `3.5.x` maintenance release was rejected for this scope. The selected
+  candidate is `3.6.0` because the current reactor intentionally carries
+  backward-compatible observable metric semantics plus expanded mock, consumer,
+  scrape, AOT, and native contract evidence beyond an internal-only patch.
+- The current changelog makes no numerical throughput, latency, or allocation
+  claim. Priority 10 results remain non-promotable audit evidence, so `3.6.0`
+  does not require a promoted benchmark report unless release wording later adds
+  a numerical performance claim.
+
+### [x] 12.2 Assemble immutable release evidence
+
+- [x] Run clean full reactor verification from the release-prep tree.
+- [x] Run strict root/module API compatibility from isolated Central-only
       repositories.
-- [ ] Run generation packaging, current/published consumer, supported matrix,
+- [x] Run generation packaging, current/published consumer, supported matrix,
       duration/resilience/metrics/health/OTel composition, AOT/native, and
       documentation gates.
-- [ ] Verify complete candidate parent, starter, test-helper, and OTel POM,
+- [x] Verify complete candidate parent, starter, test-helper, and OTel POM,
       binary, source, and Javadoc artifacts.
-- [ ] Re-run every release gate from one clean immutable commit.
-- [ ] Cite a clean promoted benchmark report or keep changelog wording
+- [x] Re-run every release gate from one clean immutable commit.
+- [x] Cite a clean promoted benchmark report or keep changelog wording
       non-numerical.
+
+Pre-commit release-candidate preflight (not immutable release evidence):
+
+- Finalized reactor, module, benchmark, assembled-consumer, and native-fixture
+  coordinates at `3.6.0` while retaining published/API/consumer/benchmark
+  baselines at `3.5.0` until Maven Central publication is verified.
+- Full reactor verification passed 1,047 starter, 49 test-helper, and 52 OTel
+  tests. Release-document/configuration-metadata tests passed 57 focused tests.
+- Java 21 supported-matrix verification passed Spring Boot `4.0.0` and `4.1.0`,
+  including strict API compatibility against Central-resolved `3.5.0`, optional
+  integrations, dependency captures, and assembled consumers.
+- Current `3.6.0` and published `3.5.0` assembled-consumer lanes passed from
+  fresh isolated repositories. Generation packaging passed for the complete
+  13-file candidate POM/binary/source/Javadoc set.
+- The changelog remains non-numerical, so no promoted benchmark report is
+  required. This preflight recorded `sourceState=dirty` by construction and did
+  not satisfy 12.2; the immutable rerun below supersedes it.
+
+Immutable evidence:
+
+- Froze the final release-prep implementation and artifact inputs at clean
+  commit `15754f50979a25be4aaf137766a23adbc96baa1e`. The JDK 21 clean reactor
+  build passed 1,047 starter, 49 test-helper, and 52 OTel tests, including the
+  duration, resilience, metrics, health, OTel, AOT, and documentation suites.
+- Strict root and starter-module japicmp checks passed against Central-resolved
+  `3.5.0` from separate isolated repositories. API incompatibility and
+  published-baseline contamination fixtures also passed their positive and
+  intentional-rejection cases.
+- The supported matrix passed on JDK `21.0.11` for Spring Boot `4.0.0` and
+  `4.1.0`, including optional integrations, assembled consumers, dependency
+  captures, and per-row strict API compatibility. Both matrix rows record
+  `sourceState=clean` and the immutable commit above.
+- Current-candidate `3.6.0` and published-baseline `3.5.0` consumer lanes passed
+  from fresh repositories without reactor-classpath leakage. Generation
+  packaging passed for the complete 13-file parent/module POM, binary, source,
+  and Javadoc attachment set. Local checksums exclude GPG signatures, which
+  remain owned by the publication workflow.
+- Oracle GraalVM `25.0.3` compiled and executed the assembled native fixture.
+  The executable SHA-256 is
+  `3eabc8cbfc68811b7d19aa36c449b802b9c68a4e0c666678a34e90bfb76e46f5`.
+  The native run covered the zero-dispatch open-circuit path and completed with
+  exit status zero.
+- The complete benchmark smoke harness passed from the immutable commit. Its
+  target-only output is non-promotable, and the `3.6.0` changelog remains
+  non-numerical, so no promoted benchmark report is required.
+- Consolidated provenance, 328 evidence files, command logs, dependency lists,
+  API reports, test reports, artifact checksums, native hash, and smoke output
+  are under
+  `target/release-evidence/v26/priority12/immutable-15754f5/`.
 
 ### [ ] 12.3 Record the mutually exclusive decision
 
