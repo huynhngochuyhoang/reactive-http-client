@@ -729,7 +729,7 @@ Pre-commit release-candidate preflight (not immutable release evidence):
 Immutable evidence:
 
 - Froze the final release-prep implementation and artifact inputs at clean
-  commit `15754f50979a25be4aaf137766a23adbc96baa1e`. The JDK 21 clean reactor
+  commit `52b193e940d20d61841470da72c630112d5d1a51`. The JDK 21 clean reactor
   build passed 1,047 starter, 49 test-helper, and 52 OTel tests, including the
   duration, resilience, metrics, health, OTel, AOT, and documentation suites.
 - Strict root and starter-module japicmp checks passed against Central-resolved
@@ -756,20 +756,43 @@ Immutable evidence:
 - Consolidated provenance, 328 evidence files, command logs, dependency lists,
   API reports, test reports, artifact checksums, native hash, and smoke output
   are under
-  `target/release-evidence/v26/priority12/immutable-15754f5/`.
+  `target/release-evidence/v26/priority12/immutable-52b193e/`.
 
-### [ ] 12.3 Record the mutually exclusive decision
+### [x] 12.3 Record the mutually exclusive decision
 
-- [ ] **Go path:** tag and publish the selected version from the matching
+- [x] **Go path:** tag and publish the selected version from the matching
       immutable commit.
-- [ ] **Go path:** verify every Maven Central artifact and assembled published
+- [x] **Go path:** verify every Maven Central artifact and assembled published
       consumer before moving public/API/consumer/benchmark baselines.
-- [ ] **Go path:** open the next snapshot line and archive V26 only after Central
+- [x] **Go path:** open the next snapshot line and archive V26 only after Central
       verification succeeds.
 - [ ] **No-go path:** publish nothing and record each blocker, reproduction, and
       retained evidence path.
-- [ ] Update roadmap/checklist/index/changelog status to match the selected path.
-- [ ] Run final release-documentation tests and `git diff --check`.
+- [x] Update roadmap/checklist/index/changelog status to match the selected path.
+- [x] Run final release-documentation tests and `git diff --check`.
+
+Evidence:
+
+- V26 selected the go path. Remote tag `v3.6.0` points to release commit
+  `466c59f271880c37e9365f817376c6b595484fd2`; the tagged implementation matches
+  the clean candidate inputs, with source-controlled release evidence added
+  before publication.
+- `scripts/verify-published-release-artifacts.sh 3.6.0` resolved the parent POM
+  plus starter, test-helper, and OTel POM, binary, source, and Javadoc artifacts
+  from a fresh Maven Central repository. Version, remote-marker, and SHA-256
+  provenance passed under
+  `target/release-evidence/published-baselines/release-artifacts-3.6.0/`.
+- `scripts/verify-published-consumer.sh 3.6.0` passed the assembled Boot 4
+  consumer using only Maven Central artifacts, rejected reactor-classpath
+  leakage, and retained evidence under
+  `target/release-evidence/published-consumer/published-3.6.0/`.
+- Public examples and published consumer, API compatibility, and benchmark
+  baselines now use `3.6.0`. Reactor-only coordinates use `3.7.0-SNAPSHOT`,
+  preserving the API self-comparison guard. V26 remains non-numerical, so no
+  benchmark report was promoted.
+- Final post-release verification passed 40 release-document tests, 17 starter
+  configuration-metadata tests, four OTel metadata tests, reactor model
+  validation, and `git diff --check`.
 
 ## Completion Rule
 

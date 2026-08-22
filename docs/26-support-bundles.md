@@ -10,7 +10,7 @@ secrets, or customer data by default.
 Start triage in [Operations Troubleshooting](30-operations-troubleshooting.md),
 then return here for the bounded artifacts requested by that decision path.
 
-The commands and endpoint names on this page target published starter `3.5.0`
+The commands and endpoint names on this page target published starter `3.6.0`
 on Boot 4. Boot 3.5 applications remain on `2.14.1`; use the
 [3.x migration guide](28-spring-boot-4-jackson-migration.md) before applying the
 Boot 4 health type or native-image instructions.
