@@ -271,10 +271,14 @@ final class EffectiveHttpClientContractExporter {
                                            ResilienceOperatorApplier.InstanceType type,
                                            String methodLevel,
                                            String clientLevel) {
+        String instanceName = resolve(methodLevel, clientLevel);
+        if (!StringUtils.hasText(instanceName)) {
+            return "disabled";
+        }
         if (resilienceOperatorApplier != null && !resilienceOperatorApplier.isOperatorAvailable(type)) {
             return "unavailable";
         }
-        return resolve(methodLevel, clientLevel);
+        return instanceName;
     }
 
     private static boolean isRetryableMethod(String httpMethod, ReactiveHttpClientProperties.ResilienceConfig resilience) {
@@ -284,7 +288,10 @@ final class EffectiveHttpClientContractExporter {
     }
 
     private static String resolve(String methodLevel, String clientLevel) {
-        return StringUtils.hasText(methodLevel) ? methodLevel : clientLevel;
+        if (StringUtils.hasText(methodLevel)) {
+            return methodLevel;
+        }
+        return StringUtils.hasText(clientLevel) ? clientLevel : null;
     }
 
     static String genericBindings(Class<?> clientInterface, Method method) {

@@ -80,6 +80,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         config.setFollowRedirects(true);
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setEnabled(true);
+        resilience.setRetry("default");
         config.setResilience(resilience);
         properties.setClients(Map.of("diagnostic-client", config));
 
@@ -541,6 +542,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         ReactiveHttpClientProperties.ResilienceConfig resilience =
                 new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setEnabled(true);
+        resilience.setRetry("default");
         resilience.setStrictUnsafeRetryValidation(true);
         config.setResilience(resilience);
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
@@ -1210,6 +1212,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setStrictUnsafeRetryValidation(true);
+        resilience.setRetry("default");
         config.setResilience(resilience);
 
         Map<String, Object> dormantClient = snapshotClient(config);
@@ -1248,6 +1251,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setEnabled(true);
+        resilience.setRetry("default");
         resilience.setStrictUnsafeRetryValidation(true);
         config.setResilience(resilience);
         RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
@@ -1266,6 +1270,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setEnabled(true);
+        resilience.setRetry("default");
         resilience.setStrictUnsafeRetryValidation(true);
         config.setResilience(resilience);
         RetryRegistry retryRegistry = RetryRegistry.ofDefaults();
@@ -1344,6 +1349,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         ReactiveHttpClientProperties.ClientConfig config = sensitiveClientConfig();
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setEnabled(true);
+        resilience.setRetry("default");
         resilience.setStrictUnsafeRetryValidation(true);
         config.setResilience(resilience);
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
@@ -1619,6 +1625,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         ReactiveHttpClientProperties.ResilienceConfig resilience =
                 new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setEnabled(true);
+        resilience.setRetry("default");
         resilience.setStrictUnsafeRetryValidation(true);
         config.setResilience(resilience);
         return config;
@@ -1718,6 +1725,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         config.setFollowRedirects(true);
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setEnabled(true);
+        resilience.setRetry("default");
         config.setResilience(resilience);
         return config;
     }

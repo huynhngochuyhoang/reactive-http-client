@@ -99,6 +99,7 @@ class LogicalCallTimeoutBudgetContractTest {
         ReactiveHttpClientProperties.ClientConfig config = budget(100);
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setEnabled(true);
+        resilience.setRetry("default");
         resilience.setRetryMethods(java.util.Set.of("GET"));
         config.setResilience(resilience);
         WebClient webClient = WebClient.builder()
@@ -144,6 +145,7 @@ class LogicalCallTimeoutBudgetContractTest {
         ReactiveHttpClientProperties.ClientConfig config = budget(100);
         ReactiveHttpClientProperties.ResilienceConfig resilience = new ReactiveHttpClientProperties.ResilienceConfig();
         resilience.setEnabled(true);
+        resilience.setRetry("default");
         resilience.setRetryMethods(java.util.Set.of("GET"));
         config.setResilience(resilience);
         DefaultDataBufferFactory buffers = new DefaultDataBufferFactory();

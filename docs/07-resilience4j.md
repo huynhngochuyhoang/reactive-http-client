@@ -60,7 +60,7 @@ reactive:
         request-timeout-ms: 5000          # per-request timeout (0 = disabled)
 ```
 
-When `enabled: false` (the default), no Resilience4j operators are applied regardless of other settings. `request-timeout-ms` is independent of this switch and still applies when configured.
+When `enabled: false` (the default), no Resilience4j operators are applied regardless of other settings. Setting `enabled: true` only opens the master gate; each operator remains disabled until its non-blank instance property or matching method annotation explicitly selects it. Use the instance name `default` explicitly when the Resilience4j default instance is intended. `retry-methods` limits an already selected Retry and never activates Retry by itself. `request-timeout-ms` is independent of this switch and still applies when configured.
 
 ---
 

@@ -556,10 +556,10 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.clients.[name].auth.oauth2-client-credentials.token-service.retry-backoff-ms", 100);
         assertDefaultValue(metadata, "reactive.http.clients.[name].auth.aws-sig-v4.strict-body-signing-validation", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.enabled", false);
-        assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.retry", "default");
-        assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.circuit-breaker", "default");
-        assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.bulkhead", "default");
-        assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.rate-limiter", "default");
+        assertNoDefaultValue(metadata, "reactive.http.clients.[name].resilience.retry");
+        assertNoDefaultValue(metadata, "reactive.http.clients.[name].resilience.circuit-breaker");
+        assertNoDefaultValue(metadata, "reactive.http.clients.[name].resilience.bulkhead");
+        assertNoDefaultValue(metadata, "reactive.http.clients.[name].resilience.rate-limiter");
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.retry-methods", List.of("GET", "HEAD"));
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.strict-unsafe-retry-validation", false);
         assertDefaultValue(metadata, "reactive.http.clients.[name].resilience.timeout-ms", 0);
@@ -846,6 +846,12 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertThat(property.get("defaultValue"))
                 .as("%s defaultValue", propertyName)
                 .isEqualTo(OBJECT_MAPPER.valueToTree(expected));
+    }
+
+    private static void assertNoDefaultValue(JsonNode metadata, String propertyName) {
+        assertThat(findProperty(metadata, propertyName).has("defaultValue"))
+                .as("%s defaultValue", propertyName)
+                .isFalse();
     }
 
     private static void assertDeprecation(JsonNode metadata, String propertyName, String replacement) {

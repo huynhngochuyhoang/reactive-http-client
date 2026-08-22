@@ -83,39 +83,87 @@ Evidence recorded on 2026-08-22:
 
 ## Priority 2 - Explicit Resilience Activation Contract
 
-### [ ] 2.1 Characterize the current implicit activation behavior
+### [x] 2.1 Characterize the current implicit activation behavior
 
-- [ ] Add focused `Mono` and `Flux` tests proving that `enabled: true` currently
+- [x] Add focused `Mono` and `Flux` tests proving that `enabled: true` currently
       selects each available `default` operator.
-- [ ] Record client-level, method-level, blank, unavailable-registry,
+- [x] Record client-level, method-level, blank, unavailable-registry,
       retry-method, and strict-validation behavior before changing defaults.
-- [ ] Freeze the existing Retry, CircuitBreaker, Bulkhead, and RateLimiter
+- [x] Freeze the existing Retry, CircuitBreaker, Bulkhead, and RateLimiter
       composition order.
-- [ ] Inventory every direct read of resilience instance properties across
+- [x] Inventory every direct read of resilience instance properties across
       invocation, startup, diagnostics, contract export, mocks, and docs.
 
-### [ ] 2.2 Make every operator explicit by intent
+Evidence recorded on 2026-08-22:
 
-- [ ] Default client-level Retry, CircuitBreaker, Bulkhead, and RateLimiter
+- [`RESILIENCE_ACTIVATION_BASELINE.md`](RESILIENCE_ACTIVATION_BASELINE.md)
+  records the pre-change configuration matrix, operator and subscription order,
+  strict-validation boundaries, and direct-read inventory.
+- The pre-change focused characterization run proved enabled-only Mono and Flux
+  calls selected all four available `default` operators, method annotations
+  won, blank client values remained selected, unavailable operators passed
+  through, and default retry methods gated only Retry. The executable suite now
+  asserts the replacement 4.x contract in 2.2.
+- Existing per-method, factory diagnostics, effective-contract, and metadata
+  suites retain the missing-instance, blank-annotation, strict-validation,
+  unavailable-registry, and published-default evidence.
+- The focused Maven run for those six suites passed, followed by
+  `git diff --check`.
+
+### [x] 2.2 Make every operator explicit by intent
+
+- [x] Default client-level Retry, CircuitBreaker, Bulkhead, and RateLimiter
       selections to absent rather than `default`.
-- [ ] Keep `resilience.enabled` as the master gate without selecting any
+- [x] Keep `resilience.enabled` as the master gate without selecting any
       operator by itself.
-- [ ] Treat explicit `default` and non-blank named instances as activation;
+- [x] Treat explicit `default` and non-blank named instances as activation;
       treat blank/absent values as disabled.
-- [ ] Keep method annotations as explicit per-method selection under the master
+- [x] Keep method annotations as explicit per-method selection under the master
       gate and above client-level selection.
-- [ ] Keep `retry-methods` as eligibility only; it must not activate Retry.
+- [x] Keep `retry-methods` as eligibility only; it must not activate Retry.
 
-### [ ] 2.3 Preserve strict and composition semantics
+Evidence recorded on 2026-08-22:
 
-- [ ] Keep strict unsafe-retry validation dormant when Retry is unselected,
+- `ResilienceConfig` now leaves all four client-level instance names absent;
+  generated metadata and the configuration reference publish no implicit
+  `default` values.
+- `ReactiveClientInvocationHandler` resolves only non-blank method/client
+  selections and does not invoke an operator applier for absent selections.
+  Existing startup diagnostics, strict retry validation, diagnostics snapshots,
+  and effective-contract export report those selections as disabled.
+- `ExplicitResilienceActivationContractTest` covers enabled-only Mono/Flux,
+  explicit `default`, named subsets, blank values, method-level precedence and
+  method-only activation, unavailable operators, and retry-method eligibility.
+
+### [x] 2.3 Preserve strict and composition semantics
+
+- [x] Keep strict unsafe-retry validation dormant when Retry is unselected,
       unavailable, missing, or configured for one attempt.
-- [ ] Prove retry-only, circuit-breaker-only, bulkhead-only, and
+- [x] Prove retry-only, circuit-breaker-only, bulkhead-only, and
       rate-limiter-only clients apply exactly one selected operator.
-- [ ] Prove explicit multi-operator clients retain the established operator
+- [x] Prove explicit multi-operator clients retain the established operator
       order and terminal facts.
-- [ ] Verify `enabled: true` alone applies no operator and performs no registry
+- [x] Verify `enabled: true` alone applies no operator and performs no registry
       lookup or operator subscription.
+
+Evidence recorded on 2026-08-22:
+
+- `ReactiveHttpClientFactoryBeanDiagnosticsTest` proves strict unsafe-retry
+  validation remains dormant for unselected, unavailable, and one-attempt
+  Retry states. `PerMethodResilienceTest` proves a missing method-level Retry
+  is rejected by instance validation before strict retry validation runs.
+- `ExplicitResilienceActivationContractTest` independently selects Retry,
+  CircuitBreaker, Bulkhead, and RateLimiter and observes exactly one matching
+  operator application and subscription for each case.
+- The same suite records the established assembly and subscription order for
+  an explicit four-operator client. `ResilienceOperatorCompositionContractTest`
+  retains the real Resilience4j retry, admission, cancellation, attempt-count,
+  and one-logical-terminal-result evidence.
+- Enabled-only `Mono` and `Flux` calls now assert zero operator application,
+  zero operator subscription, and zero availability/configuration/capacity
+  lookup through the operator-applier registry boundary.
+- The focused four-suite Maven run and the complete starter test suite passed;
+  `git diff --check` passed after the checklist update.
 
 ---
 
