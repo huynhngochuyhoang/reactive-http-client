@@ -1,9 +1,19 @@
 # Reactive HTTP Client - Roadmap V26
 
-> **Status:** release candidate
+> **Status:** completed - released as `3.6.0` on 2026-08-22
 > **Theme:** trustworthy logical-call observability after the `3.5.0` request-boundary release
-> **Release candidate:** `3.6.0`
-> **Published/API baseline:** `3.5.0`
+> **Delivered release:** `3.6.0`
+> **Post-release development line:** `3.7.0-SNAPSHOT`
+> **Published/API baseline:** `3.6.0`
+
+## Completion Record
+
+V26 shipped as `3.6.0` from tag `v3.6.0` at commit
+`466c59f271880c37e9365f817376c6b595484fd2`. The parent, starter, test-helper,
+and OTel release bundle and the assembled Boot 4 consumer were verified from
+Maven Central. Public coordinates and API, consumer, and benchmark baselines
+moved to `3.6.0`; reactor-only development moved to `3.7.0-SNAPSHOT`. V26 made
+no promoted numerical benchmark claim.
 
 ## Starting State
 
