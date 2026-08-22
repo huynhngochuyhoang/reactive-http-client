@@ -647,13 +647,13 @@ Evidence:
 - The native fixture now proves a pre-dispatch open CircuitBreaker call has no
   loopback dispatch, one finite timer sample, and attempts value `0`. It
   compiled and ran on Oracle GraalVM/JDK `25.0.3`; the binary SHA-256 is
-  `1338f1b00d7fdb44fcc7b6cd21cdb5c7dc60bf77b16dec92e9b4e31f9ca7919c`.
+  `290a717008ce8ef19561b68bd5ea3d4e4621f7bf3aa7c95cb90d211e2308b114`.
   Functional provenance is under
   `target/release-evidence/v26/priority11/native-smoke/`.
 - Full verification passed 1,047 starter, 49 test-helper, and 52 OTel tests.
   Generation packaging and `git diff --check` passed.
 - The immutable rerun records commit
-  `1a39317fe2c59e123e615fb8e76a640db5a3f383`, `sourceState=clean`, the complete
+  `d65d82201558cc6189f3de21018dffe8ae50b3e4`, `sourceState=clean`, the complete
   fixture dependency list, and `executableStatus=passed` in
   `target/release-evidence/v26/priority11/native-smoke/native-provenance.txt`.
 
