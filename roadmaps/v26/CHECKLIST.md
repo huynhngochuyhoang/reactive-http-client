@@ -614,14 +614,14 @@ Evidence:
       `3.5.0`.
 - [x] Run API and published-baseline contamination fixtures.
 
-### [ ] 11.3 Revalidate AOT and native behavior
+### [x] 11.3 Revalidate AOT and native behavior
 
 - [x] Run AOT generation for direct, inherited, generic, and `@ApiRef` clients
       with Micrometer and the diagnostics endpoint present.
 - [x] Compile and execute the native smoke fixture with the corrected
       zero-attempt terminal path.
 - [x] Verify no reflection fallback or missing resource hint is introduced.
-- [ ] Record clean commit, GraalVM/JDK versions, binary hash, and evidence path.
+- [x] Record clean commit, GraalVM/JDK versions, binary hash, and evidence path.
 - [x] Run generation packaging, full reactor verification, and
       `git diff --check`.
 
@@ -647,15 +647,15 @@ Evidence:
 - The native fixture now proves a pre-dispatch open CircuitBreaker call has no
   loopback dispatch, one finite timer sample, and attempts value `0`. It
   compiled and ran on Oracle GraalVM/JDK `25.0.3`; the binary SHA-256 is
-  `290a717008ce8ef19561b68bd5ea3d4e4621f7bf3aa7c95cb90d211e2308b114`.
+  `1a6baae64fcc8c15e9d95990546f31b72dc2b2a94d52385d612f31802a9ef10a`.
   Functional provenance is under
   `target/release-evidence/v26/priority11/native-smoke/`.
 - Full verification passed 1,047 starter, 49 test-helper, and 52 OTel tests.
   Generation packaging and `git diff --check` passed.
-- The previous immutable rerun records commit
-  `d65d82201558cc6189f3de21018dffe8ae50b3e4`, but it predates the bounded
-  server-dispatch quiet period. Commit this synchronization fix and rerun the
-  native compile and executable before closing the immutable evidence item.
+- The immutable rerun records commit
+  `53166a22fef06cd9329da3c5d936d2d936b42c99`, `sourceState=clean`, the complete
+  fixture dependency list, and `executableStatus=passed` in
+  `target/release-evidence/v26/priority11/native-smoke/native-provenance.txt`.
 
 ---
 
