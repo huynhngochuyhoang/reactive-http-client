@@ -614,14 +614,14 @@ Evidence:
       `3.5.0`.
 - [x] Run API and published-baseline contamination fixtures.
 
-### [x] 11.3 Revalidate AOT and native behavior
+### [ ] 11.3 Revalidate AOT and native behavior
 
 - [x] Run AOT generation for direct, inherited, generic, and `@ApiRef` clients
       with Micrometer and the diagnostics endpoint present.
 - [x] Compile and execute the native smoke fixture with the corrected
       zero-attempt terminal path.
 - [x] Verify no reflection fallback or missing resource hint is introduced.
-- [x] Record clean commit, GraalVM/JDK versions, binary hash, and evidence path.
+- [ ] Record clean commit, GraalVM/JDK versions, binary hash, and evidence path.
 - [x] Run generation packaging, full reactor verification, and
       `git diff --check`.
 
@@ -652,10 +652,10 @@ Evidence:
   `target/release-evidence/v26/priority11/native-smoke/`.
 - Full verification passed 1,047 starter, 49 test-helper, and 52 OTel tests.
   Generation packaging and `git diff --check` passed.
-- The immutable rerun records commit
-  `d65d82201558cc6189f3de21018dffe8ae50b3e4`, `sourceState=clean`, the complete
-  fixture dependency list, and `executableStatus=passed` in
-  `target/release-evidence/v26/priority11/native-smoke/native-provenance.txt`.
+- The previous immutable rerun records commit
+  `d65d82201558cc6189f3de21018dffe8ae50b3e4`, but it predates the bounded
+  server-dispatch quiet period. Commit this synchronization fix and rerun the
+  native compile and executable before closing the immutable evidence item.
 
 ---
 

@@ -30,6 +30,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -46,7 +47,9 @@ public class NativeSmokeApplication {
         AtomicReference<String> observedAuth = new AtomicReference<>();
         AtomicReference<String> observedAcceptEncoding = new AtomicReference<>();
         AtomicInteger dispatchCount = new AtomicInteger();
-        DisposableServer server = loopbackServer(observedAuth, observedAcceptEncoding, dispatchCount);
+        CountDownLatch openCircuitDispatch = new CountDownLatch(1);
+        DisposableServer server = loopbackServer(
+                observedAuth, observedAcceptEncoding, dispatchCount, openCircuitDispatch);
         SpringApplication application = new SpringApplication(NativeSmokeApplication.class);
         application.setWebApplicationType(WebApplicationType.NONE);
         application.setDefaultProperties(Map.of(
@@ -85,6 +88,13 @@ public class NativeSmokeApplication {
                 client.getOpenCircuit().block(Duration.ofSeconds(5));
                 throw new IllegalStateException("Open circuit did not reject the native call");
             } catch (CallNotPermittedException expected) {
+                try {
+                    require(!openCircuitDispatch.await(1, TimeUnit.SECONDS),
+                            "Open-circuit rejection unexpectedly reached the loopback server");
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Interrupted while observing open-circuit dispatches", error);
+                }
                 require(dispatchCount.get() == dispatchedBeforeOpenCircuit,
                         "Open-circuit rejection unexpectedly reached the loopback server");
             }
@@ -212,7 +222,8 @@ public class NativeSmokeApplication {
     private static DisposableServer loopbackServer(
             AtomicReference<String> observedAuth,
             AtomicReference<String> observedAcceptEncoding,
-            AtomicInteger dispatchCount) {
+            AtomicInteger dispatchCount,
+            CountDownLatch openCircuitDispatch) {
         return HttpServer.create()
                 .port(0)
                 .route(routes -> routes
@@ -241,6 +252,7 @@ public class NativeSmokeApplication {
                         })
                         .get("/api/open-circuit", (request, response) -> {
                             dispatchCount.incrementAndGet();
+                            openCircuitDispatch.countDown();
                             return response.header("Content-Type", "application/json")
                                     .sendString(Mono.just("{\"code\":\"unexpected\",\"message\":\"dispatched\"}"))
                                     .then();
