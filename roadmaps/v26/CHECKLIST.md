@@ -729,7 +729,7 @@ Pre-commit release-candidate preflight (not immutable release evidence):
 Immutable evidence:
 
 - Froze the final release-prep implementation and artifact inputs at clean
-  commit `52b193e940d20d61841470da72c630112d5d1a51`. The JDK 21 clean reactor
+  commit `15754f50979a25be4aaf137766a23adbc96baa1e`. The JDK 21 clean reactor
   build passed 1,047 starter, 49 test-helper, and 52 OTel tests, including the
   duration, resilience, metrics, health, OTel, AOT, and documentation suites.
 - Strict root and starter-module japicmp checks passed against Central-resolved
@@ -756,7 +756,7 @@ Immutable evidence:
 - Consolidated provenance, 328 evidence files, command logs, dependency lists,
   API reports, test reports, artifact checksums, native hash, and smoke output
   are under
-  `target/release-evidence/v26/priority12/immutable-52b193e/`.
+  `target/release-evidence/v26/priority12/immutable-15754f5/`.
 
 ### [ ] 12.3 Record the mutually exclusive decision
 
