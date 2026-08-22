@@ -134,7 +134,19 @@ class ResilienceOperatorApplierTest {
             };
 
             assertThat(custom.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)).isTrue();
+            assertThat(EffectiveResiliencePolicy.isOperatorAvailable(custom,
+                    ResilienceOperatorApplier.InstanceType.RETRY,
+                    EffectiveResiliencePolicy.PublisherShape.MONO)).isTrue();
+            assertThat(EffectiveResiliencePolicy.isOperatorAvailable(custom,
+                    ResilienceOperatorApplier.InstanceType.RETRY,
+                    EffectiveResiliencePolicy.PublisherShape.FLUX)).isFalse();
             assertThat(custom.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.BULKHEAD)).isTrue();
+            assertThat(EffectiveResiliencePolicy.isOperatorAvailable(custom,
+                    ResilienceOperatorApplier.InstanceType.BULKHEAD,
+                    EffectiveResiliencePolicy.PublisherShape.MONO)).isFalse();
+            assertThat(EffectiveResiliencePolicy.isOperatorAvailable(custom,
+                    ResilienceOperatorApplier.InstanceType.BULKHEAD,
+                    EffectiveResiliencePolicy.PublisherShape.FLUX)).isTrue();
             assertThat(custom.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER)).isFalse();
             assertThat(custom.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RATE_LIMITER)).isFalse();
 
@@ -151,6 +163,9 @@ class ResilienceOperatorApplierTest {
             };
             assertThat(explicitlyUnavailable.isOperatorAvailable(
                     ResilienceOperatorApplier.InstanceType.RETRY)).isFalse();
+            assertThat(EffectiveResiliencePolicy.isOperatorAvailable(explicitlyUnavailable,
+                    ResilienceOperatorApplier.InstanceType.RETRY,
+                    EffectiveResiliencePolicy.PublisherShape.MONO)).isFalse();
         }
     }
 

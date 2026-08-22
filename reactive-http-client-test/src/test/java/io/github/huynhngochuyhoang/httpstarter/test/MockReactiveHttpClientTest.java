@@ -60,6 +60,11 @@ class MockReactiveHttpClientTest {
         Mono<String> create();
     }
 
+    interface StrictUnsafeFluxMockClient {
+        @POST("/strict-flux")
+        Flux<String> create();
+    }
+
     interface InvalidNestedResponseClient {
         @GET("/nested")
         Mono<ResponseEntity<Flux<String>>> nested();
@@ -813,6 +818,33 @@ class MockReactiveHttpClientTest {
                 .build();
 
         assertThat(mock.proxy().create().block()).isEqualTo("ok");
+        RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(1);
+    }
+
+    @Test
+    void monoOnlyNoopOverrideDoesNotActivateFluxRetryOrStrictValidation() {
+        AtomicInteger applications = new AtomicInteger();
+        ResilienceOperatorApplier monoOnly = new NoopResilienceOperatorApplier() {
+            @Override
+            public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
+                applications.incrementAndGet();
+                return mono.retry(1);
+            }
+        };
+
+        MockReactiveHttpClient<StrictUnsafeFluxMockClient> mock = MockReactiveHttpClient
+                .forClient(StrictUnsafeFluxMockClient.class)
+                .clientConfig(strictMockRetryConfig())
+                .resilienceOperatorApplier(monoOnly)
+                .respondTo(HttpMethod.POST, "/strict-flux",
+                        exchange -> MockReactiveHttpClient.text(200, "ok"))
+                .build();
+
+        StepVerifier.create(mock.proxy().create())
+                .expectNext("ok")
+                .verifyComplete();
+
+        assertThat(applications).hasValue(0);
         RecordedExchangeAssertions.assertThat(mock).hasAttemptCount(1);
     }
 

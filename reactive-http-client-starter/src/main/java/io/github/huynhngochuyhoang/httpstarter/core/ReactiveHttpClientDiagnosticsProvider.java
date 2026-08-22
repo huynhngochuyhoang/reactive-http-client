@@ -416,14 +416,17 @@ public class ReactiveHttpClientDiagnosticsProvider {
             operatorApplier = new NoopResilienceOperatorApplier();
         }
         ResilienceOperatorApplier resolvedApplier = operatorApplier;
-        EffectiveResiliencePolicy.OperatorAvailability operatorAvailability = type -> {
+        EffectiveResiliencePolicy.OperatorAvailability operatorAvailability = (type, publisherShape) -> {
             ExistingBeanLookup lookup = switch (type) {
                 case RETRY -> retryRegistry;
                 case CIRCUIT_BREAKER -> circuitBreakerRegistry;
                 case BULKHEAD -> bulkheadRegistry;
                 case RATE_LIMITER -> rateLimiterRegistry;
             };
-            return lookup.unresolved() ? null : resolvedApplier.isOperatorAvailable(type);
+            return lookup.unresolved()
+                    ? null
+                    : EffectiveResiliencePolicy.isOperatorAvailable(
+                            resolvedApplier, type, publisherShape);
         };
         return new ResilienceDiagnostics(operatorApplier, operatorAvailability);
     }

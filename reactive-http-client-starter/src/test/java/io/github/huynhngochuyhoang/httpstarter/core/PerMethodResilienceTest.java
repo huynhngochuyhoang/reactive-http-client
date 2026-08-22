@@ -44,7 +44,7 @@ class PerMethodResilienceTest {
                 new MethodMetadataCache().get(SampleClient.class.getMethod("hotPath")), SampleClient.class);
 
         EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
-                plan, "GET", resilience, type -> true);
+                plan, "GET", resilience, (type, publisherType) -> true);
 
         assertThat(policy.retry().instanceName()).isEqualTo("hot-retry");
         assertThat(policy.retry().source()).isEqualTo(EffectiveResiliencePolicy.Source.METHOD);
@@ -57,7 +57,7 @@ class PerMethodResilienceTest {
                 new MethodMetadataCache().get(SampleClient.class.getMethod("coldPath")), SampleClient.class);
 
         EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
-                plan, "GET", resilience, type -> true);
+                plan, "GET", resilience, (type, publisherType) -> true);
 
         assertThat(policy.retry().instanceName()).isEqualTo("default-retry");
         assertThat(policy.retry().source()).isEqualTo(EffectiveResiliencePolicy.Source.CLIENT);

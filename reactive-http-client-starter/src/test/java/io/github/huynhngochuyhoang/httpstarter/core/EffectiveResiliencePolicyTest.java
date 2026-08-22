@@ -23,7 +23,7 @@ class EffectiveResiliencePolicyTest {
         ReactiveHttpClientProperties.ResilienceConfig resilience = enabledResilience();
         List<ResilienceOperatorApplier.InstanceType> lookups = new ArrayList<>();
 
-        EffectiveResiliencePolicy policy = resolve("plain", "GET", resilience, type -> {
+        EffectiveResiliencePolicy policy = resolve("plain", "GET", resilience, (type, publisherType) -> {
             lookups.add(type);
             return true;
         });
@@ -45,7 +45,7 @@ class EffectiveResiliencePolicyTest {
         resilience.setRetryMethods(Set.of("GET"));
         List<ResilienceOperatorApplier.InstanceType> lookups = new ArrayList<>();
 
-        EffectiveResiliencePolicy policy = resolve("overrides", "GET", resilience, type -> {
+        EffectiveResiliencePolicy policy = resolve("overrides", "GET", resilience, (type, publisherType) -> {
             lookups.add(type);
             return switch (type) {
                 case RETRY, CIRCUIT_BREAKER -> true;
@@ -75,7 +75,7 @@ class EffectiveResiliencePolicyTest {
                 ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER,
                 ResilienceOperatorApplier.InstanceType.BULKHEAD);
 
-        EffectiveResiliencePolicy ineligible = resolve("overrides", "POST", resilience, type -> {
+        EffectiveResiliencePolicy ineligible = resolve("overrides", "POST", resilience, (type, publisherType) -> {
             if (type == ResilienceOperatorApplier.InstanceType.RETRY) {
                 throw new AssertionError("ineligible Retry must not query availability");
             }

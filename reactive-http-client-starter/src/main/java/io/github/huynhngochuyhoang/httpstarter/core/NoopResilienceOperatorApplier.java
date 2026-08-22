@@ -11,22 +11,28 @@ import java.util.Set;
  *
  * <p>The exact no-op implementation reports every operator as unavailable.
  * Subclasses that override an {@code apply*} method are treated as providing
- * that operator unless they override {@link #isOperatorAvailable(InstanceType)}
- * explicitly. This preserves lightweight custom appliers used by test helpers.
+ * that operator for the matching Mono or Flux publisher shape unless they
+ * override {@link #isOperatorAvailable(InstanceType)} explicitly. This
+ * preserves lightweight custom appliers used by test helpers without claiming
+ * that a Mono-only override also applies to Flux.
  */
 public class NoopResilienceOperatorApplier implements ResilienceOperatorApplier {
 
-    private static final ClassValue<Set<InstanceType>> OVERRIDDEN_OPERATORS = new ClassValue<>() {
+    private static final ClassValue<OverrideContract> OVERRIDE_CONTRACTS = new ClassValue<>() {
         @Override
-        protected Set<InstanceType> computeValue(Class<?> implementation) {
-            EnumSet<InstanceType> operators = EnumSet.noneOf(InstanceType.class);
+        protected OverrideContract computeValue(Class<?> implementation) {
+            EnumSet<InstanceType> monoOperators = EnumSet.noneOf(InstanceType.class);
+            EnumSet<InstanceType> fluxOperators = EnumSet.noneOf(InstanceType.class);
             for (InstanceType type : InstanceType.values()) {
-                if (overridesApplyMethod(implementation, type, Mono.class)
-                        || overridesApplyMethod(implementation, type, Flux.class)) {
-                    operators.add(type);
+                if (overridesApplyMethod(implementation, type, Mono.class)) {
+                    monoOperators.add(type);
+                }
+                if (overridesApplyMethod(implementation, type, Flux.class)) {
+                    fluxOperators.add(type);
                 }
             }
-            return operators;
+            return new OverrideContract(
+                    overridesAvailabilityMethod(implementation), monoOperators, fluxOperators);
         }
     };
 
@@ -69,11 +75,27 @@ public class NoopResilienceOperatorApplier implements ResilienceOperatorApplier 
     public <T> Flux<T> applyRateLimiter(Flux<T> flux, String instanceName) {
         return flux;
     }
+
     @Override
     public boolean isOperatorAvailable(InstanceType type) {
-        return type != null
-                && getClass() != NoopResilienceOperatorApplier.class
-                && OVERRIDDEN_OPERATORS.get(getClass()).contains(type);
+        if (type == null || getClass() == NoopResilienceOperatorApplier.class) {
+            return false;
+        }
+        OverrideContract contract = OVERRIDE_CONTRACTS.get(getClass());
+        return contract.monoOperators().contains(type) || contract.fluxOperators().contains(type);
+    }
+
+    boolean isOperatorAvailable(
+            InstanceType type,
+            EffectiveResiliencePolicy.PublisherShape publisherShape) {
+        if (type == null || publisherShape == null || getClass() == NoopResilienceOperatorApplier.class) {
+            return false;
+        }
+        OverrideContract contract = OVERRIDE_CONTRACTS.get(getClass());
+        if (contract.explicitAvailability()) {
+            return isOperatorAvailable(type);
+        }
+        return contract.operators(publisherShape).contains(type);
     }
 
     private static boolean overridesApplyMethod(
@@ -93,5 +115,26 @@ public class NoopResilienceOperatorApplier implements ResilienceOperatorApplier 
             case BULKHEAD -> "applyBulkhead";
             case RATE_LIMITER -> "applyRateLimiter";
         };
+    }
+
+    private static boolean overridesAvailabilityMethod(Class<?> implementation) {
+        try {
+            return implementation.getMethod("isOperatorAvailable", InstanceType.class)
+                    .getDeclaringClass() != NoopResilienceOperatorApplier.class;
+        } catch (NoSuchMethodException error) {
+            throw new IllegalStateException("Resilience availability contract is incomplete", error);
+        }
+    }
+
+    private record OverrideContract(
+            boolean explicitAvailability,
+            Set<InstanceType> monoOperators,
+            Set<InstanceType> fluxOperators) {
+
+        Set<InstanceType> operators(EffectiveResiliencePolicy.PublisherShape publisherShape) {
+            return publisherShape == EffectiveResiliencePolicy.PublisherShape.FLUX
+                    ? fluxOperators
+                    : monoOperators;
+        }
     }
 }

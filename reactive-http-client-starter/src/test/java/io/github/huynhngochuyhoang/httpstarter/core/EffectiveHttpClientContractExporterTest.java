@@ -290,6 +290,22 @@ class EffectiveHttpClientContractExporterTest {
     }
 
     @Test
+    void reportsMonoOnlyNoopRetryUnavailableForFluxContract() {
+        ReactiveHttpClientProperties.ClientConfig config = enabledResilienceConfig();
+        config.getResilience().setRetryMethods(Set.of("POST"));
+        ResilienceOperatorApplier monoOnly = new NoopResilienceOperatorApplier() {
+            @Override
+            public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
+                return mono.retry(1);
+            }
+        };
+
+        EffectiveHttpClientContract contract = onlyContract(FluxRetryClient.class, config, monoOnly);
+
+        assertThat(contract.resilience().retry()).isEqualTo("unavailable");
+    }
+
+    @Test
     void failsExportWhenMethodLevelResilienceInstanceIsMissing() {
         ResilienceOperatorApplier applier = mock(ResilienceOperatorApplier.class);
         when(applier.isOperatorAvailable(ResilienceOperatorApplier.InstanceType.RETRY)).thenReturn(true);
@@ -407,6 +423,13 @@ class EffectiveHttpClientContractExporterTest {
         @TimeoutMs(250)
         @Retry("method-retry")
         Mono<String> create(@Body String body);
+    }
+
+    interface FluxRetryClient {
+
+        @POST("/items")
+        @Retry("method-retry")
+        Flux<String> create();
     }
 
     interface UncertainBodyClient {

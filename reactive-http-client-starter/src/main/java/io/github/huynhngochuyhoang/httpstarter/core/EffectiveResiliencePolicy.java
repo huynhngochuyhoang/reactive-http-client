@@ -19,35 +19,52 @@ record EffectiveResiliencePolicy(
             ReactiveHttpClientProperties.ResilienceConfig resilience,
             OperatorAvailability availability) {
         boolean enabled = resilience != null && resilience.isEnabled();
+        PublisherShape publisherShape = plan.returnsFlux()
+                ? PublisherShape.FLUX
+                : PublisherShape.MONO;
         return new EffectiveResiliencePolicy(
                 operator(
                         ResilienceOperatorApplier.InstanceType.RETRY,
                         enabled && retryEligible(resilience, httpMethod),
                         plan.retryInstanceName(),
                         resilience != null ? resilience.getRetry() : null,
-                        availability),
+                        availability, publisherShape),
                 operator(
                         ResilienceOperatorApplier.InstanceType.RATE_LIMITER,
                         enabled,
                         plan.rateLimiterInstanceName(),
                         resilience != null ? resilience.getRateLimiter() : null,
-                        availability),
+                        availability, publisherShape),
                 operator(
                         ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER,
                         enabled,
                         plan.circuitBreakerInstanceName(),
                         resilience != null ? resilience.getCircuitBreaker() : null,
-                        availability),
+                        availability, publisherShape),
                 operator(
                         ResilienceOperatorApplier.InstanceType.BULKHEAD,
                         enabled,
                         plan.bulkheadInstanceName(),
                         resilience != null ? resilience.getBulkhead() : null,
-                        availability));
+                        availability, publisherShape));
     }
 
     static OperatorAvailability availability(ResilienceOperatorApplier applier) {
-        return applier == null ? type -> true : applier::isOperatorAvailable;
+        if (applier == null) {
+            return (type, publisherShape) -> true;
+        }
+        return (type, publisherShape) ->
+                isOperatorAvailable(applier, type, publisherShape);
+    }
+
+    static boolean isOperatorAvailable(
+            ResilienceOperatorApplier applier,
+            ResilienceOperatorApplier.InstanceType type,
+            PublisherShape publisherShape) {
+        if (applier instanceof NoopResilienceOperatorApplier noopApplier) {
+            return noopApplier.isOperatorAvailable(type, publisherShape);
+        }
+        return applier.isOperatorAvailable(type);
     }
 
     private static Operator operator(
@@ -55,7 +72,8 @@ record EffectiveResiliencePolicy(
             boolean eligible,
             String methodLevel,
             String clientLevel,
-            OperatorAvailability availability) {
+            OperatorAvailability availability,
+            PublisherShape publisherShape) {
         if (!eligible) {
             return Operator.disabled(type);
         }
@@ -70,7 +88,7 @@ record EffectiveResiliencePolicy(
         } else {
             return Operator.disabled(type);
         }
-        Boolean available = availability.isAvailable(type);
+        Boolean available = availability.isAvailable(type, publisherShape);
         State state = available == null
                 ? State.UNKNOWN
                 : available ? State.ACTIVE : State.SELECTED_UNAVAILABLE;
@@ -89,7 +107,14 @@ record EffectiveResiliencePolicy(
     @FunctionalInterface
     interface OperatorAvailability {
         /** {@code null} means availability cannot be proven without creating a lazy component. */
-        Boolean isAvailable(ResilienceOperatorApplier.InstanceType type);
+        Boolean isAvailable(
+                ResilienceOperatorApplier.InstanceType type,
+                PublisherShape publisherShape);
+    }
+
+    enum PublisherShape {
+        MONO,
+        FLUX
     }
 
     enum Source {
