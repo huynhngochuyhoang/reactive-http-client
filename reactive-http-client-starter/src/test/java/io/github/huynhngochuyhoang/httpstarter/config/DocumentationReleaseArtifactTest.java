@@ -580,6 +580,19 @@ class DocumentationReleaseArtifactTest {
         assertThat(published).isEqualTo(new ReleaseVersionContract(
                 "post-publication", null, "3.1.0", null, "3.1.0"));
 
+        assertThat(majorReleaseCandidate("3.1.0-SNAPSHOT", snapshot))
+                .containsEntry("version", "3.1.0")
+                .containsEntry("status", "deferred")
+                .containsEntry("published", false);
+        assertThat(majorReleaseCandidate("3.1.0", candidate))
+                .containsEntry("version", "3.1.0")
+                .containsEntry("status", "pending-publication")
+                .containsEntry("published", false);
+        assertThat(majorReleaseCandidate("3.1.0", published))
+                .containsEntry("version", "3.1.0")
+                .containsEntry("status", "published")
+                .containsEntry("published", true);
+
         assertThat(benchmarkEvidence("3.1.0-SNAPSHOT", "3.0.0", snapshot, false).get("promotedReport")).isNull();
         // A non-snapshot release without the report on disk stays deferred/pending.
         assertThat(benchmarkEvidence("3.1.0", "3.0.0", candidate, false).get("promotedReport")).isNull();
@@ -660,11 +673,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("<version>3.6.0</version>")
                 .doesNotContain("<version>4.0.0-SNAPSHOT");
         assertThat(releaseDocs)
-                .contains("### V20 default Spring Boot 4 reactor")
+                .contains("### V20 default Spring Boot 4 reactor\n\n"
+                        + "The default reactor now declares `3.7.0-SNAPSHOT`")
                 .contains("### V27 major development lane")
-                .contains("default reactor now declares `4.0.0-SNAPSHOT`")
+                .contains("reactor develops as `4.0.0-SNAPSHOT`")
                 .contains("uses published `3.6.0` as its strict compatibility baseline")
                 .contains("report-only `major-api-report` profile is additional classification")
+                .contains("Strict mode enables both japicmp binary- and source-incompatibility failures")
                 .contains("mvn -s .mvn/maven-central-settings.xml verify")
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`");
         assertThat(majorMigration)
@@ -684,6 +699,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("api-root-3.6.0")
                 .contains("api-starter-3.6.0")
                 .contains("api-major-report-3.6.0")
+                .contains("- name: Generate report-only 4.0.0 major API evidence\n        if: always()")
                 .contains("-Papi-compatibility -DskipTests verify")
                 .contains("-Papi-compatibility,major-api-report -DskipTests verify");
         assertThat(benchmarkDocs)
@@ -959,12 +975,16 @@ class DocumentationReleaseArtifactTest {
         String report = Files.readString(root.resolve("docs/api-report-2.14.1-to-3.0.0.md"));
         String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
         String deltaGuard = Files.readString(root.resolve("scripts/verify-major-api-delta.sh"));
+        String fixtureGuard = Files.readString(root.resolve("scripts/verify-api-compatibility-fixtures.sh"));
 
         assertThat(pomXml)
                 .contains("<id>major-api-report</id>")
                 .contains("<api.compatibility.break-on-binary-incompatible>true</api.compatibility.break-on-binary-incompatible>")
+                .contains("<api.compatibility.break-on-source-incompatible>true</api.compatibility.break-on-source-incompatible>")
                 .contains("<api.compatibility.ignore-missing-classes>false</api.compatibility.ignore-missing-classes>")
                 .contains("<api.compatibility.break-on-binary-incompatible>false</api.compatibility.break-on-binary-incompatible>")
+                .contains("<api.compatibility.break-on-source-incompatible>false</api.compatibility.break-on-source-incompatible>")
+                .contains("<breakBuildOnSourceIncompatibleModifications>${api.compatibility.break-on-source-incompatible}</breakBuildOnSourceIncompatibleModifications>")
                 .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
         assertThat(workflow)
                 .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-root-3.6.0")
@@ -973,6 +993,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Papi-compatibility,major-api-report -DskipTests verify")
                 .contains("bash scripts/verify-published-baseline-fixtures.sh")
                 .doesNotContain("bash scripts/verify-major-api-delta.sh");
+        assertThat(fixtureGuard)
+                .contains("compile_fixture source-breaking")
+                .contains("Expected checked-exception fixture to fail source compatibility check");
         assertThat(guide)
                 .contains("<version>3.5.16</version>")
                 .contains("<reactive-http-client.version>2.14.1</reactive-http-client.version>")
@@ -1268,7 +1291,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("builder methods, and\n  rendered table columns")
                 .contains("Package-private\n  constructors remain internal")
                 .contains("public nested enum")
-                .contains("constructor, nested fluent method, or public enum constant fail")
+                .contains("source-only checked\nexception addition")
+                .contains("constructor, nested fluent method,\nor public enum constant fail")
                 .contains("`MockReactiveHttpClient`, `RecordedExchange`, `RecordedExchangeAssertions`")
                 .contains("`ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension`")
                 .contains("`OpenTelemetryHttpClientObserver`, `OpenTelemetryContextWebFilter`")
@@ -2919,8 +2943,8 @@ class DocumentationReleaseArtifactTest {
                                 + "bash scripts/verify-publishable-artifacts.sh && "
                                 + "bash scripts/verify-generation-packaging.sh",
                         "pending", "Run publication preflight from the final release candidate."));
-        Map<String, Object> readiness = releaseReadiness(pom.getParent(), projectVersion, baselineVersion, benchmarkEvidence,
-                publishedBaselineArtifacts, checks);
+        Map<String, Object> readiness = releaseReadiness(pom.getParent(), projectVersion, baselineVersion,
+                versionContract, benchmarkEvidence, publishedBaselineArtifacts, checks);
         manifest.put("readiness", readiness);
         manifest.put("releasePrepChecklist", releasePrepChecklist(pom.getParent(), projectVersion, baselineVersion,
                 versionContract, readiness, benchmarkEvidence, publishedBaselineArtifacts, checks));
@@ -2953,6 +2977,7 @@ class DocumentationReleaseArtifactTest {
     private static Map<String, Object> releaseReadiness(Path root,
                                                         String projectVersion,
                                                         String baselineVersion,
+                                                        ReleaseVersionContract versionContract,
                                                         Map<String, Object> benchmarkEvidence,
                                                         List<Map<String, String>> publishedBaselineArtifacts,
                                                         List<Map<String, String>> checks) throws IOException {
@@ -2996,13 +3021,7 @@ class DocumentationReleaseArtifactTest {
         readiness.put("apiCompatibilityBaselineMatchesProjectVersion", projectVersion.equals(baselineVersion));
         readiness.put("activeRoadmap", "V27");
         readiness.put("releaseLane", "major");
-        readiness.put("releaseCandidate", Map.of(
-                "version", "4.0.0",
-                "status", "deferred",
-                "published", false,
-                "migrationReport", "docs/31-3x-to-4x-resilience-migration.md",
-                "pendingWork", List.of("resilience migration", "cache phases", "API compatibility",
-                        "assembled consumers", "benchmarks", "AOT", "native image", "publication")));
+        readiness.put("releaseCandidate", majorReleaseCandidate(projectVersion, versionContract));
         readiness.put("generatedTestEvidence", readinessStatus("pass",
                 "Generated by DocumentationReleaseArtifactTest in target/release-evidence/."));
         readiness.put("manualReleaseEvidence", readinessManualStatus(pendingManualCommands));
@@ -3031,6 +3050,26 @@ class DocumentationReleaseArtifactTest {
                 "sourceControlled", false,
                 "commitGeneratedEvidence", false));
         return readiness;
+    }
+
+    private static Map<String, Object> majorReleaseCandidate(String projectVersion,
+                                                              ReleaseVersionContract versionContract) {
+        String candidateVersion = projectVersion.endsWith("-SNAPSHOT")
+                ? projectVersion.substring(0, projectVersion.length() - "-SNAPSHOT".length())
+                : projectVersion;
+        String status = switch (versionContract.releaseState()) {
+            case "snapshot-development" -> "deferred";
+            case "release-candidate" -> "pending-publication";
+            case "post-publication" -> "published";
+            default -> throw new IllegalStateException("Unsupported release state: " + versionContract.releaseState());
+        };
+        return Map.of(
+                "version", candidateVersion,
+                "status", status,
+                "published", "post-publication".equals(versionContract.releaseState()),
+                "migrationReport", "docs/31-3x-to-4x-resilience-migration.md",
+                "pendingWork", List.of("resilience migration", "cache phases", "API compatibility",
+                        "assembled consumers", "benchmarks", "AOT", "native image", "publication"));
     }
 
     private static Map<String, Object> releasePrepChecklist(Path root,

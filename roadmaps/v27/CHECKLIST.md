@@ -67,7 +67,8 @@ Evidence recorded on 2026-08-22:
   mixed candidate versions, missing POM/source/Javadoc files, mismatched
   project/parent POM versions, mismatched embedded JAR versions, and root/module
   self-comparison. `scripts/verify-api-compatibility-fixtures.sh` accepted the
-  additive fixture and rejected constructor, nested-method, and enum removals.
+  additive fixture and rejected a source-only checked-exception addition plus
+  constructor, nested-method, and enum removals.
 - [`docs/31-3x-to-4x-resilience-migration.md`](../../docs/31-3x-to-4x-resilience-migration.md)
   records enabled-only, explicit `default`, named, blank, method-annotation,
   retry-method, and strict-validation migration behavior before the V27 behavior

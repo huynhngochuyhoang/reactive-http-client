@@ -26,6 +26,7 @@
                         </file>
                     </newVersion>
                     <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
+                    <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>
                     <parameter>
                         <onlyModified>true</onlyModified>
                     </parameter>

@@ -107,6 +107,7 @@ jobs:
             reactive-http-client-starter
 
       - name: Generate report-only 4.0.0 major API evidence
+        if: always()
         run: |
           test ! -e target/published-baseline-repositories/api-major-report-3.6.0 && \
           mvn -B -ntp -s .mvn/maven-central-settings.xml \

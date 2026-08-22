@@ -94,7 +94,7 @@ change.
 
 ### V20 default Spring Boot 4 reactor
 
-The default reactor now declares `4.0.0-SNAPSHOT`, imports Spring Boot `4.0.0`,
+The default reactor now declares `3.7.0-SNAPSHOT`, imports Spring Boot `4.0.0`,
 and uses published `3.6.0` as its strict compatibility baseline. Boot 4
 WebClient, health, Jackson 3, OTel, test-helper, and benchmark adapters live in
 normal source roots. The old `boot4-spike` profile, compiler exclusions,
@@ -121,6 +121,9 @@ records the behavior reason for the major version and the initial API result.
 The report-only `major-api-report` profile is additional classification
 evidence. It never replaces strict root and starter-module compatibility runs,
 which continue to fail on any unreviewed binary or source incompatibility.
+Strict mode enables both japicmp binary- and source-incompatibility failures;
+the report-only profile disables both failure switches so reviewed major changes
+can still be rendered after either strict step fails.
 
 `4.0.0` is not a release candidate during snapshot development. Generated
 readiness keeps publication deferred and lists the remaining resilience,
@@ -371,11 +374,13 @@ scripts/verify-published-baseline-provenance.sh api-starter 3.6.0 \
 ```
 
 The Maven profiles produce japicmp reports under each module's
-`target/japicmp/` directory. `api-compatibility` is strict for the current minor
-line. The source-controlled cross-major report and reviewed-delta guard retain
-the classified `3.0.0` removals as historical migration evidence. The
-fixture script verifies that additive APIs pass while removals of a public
-constructor, nested fluent method, or public enum constant fail. The filtered
+`target/japicmp/` directory. `api-compatibility` fails on binary and source
+incompatibilities for the current line. The source-controlled cross-major report
+and reviewed-delta guard retain the classified `3.0.0` removals as historical
+migration evidence. The
+fixture script verifies that additive APIs pass while a source-only checked
+exception addition and removals of a public constructor, nested fluent method,
+or public enum constant fail. The filtered
 comparison covers the documented extension
 points, annotations, exceptions, observability types, configuration properties,
 test-helper package, OpenTelemetry companion package, documented cache and

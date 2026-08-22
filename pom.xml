@@ -38,6 +38,7 @@
         <latest.published.version>3.6.0</latest.published.version>
         <api.compatibility.baseline.version>3.6.0</api.compatibility.baseline.version>
         <api.compatibility.break-on-binary-incompatible>true</api.compatibility.break-on-binary-incompatible>
+        <api.compatibility.break-on-source-incompatible>true</api.compatibility.break-on-source-incompatible>
         <api.compatibility.ignore-missing-classes>false</api.compatibility.ignore-missing-classes>
     </properties>
 
@@ -214,6 +215,7 @@
             <id>major-api-report</id>
             <properties>
                 <api.compatibility.break-on-binary-incompatible>false</api.compatibility.break-on-binary-incompatible>
+                <api.compatibility.break-on-source-incompatible>false</api.compatibility.break-on-source-incompatible>
                 <api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>
             </properties>
         </profile>
@@ -282,6 +284,7 @@
                                 </file>
                             </newVersion>
                             <breakBuildOnBinaryIncompatibleModifications>${api.compatibility.break-on-binary-incompatible}</breakBuildOnBinaryIncompatibleModifications>
+                            <breakBuildOnSourceIncompatibleModifications>${api.compatibility.break-on-source-incompatible}</breakBuildOnSourceIncompatibleModifications>
                             <parameter>
                                 <ignoreMissingClasses>${api.compatibility.ignore-missing-classes}</ignoreMissingClasses>
                                 <accessModifier>public</accessModifier>

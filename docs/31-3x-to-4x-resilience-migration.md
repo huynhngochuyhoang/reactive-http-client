@@ -62,7 +62,9 @@ mvn -s .mvn/maven-central-settings.xml \
 ```
 
 The report-only major lane is additional evidence, not a replacement for either
-strict command:
+strict command. Strict mode fails on binary or source incompatibilities; the
+report-only profile disables both failure switches so the report still runs
+after a strict failure:
 
 ```bash
 test ! -e target/published-baseline-repositories/api-major-report-3.6.0 && \
@@ -81,4 +83,3 @@ implicitly accepted consequence of the major version.
 - Latest published and API baseline: `3.6.0`.
 - Public README and quick-start coordinates: `3.6.0`.
 - `4.0.0` publication: deferred pending all V27 priorities.
-
