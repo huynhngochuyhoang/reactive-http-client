@@ -220,8 +220,10 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
 - Every key includes concrete client identity, full resolved method signature,
   and a deterministic representation of the selected request-varying inputs.
 - Path/query values and declared key parameters have stable handling for nulls,
-  arrays, collections, maps, inherited generics, and ordering. Mutable arguments
-  are snapshotted for key construction rather than retained as live key objects.
+  arrays, collections, maps, inherited generics, and ordering. Each subscription
+  freezes one supported argument snapshot and uses that same snapshot for key
+  construction and request materialization. Mutable or nested values that cannot
+  be copied safely are rejected rather than retained as live key/request state.
 - Header-, locale-, tenant-, Reactor-context-, or auth-dependent responses
   require explicit variant/partition inputs or an explicit shared-response
   acknowledgement. The starter never silently assumes such responses are
@@ -259,6 +261,10 @@ defined: local, bounded, expiring, and opt-in.
 - Phase one intentionally does not coalesce concurrent misses: two simultaneous
   misses may perform two loads. This is documented so single flight is not
   claimed before phase two.
+- Concurrent same-key misses use a generation-checked, first-successful-fill-wins
+  publication rule. A later completion still returns its own value to its caller
+  but cannot replace the winning entry or restart its TTL after another fill,
+  expiry, eviction, or refresh generation has advanced.
 - Maximum-size eviction, TTL expiry, replacement, cancellation, load failure,
   and factory shutdown release all cache references deterministically.
 - Cached mutable objects are not copied or re-serialized. Documentation states
@@ -283,6 +289,10 @@ are stable.
 - Every caller retains its own subscription, timeout budget, cancellation, and
   one terminal lifecycle/observer/exchange record. Coalescing does not merge
   caller reporting state.
+- The shared load is owned by the set of interested callers, not by the first
+  caller's outer logical-call timeout. If the first caller times out after a
+  waiter joins, that caller detaches while the load continues for the waiter;
+  request/attempt timeouts and any explicit shared-load safety bound still apply.
 - Cancelling one waiter does not cancel a load still required by another waiter.
   Cancelling the last interested caller has one documented behavior and cannot
   populate a value from an abandoned load accidentally.
@@ -291,7 +301,9 @@ are stable.
 - A slow or failed key does not block unrelated keys, exhaust a global lock, or
   retain caller context after termination.
 - Deterministic concurrency tests prove one transport dispatch and one body
-  subscription for a coalesced load without using timing-only assertions.
+  subscription for a coalesced load without using timing-only assertions. They
+  cover both waiter timeout while the first caller succeeds and first-caller
+  timeout while a later waiter succeeds.
 
 ## 8. Phase Three - Refresh on Access
 
@@ -333,7 +345,9 @@ side effects.
 - A miss leader uses the selected resilience operators exactly as an uncached
   call does. Cache storage occurs only after the final successful decoded result.
 - Logical-call timeout includes lookup and each caller's wait. A waiter timeout
-  does not rewrite or clear the leader's terminal state.
+  does not rewrite or clear shared-load state, and the first caller's timeout
+  cannot truncate a later waiter's fresh budget while that waiter remains
+  interested.
 - Unsafe methods remain ineligible even when idempotency keys exist. Caching does
   not become a replay-safety mechanism.
 - Cached results do not suppress explicit downstream writes or infer
@@ -341,8 +355,11 @@ side effects.
 - Prior load/refresh URL, status, headers, error, failure stage, attempt count,
   body size, and request-dispatch evidence cannot leak into a cache hit or a
   different caller.
-- `ResponseEntity<T>` caching preserves the selected value/status/header
-  contract without claiming that cached headers came from a new wire response.
+- `ResponseEntity<T>` caching preserves the selected value and status but copies
+  only a documented, bounded allowlist of representation headers into the cache.
+  `Set-Cookie`, auth challenges, `SensitiveHeaders`, and configured per-caller
+  headers make the response non-cacheable; non-allowlisted headers are never
+  replayed from the first caller to later hits.
 
 ## 10. Phase Four - Cache Metrics, Observability, and Diagnostics
 

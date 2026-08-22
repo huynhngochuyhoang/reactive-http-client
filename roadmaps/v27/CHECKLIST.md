@@ -173,8 +173,10 @@ one candidate release.
 - [ ] Define deterministic selected-input handling for nulls, primitives,
       strings, arrays, collections, maps, enums, records, and inherited generic
       values.
-- [ ] Snapshot mutable key inputs rather than retaining caller-owned objects as
-      live keys.
+- [ ] Freeze one supported argument snapshot per subscription and use that same
+      snapshot for both key construction and request materialization.
+- [ ] Reject mutable/nested inputs that cannot be copied safely rather than
+      allowing the key and dispatched request to observe different values.
 - [ ] Reject publishers, streams, resources, unstable maps, and unresolved or
       unsupported values selected as key inputs.
 - [ ] Prove no collision across clients, overloads, inherited methods, argument
@@ -229,8 +231,14 @@ one candidate release.
       store only its final successful decoded value.
 - [ ] Preserve phase-one behavior where concurrent misses may execute separate
       loads; do not claim single flight before Priority 7.
+- [ ] Publish concurrent same-key loads conditionally so the first successful
+      fill for the observed generation wins; a late duplicate returns to its
+      caller but cannot replace the entry or restart TTL.
+- [ ] Prevent a late duplicate from repopulating after expiry, eviction, refresh,
+      or shutdown has advanced the entry generation.
 - [ ] Prove hit/miss behavior with deterministic time and dispatch counters,
-      including auth/tenant/locale variants.
+      including reversed duplicate-load completion order and auth/tenant/locale
+      variants.
 
 ### [ ] 6.3 Bound expiry, eviction, identity, and lifecycle
 
@@ -259,12 +267,19 @@ one candidate release.
 
 - [ ] Give every waiter its own subscription-local timeout, cancellation, and
       one terminal lifecycle/observer/exchange record.
+- [ ] Keep the shared load alive while any caller remains interested; the first
+      caller's outer logical timeout must detach only that caller rather than
+      terminating the load for later waiters.
+- [ ] Keep request/attempt timeouts and any explicit shared-load safety bound
+      effective without borrowing one caller's logical deadline.
 - [ ] Ensure cancelling one waiter does not cancel a load required by another.
 - [ ] Define and test cancellation when the last interested caller leaves;
       abandoned work cannot populate the cache accidentally.
 - [ ] Fan out load success, error, empty completion, and cancellation
       deterministically, then remove completed/failed in-flight state.
 - [ ] Prove slow/failed keys do not hold a global lock or block unrelated keys.
+- [ ] Deterministically prove both timeout directions: waiter timeout with first
+      caller success, and first-caller timeout with later waiter success.
 
 ### [ ] 7.3 Keep hidden replay inside the leader
 
@@ -323,7 +338,8 @@ one candidate release.
 - [ ] Keep a miss leader behaviorally identical to an uncached invocation until
       its final successful decoded value is stored.
 - [ ] Include lookup and each caller's coalesced wait in that caller's logical
-      timeout without changing leader timeout ownership.
+      timeout without placing any caller-specific outer deadline inside the
+      shared load publisher.
 - [ ] Keep non-GET/unsafe methods ineligible regardless of idempotency keys.
 - [ ] Do not infer read invalidation from any write method.
 
@@ -341,8 +357,13 @@ one candidate release.
 ### [ ] 9.3 Preserve envelope and object contracts
 
 - [ ] Return cached `Mono<T>` values without re-decoding or re-serializing.
-- [ ] Preserve cached `ResponseEntity<T>` value, status, and headers while
-      marking that no new request was dispatched.
+- [ ] Preserve cached `ResponseEntity<T>` value and status while copying only a
+      documented bounded allowlist of representation headers.
+- [ ] Treat `Set-Cookie`, auth challenges, `SensitiveHeaders`, and configured
+      per-caller response headers as non-cacheable, and never replay
+      non-allowlisted headers to later callers.
+- [ ] Verify load responses and cache hits document their header difference and
+      never expose the first caller's session/identity headers.
 - [ ] Prove mutable-value identity behavior and document caller responsibility.
 - [ ] Reject any later response shape that cannot retain deterministic ownership
       and terminal semantics.
