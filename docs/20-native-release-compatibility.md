@@ -632,6 +632,8 @@ Supported Boot 4 native-image path:
 - Starter configuration properties under `reactive.http.*`.
 - Problem Detail error mapping, a named auth provider, and Micrometer-backed
   client metrics.
+- A native open-circuit rejection that reaches no transport dispatch and records
+  one finite logical-call duration with zero subscription attempts.
 - Opt-in gzip negotiation and transparent JSON response decompression over the
   real loopback transport.
 - The optional `rhttpclients` Actuator endpoint and reactive health indicator.
@@ -668,8 +670,9 @@ must be accompanied by a successful executable smoke run.
 
 Limits:
 
-- The scheduled native smoke uses a real Reactor Netty loopback request. It does
-  not exercise custom TLS configuration, Resilience4j, or OTel exporters.
+- The scheduled native smoke uses real Reactor Netty loopback requests and one
+  Resilience4j open-circuit rejection. It does not exercise custom TLS
+  configuration, other Resilience4j operators, or OTel exporters.
 - Optional libraries still require native support and runtime hints from their
   owners, including Resilience4j, alternate TLS providers, and OpenTelemetry
   exporters.

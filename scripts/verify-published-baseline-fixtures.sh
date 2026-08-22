@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SETTINGS="$ROOT_DIR/.mvn/maven-central-settings.xml"
 VERSION="fixture"
 GROUP_PATH="io/github/huynhngochuyhoang"
 ARTIFACT="reactive-http-client-starter"
@@ -149,13 +150,13 @@ if "$ROOT_DIR/scripts/verify-published-baseline-provenance.sh" \
   exit 1
 fi
 
-PROJECT_VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+PROJECT_VERSION="$(mvn -q -s "$SETTINGS" -DforceStdout help:evaluate -Dexpression=project.version)"
 for scope in root module; do
   if [[ "$scope" == root ]]; then
-    command=(mvn -q -N -Papi-compatibility
+    command=(mvn -q -s "$SETTINGS" -N -Papi-compatibility
       -Dapi.compatibility.baseline.version="$PROJECT_VERSION" validate)
   else
-    command=(mvn -q -pl reactive-http-client-starter -Papi-compatibility
+    command=(mvn -q -s "$SETTINGS" -pl reactive-http-client-starter -Papi-compatibility
       -Dapi.compatibility.baseline.version="$PROJECT_VERSION" validate)
   fi
   log="$WORK/self-comparison-$scope.log"
