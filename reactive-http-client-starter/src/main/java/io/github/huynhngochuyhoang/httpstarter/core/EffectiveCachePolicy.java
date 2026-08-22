@@ -63,6 +63,7 @@ final class EffectiveCachePolicy {
         }
         validateMaterializedType(context, cacheValueType);
         validateRequestBody(context, plan);
+        CacheKeyContract.validate(clientInterface, clientName, plan, clientConfig, selection);
         return selection;
     }
 

@@ -29,9 +29,11 @@ final class DeclarativeRequestParameterGrammar {
         validateHeaderMapTypes(concreteClientInterface, clientName, plan);
         validateFormFileTypes(concreteClientInterface, clientName, plan);
 
+        Set<Integer> cacheKeyParameters = new HashSet<>();
+        plan.cacheKeyParams().forEach(binding -> cacheKeyParameters.add(binding.argumentIndex()));
         List<Integer> unannotated = new ArrayList<>();
         for (int index = 0; index < method.getParameterCount(); index++) {
-            if (!rolesByParameter.containsKey(index)) {
+            if (!rolesByParameter.containsKey(index) && !cacheKeyParameters.contains(index)) {
                 unannotated.add(index);
             }
         }

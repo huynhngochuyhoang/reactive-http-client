@@ -48,6 +48,7 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
             RateLimiter.class,
             CacheResponse.class,
             CacheDisabled.class,
+            CacheKey.class,
             LogHttpExchange.class
     };
 

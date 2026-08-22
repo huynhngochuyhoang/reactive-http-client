@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Cache key, variant, and isolation contract.** Added named `@CacheKey`
+  parameter partitions, explicit header/context variants, authenticated/shared
+  response acknowledgement, canonical typed structural encoding, digest-only
+  keys, and one defensive argument snapshot per subscription. Unknown or
+  unfreezable variants now fail before dispatch; no response storage is enabled
+  until the bounded local-cache phase.
 - **Cache opt-in and declarative eligibility grammar.** Added inert named cache
   policies, explicit client/method selection, `@CacheDisabled` method exclusion,
   finite TTL/capacity validation, and startup rejection for non-GET, streaming,

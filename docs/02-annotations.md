@@ -524,6 +524,20 @@ methods and configured `@ApiRef` methods.
 Mono<CatalogItem> getItem(@PathVar("id") String id);
 ```
 
+### `@CacheKey`
+
+Gives a method parameter a stable partition label. The selected policy must
+name that label in `vary-by-parameters`. Path and query values are already
+included automatically.
+
+```java
+@GET("/catalog/{id}")
+@CacheResponse("tenant-catalog")
+Mono<CatalogItem> getItem(
+        @PathVar("id") String id,
+        @CacheKey("tenant") String tenantId);
+```
+
 ### `@CacheDisabled`
 
 Explicitly excludes a method when its client selects a policy for all eligible
@@ -537,4 +551,4 @@ Mono<CatalogState> liveState();
 
 Selected caching is restricted to `GET` methods returning a finite `Mono<T>` or
 `Mono<ResponseEntity<T>>`. See [Response Caching](32-response-caching.md) for
-the full eligibility and customization-safety contract.
+the full eligibility, key isolation, and customization-safety contract.

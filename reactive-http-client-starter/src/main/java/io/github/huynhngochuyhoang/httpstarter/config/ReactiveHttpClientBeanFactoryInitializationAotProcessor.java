@@ -4,6 +4,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import org.springframework.aot.hint.ExecutableMode;
+import org.springframework.aot.hint.ReflectionHints;
 import org.springframework.aot.hint.TypeReference;
 import org.springframework.beans.PropertyValue;
 import org.springframework.beans.factory.FactoryBean;
@@ -15,7 +16,9 @@ import org.springframework.core.ResolvableType;
 import org.springframework.util.ClassUtils;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Registers native-image JDK proxy hints for scanned {@code @ReactiveHttpClient} interfaces.
@@ -49,8 +52,14 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         return (generationContext, beanFactoryInitializationCode) -> clientInterfaces.forEach(clientInterface -> {
             generationContext.getRuntimeHints().proxies().registerJdkProxy(clientInterface);
             var reflectionHints = generationContext.getRuntimeHints().reflection();
+            Set<Class<?>> registeredRecordTypes = new HashSet<>();
             for (var method : clientInterface.getMethods()) {
                 reflectionHints.registerMethod(method, ExecutableMode.INVOKE);
+                for (int index = 0; index < method.getParameterCount(); index++) {
+                    registerRecordAccessors(reflectionHints,
+                            ResolvableType.forMethodParameter(method, index, clientInterface),
+                            registeredRecordTypes);
+                }
             }
             reflectionHints.registerType(clientInterface, typeHint -> {
                 for (var method : clientInterface.getMethods()) {
@@ -59,6 +68,27 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 }
             });
         });
+    }
+
+    private static void registerRecordAccessors(ReflectionHints hints,
+                                                ResolvableType type,
+                                                Set<Class<?>> registeredTypes) {
+        if (type.isArray()) {
+            registerRecordAccessors(hints, type.getComponentType(), registeredTypes);
+            return;
+        }
+        for (ResolvableType generic : type.getGenerics()) {
+            registerRecordAccessors(hints, generic, registeredTypes);
+        }
+        Class<?> candidate = type.resolve();
+        if (candidate == null || !candidate.isRecord() || !registeredTypes.add(candidate)) {
+            return;
+        }
+        hints.registerType(candidate, typeHint -> {});
+        for (var component : candidate.getRecordComponents()) {
+            hints.registerMethod(component.getAccessor(), ExecutableMode.INVOKE);
+            registerRecordAccessors(hints, ResolvableType.forType(component.getGenericType()), registeredTypes);
+        }
     }
 
     private List<Class<?>> findClientInterfaces(ConfigurableListableBeanFactory beanFactory) {

@@ -323,52 +323,92 @@ Evidence recorded on 2026-08-22:
 
 ## Priority 5 - Cache Key, Variant, and Isolation Contract
 
-### [ ] 5.1 Build a deterministic opaque key
+### [x] 5.1 Build a deterministic opaque key
 
-- [ ] Include concrete client identity and full resolved method signature in
+- [x] Include concrete client identity and full resolved method signature in
       every key.
-- [ ] Define a canonical typed structural encoding with explicit null markers,
+- [x] Define a canonical typed structural encoding with explicit null markers,
       scalar type identifiers, length framing, container/element boundaries,
       and canonical map-entry ordering before key equality or one-way derivation.
-- [ ] Reject delimiter concatenation, `toString()`, identity hash codes, and
+- [x] Reject delimiter concatenation, `toString()`, identity hash codes, and
       unframed serialized text as cache-key encodings.
-- [ ] Define deterministic selected-input handling for nulls, primitives,
+- [x] Define deterministic selected-input handling for nulls, primitives,
       strings, arrays, collections, maps, enums, records, and inherited generic
       values.
-- [ ] Freeze one supported argument snapshot per subscription and use that same
+- [x] Freeze one supported argument snapshot per subscription and use that same
       snapshot for both key construction and request materialization.
-- [ ] Reject mutable/nested inputs that cannot be copied safely rather than
+- [x] Reject mutable/nested inputs that cannot be copied safely rather than
       allowing the key and dispatched request to observe different values.
-- [ ] Reject publishers, streams, resources, unstable maps, and unresolved or
+- [x] Reject publishers, streams, resources, unstable maps, and unresolved or
       unsupported values selected as key inputs.
-- [ ] Prove no collision across clients, overloads, inherited methods, argument
+- [x] Prove no collision across clients, overloads, inherited methods, argument
       order, and configured variants.
-- [ ] Add adversarial collision tests for null versus `"null"`, scalar values
+- [x] Add adversarial collision tests for null versus `"null"`, scalar values
       with different types, `("ab", "c")` versus `("a", "bc")`, empty versus
       absent containers, nested boundaries, and equivalent maps with different
       iteration order.
 
-### [ ] 5.2 Require explicit response variants
+### [x] 5.2 Require explicit response variants
 
-- [ ] Define startup-validated selection for path/query inputs and additional
+- [x] Define startup-validated selection for path/query inputs and additional
       parameter/header/context partition dimensions.
-- [ ] Require explicit partition inputs or an explicit shared-response
+- [x] Require explicit partition inputs or an explicit shared-response
       acknowledgement for auth-, tenant-, locale-, header-, or Reactor-context-
       dependent responses.
-- [ ] Reject unknown parameter/header names and ambiguous variant declarations
+- [x] Reject unknown parameter/header names and ambiguous variant declarations
       before auth or transport dispatch.
-- [ ] Document that request IDs and correlation IDs are not useful response
+- [x] Document that request IDs and correlation IDs are not useful response
       variants and can destroy cache effectiveness.
 
-### [ ] 5.3 Protect key material
+### [x] 5.3 Protect key material
 
-- [ ] Never export raw or hashed keys through metrics, logs, traces,
+- [x] Never export raw or hashed keys through metrics, logs, traces,
       diagnostics, health, or support bundles.
-- [ ] Never retain auth tokens, credentials, or cookies as ordinary key text.
-- [ ] Use an opaque one-way representation for explicitly selected sensitive
+- [x] Never retain auth tokens, credentials, or cookies as ordinary key text.
+- [x] Use an opaque one-way representation for explicitly selected sensitive
       partition values and clear references on eviction.
-- [ ] Add cross-tenant/auth/locale isolation tests and redaction tests for every
+- [x] Add cross-tenant/auth/locale isolation tests and redaction tests for every
       observability surface.
+
+Evidence recorded on 2026-08-22:
+
+- Added the public parameter-level `@CacheKey` label and inert policy fields
+  `vary-by-parameters`, `vary-by-headers`, `vary-by-context`, and
+  `shared-response`. `MethodMetadataCache` validates labels once, so proxy
+  startup, AOT, diagnostics/export, and `MockReactiveHttpClient` retain the
+  shared declarative grammar.
+- Package-private `CacheKeyContract` includes the logical and concrete client,
+  resolved parameter/response signature, path/query values, and selected
+  parameter/header/context variants in a typed, length-framed canonical form.
+  Map and set values are canonically ordered; no delimiter concatenation,
+  arbitrary serialization, identity hash, or generic `toString()` fallback is
+  accepted. Equality uses an internal SHA-256 digest whose string form is only
+  `OpaqueCacheKey`.
+- Selected calls are prepared through `Mono.deferContextual`. Each subscription
+  defensively freezes one supported argument graph, resolves the request from
+  that graph, and derives the key from the same resolved values. Mutable DTOs,
+  mutable record components, raw/unstable containers, unresolved values,
+  publishers, streams, buffers, channels, and resources fail before dispatch.
+- Startup rejects unknown/duplicate variant names, unpartitioned dynamic
+  headers, header maps, bodies, and authenticated responses unless an explicit
+  partition or `shared-response` acknowledgement makes the reuse decision
+  reviewable. Documentation warns against request/correlation IDs as variants.
+- The final canonical byte copy is zeroed immediately after one-way derivation.
+  Only the digest-only key can reach the future storage boundary; selected
+  values remain subscription-local, so dropping an entry cannot retain auth,
+  cookie, tenant, or locale references. A source reachability audit confirms
+  neither raw nor digest keys enter observability, logs, diagnostics, health,
+  or support output.
+- `CacheKeyContractTest` covers client/method/inherited-generic separation,
+  tenant/auth/locale isolation, sensitive header opacity, adversarial scalar and
+  boundary collisions, null/empty containers, map ordering, defensive copies,
+  mutable nested records, and a real cold-proxy subscription snapshot. AOT
+  tests cover `@CacheKey` plus record accessors nested inside resolved generic
+  containers.
+- `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
+  test` passed `1098` starter tests and `55` test-helper tests with zero
+  failures, errors, or skips. Metadata JSON validation and `git diff --check`
+  also passed.
 
 ---
 

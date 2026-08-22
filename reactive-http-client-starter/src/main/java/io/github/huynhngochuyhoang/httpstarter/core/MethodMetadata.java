@@ -72,6 +72,8 @@ public class MethodMetadata {
     private String cachePolicyName;
     /** Explicit method exclusion from a client-wide response-cache policy. */
     private boolean cacheDisabled;
+    /** index -> stable cache-key parameter label. */
+    private Map<Integer, String> cacheKeyParams = new HashMap<>();
     private RequestPlan requestPlan;
 
     /**
@@ -169,6 +171,8 @@ public class MethodMetadata {
     public boolean isCacheDisabled() { return cacheDisabled; }
     public void setCacheDisabled(boolean cacheDisabled) { this.cacheDisabled = cacheDisabled; }
 
+    public Map<Integer, String> getCacheKeyParams() { return cacheKeyParams; }
+
     RequestPlan getRequestPlan() { return requestPlan; }
     void setRequestPlan(RequestPlan requestPlan) { this.requestPlan = requestPlan; }
 
@@ -198,5 +202,6 @@ public class MethodMetadata {
         idempotencyKeyParams = Map.copyOf(idempotencyKeyParams);
         formFieldParams = Map.copyOf(formFieldParams);
         formFileParams = Map.copyOf(formFileParams);
+        cacheKeyParams = Map.copyOf(cacheKeyParams);
     }
 }

@@ -274,8 +274,42 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     "Method " + method.getName() + " has no HTTP verb annotation (@GET, @POST, @PUT, @DELETE, @PATCH) or @ApiRef");
         }
 
+        Class<?> concreteClient = clientInterface != null ? clientInterface : method.getDeclaringClass();
+        EffectiveCachePolicy.Selection cacheSelection = EffectiveCachePolicy.validate(
+                concreteClient, clientName, plan, clientConfig, effectiveApi.httpMethod());
+        if (cacheSelection.enabled()) {
+            Object[] invocationArguments = args != null ? args.clone() : new Object[0];
+            return Mono.deferContextual(context -> {
+                Object[] frozenArguments = CacheKeyContract.freezeArguments(
+                        plan, invocationArguments, cacheSelection.policy());
+                RequestArgumentResolver.ResolvedArgs frozenResolved = applyDefaultHeaders(
+                        applyDefaultQueryParams(argumentResolver.resolve(plan, frozenArguments)));
+                CacheKeyContract.PreparedKey preparedKey = CacheKeyContract.derive(
+                        concreteClient,
+                        clientName,
+                        plan,
+                        frozenArguments,
+                        frozenResolved,
+                        context,
+                        cacheSelection.policy());
+                Mono<?> source = (Mono<?>) invokeResolved(
+                        proxy, method, frozenArguments, meta, plan, effectiveApi, frozenResolved);
+                return source.contextWrite(preparedKey::writeContext);
+            });
+        }
+
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
                 applyDefaultQueryParams(argumentResolver.resolve(plan, args)));
+        return invokeResolved(proxy, method, args, meta, plan, effectiveApi, resolved);
+    }
+
+    private Object invokeResolved(Object proxy,
+                                  Method method,
+                                  Object[] args,
+                                  MethodMetadata meta,
+                                  RequestPlan plan,
+                                  EffectiveApi effectiveApi,
+                                  RequestArgumentResolver.ResolvedArgs resolved) {
         String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         RequestBodyOwnership requestBodyOwnership = new RequestBodyOwnership(resolved.body());
 

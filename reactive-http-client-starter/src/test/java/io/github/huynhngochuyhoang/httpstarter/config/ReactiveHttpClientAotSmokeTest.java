@@ -26,6 +26,7 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +49,8 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(OPTIONS.class, "value")))
                 .accepts(hints);
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(CacheResponse.class, "value")))
+                .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(CacheKey.class, "value")))
                 .accepts(hints);
         assertThat(hints.reflection().getTypeHint(CacheDisabled.class)).isNotNull();
         assertThat(hints.reflection().getTypeHint(Body.class)).isNotNull();
@@ -257,6 +260,38 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorRegistersCacheKeyRecordAccessors() throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", CacheRecordAotClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, CacheRecordAotClient.class);
+        context.registerBeanDefinition(CacheRecordAotClient.class.getName(), beanDefinition);
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        policy.setVaryByParameters(List.of("tenant"));
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("cache-record-aot", config));
+        context.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+        DefaultGenerationContext generationContext = newGenerationContext();
+
+        contribution.applyTo(generationContext, null);
+
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                CacheRecordVariant.class.getMethod("value")))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                CacheRecordVariant.class.getMethod("version")))
+                .accepts(generationContext.getRuntimeHints());
+        context.close();
+    }
+
+    @Test
     void beanFactoryAotProcessorUsesReplacementMethodMetadataCache() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
@@ -373,6 +408,16 @@ class ReactiveHttpClientAotSmokeTest {
         @POST("/items")
         @CacheResponse("selected")
         Mono<String> create();
+    }
+
+    record CacheRecordVariant(String value, int version) {
+    }
+
+    @ReactiveHttpClient(name = "cache-record-aot", baseUrl = "http://cache-record-aot.test")
+    interface CacheRecordAotClient {
+        @GET("/items")
+        @CacheResponse("selected")
+        Mono<String> get(@CacheKey("tenant") List<CacheRecordVariant> tenant);
     }
 
     @ReactiveHttpClient(name = "replacement-metadata", baseUrl = "http://replacement.test")

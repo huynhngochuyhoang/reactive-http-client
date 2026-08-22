@@ -1,9 +1,9 @@
 # Response Caching
 
 V27 introduces an explicit local response-cache contract in four phases. This
-page currently freezes policy selection and startup eligibility. The Priority 4
-implementation does not yet store or reuse responses; bounded storage is added
-only after key and variant isolation are complete.
+page currently freezes policy selection, startup eligibility, and key isolation.
+The Priority 5 implementation still does not store or reuse responses; bounded
+storage is added in phase one only after this contract.
 
 ## Explicit selection
 
@@ -65,6 +65,68 @@ value, status, and only the bounded representation-header allowlist defined by
 the storage phase. A hit does not create a new downstream wire response.
 Per-caller and sensitive response headers are never reusable cache metadata.
 
+## Key and variant isolation
+
+Every key includes the logical and concrete client identity plus the full
+generic-resolved method signature. Path and query values are always included.
+Additional values are explicit:
+
+```yaml
+reactive:
+  http:
+    clients:
+      catalog-service:
+        cache:
+          policies:
+            catalog-read:
+              ttl-ms: 60000
+              maximum-size: 10000
+              vary-by-parameters: [tenant]
+              vary-by-headers: [Accept-Language]
+              vary-by-context: [salesRegion]
+```
+
+```java
+@GET("/catalog/{id}")
+@CacheResponse("catalog-read")
+Mono<CatalogItem> getItem(
+        @PathVar("id") String id,
+        @HeaderParam("Accept-Language") String language,
+        @CacheKey("tenant") String tenantId);
+```
+
+`vary-by-parameters` names stable `@CacheKey` labels.
+`vary-by-headers` must name a declared header/idempotency parameter or a
+configured default header and is case-insensitive. `vary-by-context` reads
+string keys from the subscriber's Reactor context. Blank, duplicate, unknown
+parameter/header, and ambiguous declarations fail startup.
+
+For an authenticated method with no explicit parameter/header/context
+partition, set `shared-response: true` only when the response is deliberately
+shared across identities. The same acknowledgement is required when dynamic
+headers, header maps, or a body are intentionally omitted. It cannot be
+used to remove explicitly selected variants; those dimensions still partition
+the response.
+
+Request IDs, correlation IDs, trace IDs, and similarly unique values are poor
+cache variants: they make nearly every call a miss and provide no response
+isolation. Prefer stable tenant, locale, authorization-scope, or business
+partition values.
+
+Supported selected values are null, primitive/scalar values, strings, enums,
+scalar records, arrays, typed lists/sets/maps, and optionals. The starter
+defensively freezes one snapshot per subscription and uses it for both the key
+and request materialization. Publishers, streams, resources, raw containers,
+unresolved generics, mutable DTOs, and mutable nested record components fail
+before transport dispatch.
+
+The canonical representation uses type tags, explicit nulls, length framing,
+container boundaries, and sorted map/set encodings. Only its SHA-256 digest is
+retained as the local opaque key. Raw values and digest text are never exported
+through metrics, logs, traces, diagnostics, health, or support bundles. Auth
+tokens, credentials, and cookies selected as variants therefore never become
+ordinary retained key text.
+
 ## Customization safety
 
 A cache hit will eventually occur before HTTP dispatch, so arbitrary builder
@@ -102,5 +164,5 @@ it `INCOMPATIBLE`; classification is not a bypass mechanism.
 Proxy startup, AOT processing, effective-contract export, diagnostics, and
 `MockReactiveHttpClient` use the same `MethodMetadataCache`-backed grammar.
 Replacement metadata caches remain authoritative. Contract snapshots expose a
-bounded `Cache` cell with only source, TTL, and maximum size; policy names and
-request values are not exported.
+bounded `Cache` cell with only source, TTL, and maximum size; policy names,
+raw values, and opaque key digests are not exported.
