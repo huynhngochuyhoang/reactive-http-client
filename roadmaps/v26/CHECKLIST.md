@@ -695,18 +695,18 @@ Evidence:
   does not require a promoted benchmark report unless release wording later adds
   a numerical performance claim.
 
-### [ ] 12.2 Assemble immutable release evidence
+### [x] 12.2 Assemble immutable release evidence
 
-- [ ] Run clean full reactor verification from the release-prep tree.
-- [ ] Run strict root/module API compatibility from isolated Central-only
+- [x] Run clean full reactor verification from the release-prep tree.
+- [x] Run strict root/module API compatibility from isolated Central-only
       repositories.
-- [ ] Run generation packaging, current/published consumer, supported matrix,
+- [x] Run generation packaging, current/published consumer, supported matrix,
       duration/resilience/metrics/health/OTel composition, AOT/native, and
       documentation gates.
-- [ ] Verify complete candidate parent, starter, test-helper, and OTel POM,
+- [x] Verify complete candidate parent, starter, test-helper, and OTel POM,
       binary, source, and Javadoc artifacts.
-- [ ] Re-run every release gate from one clean immutable commit.
-- [ ] Cite a clean promoted benchmark report or keep changelog wording
+- [x] Re-run every release gate from one clean immutable commit.
+- [x] Cite a clean promoted benchmark report or keep changelog wording
       non-numerical.
 
 Pre-commit release-candidate preflight (not immutable release evidence):
@@ -718,16 +718,45 @@ Pre-commit release-candidate preflight (not immutable release evidence):
   tests. Release-document/configuration-metadata tests passed 57 focused tests.
 - Java 21 supported-matrix verification passed Spring Boot `4.0.0` and `4.1.0`,
   including strict API compatibility against Central-resolved `3.5.0`, optional
-  integrations, dependency captures, and assembled consumers. Evidence is under
-  `target/release-evidence/v26/priority12/supported-matrix/`.
+  integrations, dependency captures, and assembled consumers.
 - Current `3.6.0` and published `3.5.0` assembled-consumer lanes passed from
-  fresh isolated repositories. Generation packaging passed, and the complete
-  13-file candidate POM/binary/source/Javadoc checksum set is under
-  `target/release-evidence/v26/priority12/candidate-artifacts/`.
+  fresh isolated repositories. Generation packaging passed for the complete
+  13-file candidate POM/binary/source/Javadoc set.
 - The changelog remains non-numerical, so no promoted benchmark report is
-  required. This preflight records `sourceState=dirty` by construction; the
-  checkboxes above remain open until these release-prep changes are committed
-  and every release gate is rerun from that clean immutable commit.
+  required. This preflight recorded `sourceState=dirty` by construction and did
+  not satisfy 12.2; the immutable rerun below supersedes it.
+
+Immutable evidence:
+
+- Froze the final release-prep implementation and artifact inputs at clean
+  commit `52b193e940d20d61841470da72c630112d5d1a51`. The JDK 21 clean reactor
+  build passed 1,047 starter, 49 test-helper, and 52 OTel tests, including the
+  duration, resilience, metrics, health, OTel, AOT, and documentation suites.
+- Strict root and starter-module japicmp checks passed against Central-resolved
+  `3.5.0` from separate isolated repositories. API incompatibility and
+  published-baseline contamination fixtures also passed their positive and
+  intentional-rejection cases.
+- The supported matrix passed on JDK `21.0.11` for Spring Boot `4.0.0` and
+  `4.1.0`, including optional integrations, assembled consumers, dependency
+  captures, and per-row strict API compatibility. Both matrix rows record
+  `sourceState=clean` and the immutable commit above.
+- Current-candidate `3.6.0` and published-baseline `3.5.0` consumer lanes passed
+  from fresh repositories without reactor-classpath leakage. Generation
+  packaging passed for the complete 13-file parent/module POM, binary, source,
+  and Javadoc attachment set. Local checksums exclude GPG signatures, which
+  remain owned by the publication workflow.
+- Oracle GraalVM `25.0.3` compiled and executed the assembled native fixture.
+  The executable SHA-256 is
+  `3eabc8cbfc68811b7d19aa36c449b802b9c68a4e0c666678a34e90bfb76e46f5`.
+  The native run covered the zero-dispatch open-circuit path and completed with
+  exit status zero.
+- The complete benchmark smoke harness passed from the immutable commit. Its
+  target-only output is non-promotable, and the `3.6.0` changelog remains
+  non-numerical, so no promoted benchmark report is required.
+- Consolidated provenance, 328 evidence files, command logs, dependency lists,
+  API reports, test reports, artifact checksums, native hash, and smoke output
+  are under
+  `target/release-evidence/v26/priority12/immutable-52b193e/`.
 
 ### [ ] 12.3 Record the mutually exclusive decision
 
