@@ -238,6 +238,12 @@ public class NativeSmokeApplication {
                                     .header("Content-Type", "application/problem+json")
                                     .sendString(Mono.just("{\"status\":502,\"title\":\"native problem\",\"detail\":\"smoke\"}"))
                                     .then();
+                        })
+                        .get("/api/open-circuit", (request, response) -> {
+                            dispatchCount.incrementAndGet();
+                            return response.header("Content-Type", "application/json")
+                                    .sendString(Mono.just("{\"code\":\"unexpected\",\"message\":\"dispatched\"}"))
+                                    .then();
                         }))
                 .bindNow(Duration.ofSeconds(5));
     }
