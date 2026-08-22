@@ -164,47 +164,9 @@ one candidate release.
 
 ---
 
-## Priority 5 - Phase One: Bounded Local TTL Cache
+## Priority 5 - Cache Key, Variant, and Isolation Contract
 
-### [ ] 5.1 Integrate a proven local cache implementation
-
-- [ ] Select a maintained local cache implementation with bounded maximum-size
-      eviction and monotonic expiry; do not hand-roll concurrent eviction.
-- [ ] Keep implementation types out of public starter APIs unless deliberately
-      reviewed as long-term extension points.
-- [ ] Decide and verify dependency packaging so cache-disabled consumers do not
-      fail when the optional implementation is absent.
-- [ ] Fail startup clearly only when a client selects caching but the required
-      implementation is unavailable.
-
-### [ ] 5.2 Implement hit, miss, and storage boundaries
-
-- [ ] Build one cold per-subscription cache lookup around eligible declarative
-      invocations.
-- [ ] Return an unexpired hit without auth resolution, resilience admission,
-      redirect, pool acquisition, or HTTP dispatch.
-- [ ] Execute the existing logical-call pipeline once for a phase-one miss and
-      store only its final successful decoded value.
-- [ ] Preserve phase-one behavior where concurrent misses may execute separate
-      loads; do not claim single flight before Priority 7.
-- [ ] Prove hit/miss behavior with deterministic time and dispatch counters.
-
-### [ ] 5.3 Bound expiry, eviction, identity, and lifecycle
-
-- [ ] Enforce hard TTL with monotonic time and maximum-size eviction under
-      concurrent access.
-- [ ] Cover expiry, replacement, size eviction, load failure, cancellation, and
-      factory shutdown without retaining orphaned entries.
-- [ ] Document that cached mutable values are returned by identity and are not
-      copied or serialized solely for caching.
-- [ ] Verify aggregate configured capacity and current size can be inspected
-      without exposing entries or keys.
-
----
-
-## Priority 6 - Cache Key, Variant, and Isolation Contract
-
-### [ ] 6.1 Build a deterministic opaque key
+### [ ] 5.1 Build a deterministic opaque key
 
 - [ ] Include concrete client identity and full resolved method signature in
       every key.
@@ -218,7 +180,7 @@ one candidate release.
 - [ ] Prove no collision across clients, overloads, inherited methods, argument
       order, and configured variants.
 
-### [ ] 6.2 Require explicit response variants
+### [ ] 5.2 Require explicit response variants
 
 - [ ] Define startup-validated selection for path/query inputs and additional
       parameter/header/context partition dimensions.
@@ -230,7 +192,7 @@ one candidate release.
 - [ ] Document that request IDs and correlation IDs are not useful response
       variants and can destroy cache effectiveness.
 
-### [ ] 6.3 Protect key material
+### [ ] 5.3 Protect key material
 
 - [ ] Never export raw or hashed keys through metrics, logs, traces,
       diagnostics, health, or support bundles.
@@ -239,6 +201,47 @@ one candidate release.
       partition values and clear references on eviction.
 - [ ] Add cross-tenant/auth/locale isolation tests and redaction tests for every
       observability surface.
+
+---
+
+## Priority 6 - Phase One: Bounded Local TTL Cache
+
+### [ ] 6.1 Integrate a proven local cache implementation
+
+- [ ] Select a maintained local cache implementation with bounded maximum-size
+      eviction and monotonic expiry; do not hand-roll concurrent eviction.
+- [ ] Keep implementation types out of public starter APIs unless deliberately
+      reviewed as long-term extension points.
+- [ ] Decide and verify dependency packaging so cache-disabled consumers do not
+      fail when the optional implementation is absent.
+- [ ] Fail startup clearly only when a client selects caching but the required
+      implementation is unavailable.
+
+### [ ] 6.2 Implement hit, miss, and storage boundaries
+
+- [ ] Build one cold per-subscription cache lookup around eligible declarative
+      invocations.
+- [ ] Require the validated Priority 5 key/variant decision before any cache
+      lookup or response storage can occur.
+- [ ] Return an unexpired hit without auth resolution, resilience admission,
+      redirect, pool acquisition, or HTTP dispatch.
+- [ ] Execute the existing logical-call pipeline once for a phase-one miss and
+      store only its final successful decoded value.
+- [ ] Preserve phase-one behavior where concurrent misses may execute separate
+      loads; do not claim single flight before Priority 7.
+- [ ] Prove hit/miss behavior with deterministic time and dispatch counters,
+      including auth/tenant/locale variants.
+
+### [ ] 6.3 Bound expiry, eviction, identity, and lifecycle
+
+- [ ] Enforce hard TTL with monotonic time and maximum-size eviction under
+      concurrent access.
+- [ ] Cover expiry, replacement, size eviction, load failure, cancellation, and
+      factory shutdown without retaining orphaned entries.
+- [ ] Document that cached mutable values are returned by identity and are not
+      copied or serialized solely for caching.
+- [ ] Verify aggregate configured capacity and current size can be inspected
+      without exposing entries or keys.
 
 ---
 
@@ -606,4 +609,3 @@ Maven Central provenance. Phase one must remain useful without silently enabling
 phase two, phase three, or phase four exports. Check only the release-decision
 branch that actually occurs; the unchecked mutually exclusive branch remains
 historical context after V27 is archived.
-

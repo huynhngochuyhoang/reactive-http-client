@@ -211,34 +211,7 @@ behavior.
   the public compatibility include set; examples in this roadmap are not used
   as a substitute for that design review.
 
-## 5. Phase One - Bounded Local TTL Cache
-
-Implement the smallest useful cache: local, bounded, expiring, and opt-in.
-
-**Acceptance:**
-
-- Use a proven local cache implementation for maximum-size eviction and expiry;
-  do not implement a custom concurrent eviction algorithm.
-- Cache storage is process-local and bounded by the selected policy's maximum
-  size. The aggregate configured capacity is visible in sanitized diagnostics.
-- TTL is a hard serve boundary measured with a monotonic source. Clock changes
-  cannot make entries immortal or immediately stale.
-- A hit returns the cached materialized value without auth resolution,
-  Resilience4j admission, redirect handling, or transport dispatch.
-- A miss executes the existing logical-call pipeline once for that caller and
-  stores only a successful eligible result after full decoding.
-- Phase one intentionally does not coalesce concurrent misses: two simultaneous
-  misses may perform two loads. This is documented so single flight is not
-  claimed before phase two.
-- Maximum-size eviction, TTL expiry, replacement, cancellation, load failure,
-  and factory shutdown release all cache references deterministically.
-- Cached mutable objects are not copied or re-serialized. Documentation states
-  that callers may observe the same object instance and should use immutable DTOs
-  or copy on their side.
-- A missing optional cache implementation fails startup only for clients that
-  select caching; clients with caching disabled remain unaffected.
-
-## 6. Cache Key, Variant, and Isolation Contract
+## 5. Cache Key, Variant, and Isolation Contract
 
 Make cross-user or cross-tenant reuse impossible without explicit user intent.
 
@@ -263,6 +236,36 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
   opaque one-way representation and is cleared on eviction.
 - Tests prove no collision across clients, overloaded methods, inherited generic
   methods, argument order, tenants, and configured variants.
+
+## 6. Phase One - Bounded Local TTL Cache
+
+Implement the smallest useful cache only after key and variant isolation are
+defined: local, bounded, expiring, and opt-in.
+
+**Acceptance:**
+
+- Use a proven local cache implementation for maximum-size eviction and expiry;
+  do not implement a custom concurrent eviction algorithm.
+- Cache storage is process-local and bounded by the selected policy's maximum
+  size. The aggregate configured capacity is visible in sanitized diagnostics.
+- TTL is a hard serve boundary measured with a monotonic source. Clock changes
+  cannot make entries immortal or immediately stale.
+- No response can be stored until Priority 5 has produced its validated,
+  isolated key and variant decision.
+- A hit returns the cached materialized value without auth resolution,
+  Resilience4j admission, redirect handling, or transport dispatch.
+- A miss executes the existing logical-call pipeline once for that caller and
+  stores only a successful eligible result after full decoding.
+- Phase one intentionally does not coalesce concurrent misses: two simultaneous
+  misses may perform two loads. This is documented so single flight is not
+  claimed before phase two.
+- Maximum-size eviction, TTL expiry, replacement, cancellation, load failure,
+  and factory shutdown release all cache references deterministically.
+- Cached mutable objects are not copied or re-serialized. Documentation states
+  that callers may observe the same object instance and should use immutable DTOs
+  or copy on their side.
+- A missing optional cache implementation fails startup only for clients that
+  select caching; clients with caching disabled remain unaffected.
 
 ## 7. Phase Two - Request Coalescing / Single Flight
 
