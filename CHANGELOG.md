@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Open the V27 major development lane.** Moved reactor-only coordinates and
+  assembled current-consumer/native fixtures to `4.0.0-SNAPSHOT` while keeping
+  public examples plus API, consumer, and benchmark baselines on published
+  `3.6.0`. Added the initial explicit-resilience migration report and a
+  report-only major API lane alongside unchanged strict root and module checks;
+  publication remains deferred until all V27 resilience and cache phases pass.
+
 ## [3.6.0] - 2026-08-22
 
 ### Changed

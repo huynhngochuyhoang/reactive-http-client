@@ -14,41 +14,70 @@ one candidate release.
 
 ## Priority 1 - Post-`3.6.0` Baseline and Major-Lane Integrity
 
-### [ ] 1.1 Prove the published `3.6.0` baseline
+### [x] 1.1 Prove the published `3.6.0` baseline
 
-- [ ] Resolve the parent POM plus starter, test-helper, and OTel POM/JAR/source/
+- [x] Resolve the parent POM plus starter, test-helper, and OTel POM/JAR/source/
       Javadoc artifacts from a previously absent Central-only repository.
-- [ ] Require Maven Central remote markers and record SHA-256 values for every
+- [x] Require Maven Central remote markers and record SHA-256 values for every
       required artifact.
-- [ ] Run strict root and starter-module japicmp against published `3.6.0` from
+- [x] Run strict root and starter-module japicmp against published `3.6.0` from
       separate isolated repositories.
-- [ ] Run published-baseline fixtures for contamination, mixed versions,
+- [x] Run published-baseline fixtures for contamination, mixed versions,
       missing attachments, mismatched POM/JAR versions, and self-comparison.
 
-### [ ] 1.2 Establish the `4.0.0` development lane
+### [x] 1.2 Establish the `4.0.0` development lane
 
-- [ ] Generate and source-control the initial `3.x` to `4.0.0` resilience
+- [x] Generate and source-control the initial `3.x` to `4.0.0` resilience
       migration report, including enabled-only and explicit `default` behavior,
       before changing the reactor version.
-- [ ] Move root, modules, benchmark harness, assembled consumer, and native
+- [x] Move root, modules, benchmark harness, assembled consumer, and native
       fixture from `3.7.0-SNAPSHOT` to `4.0.0-SNAPSHOT` in the same reviewed
       change that updates the baseline guard, migration report, and release lane.
-- [ ] Keep `latest.published.version`, API compatibility, published consumer,
+- [x] Keep `latest.published.version`, API compatibility, published consumer,
       and benchmark baselines on published `3.6.0`.
-- [ ] Add a report-only major API lane without weakening strict checks for
+- [x] Add a report-only major API lane without weakening strict checks for
       unrelated binary/source incompatibilities.
-- [ ] Preserve guards against same-version and locally installed baseline
+- [x] Preserve guards against same-version and locally installed baseline
       resolution for root and module-scoped builds.
 
-### [ ] 1.3 Keep generated readiness and roadmap state honest
+### [x] 1.3 Keep generated readiness and roadmap state honest
 
-- [ ] Report `4.0.0-SNAPSHOT` as development, `3.6.0` as published/API
+- [x] Report `4.0.0-SNAPSHOT` as development, `3.6.0` as published/API
       baseline, and the release candidate as deferred.
-- [ ] Keep V27 as the only active roadmap without rewriting V1-V26 evidence.
-- [ ] Include pending resilience migration, cache phases, API, consumer,
+- [x] Keep V27 as the only active roadmap without rewriting V1-V26 evidence.
+- [x] Include pending resilience migration, cache phases, API, consumer,
       benchmark, AOT, native, and publication work in release readiness.
-- [ ] Run release-documentation tests, reactor validation, and
+- [x] Run release-documentation tests, reactor validation, and
       `git diff --check`.
+
+Evidence recorded on 2026-08-22:
+
+- A previously absent
+  `target/published-baseline-repositories/v27-priority1-3.6.0/` resolved the
+  published parent POM and all three module POM, binary, source, and Javadoc
+  artifacts through `.mvn/maven-central-settings.xml`. The shared provenance
+  verifier accepted all Central markers, declared/embedded versions, and 13
+  SHA-256 records under
+  `target/release-evidence/v27/priority1/published-baseline/`.
+- Strict root and starter-module `api-compatibility` runs passed from separate
+  `api-root-3.6.0` and `api-starter-3.6.0` repositories. The additional
+  `api-major-report-3.6.0` report-only run passed and produced no incompatible
+  rows for starter, test-helper, or OTel; strict runs remain separate CI gates.
+- `scripts/verify-published-baseline-fixtures.sh` rejected local artifacts,
+  mixed candidate versions, missing POM/source/Javadoc files, mismatched
+  project/parent POM versions, mismatched embedded JAR versions, and root/module
+  self-comparison. `scripts/verify-api-compatibility-fixtures.sh` accepted the
+  additive fixture and rejected a source-only checked-exception addition plus
+  constructor, nested-method, and enum removals.
+- [`docs/31-3x-to-4x-resilience-migration.md`](../../docs/31-3x-to-4x-resilience-migration.md)
+  records enabled-only, explicit `default`, named, blank, method-annotation,
+  retry-method, and strict-validation migration behavior before the V27 behavior
+  implementation begins.
+- `DocumentationReleaseArtifactTest` passed all 40 tests. Generated readiness
+  reports `4.0.0-SNAPSHOT`, published/API baseline `3.6.0`, active V27 major
+  lane, a non-published deferred `4.0.0` candidate, and every remaining V27
+  release workstream. `mvn -q -s .mvn/maven-central-settings.xml validate` and
+  `git diff --check` also passed.
 
 ---
 

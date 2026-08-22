@@ -19,6 +19,7 @@ compile_fixture additive
 compile_fixture breaking
 compile_fixture breaking-nested
 compile_fixture breaking-enum
+compile_fixture source-breaking
 
 mvn -q -f "$ROOT_DIR/.github/api-compatibility-fixtures/pom.xml" \
   -Dold.jar="$WORK_DIR/old.jar" \
@@ -52,4 +53,13 @@ if mvn -q -f "$ROOT_DIR/.github/api-compatibility-fixtures/pom.xml" \
   exit 1
 fi
 
-echo "API compatibility fixtures passed: additive API accepted; constructor, nested method, and enum constant removals rejected."
+if mvn -q -f "$ROOT_DIR/.github/api-compatibility-fixtures/pom.xml" \
+    -Dold.jar="$WORK_DIR/old.jar" \
+    -Dnew.jar="$WORK_DIR/source-breaking.jar" \
+    verify \
+    > "$WORK_DIR/source-breaking.log" 2>&1; then
+  echo "Expected checked-exception fixture to fail source compatibility check" >&2
+  exit 1
+fi
+
+echo "API compatibility fixtures passed: additive API accepted; source-only checked exception plus constructor, nested method, and enum constant removals rejected."

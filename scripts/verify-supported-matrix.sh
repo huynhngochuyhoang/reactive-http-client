@@ -27,8 +27,8 @@ WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/reactive-http-client-matrix.XXXXXX")"
 EVIDENCE_ROOT="$WORK_ROOT/evidence"
 REPOSITORY_ROOT="$WORK_ROOT/repositories"
 
-[[ "$PROJECT_VERSION" == "3.7.0-SNAPSHOT" ]] \
-  || fail "expected current development version 3.7.0-SNAPSHOT, found $PROJECT_VERSION"
+[[ "$PROJECT_VERSION" == "4.0.0-SNAPSHOT" ]] \
+  || fail "expected current development version 4.0.0-SNAPSHOT, found $PROJECT_VERSION"
 [[ "$BASELINE_VERSION" == "3.6.0" ]] \
   || fail "expected published API baseline 3.6.0, found $BASELINE_VERSION"
 [[ ! -e "$FINAL_EVIDENCE_ROOT" ]] \
