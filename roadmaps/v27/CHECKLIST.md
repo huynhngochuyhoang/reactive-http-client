@@ -183,6 +183,11 @@ one candidate release.
 
 - [ ] Include concrete client identity and full resolved method signature in
       every key.
+- [ ] Define a canonical typed structural encoding with explicit null markers,
+      scalar type identifiers, length framing, container/element boundaries,
+      and canonical map-entry ordering before key equality or one-way derivation.
+- [ ] Reject delimiter concatenation, `toString()`, identity hash codes, and
+      unframed serialized text as cache-key encodings.
 - [ ] Define deterministic selected-input handling for nulls, primitives,
       strings, arrays, collections, maps, enums, records, and inherited generic
       values.
@@ -194,6 +199,10 @@ one candidate release.
       unsupported values selected as key inputs.
 - [ ] Prove no collision across clients, overloads, inherited methods, argument
       order, and configured variants.
+- [ ] Add adversarial collision tests for null versus `"null"`, scalar values
+      with different types, `("ab", "c")` versus `("a", "bc")`, empty versus
+      absent containers, nested boundaries, and equivalent maps with different
+      iteration order.
 
 ### [ ] 5.2 Require explicit response variants
 

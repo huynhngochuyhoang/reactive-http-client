@@ -230,6 +230,11 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
 
 - Every key includes concrete client identity, full resolved method signature,
   and a deterministic representation of the selected request-varying inputs.
+- Encode key inputs as a canonical typed structure with explicit null markers,
+  scalar type identifiers, length framing, container boundaries, element/index
+  boundaries, and canonical map-entry ordering before equality or one-way
+  derivation. Delimiter concatenation, `toString()`, identity hash codes, and
+  unframed serialized text are not valid key encodings.
 - Path/query values and declared key parameters have stable handling for nulls,
   arrays, collections, maps, inherited generics, and ordering. Each subscription
   freezes one supported argument snapshot and uses that same snapshot for key
@@ -248,7 +253,9 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
   retained as ordinary key text. Any required sensitive partition value uses an
   opaque one-way representation and is cleared on eviction.
 - Tests prove no collision across clients, overloaded methods, inherited generic
-  methods, argument order, tenants, and configured variants.
+  methods, argument order, tenants, and configured variants, including
+  adversarial null/string, scalar-type, prefix/suffix, nested-container, empty,
+  and map-order boundary cases.
 
 ## 6. Phase One - Bounded Local TTL Cache
 
