@@ -159,10 +159,13 @@ one candidate release.
 
 - [ ] Define a cache-aware pre-lookup policy boundary that runs authorization,
       tenant, and other required per-invocation gates before every hit or miss.
-- [ ] Inventory custom `ExchangeFilterFunction` filters installed through
-      `ReactiveHttpClientCustomizer`; reject cache activation unless each is
-      explicitly cache-safe or its required gate exists at the pre-lookup
-      boundary.
+- [ ] Inventory every applicable Boot `WebClientCustomizer` and per-client
+      `ReactiveHttpClientCustomizer`, including filters, `defaultRequest`,
+      exchange-function replacement, codecs/connectors, and other builder
+      mutations.
+- [ ] Classify each customization as cache-safe, represented by a pre-lookup
+      gate or key/variant contribution, or cache-incompatible; reject caching
+      when any applicable customization or later builder mutation is unknown.
 - [ ] Resolve inherited methods, overloads, nested generic bindings, and
       `@ApiRef` cache metadata against the concrete client.
 - [ ] Run the same validation during starter proxy startup, effective-contract
@@ -356,8 +359,10 @@ one candidate release.
 - [ ] Place lookup after mandatory cache-aware policy, authorization, tenant,
       and key-partition gates but before downstream resilience, redirect, pool,
       and transport work.
-- [ ] Reject caching for a client with an unclassified custom WebClient filter;
-      a hit cannot bypass a filter that could reject the current invocation.
+- [ ] Reject caching for a client with any unclassified Boot/per-client
+      customizer or builder mutation; a hit cannot bypass dynamic request,
+      authorization, tenant, exchange-function, filter, codec, connector, or
+      response-transformation behavior.
 - [ ] Keep a miss leader behaviorally identical to an uncached invocation until
       its final successful decoded value is stored.
 - [ ] Make refresh bypass lookup only and reuse the miss auth/resilience/
@@ -420,6 +425,14 @@ one candidate release.
       registry time units.
 - [ ] Export current entry count, configured maximum size, and eviction count
       under starter-specific names that cannot collide with cache-library meters.
+- [ ] Track every cache meter registration as factory-owned state and remove all
+      counters, timers, summaries, and gauges from the `MeterRegistry` during
+      factory destruction.
+- [ ] Prove destroy is idempotent, releases cache references, and prevents late
+      load/refresh completion from recording into removed meters.
+- [ ] Destroy and recreate a factory with the same meter tags against one live
+      registry; verify the replacement gauge observes only the new cache and no
+      stale meter registration is reused.
 - [ ] Verify meter absence when caching is unselected and prove metrics enablement
       cannot activate caching.
 - [ ] Verify a cache-enabled, cache-observability-disabled client records no
@@ -492,6 +505,8 @@ one candidate release.
       refresh, and explicit retry-only activation while counting all dispatches.
 - [ ] Prove factory destruction clears entries and terminates coalesced loads and
       refresh work within the shared shutdown deadline.
+- [ ] Prove destruction removes factory-owned cache meters before same-tag
+      recreation and leaves no registry reference to the closed cache.
 - [ ] Record clean commit, GraalVM/JDK versions, dependency list, executable
       status, and binary SHA-256.
 

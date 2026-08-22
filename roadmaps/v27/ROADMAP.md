@@ -202,10 +202,14 @@ behavior.
 - Define one cache-aware pre-lookup policy boundary that runs for every hit and
   miss before a value can be returned. Authorization, tenant, and other required
   per-invocation gates belong at this boundary.
-- Because `ReactiveHttpClientCustomizer` can install arbitrary
-  `ExchangeFilterFunction` behavior, reject cache activation for clients with
-  unclassified custom filters unless each filter is explicitly declared
-  cache-safe or its required gate is represented at the pre-lookup boundary.
+- Classify every applicable Boot `WebClientCustomizer` and per-client
+  `ReactiveHttpClientCustomizer` before cache activation. Classification covers
+  the complete `WebClient.Builder` mutation surface, including filters,
+  `defaultRequest`, exchange-function replacement, codecs/connectors, and other
+  request/response mutations, not only `ExchangeFilterFunction` values.
+- Each customization must be proven cache-safe, represented by a pre-lookup gate
+  or key/variant contribution, or declared cache-incompatible. Reject caching
+  when any applicable customization or later builder mutation is unclassified.
 - Initial eligibility is restricted to explicitly selected `GET` methods that
   return finite, materialized `Mono<T>` or `Mono<ResponseEntity<T>>` values.
 - `Flux`, `Mono<Void>`, streaming envelopes, `DataBuffer`, publishers,
@@ -359,9 +363,10 @@ side effects.
   circuit-breaker call, rate-limit permit, bulkhead slot, redirect, pool
   acquisition, or HTTP dispatch after mandatory pre-lookup policy/auth/key gates
   have succeeded.
-- Every configured `ReactiveHttpClientCustomizer` filter is classified before
-  caching is allowed. A cache hit cannot bypass an authorization, tenant, or
-  other required pre-dispatch filter.
+- Every Boot/per-client customizer and resulting builder mutation is classified
+  before caching is allowed. A cache hit cannot bypass authorization, tenant,
+  dynamic `defaultRequest`, exchange-function, filter, codec, connector, or
+  response-transformation behavior that affects policy, key identity, or value.
 - A miss leader uses the selected resilience operators exactly as an uncached
   call does. Cache storage occurs only after the final successful decoded result.
 - A refresh load bypasses lookup only and otherwise uses that same miss pipeline,
@@ -408,6 +413,13 @@ telemetry and the established one-terminal-record contract.
 - Current entry count, configured maximum size, and eviction count are exposed
   with starter-specific meter names. Cache keys, argument values, policy names
   supplied from unbounded input, and raw method signatures are never tags.
+- Cache meter registrations are owned by the client factory/cache runtime that
+  created them. Factory destruction removes every cache counter, timer, summary,
+  and gauge from the still-live `MeterRegistry` and releases references to the
+  closed cache before returning.
+- Destroying and recreating a factory with the same meter name/tags registers
+  meters backed by the replacement cache, never a stale strong/weak reference or
+  an old meter returned by Micrometer's duplicate-registration behavior.
 - Meter names, types, units, tag keys, zero-series behavior, and PromQL recipes
   for hit ratio, miss/load rate, coalescing ratio, refresh failure rate, and
   capacity pressure are verified at scrape level.
@@ -462,7 +474,8 @@ Prove the feature outside unit-only invocation paths.
 - Native smoke proves one cached read and explicit retry-only activation while
   counting all loopback dispatches.
 - Factory destruction clears cache state and terminates in-flight loads and
-  refreshes under the existing shared shutdown deadline.
+  refreshes under the existing shared shutdown deadline, then deregisters every
+  factory-owned cache meter idempotently.
 
 ## 12. Performance and Allocation Evidence
 
