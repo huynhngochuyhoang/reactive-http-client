@@ -5,14 +5,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.ClassUtils;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
@@ -39,6 +37,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
     private final ClassLoader classLoader;
     private final LongSupplier ticker;
     private final Map<PolicyBounds, LocalResponseCache> caches = new LinkedHashMap<>();
+    private final Map<FlightKey, InFlightLoad> inFlightLoads = new HashMap<>();
+    private final Sinks.Empty<Void> shutdown = Sinks.empty();
     private final AtomicBoolean closed = new AtomicBoolean();
 
     private LocalResponseCacheManager(ClassLoader classLoader, LongSupplier ticker) {
@@ -92,6 +92,45 @@ final class LocalResponseCacheManager implements AutoCloseable {
             }
 
             LocalResponseCache.LoadToken token = lookup.loadToken();
+            if (selection.policy().isSingleFlight()) {
+                return coalescedLoad(cache, key, token, loader, responseMetadata);
+            }
+            return load(cache, token, loader, responseMetadata);
+        });
+    }
+
+    private Mono<?> coalescedLoad(LocalResponseCache cache,
+                                  CacheKeyContract.OpaqueKey key,
+                                  LocalResponseCache.LoadToken token,
+                                  Supplier<Mono<?>> loader,
+                                  Supplier<ResponseMetadata> responseMetadata) {
+        FlightKey flightKey = new FlightKey(cache, key);
+        synchronized (inFlightLoads) {
+            if (closed.get()) {
+                cache.finish(token);
+                return Mono.error(new IllegalStateException("The local response cache has been closed"));
+            }
+            InFlightLoad existing = inFlightLoads.get(flightKey);
+            if (existing != null) {
+                cache.finish(token);
+                return existing.publisher;
+            }
+
+            InFlightLoad created = new InFlightLoad();
+            Mono<?> source = load(cache, token, loader, responseMetadata)
+                    .takeUntilOther(shutdown.asMono())
+                    .doFinally(ignored -> removeFlight(flightKey, created));
+            created.publisher = source.share();
+            inFlightLoads.put(flightKey, created);
+            return created.publisher;
+        }
+    }
+
+    private Mono<?> load(LocalResponseCache cache,
+                         LocalResponseCache.LoadToken token,
+                         Supplier<Mono<?>> loader,
+                         Supplier<ResponseMetadata> responseMetadata) {
+        return Mono.defer(() -> {
             Mono<?> source;
             try {
                 source = loader.get();
@@ -110,6 +149,12 @@ final class LocalResponseCacheManager implements AutoCloseable {
         });
     }
 
+    private void removeFlight(FlightKey key, InFlightLoad flight) {
+        synchronized (inFlightLoads) {
+            inFlightLoads.remove(key, flight);
+        }
+    }
+
     Snapshot snapshot() {
         synchronized (caches) {
             long capacity = 0;
@@ -126,6 +171,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
     public void close() {
         if (!closed.compareAndSet(false, true)) {
             return;
+        }
+        shutdown.tryEmitEmpty();
+        synchronized (inFlightLoads) {
+            inFlightLoads.clear();
         }
         synchronized (caches) {
             caches.values().forEach(LocalResponseCache::close);
@@ -248,5 +297,12 @@ final class LocalResponseCacheManager implements AutoCloseable {
     }
 
     private record PolicyBounds(String policyName, long ttlMs, long maximumSize) {
+    }
+
+    private record FlightKey(LocalResponseCache cache, CacheKeyContract.OpaqueKey key) {
+    }
+
+    private static final class InFlightLoad {
+        private Mono<?> publisher;
     }
 }

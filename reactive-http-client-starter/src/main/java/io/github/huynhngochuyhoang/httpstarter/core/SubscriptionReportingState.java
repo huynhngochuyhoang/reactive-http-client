@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 final class SubscriptionReportingState {
 
     private final AtomicReference<String> generatedIdempotencyKey = new AtomicReference<>();
-    private final RequestArgumentResolver.ResolvedArgs initialResolved;
+    private final AtomicReference<RequestArgumentResolver.ResolvedArgs> initialResolved;
     private final AtomicInteger attemptCount = new AtomicInteger();
     private final long startedAtNanos;
     private final AtomicBoolean firstAttempt = new AtomicBoolean(true);
@@ -23,8 +23,14 @@ final class SubscriptionReportingState {
     private final AtomicReference<TerminalSnapshot> terminalSnapshot = new AtomicReference<>();
 
     SubscriptionReportingState(RequestArgumentResolver.ResolvedArgs initialResolved) {
-        this.initialResolved = initialResolved;
+        this.initialResolved = new AtomicReference<>(initialResolved);
         this.startedAtNanos = System.nanoTime();
+    }
+
+    void prepareInitialResolved(RequestArgumentResolver.ResolvedArgs resolved) {
+        if (attemptCount.get() == 0 && terminalSnapshot.get() == null) {
+            initialResolved.set(resolved);
+        }
     }
 
     AtomicReference<String> generatedIdempotencyKey() {
@@ -82,7 +88,7 @@ final class SubscriptionReportingState {
         AttemptEvidence evidence = attempt != null ? attempt.evidence() : AttemptEvidence.empty();
         TerminalSnapshot candidate = new TerminalSnapshot(
                 signal,
-                attempt != null ? attempt.preparedResolved() : initialResolved,
+                attempt != null ? attempt.preparedResolved() : initialResolved.get(),
                 evidence.requestUrl(),
                 evidence.finalRequestObservation(),
                 elapsedMillis(),

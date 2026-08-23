@@ -598,42 +598,62 @@ Evidence recorded on 2026-08-23:
 
 ## Priority 7 - Phase Two: Request Coalescing / Single Flight
 
-### [ ] 7.1 Add separately opt-in single flight
+### [x] 7.1 Add separately opt-in single flight
 
-- [ ] Keep single flight disabled unless the selected cache policy enables it.
-- [ ] Share exactly one in-flight load for concurrent misses of the same key.
-- [ ] Keep different keys, clients, methods, and policies independent.
-- [ ] Prove one transport dispatch and one request-body subscription with
+- [x] Keep single flight disabled unless the selected cache policy enables it.
+- [x] Share exactly one in-flight load for concurrent misses of the same key.
+- [x] Keep different keys, clients, methods, and policies independent.
+- [x] Prove one transport dispatch and one request-body subscription with
       latches/barriers rather than sleep-only timing.
 
-### [ ] 7.2 Preserve caller subscription ownership
+### [x] 7.2 Preserve caller subscription ownership
 
-- [ ] Give every waiter its own subscription-local timeout, cancellation, and
+- [x] Give every waiter its own subscription-local timeout, cancellation, and
       one terminal lifecycle/observer/exchange record.
-- [ ] Keep the shared load alive while any caller remains interested; the first
+- [x] Keep the shared load alive while any caller remains interested; the first
       caller's outer logical timeout must detach only that caller rather than
       terminating the load for later waiters.
-- [ ] Keep request/attempt timeouts and any explicit shared-load safety bound
+- [x] Keep request/attempt timeouts and any explicit shared-load safety bound
       effective without borrowing one caller's logical deadline.
-- [ ] Ensure cancelling one waiter does not cancel a load required by another.
-- [ ] Define and test cancellation when the last interested caller leaves;
+- [x] Ensure cancelling one waiter does not cancel a load required by another.
+- [x] Define and test cancellation when the last interested caller leaves;
       abandoned work cannot populate the cache accidentally.
-- [ ] Fan out load success, error, empty completion, and cancellation
+- [x] Fan out load success, error, empty completion, and cancellation
       deterministically, then remove completed/failed in-flight state.
-- [ ] Prove slow/failed keys do not hold a global lock or block unrelated keys.
-- [ ] Deterministically prove both timeout directions: waiter timeout with first
+- [x] Prove slow/failed keys do not hold a global lock or block unrelated keys.
+- [x] Deterministically prove both timeout directions: waiter timeout with first
       caller success, and first-caller timeout with later waiter success.
 
-### [ ] 7.3 Keep hidden replay inside the leader
+### [x] 7.3 Keep hidden replay inside the leader
 
-- [ ] Run Retry, one-time auth replay, redirects, and transport dispatch only in
+- [x] Run Retry, one-time auth replay, redirects, and transport dispatch only in
       the leader load.
-- [ ] Prevent each waiter from consuming resilience permits or creating hidden
+- [x] Prevent each waiter from consuming resilience permits or creating hidden
       replays.
-- [ ] Keep each waiter's terminal cache outcome distinct from the leader's HTTP
+- [x] Keep each waiter's terminal cache outcome distinct from the leader's HTTP
       attempt and dispatch facts.
-- [ ] Cover waiter timeout/cancellation while the leader retries, redirects, or
+- [x] Cover waiter timeout/cancellation while the leader retries, redirects, or
       refreshes auth.
+
+Evidence recorded on 2026-08-23:
+
+- `single-flight` is a default-false cache-policy property and is included in
+  generated configuration metadata and effective-contract snapshots.
+  `LocalResponseCacheManager` owns one reference-counted in-flight publisher
+  per cache and opaque key; phase-one duplicate-miss behavior is unchanged
+  when the property is false.
+- Subscription-local reporting wraps each coalesced caller. Logical-call
+  deadlines and cancellation detach only that caller, while request/attempt
+  timeouts remain inside the shared leader. Last-caller cancellation and
+  factory shutdown cancel the load without publishing a late cache entry.
+- `BoundedLocalResponseCacheContractTest` uses virtual time, latches, a real
+  Reactor Netty redirect server, an auth-refresh-plus-retry fixture, and a real
+  body inserter to prove both timeout directions, one dispatch/body
+  subscription, independent keys/policies, deterministic terminal fan-out,
+  leader-only replay, and waiter cancellation during replay.
+- Focused cache/configuration/contract tests pass `81` tests. The complete
+  reactor passes starter `1168`, test-helper `55`, and OTel `52` tests with
+  zero failures, errors, or skips.
 
 ---
 
