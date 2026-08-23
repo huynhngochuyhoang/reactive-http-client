@@ -77,6 +77,13 @@ final class LocalResponseCacheManager implements AutoCloseable {
     Mono<?> getOrLoad(EffectiveCachePolicy.Selection selection,
                       CacheKeyContract.OpaqueKey key,
                       Supplier<Mono<?>> loader) {
+        return getOrLoad(selection, key, loader, ResponseMetadata::successWithoutHeaders);
+    }
+
+    Mono<?> getOrLoad(EffectiveCachePolicy.Selection selection,
+                      CacheKeyContract.OpaqueKey key,
+                      Supplier<Mono<?>> loader,
+                      Supplier<ResponseMetadata> responseMetadata) {
         return Mono.defer(() -> {
             LocalResponseCache cache = cache(selection, "unknown");
             LocalResponseCache.Lookup lookup = cache.lookup(key);
@@ -95,7 +102,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
             return source
                     .doOnSuccess(value -> {
                         if (value != null) {
-                            cacheCandidate(value).ifPresent(candidate -> cache.publish(token, candidate));
+                            cacheCandidate(value, responseMetadata.get())
+                                    .ifPresent(candidate -> cache.publish(token, candidate));
                         }
                     })
                     .doFinally(ignored -> cache.finish(token));
@@ -136,6 +144,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
         PolicyBounds bounds = new PolicyBounds(selection.policyName(), policy.getTtlMs(), policy.getMaximumSize());
         synchronized (caches) {
+            if (closed.get()) {
+                throw new IllegalStateException(
+                        "The local response cache for client '" + clientName + "' has been closed");
+            }
             return caches.computeIfAbsent(bounds, ignored -> newCache(selection.policyName(), clientName, bounds));
         }
     }
@@ -149,17 +161,18 @@ final class LocalResponseCacheManager implements AutoCloseable {
         return new CaffeineLocalResponseCache(bounds.ttlMs, bounds.maximumSize, ticker);
     }
 
-    private java.util.Optional<Object> cacheCandidate(Object value) {
+    private java.util.Optional<Object> cacheCandidate(Object value, ResponseMetadata responseMetadata) {
+        if (responseMetadata != null
+                && (isRedirect(responseMetadata.statusCode())
+                || hasNonCacheableHeaders(responseMetadata.headers()))) {
+            return java.util.Optional.empty();
+        }
         if (!(value instanceof ResponseEntity<?> entity)) {
             return java.util.Optional.of(value);
         }
-        for (Map.Entry<String, java.util.List<String>> header : entity.getHeaders().headerSet()) {
-            String headerName = header.getKey();
-            String normalized = headerName.toLowerCase(Locale.ROOT);
-            if (SensitiveHeaders.isSensitive(headerName)
-                    || NON_CACHEABLE_RESPONSE_HEADERS.contains(normalized)) {
-                return java.util.Optional.empty();
-            }
+        if (isRedirect(entity.getStatusCode().value())
+                || hasNonCacheableHeaders(entity.getHeaders())) {
+            return java.util.Optional.empty();
         }
         HttpHeaders retained = new HttpHeaders();
         int retainedValues = 0;
@@ -189,7 +202,49 @@ final class LocalResponseCacheManager implements AutoCloseable {
         return java.util.Optional.of(new ResponseEntity<>(entity.getBody(), retained, entity.getStatusCode()));
     }
 
+    private boolean hasNonCacheableHeaders(Map<String, ? extends java.util.List<String>> headers) {
+        return hasNonCacheableHeaderNames(headers.keySet());
+    }
+
+    private boolean hasNonCacheableHeaders(HttpHeaders headers) {
+        return hasNonCacheableHeaderNames(
+                headers.headerSet().stream().map(Map.Entry::getKey).toList());
+    }
+
+    private boolean hasNonCacheableHeaderNames(Iterable<String> headerNames) {
+        for (String headerName : headerNames) {
+            String normalized = headerName.toLowerCase(Locale.ROOT);
+            if (SensitiveHeaders.isSensitive(headerName)
+                    || NON_CACHEABLE_RESPONSE_HEADERS.contains(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isRedirect(int statusCode) {
+        return statusCode >= 300 && statusCode < 400;
+    }
+
     record Snapshot(int policyCount, long configuredCapacity, long currentSize, boolean closed) {
+    }
+
+    record ResponseMetadata(int statusCode, Map<String, java.util.List<String>> headers) {
+
+        ResponseMetadata {
+            if (headers == null || headers.isEmpty()) {
+                headers = Map.of();
+            }
+            else {
+                Map<String, java.util.List<String>> copied = new LinkedHashMap<>();
+                headers.forEach((name, values) -> copied.put(name, java.util.List.copyOf(values)));
+                headers = Map.copyOf(copied);
+            }
+        }
+
+        static ResponseMetadata successWithoutHeaders() {
+            return new ResponseMetadata(200, Map.of());
+        }
     }
 
     private record PolicyBounds(String policyName, long ttlMs, long maximumSize) {

@@ -12,6 +12,7 @@ import reactor.core.publisher.Mono;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * WebClient filter that resolves and injects auth information for outbound requests.
@@ -34,13 +35,19 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
                 .orElse(null);
         AuthRequest authRequest = new AuthRequest(clientName, request, requestBody);
         Mono<ClientRequest> authorizedRequest = request.attribute(AuthRequest.PRE_RESOLVED_AUTH_CONTEXT_ATTRIBUTE)
-                .filter(AuthContext.class::isInstance)
-                .map(AuthContext.class::cast)
+                .map(this::consumePreResolvedAuth)
                 .map(authContext -> Mono.just(applyAuth(request, authContext)))
                 .orElseGet(() -> resolveAuthorizedRequest(request, authRequest));
         return authorizedRequest
                 .flatMap(next::exchange)
                 .flatMap(response -> retryOnceOnUnauthorized(response, request, authRequest, next));
+    }
+
+    private AuthContext consumePreResolvedAuth(Object attribute) {
+        Object value = attribute instanceof AtomicReference<?> reference
+                ? reference.getAndSet(null)
+                : attribute;
+        return value instanceof AuthContext authContext ? authContext : null;
     }
 
     private Mono<ClientRequest> resolveAuthorizedRequest(ClientRequest request, AuthRequest authRequest) {

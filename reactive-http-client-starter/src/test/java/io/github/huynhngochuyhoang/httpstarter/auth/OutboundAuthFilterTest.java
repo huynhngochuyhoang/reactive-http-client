@@ -16,8 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -147,6 +146,63 @@ class OutboundAuthFilterTest {
                 .verifyComplete();
         assertTrue(capturedBody.get() instanceof byte[]);
         org.junit.jupiter.api.Assertions.assertArrayEquals(raw, (byte[]) capturedBody.get());
+    }
+
+    @Test
+    void shouldConsumePreResolvedAuthOnlyForTheFirstOuterAttempt() {
+        AtomicInteger providerCalls = new AtomicInteger();
+        AuthProvider authProvider = request -> {
+            providerCalls.incrementAndGet();
+            return Mono.just(AuthContext.builder()
+                    .header("Authorization", "Bearer current")
+                    .build());
+        };
+        AtomicReference<AuthContext> preResolved = new AtomicReference<>(AuthContext.builder()
+                .header("Authorization", "Bearer initial")
+                .build());
+        ClientRequest request = ClientRequest.create(
+                        HttpMethod.GET, URI.create("https://api.test.local/users"))
+                .attribute(AuthRequest.PRE_RESOLVED_AUTH_CONTEXT_ATTRIBUTE, preResolved)
+                .build();
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+        java.util.List<String> authorizationHeaders = new java.util.ArrayList<>();
+
+        filter.filter(request, authorized -> {
+            authorizationHeaders.add(authorized.headers().getFirst("Authorization"));
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        }).block();
+        filter.filter(request, authorized -> {
+            authorizationHeaders.add(authorized.headers().getFirst("Authorization"));
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        }).block();
+
+        assertEquals(java.util.List.of("Bearer initial", "Bearer current"), authorizationHeaders);
+        assertEquals(1, providerCalls.get());
+        assertNull(preResolved.get());
+    }
+
+    @Test
+    void shouldKeepDirectPreResolvedAuthContextCompatibility() {
+        AtomicInteger providerCalls = new AtomicInteger();
+        AuthProvider authProvider = request -> {
+            providerCalls.incrementAndGet();
+            return Mono.just(AuthContext.empty());
+        };
+        ClientRequest request = ClientRequest.create(
+                        HttpMethod.GET, URI.create("https://api.test.local/users"))
+                .attribute(AuthRequest.PRE_RESOLVED_AUTH_CONTEXT_ATTRIBUTE, AuthContext.builder()
+                        .header("Authorization", "Bearer direct")
+                        .build())
+                .build();
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+
+        ClientResponse response = filter.filter(request, authorized -> {
+            assertEquals("Bearer direct", authorized.headers().getFirst("Authorization"));
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        }).block();
+
+        assertEquals(HttpStatus.OK, response.statusCode());
+        assertEquals(0, providerCalls.get());
     }
 
     @Test

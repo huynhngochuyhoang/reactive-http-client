@@ -94,11 +94,17 @@ capacity, and current size; entries and opaque keys are not inspectable.
 
 Lookup is cold and repeats for every subscription. Mandatory key, request
 variant, and configured `AuthProvider` checks run before a value can be returned.
+The per-subscription logical-call timeout, when configured, starts before cache
+body preparation and authorization, so those gates cannot make either a hit or
+miss exceed the end-to-end budget. Selected Reactor-context variants are frozen
+once and that same context snapshot is visible to pre-lookup authorization.
 On a hit, the existing HTTP load publisher is not constructed or subscribed, so
 the call consumes no downstream resilience permit, redirect, pool acquisition,
 or transport dispatch. On a miss, the existing decoded `Mono` pipeline runs and
-the pre-resolved auth context is reused by the outbound auth filter. A failure,
-empty completion, or cancellation releases the miss token without storing.
+the pre-resolved auth context is consumed only by its first outer attempt. A
+Resilience4j retry resolves current auth again; the filter's one-time 401
+invalidation/replay remains inside that attempt. A failure, empty completion,
+or cancellation releases the miss token without storing.
 
 Phase one deliberately does not coalesce misses. Concurrent same-key callers
 may each dispatch. The first successful completion observed for that key and
@@ -111,6 +117,12 @@ does not copy or serialize a decoded value solely for caching. Prefer immutable
 DTOs; callers that mutate a cached object must copy it on their side. A cached
 `ResponseEntity` is rebuilt only to retain the bounded safe header subset; its
 body retains the decoded object identity.
+
+Response cacheability is decided from the final wire status and headers for
+both plain `Mono<T>` and `Mono<ResponseEntity<T>>` contracts. Redirect responses
+are never stored. Responses carrying credential, cookie, authentication
+challenge, or another sensitive header are also never stored, even though a
+plain-body return type does not expose those headers to application code.
 
 ## Key and variant isolation
 

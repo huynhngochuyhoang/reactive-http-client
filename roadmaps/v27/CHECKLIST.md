@@ -560,10 +560,13 @@ Evidence recorded on 2026-08-23:
   destruction invalidates all entries before transport disposal and advances
   the closed generation so late loads cannot publish.
 - Declarative cache lookup is cold per subscription and occurs only after the
-  Priority 5 opaque key is derived. Configured auth resolves before lookup and
-  its result is reused by `OutboundAuthFilter` on a miss. A hit does not build
-  or subscribe the existing load pipeline, so it consumes no resilience
-  operator or HTTP dispatch.
+  Priority 5 opaque key is derived. The logical-call deadline starts before
+  cache preparation and authorization, and the frozen context variant snapshot
+  is applied to authorization and lookup. Configured auth resolves before
+  lookup and its result is consumed once by `OutboundAuthFilter`; later
+  resilience attempts resolve current auth while one-time 401 replay remains
+  attempt-local. A hit does not build or subscribe the existing load pipeline,
+  so it consumes no resilience operator or HTTP dispatch.
 - Phase-one misses remain independent. Generation-checked publication makes the
   first successful completion win without replacing its value/TTL; deterministic
   reversed-completion and eviction tests prove late duplicates cannot restore
@@ -571,11 +574,15 @@ Evidence recorded on 2026-08-23:
   capacity eviction, and shutdown create no orphaned entry.
 - Cached values retain decoded object identity. `ResponseEntity` hits retain
   status/body identity plus an allowlisted 32-value/16-KiB representation-header
-  subset; credential/session/auth-challenge or oversized headers make the
-  response non-cacheable.
-- `BoundedLocalResponseCacheContractTest` passes `12` deterministic contracts,
-  including the real factory-destroy path. The complete reactor test run passes
-  starter `1147`, test-helper `55`, and OTel `52` tests with zero failures,
+  subset. Redirects and credential/session/auth-challenge responses are
+  non-cacheable for both plain bodies and `ResponseEntity`; oversized retained
+  headers are also non-cacheable.
+- `BoundedLocalResponseCacheContractTest` passes `15` deterministic contracts,
+  including the real factory-destroy path, wire-header/redirect rejection,
+  retry/auth freshness, frozen pre-lookup context, and hit-path logical timeout.
+  `OutboundAuthFilterTest` passes `13` contracts, including compatibility for
+  the prior direct pre-resolved attribute form. The complete reactor passes
+  starter `1152`, test-helper `55`, and OTel `52` tests with zero failures,
   errors, or skips. An isolated assembled-consumer dependency tree contains the
   starter but no Caffeine artifact, and `git diff --check` passes.
 

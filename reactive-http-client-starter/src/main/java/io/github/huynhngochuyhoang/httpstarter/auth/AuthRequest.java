@@ -18,7 +18,7 @@ public record AuthRequest(String clientName, ClientRequest request, Object reque
      * Internal request attribute key used to pass serialized raw bytes for auth signing.
      */
     public static final String REQUEST_RAW_BODY_ATTRIBUTE = "reactive-http-client.auth.request-raw-body";
-    /** Internal request attribute carrying auth resolved before a response-cache lookup. */
+    /** Internal request attribute carrying a one-shot auth reference resolved before a cache lookup. */
     public static final String PRE_RESOLVED_AUTH_CONTEXT_ATTRIBUTE =
             "reactive-http-client.auth.pre-resolved-context";
     /** Internal request attribute used to reset final-request observation before auth retry. */

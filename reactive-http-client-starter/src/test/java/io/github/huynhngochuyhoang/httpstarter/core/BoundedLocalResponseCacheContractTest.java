@@ -2,8 +2,10 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
+import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.StaticApplicationContext;
@@ -26,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.*;
@@ -446,6 +449,237 @@ class BoundedLocalResponseCacheContractTest {
         }
     }
 
+    @Test
+    void plainSensitiveResponsesAndRedirectEnvelopesAreNeverCached() {
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        config.getCache().getPolicies().get("local").setVaryByParameters(List.of("partition"));
+        AtomicInteger plainDispatches = new AtomicInteger();
+        AtomicInteger redirectDispatches = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .exchangeFunction(request -> {
+                    if (request.url().getPath().startsWith("/plain/")) {
+                        return Mono.just(ClientResponse.create(HttpStatus.OK)
+                                .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                                .header(HttpHeaders.SET_COOKIE, "SESSION=private")
+                                .body("plain-" + plainDispatches.incrementAndGet())
+                                .build());
+                    }
+                    int dispatch = redirectDispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.FOUND)
+                            .header(HttpHeaders.LOCATION, "/target-" + dispatch)
+                            .body("redirect-" + dispatch)
+                            .build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+            ResponseCacheClient client = responseCacheClient(webClient, config, context, manager);
+
+            assertThat(client.plain("42", "tenant-a").block()).isEqualTo("plain-1");
+            assertThat(client.plain("42", "tenant-a").block()).isEqualTo("plain-2");
+
+            ResponseEntity<String> first = client.redirect("42", "tenant-a").block();
+            ResponseEntity<String> second = client.redirect("42", "tenant-a").block();
+            assertThat(first.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+            assertThat(first.getHeaders().getLocation()).hasPath("/target-1");
+            assertThat(second.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+            assertThat(second.getHeaders().getLocation()).hasPath("/target-2");
+        }
+
+        assertThat(plainDispatches).hasValue(2);
+        assertThat(redirectDispatches).hasValue(2);
+    }
+
+    @Test
+    void cacheAuthorizationUsesFrozenContextAndTheLogicalCallBudgetOnHits() {
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        config.setAuthProvider("cache-auth");
+        config.setLogicalCallTimeoutMs(75L);
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                config.getCache().getPolicies().get("local");
+        policy.setVaryByParameters(List.of("principal", "tenant"));
+        policy.setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        policy.setVaryByContext(List.of("region"));
+        AtomicReference<List<String>> callerRegion = new AtomicReference<>();
+        AtomicReference<List<String>> observedRegion = new AtomicReference<>();
+        AtomicBoolean stall = new AtomicBoolean();
+        AtomicInteger dispatches = new AtomicInteger();
+        io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider = request ->
+                Mono.deferContextual(context -> {
+                    callerRegion.get().set(0, "mutated-after-key");
+                    observedRegion.set(List.copyOf(context.get("region")));
+                    if (stall.get()) {
+                        return Mono.never();
+                    }
+                    return Mono.just(AuthContext.empty());
+                });
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .filter(new OutboundAuthFilter("cache-client", authProvider))
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body("dispatch-" + dispatches.incrementAndGet())
+                        .build()))
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+            CacheClient client = cacheClient(webClient, config, context, manager,
+                    new NoopResilienceOperatorApplier(), authProvider);
+
+            List<String> fillRegion = new ArrayList<>(List.of("apac"));
+            callerRegion.set(fillRegion);
+            assertThat(client.get("42", "principal-a", "tenant-a", "en-US")
+                    .contextWrite(contextView -> contextView.put("region", fillRegion))
+                    .block()).isEqualTo("dispatch-1");
+            assertThat(observedRegion.get()).containsExactly("apac");
+
+            List<String> hitRegion = new ArrayList<>(List.of("apac"));
+            callerRegion.set(hitRegion);
+            stall.set(true);
+            assertThatThrownBy(() -> client.get("42", "principal-a", "tenant-a", "en-US")
+                    .contextWrite(contextView -> contextView.put("region", hitRegion))
+                    .block(Duration.ofSeconds(1)))
+                    .satisfies(error -> assertThat(hasCause(error, LogicalCallTimeoutException.class)).isTrue());
+            assertThat(observedRegion.get()).containsExactly("apac");
+            assertThat(dispatches).hasValue(1);
+        }
+    }
+
+    @Test
+    void resilienceRetryResolvesCurrentAuthAfterTheOneTimeUnauthorizedReplay() {
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        config.setAuthProvider("cache-auth");
+        config.getCache().getPolicies().get("local")
+                .setVaryByParameters(List.of("principal", "tenant"));
+        config.getCache().getPolicies().get("local")
+                .setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("cache-retry");
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger invalidations = new AtomicInteger();
+        AtomicInteger staleDispatches = new AtomicInteger();
+        AtomicInteger freshDispatches = new AtomicInteger();
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest request) {
+                String credential = authCalls.incrementAndGet() == 1 ? "stale" : "fresh";
+                return Mono.just(AuthContext.builder()
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + credential)
+                        .build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                invalidations.incrementAndGet();
+                return Mono.empty();
+            }
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .filter(new OutboundAuthFilter("cache-client", authProvider))
+                .exchangeFunction(request -> {
+                    String authorization = request.headers().getFirst(HttpHeaders.AUTHORIZATION);
+                    if ("Bearer stale".equals(authorization)) {
+                        staleDispatches.incrementAndGet();
+                        return Mono.just(ClientResponse.create(HttpStatus.UNAUTHORIZED).build());
+                    }
+                    int dispatch = freshDispatches.incrementAndGet();
+                    if (dispatch == 1) {
+                        return Mono.just(ClientResponse.create(HttpStatus.SERVICE_UNAVAILABLE)
+                                .body("retry")
+                                .build());
+                    }
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("authorized")
+                            .build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            CacheClient client = cacheClient(
+                    webClient,
+                    config,
+                    context,
+                    LocalResponseCacheManager.testing(System::nanoTime),
+                    new RetryOnceApplier(),
+                    authProvider);
+
+            assertThat(client.get("42", "principal-a", "tenant-a", "en-US").block())
+                    .isEqualTo("authorized");
+        }
+
+        assertThat(authCalls).hasValue(3);
+        assertThat(invalidations).hasValue(1);
+        assertThat(staleDispatches).hasValue(1);
+        assertThat(freshDispatches).hasValue(2);
+    }
+
+    private CacheClient cacheClient(
+            WebClient webClient,
+            ReactiveHttpClientProperties.ClientConfig config,
+            AnnotationConfigApplicationContext context,
+            LocalResponseCacheManager manager,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider) {
+        ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                webClient,
+                new MethodMetadataCache(),
+                new RequestArgumentResolver(),
+                new DefaultErrorDecoder(),
+                config,
+                "cache-client",
+                CacheClient.class,
+                context,
+                resilienceOperatorApplier,
+                TestJsonCodecs.jsonCodec(),
+                new ReactiveHttpClientProperties.ObservabilityConfig(),
+                manager,
+                authProvider,
+                "http://cache.test");
+        return (CacheClient) Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{CacheClient.class}, handler);
+    }
+
+    private ResponseCacheClient responseCacheClient(
+            WebClient webClient,
+            ReactiveHttpClientProperties.ClientConfig config,
+            AnnotationConfigApplicationContext context,
+            LocalResponseCacheManager manager) {
+        ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                webClient,
+                new MethodMetadataCache(),
+                new RequestArgumentResolver(),
+                new DefaultErrorDecoder(),
+                config,
+                "response-cache-client",
+                ResponseCacheClient.class,
+                context,
+                new NoopResilienceOperatorApplier(),
+                TestJsonCodecs.jsonCodec(),
+                new ReactiveHttpClientProperties.ObservabilityConfig(),
+                manager);
+        return (ResponseCacheClient) Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{ResponseCacheClient.class}, handler);
+    }
+
+    private static boolean hasCause(Throwable error, Class<? extends Throwable> expectedType) {
+        Throwable current = error;
+        while (current != null) {
+            if (expectedType.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
     private static String load(LocalResponseCacheManager manager,
                                EffectiveCachePolicy.Selection selection,
                                CacheKeyContract.OpaqueKey key,
@@ -491,6 +725,28 @@ class BoundedLocalResponseCacheContractTest {
                          @CacheKey("principal") String principal,
                          @CacheKey("tenant") String tenant,
                          @HeaderParam("Accept-Language") String language);
+    }
+
+    @ReactiveHttpClient(name = "response-cache-client")
+    interface ResponseCacheClient {
+        @GET("/plain/{id}")
+        Mono<String> plain(@PathVar("id") String id, @CacheKey("partition") String partition);
+
+        @GET("/redirect/{id}")
+        Mono<ResponseEntity<String>> redirect(
+                @PathVar("id") String id, @CacheKey("partition") String partition);
+    }
+
+    private static final class RetryOnceApplier extends NoopResilienceOperatorApplier {
+        @Override
+        public <T> Mono<T> applyRetry(Mono<T> mono, String instanceName) {
+            return mono.retry(1);
+        }
+
+        @Override
+        public boolean canRetryMoreThanOnce(String instanceName) {
+            return true;
+        }
     }
 
     private static final class RecordingCircuitBreakerApplier extends NoopResilienceOperatorApplier {
