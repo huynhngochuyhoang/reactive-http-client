@@ -242,16 +242,20 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
   freezes one supported argument snapshot and uses that same snapshot for key
   construction and request materialization. Mutable or nested values that cannot
   be copied safely are rejected rather than retained as live key/request state.
+  Arrays in path/query positions are rejected until request-target conversion
+  has a stable structural projection rather than identity-based `String.valueOf`.
 - Request-bound selected collections preserve the same element order used by
   URI, header, and body materialization. Canonical set ordering applies only to
   selected values whose wire representation is not order-sensitive.
 - One cumulative element budget includes container members, optional values,
-  and record components, and one cumulative byte budget is enforced while
-  nested canonical frames are written rather than after materialization.
+  and record components. Startup and runtime count one level per nested record.
+  One cumulative byte budget is enforced while nested canonical frames are
+  written, and UTF-8 scalar sizes are checked before encoded arrays are allocated.
 - Header-, locale-, tenant-, Reactor-context-, or auth-dependent responses
   require explicit variant/partition inputs or an explicit shared-response
   acknowledgement. The starter never silently assumes such responses are
-  globally shareable.
+  globally shareable. The universally required, potentially absent effective
+  idempotency header does not by itself prove authenticated identity isolation.
 - The conventional context-only `Idempotency-Key` header is an available header
   variant for every selected policy and must be partitioned or explicitly
   acknowledged as shared.

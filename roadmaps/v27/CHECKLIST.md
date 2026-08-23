@@ -352,6 +352,12 @@ Evidence recorded on 2026-08-22:
       the canonical byte cap while nested frames are written.
 - [x] Preserve wire iteration order when a selected set is also request-bound;
       keep canonical set sorting only for non-request variants.
+- [x] Count one depth level per nested record in both startup validation and
+      runtime freezing, including a valid 17-record scalar chain.
+- [x] Reject array-valued path/query shapes whose current `String.valueOf` wire
+      projection would change when the per-subscription snapshot is copied.
+- [x] Preflight UTF-8 scalar length against the remaining canonical byte budget
+      before allocating encoded scalar bytes.
 
 ### [x] 5.2 Require explicit response variants
 
@@ -365,6 +371,9 @@ Evidence recorded on 2026-08-22:
 - [x] Expose the conventional context-only `Idempotency-Key` as a selectable
       header variant and require partitioning or `shared-response` even when the
       method has no idempotency annotation.
+- [x] Do not count that universally required, potentially absent idempotency
+      header as the sole authenticated-response partition; require another
+      explicit parameter/header/context dimension or `shared-response`.
 - [x] Document that request IDs and correlation IDs are not useful response
       variants and can destroy cache effectiveness.
 - [x] Document the explicit runtime hint required when a native application
@@ -429,8 +438,12 @@ Evidence recorded on 2026-08-22:
   budget, preserved selected request-bound set order, and enforced the 1 MiB
   canonical limit during nested writes. The native guide now requires explicit
   runtime hints for record types that occur only in `vary-by-context` values.
+- A fourth review pass excluded the effective idempotency header as the sole
+  authenticated identity partition, aligned record depth accounting, rejected
+  identity-based array request targets, exercised generic-record fan-out, and
+  preflighted oversized UTF-8 scalars before byte-array allocation.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1112` starter tests and `55` test-helper tests with zero
+  test` passed `1115` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

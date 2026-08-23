@@ -59,6 +59,7 @@ final class CacheKeyContract {
             }
             validateType(plan.parameterTypes().get(index), context + " parameter index " + index, 0);
         }
+        validateRequestTargetTypes(plan, context);
 
         if (!selection.policy().isSharedResponse()) {
             if (hasUnpartitionedNamedHeaders(plan, variants)) {
@@ -75,9 +76,7 @@ final class CacheKeyContract {
                         + "shared-response must be explicitly acknowledged");
             }
             if (clientConfig != null && clientConfig.hasAuthConfigured()
-                    && variants.parameterIndexes().isEmpty()
-                    && variants.headerNames().isEmpty()
-                    && variants.contextNames().isEmpty()) {
+                    && !hasAuthenticatedResponsePartition(plan, variants)) {
                 throw invalid(context, "authenticated responses require an explicit parameter/header/context "
                         + "partition or shared-response acknowledgement");
             }
@@ -221,6 +220,15 @@ final class CacheKeyContract {
                 || !selected.contains(idempotencyHeaderName(plan));
     }
 
+    private static boolean hasAuthenticatedResponsePartition(RequestPlan plan, VariantSelection variants) {
+        if (!variants.parameterIndexes().isEmpty() || !variants.contextNames().isEmpty()) {
+            return true;
+        }
+        String idempotencyHeader = idempotencyHeaderName(plan);
+        return variants.headerNames().stream()
+                .anyMatch(name -> !name.equalsIgnoreCase(idempotencyHeader));
+    }
+
     private static String idempotencyHeaderName(RequestPlan plan) {
         if (plan.generatedIdempotencyKeyHeader() != null
                 && !plan.generatedIdempotencyKeyHeader().isBlank()) {
@@ -246,6 +254,37 @@ final class CacheKeyContract {
         return indexes;
     }
 
+    private static void validateRequestTargetTypes(RequestPlan plan, String context) {
+        Set<Integer> indexes = new LinkedHashSet<>();
+        plan.pathVars().forEach(binding -> indexes.add(binding.argumentIndex()));
+        plan.queryParams().forEach(binding -> indexes.add(binding.argumentIndex()));
+        for (int index : indexes) {
+            if (index >= 0 && index < plan.parameterTypes().size()
+                    && containsArrayType(plan.parameterTypes().get(index))) {
+                throw invalid(context, "array-valued path/query parameters cannot preserve a stable "
+                        + "String.valueOf wire projection; use an explicitly formatted scalar value");
+            }
+        }
+    }
+
+    private static boolean containsArrayType(Type type) {
+        if (type instanceof GenericArrayType || type instanceof Class<?> clazz && clazz.isArray()) {
+            return true;
+        }
+        if (type instanceof ParameterizedType parameterizedType) {
+            if (containsArrayType(parameterizedType.getRawType())) {
+                return true;
+            }
+            if (parameterizedType.getOwnerType() != null
+                    && containsArrayType(parameterizedType.getOwnerType())) {
+                return true;
+            }
+            return Arrays.stream(parameterizedType.getActualTypeArguments())
+                    .anyMatch(CacheKeyContract::containsArrayType);
+        }
+        return false;
+    }
+
     private static void validateType(Type type, String context, int depth) {
         if (depth > MAX_DEPTH) {
             throw invalid(context, "cache-key type nesting exceeds " + MAX_DEPTH);
@@ -264,7 +303,7 @@ final class CacheKeyContract {
                     && !Map.class.isAssignableFrom(raw)
                     && !Optional.class.isAssignableFrom(raw))) {
                 if (raw != null && raw.isRecord()) {
-                    validateRecord(parameterizedType, raw, context, depth + 1);
+                    validateRecord(parameterizedType, raw, context, depth);
                     return;
                 }
                 throw invalid(context, "unsupported parameterized cache-key type " + type.getTypeName());
@@ -292,7 +331,7 @@ final class CacheKeyContract {
             return;
         }
         if (raw.isRecord()) {
-            validateRecord(raw, raw, context, depth + 1);
+            validateRecord(raw, raw, context, depth);
             return;
         }
         if (Collection.class.isAssignableFrom(raw) || Map.class.isAssignableFrom(raw)
@@ -574,11 +613,15 @@ final class CacheKeyContract {
     private static final class ByteBudget {
         private int remaining = MAX_CANONICAL_BYTES;
 
-        private void consume(int count) {
+        private void require(int count) {
             if (count < 0 || count > remaining) {
                 throw new IllegalStateException(
                         "Cache key material exceeds " + MAX_CANONICAL_BYTES + " bytes");
             }
+        }
+
+        private void consume(int count) {
+            require(count);
             remaining -= count;
         }
     }
@@ -716,7 +759,7 @@ final class CacheKeyContract {
             }
             Class<?> type = value.getClass();
             if (value instanceof String text) {
-                scalar(1, type, text.getBytes(StandardCharsets.UTF_8));
+                stringScalar(type, text);
             } else if (value instanceof Boolean booleanValue) {
                 scalar(2, type, new byte[]{(byte) (booleanValue ? 1 : 0)});
             } else if (value instanceof Number number) {
@@ -790,6 +833,45 @@ final class CacheKeyContract {
             output.writeByte(tag);
             text(type.getName());
             rawFrame(value);
+        }
+
+        private void stringScalar(Class<?> type, String value) throws IOException {
+            output.writeByte(1);
+            text(type.getName());
+            utf8Frame(value);
+        }
+
+        private void utf8Frame(String value) throws IOException {
+            int encodedLength = utf8Length(value);
+            budget.require(Integer.BYTES + encodedLength);
+            output.writeInt(encodedLength);
+            output.write(value.getBytes(StandardCharsets.UTF_8));
+        }
+
+        private static int utf8Length(String value) {
+            long length = 0;
+            for (int index = 0; index < value.length(); index++) {
+                char character = value.charAt(index);
+                if (character < 0x80) {
+                    length++;
+                } else if (character < 0x800) {
+                    length += 2;
+                } else if (Character.isHighSurrogate(character)
+                        && index + 1 < value.length()
+                        && Character.isLowSurrogate(value.charAt(index + 1))) {
+                    length += 4;
+                    index++;
+                } else if (Character.isSurrogate(character)) {
+                    length++;
+                } else {
+                    length += 3;
+                }
+                if (length > MAX_CANONICAL_BYTES) {
+                    throw new IllegalStateException(
+                            "Cache key material exceeds " + MAX_CANONICAL_BYTES + " bytes");
+                }
+            }
+            return (int) length;
         }
 
         private void framed(Object value, int depth) throws IOException {

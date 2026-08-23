@@ -109,10 +109,13 @@ ambiguous declarations fail startup.
 
 For an authenticated method with no explicit parameter/header/context
 partition, set `shared-response: true` only when the response is deliberately
-shared across identities. The same acknowledgement is required when dynamic
-headers, header maps, or a body are intentionally omitted. It cannot be
-used to remove explicitly selected variants; those dimensions still partition
-the response.
+shared across identities. The effective idempotency header alone is not an
+authenticated identity partition because it may be absent and is required for
+every non-shared policy. Select at least one additional stable parameter,
+header, or context dimension, or explicitly acknowledge `shared-response`.
+The same acknowledgement is required when dynamic headers, header maps, or a
+body are intentionally omitted. It cannot be used to remove explicitly
+selected variants; those dimensions still partition the response.
 
 Request IDs, correlation IDs, trace IDs, and similarly unique values are poor
 cache variants: they make nearly every call a miss and provide no response
@@ -124,11 +127,14 @@ scalar records, arrays, typed lists/sets/maps, and optionals. The starter
 defensively freezes one snapshot per subscription and uses it for both the key
 and request materialization. Publishers, streams, resources, raw containers,
 unresolved generics, mutable DTOs, and mutable nested record components fail
-before transport dispatch. Freezing enforces one cumulative 10,000-element
-budget across the selected argument graph and another across selected Reactor
-context values. Container elements, optional values, and record components
-consume that budget, so shared or deeply nested object graphs cannot expand
-without a bound.
+before transport dispatch. Arrays nested in path or query values are also
+rejected because the current request-target conversion would serialize them by
+object identity; format those values as stable scalars instead. Freezing and
+startup validation count one depth level per nested container or record and
+enforce one cumulative 10,000-element budget across the selected argument graph
+and another across selected Reactor context values. Container elements,
+optional values, and record components consume that budget, so shared or deeply
+nested object graphs cannot expand without a bound.
 
 The canonical representation uses type tags, explicit nulls, length framing,
 container boundaries, and sorted map/set encodings for values that are not
@@ -137,12 +143,14 @@ request-bound. Path/query dimensions first use the same frozen
 set preserves the iteration order sent on the wire instead of being sorted for
 the key. These projections prevent wire-distinct requests from collapsing into
 one structural key. Canonical encoding has a cumulative 1 MiB byte limit that
-is enforced while nested frames are written. This wire projection is not a
-fallback for arbitrary `@CacheKey` or Reactor-context values. Only the SHA-256
-digest is retained as the local opaque key. Raw values and digest text are
-never exported through metrics, logs, traces, diagnostics, health, or support
-bundles. Auth tokens, credentials, and cookies selected as variants therefore
-never become ordinary retained key text.
+is enforced while nested frames are written. UTF-8 scalar length is checked
+before encoded scalar bytes are materialized, so one oversized string cannot
+bypass the allocation bound. This wire projection is not a fallback for
+arbitrary `@CacheKey` or Reactor-context values. Only the SHA-256 digest is
+retained as the local opaque key. Raw values and digest text are never exported
+through metrics, logs, traces, diagnostics, health, or support bundles. Auth
+tokens, credentials, and cookies selected as variants therefore never become
+ordinary retained key text.
 
 ### Native context record values
 

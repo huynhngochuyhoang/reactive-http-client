@@ -155,7 +155,11 @@ class CacheKeyContractTest {
 
         config = selectedPolicy();
         config.setAuthProvider("oauth");
-        ReactiveHttpClientProperties.ClientConfig partitionedAuthConfig = config;
+        assertRejected(NoArgumentClient.class, config, "authenticated responses require");
+
+        ReactiveHttpClientProperties.ClientConfig partitionedAuthConfig = selectedPolicy();
+        partitionedAuthConfig.setAuthProvider("oauth");
+        policy(partitionedAuthConfig).setVaryByContext(List.of("tenant"));
         assertThatCode(() -> validate(NoArgumentClient.class, partitionedAuthConfig))
                 .doesNotThrowAnyException();
 
@@ -390,7 +394,7 @@ class CacheKeyContractTest {
         policy(config).setVaryByContext(List.of("tenant"));
         Object shared = "tenant";
         for (int depth = 0; depth < 14; depth++) {
-            shared = new Fanout(shared, shared);
+            shared = new Fanout<>(shared, shared);
         }
 
         Object contextValue = shared;
@@ -406,6 +410,23 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void startupCountsOneDepthLevelPerNestedRecord() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("value"));
+
+        assertThatCode(() -> validate(DeepRecordClient.class, config))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void startupRejectsArraysInRequestTargetValues() {
+        assertRejected(ArrayPathClient.class, selectedPolicy(),
+                "array-valued path/query parameters cannot preserve a stable String.valueOf wire projection");
+        assertRejected(NestedArrayQueryClient.class, selectedPolicy(),
+                "array-valued path/query parameters cannot preserve a stable String.valueOf wire projection");
+    }
+
+    @Test
     void canonicalEncodingEnforcesTheByteBudgetWhileWritingNestedFrames() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         policy(config).setVaryByParameters(List.of("values"));
@@ -418,6 +439,21 @@ class CacheKeyContractTest {
                 "large-scalar",
                 method,
                 new Object[]{values},
+                config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cache key material exceeds 1048576 bytes");
+    }
+
+    @Test
+    void canonicalEncodingPreflightsOversizedUtf8Scalars() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("value"));
+
+        assertThatThrownBy(() -> key(
+                StringScalarClient.class,
+                "large-string",
+                StringScalarClient.class.getMethod("get", String.class),
+                new Object[]{"\u00e9".repeat(600_000)},
                 config))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cache key material exceeds 1048576 bytes");
@@ -663,7 +699,58 @@ class CacheKeyContractTest {
     record Box<T>(T value) {
     }
 
-    record Fanout(Object left, Object right) {
+    record Fanout<T>(T left, T right) {
+    }
+
+    record Depth01(Depth02 value) {
+    }
+
+    record Depth02(Depth03 value) {
+    }
+
+    record Depth03(Depth04 value) {
+    }
+
+    record Depth04(Depth05 value) {
+    }
+
+    record Depth05(Depth06 value) {
+    }
+
+    record Depth06(Depth07 value) {
+    }
+
+    record Depth07(Depth08 value) {
+    }
+
+    record Depth08(Depth09 value) {
+    }
+
+    record Depth09(Depth10 value) {
+    }
+
+    record Depth10(Depth11 value) {
+    }
+
+    record Depth11(Depth12 value) {
+    }
+
+    record Depth12(Depth13 value) {
+    }
+
+    record Depth13(Depth14 value) {
+    }
+
+    record Depth14(Depth15 value) {
+    }
+
+    record Depth15(Depth16 value) {
+    }
+
+    record Depth16(Depth17 value) {
+    }
+
+    record Depth17(String value) {
     }
 
     enum Mode {
@@ -803,6 +890,26 @@ class CacheKeyContractTest {
     interface LargeScalarClient {
         @GET("/items")
         Mono<String> get(@CacheKey("values") List<String> values);
+    }
+
+    interface StringScalarClient {
+        @GET("/items")
+        Mono<String> get(@CacheKey("value") String value);
+    }
+
+    interface DeepRecordClient {
+        @GET("/items")
+        Mono<String> get(@CacheKey("value") Depth01 value);
+    }
+
+    interface ArrayPathClient {
+        @GET("/items/{id}")
+        Mono<String> get(@PathVar("id") String[] id);
+    }
+
+    interface NestedArrayQueryClient {
+        @GET("/items")
+        Mono<String> get(@QueryParam("tag") List<String[]> tags);
     }
 
     interface GenericRecordClient {
