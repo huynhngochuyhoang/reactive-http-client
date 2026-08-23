@@ -22,6 +22,7 @@ reactive:
             catalog-read:
               ttl-ms: 60000
               maximum-size: 10000
+              vary-by-headers: [Idempotency-Key]
 ```
 
 Omitting `cache.policy` keeps client-wide caching disabled. Adding a future
@@ -82,7 +83,7 @@ reactive:
               ttl-ms: 60000
               maximum-size: 10000
               vary-by-parameters: [tenant]
-              vary-by-headers: [Accept-Language]
+              vary-by-headers: [Accept-Language, Idempotency-Key]
               vary-by-context: [salesRegion]
 ```
 
@@ -97,11 +98,14 @@ Mono<CatalogItem> getItem(
 
 `vary-by-parameters` names stable `@CacheKey` labels.
 `vary-by-headers` must name a declared header/idempotency parameter, a
-method-level generated idempotency header, or a configured default header and
-is case-insensitive. A generated idempotency header that is not selected must
-be acknowledged with `shared-response: true`. `vary-by-context` reads string
-keys from the subscriber's Reactor context. Blank, duplicate, unknown
-parameter/header, and ambiguous declarations fail startup.
+method-level generated idempotency header, the conventional `Idempotency-Key`
+header available through `RequestContext.withIdempotencyKey(...)`, or a
+configured default header and is case-insensitive. Because any invocation can
+supply the context-only idempotency header, a selected policy must either vary
+by its effective idempotency header or explicitly acknowledge reuse with
+`shared-response: true`. `vary-by-context` reads string keys from the
+subscriber's Reactor context. Blank, duplicate, unknown parameter/header, and
+ambiguous declarations fail startup.
 
 For an authenticated method with no explicit parameter/header/context
 partition, set `shared-response: true` only when the response is deliberately
@@ -122,19 +126,61 @@ and request materialization. Publishers, streams, resources, raw containers,
 unresolved generics, mutable DTOs, and mutable nested record components fail
 before transport dispatch. Freezing enforces one cumulative 10,000-element
 budget across the selected argument graph and another across selected Reactor
-context values, so shared or deeply nested containers cannot expand without a
-bound.
+context values. Container elements, optional values, and record components
+consume that budget, so shared or deeply nested object graphs cannot expand
+without a bound.
 
 The canonical representation uses type tags, explicit nulls, length framing,
-container boundaries, and sorted map/set encodings. Path and query dimensions
-first use the same frozen `String.valueOf` projection used by URI construction,
-so order-sensitive request-target text cannot collapse into one structural
-key. This wire projection is not a fallback for arbitrary `@CacheKey` or
-Reactor-context values. Only the SHA-256 digest is retained as the local opaque
-key. Raw values and digest text are never exported through metrics, logs,
-traces, diagnostics, health, or support bundles. Auth tokens, credentials, and
-cookies selected as variants therefore never become ordinary retained key
-text.
+container boundaries, and sorted map/set encodings for values that are not
+request-bound. Path/query dimensions first use the same frozen
+`String.valueOf` projection used by URI construction. A selected body or header
+set preserves the iteration order sent on the wire instead of being sorted for
+the key. These projections prevent wire-distinct requests from collapsing into
+one structural key. Canonical encoding has a cumulative 1 MiB byte limit that
+is enforced while nested frames are written. This wire projection is not a
+fallback for arbitrary `@CacheKey` or Reactor-context values. Only the SHA-256
+digest is retained as the local opaque key. Raw values and digest text are
+never exported through metrics, logs, traces, diagnostics, health, or support
+bundles. Auth tokens, credentials, and cookies selected as variants therefore
+never become ordinary retained key text.
+
+### Native context record values
+
+The AOT processor registers record accessors reachable from selected client
+method parameters. A record used only as a runtime `vary-by-context` value has
+no discoverable Java type in the client contract, so a native application must
+register that type explicitly:
+
+```java
+import org.springframework.aot.hint.ExecutableMode;
+import org.springframework.aot.hint.RuntimeHints;
+import org.springframework.aot.hint.RuntimeHintsRegistrar;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ImportRuntimeHints;
+
+record SalesRegion(String region, int tier) {
+}
+
+final class CacheContextRuntimeHints implements RuntimeHintsRegistrar {
+    @Override
+    public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
+        hints.reflection().registerType(SalesRegion.class, typeHint -> {});
+        for (var component : SalesRegion.class.getRecordComponents()) {
+            hints.reflection().registerMethod(
+                    component.getAccessor(), ExecutableMode.INVOKE);
+        }
+    }
+}
+
+@Configuration
+@ImportRuntimeHints(CacheContextRuntimeHints.class)
+class CacheNativeConfiguration {
+}
+```
+
+JVM applications need no additional hint. Native applications that do not
+register a context-only record must use a supported scalar/container context
+value instead.
 
 ## Customization safety
 

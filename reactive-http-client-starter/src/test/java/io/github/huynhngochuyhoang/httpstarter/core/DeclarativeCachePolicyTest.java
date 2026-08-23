@@ -247,6 +247,7 @@ class DeclarativeCachePolicyTest {
         ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
         policy.setTtlMs(ttlMs);
         policy.setMaximumSize(maximumSize);
+        policy.setVaryByHeaders(List.of("Idempotency-Key"));
         config.getCache().getPolicies().put(name, policy);
     }
 

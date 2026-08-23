@@ -13,7 +13,9 @@ import org.springframework.aot.generate.ClassNameGenerator;
 import org.springframework.aot.generate.DefaultGenerationContext;
 import org.springframework.aot.generate.InMemoryGeneratedFiles;
 import org.springframework.aot.hint.ExecutableHint;
+import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.RuntimeHints;
+import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
@@ -270,6 +272,7 @@ class ReactiveHttpClientAotSmokeTest {
         policy.setTtlMs(1_000L);
         policy.setMaximumSize(100L);
         policy.setVaryByParameters(List.of("tenant"));
+        policy.setVaryByHeaders(List.of("Idempotency-Key"));
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.getCache().getPolicies().put("selected", policy);
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
@@ -289,6 +292,18 @@ class ReactiveHttpClientAotSmokeTest {
                 CacheRecordVariant.class.getMethod("version")))
                 .accepts(generationContext.getRuntimeHints());
         context.close();
+    }
+
+    @Test
+    void applicationRuntimeHintsCanCoverContextOnlyCacheRecords() throws Exception {
+        RuntimeHints hints = new RuntimeHints();
+
+        new CacheContextRuntimeHints().registerHints(hints, getClass().getClassLoader());
+
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                CacheContextVariant.class.getMethod("region"))).accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                CacheContextVariant.class.getMethod("tier"))).accepts(hints);
     }
 
     @Test
@@ -411,6 +426,19 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     record CacheRecordVariant(String value, int version) {
+    }
+
+    record CacheContextVariant(String region, int tier) {
+    }
+
+    static final class CacheContextRuntimeHints implements RuntimeHintsRegistrar {
+        @Override
+        public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
+            hints.reflection().registerType(CacheContextVariant.class, typeHint -> {});
+            for (var component : CacheContextVariant.class.getRecordComponents()) {
+                hints.reflection().registerMethod(component.getAccessor(), ExecutableMode.INVOKE);
+            }
+        }
     }
 
     @ReactiveHttpClient(name = "cache-record-aot", baseUrl = "http://cache-record-aot.test")

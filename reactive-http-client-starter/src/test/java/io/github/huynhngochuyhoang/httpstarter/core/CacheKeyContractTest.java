@@ -60,7 +60,7 @@ class CacheKeyContractTest {
     void keyIncludesConcreteClientResolvedSignatureAndConfiguredVariants() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         policy(config).setVaryByParameters(List.of("attributes"));
-        policy(config).setVaryByHeaders(List.of("X-Tenant"));
+        policy(config).setVaryByHeaders(List.of("X-Tenant", "Idempotency-Key"));
         policy(config).setVaryByContext(List.of("locale"));
         Method method = VariantClient.class.getMethod(
                 "get", String.class, String.class, Map.class);
@@ -120,7 +120,8 @@ class CacheKeyContractTest {
                 .isNotEqualTo(key(ListQueryClient.class, "list", listMethod, new Object[]{List.of()}, listConfig));
 
         ReactiveHttpClientProperties.ClientConfig sensitiveConfig = selectedPolicy();
-        policy(sensitiveConfig).setVaryByHeaders(List.of("Authorization", "Cookie"));
+        policy(sensitiveConfig).setVaryByHeaders(List.of(
+                "Authorization", "Cookie", "Idempotency-Key"));
         Method sensitiveMethod = SensitiveHeaderClient.class.getMethod("get", String.class, String.class);
         CacheKeyContract.OpaqueKey first = key(
                 SensitiveHeaderClient.class, "sensitive", sensitiveMethod,
@@ -141,19 +142,22 @@ class CacheKeyContractTest {
         assertRejected(VariantClient.class, config, "unknown vary-by-parameters name 'missing'");
 
         config = selectedPolicy();
-        policy(config).setVaryByHeaders(List.of("X-Unknown"));
+        policy(config).setVaryByHeaders(List.of("X-Unknown", "Idempotency-Key"));
         assertRejected(VariantClient.class, config, "unknown vary-by-headers name 'X-Unknown'");
 
         config = selectedPolicy();
         assertRejected(VariantClient.class, config, "dynamic request headers must be selected");
 
         config = selectedPolicy();
-        policy(config).setVaryByHeaders(List.of("X-Tenant", "x-tenant"));
+        policy(config).setVaryByHeaders(List.of(
+                "X-Tenant", "x-tenant", "Idempotency-Key"));
         assertRejected(VariantClient.class, config, "vary-by-headers contains duplicate name");
 
         config = selectedPolicy();
         config.setAuthProvider("oauth");
-        assertRejected(NoArgumentClient.class, config, "authenticated responses require");
+        ReactiveHttpClientProperties.ClientConfig partitionedAuthConfig = config;
+        assertThatCode(() -> validate(NoArgumentClient.class, partitionedAuthConfig))
+                .doesNotThrowAnyException();
 
         ReactiveHttpClientProperties.ClientConfig sharedConfig = selectedPolicy();
         sharedConfig.setAuthProvider("oauth");
@@ -250,7 +254,7 @@ class CacheKeyContractTest {
     @Test
     void headerVariantsIncludeEveryCaseInsensitiveHeaderSource() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
-        policy(config).setVaryByHeaders(List.of("X-Tenant"));
+        policy(config).setVaryByHeaders(List.of("X-Tenant", "Idempotency-Key"));
         Method method = HeaderCaseClient.class.getMethod("get", String.class);
         RequestPlan plan = plan(HeaderCaseClient.class, method);
         EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
@@ -327,6 +331,43 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void contextOnlyIdempotencyHeadersAreSelectableAndPartitioned() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        Method method = NoArgumentClient.class.getMethod("get");
+        RequestPlan plan = plan(NoArgumentClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                NoArgumentClient.class, "context-idempotency", plan, config, "GET");
+        Object[] frozen = CacheKeyContract.freezeArguments(plan, new Object[0], selection.policy());
+        RequestArgumentResolver.ResolvedArgs base = argumentResolver.resolve(plan, frozen);
+        Context firstContext = Context.of(RequestContext.IDEMPOTENCY_KEY_CONTEXT_KEY, "idem-a");
+        Context secondContext = Context.of(RequestContext.IDEMPOTENCY_KEY_CONTEXT_KEY, "idem-b");
+        RequestArgumentResolver.ResolvedArgs firstResolved =
+                ReactiveClientInvocationHandler.applyCacheKeyIdempotencyKey(plan, base, firstContext);
+        RequestArgumentResolver.ResolvedArgs secondResolved =
+                ReactiveClientInvocationHandler.applyCacheKeyIdempotencyKey(plan, base, secondContext);
+
+        CacheKeyContract.OpaqueKey first = CacheKeyContract.derive(
+                NoArgumentClient.class, "context-idempotency", plan, frozen,
+                firstResolved, firstContext, selection.policy()).key();
+        CacheKeyContract.OpaqueKey second = CacheKeyContract.derive(
+                NoArgumentClient.class, "context-idempotency", plan, frozen,
+                secondResolved, secondContext, selection.policy()).key();
+
+        assertThat(firstResolved.headers().get("Idempotency-Key")).containsExactly("idem-a");
+        assertThat(secondResolved.headers().get("Idempotency-Key")).containsExactly("idem-b");
+        assertThat(first).isNotEqualTo(second);
+
+        ReactiveHttpClientProperties.ClientConfig unpartitioned = selectedPolicy();
+        policy(unpartitioned).setVaryByHeaders(List.of());
+        assertRejected(NoArgumentClient.class, unpartitioned, "dynamic request headers must be selected");
+
+        ReactiveHttpClientProperties.ClientConfig acknowledged = selectedPolicy();
+        policy(acknowledged).setVaryByHeaders(List.of());
+        policy(acknowledged).setSharedResponse(true);
+        assertThatCode(() -> validate(NoArgumentClient.class, acknowledged)).doesNotThrowAnyException();
+    }
+
+    @Test
     void freezingEnforcesOneCumulativeElementBudgetAcrossNestedContainers() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         policy(config).setVaryByParameters(List.of("nested"));
@@ -341,6 +382,45 @@ class CacheKeyContractTest {
                 plan, new Object[]{nested}, selection.policy()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("cumulative element count exceeds maximum 10000");
+    }
+
+    @Test
+    void freezingCountsRecordComponentsAgainstTheCumulativeBudget() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByContext(List.of("tenant"));
+        Object shared = "tenant";
+        for (int depth = 0; depth < 14; depth++) {
+            shared = new Fanout(shared, shared);
+        }
+
+        Object contextValue = shared;
+        assertThatThrownBy(() -> key(
+                NoArgumentClient.class,
+                "record-budget",
+                NoArgumentClient.class.getMethod("get"),
+                new Object[0],
+                config,
+                Context.of("tenant", contextValue)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cumulative element count exceeds maximum 10000");
+    }
+
+    @Test
+    void canonicalEncodingEnforcesTheByteBudgetWhileWritingNestedFrames() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("values"));
+        Method method = LargeScalarClient.class.getMethod("get", List.class);
+        String shared = "x".repeat(256 * 1024);
+        List<String> values = Collections.nCopies(10_000, shared);
+
+        assertThatThrownBy(() -> key(
+                LargeScalarClient.class,
+                "large-scalar",
+                method,
+                new Object[]{values},
+                config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cache key material exceeds 1048576 bytes");
     }
 
     @Test
@@ -360,6 +440,7 @@ class CacheKeyContractTest {
     @Test
     void generatedIdempotencyHeadersRequireAndSupportExplicitPartitioning() throws Exception {
         ReactiveHttpClientProperties.ClientConfig unpartitioned = selectedPolicy();
+        policy(unpartitioned).setVaryByHeaders(List.of());
         assertRejected(GeneratedIdempotencyClient.class, unpartitioned, "dynamic request headers must be selected");
 
         ReactiveHttpClientProperties.ClientConfig partitioned = selectedPolicy();
@@ -389,6 +470,7 @@ class CacheKeyContractTest {
         assertThat(first).isNotEqualTo(second);
 
         ReactiveHttpClientProperties.ClientConfig acknowledged = selectedPolicy();
+        policy(acknowledged).setVaryByHeaders(List.of());
         policy(acknowledged).setSharedResponse(true);
         assertThatCode(() -> validate(GeneratedIdempotencyClient.class, acknowledged))
                 .doesNotThrowAnyException();
@@ -417,6 +499,28 @@ class CacheKeyContractTest {
         assertThat(base).isNotEqualTo(key(
                 UriShapeClient.class, "uri-shape", method,
                 new Object[]{firstPath, secondQuery}, config));
+    }
+
+    @Test
+    void requestBoundSelectedSetsPreserveWireOrderInTheKey() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("tags"));
+        Method method = OrderedHeaderSetClient.class.getMethod("get", Set.class);
+        Set<String> first = new LinkedHashSet<>(List.of("z", "a"));
+        Set<String> second = new LinkedHashSet<>(List.of("a", "z"));
+
+        assertThat(key(
+                OrderedHeaderSetClient.class,
+                "ordered-header",
+                method,
+                new Object[]{first},
+                config))
+                .isNotEqualTo(key(
+                        OrderedHeaderSetClient.class,
+                        "ordered-header",
+                        method,
+                        new Object[]{second},
+                        config));
     }
 
     @Test
@@ -539,6 +643,7 @@ class CacheKeyContractTest {
                 new ReactiveHttpClientProperties.CachePolicyConfig();
         policy.setTtlMs(1_000L);
         policy.setMaximumSize(100L);
+        policy.setVaryByHeaders(List.of("Idempotency-Key"));
         config.getCache().setPolicy("selected");
         config.getCache().getPolicies().put("selected", policy);
         return config;
@@ -556,6 +661,9 @@ class CacheKeyContractTest {
     }
 
     record Box<T>(T value) {
+    }
+
+    record Fanout(Object left, Object right) {
     }
 
     enum Mode {
@@ -692,6 +800,11 @@ class CacheKeyContractTest {
         Mono<String> get(@CacheKey("nested") List<List<String>> nested);
     }
 
+    interface LargeScalarClient {
+        @GET("/items")
+        Mono<String> get(@CacheKey("values") List<String> values);
+    }
+
     interface GenericRecordClient {
         @GET("/items")
         Mono<String> get(@CacheKey("box") Box<String> box);
@@ -708,6 +821,11 @@ class CacheKeyContractTest {
         Mono<String> get(
                 @PathVar("path") Set<String> path,
                 @QueryParam("filters") Map<String, Integer> filters);
+    }
+
+    interface OrderedHeaderSetClient {
+        @GET("/items")
+        Mono<String> get(@HeaderParam("X-Tag") @CacheKey("tags") Set<String> tags);
     }
 
     interface SensitiveHeaderClient {

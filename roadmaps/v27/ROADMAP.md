@@ -242,10 +242,23 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
   freezes one supported argument snapshot and uses that same snapshot for key
   construction and request materialization. Mutable or nested values that cannot
   be copied safely are rejected rather than retained as live key/request state.
+- Request-bound selected collections preserve the same element order used by
+  URI, header, and body materialization. Canonical set ordering applies only to
+  selected values whose wire representation is not order-sensitive.
+- One cumulative element budget includes container members, optional values,
+  and record components, and one cumulative byte budget is enforced while
+  nested canonical frames are written rather than after materialization.
 - Header-, locale-, tenant-, Reactor-context-, or auth-dependent responses
   require explicit variant/partition inputs or an explicit shared-response
   acknowledgement. The starter never silently assumes such responses are
   globally shareable.
+- The conventional context-only `Idempotency-Key` header is an available header
+  variant for every selected policy and must be partitioned or explicitly
+  acknowledged as shared.
+- AOT registers record accessors reachable from client method parameters.
+  Native applications explicitly register record types used only through
+  `vary-by-context`, because their runtime type is absent from the declarative
+  client signature.
 - Method-level key selection is validated at startup. Unknown parameter/header
   names, unsupported values, unstable publishers/streams, and ambiguous maps are
   rejected before dispatch.

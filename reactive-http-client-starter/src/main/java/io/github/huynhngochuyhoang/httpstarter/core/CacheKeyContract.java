@@ -30,6 +30,7 @@ final class CacheKeyContract {
     private static final int MAX_DEPTH = 32;
     private static final int MAX_ELEMENTS = 10_000;
     private static final int MAX_CANONICAL_BYTES = 1024 * 1024;
+    private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     private static final Set<Class<?>> IMMUTABLE_SCALARS = Set.of(
             String.class, Boolean.class, Byte.class, Short.class, Integer.class, Long.class,
             Float.class, Double.class, Character.class, BigInteger.class, BigDecimal.class,
@@ -126,8 +127,8 @@ final class CacheKeyContract {
         writer.value(uriQueryValues(resolved.queryParams()));
 
         Map<String, Object> selectedParameters = new TreeMap<>();
-        variants.parameterIndexes().forEach((name, index) ->
-                selectedParameters.put(name, index < frozenArguments.length ? frozenArguments[index] : null));
+        variants.parameterIndexes().forEach((name, index) -> selectedParameters.put(
+                name, selectedParameterValue(plan, index, frozenArguments, resolved)));
         writer.value(selectedParameters);
 
         Map<String, Object> selectedHeaders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -165,10 +166,7 @@ final class CacheKeyContract {
         Set<String> availableHeaders = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         plan.headerParams().forEach(binding -> availableHeaders.add(binding.name()));
         plan.idempotencyKeyParams().forEach(binding -> availableHeaders.add(binding.name()));
-        if (plan.generatedIdempotencyKeyHeader() != null
-                && !plan.generatedIdempotencyKeyHeader().isBlank()) {
-            availableHeaders.add(plan.generatedIdempotencyKeyHeader());
-        }
+        availableHeaders.add(idempotencyHeaderName(plan));
         if (clientConfig != null && clientConfig.getDefaultHeaders() != null) {
             availableHeaders.addAll(clientConfig.getDefaultHeaders().keySet());
         }
@@ -219,11 +217,20 @@ final class CacheKeyContract {
                 .anyMatch(binding -> !selected.contains(binding.name())
                         && !selectedParameters.contains(binding.argumentIndex()))
                 || plan.idempotencyKeyParams().stream()
-                .anyMatch(binding -> !selected.contains(binding.name())
-                        && !selectedParameters.contains(binding.argumentIndex()))
-                || (plan.generatedIdempotencyKeyHeader() != null
-                && !plan.generatedIdempotencyKeyHeader().isBlank()
-                && !selected.contains(plan.generatedIdempotencyKeyHeader()));
+                .anyMatch(binding -> !selected.contains(binding.name()))
+                || !selected.contains(idempotencyHeaderName(plan));
+    }
+
+    private static String idempotencyHeaderName(RequestPlan plan) {
+        if (plan.generatedIdempotencyKeyHeader() != null
+                && !plan.generatedIdempotencyKeyHeader().isBlank()) {
+            return plan.generatedIdempotencyKeyHeader();
+        }
+        return plan.idempotencyKeyParams().stream()
+                .map(RequestPlan.NamedArgumentBinding::name)
+                .filter(name -> name != null && !name.isBlank())
+                .findFirst()
+                .orElse(IDEMPOTENCY_KEY_HEADER);
     }
 
     private static Set<Integer> requestArgumentIndexes(RequestPlan plan) {
@@ -409,7 +416,9 @@ final class CacheKeyContract {
             return optional.map(item -> freeze(item, depth + 1, context + " optional", budget));
         }
         if (type.isRecord()) {
-            for (RecordComponent component : type.getRecordComponents()) {
+            RecordComponent[] components = type.getRecordComponents();
+            budget.consume(components.length, context);
+            for (RecordComponent component : components) {
                 Object componentValue = recordComponentValue(component, value, context);
                 Object frozen = freeze(componentValue, depth + 1,
                         context + " record component '" + component.getName() + "'", budget);
@@ -435,6 +444,51 @@ final class CacheKeyContract {
                 .map(String::valueOf)
                 .toList()));
         return values;
+    }
+
+    private static Object selectedParameterValue(RequestPlan plan,
+                                                 int index,
+                                                 Object[] frozenArguments,
+                                                 RequestArgumentResolver.ResolvedArgs resolved) {
+        for (RequestPlan.NamedArgumentBinding binding : plan.headerParams()) {
+            if (binding.argumentIndex() == index) {
+                return headerValues(resolved.headers(), binding.name());
+            }
+        }
+        for (RequestPlan.NamedArgumentBinding binding : plan.idempotencyKeyParams()) {
+            if (binding.argumentIndex() == index) {
+                return headerValues(resolved.headers(), binding.name());
+            }
+        }
+        Object value = index < frozenArguments.length ? frozenArguments[index] : null;
+        return plan.bodyIndex() == index ? preserveRequestSetOrder(value) : value;
+    }
+
+    private static Object preserveRequestSetOrder(Object value) {
+        if (value instanceof Set<?> set) {
+            return set.stream().map(CacheKeyContract::preserveRequestSetOrder).toList();
+        }
+        if (value instanceof List<?> list) {
+            return list.stream().map(CacheKeyContract::preserveRequestSetOrder).toList();
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> ordered = new LinkedHashMap<>();
+            map.forEach((key, mapped) -> ordered.put(
+                    preserveRequestSetOrder(key), preserveRequestSetOrder(mapped)));
+            return ordered;
+        }
+        if (value instanceof Optional<?> optional) {
+            return optional.map(CacheKeyContract::preserveRequestSetOrder);
+        }
+        if (value != null && value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            List<Object> ordered = new ArrayList<>(length);
+            for (int index = 0; index < length; index++) {
+                ordered.add(preserveRequestSetOrder(Array.get(value, index)));
+            }
+            return ordered;
+        }
+        return value;
     }
 
     private static List<String> headerValues(Map<String, List<String>> headers, String requestedName) {
@@ -472,8 +526,8 @@ final class CacheKeyContract {
         return signature.toString();
     }
 
-    private static byte[] canonicalBytes(Object value) {
-        CanonicalWriter writer = new CanonicalWriter();
+    private static byte[] canonicalBytes(Object value, ByteBudget budget) {
+        CanonicalWriter writer = new CanonicalWriter(budget);
         writer.value(value);
         return writer.finish();
     }
@@ -514,6 +568,18 @@ final class CacheKeyContract {
                 throw invalid(context, "cumulative element count exceeds maximum " + MAX_ELEMENTS);
             }
             elements += count;
+        }
+    }
+
+    private static final class ByteBudget {
+        private int remaining = MAX_CANONICAL_BYTES;
+
+        private void consume(int count) {
+            if (count < 0 || count > remaining) {
+                throw new IllegalStateException(
+                        "Cache key material exceeds " + MAX_CANONICAL_BYTES + " bytes");
+            }
+            remaining -= count;
         }
     }
 
@@ -614,15 +680,23 @@ final class CacheKeyContract {
     }
 
     private static final class CanonicalWriter {
-        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        private final DataOutputStream output = new DataOutputStream(bytes);
+        private final ByteBudget budget;
+        private final BudgetedByteArrayOutputStream bytes;
+        private final DataOutputStream output;
+
+        private CanonicalWriter() {
+            this(new ByteBudget());
+        }
+
+        private CanonicalWriter(ByteBudget budget) {
+            this.budget = budget;
+            this.bytes = new BudgetedByteArrayOutputStream(budget);
+            this.output = new DataOutputStream(bytes);
+        }
 
         void value(Object value) {
             try {
                 writeValue(value, 0);
-                if (bytes.size() > MAX_CANONICAL_BYTES) {
-                    throw new IllegalStateException("Cache key material exceeds " + MAX_CANONICAL_BYTES + " bytes");
-                }
             } catch (IOException ex) {
                 throw new IllegalStateException("Unable to encode cache key", ex);
             }
@@ -668,22 +742,23 @@ final class CacheKeyContract {
                 sequence(21, list, depth);
             } else if (value instanceof Set<?> set) {
                 output.writeByte(22);
-                List<byte[]> encoded = set.stream().map(CacheKeyContract::canonicalBytes)
+                List<byte[]> encoded = set.stream().map(item -> canonicalBytes(item, budget))
                         .sorted(CacheKeyContract::compareBytes).toList();
                 output.writeInt(encoded.size());
-                encoded.forEach(this::rawFrame);
+                encoded.forEach(this::countedRawFrame);
             } else if (value instanceof Map<?, ?> map) {
                 output.writeByte(23);
                 List<MapEntryBytes> entries = map.entrySet().stream()
                         .map(entry -> new MapEntryBytes(
-                                canonicalBytes(entry.getKey()), canonicalBytes(entry.getValue())))
+                                canonicalBytes(entry.getKey(), budget),
+                                canonicalBytes(entry.getValue(), budget)))
                         .sorted(Comparator.comparing(MapEntryBytes::key, CacheKeyContract::compareBytes)
                                 .thenComparing(MapEntryBytes::value, CacheKeyContract::compareBytes))
                         .toList();
                 output.writeInt(entries.size());
                 for (MapEntryBytes entry : entries) {
-                    rawFrame(entry.key());
-                    rawFrame(entry.value());
+                    countedRawFrame(entry.key());
+                    countedRawFrame(entry.value());
                 }
             } else if (value instanceof Optional<?> optional) {
                 output.writeByte(24);
@@ -718,15 +793,24 @@ final class CacheKeyContract {
         }
 
         private void framed(Object value, int depth) throws IOException {
-            CanonicalWriter nested = new CanonicalWriter();
+            CanonicalWriter nested = new CanonicalWriter(budget);
             nested.writeValue(value, depth);
-            rawFrame(nested.finish());
+            countedRawFrame(nested.finish());
         }
 
         private void rawFrame(byte[] value) {
             try {
                 output.writeInt(value.length);
                 output.write(value);
+            } catch (IOException ex) {
+                throw new IllegalStateException(ex);
+            }
+        }
+
+        private void countedRawFrame(byte[] value) {
+            try {
+                output.writeInt(value.length);
+                bytes.writeAlreadyCounted(value);
             } catch (IOException ex) {
                 throw new IllegalStateException(ex);
             }
@@ -812,6 +896,30 @@ final class CacheKeyContract {
             } catch (IOException ex) {
                 throw new IllegalStateException(ex);
             }
+        }
+    }
+
+    private static final class BudgetedByteArrayOutputStream extends ByteArrayOutputStream {
+        private final ByteBudget budget;
+
+        private BudgetedByteArrayOutputStream(ByteBudget budget) {
+            this.budget = budget;
+        }
+
+        @Override
+        public synchronized void write(int value) {
+            budget.consume(1);
+            super.write(value);
+        }
+
+        @Override
+        public synchronized void write(byte[] value, int offset, int length) {
+            budget.consume(length);
+            super.write(value, offset, length);
+        }
+
+        private synchronized void writeAlreadyCounted(byte[] value) {
+            super.write(value, 0, value.length);
         }
     }
 

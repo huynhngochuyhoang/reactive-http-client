@@ -119,6 +119,24 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void responseCacheDocumentationKeepsIsolationAndNativeConstraintsExplicit() throws IOException {
+        String caching = Files.readString(projectRoot().resolve("docs/32-response-caching.md"));
+
+        assertThat(caching)
+                .contains("vary-by-headers: [Accept-Language, Idempotency-Key]")
+                .contains("RequestContext.withIdempotencyKey(...)")
+                .contains("must either vary\nby its effective idempotency header")
+                .contains("record components\nconsume that budget")
+                .contains("cumulative 1 MiB byte limit")
+                .contains("selected body or header\nset preserves the iteration order")
+                .contains("### Native context record values")
+                .contains("@ImportRuntimeHints(CacheContextRuntimeHints.class)")
+                .contains("SalesRegion.class.getRecordComponents()")
+                .contains("component.getAccessor(), ExecutableMode.INVOKE")
+                .contains("Native applications that do not\nregister a context-only record");
+    }
+
+    @Test
     void v23OperationsGuidanceIsAlignedBoundedDiscoverableAndVersionScoped() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

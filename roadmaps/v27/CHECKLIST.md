@@ -348,6 +348,10 @@ Evidence recorded on 2026-08-22:
       with different types, `("ab", "c")` versus `("a", "bc")`, empty versus
       absent containers, nested boundaries, and equivalent maps with different
       iteration order.
+- [x] Count record components against the cumulative freeze budget and enforce
+      the canonical byte cap while nested frames are written.
+- [x] Preserve wire iteration order when a selected set is also request-bound;
+      keep canonical set sorting only for non-request variants.
 
 ### [x] 5.2 Require explicit response variants
 
@@ -358,8 +362,13 @@ Evidence recorded on 2026-08-22:
       dependent responses.
 - [x] Reject unknown parameter/header names and ambiguous variant declarations
       before auth or transport dispatch.
+- [x] Expose the conventional context-only `Idempotency-Key` as a selectable
+      header variant and require partitioning or `shared-response` even when the
+      method has no idempotency annotation.
 - [x] Document that request IDs and correlation IDs are not useful response
       variants and can destroy cache effectiveness.
+- [x] Document the explicit runtime hint required when a native application
+      uses a record type only as a selected Reactor-context value.
 
 ### [x] 5.3 Protect key material
 
@@ -415,8 +424,13 @@ Evidence recorded on 2026-08-22:
   path/query wire projection. Regression tests cover shared nested containers,
   `Box<String>`, generated-header acknowledgement/partitioning, and
   order-sensitive path/query containers.
+- A third review pass made the context-only conventional idempotency header a
+  startup-visible variant, counted record fan-out against the cumulative freeze
+  budget, preserved selected request-bound set order, and enforced the 1 MiB
+  canonical limit during nested writes. The native guide now requires explicit
+  runtime hints for record types that occur only in `vary-by-context` values.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1106` starter tests and `55` test-helper tests with zero
+  test` passed `1112` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

@@ -777,7 +777,10 @@ public class ReactiveHttpClientProperties {
         private Long maximumSize;
         /** Stable {@code @CacheKey} labels included as additional key dimensions. */
         private List<String> varyByParameters = new ArrayList<>();
-        /** Named outbound headers included as key dimensions, matched case-insensitively. */
+        /**
+         * Named outbound headers included as key dimensions, matched case-insensitively.
+         * Include the effective idempotency header unless {@link #sharedResponse} is acknowledged.
+         */
         private List<String> varyByHeaders = new ArrayList<>();
         /** String Reactor-context keys included as key dimensions. */
         private List<String> varyByContext = new ArrayList<>();

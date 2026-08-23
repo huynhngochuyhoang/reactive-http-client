@@ -433,7 +433,7 @@
     {
       "name": "reactive.http.clients.[name].cache.policies.[policy-name].vary-by-headers",
       "type": "java.util.List<java.lang.String>",
-      "description": "Named outbound headers used as response partition dimensions, matched case-insensitively.",
+      "description": "Named outbound headers used as response partition dimensions, matched case-insensitively. Include the effective idempotency header unless shared-response is acknowledged.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
     },
     {
