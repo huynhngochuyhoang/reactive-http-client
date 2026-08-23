@@ -130,15 +130,19 @@ unresolved generics, mutable DTOs, and mutable nested record components fail
 before transport dispatch. A top-level query array is supported and expands to
 ordered query values. Arrays used as path values or nested inside query elements
 are rejected because the current request-target conversion would serialize them
-by object identity; format those values as stable scalars instead. Freezing and
-startup validation count one depth level per nested container or record and
-enforce one cumulative 10,000-element budget across the selected argument graph
-and another across selected Reactor context values. Container elements,
-optional values, and record components consume that budget, so shared or deeply
-nested object graphs cannot expand without a bound. Runtime freezing charges
-actual iterated list, set, and map members instead of trusting reported
+by object identity; format those values as stable scalars instead. Arrays of
+containers must use a component type such as `List`, `Set`, or `Map` that can
+hold the defensive snapshot. Incompatible concrete or covariant runtime array
+components fail before dispatch instead of producing an array-store error.
+Freezing and startup validation count one depth level per nested container or
+record and enforce one cumulative 10,000-element budget across the selected
+argument graph and another across selected Reactor context values. Container
+elements, optional values, and record components consume that budget, so shared
+or deeply nested object graphs cannot expand without a bound. Runtime freezing
+charges actual iterated list, set, and map members instead of trusting reported
 container sizes. It also preserves equal-by-value elements from identity-based
-sets so the frozen request cannot silently lose query, header, or body values.
+sets and every iterated identity-map entry so the frozen request cannot silently
+lose query, header, or body values.
 
 The canonical representation uses type tags, explicit nulls, length framing,
 container boundaries, and sorted map/set encodings for values that are not
@@ -149,14 +153,15 @@ instead of being sorted for the key. URI variants retain their non-normalized
 text, so a literal Unicode path and an explicitly percent-escaped path remain
 distinct. These projections prevent wire-distinct requests from collapsing
 into one structural key. Canonical encoding has a cumulative 1 MiB byte limit
-that is enforced while nested frames are written. UTF-8 scalar length is
-checked before encoded scalar bytes are materialized, so one oversized string
-cannot bypass the allocation bound. This wire projection is not a fallback for
-arbitrary `@CacheKey` or Reactor-context values. Only the SHA-256 digest is
-retained as the local opaque key. Raw values and digest text are never exported
-through metrics, logs, traces, diagnostics, health, or support bundles. Auth
-tokens, credentials, and cookies selected as variants therefore never become
-ordinary retained key text.
+that is enforced while nested frames are written. UTF-8 scalar length and
+`BigInteger`/`BigDecimal` encoded magnitude length are checked before encoded
+scalar bytes are materialized, so one oversized scalar cannot bypass the
+allocation bound. This wire projection is not a fallback for arbitrary
+`@CacheKey` or Reactor-context values. Only the SHA-256 digest is retained as
+the local opaque key. Raw values and digest text are never exported through
+metrics, logs, traces, diagnostics, health, or support bundles. Auth tokens,
+credentials, and cookies selected as variants therefore never become ordinary
+retained key text.
 
 ### Native context record values
 

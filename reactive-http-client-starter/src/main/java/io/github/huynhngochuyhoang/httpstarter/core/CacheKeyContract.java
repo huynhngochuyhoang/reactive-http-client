@@ -309,6 +309,7 @@ final class CacheKeyContract {
             throw invalid(context, "unresolved type " + type.getTypeName() + " cannot be frozen");
         }
         if (type instanceof GenericArrayType arrayType) {
+            validateArrayComponentSnapshotCompatibility(arrayType.getGenericComponentType(), context);
             validateType(arrayType.getGenericComponentType(), context, depth + 1);
             return;
         }
@@ -343,6 +344,7 @@ final class CacheKeyContract {
             return;
         }
         if (raw.isArray()) {
+            validateArrayComponentSnapshotCompatibility(raw.getComponentType(), context);
             validateType(raw.getComponentType(), context, depth + 1);
             return;
         }
@@ -356,6 +358,22 @@ final class CacheKeyContract {
         }
         throw invalid(context, "mutable or unsupported type " + raw.getTypeName()
                 + " cannot be copied safely; use immutable scalars, arrays, typed lists/sets/maps, enums, or records");
+    }
+
+    private static void validateArrayComponentSnapshotCompatibility(Type componentType, String context) {
+        Class<?> component = rawClass(componentType);
+        if (component == null) {
+            return;
+        }
+        boolean compatible = !List.class.isAssignableFrom(component) || component.isAssignableFrom(List.class);
+        compatible &= !Set.class.isAssignableFrom(component)
+                || component.isAssignableFrom(IdentityPreservingSet.class);
+        compatible &= !Map.class.isAssignableFrom(component)
+                || component.isAssignableFrom(EntryPreservingMap.class);
+        if (!compatible) {
+            throw invalid(context, "array component type " + component.getTypeName()
+                    + " cannot hold the defensive cache-key snapshot; use a List, Set, or Map component type");
+        }
     }
 
     private static void validateRecord(Type declaredType,
@@ -429,10 +447,16 @@ final class CacheKeyContract {
         if (type.isArray()) {
             int length = Array.getLength(value);
             budget.consume(length, context);
-            Object copy = Array.newInstance(type.getComponentType(), length);
+            Class<?> componentType = type.getComponentType();
+            Object copy = Array.newInstance(componentType, length);
             for (int i = 0; i < length; i++) {
-                Array.set(copy, i, freeze(
-                        Array.get(value, i), depth + 1, context + "[" + i + "]", budget));
+                Object frozen = freeze(Array.get(value, i), depth + 1, context + "[" + i + "]", budget);
+                if (!componentType.isPrimitive() && frozen != null && !componentType.isInstance(frozen)) {
+                    throw invalid(context + "[" + i + "]", "runtime array component type "
+                            + componentType.getTypeName() + " cannot hold defensive snapshot type "
+                            + frozen.getClass().getTypeName());
+                }
+                Array.set(copy, i, frozen);
             }
             return copy;
         }
@@ -455,14 +479,14 @@ final class CacheKeyContract {
             return new IdentityPreservingSet(values);
         }
         if (value instanceof Map<?, ?> map) {
-            Map<Object, Object> copy = new LinkedHashMap<>();
+            List<Map.Entry<Object, Object>> entries = new ArrayList<>();
             for (Map.Entry<?, ?> entry : map.entrySet()) {
                 budget.consume(1, context);
                 Object key = freeze(entry.getKey(), depth + 1, context + " map key", budget);
                 Object mapped = freeze(entry.getValue(), depth + 1, context + " map value", budget);
-                copy.put(key, mapped);
+                entries.add(new AbstractMap.SimpleImmutableEntry<>(key, mapped));
             }
-            return Collections.unmodifiableMap(copy);
+            return new EntryPreservingMap(entries, map instanceof IdentityHashMap<?, ?>);
         }
         if (value instanceof Optional<?> optional) {
             if (optional.isPresent()) {
@@ -626,15 +650,15 @@ final class CacheKeyContract {
         }
     }
 
-    private static final class IdentityPreservingSet extends AbstractSet<Object> {
-        private final List<Object> values;
+    private static final class IdentityPreservingSet<E> extends AbstractSet<E> {
+        private final List<E> values;
 
-        private IdentityPreservingSet(List<Object> values) {
+        private IdentityPreservingSet(List<E> values) {
             this.values = Collections.unmodifiableList(new ArrayList<>(values));
         }
 
         @Override
-        public Iterator<Object> iterator() {
+        public Iterator<E> iterator() {
             return values.iterator();
         }
 
@@ -649,10 +673,47 @@ final class CacheKeyContract {
         }
     }
 
+    private static final class EntryPreservingMap extends AbstractMap<Object, Object> {
+        private final List<Map.Entry<Object, Object>> entries;
+        private final Set<Map.Entry<Object, Object>> entrySet;
+        private final boolean identityKeys;
+
+        private EntryPreservingMap(List<Map.Entry<Object, Object>> entries, boolean identityKeys) {
+            this.entries = Collections.unmodifiableList(new ArrayList<>(entries));
+            this.entrySet = new IdentityPreservingSet(new ArrayList<>(entries));
+            this.identityKeys = identityKeys;
+        }
+
+        @Override
+        public Set<Map.Entry<Object, Object>> entrySet() {
+            return entrySet;
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            return identityKeys
+                    ? entries.stream().anyMatch(entry -> entry.getKey() == key)
+                    : super.containsKey(key);
+        }
+
+        @Override
+        public Object get(Object key) {
+            if (!identityKeys) {
+                return super.get(key);
+            }
+            for (Map.Entry<Object, Object> entry : entries) {
+                if (entry.getKey() == key) {
+                    return entry.getValue();
+                }
+            }
+            return null;
+        }
+    }
+
     private static final class ByteBudget {
         private int remaining = MAX_CANONICAL_BYTES;
 
-        private void require(int count) {
+        private void require(long count) {
             if (count < 0 || count > remaining) {
                 throw new IllegalStateException(
                         "Cache key material exceeds " + MAX_CANONICAL_BYTES + " bytes");
@@ -808,7 +869,7 @@ final class CacheKeyContract {
             } else if (value instanceof Boolean booleanValue) {
                 scalar(2, type, new byte[]{(byte) (booleanValue ? 1 : 0)});
             } else if (value instanceof Number number) {
-                scalar(3, type, numberBytes(number));
+                scalar(3, type, numberBytes(number, type));
             } else if (value instanceof Character character) {
                 scalar(4, type, new byte[]{(byte) (character >>> 8), (byte) character.charValue()});
             } else if (value instanceof Enum<?> enumValue) {
@@ -954,7 +1015,8 @@ final class CacheKeyContract {
             rawFrame(value.getBytes(StandardCharsets.UTF_8));
         }
 
-        private static byte[] numberBytes(Number value) {
+        private byte[] numberBytes(Number value, Class<?> type) {
+            requireScalarPayload(type, numericPayloadLength(value));
             try {
                 ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 DataOutputStream output = new DataOutputStream(bytes);
@@ -984,7 +1046,38 @@ final class CacheKeyContract {
             }
         }
 
-        private static byte[] scalarBytes(Object value) {
+        private void requireScalarPayload(Class<?> type, long payloadLength) {
+            long typeLength = utf8Length(type.getName());
+            budget.require(1L + Integer.BYTES + typeLength + Integer.BYTES + payloadLength);
+        }
+
+        private static long numericPayloadLength(Number value) {
+            if (value instanceof Byte) {
+                return Byte.BYTES;
+            }
+            if (value instanceof Short) {
+                return Short.BYTES;
+            }
+            if (value instanceof Integer || value instanceof Float) {
+                return Integer.BYTES;
+            }
+            if (value instanceof Long || value instanceof Double) {
+                return Long.BYTES;
+            }
+            if (value instanceof BigInteger integer) {
+                return encodedBigIntegerLength(integer);
+            }
+            if (value instanceof BigDecimal decimal) {
+                return Integer.BYTES + encodedBigIntegerLength(decimal.unscaledValue());
+            }
+            throw new IllegalStateException("Unsupported numeric cache-key value " + value.getClass().getName());
+        }
+
+        private static long encodedBigIntegerLength(BigInteger value) {
+            return ((long) value.bitLength() + Byte.SIZE) / Byte.SIZE;
+        }
+
+        private byte[] scalarBytes(Object value) {
             try {
                 ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 DataOutputStream output = new DataOutputStream(bytes);
@@ -1022,7 +1115,7 @@ final class CacheKeyContract {
                     output.writeInt(period.getMonths());
                     output.writeInt(period.getDays());
                 } else if (value instanceof BigInteger || value instanceof BigDecimal) {
-                    output.write(numberBytes((Number) value));
+                    output.write(numberBytes((Number) value, value.getClass()));
                 } else {
                     throw new IllegalStateException("Unsupported immutable scalar " + value.getClass().getName());
                 }

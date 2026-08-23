@@ -366,6 +366,12 @@ Evidence recorded on 2026-08-22:
 - [x] Preserve selected request-body map entry order while keeping cache-only
       maps canonically order-independent.
 - [x] Keep non-normalized URI spellings distinct in canonical key material.
+- [x] Reject container arrays whose declared or runtime component cannot hold
+      the defensive snapshot while retaining interface-typed container arrays.
+- [x] Preserve every iterated identity-map entry without collapsing frozen keys
+      under `equals` semantics.
+- [x] Preflight `BigInteger` and `BigDecimal` magnitude length before allocating
+      their canonical byte arrays.
 
 ### [x] 5.2 Require explicit response variants
 
@@ -455,8 +461,11 @@ Evidence recorded on 2026-08-22:
   member, preserved duplicate-equal identity-set elements, retained selected
   request-body map order, and stopped normalizing distinct URI spellings into
   one key.
+- A sixth review pass rejected incompatible concrete/covariant container arrays,
+  preserved duplicate-equal identity-map entries, and preflighted arbitrary-
+  precision numeric magnitudes before canonical byte allocation.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1118` starter tests and `55` test-helper tests with zero
+  test` passed `1121` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

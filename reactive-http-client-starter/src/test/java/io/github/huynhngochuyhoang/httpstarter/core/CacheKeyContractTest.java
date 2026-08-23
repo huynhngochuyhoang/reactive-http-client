@@ -15,6 +15,8 @@ import reactor.util.context.Context;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URI;
 import java.util.*;
 
@@ -227,6 +229,35 @@ class CacheKeyContractTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void arraySnapshotsRequireCompatibleComponentTypes() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig concreteConfig = selectedPolicy();
+        policy(concreteConfig).setVaryByParameters(List.of("values"));
+        assertRejected(ConcreteContainerArrayClient.class, concreteConfig,
+                "array component type java.util.ArrayList cannot hold the defensive cache-key snapshot");
+
+        ReactiveHttpClientProperties.ClientConfig interfaceConfig = selectedPolicy();
+        policy(interfaceConfig).setVaryByParameters(List.of("values"));
+        assertThatCode(() -> validate(InterfaceContainerArrayClient.class, interfaceConfig))
+                .doesNotThrowAnyException();
+        Method method = InterfaceContainerArrayClient.class.getMethod("get", List[].class);
+        RequestPlan plan = plan(InterfaceContainerArrayClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                InterfaceContainerArrayClient.class, "interface-array", plan, interfaceConfig, "GET");
+        List<String>[] compatible = (List<String>[]) new List<?>[]{new ArrayList<>(List.of("value"))};
+        assertThatCode(() -> CacheKeyContract.freezeArguments(
+                plan, new Object[]{compatible}, selection.policy())).doesNotThrowAnyException();
+
+        ArrayList<String>[] covariant = (ArrayList<String>[]) new ArrayList<?>[]{
+                new ArrayList<>(List.of("value"))};
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                plan, new Object[]{covariant}, selection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("runtime array component type java.util.ArrayList")
+                .hasMessageContaining("cannot hold defensive snapshot type");
+    }
+
+    @Test
     void contextRecordWithMutableNestedStateIsRejectedBeforeDispatch() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         policy(config).setVaryByContext(List.of("tenant"));
@@ -304,6 +335,31 @@ class CacheKeyContractTest {
 
         assertThat((Set<?>) frozen[2]).hasSize(2);
         assertThat(resolved.queryParams().get("tag")).containsExactly("same", "same");
+    }
+
+    @Test
+    void freezingPreservesEveryIdentityMapEntry() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("entries"));
+        Method method = IdentityMapClient.class.getMethod("get", Map.class);
+        RequestPlan plan = plan(IdentityMapClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                IdentityMapClient.class, "identity-map", plan, config, "GET");
+        Identity first = new Identity("same", 1);
+        Identity second = new Identity("same", 1);
+        Map<Identity, String> entries = new IdentityHashMap<>();
+        entries.put(first, "value");
+        entries.put(second, "value");
+
+        Object[] frozen = CacheKeyContract.freezeArguments(
+                plan, new Object[]{entries}, selection.policy());
+
+        assertThat((Map<?, ?>) frozen[0]).hasSize(2);
+        assertThat(((Map<?, ?>) frozen[0]).entrySet()).hasSize(2);
+        assertThat(key(IdentityMapClient.class, "identity-map", method,
+                new Object[]{entries}, config))
+                .isNotEqualTo(key(IdentityMapClient.class, "identity-map", method,
+                        new Object[]{Map.of(first, "value")}, config));
     }
 
     @Test
@@ -530,6 +586,30 @@ class CacheKeyContractTest {
                 "large-string",
                 StringScalarClient.class.getMethod("get", String.class),
                 new Object[]{"\u00e9".repeat(600_000)},
+                config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cache key material exceeds 1048576 bytes");
+    }
+
+    @Test
+    void canonicalEncodingPreflightsOversizedNumericMagnitudes() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("value"));
+        BigInteger oversized = BigInteger.ONE.shiftLeft((1024 * 1024 + 1) * Byte.SIZE);
+
+        assertThatThrownBy(() -> key(
+                BigIntegerClient.class,
+                "large-integer",
+                BigIntegerClient.class.getMethod("get", BigInteger.class),
+                new Object[]{oversized},
+                config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cache key material exceeds 1048576 bytes");
+        assertThatThrownBy(() -> key(
+                BigDecimalClient.class,
+                "large-decimal",
+                BigDecimalClient.class.getMethod("get", BigDecimal.class),
+                new Object[]{new BigDecimal(oversized, 2)},
                 config))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cache key material exceeds 1048576 bytes");
@@ -898,9 +978,34 @@ class CacheKeyContractTest {
         Mono<String> get(@Body @CacheKey("body") Map<String, String> body);
     }
 
+    interface IdentityMapClient {
+        @GET("/items")
+        Mono<String> get(@Body @CacheKey("entries") Map<Identity, String> entries);
+    }
+
+    interface ConcreteContainerArrayClient {
+        @GET("/items")
+        Mono<String> get(@QueryParam("value") @CacheKey("values") ArrayList<String>[] values);
+    }
+
+    interface InterfaceContainerArrayClient {
+        @GET("/items")
+        Mono<String> get(@QueryParam("value") @CacheKey("values") List<String>[] values);
+    }
+
     interface UriVariantClient {
         @GET("/items")
         Mono<String> get(@CacheKey("uri") URI uri);
+    }
+
+    interface BigIntegerClient {
+        @GET("/items")
+        Mono<String> get(@CacheKey("value") BigInteger value);
+    }
+
+    interface BigDecimalClient {
+        @GET("/items")
+        Mono<String> get(@CacheKey("value") BigDecimal value);
     }
 
     interface VariantClient {
