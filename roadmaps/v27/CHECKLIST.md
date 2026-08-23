@@ -408,7 +408,7 @@ Evidence recorded on 2026-08-22:
 - [x] Add cross-tenant/auth/locale isolation tests and redaction tests for every
       observability surface.
 
-Evidence recorded on 2026-08-22:
+Evidence recorded on 2026-08-23:
 
 - Added the public parameter-level `@CacheKey` label and inert policy fields
   `vary-by-parameters`, `vary-by-headers`, `vary-by-context`, and
@@ -487,11 +487,13 @@ Evidence recorded on 2026-08-22:
   and preflighted selected String and serialized-body lengths before copying.
 - A tenth review pass exports normalized parameter, lowercase header, context,
   and shared-response isolation settings in effective contract snapshots;
-  rejects selected application-defined list bodies before defensive copying can
-  change their codec subtype; and bounds header projection before ordinary
-  request argument resolution can materialize expanded values.
+  rejects selected application-defined list, set, and map bodies before
+  defensive copying can change their codec subtype; freezes only request-target
+  and explicitly selected request variants; and bounds selected header
+  projection before ordinary request argument resolution can materialize
+  expanded values.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1135` starter tests and `55` test-helper tests with zero
+  test` passed `1138` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -152,8 +153,43 @@ class ReactiveHttpClientContractSnapshotTest {
                 .render();
 
         assertThat(snapshot).contains(
-                "client:ttl=5000ms,max=25,varyParameters=[tenant],varyHeaders=[x-tenant],"
-                        + "varyContext=[locale, region],sharedResponse=true");
+                "client:ttl=5000ms,max=25,varyParameters=[\"tenant\"],varyHeaders=[\"x-tenant\"],"
+                        + "varyContext=[\"locale\",\"region\"],sharedResponse=true");
+    }
+
+    @Test
+    void escapesVariantNamesWithoutCollapsingDistinctIsolationPolicies() {
+        ReactiveHttpClientProperties.ClientConfig oneName =
+                cacheSnapshotConfig(List.of("a, b", "quote\"slash\\"));
+        ReactiveHttpClientProperties.ClientConfig twoNames =
+                cacheSnapshotConfig(List.of("a", "b", "quote\"slash\\"));
+
+        String oneNameSnapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(CacheSnapshotClient.class, "cache-snapshot", oneName)
+                .render();
+        String twoNameSnapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(CacheSnapshotClient.class, "cache-snapshot", twoNames)
+                .render();
+
+        assertThat(oneNameSnapshot)
+                .contains("varyContext=[\"a, b\",\"quote\\\"slash\\\\\"]")
+                .isNotEqualTo(twoNameSnapshot);
+        assertThat(twoNameSnapshot)
+                .contains("varyContext=[\"a\",\"b\",\"quote\\\"slash\\\\\"]");
+    }
+
+    private ReactiveHttpClientProperties.ClientConfig cacheSnapshotConfig(List<String> contexts) {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(5_000L);
+        policy.setMaximumSize(25L);
+        policy.setVaryByParameters(List.of("tenant"));
+        policy.setVaryByContext(contexts);
+        policy.setSharedResponse(true);
+        config.getCache().setPolicy("selected");
+        config.getCache().getPolicies().put("selected", policy);
+        return config;
     }
 
     private ReactiveHttpClientProperties.ClientConfig clientConfig(String baseUrl,

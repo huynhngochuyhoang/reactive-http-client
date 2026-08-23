@@ -165,12 +165,16 @@ its opaque key and outbound request use those exact bytes, including
 `@JsonValue` and application serializer behavior. An absent body has a distinct
 key marker from a present zero-length body because body presence can change
 effective headers and downstream behavior. Selected header sets preserve their
-wire order. Application-defined `List` implementations are rejected when used
-as selected bodies because replacing them with a defensive collection snapshot
-cannot preserve an arbitrary concrete-type codec serializer; use a JDK list or
-an immutable record body. Header scalar and nested-container projections are
+wire order. Application-defined `List`, `Set`, and `Map` implementations are
+rejected when used as selected bodies because replacing them with a defensive
+collection snapshot cannot preserve an arbitrary concrete-type codec serializer;
+use a JDK collection or an immutable record body. Selected header scalar and
+nested-container projections are
 materialized under the same cumulative 1 MiB bound before the ordinary request
-resolver can call `String.valueOf`. URI
+resolver can call `String.valueOf`. Path and query arguments are always frozen
+because they define the request target. A body or dynamic header omitted under
+`shared-response: true` is neither cache-key validated nor frozen; the explicit
+sharing acknowledgement leaves its ordinary request behavior unchanged. URI
 variants retain their non-normalized text, so a literal Unicode path and an
 explicitly percent-escaped path remain distinct. These projections prevent
 wire-distinct requests from collapsing into one structural key. Canonical
@@ -189,8 +193,10 @@ retained key text.
 Effective-contract snapshots include normalized cache isolation policy next to
 TTL and maximum size. Parameter and context names are trimmed and sorted;
 case-insensitive header names are trimmed, sorted, and rendered lowercase; and
-`shared-response` is explicit. Approval diffs therefore expose tenant, locale,
-header, or sharing-policy drift without rendering selected values.
+`shared-response` is explicit. Variant names use quoted, escaped list entries so
+punctuation cannot make different policies render identically. Approval diffs
+therefore expose tenant, locale, header, or sharing-policy drift without
+rendering selected values.
 
 ### Native context record values
 

@@ -64,8 +64,9 @@ final class CacheKeyContract {
         }
         String context = context(clientInterface, clientName, plan, selection);
         VariantSelection variants = variants(plan, clientConfig, selection.policy(), context);
-        Set<Integer> frozenIndexes = requestArgumentIndexes(plan);
+        Set<Integer> frozenIndexes = requestTargetArgumentIndexes(plan);
         frozenIndexes.addAll(variants.parameterIndexes().values());
+        frozenIndexes.addAll(selectedHeaderArgumentIndexes(plan, variants));
         for (int index : frozenIndexes) {
             if (index < 0 || index >= plan.parameterTypes().size()) {
                 throw invalid(context, "cache-key parameter index " + index + " is outside the method signature");
@@ -104,15 +105,16 @@ final class CacheKeyContract {
         Object[] frozen = arguments != null ? arguments.clone() : new Object[0];
         VariantSelection variants = variants(
                 plan, null, policy, "Method " + plan.method().toGenericString());
-        Set<Integer> indexes = requestArgumentIndexes(plan);
+        Set<Integer> indexes = requestTargetArgumentIndexes(plan);
         indexes.addAll(variants.parameterIndexes().values());
+        indexes.addAll(selectedHeaderArgumentIndexes(plan, variants));
         FreezeBudget budget = new FreezeBudget();
         for (int index : indexes) {
             if (index < frozen.length) {
                 frozen[index] = freeze(frozen[index], 0, "parameter index " + index, budget);
             }
         }
-        snapshotHeaderArguments(plan, frozen);
+        snapshotHeaderArguments(plan, variants, frozen);
         return frozen;
     }
 
@@ -125,24 +127,27 @@ final class CacheKeyContract {
             return;
         }
         Object body = arguments[plan.bodyIndex()];
-        if (body instanceof List<?> && !isJdkListImplementation(body.getClass())) {
+        String collectionKind = body instanceof List<?> ? "list"
+                : body instanceof Set<?> ? "set"
+                : body instanceof Map<?, ?> ? "map"
+                : null;
+        if (collectionKind != null && !isJdkCollectionImplementation(body.getClass())) {
             throw invalid("Method " + plan.method().toGenericString(),
-                    "selected request body list implementation " + body.getClass().getTypeName()
+                    "selected request body " + collectionKind + " implementation "
+                            + body.getClass().getTypeName()
                             + " cannot preserve its concrete JSON codec semantics through a defensive snapshot; "
-                            + "use a JDK List implementation or an immutable record body");
+                            + "use a JDK collection implementation or an immutable record body");
         }
     }
 
-    private static boolean isJdkListImplementation(Class<?> type) {
+    private static boolean isJdkCollectionImplementation(Class<?> type) {
         return type.getClassLoader() == null && type.getModule() == List.class.getModule();
     }
 
-    private static void snapshotHeaderArguments(RequestPlan plan, Object[] arguments) {
+    private static void snapshotHeaderArguments(
+            RequestPlan plan, VariantSelection variants, Object[] arguments) {
         RequestTargetProjector projector = new RequestTargetProjector("Header projection");
-        Set<Integer> indexes = new LinkedHashSet<>();
-        plan.headerParams().forEach(binding -> indexes.add(binding.argumentIndex()));
-        plan.idempotencyKeyParams().forEach(binding -> indexes.add(binding.argumentIndex()));
-        for (int index : indexes) {
+        for (int index : selectedHeaderArgumentIndexes(plan, variants)) {
             if (index >= 0 && index < arguments.length) {
                 arguments[index] = projector.projectHeaderArgument(arguments[index]);
             }
@@ -493,16 +498,27 @@ final class CacheKeyContract {
                 .orElse(IDEMPOTENCY_KEY_HEADER);
     }
 
-    private static Set<Integer> requestArgumentIndexes(RequestPlan plan) {
+    private static Set<Integer> requestTargetArgumentIndexes(RequestPlan plan) {
         Set<Integer> indexes = new LinkedHashSet<>();
         plan.pathVars().forEach(binding -> indexes.add(binding.argumentIndex()));
         plan.queryParams().forEach(binding -> indexes.add(binding.argumentIndex()));
-        plan.headerParams().forEach(binding -> indexes.add(binding.argumentIndex()));
-        plan.idempotencyKeyParams().forEach(binding -> indexes.add(binding.argumentIndex()));
-        indexes.addAll(plan.headerMapParams());
-        if (plan.bodyIndex() >= 0) {
-            indexes.add(plan.bodyIndex());
-        }
+        return indexes;
+    }
+
+    private static Set<Integer> selectedHeaderArgumentIndexes(
+            RequestPlan plan, VariantSelection variants) {
+        Set<String> selected = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        selected.addAll(variants.headerNames());
+        Set<Integer> selectedParameters = new HashSet<>(variants.parameterIndexes().values());
+        Set<Integer> indexes = new LinkedHashSet<>();
+        plan.headerParams().stream()
+                .filter(binding -> selected.contains(binding.name())
+                        || selectedParameters.contains(binding.argumentIndex()))
+                .forEach(binding -> indexes.add(binding.argumentIndex()));
+        plan.idempotencyKeyParams().stream()
+                .filter(binding -> selected.contains(binding.name())
+                        || selectedParameters.contains(binding.argumentIndex()))
+                .forEach(binding -> indexes.add(binding.argumentIndex()));
         return indexes;
     }
 

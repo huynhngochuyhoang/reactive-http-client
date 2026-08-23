@@ -178,10 +178,40 @@ public final class ReactiveHttpClientContractSnapshot {
             return cache != null ? cache.source() : "disabled";
         }
         return cache.source() + ":ttl=" + cache.ttlMs() + "ms,max=" + cache.maximumSize()
-                + ",varyParameters=" + cache.varyByParameters()
-                + ",varyHeaders=" + cache.varyByHeaders()
-                + ",varyContext=" + cache.varyByContext()
+                + ",varyParameters=" + variantNames(cache.varyByParameters())
+                + ",varyHeaders=" + variantNames(cache.varyByHeaders())
+                + ",varyContext=" + variantNames(cache.varyByContext())
                 + ",sharedResponse=" + cache.sharedResponse();
+    }
+
+    private static String variantNames(List<String> names) {
+        StringBuilder rendered = new StringBuilder("[");
+        for (int index = 0; index < names.size(); index++) {
+            if (index > 0) {
+                rendered.append(',');
+            }
+            rendered.append('"');
+            for (char character : names.get(index).toCharArray()) {
+                switch (character) {
+                    case '"' -> rendered.append("\\\"");
+                    case '\\' -> rendered.append("\\\\");
+                    case '\b' -> rendered.append("\\b");
+                    case '\f' -> rendered.append("\\f");
+                    case '\n' -> rendered.append("\\n");
+                    case '\r' -> rendered.append("\\r");
+                    case '\t' -> rendered.append("\\t");
+                    default -> {
+                        if (Character.isISOControl(character)) {
+                            rendered.append(String.format(Locale.ROOT, "\\u%04x", (int) character));
+                        } else {
+                            rendered.append(character);
+                        }
+                    }
+                }
+            }
+            rendered.append('"');
+        }
+        return rendered.append(']').toString();
     }
 
     private static String methodSignature(Method method) {

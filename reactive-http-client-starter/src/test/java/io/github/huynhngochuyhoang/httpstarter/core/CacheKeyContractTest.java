@@ -502,8 +502,61 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void sharedResponsesLeaveUnselectedRequestVariantsUnchanged() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByHeaders(List.of());
+        policy(config).setSharedResponse(true);
+
+        assertThatCode(() -> validate(SharedUnselectedRequestClient.class, config))
+                .doesNotThrowAnyException();
+
+        Method method = SharedUnselectedRequestClient.class.getMethod(
+                "get", MutableInput.class, MutableInput.class);
+        RequestPlan plan = plan(SharedUnselectedRequestClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                SharedUnselectedRequestClient.class, "shared-unselected", plan, config, "GET");
+        MutableInput header = new MutableInput();
+        MutableInput body = new MutableInput();
+
+        Object[] frozen = CacheKeyContract.freezeArguments(
+                plan, new Object[]{header, body}, selection.policy());
+
+        assertThat(frozen[0]).isSameAs(header);
+        assertThat(frozen[1]).isSameAs(body);
+    }
+
+    @Test
+    void selectedCustomSetAndMapBodiesFailBeforeTheirCodecTypesCanChange() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+
+        Method setMethod = CustomSetBodyClient.class.getMethod("get", Set.class);
+        RequestPlan setPlan = plan(CustomSetBodyClient.class, setMethod);
+        EffectiveCachePolicy.Selection setSelection = EffectiveCachePolicy.validate(
+                CustomSetBodyClient.class, "custom-set-body", setPlan, config, "GET");
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                setPlan, new Object[]{new CustomBodySet("a", "b")}, setSelection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("selected request body set implementation")
+                .hasMessageContaining(CustomBodySet.class.getName())
+                .hasMessageContaining("concrete JSON codec semantics");
+
+        Method mapMethod = CustomMapBodyClient.class.getMethod("get", Map.class);
+        RequestPlan mapPlan = plan(CustomMapBodyClient.class, mapMethod);
+        EffectiveCachePolicy.Selection mapSelection = EffectiveCachePolicy.validate(
+                CustomMapBodyClient.class, "custom-map-body", mapPlan, config, "GET");
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                mapPlan, new Object[]{new CustomBodyMap("a", "b")}, mapSelection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("selected request body map implementation")
+                .hasMessageContaining(CustomBodyMap.class.getName())
+                .hasMessageContaining("concrete JSON codec semantics");
+    }
+
+    @Test
     void headerProjectionEnforcesCumulativeByteLimitBeforeStringification() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByHeaders(List.of("X-Metadata"));
         policy(config).setSharedResponse(true);
         Method method = LargeHeaderClient.class.getMethod("get", List.class);
         RequestPlan plan = plan(LargeHeaderClient.class, method);
@@ -1172,6 +1225,18 @@ class CacheKeyContractTest {
         }
     }
 
+    static final class CustomBodySet extends LinkedHashSet<String> {
+        CustomBodySet(String... values) {
+            super(List.of(values));
+        }
+    }
+
+    static final class CustomBodyMap extends LinkedHashMap<String, String> {
+        CustomBodyMap(String key, String value) {
+            put(key, value);
+        }
+    }
+
     record MutableRecord(List<String> values) {
     }
 
@@ -1520,6 +1585,23 @@ class CacheKeyContractTest {
     interface CustomListBodyClient {
         @GET("/items")
         Mono<String> get(@Body @CacheKey("body") List<String> body);
+    }
+
+    interface CustomSetBodyClient {
+        @GET("/items")
+        Mono<String> get(@Body @CacheKey("body") Set<String> body);
+    }
+
+    interface CustomMapBodyClient {
+        @GET("/items")
+        Mono<String> get(@Body @CacheKey("body") Map<String, String> body);
+    }
+
+    interface SharedUnselectedRequestClient {
+        @GET("/items")
+        Mono<String> get(
+                @HeaderParam("X-Metadata") MutableInput metadata,
+                @Body MutableInput body);
     }
 
     interface LargeHeaderClient {
