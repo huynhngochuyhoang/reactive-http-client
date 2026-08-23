@@ -284,16 +284,18 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         plan, invocationArguments, cacheSelection.policy());
                 RequestArgumentResolver.ResolvedArgs frozenResolved = applyDefaultHeaders(
                         applyDefaultQueryParams(argumentResolver.resolve(plan, frozenArguments)));
+                RequestArgumentResolver.ResolvedArgs keyResolved =
+                        applyContextIdempotencyKey(plan, frozenResolved, context);
                 CacheKeyContract.PreparedKey preparedKey = CacheKeyContract.derive(
                         concreteClient,
                         clientName,
                         plan,
                         frozenArguments,
-                        frozenResolved,
+                        keyResolved,
                         context,
                         cacheSelection.policy());
                 Mono<?> source = (Mono<?>) invokeResolved(
-                        proxy, method, frozenArguments, meta, plan, effectiveApi, frozenResolved);
+                        proxy, method, frozenArguments, meta, plan, effectiveApi, keyResolved);
                 return source.contextWrite(preparedKey::writeContext);
             });
         }
@@ -1978,9 +1980,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return generatedIdempotencyKey.compareAndSet(null, candidate) ? candidate : generatedIdempotencyKey.get();
     }
 
-    private RequestArgumentResolver.ResolvedArgs applyContextIdempotencyKey(RequestPlan plan,
-                                                                            RequestArgumentResolver.ResolvedArgs resolved,
-                                                                            reactor.util.context.ContextView context) {
+    static RequestArgumentResolver.ResolvedArgs applyContextIdempotencyKey(
+            RequestPlan plan,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            reactor.util.context.ContextView context) {
         if (hasIdempotencyKeyHeaderValue(plan, resolved)) {
             return resolved;
         }
@@ -2015,9 +2018,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 .orElse(IDEMPOTENCY_KEY_HEADER);
     }
 
-    private RequestArgumentResolver.ResolvedArgs withHeader(RequestArgumentResolver.ResolvedArgs resolved,
-                                                            String headerName,
-                                                            String headerValue) {
+    private static RequestArgumentResolver.ResolvedArgs withHeader(
+            RequestArgumentResolver.ResolvedArgs resolved,
+            String headerName,
+            String headerValue) {
         RequestArgumentResolver.validateHeaderName(headerName);
         RequestArgumentResolver.validateHeaderValue(headerName, headerValue);
         Map<String, List<String>> merged = new LinkedHashMap<>(resolved.headers());
@@ -2051,7 +2055,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 resolved.body());
     }
 
-    private String findHeaderNameIgnoreCase(Map<String, ?> headers, String headerName) {
+    private static String findHeaderNameIgnoreCase(Map<String, ?> headers, String headerName) {
         for (String existingName : headers.keySet()) {
             if (existingName.equalsIgnoreCase(headerName)) {
                 return existingName;

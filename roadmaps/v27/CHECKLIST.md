@@ -405,8 +405,12 @@ Evidence recorded on 2026-08-22:
   mutable nested records, and a real cold-proxy subscription snapshot. AOT
   tests cover `@CacheKey` plus record accessors nested inside resolved generic
   containers.
+- Follow-up review on 2026-08-23 added constant-specific enum support, linear
+  sequential-list copying, request-order-preserving set/map snapshots,
+  accessible external non-public records, complete case-insensitive header
+  variants, and context idempotency-key preparation before key derivation.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1098` starter tests and `55` test-helper tests with zero
+  test` passed `1102` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

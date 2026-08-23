@@ -306,7 +306,7 @@ final class CacheKeyContract {
             throw invalid(context, "cache-key value nesting exceeds " + MAX_DEPTH);
         }
         Class<?> type = value.getClass();
-        if (type.isPrimitive() || IMMUTABLE_SCALARS.contains(type) || type.isEnum()) {
+        if (type.isPrimitive() || IMMUTABLE_SCALARS.contains(type) || value instanceof Enum<?>) {
             return value;
         }
         if (type.isArray()) {
@@ -321,8 +321,10 @@ final class CacheKeyContract {
         if (value instanceof List<?> list) {
             requireElementCount(list.size(), context);
             List<Object> copy = new ArrayList<>(list.size());
-            for (int i = 0; i < list.size(); i++) {
-                copy.add(freeze(list.get(i), depth + 1, context + "[" + i + "]"));
+            int index = 0;
+            for (Object element : list) {
+                copy.add(freeze(element, depth + 1, context + "[" + index + "]"));
+                index++;
             }
             return Collections.unmodifiableList(copy);
         }
@@ -332,25 +334,16 @@ final class CacheKeyContract {
             for (Object element : set) {
                 values.add(freeze(element, depth + 1, context + " set element"));
             }
-            values.sort(Comparator.comparing(CacheKeyContract::canonicalBytes, CacheKeyContract::compareBytes));
             return Collections.unmodifiableSet(new LinkedHashSet<>(values));
         }
         if (value instanceof Map<?, ?> map) {
             requireElementCount(map.size(), context);
-            List<Map.Entry<Object, Object>> entries = new ArrayList<>(map.size());
+            Map<Object, Object> copy = new LinkedHashMap<>();
             for (Map.Entry<?, ?> entry : map.entrySet()) {
                 Object key = freeze(entry.getKey(), depth + 1, context + " map key");
                 Object mapped = freeze(entry.getValue(), depth + 1, context + " map value");
-                entries.add(new AbstractMap.SimpleImmutableEntry<>(key, mapped));
+                copy.put(key, mapped);
             }
-            entries.sort((left, right) -> {
-                int compared = compareBytes(canonicalBytes(left.getKey()), canonicalBytes(right.getKey()));
-                return compared != 0
-                        ? compared
-                        : compareBytes(canonicalBytes(left.getValue()), canonicalBytes(right.getValue()));
-            });
-            Map<Object, Object> copy = new LinkedHashMap<>();
-            entries.forEach(entry -> copy.put(entry.getKey(), entry.getValue()));
             return Collections.unmodifiableMap(copy);
         }
         if (value instanceof Optional<?> optional) {
@@ -358,16 +351,12 @@ final class CacheKeyContract {
         }
         if (type.isRecord()) {
             for (RecordComponent component : type.getRecordComponents()) {
-                try {
-                    Object componentValue = component.getAccessor().invoke(value);
-                    Object frozen = freeze(componentValue, depth + 1,
-                            context + " record component '" + component.getName() + "'");
-                    if (frozen != componentValue) {
-                        throw invalid(context, "record component '" + component.getName()
-                                + "' is mutable and cannot be copied without changing the record");
-                    }
-                } catch (ReflectiveOperationException ex) {
-                    throw invalid(context, "cannot read record component '" + component.getName() + "'");
+                Object componentValue = recordComponentValue(component, value, context);
+                Object frozen = freeze(componentValue, depth + 1,
+                        context + " record component '" + component.getName() + "'");
+                if (frozen != componentValue) {
+                    throw invalid(context, "record component '" + component.getName()
+                            + "' is mutable and cannot be copied without changing the record");
                 }
             }
             return value;
@@ -382,11 +371,31 @@ final class CacheKeyContract {
     }
 
     private static List<String> headerValues(Map<String, List<String>> headers, String requestedName) {
-        return headers.entrySet().stream()
-                .filter(entry -> entry.getKey().equalsIgnoreCase(requestedName))
-                .map(Map.Entry::getValue)
-                .findFirst()
-                .orElse(null);
+        List<String> values = new ArrayList<>();
+        headers.forEach((name, headerValues) -> {
+            if (name.equalsIgnoreCase(requestedName) && headerValues != null) {
+                values.addAll(headerValues);
+            }
+        });
+        return values.isEmpty() ? null : List.copyOf(values);
+    }
+
+    private static Object recordComponentValue(RecordComponent component, Object record, String context) {
+        Method accessor = component.getAccessor();
+        boolean accessible;
+        try {
+            accessible = accessor.canAccess(record) || accessor.trySetAccessible();
+        } catch (RuntimeException ex) {
+            throw invalid(context, "cannot access record component '" + component.getName() + "'");
+        }
+        if (!accessible) {
+            throw invalid(context, "cannot access record component '" + component.getName() + "'");
+        }
+        try {
+            return accessor.invoke(record);
+        } catch (ReflectiveOperationException | SecurityException ex) {
+            throw invalid(context, "cannot read record component '" + component.getName() + "'");
+        }
     }
 
     private static String resolvedMethodSignature(RequestPlan plan) {
@@ -521,7 +530,7 @@ final class CacheKeyContract {
             } else if (value instanceof Character character) {
                 scalar(4, type, new byte[]{(byte) (character >>> 8), (byte) character.charValue()});
             } else if (value instanceof Enum<?> enumValue) {
-                scalar(5, type, enumValue.name().getBytes(StandardCharsets.UTF_8));
+                scalar(5, enumValue.getDeclaringClass(), enumValue.name().getBytes(StandardCharsets.UTF_8));
             } else if (value instanceof UUID uuid) {
                 scalar(6, type, (uuid.getMostSignificantBits() + ":" + uuid.getLeastSignificantBits())
                         .getBytes(StandardCharsets.US_ASCII));
@@ -566,12 +575,8 @@ final class CacheKeyContract {
                 output.writeInt(components.length);
                 for (RecordComponent component : components) {
                     text(component.getName());
-                    try {
-                        framed(component.getAccessor().invoke(value), depth + 1);
-                    } catch (ReflectiveOperationException ex) {
-                        throw new IllegalStateException(
-                                "Unable to encode record component " + component.getName(), ex);
-                    }
+                    framed(recordComponentValue(component, value,
+                            "Cache-key record " + type.getName()), depth + 1);
                 }
             } else {
                 throw new IllegalStateException("Unsupported cache key value type " + type.getName());

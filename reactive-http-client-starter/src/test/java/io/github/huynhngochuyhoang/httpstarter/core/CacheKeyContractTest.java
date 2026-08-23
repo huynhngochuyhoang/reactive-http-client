@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.core.fixture.cache.NonPublicRecordFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.http.HttpHeaders;
@@ -14,10 +15,7 @@ import reactor.util.context.Context;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -206,6 +204,129 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void freezingSupportsConstantSpecificEnumsAndSequentialListsWithoutReorderingSets() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("mode", "values"));
+        Method method = OrderedInputClient.class.getMethod("get", Mode.class, List.class, Set.class);
+        RequestPlan plan = plan(OrderedInputClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                OrderedInputClient.class, "ordered", plan, config, "GET");
+        Set<String> orderedTags = new LinkedHashSet<>(List.of("z", "a"));
+
+        Object[] frozen = CacheKeyContract.freezeArguments(
+                plan,
+                new Object[]{Mode.SPECIAL, new IteratorOnlyList<>(List.of("first", "second")), orderedTags},
+                selection.policy());
+        RequestArgumentResolver.ResolvedArgs resolved = argumentResolver.resolve(plan, frozen);
+
+        assertThat(frozen[0]).isSameAs(Mode.SPECIAL);
+        assertThat((Object) frozen[1]).isEqualTo(List.of("first", "second"));
+        assertThat((Object) new ArrayList<>((Set<?>) frozen[2])).isEqualTo(List.of("z", "a"));
+        assertThat(resolved.queryParams().get("tag")).containsExactly("z", "a");
+        assertThatCode(() -> CacheKeyContract.derive(
+                OrderedInputClient.class,
+                "ordered",
+                plan,
+                frozen,
+                resolved,
+                Context.empty(),
+                selection.policy())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void nonPublicRecordValuesCanBeFrozenAndEncoded() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        Class<?> clientType = NonPublicRecordFixture.clientType();
+
+        assertThatCode(() -> key(
+                clientType,
+                "non-public-record",
+                NonPublicRecordFixture.method(),
+                new Object[]{NonPublicRecordFixture.create("tenant-a")},
+                config))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void headerVariantsIncludeEveryCaseInsensitiveHeaderSource() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByHeaders(List.of("X-Tenant"));
+        Method method = HeaderCaseClient.class.getMethod("get", String.class);
+        RequestPlan plan = plan(HeaderCaseClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                HeaderCaseClient.class, "header-case", plan, config, "GET");
+        Object[] frozen = CacheKeyContract.freezeArguments(plan, new Object[]{"dynamic-a"}, selection.policy());
+        RequestArgumentResolver.ResolvedArgs base = argumentResolver.resolve(plan, frozen);
+
+        Map<String, List<String>> firstHeaders = new LinkedHashMap<>();
+        firstHeaders.put("x-tenant", List.of("static"));
+        firstHeaders.put("X-TENANT", List.of("dynamic-a"));
+        Map<String, List<String>> secondHeaders = new LinkedHashMap<>();
+        secondHeaders.put("x-tenant", List.of("static"));
+        secondHeaders.put("X-TENANT", List.of("dynamic-b"));
+
+        CacheKeyContract.OpaqueKey first = CacheKeyContract.derive(
+                HeaderCaseClient.class,
+                "header-case",
+                plan,
+                frozen,
+                new RequestArgumentResolver.ResolvedArgs(
+                        base.pathVars(), base.queryParams(), firstHeaders, base.body(), Map.of()),
+                Context.empty(),
+                selection.policy()).key();
+        CacheKeyContract.OpaqueKey second = CacheKeyContract.derive(
+                HeaderCaseClient.class,
+                "header-case",
+                plan,
+                frozen,
+                new RequestArgumentResolver.ResolvedArgs(
+                        base.pathVars(), base.queryParams(), secondHeaders, base.body(), Map.of()),
+                Context.empty(),
+                selection.policy()).key();
+
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    void contextIdempotencyKeyIsAppliedBeforeHeaderVariantDerivation() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByHeaders(List.of("Idempotency-Key"));
+        Method method = IdempotencyVariantClient.class.getMethod("get", String.class);
+        RequestPlan plan = plan(IdempotencyVariantClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                IdempotencyVariantClient.class, "idempotency", plan, config, "GET");
+        Object[] frozen = CacheKeyContract.freezeArguments(plan, new Object[]{null}, selection.policy());
+        RequestArgumentResolver.ResolvedArgs base = argumentResolver.resolve(plan, frozen);
+        Context firstContext = Context.of(RequestContext.IDEMPOTENCY_KEY_CONTEXT_KEY, "idem-a");
+        Context secondContext = Context.of(RequestContext.IDEMPOTENCY_KEY_CONTEXT_KEY, "idem-b");
+        RequestArgumentResolver.ResolvedArgs firstResolved =
+                ReactiveClientInvocationHandler.applyContextIdempotencyKey(plan, base, firstContext);
+        RequestArgumentResolver.ResolvedArgs secondResolved =
+                ReactiveClientInvocationHandler.applyContextIdempotencyKey(plan, base, secondContext);
+
+        CacheKeyContract.OpaqueKey first = CacheKeyContract.derive(
+                IdempotencyVariantClient.class,
+                "idempotency",
+                plan,
+                frozen,
+                firstResolved,
+                firstContext,
+                selection.policy()).key();
+        CacheKeyContract.OpaqueKey second = CacheKeyContract.derive(
+                IdempotencyVariantClient.class,
+                "idempotency",
+                plan,
+                frozen,
+                secondResolved,
+                secondContext,
+                selection.policy()).key();
+
+        assertThat(firstResolved.headers().get("Idempotency-Key")).containsExactly("idem-a");
+        assertThat(secondResolved.headers().get("Idempotency-Key")).containsExactly("idem-b");
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
     void eachFreezeUsesOneDefensiveSnapshotForKeyAndRequestMaterialization() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         Method method = ListQueryClient.class.getMethod("get", List.class);
@@ -341,6 +462,34 @@ class CacheKeyContractTest {
     record MutableRecord(List<String> values) {
     }
 
+    enum Mode {
+        SPECIAL {
+        }
+    }
+
+    static final class IteratorOnlyList<E> extends AbstractList<E> {
+        private final List<E> values;
+
+        IteratorOnlyList(List<E> values) {
+            this.values = values;
+        }
+
+        @Override
+        public E get(int index) {
+            throw new AssertionError("cache-key freezing must not use indexed access");
+        }
+
+        @Override
+        public int size() {
+            return values.size();
+        }
+
+        @Override
+        public Iterator<E> iterator() {
+            return values.iterator();
+        }
+    }
+
     static final class MutableInput {
         private String value;
     }
@@ -422,6 +571,24 @@ class CacheKeyContractTest {
     interface ListQueryClient {
         @GET("/items")
         Mono<String> get(@QueryParam("tag") List<String> tags);
+    }
+
+    interface OrderedInputClient {
+        @GET("/items")
+        Mono<String> get(
+                @CacheKey("mode") Mode mode,
+                @CacheKey("values") List<String> values,
+                @QueryParam("tag") Set<String> tags);
+    }
+
+    interface HeaderCaseClient {
+        @GET("/items")
+        Mono<String> get(@HeaderParam("X-Tenant") String tenant);
+    }
+
+    interface IdempotencyVariantClient {
+        @GET("/items")
+        Mono<String> get(@IdempotencyKey String idempotencyKey);
     }
 
     interface SensitiveHeaderClient {
