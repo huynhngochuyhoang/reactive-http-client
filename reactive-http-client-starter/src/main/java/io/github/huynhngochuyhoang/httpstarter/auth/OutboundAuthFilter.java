@@ -33,7 +33,12 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
                 .or(() -> request.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE))
                 .orElse(null);
         AuthRequest authRequest = new AuthRequest(clientName, request, requestBody);
-        return resolveAuthorizedRequest(request, authRequest)
+        Mono<ClientRequest> authorizedRequest = request.attribute(AuthRequest.PRE_RESOLVED_AUTH_CONTEXT_ATTRIBUTE)
+                .filter(AuthContext.class::isInstance)
+                .map(AuthContext.class::cast)
+                .map(authContext -> Mono.just(applyAuth(request, authContext)))
+                .orElseGet(() -> resolveAuthorizedRequest(request, authRequest));
+        return authorizedRequest
                 .flatMap(next::exchange)
                 .flatMap(response -> retryOnceOnUnauthorized(response, request, authRequest, next));
     }

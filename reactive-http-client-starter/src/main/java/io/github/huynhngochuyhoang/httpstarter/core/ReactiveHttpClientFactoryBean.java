@@ -70,6 +70,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     private final Object ownedConnectionLifecycleMonitor = new Object();
     private boolean shuttingDown;
     private ProtocolAwareConnectionPoolMeterRegistrar connectionPoolMeterRegistrar;
+    private LocalResponseCacheManager responseCacheManager;
 
     // -------------------------------------------------------------------------
     // FactoryBean contract
@@ -149,8 +150,11 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 applicationContext,
                 resilienceOperatorApplier,
                 jsonCodec,
-                properties.getObservability()
+                properties.getObservability(),
+                authProvider,
+                baseUrl
         );
+        this.responseCacheManager = handler.responseCacheManager();
 
         logStartupConfiguration(
                 clientName,
@@ -209,10 +213,19 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
      */
     @Override
     public void destroy() {
+        if (responseCacheManager != null) {
+            responseCacheManager.close();
+        }
         disposeResources(CONNECTION_DISPOSAL_TIMEOUT);
         if (connectionPoolMeterRegistrar != null) {
             connectionPoolMeterRegistrar.close();
         }
+    }
+
+    LocalResponseCacheManager.Snapshot responseCacheSnapshot() {
+        return responseCacheManager != null
+                ? responseCacheManager.snapshot()
+                : new LocalResponseCacheManager.Snapshot(0, 0, 0, false);
     }
 
     private void disposeResources(Duration timeout) {

@@ -1,0 +1,509 @@
+package io.github.huynhngochuyhoang.httpstarter.core;
+
+import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
+import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.support.StaticApplicationContext;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.Disposable;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+
+import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
+
+import static org.assertj.core.api.Assertions.*;
+
+class BoundedLocalResponseCacheContractTest {
+
+    @Test
+    void lookupIsColdAndReturnsTheCachedValueByIdentity() {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("identity", 1_000, 10);
+        CacheKeyContract.OpaqueKey key = key("identity");
+        AtomicInteger loads = new AtomicInteger();
+        List<String> value = new ArrayList<>(List.of("first"));
+        Mono<List<String>> call = cached(manager, selection, key, () -> {
+            loads.incrementAndGet();
+            return Mono.just(value);
+        });
+
+        assertThat(loads).hasValue(0);
+        List<String> first = call.block();
+        List<String> second = call.block();
+
+        assertThat(loads).hasValue(1);
+        assertThat(first).isSameAs(value);
+        assertThat(second).isSameAs(value);
+        assertThat(manager.snapshot()).isEqualTo(
+                new LocalResponseCacheManager.Snapshot(1, 10, 1, false));
+    }
+
+    @Test
+    void hardExpiryUsesMonotonicTickerAndCapacityRemainsBounded() {
+        AtomicLong ticker = new AtomicLong();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get);
+        EffectiveCachePolicy.Selection selection = selection("bounded", 100, 1);
+        AtomicInteger loads = new AtomicInteger();
+
+        assertThat(load(manager, selection, key("one"), loads)).isEqualTo("value-1");
+        ticker.addAndGet(Duration.ofMillis(99).toNanos());
+        assertThat(load(manager, selection, key("one"), loads)).isEqualTo("value-1");
+        ticker.addAndGet(Duration.ofMillis(1).toNanos());
+        assertThat(load(manager, selection, key("one"), loads)).isEqualTo("value-2");
+        assertThat(load(manager, selection, key("two"), loads)).isEqualTo("value-3");
+        EffectiveCachePolicy.Selection secondPolicy = selection("second", 500, 3);
+        assertThat(cached(manager, secondPolicy, key("second-policy"), () -> Mono.just("second")).block())
+                .isEqualTo("second");
+
+        assertThat(manager.snapshot()).isEqualTo(
+                new LocalResponseCacheManager.Snapshot(2, 4, 2, false));
+    }
+
+    @Test
+    void concurrentMissesRemainIndependentAndFirstSuccessfulFillWins() throws Exception {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("duplicates", 1_000, 10);
+        CacheKeyContract.OpaqueKey key = key("shared");
+        Sinks.One<String> firstLoad = Sinks.one();
+        Sinks.One<String> secondLoad = Sinks.one();
+        AtomicInteger subscriptions = new AtomicInteger();
+        Mono<String> call = cached(manager, selection, key, () ->
+                subscriptions.getAndIncrement() == 0 ? firstLoad.asMono() : secondLoad.asMono());
+
+        CompletableFuture<String> first = call.toFuture();
+        CompletableFuture<String> second = call.toFuture();
+        assertThat(subscriptions).hasValue(2);
+
+        secondLoad.tryEmitValue("newer-completion").orThrow();
+        assertThat(second.get(1, TimeUnit.SECONDS)).isEqualTo("newer-completion");
+        firstLoad.tryEmitValue("older-completion").orThrow();
+        assertThat(first.get(1, TimeUnit.SECONDS)).isEqualTo("older-completion");
+
+        assertThat(call.block()).isEqualTo("newer-completion");
+        assertThat(subscriptions).hasValue(2);
+    }
+
+    @Test
+    void lateDuplicateCannotRepopulateAfterCapacityEviction() throws Exception {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("eviction", 1_000, 1);
+        CacheKeyContract.OpaqueKey sharedKey = key("shared");
+        Sinks.One<String> lateLoad = Sinks.one();
+        Sinks.One<String> winningLoad = Sinks.one();
+        AtomicInteger duplicateSubscriptions = new AtomicInteger();
+        Mono<String> duplicate = cached(manager, selection, sharedKey, () ->
+                duplicateSubscriptions.getAndIncrement() == 0 ? lateLoad.asMono() : winningLoad.asMono());
+
+        CompletableFuture<String> late = duplicate.toFuture();
+        CompletableFuture<String> winner = duplicate.toFuture();
+        winningLoad.tryEmitValue("winner").orThrow();
+        assertThat(winner.get(1, TimeUnit.SECONDS)).isEqualTo("winner");
+        assertThat(cached(manager, selection, key("other"), () -> Mono.just("other")).block())
+                .isEqualTo("other");
+
+        lateLoad.tryEmitValue("late").orThrow();
+        assertThat(late.get(1, TimeUnit.SECONDS)).isEqualTo("late");
+        AtomicInteger freshLoads = new AtomicInteger();
+        assertThat(cached(manager, selection, sharedKey, () -> {
+            freshLoads.incrementAndGet();
+            return Mono.just("fresh");
+        }).block()).isEqualTo("fresh");
+        assertThat(freshLoads).hasValue(1);
+    }
+
+    @Test
+    void lateDuplicateCannotReplaceAFreshGenerationAfterExpiry() throws Exception {
+        AtomicLong ticker = new AtomicLong();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get);
+        EffectiveCachePolicy.Selection selection = selection("expiry-generation", 100, 10);
+        CacheKeyContract.OpaqueKey key = key("shared");
+        Sinks.One<String> lateLoad = Sinks.one();
+        Sinks.One<String> winningLoad = Sinks.one();
+        AtomicInteger subscriptions = new AtomicInteger();
+        Mono<String> duplicate = cached(manager, selection, key, () ->
+                subscriptions.getAndIncrement() == 0 ? lateLoad.asMono() : winningLoad.asMono());
+
+        CompletableFuture<String> late = duplicate.toFuture();
+        CompletableFuture<String> winner = duplicate.toFuture();
+        winningLoad.tryEmitValue("winner").orThrow();
+        assertThat(winner.get(1, TimeUnit.SECONDS)).isEqualTo("winner");
+
+        ticker.addAndGet(Duration.ofMillis(100).toNanos());
+        AtomicInteger freshLoads = new AtomicInteger();
+        assertThat(cached(manager, selection, key, () -> {
+            freshLoads.incrementAndGet();
+            return Mono.just("fresh");
+        }).block()).isEqualTo("fresh");
+
+        lateLoad.tryEmitValue("late").orThrow();
+        assertThat(late.get(1, TimeUnit.SECONDS)).isEqualTo("late");
+        assertThat(cached(manager, selection, key, () -> Mono.just("unexpected")).block())
+                .isEqualTo("fresh");
+        assertThat(freshLoads).hasValue(1);
+    }
+
+    @Test
+    void emptyFailureAndCancellationNeverPopulateEntries() {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("terminal", 1_000, 10);
+
+        assertThat(cached(manager, selection, key("empty"), Mono::empty).block()).isNull();
+        assertThat(cached(manager, selection, key("empty"), () -> Mono.just("after-empty")).block())
+                .isEqualTo("after-empty");
+
+        assertThatThrownBy(() -> cached(manager, selection, key("error"),
+                () -> Mono.error(new IllegalStateException("load failed"))).block())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("load failed");
+        assertThat(cached(manager, selection, key("error"), () -> Mono.just("after-error")).block())
+                .isEqualTo("after-error");
+
+        Disposable cancelled = cached(manager, selection, key("cancel"), Mono::<String>never).subscribe();
+        cancelled.dispose();
+        assertThat(cached(manager, selection, key("cancel"), () -> Mono.just("after-cancel")).block())
+                .isEqualTo("after-cancel");
+    }
+
+    @Test
+    void responseEntitiesRetainOnlyRepresentationHeadersAndSensitiveResponsesAreNotStored() {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("entity", 1_000, 10);
+        AtomicInteger safeLoads = new AtomicInteger();
+        ResponseEntity<String> source = ResponseEntity.status(203)
+                .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                .header(HttpHeaders.ETAG, "v1")
+                .header("X-Request-Id", "caller-one")
+                .body("body");
+
+        Mono<ResponseEntity<String>> safe = cached(manager, selection, key("safe"), () -> {
+            safeLoads.incrementAndGet();
+            return Mono.just(source);
+        });
+        ResponseEntity<String> first = safe.block();
+        ResponseEntity<String> hit = safe.block();
+
+        assertThat(first).isSameAs(source);
+        assertThat(hit.getStatusCode().value()).isEqualTo(203);
+        assertThat(hit.getBody()).isSameAs(source.getBody());
+        assertThat(hit.getHeaders().getFirst(HttpHeaders.ETAG)).isEqualTo("v1");
+        assertThat(hit.getHeaders().containsHeader("X-Request-Id")).isFalse();
+        assertThat(safeLoads).hasValue(1);
+
+        AtomicInteger sensitiveLoads = new AtomicInteger();
+        Mono<ResponseEntity<String>> sensitive = cached(manager, selection, key("sensitive"), () -> {
+            sensitiveLoads.incrementAndGet();
+            return Mono.just(ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, "SESSION=secret")
+                    .body("private"));
+        });
+        sensitive.block();
+        sensitive.block();
+        assertThat(sensitiveLoads).hasValue(2);
+
+        AtomicInteger oversizedLoads = new AtomicInteger();
+        Mono<ResponseEntity<String>> oversized = cached(manager, selection, key("oversized"), () -> {
+            oversizedLoads.incrementAndGet();
+            ResponseEntity.BodyBuilder builder = ResponseEntity.ok();
+            for (int index = 0; index < 33; index++) {
+                builder.header(HttpHeaders.ETAG, "value-" + index);
+            }
+            return Mono.just(builder.body("oversized-headers"));
+        });
+        oversized.block();
+        oversized.block();
+        assertThat(oversizedLoads).hasValue(2);
+    }
+
+    @Test
+    void shutdownClearsEntriesAndRejectsLatePublication() {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("shutdown", 1_000, 10);
+        Sinks.One<String> load = Sinks.one();
+        CompletableFuture<String> result = cached(manager, selection, key("late"), load::asMono).toFuture();
+
+        manager.close();
+        load.tryEmitValue("late-value").orThrow();
+
+        assertThatCode(() -> result.get(1, TimeUnit.SECONDS)).doesNotThrowAnyException();
+        assertThat(manager.snapshot()).isEqualTo(
+                new LocalResponseCacheManager.Snapshot(0, 0, 0, true));
+        assertThatThrownBy(() -> cached(manager, selection, key("late"), () -> Mono.just("new")).block())
+                .hasMessageContaining("closed");
+    }
+
+    @Test
+    void factoryShutdownClosesItsCacheBeforeTransportDisposal() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig clientConfig = config();
+        clientConfig.setBaseUrl("http://cache.test");
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                clientConfig.getCache().getPolicies().get("local");
+        policy.setVaryByParameters(List.of("principal", "tenant"));
+        policy.setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        clientConfig.getCache().getCustomizations().put(
+                "starterWebClientBuilder", ReactiveHttpClientProperties.CacheCustomizationSafety.SAFE);
+        properties.getClients().put("cache-client", clientConfig);
+
+        StaticApplicationContext context = new StaticApplicationContext();
+        context.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
+        context.getBeanFactory().registerSingleton("starterWebClientBuilder", WebClient.builder()
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body("cached")
+                        .build())));
+        context.getBeanFactory().registerSingleton("reactiveHttpClientJsonCodec", TestJsonCodecs.jsonCodec());
+
+        ReactiveHttpClientFactoryBean<CacheClient> factory = new ReactiveHttpClientFactoryBean<>();
+        factory.setType(CacheClient.class);
+        factory.setApplicationContext(context);
+        try {
+            assertThat(factory.getObject().get("42", "principal", "tenant", "en-US").block())
+                    .isEqualTo("cached");
+            assertThat(factory.responseCacheSnapshot().currentSize()).isEqualTo(1);
+
+            factory.destroy();
+
+            assertThat(factory.responseCacheSnapshot()).isEqualTo(
+                    new LocalResponseCacheManager.Snapshot(0, 0, 0, true));
+        }
+        finally {
+            factory.destroy();
+            context.close();
+        }
+    }
+
+    @Test
+    void optionalImplementationIsRequiredOnlyForSelectedPolicies() throws Exception {
+        ClassLoader withoutCaffeine = new ClassLoader(getClass().getClassLoader()) {
+            @Override
+            protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                if (name.startsWith("com.github.benmanes.caffeine")) {
+                    throw new ClassNotFoundException(name);
+                }
+                return super.loadClass(name, resolve);
+            }
+        };
+        MethodMetadataCache metadata = new MethodMetadataCache();
+        ReactiveHttpClientProperties.ClientConfig disabled = new ReactiveHttpClientProperties.ClientConfig();
+
+        LocalResponseCacheManager disabledManager = LocalResponseCacheManager.createForClient(
+                CacheClient.class, "cache-client", metadata, disabled, withoutCaffeine);
+        assertThat(disabledManager.snapshot().policyCount()).isZero();
+
+        ReactiveHttpClientProperties.ClientConfig selected = config();
+        assertThatThrownBy(() -> LocalResponseCacheManager.createForClient(
+                CacheClient.class, "cache-client", metadata, selected, withoutCaffeine))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cache-client")
+                .hasMessageContaining("com.github.ben-manes.caffeine:caffeine");
+    }
+
+    @Test
+    void declarativeHitsBypassTheLoadPipelineAndVariantsRemainIsolated() {
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                config.getCache().getPolicies().get("local");
+        policy.setVaryByParameters(List.of("principal", "tenant"));
+        policy.setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        policy.setVaryByContext(List.of("region"));
+        config.getResilience().setEnabled(true);
+        config.getResilience().setCircuitBreaker("catalog-cb");
+        AtomicInteger dispatches = new AtomicInteger();
+        RecordingCircuitBreakerApplier applier = new RecordingCircuitBreakerApplier();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body("dispatch-" + dispatches.incrementAndGet())
+                        .build()))
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient,
+                    new MethodMetadataCache(),
+                    new RequestArgumentResolver(),
+                    new DefaultErrorDecoder(),
+                    config,
+                    "cache-client",
+                    CacheClient.class,
+                    context,
+                    applier,
+                    TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    manager);
+            CacheClient client = (CacheClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{CacheClient.class}, handler);
+
+            Mono<String> base = client.get("42", "principal-a", "tenant-a", "en-US")
+                    .contextWrite(ctx -> ctx.put("region", "apac"));
+            String first = base.block();
+            String hit = base.block();
+            String otherPrincipal = client.get("42", "principal-b", "tenant-a", "en-US")
+                    .contextWrite(ctx -> ctx.put("region", "apac"))
+                    .block();
+            String otherLocale = client.get("42", "principal-a", "tenant-a", "fr-FR")
+                    .contextWrite(ctx -> ctx.put("region", "apac"))
+                    .block();
+            String otherRegion = client.get("42", "principal-a", "tenant-a", "en-US")
+                    .contextWrite(ctx -> ctx.put("region", "emea"))
+                    .block();
+
+            assertThat(hit).isSameAs(first);
+            assertThat(otherPrincipal).isNotEqualTo(first);
+            assertThat(otherLocale).isNotEqualTo(first);
+            assertThat(otherRegion).isNotEqualTo(first);
+            assertThat(manager.snapshot().currentSize()).isEqualTo(4);
+        }
+
+        assertThat(dispatches).hasValue(4);
+        assertThat(applier.applications).hasValue(4);
+        assertThat(applier.subscriptions).hasValue(4);
+    }
+
+    @Test
+    void configuredAuthRunsBeforeHitsAndIsReusedByTheMissFilter() {
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        config.setAuthProvider("cache-auth");
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                config.getCache().getPolicies().get("local");
+        policy.setVaryByParameters(List.of("principal", "tenant"));
+        policy.setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+        AtomicBoolean reject = new AtomicBoolean();
+        io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider = request -> {
+            authCalls.incrementAndGet();
+            if (reject.get()) {
+                return Mono.error(new IllegalStateException("principal rejected"));
+            }
+            return Mono.just(AuthContext.builder().header("Authorization", "Bearer safe-test-token").build());
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .filter(new OutboundAuthFilter("cache-client", authProvider))
+                .exchangeFunction(request -> {
+                    assertThat(request.headers().getFirst(HttpHeaders.AUTHORIZATION))
+                            .isEqualTo("Bearer safe-test-token");
+                    dispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("authorized")
+                            .build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient,
+                    new MethodMetadataCache(),
+                    new RequestArgumentResolver(),
+                    new DefaultErrorDecoder(),
+                    config,
+                    "cache-client",
+                    CacheClient.class,
+                    context,
+                    new NoopResilienceOperatorApplier(),
+                    TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    manager,
+                    authProvider,
+                    "http://cache.test");
+            CacheClient client = (CacheClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{CacheClient.class}, handler);
+
+            assertThat(client.get("42", "principal-a", "tenant-a", "en-US").block())
+                    .isEqualTo("authorized");
+            assertThat(authCalls).hasValue(1);
+            assertThat(dispatches).hasValue(1);
+
+            reject.set(true);
+            assertThatThrownBy(() -> client.get("42", "principal-a", "tenant-a", "en-US").block())
+                    .hasRootCauseMessage("principal rejected");
+            assertThat(authCalls).hasValue(2);
+            assertThat(dispatches).hasValue(1);
+        }
+    }
+
+    private static String load(LocalResponseCacheManager manager,
+                               EffectiveCachePolicy.Selection selection,
+                               CacheKeyContract.OpaqueKey key,
+                               AtomicInteger loads) {
+        return cached(manager, selection, key,
+                () -> Mono.just("value-" + loads.incrementAndGet())).block();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> Mono<T> cached(LocalResponseCacheManager manager,
+                                      EffectiveCachePolicy.Selection selection,
+                                      CacheKeyContract.OpaqueKey key,
+                                      Supplier<Mono<T>> loader) {
+        return (Mono<T>) manager.getOrLoad(selection, key, () -> loader.get());
+    }
+
+    private static CacheKeyContract.OpaqueKey key(String value) {
+        return CacheKeyContract.OpaqueKey.from(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static EffectiveCachePolicy.Selection selection(String name, long ttlMs, long maximumSize) {
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(ttlMs);
+        policy.setMaximumSize(maximumSize);
+        return new EffectiveCachePolicy.Selection(true, EffectiveCachePolicy.Source.CLIENT, name, policy);
+    }
+
+    private static ReactiveHttpClientProperties.ClientConfig config() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(60_000L);
+        policy.setMaximumSize(100L);
+        policy.setVaryByHeaders(List.of("Idempotency-Key"));
+        config.getCache().setPolicy("local");
+        config.getCache().getPolicies().put("local", policy);
+        return config;
+    }
+
+    @ReactiveHttpClient(name = "cache-client")
+    interface CacheClient {
+        @GET("/catalog/{id}")
+        Mono<String> get(@PathVar("id") String id,
+                         @CacheKey("principal") String principal,
+                         @CacheKey("tenant") String tenant,
+                         @HeaderParam("Accept-Language") String language);
+    }
+
+    private static final class RecordingCircuitBreakerApplier extends NoopResilienceOperatorApplier {
+        private final AtomicInteger applications = new AtomicInteger();
+        private final AtomicInteger subscriptions = new AtomicInteger();
+
+        @Override
+        public <T> Mono<T> applyCircuitBreaker(Mono<T> mono, String instanceName) {
+            applications.incrementAndGet();
+            return Mono.defer(() -> {
+                subscriptions.incrementAndGet();
+                return mono;
+            });
+        }
+    }
+}
