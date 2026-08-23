@@ -165,7 +165,12 @@ its opaque key and outbound request use those exact bytes, including
 `@JsonValue` and application serializer behavior. An absent body has a distinct
 key marker from a present zero-length body because body presence can change
 effective headers and downstream behavior. Selected header sets preserve their
-wire order. URI
+wire order. Application-defined `List` implementations are rejected when used
+as selected bodies because replacing them with a defensive collection snapshot
+cannot preserve an arbitrary concrete-type codec serializer; use a JDK list or
+an immutable record body. Header scalar and nested-container projections are
+materialized under the same cumulative 1 MiB bound before the ordinary request
+resolver can call `String.valueOf`. URI
 variants retain their non-normalized text, so a literal Unicode path and an
 explicitly percent-escaped path remain distinct. These projections prevent
 wire-distinct requests from collapsing into one structural key. Canonical
@@ -180,6 +185,12 @@ the local opaque key. Raw values and digest text are never exported through
 metrics, logs, traces, diagnostics, health, or support bundles. Auth tokens,
 credentials, and cookies selected as variants therefore never become ordinary
 retained key text.
+
+Effective-contract snapshots include normalized cache isolation policy next to
+TTL and maximum size. Parameter and context names are trimmed and sorted;
+case-insensitive header names are trimmed, sorted, and rendered lowercase; and
+`shared-response` is explicit. Approval diffs therefore expose tenant, locale,
+header, or sharing-policy drift without rendering selected values.
 
 ### Native context record values
 

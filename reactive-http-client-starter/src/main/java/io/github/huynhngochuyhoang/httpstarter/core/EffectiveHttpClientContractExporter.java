@@ -150,11 +150,16 @@ final class EffectiveHttpClientContractExporter {
     private static EffectiveHttpClientContract.CachePolicy cachePolicy(
             EffectiveCachePolicy.Selection selection) {
         ReactiveHttpClientProperties.CachePolicyConfig policy = selection.policy();
+        CacheKeyContract.NormalizedVariants variants = CacheKeyContract.normalizedVariants(policy);
         return new EffectiveHttpClientContract.CachePolicy(
                 selection.enabled(),
                 selection.source().value(),
                 policy != null && policy.getTtlMs() != null ? policy.getTtlMs() : 0,
-                policy != null && policy.getMaximumSize() != null ? policy.getMaximumSize() : 0);
+                policy != null && policy.getMaximumSize() != null ? policy.getMaximumSize() : 0,
+                variants.parameterNames(),
+                variants.headerNames(),
+                variants.contextNames(),
+                variants.sharedResponse());
     }
 
     private static String authMode(ReactiveHttpClientProperties.ClientConfig clientConfig) {

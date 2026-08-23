@@ -485,8 +485,13 @@ Evidence recorded on 2026-08-22:
   conversions, reproduced compiler-generated record text structurally under the
   projection budget, distinguished absent from present-empty selected bodies,
   and preflighted selected String and serialized-body lengths before copying.
+- A tenth review pass exports normalized parameter, lowercase header, context,
+  and shared-response isolation settings in effective contract snapshots;
+  rejects selected application-defined list bodies before defensive copying can
+  change their codec subtype; and bounds header projection before ordinary
+  request argument resolution can materialize expanded values.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1131` starter tests and `55` test-helper tests with zero
+  test` passed `1135` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

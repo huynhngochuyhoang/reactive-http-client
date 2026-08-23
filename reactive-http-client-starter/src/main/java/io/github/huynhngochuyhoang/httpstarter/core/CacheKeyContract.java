@@ -100,6 +100,7 @@ final class CacheKeyContract {
                                     Object[] arguments,
                                     ReactiveHttpClientProperties.CachePolicyConfig policy) {
         validateRequestTargetContainers(plan, arguments);
+        validateSelectedBodyImplementation(plan, arguments, policy);
         Object[] frozen = arguments != null ? arguments.clone() : new Object[0];
         VariantSelection variants = variants(
                 plan, null, policy, "Method " + plan.method().toGenericString());
@@ -111,12 +112,46 @@ final class CacheKeyContract {
                 frozen[index] = freeze(frozen[index], 0, "parameter index " + index, budget);
             }
         }
+        snapshotHeaderArguments(plan, frozen);
         return frozen;
+    }
+
+    private static void validateSelectedBodyImplementation(
+            RequestPlan plan,
+            Object[] arguments,
+            ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        if (!selectsRequestBody(plan, policy) || arguments == null
+                || plan.bodyIndex() < 0 || plan.bodyIndex() >= arguments.length) {
+            return;
+        }
+        Object body = arguments[plan.bodyIndex()];
+        if (body instanceof List<?> && !isJdkListImplementation(body.getClass())) {
+            throw invalid("Method " + plan.method().toGenericString(),
+                    "selected request body list implementation " + body.getClass().getTypeName()
+                            + " cannot preserve its concrete JSON codec semantics through a defensive snapshot; "
+                            + "use a JDK List implementation or an immutable record body");
+        }
+    }
+
+    private static boolean isJdkListImplementation(Class<?> type) {
+        return type.getClassLoader() == null && type.getModule() == List.class.getModule();
+    }
+
+    private static void snapshotHeaderArguments(RequestPlan plan, Object[] arguments) {
+        RequestTargetProjector projector = new RequestTargetProjector("Header projection");
+        Set<Integer> indexes = new LinkedHashSet<>();
+        plan.headerParams().forEach(binding -> indexes.add(binding.argumentIndex()));
+        plan.idempotencyKeyParams().forEach(binding -> indexes.add(binding.argumentIndex()));
+        for (int index : indexes) {
+            if (index >= 0 && index < arguments.length) {
+                arguments[index] = projector.projectHeaderArgument(arguments[index]);
+            }
+        }
     }
 
     static RequestArgumentResolver.ResolvedArgs snapshotRequestTarget(
             RequestArgumentResolver.ResolvedArgs resolved) {
-        RequestTargetProjector projector = new RequestTargetProjector();
+        RequestTargetProjector projector = new RequestTargetProjector("Request-target projection");
         Map<String, Object> pathVars = new LinkedHashMap<>();
         resolved.pathVars().forEach((name, value) -> pathVars.put(name, projector.project(value)));
         Map<String, List<Object>> queryParams = new LinkedHashMap<>();
@@ -406,6 +441,23 @@ final class CacheKeyContract {
         }
         normalized.sort(ignoreCase ? String.CASE_INSENSITIVE_ORDER : Comparator.naturalOrder());
         return normalized;
+    }
+
+    static NormalizedVariants normalizedVariants(
+            ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        if (policy == null) {
+            return NormalizedVariants.EMPTY;
+        }
+        String context = "Effective cache policy";
+        List<String> parameters = normalized(
+                policy.getVaryByParameters(), "vary-by-parameters", false, context);
+        List<String> headers = normalized(
+                        policy.getVaryByHeaders(), "vary-by-headers", true, context).stream()
+                .map(name -> name.toLowerCase(Locale.ROOT))
+                .toList();
+        List<String> contexts = normalized(
+                policy.getVaryByContext(), "vary-by-context", false, context);
+        return new NormalizedVariants(parameters, headers, contexts, policy.isSharedResponse());
     }
 
     private static boolean hasUnpartitionedNamedHeaders(RequestPlan plan, VariantSelection variants) {
@@ -1212,6 +1264,14 @@ final class CacheKeyContract {
                 new VariantSelection(Map.of(), List.of(), List.of());
     }
 
+    record NormalizedVariants(List<String> parameterNames,
+                              List<String> headerNames,
+                              List<String> contextNames,
+                              boolean sharedResponse) {
+        private static final NormalizedVariants EMPTY =
+                new NormalizedVariants(List.of(), List.of(), List.of(), false);
+    }
+
     static final class SerializedBodyKey {
         private final boolean present;
         private final byte[] wireBytes;
@@ -1224,6 +1284,11 @@ final class CacheKeyContract {
 
     private static final class RequestTargetProjector {
         private final ByteBudget budget = new ByteBudget();
+        private final String description;
+
+        private RequestTargetProjector(String description) {
+            this.description = description;
+        }
 
         private String project(Object value) {
             StringBuilder projection = new StringBuilder();
@@ -1231,9 +1296,36 @@ final class CacheKeyContract {
             return projection.toString();
         }
 
+        private Object projectHeaderArgument(Object value) {
+            if (value == null) {
+                return null;
+            }
+            if (value instanceof Collection<?> collection) {
+                List<String> projected = new ArrayList<>();
+                for (Object element : collection) {
+                    if (element != null) {
+                        projected.add(project(element));
+                    }
+                }
+                return List.copyOf(projected);
+            }
+            if (value.getClass().isArray()) {
+                int length = Array.getLength(value);
+                List<String> projected = new ArrayList<>(length);
+                for (int index = 0; index < length; index++) {
+                    Object element = Array.get(value, index);
+                    if (element != null) {
+                        projected.add(project(element));
+                    }
+                }
+                return List.copyOf(projected);
+            }
+            return project(value);
+        }
+
         private void append(StringBuilder projection, Object value, int depth) {
             if (depth > MAX_DEPTH) {
-                throw new IllegalStateException("Request-target projection nesting exceeds " + MAX_DEPTH);
+                throw new IllegalStateException(description + " nesting exceeds " + MAX_DEPTH);
             }
             if (value == null) {
                 appendText(projection, "null");

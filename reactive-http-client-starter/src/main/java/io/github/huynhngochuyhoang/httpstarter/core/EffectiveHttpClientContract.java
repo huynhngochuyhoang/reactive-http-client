@@ -1,5 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import java.util.List;
+
 record EffectiveHttpClientContract(
         String clientName,
         String concreteClientInterface,
@@ -30,6 +32,13 @@ record EffectiveHttpClientContract(
     record ResiliencePolicy(String retry, String rateLimiter, String circuitBreaker, String bulkhead) {
     }
 
-    record CachePolicy(boolean enabled, String source, long ttlMs, long maximumSize) {
+    record CachePolicy(boolean enabled,
+                       String source,
+                       long ttlMs,
+                       long maximumSize,
+                       List<String> varyByParameters,
+                       List<String> varyByHeaders,
+                       List<String> varyByContext,
+                       boolean sharedResponse) {
     }
 }

@@ -177,7 +177,11 @@ public final class ReactiveHttpClientContractSnapshot {
         if (cache == null || !cache.enabled()) {
             return cache != null ? cache.source() : "disabled";
         }
-        return cache.source() + ":ttl=" + cache.ttlMs() + "ms,max=" + cache.maximumSize();
+        return cache.source() + ":ttl=" + cache.ttlMs() + "ms,max=" + cache.maximumSize()
+                + ",varyParameters=" + cache.varyByParameters()
+                + ",varyHeaders=" + cache.varyByHeaders()
+                + ",varyContext=" + cache.varyByContext()
+                + ",sharedResponse=" + cache.sharedResponse();
     }
 
     private static String methodSignature(Method method) {

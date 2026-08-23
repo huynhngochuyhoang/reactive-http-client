@@ -485,6 +485,40 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void selectedCustomListBodiesFailBeforeTheirCodecTypeCanChange() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        Method method = CustomListBodyClient.class.getMethod("get", List.class);
+        RequestPlan plan = plan(CustomListBodyClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                CustomListBodyClient.class, "custom-list-body", plan, config, "GET");
+
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                plan, new Object[]{new PipeDelimitedList("a", "b")}, selection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("selected request body list implementation")
+                .hasMessageContaining(PipeDelimitedList.class.getName())
+                .hasMessageContaining("concrete JSON codec semantics");
+    }
+
+    @Test
+    void headerProjectionEnforcesCumulativeByteLimitBeforeStringification() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setSharedResponse(true);
+        Method method = LargeHeaderClient.class.getMethod("get", List.class);
+        RequestPlan plan = plan(LargeHeaderClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                LargeHeaderClient.class, "large-header", plan, config, "GET");
+        String repeated = "x".repeat(256_000);
+        List<String> expandingValue = Collections.nCopies(8, repeated);
+
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                plan, new Object[]{List.of(expandingValue)}, selection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cache key material exceeds 1048576 bytes");
+    }
+
+    @Test
     void selectedBodyUsesOneCodecRepresentationForTheKeyAndWireRequest() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         policy(config).setVaryByParameters(List.of("body"));
@@ -1481,6 +1515,16 @@ class CacheKeyContractTest {
     interface OrderedHeaderSetClient {
         @GET("/items")
         Mono<String> get(@HeaderParam("X-Tag") @CacheKey("tags") Set<String> tags);
+    }
+
+    interface CustomListBodyClient {
+        @GET("/items")
+        Mono<String> get(@Body @CacheKey("body") List<String> body);
+    }
+
+    interface LargeHeaderClient {
+        @GET("/items")
+        Mono<String> get(@HeaderParam("X-Metadata") List<List<String>> metadata);
     }
 
     interface SensitiveHeaderClient {

@@ -132,6 +132,30 @@ class ReactiveHttpClientContractSnapshotTest {
                 .doesNotContain("user:token");
     }
 
+    @Test
+    void rendersNormalizedCacheIsolationPolicy() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(5_000L);
+        policy.setMaximumSize(25L);
+        policy.setVaryByParameters(java.util.List.of(" tenant "));
+        policy.setVaryByHeaders(java.util.List.of(" X-Tenant "));
+        policy.setVaryByContext(java.util.List.of(" region ", "locale"));
+        policy.setSharedResponse(true);
+        config.getCache().setPolicy("selected");
+        config.getCache().getPolicies().put("selected", policy);
+        config.setDefaultHeaders(Map.of("X-Tenant", "public"));
+
+        String snapshot = ReactiveHttpClientContractSnapshot.markdown()
+                .client(CacheSnapshotClient.class, "cache-snapshot", config)
+                .render();
+
+        assertThat(snapshot).contains(
+                "client:ttl=5000ms,max=25,varyParameters=[tenant],varyHeaders=[x-tenant],"
+                        + "varyContext=[locale, region],sharedResponse=true");
+    }
+
     private ReactiveHttpClientProperties.ClientConfig clientConfig(String baseUrl,
                                                                   long timeoutMs,
                                                                   String method,
@@ -153,6 +177,11 @@ class ReactiveHttpClientContractSnapshotTest {
 
         @GET("/users")
         Mono<String> listUsers();
+    }
+
+    interface CacheSnapshotClient {
+        @GET("/cache")
+        Mono<String> get(@CacheKey("tenant") String tenant);
     }
 
     @ReactiveHttpClient(name = "internal-users")
