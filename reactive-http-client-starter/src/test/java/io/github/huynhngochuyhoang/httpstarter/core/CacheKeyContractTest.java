@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.fixture.cache.NonPublicRecordFixture;
@@ -7,7 +8,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
+import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
@@ -18,8 +22,10 @@ import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -412,6 +418,91 @@ class CacheKeyContractTest {
                 UnstableRecordClient.class, "unstable-record", plan, config, "GET"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("must use a canonical field accessor");
+    }
+
+    @Test
+    void freezingRecordsDoesNotInvokeTheirCanonicalConstructorAgain() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("record"));
+        Method method = ConstructorSideEffectClient.class.getMethod("get", ConstructorSideEffectRecord.class);
+        RequestPlan plan = plan(ConstructorSideEffectClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                ConstructorSideEffectClient.class, "constructor-side-effect", plan, config, "GET");
+        ConstructorSideEffectRecord.CONSTRUCTIONS.set(0);
+        ConstructorSideEffectRecord record = new ConstructorSideEffectRecord("value");
+
+        Object[] frozen = CacheKeyContract.freezeArguments(
+                plan, new Object[]{record}, selection.policy());
+
+        assertThat(frozen[0]).isSameAs(record);
+        assertThat(ConstructorSideEffectRecord.CONSTRUCTIONS).hasValue(1);
+    }
+
+    @Test
+    void recordRequestTargetsPreserveTheOriginalToStringProjection() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        Method method = SlugPathClient.class.getMethod("get", Slug.class);
+        RequestPlan plan = plan(SlugPathClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                SlugPathClient.class, "slug", plan, config, "GET");
+        Slug slug = new Slug("catalog-item");
+        Object[] frozen = CacheKeyContract.freezeArguments(plan, new Object[]{slug}, selection.policy());
+
+        RequestArgumentResolver.ResolvedArgs resolved = CacheKeyContract.snapshotRequestTarget(
+                argumentResolver.resolve(plan, frozen));
+
+        assertThat(frozen[0]).isSameAs(slug);
+        assertThat(resolved.pathVars()).containsEntry("slug", "catalog-item");
+    }
+
+    @Test
+    void selectedBodyUsesOneCodecRepresentationForTheKeyAndWireRequest() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        Method method = JsonValueBodyClient.class.getMethod("get", JsonValueBody.class);
+        RequestPlan plan = plan(JsonValueBodyClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                JsonValueBodyClient.class, "json-value", plan, config, "GET");
+        JsonValueBody body = new JsonValueBody("catalog-item");
+        byte[] wireBytes = TestJsonCodecs.jsonCodec().write(body);
+        Object[] frozen = CacheKeyContract.freezeArguments(plan, new Object[]{body}, selection.policy());
+        RequestArgumentResolver.ResolvedArgs resolved = argumentResolver.resolve(plan, frozen);
+
+        CacheKeyContract.OpaqueKey codecKey = CacheKeyContract.derive(
+                JsonValueBodyClient.class, "json-value", plan, frozen, resolved,
+                Context.empty(), selection.policy(), CacheKeyContract.serializedBodyKey(wireBytes)).key();
+        CacheKeyContract.OpaqueKey differentWireKey = CacheKeyContract.derive(
+                JsonValueBodyClient.class, "json-value", plan, frozen, resolved,
+                Context.empty(), selection.policy(),
+                CacheKeyContract.serializedBodyKey("\"different\"".getBytes(StandardCharsets.UTF_8))).key();
+        assertThat(codecKey).isNotEqualTo(differentWireKey);
+
+        AtomicReference<String> dispatchedBody = new AtomicReference<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .exchangeFunction(request -> {
+                    dispatchedBody.set(materialize(request).getBodyAsString().block());
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("ok")
+                            .build());
+                })
+                .build();
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "json-value", JsonValueBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig());
+            JsonValueBodyClient client = (JsonValueBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{JsonValueBodyClient.class}, handler);
+
+            assertThat(client.get(body).block()).isEqualTo("ok");
+        }
+
+        assertThat(dispatchedBody).hasValue(new String(wireBytes, StandardCharsets.UTF_8));
+        assertThat(dispatchedBody).hasValue("\"wire-catalog-item\"");
     }
 
     @Test
@@ -876,8 +967,24 @@ class CacheKeyContractTest {
                 client, clientName, plan, config, "GET");
         Object[] frozen = CacheKeyContract.freezeArguments(plan, arguments, selection.policy());
         RequestArgumentResolver.ResolvedArgs resolved = argumentResolver.resolve(plan, frozen);
-        return CacheKeyContract.derive(
-                client, clientName, plan, frozen, resolved, context, selection.policy()).key();
+        CacheKeyContract.SerializedBodyKey serializedBody = null;
+        if (CacheKeyContract.selectsRequestBody(plan, selection.policy())) {
+            Object body = resolved.body();
+            try {
+                serializedBody = CacheKeyContract.serializedBodyKey(
+                        body != null ? TestJsonCodecs.jsonCodec().write(body) : new byte[0]);
+            } catch (Exception ex) {
+                throw new AssertionError("Unable to serialize selected test body", ex);
+            }
+        }
+        return CacheKeyContract.derive(client, clientName, plan, frozen, resolved, context,
+                selection.policy(), serializedBody).key();
+    }
+
+    private static MockClientHttpRequest materialize(ClientRequest request) {
+        MockClientHttpRequest mock = new MockClientHttpRequest(request.method(), request.url());
+        request.writeTo(mock, ExchangeStrategies.withDefaults()).block();
+        return mock;
     }
 
     private RequestPlan plan(Class<?> client, Method method) {
@@ -924,6 +1031,28 @@ class CacheKeyContractTest {
         public String token() {
             int read = READS.incrementAndGet();
             return read <= 2 ? token : token + "-" + read;
+        }
+    }
+
+    record ConstructorSideEffectRecord(String value) {
+        private static final AtomicInteger CONSTRUCTIONS = new AtomicInteger();
+
+        ConstructorSideEffectRecord {
+            CONSTRUCTIONS.incrementAndGet();
+        }
+    }
+
+    record Slug(String value) {
+        @Override
+        public String toString() {
+            return value;
+        }
+    }
+
+    record JsonValueBody(String value) {
+        @JsonValue
+        String wireValue() {
+            return "wire-" + value;
         }
     }
 
@@ -1069,6 +1198,21 @@ class CacheKeyContractTest {
     interface UnstableRecordClient {
         @GET("/items")
         Mono<String> get(@Body @CacheKey("record") UnstableRecord record);
+    }
+
+    interface ConstructorSideEffectClient {
+        @GET("/items")
+        Mono<String> get(@CacheKey("record") ConstructorSideEffectRecord record);
+    }
+
+    interface SlugPathClient {
+        @GET("/items/{slug}")
+        Mono<String> get(@PathVar("slug") Slug slug);
+    }
+
+    interface JsonValueBodyClient {
+        @GET("/items")
+        Mono<String> get(@Body @CacheKey("body") JsonValueBody body);
     }
 
     interface CacheOnlyParameterClient {

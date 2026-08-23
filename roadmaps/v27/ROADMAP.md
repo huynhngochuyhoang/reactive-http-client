@@ -241,9 +241,10 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
 - Path/query values and declared key parameters have stable handling for nulls,
   arrays, collections, maps, inherited generics, and ordering. Each subscription
   freezes one supported argument snapshot and uses that same snapshot for key
-  construction and request materialization. Records are reconstructed from one
-  captured accessor pass and rejected when their accessors cannot represent the
-  captured state. Mutable or nested values that cannot be copied safely are
+  construction and request materialization. Caller-created records are retained
+  without rerunning canonical constructors and are accepted only with canonical
+  field accessors plus immutable scalar/record components. Mutable or nested
+  values that cannot be copied safely are
   rejected rather than retained as live key/request state.
   Top-level query arrays expand into ordered query values. Arrays in path
   positions or nested inside query elements are rejected until request-target

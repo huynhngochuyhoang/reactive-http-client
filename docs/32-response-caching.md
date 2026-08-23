@@ -129,11 +129,12 @@ partition values.
 Supported selected values are null, primitive/scalar values, strings, enums,
 scalar records, arrays, typed lists/sets/maps, and optionals. The starter
 defensively freezes one snapshot per subscription and uses it for both the key
-and request materialization. Supported records are reconstructed from one
-captured accessor pass; an accessor that cannot reproduce that captured state
-is rejected before dispatch. Publishers, streams, resources, raw containers,
-unresolved generics, mutable DTOs, and mutable nested record components also
-fail before transport dispatch. A top-level query array is supported and
+and request materialization. Caller-created records are retained without
+rerunning their canonical constructors; only canonical field accessors and
+immutable scalar/record components are accepted. Publishers, streams,
+resources, raw containers, unresolved generics, mutable DTOs, and mutable
+nested record components fail before transport dispatch.
+A top-level query array is supported and
 expands to ordered query values. Arrays used as path values or nested inside
 query elements are rejected because the current request-target conversion would
 serialize them by object identity; format those values as stable scalars
@@ -156,8 +157,10 @@ container boundaries, and sorted map/set encodings for values that are not
 request-bound. Path/query dimensions use a bounded structural string snapshot
 that is then passed to URI construction, so repeated nested values cannot build
 an unbounded intermediate projection and the key sees the exact dispatched
-value. A selected body or header set, or a selected body map, preserves the
-iteration order sent on the wire instead of being sorted for the key. URI
+value. A selected body is serialized once through `ReactiveHttpClientJsonCodec`;
+its opaque key and outbound request use those exact bytes, including
+`@JsonValue` and application serializer behavior. Selected header sets preserve
+their wire order. URI
 variants retain their non-normalized text, so a literal Unicode path and an
 explicitly percent-escaped path remain distinct. These projections prevent
 wire-distinct requests from collapsing into one structural key. Canonical
@@ -174,8 +177,8 @@ retained key text.
 
 ### Native context record values
 
-The AOT processor registers record accessors and canonical constructors
-reachable from selected client method parameters. Supported records must use
+The AOT processor registers record accessors reachable from selected client
+method parameters. Supported records must use
 canonical field accessors; computed or stateful component accessors are rejected
 because their later serialized value cannot be proven equal to the captured key
 value. The processor also registers each reachable record class resource for
@@ -203,13 +206,6 @@ final class CacheContextRuntimeHints implements RuntimeHintsRegistrar {
         for (var component : components) {
             hints.reflection().registerMethod(
                     component.getAccessor(), ExecutableMode.INVOKE);
-        }
-        try {
-            hints.reflection().registerConstructor(
-                    SalesRegion.class.getDeclaredConstructor(String.class, int.class),
-                    ExecutableMode.INVOKE);
-        } catch (NoSuchMethodException ex) {
-            throw new IllegalStateException(ex);
         }
     }
 }

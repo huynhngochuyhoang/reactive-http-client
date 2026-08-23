@@ -134,19 +134,18 @@ class DocumentationReleaseArtifactTest {
                 .contains("Incompatible concrete or\ncovariant runtime array components fail before dispatch")
                 .contains("bounded structural string snapshot")
                 .contains("request-target projection each have a cumulative 1 MiB byte limit")
-                .contains("records are reconstructed from one\ncaptured accessor pass")
+                .contains("Caller-created records are retained without\nrerunning their canonical constructors")
                 .contains("`BigInteger`/`BigDecimal` encoded\nmagnitude length are checked")
                 .contains("URI text length")
                 .contains("actual iterated list, set, and map members")
                 .contains("equal-by-value elements from identity-based\nsets")
                 .contains("every iterated identity-map entry")
-                .contains("A selected body or header set, or a selected body map, preserves the")
+                .contains("A selected body is serialized once through `ReactiveHttpClientJsonCodec`")
                 .contains("URI\nvariants retain their non-normalized text")
                 .contains("### Native context record values")
                 .contains("@ImportRuntimeHints(CacheContextRuntimeHints.class)")
                 .contains("SalesRegion.class.getRecordComponents()")
                 .contains("component.getAccessor(), ExecutableMode.INVOKE")
-                .contains("SalesRegion.class.getDeclaredConstructor(String.class, int.class)")
                 .contains("Native applications that do not\nregister a context-only record");
     }
 

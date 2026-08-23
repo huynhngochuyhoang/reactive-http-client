@@ -96,20 +96,12 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         runtimeHints.resources().registerPattern(candidate.getName().replace('.', '/') + ".class");
         hints.registerType(candidate, typeHint -> {});
         var components = candidate.getRecordComponents();
-        Class<?>[] componentTypes = new Class<?>[components.length];
-        for (int index = 0; index < components.length; index++) {
-            var component = components[index];
-            componentTypes[index] = component.getType();
+        for (var component : components) {
             hints.registerMethod(component.getAccessor(), ExecutableMode.INVOKE);
             registerRecordAccessors(runtimeHints,
                     ResolvableType.forType(component.getGenericType()),
                     registeredTypes,
                     visitedTypes);
-        }
-        try {
-            hints.registerConstructor(candidate.getDeclaredConstructor(componentTypes), ExecutableMode.INVOKE);
-        } catch (NoSuchMethodException ex) {
-            throw new IllegalStateException("Record has no canonical constructor: " + candidate.getName(), ex);
         }
     }
 
