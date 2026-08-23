@@ -2,6 +2,10 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.reactivestreams.Publisher;
+import org.springframework.asm.ClassReader;
+import org.springframework.asm.ClassVisitor;
+import org.springframework.asm.MethodVisitor;
+import org.springframework.asm.Opcodes;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
 import reactor.util.context.Context;
@@ -37,6 +41,13 @@ final class CacheKeyContract {
             UUID.class, URI.class, Instant.class, LocalDate.class, LocalTime.class,
             LocalDateTime.class, OffsetTime.class, OffsetDateTime.class, ZonedDateTime.class,
             Duration.class, Period.class);
+    private static final ClassValue<CanonicalRecordAccessors> CANONICAL_RECORD_ACCESSORS =
+            new ClassValue<>() {
+                @Override
+                protected CanonicalRecordAccessors computeValue(Class<?> type) {
+                    return inspectCanonicalRecordAccessors(type);
+                }
+            };
 
     private CacheKeyContract() {
     }
@@ -404,6 +415,7 @@ final class CacheKeyContract {
                                        Class<?> recordType,
                                        String context,
                                        int depth) {
+        validateCanonicalRecordAccessors(recordType, context);
         Map<TypeVariable<?>, Type> bindings = recordBindings(declaredType, recordType);
         for (RecordComponent component : recordType.getRecordComponents()) {
             Type type = resolveType(component.getGenericType(), bindings);
@@ -519,6 +531,7 @@ final class CacheKeyContract {
             return optional.map(item -> freeze(item, depth + 1, context + " optional", budget));
         }
         if (type.isRecord()) {
+            validateCanonicalRecordAccessors(type, context);
             RecordComponent[] components = type.getRecordComponents();
             budget.consume(components.length, context);
             Object[] frozenComponents = new Object[components.length];
@@ -568,6 +581,177 @@ final class CacheKeyContract {
             throw invalid(context, "cannot reconstruct record " + type.getName()
                     + " from its captured component snapshot");
         }
+    }
+
+    private static void validateCanonicalRecordAccessors(Class<?> recordType, String context) {
+        CanonicalRecordAccessors accessors = CANONICAL_RECORD_ACCESSORS.get(recordType);
+        if (!accessors.classBytesAvailable()) {
+            throw invalid(context, "cannot inspect record accessors for " + recordType.getName()
+                    + "; register the record class resource for native cache-key use");
+        }
+        for (RecordComponent component : recordType.getRecordComponents()) {
+            String signature = accessorSignature(component.getAccessor());
+            if (!accessors.signatures().contains(signature)) {
+                throw invalid(context, "record component '" + component.getName()
+                        + "' must use a canonical field accessor so its captured cache-key value cannot change");
+            }
+        }
+    }
+
+    private static CanonicalRecordAccessors inspectCanonicalRecordAccessors(Class<?> recordType) {
+        String resource = "/" + recordType.getName().replace('.', '/') + ".class";
+        try (InputStream input = recordType.getResourceAsStream(resource)) {
+            if (input == null) {
+                return new CanonicalRecordAccessors(false, Set.of());
+            }
+            Map<String, RecordComponent> expected = new HashMap<>();
+            for (RecordComponent component : recordType.getRecordComponents()) {
+                expected.put(accessorSignature(component.getAccessor()), component);
+            }
+            Set<String> canonical = new HashSet<>();
+            ClassReader reader = new ClassReader(input);
+            reader.accept(new ClassVisitor(Opcodes.ASM9) {
+                @Override
+                public MethodVisitor visitMethod(int access,
+                                                 String name,
+                                                 String descriptor,
+                                                 String signature,
+                                                 String[] exceptions) {
+                    String methodSignature = name + descriptor;
+                    RecordComponent component = expected.get(methodSignature);
+                    return component != null
+                            ? new CanonicalRecordAccessorVisitor(
+                                    recordType, component, methodSignature, canonical)
+                            : null;
+                }
+            }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            return new CanonicalRecordAccessors(true, Set.copyOf(canonical));
+        } catch (IOException ex) {
+            return new CanonicalRecordAccessors(false, Set.of());
+        }
+    }
+
+    private static String accessorSignature(Method accessor) {
+        return accessor.getName() + org.springframework.asm.Type.getMethodDescriptor(accessor);
+    }
+
+    private static int returnOpcode(Class<?> type) {
+        if (type == long.class) {
+            return Opcodes.LRETURN;
+        }
+        if (type == float.class) {
+            return Opcodes.FRETURN;
+        }
+        if (type == double.class) {
+            return Opcodes.DRETURN;
+        }
+        return type.isPrimitive() ? Opcodes.IRETURN : Opcodes.ARETURN;
+    }
+
+    private static final class CanonicalRecordAccessorVisitor extends MethodVisitor {
+        private final String owner;
+        private final RecordComponent component;
+        private final String signature;
+        private final Set<String> canonical;
+        private int step;
+        private boolean valid = true;
+
+        private CanonicalRecordAccessorVisitor(Class<?> recordType,
+                                               RecordComponent component,
+                                               String signature,
+                                               Set<String> canonical) {
+            super(Opcodes.ASM9);
+            this.owner = org.springframework.asm.Type.getInternalName(recordType);
+            this.component = component;
+            this.signature = signature;
+            this.canonical = canonical;
+        }
+
+        @Override
+        public void visitVarInsn(int opcode, int varIndex) {
+            valid &= step == 0 && opcode == Opcodes.ALOAD && varIndex == 0;
+            step++;
+        }
+
+        @Override
+        public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+            valid &= step == 1
+                    && opcode == Opcodes.GETFIELD
+                    && this.owner.equals(owner)
+                    && component.getName().equals(name)
+                    && org.springframework.asm.Type.getDescriptor(component.getType()).equals(descriptor);
+            step++;
+        }
+
+        @Override
+        public void visitInsn(int opcode) {
+            valid &= step == 2 && opcode == returnOpcode(component.getType());
+            step++;
+        }
+
+        @Override
+        public void visitIntInsn(int opcode, int operand) {
+            valid = false;
+        }
+
+        @Override
+        public void visitTypeInsn(int opcode, String type) {
+            valid = false;
+        }
+
+        @Override
+        public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+            valid = false;
+        }
+
+        @Override
+        public void visitInvokeDynamicInsn(String name, String descriptor,
+                                           org.springframework.asm.Handle bootstrapMethodHandle,
+                                           Object... bootstrapMethodArguments) {
+            valid = false;
+        }
+
+        @Override
+        public void visitJumpInsn(int opcode, org.springframework.asm.Label label) {
+            valid = false;
+        }
+
+        @Override
+        public void visitLdcInsn(Object value) {
+            valid = false;
+        }
+
+        @Override
+        public void visitIincInsn(int varIndex, int increment) {
+            valid = false;
+        }
+
+        @Override
+        public void visitTableSwitchInsn(int min, int max, org.springframework.asm.Label dflt,
+                                         org.springframework.asm.Label... labels) {
+            valid = false;
+        }
+
+        @Override
+        public void visitLookupSwitchInsn(org.springframework.asm.Label dflt, int[] keys,
+                                          org.springframework.asm.Label[] labels) {
+            valid = false;
+        }
+
+        @Override
+        public void visitMultiANewArrayInsn(String descriptor, int dimensions) {
+            valid = false;
+        }
+
+        @Override
+        public void visitEnd() {
+            if (valid && step == 3) {
+                canonical.add(signature);
+            }
+        }
+    }
+
+    private record CanonicalRecordAccessors(boolean classBytesAvailable, Set<String> signatures) {
     }
 
     private static Object selectedParameterValue(RequestPlan plan,

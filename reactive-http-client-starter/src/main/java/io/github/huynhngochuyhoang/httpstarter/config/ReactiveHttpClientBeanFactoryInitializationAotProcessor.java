@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.ReflectionHints;
+import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.TypeReference;
 import org.springframework.beans.PropertyValue;
 import org.springframework.beans.factory.FactoryBean;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.core.ResolvableType;
 import org.springframework.util.ClassUtils;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -51,14 +53,16 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         });
         return (generationContext, beanFactoryInitializationCode) -> clientInterfaces.forEach(clientInterface -> {
             generationContext.getRuntimeHints().proxies().registerJdkProxy(clientInterface);
-            var reflectionHints = generationContext.getRuntimeHints().reflection();
+            RuntimeHints runtimeHints = generationContext.getRuntimeHints();
+            var reflectionHints = runtimeHints.reflection();
             Set<Class<?>> registeredRecordTypes = new HashSet<>();
             for (var method : clientInterface.getMethods()) {
                 reflectionHints.registerMethod(method, ExecutableMode.INVOKE);
                 for (int index = 0; index < method.getParameterCount(); index++) {
-                    registerRecordAccessors(reflectionHints,
+                    registerRecordAccessors(runtimeHints,
                             ResolvableType.forMethodParameter(method, index, clientInterface),
-                            registeredRecordTypes);
+                            registeredRecordTypes,
+                            new HashSet<>());
                 }
             }
             reflectionHints.registerType(clientInterface, typeHint -> {
@@ -70,20 +74,26 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         });
     }
 
-    private static void registerRecordAccessors(ReflectionHints hints,
+    private static void registerRecordAccessors(RuntimeHints runtimeHints,
                                                 ResolvableType type,
-                                                Set<Class<?>> registeredTypes) {
+                                                Set<Class<?>> registeredTypes,
+                                                Set<Type> visitedTypes) {
+        if (!visitedTypes.add(type.getType())) {
+            return;
+        }
         if (type.isArray()) {
-            registerRecordAccessors(hints, type.getComponentType(), registeredTypes);
+            registerRecordAccessors(runtimeHints, type.getComponentType(), registeredTypes, visitedTypes);
             return;
         }
         for (ResolvableType generic : type.getGenerics()) {
-            registerRecordAccessors(hints, generic, registeredTypes);
+            registerRecordAccessors(runtimeHints, generic, registeredTypes, visitedTypes);
         }
         Class<?> candidate = type.resolve();
         if (candidate == null || !candidate.isRecord() || !registeredTypes.add(candidate)) {
             return;
         }
+        ReflectionHints hints = runtimeHints.reflection();
+        runtimeHints.resources().registerPattern(candidate.getName().replace('.', '/') + ".class");
         hints.registerType(candidate, typeHint -> {});
         var components = candidate.getRecordComponents();
         Class<?>[] componentTypes = new Class<?>[components.length];
@@ -91,7 +101,10 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             var component = components[index];
             componentTypes[index] = component.getType();
             hints.registerMethod(component.getAccessor(), ExecutableMode.INVOKE);
-            registerRecordAccessors(hints, ResolvableType.forType(component.getGenericType()), registeredTypes);
+            registerRecordAccessors(runtimeHints,
+                    ResolvableType.forType(component.getGenericType()),
+                    registeredTypes,
+                    visitedTypes);
         }
         try {
             hints.registerConstructor(candidate.getDeclaredConstructor(componentTypes), ExecutableMode.INVOKE);

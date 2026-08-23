@@ -97,6 +97,10 @@ Mono<CatalogItem> getItem(
 ```
 
 `vary-by-parameters` names stable `@CacheKey` labels.
+A parameter that has only `@CacheKey` and no request-binding annotation must be
+selected by the effective policy. Startup rejects that cache-only parameter
+when caching is disabled or when `vary-by-parameters` omits its label, because
+otherwise the argument would affect neither the request nor the cache key.
 `vary-by-headers` must name a declared header/idempotency parameter, a
 method-level generated idempotency header, the conventional `Idempotency-Key`
 header available through `RequestContext.withIdempotencyKey(...)`, or a
@@ -171,7 +175,11 @@ retained key text.
 ### Native context record values
 
 The AOT processor registers record accessors and canonical constructors
-reachable from selected client method parameters. A record used only as a
+reachable from selected client method parameters. Supported records must use
+canonical field accessors; computed or stateful component accessors are rejected
+because their later serialized value cannot be proven equal to the captured key
+value. The processor also registers each reachable record class resource for
+that validation. A record used only as a
 runtime `vary-by-context` value has no discoverable Java type in the client
 contract, so a native application must register both explicitly:
 
@@ -188,6 +196,8 @@ record SalesRegion(String region, int tier) {
 final class CacheContextRuntimeHints implements RuntimeHintsRegistrar {
     @Override
     public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
+        hints.resources().registerPattern(
+                SalesRegion.class.getName().replace('.', '/') + ".class");
         hints.reflection().registerType(SalesRegion.class, typeHint -> {});
         var components = SalesRegion.class.getRecordComponents();
         for (var component : components) {

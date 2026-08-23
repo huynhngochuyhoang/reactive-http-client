@@ -217,6 +217,26 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void cacheOnlyParametersMustBeSelectedByTheEffectivePolicy() {
+        assertRejected(CacheOnlyParameterClient.class,
+                new ReactiveHttpClientProperties.ClientConfig(),
+                "inactive because response caching is disabled");
+
+        ReactiveHttpClientProperties.ClientConfig omitted = selectedPolicy();
+        assertRejected(CacheOnlyParameterClient.class, omitted,
+                "is not selected by the effective policy's vary-by-parameters");
+
+        ReactiveHttpClientProperties.ClientConfig selected = selectedPolicy();
+        policy(selected).setVaryByParameters(List.of("tenant"));
+        assertThatCode(() -> validate(CacheOnlyParameterClient.class, selected))
+                .doesNotThrowAnyException();
+
+        assertThatCode(() -> validate(RequestBoundCacheKeyClient.class,
+                new ReactiveHttpClientProperties.ClientConfig()))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void startupAcceptsSupportedShapesAndRejectsUnfreezableInputs() {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         policy(config).setVaryByParameters(List.of("record", "array", "list", "map"));
@@ -381,19 +401,17 @@ class CacheKeyContractTest {
     }
 
     @Test
-    void recordsAreReconstructedFromOneStableAccessorSnapshot() throws Exception {
+    void recordAccessorsThatCanChangeAfterValidationAreRejected() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         policy(config).setVaryByParameters(List.of("record"));
         Method method = UnstableRecordClient.class.getMethod("get", UnstableRecord.class);
         RequestPlan plan = plan(UnstableRecordClient.class, method);
-        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
-                UnstableRecordClient.class, "unstable-record", plan, config, "GET");
         UnstableRecord.READS.set(0);
 
-        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
-                plan, new Object[]{new UnstableRecord("token")}, selection.policy()))
+        assertThatThrownBy(() -> EffectiveCachePolicy.validate(
+                UnstableRecordClient.class, "unstable-record", plan, config, "GET"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("accessor cannot represent its captured cache-key snapshot");
+                .hasMessageContaining("must use a canonical field accessor");
     }
 
     @Test
@@ -904,7 +922,8 @@ class CacheKeyContractTest {
 
         @Override
         public String token() {
-            return token + "-" + READS.incrementAndGet();
+            int read = READS.incrementAndGet();
+            return read <= 2 ? token : token + "-" + read;
         }
     }
 
@@ -1050,6 +1069,16 @@ class CacheKeyContractTest {
     interface UnstableRecordClient {
         @GET("/items")
         Mono<String> get(@Body @CacheKey("record") UnstableRecord record);
+    }
+
+    interface CacheOnlyParameterClient {
+        @GET("/items")
+        Mono<String> get(@CacheKey("tenant") String tenant);
+    }
+
+    interface RequestBoundCacheKeyClient {
+        @GET("/items")
+        Mono<String> get(@QueryParam("tenant") @CacheKey("tenant") String tenant);
     }
 
     interface ConcreteContainerArrayClient {

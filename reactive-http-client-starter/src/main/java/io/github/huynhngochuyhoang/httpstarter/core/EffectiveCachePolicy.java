@@ -26,6 +26,8 @@ final class EffectiveCachePolicy {
                               String effectiveHttpMethod) {
         Selection selection = resolve(plan, clientConfig);
         if (!selection.enabled()) {
+            DeclarativeRequestParameterGrammar.validateCacheKeyActivity(
+                    clientInterface, clientName, plan, selection);
             return selection;
         }
 
@@ -64,6 +66,8 @@ final class EffectiveCachePolicy {
         validateMaterializedType(context, cacheValueType);
         validateRequestBody(context, plan);
         CacheKeyContract.validate(clientInterface, clientName, plan, clientConfig, selection);
+        DeclarativeRequestParameterGrammar.validateCacheKeyActivity(
+                clientInterface, clientName, plan, selection);
         return selection;
     }
 

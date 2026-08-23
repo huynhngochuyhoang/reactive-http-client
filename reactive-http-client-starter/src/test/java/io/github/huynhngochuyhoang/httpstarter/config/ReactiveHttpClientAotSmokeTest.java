@@ -294,6 +294,29 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 CacheRecordVariant.class.getMethod("version")))
                 .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.resource().forResource(
+                CacheRecordVariant.class.getName().replace('.', '/') + ".class"))
+                .accepts(generationContext.getRuntimeHints());
+        context.close();
+    }
+
+    @Test
+    void beanFactoryAotProcessorGuardsRecursiveGenericParameterTraversal() throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", RecursiveGenericAotClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, RecursiveGenericAotClient.class);
+        context.registerBeanDefinition(RecursiveGenericAotClient.class.getName(), beanDefinition);
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+        DefaultGenerationContext generationContext = newGenerationContext();
+
+        contribution.applyTo(generationContext, null);
+
+        Method method = RecursiveGenericAotClient.class.getMethod("get", Comparable.class);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method))
+                .accepts(generationContext.getRuntimeHints());
         context.close();
     }
 
@@ -440,6 +463,8 @@ class ReactiveHttpClientAotSmokeTest {
     static final class CacheContextRuntimeHints implements RuntimeHintsRegistrar {
         @Override
         public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
+            hints.resources().registerPattern(
+                    CacheContextVariant.class.getName().replace('.', '/') + ".class");
             hints.reflection().registerType(CacheContextVariant.class, typeHint -> {});
             for (var component : CacheContextVariant.class.getRecordComponents()) {
                 hints.reflection().registerMethod(component.getAccessor(), ExecutableMode.INVOKE);
@@ -459,6 +484,12 @@ class ReactiveHttpClientAotSmokeTest {
         @GET("/items")
         @CacheResponse("selected")
         Mono<String> get(@CacheKey("tenant") List<CacheRecordVariant> tenant);
+    }
+
+    @ReactiveHttpClient(name = "recursive-generic-aot", baseUrl = "http://recursive-generic-aot.test")
+    interface RecursiveGenericAotClient {
+        @GET("/items")
+        <T extends Comparable<T>> Mono<String> get(@QueryParam("value") T value);
     }
 
     @ReactiveHttpClient(name = "replacement-metadata", baseUrl = "http://replacement.test")

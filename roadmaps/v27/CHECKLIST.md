@@ -443,6 +443,11 @@ Evidence recorded on 2026-08-22:
   mutable nested records, and a real cold-proxy subscription snapshot. AOT
   tests cover `@CacheKey` plus record accessors nested inside resolved generic
   containers.
+- Follow-up validation rejects cache-only `@CacheKey` parameters unless the
+  effective policy selects their label, rejects computed/stateful record
+  accessors, and bounds AOT generic traversal with a visited-type set so
+  F-bounded method parameters cannot recurse indefinitely. Native hints include
+  the record class resources required by accessor validation.
 - Follow-up review on 2026-08-23 added constant-specific enum support, linear
   sequential-list copying, request-order-preserving set/map snapshots,
   accessible external non-public records, complete case-insensitive header
