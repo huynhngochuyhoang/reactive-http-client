@@ -119,6 +119,40 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void responseCacheDocumentationKeepsIsolationAndNativeConstraintsExplicit() throws IOException {
+        String caching = Files.readString(projectRoot().resolve("docs/32-response-caching.md"));
+
+        assertThat(caching)
+                .contains("vary-by-headers: [Accept-Language, Idempotency-Key]")
+                .contains("RequestContext.withIdempotencyKey(...)")
+                .contains("must either vary\nby its effective idempotency header")
+                .contains("effective idempotency header alone is not an\nauthenticated identity partition")
+                .contains("record components consume that budget")
+                .contains("count one depth level per nested container or\nrecord")
+                .contains("A top-level query array is supported and\nexpands to ordered query values")
+                .contains("Arrays used as path values or nested inside\nquery elements are rejected")
+                .contains("Incompatible concrete or\ncovariant runtime array components fail before dispatch")
+                .contains("bounded structural string snapshot")
+                .contains("request-target projection each have a cumulative 1 MiB byte limit")
+                .contains("Caller-created records are retained without\nrerunning their canonical constructors")
+                .contains("`BigInteger`/`BigDecimal` encoded magnitude length are checked")
+                .contains("URI text length")
+                .contains("actual iterated list, set, and map members")
+                .contains("equal-by-value elements from identity-based\nsets")
+                .contains("every iterated identity-map entry")
+                .contains("A selected body is serialized once through `ReactiveHttpClientJsonCodec`")
+                .contains("An absent body has a distinct\nkey marker from a present zero-length body")
+                .contains("overrides `toString()` are also rejected")
+                .contains("selected String body length")
+                .contains("URI\nvariants retain their non-normalized text")
+                .contains("### Native context record values")
+                .contains("@ImportRuntimeHints(CacheContextRuntimeHints.class)")
+                .contains("SalesRegion.class.getRecordComponents()")
+                .contains("component.getAccessor(), ExecutableMode.INVOKE")
+                .contains("Native applications that do not\nregister a context-only record");
+    }
+
+    @Test
     void v23OperationsGuidanceIsAlignedBoundedDiscoverableAndVersionScoped() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

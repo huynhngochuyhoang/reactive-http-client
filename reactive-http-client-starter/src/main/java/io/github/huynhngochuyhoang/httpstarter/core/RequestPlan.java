@@ -46,6 +46,7 @@ record RequestPlan(
         String rateLimiterInstanceName,
         String cachePolicyName,
         boolean cacheDisabled,
+        List<NamedArgumentBinding> cacheKeyParams,
         RetrySafetyClassification retrySafety,
         RequestBodyRepeatability bodyRepeatability,
         Type bodyType,
@@ -84,6 +85,7 @@ record RequestPlan(
                 meta.getRateLimiterInstanceName(),
                 meta.getCachePolicyName(),
                 meta.isCacheDisabled(),
+                namedBindings(meta.getCacheKeyParams()),
                 retrySafety(meta.getHttpMethod(), meta.getHeaderParams(),
                         meta.getIdempotencyKeyParams(), meta.getGeneratedIdempotencyKeyHeader()),
                 bodyRepeatability(meta, concreteClientInterface, bodyType),
@@ -220,75 +222,97 @@ record RequestPlan(
     }
 
     private static Type resolvedType(ResolvableType resolvableType, Type fallback) {
+        return resolvedType(resolvableType, fallback, new HashSet<>());
+    }
+
+    private static Type resolvedType(ResolvableType resolvableType,
+                                     Type fallback,
+                                     Set<Type> visitingTypes) {
         if (resolvableType == ResolvableType.NONE) {
             return fallback;
         }
         Type type = resolvableType.getType();
-        Class<?> rawClass = resolvableType.resolve();
-        if (type instanceof GenericArrayType genericArrayType) {
-            Type componentType = resolvedType(
-                    resolvableType.getComponentType(), genericArrayType.getGenericComponentType());
-            if (componentType instanceof Class<?> componentClass) {
-                return Array.newInstance(componentClass, 0).getClass();
+        if (!visitingTypes.add(type)) {
+            return fallback;
+        }
+        try {
+            Class<?> rawClass = resolvableType.resolve();
+            if (type instanceof GenericArrayType genericArrayType) {
+                Type componentType = resolvedType(
+                        resolvableType.getComponentType(),
+                        genericArrayType.getGenericComponentType(),
+                        visitingTypes);
+                if (componentType instanceof Class<?> componentClass) {
+                    return Array.newInstance(componentClass, 0).getClass();
+                }
+                return new ResolvedGenericArrayType(componentType);
             }
-            return new ResolvedGenericArrayType(componentType);
-        }
-        if (type instanceof WildcardType wildcardType) {
-            return resolvedWildcardType(resolvableType, wildcardType);
-        }
-        if (type instanceof Class<?>) {
-            return type;
-        }
-        if (type instanceof ParameterizedType || resolvableType.hasGenerics()) {
-            if (rawClass == null) {
-                return fallback;
+            if (type instanceof WildcardType wildcardType) {
+                return resolvedWildcardType(resolvableType, wildcardType, visitingTypes);
             }
-            Type[] generics = Arrays.stream(resolvableType.getGenerics())
-                    .map(generic -> resolvedType(generic, generic.getType()))
-                    .toArray(Type[]::new);
-            Type ownerType = type instanceof ParameterizedType parameterizedType
-                    ? resolvedOwnerType(parameterizedType.getOwnerType(), resolvableType)
-                    : null;
-            return new ResolvedParameterizedType(ownerType, rawClass, generics);
+            if (type instanceof Class<?>) {
+                return type;
+            }
+            if (type instanceof ParameterizedType || resolvableType.hasGenerics()) {
+                if (rawClass == null) {
+                    return fallback;
+                }
+                Type[] generics = Arrays.stream(resolvableType.getGenerics())
+                        .map(generic -> resolvedType(generic, generic.getType(), visitingTypes))
+                        .toArray(Type[]::new);
+                Type ownerType = type instanceof ParameterizedType parameterizedType
+                        ? resolvedOwnerType(parameterizedType.getOwnerType(), resolvableType, visitingTypes)
+                        : null;
+                return new ResolvedParameterizedType(ownerType, rawClass, generics);
+            }
+            if (!(type instanceof TypeVariable<?>)) {
+                return type;
+            }
+            return rawClass != null ? rawClass : fallback;
+        } finally {
+            visitingTypes.remove(type);
         }
-        if (!(type instanceof TypeVariable<?>)) {
-            return type;
-        }
-        return rawClass != null ? rawClass : fallback;
     }
 
-    private static Type resolvedWildcardType(ResolvableType resolvableType, WildcardType wildcardType) {
+    private static Type resolvedWildcardType(ResolvableType resolvableType,
+                                             WildcardType wildcardType,
+                                             Set<Type> visitingTypes) {
         Type[] lowerBounds = wildcardType.getLowerBounds();
         if (lowerBounds.length > 0) {
-            Type resolvedLowerBound = resolvedWildcardBound(resolvableType, lowerBounds[0]);
+            Type resolvedLowerBound = resolvedWildcardBound(
+                    resolvableType, lowerBounds[0], visitingTypes);
             return new ResolvedWildcardType(new Type[]{Object.class}, new Type[]{resolvedLowerBound});
         }
         Type[] upperBounds = wildcardType.getUpperBounds();
         Type upperBound = upperBounds.length == 0 ? Object.class : upperBounds[0];
         return new ResolvedWildcardType(
-                new Type[]{resolvedWildcardBound(resolvableType, upperBound)}, new Type[0]);
+                new Type[]{resolvedWildcardBound(resolvableType, upperBound, visitingTypes)}, new Type[0]);
     }
 
-    private static Type resolvedWildcardBound(ResolvableType resolvableType, Type fallback) {
+    private static Type resolvedWildcardBound(ResolvableType resolvableType,
+                                              Type fallback,
+                                              Set<Type> visitingTypes) {
         if (fallback instanceof Class<?>) {
             return fallback;
         }
         Class<?> rawClass = resolvableType.resolve();
         if (resolvableType.hasGenerics() && rawClass != null) {
             Type[] generics = Arrays.stream(resolvableType.getGenerics())
-                    .map(generic -> resolvedType(generic, generic.getType()))
+                    .map(generic -> resolvedType(generic, generic.getType(), visitingTypes))
                     .toArray(Type[]::new);
             Type ownerType = fallback instanceof ParameterizedType parameterizedType
-                    ? resolvedOwnerType(parameterizedType.getOwnerType(), resolvableType)
+                    ? resolvedOwnerType(parameterizedType.getOwnerType(), resolvableType, visitingTypes)
                     : null;
             return new ResolvedParameterizedType(ownerType, rawClass, generics);
         }
         return rawClass != null ? rawClass : fallback;
     }
 
-    private static Type resolvedOwnerType(Type ownerType, ResolvableType context) {
+    private static Type resolvedOwnerType(Type ownerType,
+                                          ResolvableType context,
+                                          Set<Type> visitingTypes) {
         return ownerType != null
-                ? resolvedType(ResolvableType.forType(ownerType, context), ownerType)
+                ? resolvedType(ResolvableType.forType(ownerType, context), ownerType, visitingTypes)
                 : null;
     }
 

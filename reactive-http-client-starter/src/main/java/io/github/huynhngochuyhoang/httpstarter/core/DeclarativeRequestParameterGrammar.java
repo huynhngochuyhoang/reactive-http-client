@@ -29,13 +29,46 @@ final class DeclarativeRequestParameterGrammar {
         validateHeaderMapTypes(concreteClientInterface, clientName, plan);
         validateFormFileTypes(concreteClientInterface, clientName, plan);
 
+        Set<Integer> cacheKeyParameters = new HashSet<>();
+        plan.cacheKeyParams().forEach(binding -> cacheKeyParameters.add(binding.argumentIndex()));
         List<Integer> unannotated = new ArrayList<>();
         for (int index = 0; index < method.getParameterCount(); index++) {
-            if (!rolesByParameter.containsKey(index)) {
+            if (!rolesByParameter.containsKey(index) && !cacheKeyParameters.contains(index)) {
                 unannotated.add(index);
             }
         }
         return List.copyOf(unannotated);
+    }
+
+    static void validateCacheKeyActivity(Class<?> concreteClientInterface,
+                                         String clientName,
+                                         RequestPlan plan,
+                                         EffectiveCachePolicy.Selection selection) {
+        if (selection.enabled() && selection.policy() == null) {
+            return;
+        }
+        List<String> configuredLabels = selection.enabled()
+                ? selection.policy().getVaryByParameters()
+                : null;
+        Set<String> selectedLabels = new HashSet<>();
+        if (configuredLabels != null) {
+            configuredLabels.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .forEach(selectedLabels::add);
+        }
+        Set<Integer> requestParameters = rolesByParameter(plan).keySet();
+        for (RequestPlan.NamedArgumentBinding binding : plan.cacheKeyParams()) {
+            if (!requestParameters.contains(binding.argumentIndex())
+                    && !selectedLabels.contains(binding.name())) {
+                String reason = selection.enabled()
+                        ? "cache-only @CacheKey(\"" + binding.name()
+                        + "\") is not selected by the effective policy's vary-by-parameters"
+                        : "cache-only @CacheKey(\"" + binding.name()
+                        + "\") is inactive because response caching is disabled";
+                throw invalid(concreteClientInterface, clientName, plan, binding.argumentIndex(), reason);
+            }
+        }
     }
 
     private static Map<Integer, List<String>> rolesByParameter(RequestPlan plan) {

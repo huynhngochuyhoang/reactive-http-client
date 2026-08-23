@@ -425,6 +425,31 @@
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
     },
     {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].vary-by-parameters",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Stable @CacheKey labels used as additional response partition dimensions. Path and query parameters are included automatically.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].vary-by-headers",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Named outbound headers used as response partition dimensions, matched case-insensitively. Include the effective idempotency header unless shared-response is acknowledged.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].vary-by-context",
+      "type": "java.util.List<java.lang.String>",
+      "description": "String Reactor-context keys used as response partition dimensions.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].shared-response",
+      "type": "java.lang.Boolean",
+      "description": "Explicitly acknowledge that omitted caller, auth, header, and context variants may share one response. Explicitly selected dimensions still partition the response. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig",
+      "defaultValue": false
+    },
+    {
       "name": "reactive.http.clients.[name].cache.customizations",
       "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties.CacheCustomizationSafety>",
       "description": "Explicit cache-safety decisions keyed by applicable Boot WebClientCustomizer, ReactiveHttpClientCustomizer, or replacement WebClient.Builder bean name. Unknown and INCOMPATIBLE customizations reject selected caching.",

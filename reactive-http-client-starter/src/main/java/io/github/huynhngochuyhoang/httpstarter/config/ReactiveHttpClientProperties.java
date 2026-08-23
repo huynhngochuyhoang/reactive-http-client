@@ -775,12 +775,41 @@ public class ReactiveHttpClientProperties {
         private Long ttlMs;
         /** Maximum number of entries. {@code null} means missing. */
         private Long maximumSize;
+        /** Stable {@code @CacheKey} labels included as additional key dimensions. */
+        private List<String> varyByParameters = new ArrayList<>();
+        /**
+         * Named outbound headers included as key dimensions, matched case-insensitively.
+         * Include the effective idempotency header unless {@link #sharedResponse} is acknowledged.
+         */
+        private List<String> varyByHeaders = new ArrayList<>();
+        /** String Reactor-context keys included as key dimensions. */
+        private List<String> varyByContext = new ArrayList<>();
+        /** Explicit acknowledgement that omitted caller/auth variants share one response. */
+        private boolean sharedResponse;
 
         public Long getTtlMs() { return ttlMs; }
         public void setTtlMs(Long ttlMs) { this.ttlMs = ttlMs; }
 
         public Long getMaximumSize() { return maximumSize; }
         public void setMaximumSize(Long maximumSize) { this.maximumSize = maximumSize; }
+
+        public List<String> getVaryByParameters() { return varyByParameters; }
+        public void setVaryByParameters(List<String> varyByParameters) {
+            this.varyByParameters = varyByParameters != null ? new ArrayList<>(varyByParameters) : new ArrayList<>();
+        }
+
+        public List<String> getVaryByHeaders() { return varyByHeaders; }
+        public void setVaryByHeaders(List<String> varyByHeaders) {
+            this.varyByHeaders = varyByHeaders != null ? new ArrayList<>(varyByHeaders) : new ArrayList<>();
+        }
+
+        public List<String> getVaryByContext() { return varyByContext; }
+        public void setVaryByContext(List<String> varyByContext) {
+            this.varyByContext = varyByContext != null ? new ArrayList<>(varyByContext) : new ArrayList<>();
+        }
+
+        public boolean isSharedResponse() { return sharedResponse; }
+        public void setSharedResponse(boolean sharedResponse) { this.sharedResponse = sharedResponse; }
     }
 
     // ---- resilience sub-config ----

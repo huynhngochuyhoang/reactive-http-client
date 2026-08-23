@@ -1,9 +1,9 @@
 # Response Caching
 
 V27 introduces an explicit local response-cache contract in four phases. This
-page currently freezes policy selection and startup eligibility. The Priority 4
-implementation does not yet store or reuse responses; bounded storage is added
-only after key and variant isolation are complete.
+page currently freezes policy selection, startup eligibility, and key isolation.
+The Priority 5 implementation still does not store or reuse responses; bounded
+storage is added in phase one only after this contract.
 
 ## Explicit selection
 
@@ -22,6 +22,7 @@ reactive:
             catalog-read:
               ttl-ms: 60000
               maximum-size: 10000
+              vary-by-headers: [Idempotency-Key]
 ```
 
 Omitting `cache.policy` keeps client-wide caching disabled. Adding a future
@@ -65,6 +66,190 @@ value, status, and only the bounded representation-header allowlist defined by
 the storage phase. A hit does not create a new downstream wire response.
 Per-caller and sensitive response headers are never reusable cache metadata.
 
+## Key and variant isolation
+
+Every key includes the logical and concrete client identity plus the full
+generic-resolved method signature. Path and query values are always included.
+Additional values are explicit:
+
+```yaml
+reactive:
+  http:
+    clients:
+      catalog-service:
+        cache:
+          policies:
+            catalog-read:
+              ttl-ms: 60000
+              maximum-size: 10000
+              vary-by-parameters: [tenant]
+              vary-by-headers: [Accept-Language, Idempotency-Key]
+              vary-by-context: [salesRegion]
+```
+
+```java
+@GET("/catalog/{id}")
+@CacheResponse("catalog-read")
+Mono<CatalogItem> getItem(
+        @PathVar("id") String id,
+        @HeaderParam("Accept-Language") String language,
+        @CacheKey("tenant") String tenantId);
+```
+
+`vary-by-parameters` names stable `@CacheKey` labels.
+A parameter that has only `@CacheKey` and no request-binding annotation must be
+selected by the effective policy. Startup rejects that cache-only parameter
+when caching is disabled or when `vary-by-parameters` omits its label, because
+otherwise the argument would affect neither the request nor the cache key.
+`vary-by-headers` must name a declared header/idempotency parameter, a
+method-level generated idempotency header, the conventional `Idempotency-Key`
+header available through `RequestContext.withIdempotencyKey(...)`, or a
+configured default header and is case-insensitive. Because any invocation can
+supply the context-only idempotency header, a selected policy must either vary
+by its effective idempotency header or explicitly acknowledge reuse with
+`shared-response: true`. `vary-by-context` reads string keys from the
+subscriber's Reactor context. Blank, duplicate, unknown parameter/header, and
+ambiguous declarations fail startup.
+
+For an authenticated method with no explicit parameter/header/context
+partition, set `shared-response: true` only when the response is deliberately
+shared across identities. The effective idempotency header alone is not an
+authenticated identity partition because it may be absent and is required for
+every non-shared policy. Select at least one additional stable parameter,
+header, or context dimension, or explicitly acknowledge `shared-response`.
+The same acknowledgement is required when dynamic headers, header maps, or a
+body are intentionally omitted. It cannot be used to remove explicitly
+selected variants; those dimensions still partition the response.
+
+Request IDs, correlation IDs, trace IDs, and similarly unique values are poor
+cache variants: they make nearly every call a miss and provide no response
+isolation. Prefer stable tenant, locale, authorization-scope, or business
+partition values.
+
+Supported selected values are null, primitive/scalar values, strings, enums,
+scalar records, arrays, typed lists/sets/maps, and optionals. The starter
+defensively freezes one snapshot per subscription and uses it for both the key
+and request materialization. Caller-created records are retained without
+rerunning their canonical constructors; only canonical field accessors and
+immutable scalar/record components are accepted. Publishers, streams,
+resources, raw containers, unresolved generics, mutable DTOs, and mutable
+nested record components fail before transport dispatch.
+A top-level query array is supported and
+expands to ordered query values. Arrays used as path values or nested inside
+query elements are rejected because the current request-target conversion would
+serialize them by object identity; format those values as stable scalars
+instead. Arrays of containers must use a component type such as `List`, `Set`,
+or `Map` that can hold the defensive snapshot. Incompatible concrete or
+covariant runtime array components fail before dispatch instead of producing an
+array-store error. Path values and nested query elements whose collection, map,
+or record type overrides `toString()` are also rejected. Enums that override
+`toString()` are rejected for path, nested query, and selected header values:
+arbitrary conversion cannot be interrupted at the projection byte limit.
+Standard container text and compiler-generated record text are reproduced
+structurally under that limit.
+Freezing and startup validation count one depth level per nested container or
+record and enforce one cumulative 10,000-element budget across the selected
+argument graph and another across selected Reactor context values. Container
+elements, optional values, and record components consume that budget, so shared
+or deeply nested object graphs cannot expand without a bound. Runtime freezing
+charges actual iterated list, set, and map members instead of trusting reported
+container sizes. It also preserves equal-by-value elements from identity-based
+sets and every iterated identity-map entry so the frozen request cannot silently
+lose query, header, or body values.
+
+The canonical representation uses type tags, explicit nulls, length framing,
+container boundaries, and sorted map/set encodings for values that are not
+request-bound. Path/query dimensions use a bounded structural string snapshot
+that is then passed to URI construction, so repeated nested values cannot build
+an unbounded intermediate projection and the key sees the exact dispatched
+value. A selected body is serialized once through `ReactiveHttpClientJsonCodec`;
+its opaque key and outbound request use those exact bytes, including
+`@JsonValue` and application serializer behavior. An absent body has a distinct
+key marker from a present zero-length body because body presence can change
+effective headers and downstream behavior. Selected header sets preserve their
+wire order. Application-defined `List`, `Set`, and `Map` implementations are
+rejected when used as selected bodies because replacing them with a defensive
+collection snapshot cannot preserve an arbitrary concrete-type codec serializer;
+use a JDK collection or an immutable record body. Selected header scalar and
+nested-container projections are validated before freezing, so a nested custom
+container cannot lose its wire conversion. They are then
+materialized under the same cumulative 1 MiB bound before the ordinary request
+resolver can call `String.valueOf`. Path and query arguments are always frozen
+because they define the request target. A body or dynamic header omitted under
+`shared-response: true` is neither cache-key validated nor frozen; the explicit
+sharing acknowledgement leaves its ordinary request behavior unchanged. URI
+variants retain their non-normalized text, so a literal Unicode path and an
+explicitly percent-escaped path remain distinct. These projections prevent
+wire-distinct requests from collapsing into one structural key. Canonical
+encoding and request-target projection each have a cumulative 1 MiB byte limit.
+UTF-8 scalar length, selected String body length, URI text length, and
+`BigInteger`/`BigDecimal` encoded magnitude length are checked before encoded
+bytes are materialized, so one oversized value cannot bypass the allocation
+bound. Cache-selected JSON uses `ReactiveHttpClientJsonCodec.writeBounded(...)`,
+which must enforce the 1 MiB limit while encoding. The built-in Jackson 3 codec
+writes through a capped buffer; a custom codec must implement the bounded method
+or the selected call fails before dispatch. Serialized body bytes are checked
+again before defensive key/request copies.
+This wire projection is not a fallback for arbitrary
+`@CacheKey` or Reactor-context values. Only the SHA-256 digest is retained as
+the local opaque key. Raw values and digest text are never exported through
+metrics, logs, traces, diagnostics, health, or support bundles. Auth tokens,
+credentials, and cookies selected as variants therefore never become ordinary
+retained key text.
+
+Effective-contract snapshots include normalized cache isolation policy next to
+TTL and maximum size. Parameter and context names are trimmed and sorted;
+case-insensitive header names are trimmed, sorted, and rendered lowercase; and
+`shared-response` is explicit. Variant names use quoted, escaped list entries so
+punctuation cannot make different policies render identically. Approval diffs
+therefore expose tenant, locale, header, or sharing-policy drift without
+rendering selected values.
+
+### Native context record values
+
+The AOT processor registers record accessors reachable from selected client
+method parameters. Supported records must use
+canonical field accessors; computed or stateful component accessors are rejected
+because their later serialized value cannot be proven equal to the captured key
+value. The processor also registers each reachable record class resource for
+that validation. A record used only as a
+runtime `vary-by-context` value has no discoverable Java type in the client
+contract, so a native application must register both explicitly:
+
+```java
+import org.springframework.aot.hint.ExecutableMode;
+import org.springframework.aot.hint.RuntimeHints;
+import org.springframework.aot.hint.RuntimeHintsRegistrar;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ImportRuntimeHints;
+
+record SalesRegion(String region, int tier) {
+}
+
+final class CacheContextRuntimeHints implements RuntimeHintsRegistrar {
+    @Override
+    public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
+        hints.resources().registerPattern(
+                SalesRegion.class.getName().replace('.', '/') + ".class");
+        hints.reflection().registerType(SalesRegion.class, typeHint -> {});
+        var components = SalesRegion.class.getRecordComponents();
+        for (var component : components) {
+            hints.reflection().registerMethod(
+                    component.getAccessor(), ExecutableMode.INVOKE);
+        }
+    }
+}
+
+@Configuration
+@ImportRuntimeHints(CacheContextRuntimeHints.class)
+class CacheNativeConfiguration {
+}
+```
+
+JVM applications need no additional hint. Native applications that do not
+register a context-only record must use a supported scalar/container context
+value instead.
+
 ## Customization safety
 
 A cache hit will eventually occur before HTTP dispatch, so arbitrary builder
@@ -102,5 +287,5 @@ it `INCOMPATIBLE`; classification is not a bypass mechanism.
 Proxy startup, AOT processing, effective-contract export, diagnostics, and
 `MockReactiveHttpClient` use the same `MethodMetadataCache`-backed grammar.
 Replacement metadata caches remain authoritative. Contract snapshots expose a
-bounded `Cache` cell with only source, TTL, and maximum size; policy names and
-request values are not exported.
+bounded `Cache` cell with only source, TTL, and maximum size; policy names,
+raw values, and opaque key digests are not exported.

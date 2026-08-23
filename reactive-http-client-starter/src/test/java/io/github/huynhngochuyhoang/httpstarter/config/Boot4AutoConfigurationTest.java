@@ -38,9 +38,11 @@ import tools.jackson.databind.ser.std.StdSerializer;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class Boot4AutoConfigurationTest {
 
@@ -110,6 +112,17 @@ class Boot4AutoConfigurationTest {
 
         assertThat(new String(encoded, StandardCharsets.UTF_8))
                 .isEqualTo("{\"value\":\"CUSTOM:configured\"}");
+    }
+
+    @Test
+    void jackson3CodecEnforcesTheBoundWhileWriting() throws Exception {
+        Jackson3ReactiveHttpClientJsonCodec codec = new Jackson3ReactiveHttpClientJsonCodec(
+                JsonMapper.builder().build());
+
+        assertThat(new String(codec.writeBounded(Map.of("value", "ok"), 32), StandardCharsets.UTF_8))
+                .isEqualTo("{\"value\":\"ok\"}");
+        assertThatThrownBy(() -> codec.writeBounded(Map.of("value", "x".repeat(128)), 32))
+                .hasRootCauseMessage("Cache-selected request body exceeds 32 bytes");
     }
 
     @Test

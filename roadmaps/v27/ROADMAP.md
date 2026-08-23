@@ -233,17 +233,56 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
 - Encode key inputs as a canonical typed structure with explicit null markers,
   scalar type identifiers, length framing, container boundaries, element/index
   boundaries, and canonical map-entry ordering before equality or one-way
-  derivation. Delimiter concatenation, `toString()`, identity hash codes, and
-  unframed serialized text are not valid key encodings.
+  derivation. Delimiter concatenation, generic `toString()` fallback, identity
+  hash codes, and unframed serialized text are not valid selected key/context
+  encodings. Path/query dimensions use one bounded structural string snapshot
+  sent through request-target construction so wire-distinct values remain
+  distinct without unbounded intermediate projection allocation.
 - Path/query values and declared key parameters have stable handling for nulls,
   arrays, collections, maps, inherited generics, and ordering. Each subscription
   freezes one supported argument snapshot and uses that same snapshot for key
-  construction and request materialization. Mutable or nested values that cannot
-  be copied safely are rejected rather than retained as live key/request state.
+  construction and request materialization. Caller-created records are retained
+  without rerunning canonical constructors and are accepted only with canonical
+  field accessors plus immutable scalar/record components. Mutable or nested
+  values that cannot be copied safely are
+  rejected rather than retained as live key/request state.
+  Top-level query arrays expand into ordered query values. Arrays in path
+  positions or nested inside query elements are rejected until request-target
+  conversion has a stable structural projection rather than identity-based
+  `String.valueOf`. Container arrays use interface component types capable of
+  holding defensive snapshots; incompatible concrete declarations and
+  covariant runtime arrays fail before dispatch. Custom collection, map, and
+  record `toString()` implementations are rejected in request-target positions;
+  standard container and compiler-generated record text is reproduced
+  structurally under the projection budget.
+- Request-bound selected collections preserve the same element order used by
+  URI, header, and body materialization. Request-bound body maps preserve entry
+  iteration order. Canonical map/set ordering applies only to selected values
+  whose wire representation is not order-sensitive. URI variants retain their
+  non-normalized textual representation.
+- One cumulative element budget includes container members, optional values,
+  and record components. Startup and runtime count one level per nested record.
+  Runtime accounting charges actual iterated members rather than trusting
+  collection size metadata, and freezing preserves equal-by-value members of
+  identity-based sets plus every iterated identity-map entry. One cumulative
+  byte budget is enforced while nested canonical frames and bounded
+  request-target projections are written. UTF-8, URI text, and arbitrary-
+  precision numeric scalar sizes are checked before encoded arrays are
+  allocated. Selected String body bytes are preflighted before allocation, all
+  serialized bodies are checked before defensive copies, and absent bodies are
+  keyed separately from present zero-length payloads.
 - Header-, locale-, tenant-, Reactor-context-, or auth-dependent responses
   require explicit variant/partition inputs or an explicit shared-response
   acknowledgement. The starter never silently assumes such responses are
-  globally shareable.
+  globally shareable. The universally required, potentially absent effective
+  idempotency header does not by itself prove authenticated identity isolation.
+- The conventional context-only `Idempotency-Key` header is an available header
+  variant for every selected policy and must be partitioned or explicitly
+  acknowledged as shared.
+- AOT registers record accessors reachable from client method parameters.
+  Native applications explicitly register record types used only through
+  `vary-by-context`, because their runtime type is absent from the declarative
+  client signature.
 - Method-level key selection is validated at startup. Unknown parameter/header
   names, unsupported values, unstable publishers/streams, and ambiguous maps are
   rejected before dispatch.

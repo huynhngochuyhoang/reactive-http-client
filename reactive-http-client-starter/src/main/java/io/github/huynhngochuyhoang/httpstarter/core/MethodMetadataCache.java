@@ -292,6 +292,14 @@ public class MethodMetadataCache {
                                 "@FormFile value must not be blank for parameter at index " + i + " in method: " + method);
                     }
                     meta.getFormFileParams().put(i, ff);
+                } else if (ann instanceof CacheKey cacheKey) {
+                    requireNonBlankAnnotationValue(cacheKey.value(), "@CacheKey", method);
+                    String label = cacheKey.value().trim();
+                    if (meta.getCacheKeyParams().containsValue(label)) {
+                        throw new IllegalArgumentException(
+                                "Duplicate @CacheKey(\"" + label + "\") on method: " + method);
+                    }
+                    meta.getCacheKeyParams().put(i, label);
                 }
             }
         }

@@ -274,8 +274,50 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     "Method " + method.getName() + " has no HTTP verb annotation (@GET, @POST, @PUT, @DELETE, @PATCH) or @ApiRef");
         }
 
+        Class<?> concreteClient = clientInterface != null ? clientInterface : method.getDeclaringClass();
+        EffectiveCachePolicy.Selection cacheSelection = EffectiveCachePolicy.validate(
+                concreteClient, clientName, plan, clientConfig, effectiveApi.httpMethod());
+        if (cacheSelection.enabled()) {
+            Object[] invocationArguments = args != null ? args.clone() : new Object[0];
+            return Mono.deferContextual(context -> {
+                Object[] frozenArguments = CacheKeyContract.freezeArguments(
+                        plan, invocationArguments, cacheSelection.policy());
+                RequestArgumentResolver.ResolvedArgs frozenResolved = applyDefaultHeaders(
+                        applyDefaultQueryParams(argumentResolver.resolve(plan, frozenArguments)));
+                RequestArgumentResolver.ResolvedArgs keyResolved = CacheKeyContract.snapshotRequestTarget(
+                        applyCacheKeyIdempotencyKey(plan, frozenResolved, context));
+                return prepareCacheSelectedBody(plan, keyResolved, cacheSelection.policy())
+                        .flatMap(bodyPreparation -> {
+                            CacheKeyContract.PreparedKey preparedKey = CacheKeyContract.derive(
+                                    concreteClient,
+                                    clientName,
+                                    plan,
+                                    frozenArguments,
+                                    keyResolved,
+                                    context,
+                                    cacheSelection.policy(),
+                                    bodyPreparation.key());
+                            Mono<?> source = (Mono<?>) invokeResolved(
+                                    proxy, method, frozenArguments, meta, plan, effectiveApi, keyResolved,
+                                    bodyPreparation.requestBody());
+                            return source.contextWrite(preparedKey::writeContext);
+                        });
+            });
+        }
+
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
                 applyDefaultQueryParams(argumentResolver.resolve(plan, args)));
+        return invokeResolved(proxy, method, args, meta, plan, effectiveApi, resolved, null);
+    }
+
+    private Object invokeResolved(Object proxy,
+                                  Method method,
+                                  Object[] args,
+                                  MethodMetadata meta,
+                                  RequestPlan plan,
+                                  EffectiveApi effectiveApi,
+                                  RequestArgumentResolver.ResolvedArgs resolved,
+                                  SerializedRequestBody preparedSerializedRequestBody) {
         String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         RequestBodyOwnership requestBodyOwnership = new RequestBodyOwnership(resolved.body());
 
@@ -304,9 +346,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 plan, exchangeLogger, observer, lifecycleHooks, logicalCallTimeoutMs);
         Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = usesSubscriptionState
                 ? statefulRequestHeadersSpec(plan, effectiveApi, resolved, contentTypeHeader, hasAcceptHeader,
-                hasContentTypeHeader, multipartBody, lifecycleHooks, exchangeLogger, timeoutMs, shouldApplyResponseTimeout, requestBodyOwnership)
+                hasContentTypeHeader, multipartBody, lifecycleHooks, exchangeLogger, timeoutMs,
+                shouldApplyResponseTimeout, requestBodyOwnership, preparedSerializedRequestBody)
                 : statelessRequestHeadersSpec(plan, effectiveApi, resolved, hasAcceptHeader, hasContentTypeHeader,
-                multipartBody, timeoutMs, shouldApplyResponseTimeout, requestBodyOwnership);
+                multipartBody, timeoutMs, shouldApplyResponseTimeout, requestBodyOwnership,
+                preparedSerializedRequestBody);
         boolean headRequest = HttpMethod.HEAD.matches(effectiveApi.httpMethod());
 
         if (plan.returnsFlux()) {
@@ -417,9 +461,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             HttpExchangeLogger exchangeLogger,
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
-            RequestBodyOwnership requestBodyOwnership) {
+            RequestBodyOwnership requestBodyOwnership,
+            SerializedRequestBody preparedSerializedRequestBody) {
         // Cache the serialized body so retries reuse the bytes without re-serializing.
-        Mono<SerializedRequestBody> serializedBodyMono = serializeRequestBodyForAuth(resolved.body(), contentTypeHeader).cache();
+        Mono<SerializedRequestBody> serializedBodyMono = preparedSerializedRequestBody != null
+                ? Mono.just(preparedSerializedRequestBody)
+                : serializeRequestBodyForAuth(resolved.body(), contentTypeHeader).cache();
         return Mono.deferContextual(context -> {
             SubscriptionReportingState state = subscriptionState(context);
             RequestArgumentResolver.ResolvedArgs preparedResolved = applyIdempotencyKey(
@@ -458,14 +505,16 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             MultipartRequestBody multipartBody,
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
-            RequestBodyOwnership requestBodyOwnership) {
+            RequestBodyOwnership requestBodyOwnership,
+            SerializedRequestBody preparedSerializedRequestBody) {
         return Mono.deferContextual(context -> {
             if (log.isDebugEnabled()) {
                 logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), 0L);
             }
             RequestArgumentResolver.ResolvedArgs preparedResolved = applyContextIdempotencyKey(plan, resolved, context);
-            SerializedRequestBody requestBody = new SerializedRequestBody(
-                    preparedResolved.body(), preparedResolved.body(), null);
+            SerializedRequestBody requestBody = preparedSerializedRequestBody != null
+                    ? preparedSerializedRequestBody
+                    : new SerializedRequestBody(preparedResolved.body(), preparedResolved.body(), null);
             return Mono.just(buildRequestHeadersSpec(
                     plan,
                     effectiveApi,
@@ -1266,6 +1315,58 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 .onErrorMap(e -> new RequestSerializationException(clientName, e));
     }
 
+    private Mono<CacheBodyPreparation> prepareCacheSelectedBody(
+            RequestPlan plan,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        if (!CacheKeyContract.selectsRequestBody(plan, policy)) {
+            return Mono.just(CacheBodyPreparation.UNSELECTED);
+        }
+        Object body = resolved.body();
+        if (body == null) {
+            return Mono.just(new CacheBodyPreparation(
+                    new SerializedRequestBody(null, null, null),
+                    CacheKeyContract.absentSerializedBodyKey()));
+        }
+        String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
+        if (body instanceof byte[] bytes) {
+            return Mono.just(cacheBodyPreparation(body, bytes));
+        }
+        if (body instanceof String text) {
+            return Mono.fromCallable(() -> cacheBodyPreparation(
+                            body, CacheKeyContract.selectedStringBodyBytes(
+                                    text, rawBodyCharset(contentTypeHeader))))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .onErrorMap(error -> error instanceof RequestSerializationException
+                            ? error
+                            : new RequestSerializationException(clientName, error));
+        }
+        if (!shouldProvideJsonRawBody(contentTypeHeader)) {
+            return Mono.error(new RequestSerializationException(clientName, new IllegalStateException(
+                    "Cache-selected request bodies require a JSON-compatible Content-Type, String, or byte[]")));
+        }
+        if (jsonCodec == null) {
+            return Mono.error(new RequestSerializationException(clientName, new IllegalStateException(
+                    "Cache-selected JSON request bodies require a ReactiveHttpClientJsonCodec bean")));
+        }
+        return Mono.fromCallable(() -> cacheBodyPreparation(body, jsonCodec.writeBounded(
+                        body, CacheKeyContract.maximumSerializedBodyBytes())))
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorMap(error -> error instanceof RequestSerializationException
+                        ? error
+                        : new RequestSerializationException(clientName, error));
+    }
+
+    private static CacheBodyPreparation cacheBodyPreparation(Object originalBody, byte[] wireBytes) {
+        byte[] source = Objects.requireNonNull(
+                wireBytes, "ReactiveHttpClientJsonCodec returned null request bytes");
+        CacheKeyContract.requireSerializedBodyLength(source.length);
+        byte[] stableWireBytes = source.clone();
+        return new CacheBodyPreparation(
+                new SerializedRequestBody(originalBody, stableWireBytes, stableWireBytes),
+                CacheKeyContract.serializedBodyKey(stableWireBytes));
+    }
+
     private Charset rawBodyCharset(String contentTypeHeader) {
         if (contentTypeHeader == null || contentTypeHeader.isBlank()) {
             return StandardCharsets.UTF_8;
@@ -1944,9 +2045,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return generatedIdempotencyKey.compareAndSet(null, candidate) ? candidate : generatedIdempotencyKey.get();
     }
 
-    private RequestArgumentResolver.ResolvedArgs applyContextIdempotencyKey(RequestPlan plan,
-                                                                            RequestArgumentResolver.ResolvedArgs resolved,
-                                                                            reactor.util.context.ContextView context) {
+    static RequestArgumentResolver.ResolvedArgs applyContextIdempotencyKey(
+            RequestPlan plan,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            reactor.util.context.ContextView context) {
         if (hasIdempotencyKeyHeaderValue(plan, resolved)) {
             return resolved;
         }
@@ -1955,6 +2057,21 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return withHeader(resolved, idempotencyHeaderName(plan), contextKey);
         }
         return resolved;
+    }
+
+    static RequestArgumentResolver.ResolvedArgs applyCacheKeyIdempotencyKey(
+            RequestPlan plan,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            reactor.util.context.ContextView context) {
+        RequestArgumentResolver.ResolvedArgs contextResolved =
+                applyContextIdempotencyKey(plan, resolved, context);
+        if (contextResolved != resolved || hasIdempotencyKeyHeaderValue(plan, contextResolved)) {
+            return contextResolved;
+        }
+        if (StringUtils.hasText(plan.generatedIdempotencyKeyHeader())) {
+            return withHeader(contextResolved, plan.generatedIdempotencyKeyHeader(), UUID.randomUUID().toString());
+        }
+        return contextResolved;
     }
 
     private static boolean hasIdempotencyKeyHeaderValue(RequestPlan plan, RequestArgumentResolver.ResolvedArgs resolved) {
@@ -1981,9 +2098,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 .orElse(IDEMPOTENCY_KEY_HEADER);
     }
 
-    private RequestArgumentResolver.ResolvedArgs withHeader(RequestArgumentResolver.ResolvedArgs resolved,
-                                                            String headerName,
-                                                            String headerValue) {
+    private static RequestArgumentResolver.ResolvedArgs withHeader(
+            RequestArgumentResolver.ResolvedArgs resolved,
+            String headerName,
+            String headerValue) {
         RequestArgumentResolver.validateHeaderName(headerName);
         RequestArgumentResolver.validateHeaderValue(headerName, headerValue);
         Map<String, List<String>> merged = new LinkedHashMap<>(resolved.headers());
@@ -2017,7 +2135,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 resolved.body());
     }
 
-    private String findHeaderNameIgnoreCase(Map<String, ?> headers, String headerName) {
+    private static String findHeaderNameIgnoreCase(Map<String, ?> headers, String headerName) {
         for (String existingName : headers.keySet()) {
             if (existingName.equalsIgnoreCase(headerName)) {
                 return existingName;
@@ -2096,6 +2214,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private record SerializedRequestBody(Object originalBody, Object bodyToWrite, byte[] rawBody) {}
+    private record CacheBodyPreparation(
+            SerializedRequestBody requestBody,
+            CacheKeyContract.SerializedBodyKey key) {
+        private static final CacheBodyPreparation UNSELECTED = new CacheBodyPreparation(null, null);
+    }
     private record MultipartRequestBody(
             MultiValueMap<String, HttpEntity<?>> wireBody,
             List<HttpEntity<?>> authBody) {}

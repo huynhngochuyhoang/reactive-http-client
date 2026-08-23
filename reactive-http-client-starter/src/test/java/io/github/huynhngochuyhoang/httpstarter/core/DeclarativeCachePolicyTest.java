@@ -47,11 +47,35 @@ class DeclarativeCachePolicyTest {
                                 0, contract.javaMethodSignature().indexOf('(')),
                         EffectiveHttpClientContract::cache));
         assertThat(policies.get("inherited")).isEqualTo(
-                new EffectiveHttpClientContract.CachePolicy(true, "client", 1_000L, 100L));
+                new EffectiveHttpClientContract.CachePolicy(
+                        true, "client", 1_000L, 100L,
+                        List.of(), List.of("idempotency-key"), List.of(), false));
         assertThat(policies.get("overridden")).isEqualTo(
-                new EffectiveHttpClientContract.CachePolicy(true, "method", 2_000L, 200L));
+                new EffectiveHttpClientContract.CachePolicy(
+                        true, "method", 2_000L, 200L,
+                        List.of(), List.of("idempotency-key"), List.of(), false));
         assertThat(policies.get("excluded")).isEqualTo(
-                new EffectiveHttpClientContract.CachePolicy(false, "method-disabled", 0L, 0L));
+                new EffectiveHttpClientContract.CachePolicy(
+                        false, "method-disabled", 0L, 0L,
+                        List.of(), List.of(), List.of(), false));
+    }
+
+    @Test
+    void effectiveContractExportsNormalizedIsolationPolicy() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy(1_000L, 100L);
+        ReactiveHttpClientProperties.CachePolicyConfig policy = config.getCache().getPolicies().get("selected");
+        policy.setVaryByParameters(List.of(" tenant "));
+        policy.setVaryByHeaders(List.of(" X-Tenant "));
+        policy.setVaryByContext(List.of(" region ", "locale"));
+        policy.setSharedResponse(true);
+        config.setDefaultHeaders(Map.of("X-Tenant", "public"));
+
+        EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
+                VariantContractClient.class, "variant-contract", config, metadataCache).get(0);
+
+        assertThat(contract.cache()).isEqualTo(new EffectiveHttpClientContract.CachePolicy(
+                true, "client", 1_000L, 100L,
+                List.of("tenant"), List.of("x-tenant"), List.of("locale", "region"), true));
     }
 
     @Test
@@ -247,6 +271,7 @@ class DeclarativeCachePolicyTest {
         ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
         policy.setTtlMs(ttlMs);
         policy.setMaximumSize(maximumSize);
+        policy.setVaryByHeaders(List.of("Idempotency-Key"));
         config.getCache().getPolicies().put(name, policy);
     }
 
@@ -285,6 +310,11 @@ class DeclarativeCachePolicyTest {
 
         @GET("/entity")
         Mono<ResponseEntity<List<String>>> entity();
+    }
+
+    interface VariantContractClient {
+        @GET("/value")
+        Mono<String> get(@CacheKey("tenant") String tenant);
     }
 
     interface PostClient {

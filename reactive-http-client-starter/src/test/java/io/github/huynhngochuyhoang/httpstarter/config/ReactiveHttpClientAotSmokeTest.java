@@ -13,7 +13,9 @@ import org.springframework.aot.generate.ClassNameGenerator;
 import org.springframework.aot.generate.DefaultGenerationContext;
 import org.springframework.aot.generate.InMemoryGeneratedFiles;
 import org.springframework.aot.hint.ExecutableHint;
+import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.RuntimeHints;
+import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
@@ -26,6 +28,7 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +51,8 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(OPTIONS.class, "value")))
                 .accepts(hints);
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(CacheResponse.class, "value")))
+                .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method(CacheKey.class, "value")))
                 .accepts(hints);
         assertThat(hints.reflection().getTypeHint(CacheDisabled.class)).isNotNull();
         assertThat(hints.reflection().getTypeHint(Body.class)).isNotNull();
@@ -257,6 +262,74 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorRegistersCacheKeyRecordAccessors() throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", CacheRecordAotClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, CacheRecordAotClient.class);
+        context.registerBeanDefinition(CacheRecordAotClient.class.getName(), beanDefinition);
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        policy.setVaryByParameters(List.of("tenant"));
+        policy.setVaryByHeaders(List.of("Idempotency-Key"));
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("cache-record-aot", config));
+        context.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+        DefaultGenerationContext generationContext = newGenerationContext();
+
+        contribution.applyTo(generationContext, null);
+
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                CacheRecordVariant.class.getMethod("value")))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                CacheRecordVariant.class.getMethod("version")))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.resource().forResource(
+                CacheRecordVariant.class.getName().replace('.', '/') + ".class"))
+                .accepts(generationContext.getRuntimeHints());
+        context.close();
+    }
+
+    @Test
+    void beanFactoryAotProcessorGuardsRecursiveGenericParameterTraversal() throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", RecursiveGenericAotClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, RecursiveGenericAotClient.class);
+        context.registerBeanDefinition(RecursiveGenericAotClient.class.getName(), beanDefinition);
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+        DefaultGenerationContext generationContext = newGenerationContext();
+
+        contribution.applyTo(generationContext, null);
+
+        Method method = RecursiveGenericAotClient.class.getMethod("get", Comparable.class);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(method))
+                .accepts(generationContext.getRuntimeHints());
+        context.close();
+    }
+
+    @Test
+    void applicationRuntimeHintsCanCoverContextOnlyCacheRecords() throws Exception {
+        RuntimeHints hints = new RuntimeHints();
+
+        new CacheContextRuntimeHints().registerHints(hints, getClass().getClassLoader());
+
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                CacheContextVariant.class.getMethod("region"))).accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                CacheContextVariant.class.getMethod("tier"))).accepts(hints);
+    }
+
+    @Test
     void beanFactoryAotProcessorUsesReplacementMethodMetadataCache() {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
@@ -373,6 +446,37 @@ class ReactiveHttpClientAotSmokeTest {
         @POST("/items")
         @CacheResponse("selected")
         Mono<String> create();
+    }
+
+    record CacheRecordVariant(String value, int version) {
+    }
+
+    record CacheContextVariant(String region, int tier) {
+    }
+
+    static final class CacheContextRuntimeHints implements RuntimeHintsRegistrar {
+        @Override
+        public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
+            hints.resources().registerPattern(
+                    CacheContextVariant.class.getName().replace('.', '/') + ".class");
+            hints.reflection().registerType(CacheContextVariant.class, typeHint -> {});
+            for (var component : CacheContextVariant.class.getRecordComponents()) {
+                hints.reflection().registerMethod(component.getAccessor(), ExecutableMode.INVOKE);
+            }
+        }
+    }
+
+    @ReactiveHttpClient(name = "cache-record-aot", baseUrl = "http://cache-record-aot.test")
+    interface CacheRecordAotClient {
+        @GET("/items")
+        @CacheResponse("selected")
+        Mono<String> get(@CacheKey("tenant") List<CacheRecordVariant> tenant);
+    }
+
+    @ReactiveHttpClient(name = "recursive-generic-aot", baseUrl = "http://recursive-generic-aot.test")
+    interface RecursiveGenericAotClient {
+        @GET("/items")
+        <T extends Comparable<T>> Mono<String> get(@QueryParam("value") T value);
     }
 
     @ReactiveHttpClient(name = "replacement-metadata", baseUrl = "http://replacement.test")
