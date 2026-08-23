@@ -6,17 +6,25 @@ import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
+import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.netty.DisposableServer;
+import reactor.netty.http.server.HttpServer;
 
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
@@ -551,6 +559,173 @@ class BoundedLocalResponseCacheContractTest {
     }
 
     @Test
+    void cachedMissUsesOneLogicalDeadlineAndReportsResponseBodyTimeout() {
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        config.setLogicalCallTimeoutMs(500L);
+        config.getCache().getPolicies().get("local")
+                .setVaryByParameters(List.of("principal", "tenant"));
+        config.getCache().getPolicies().get("local")
+                .setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        AtomicReference<HttpClientObserverEvent> observed = new AtomicReference<>();
+        DisposableServer server = HttpServer.create()
+                .port(0)
+                .handle((request, response) -> response
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .sendString(Flux.concat(Mono.just("first"), Mono.never()))
+                        .then())
+                .bindNow();
+        try {
+            WebClient webClient = WebClient.builder()
+                    .baseUrl("http://127.0.0.1:" + server.port())
+                    .clientConnector(new ReactorClientHttpConnector())
+                    .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                    .build();
+            try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+                context.getBeanFactory().registerSingleton("cacheObserver",
+                        (io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver) observed::set);
+                context.refresh();
+                CacheClient client = cacheClient(
+                        webClient,
+                        config,
+                        context,
+                        LocalResponseCacheManager.testing(System::nanoTime),
+                        new NoopResilienceOperatorApplier(),
+                        null);
+
+                Throwable failure = catchThrowable(() -> client
+                        .get("42", "principal-a", "tenant-a", "en-US")
+                        .block(Duration.ofSeconds(2)));
+
+                LogicalCallTimeoutException timeout = findCause(failure, LogicalCallTimeoutException.class);
+                assertThat(timeout).isNotNull();
+                assertThat(timeout.getFailureStage()).isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
+                assertThat(observed.get()).isNotNull();
+                assertThat(observed.get().getStatusCode()).isEqualTo(200);
+                assertThat(observed.get().getFailureStage()).isEqualTo(HttpClientFailureStage.RESPONSE_BODY);
+                assertThat(findCause(observed.get().getError(), LogicalCallTimeoutException.class)).isSameAs(timeout);
+            }
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    @Test
+    void cacheAuthorizationSeesUpstreamRequestHeadersOnMissesAndHits() {
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        config.setAuthProvider("cache-auth");
+        config.getCache().getPolicies().get("local")
+                .setVaryByParameters(List.of("principal", "tenant"));
+        config.getCache().getPolicies().get("local")
+                .setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger downstreamFilterCalls = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+        List<HttpHeaders> authHeaders = new ArrayList<>();
+        io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider = request -> {
+            authCalls.incrementAndGet();
+            authHeaders.add(HttpHeaders.readOnlyHttpHeaders(request.request().headers()));
+            return Mono.just(AuthContext.builder().header("Authorization", "Bearer signed").build());
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .defaultRequest(request -> request.header("X-Boot-Default", "default-value"))
+                .filter((request, next) -> Mono.deferContextual(context -> next.exchange(
+                        ClientRequest.from(request)
+                                .header("X-Trace-Id", context.<String>get("trace-id"))
+                                .build())))
+                .filter(CorrelationIdWebFilter.exchangeFilter())
+                .filter(new OutboundAuthFilter("cache-client", authProvider))
+                .filter((request, next) -> {
+                    downstreamFilterCalls.incrementAndGet();
+                    return next.exchange(request);
+                })
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body("authorized-" + dispatches.incrementAndGet())
+                        .build()))
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            CacheClient client = cacheClient(
+                    webClient,
+                    config,
+                    context,
+                    LocalResponseCacheManager.testing(System::nanoTime),
+                    new NoopResilienceOperatorApplier(),
+                    authProvider);
+            Mono<String> call = client.get("42", "principal-a", "tenant-a", "en-US")
+                    .contextWrite(reactorContext -> RequestContext.withCorrelationId(
+                            reactorContext.put("trace-id", "trace-1"), "correlation-1"));
+
+            assertThat(call.block()).isEqualTo("authorized-1");
+            assertThat(call.block()).isEqualTo("authorized-1");
+        }
+
+        assertThat(authCalls).hasValue(2);
+        assertThat(dispatches).hasValue(1);
+        assertThat(downstreamFilterCalls).hasValue(1);
+        assertThat(authHeaders).allSatisfy(headers -> {
+            assertThat(headers.getFirst("X-Boot-Default")).isEqualTo("default-value");
+            assertThat(headers.getFirst("X-Trace-Id")).isEqualTo("trace-1");
+            assertThat(headers.getFirst(CorrelationIdWebFilter.CORRELATION_ID_HEADER))
+                    .isEqualTo("correlation-1");
+        });
+    }
+
+    @Test
+    void cacheHitsRejectInvalidPreResolvedAuthHeaders() {
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        config.setAuthProvider("cache-auth");
+        config.getCache().getPolicies().get("local")
+                .setVaryByParameters(List.of("principal", "tenant"));
+        config.getCache().getPolicies().get("local")
+                .setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        AtomicInteger dispatches = new AtomicInteger();
+        AtomicReference<AuthContext> currentAuth = new AtomicReference<>(AuthContext.empty());
+        io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider = request ->
+                Mono.just(currentAuth.get());
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .filter(new OutboundAuthFilter("cache-client", authProvider))
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body("dispatch-" + dispatches.incrementAndGet())
+                        .build()))
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            CacheClient client = cacheClient(
+                    webClient,
+                    config,
+                    context,
+                    LocalResponseCacheManager.testing(System::nanoTime),
+                    new NoopResilienceOperatorApplier(),
+                    authProvider);
+
+            assertThat(client.get("42", "principal-a", "tenant-a", "en-US").block())
+                    .isEqualTo("dispatch-1");
+
+            currentAuth.set(AuthContext.builder()
+                    .header("Authorization", "Bearer token\r\nX-Evil: 1")
+                    .build());
+            Throwable invalidValue = catchThrowable(() ->
+                    client.get("42", "principal-a", "tenant-a", "en-US").block());
+            assertThat(findCause(invalidValue, IllegalArgumentException.class))
+                    .hasMessageContaining("Invalid auth header value");
+
+            currentAuth.set(AuthContext.builder().header("Bad Header", "value").build());
+            Throwable invalidName = catchThrowable(() ->
+                    client.get("42", "principal-a", "tenant-a", "en-US").block());
+            assertThat(findCause(invalidName, IllegalArgumentException.class))
+                    .hasMessageContaining("Invalid auth header name");
+        }
+
+        assertThat(dispatches).hasValue(1);
+    }
+
+    @Test
     void resilienceRetryResolvesCurrentAuthAfterTheOneTimeUnauthorizedReplay() {
         ReactiveHttpClientProperties.ClientConfig config = config();
         config.setAuthProvider("cache-auth");
@@ -678,6 +853,17 @@ class BoundedLocalResponseCacheContractTest {
             current = current.getCause();
         }
         return false;
+    }
+
+    private static <T extends Throwable> T findCause(Throwable error, Class<T> expectedType) {
+        Throwable current = error;
+        while (current != null) {
+            if (expectedType.isInstance(current)) {
+                return expectedType.cast(current);
+            }
+            current = current.getCause() != current ? current.getCause() : null;
+        }
+        return null;
     }
 
     private static String load(LocalResponseCacheManager manager,

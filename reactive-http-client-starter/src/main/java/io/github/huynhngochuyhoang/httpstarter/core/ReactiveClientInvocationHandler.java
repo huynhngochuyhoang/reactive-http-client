@@ -31,7 +31,6 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -87,6 +86,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             "logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt";
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     private static final Object SUBSCRIPTION_STATE_CONTEXT_KEY = new Object();
+    private static final Object LOGICAL_CALL_DEADLINE_CONTEXT_KEY = new Object();
     private static final int MAX_LOGGER_CACHE_SIZE = 256;
     private static final int MAX_RESILIENCE_WARNING_KEYS = 256;
 
@@ -391,8 +391,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                             return authorizedLookup.contextWrite(preparedKey::writeContext);
                         });
             });
-            return applyCacheLogicalCallTimeoutMono(
-                    cacheInvocation, clientConfig.getLogicalCallTimeoutMs());
+            return applyLogicalCallTimeoutMono(cacheInvocation, clientConfig.getLogicalCallTimeoutMs());
         }
 
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
@@ -990,23 +989,52 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return mono;
         }
         return Mono.deferContextual(context -> {
-            SubscriptionReportingState state = subscriptionState(context);
+            LogicalCallDeadline inherited = context.getOrDefault(LOGICAL_CALL_DEADLINE_CONTEXT_KEY, null);
+            if (inherited != null) {
+                if (!context.hasKey(SUBSCRIPTION_STATE_CONTEXT_KEY)) {
+                    return mono;
+                }
+                SubscriptionReportingState state = subscriptionState(context);
+                if (!inherited.register(state)) {
+                    return Mono.error(logicalCallTimeout(state, inherited.timeoutMs()));
+                }
+                return timeoutAtDeadline(mono, inherited, state);
+            }
+
+            SubscriptionReportingState state = context.hasKey(SUBSCRIPTION_STATE_CONTEXT_KEY)
+                    ? subscriptionState(context)
+                    : null;
+            LogicalCallDeadline deadline = new LogicalCallDeadline(timeoutMs);
+            if (state != null) {
+                deadline.register(state);
+            }
             @SuppressWarnings("unchecked")
-            Mono<Signal<Object>> sourceSignal = ((Mono<Object>) mono).materialize();
-            Mono<Signal<Object>> deadline = Mono.delay(Duration.ofMillis(timeoutMs))
-                    .map(ignored -> Signal.error(logicalCallTimeout(state, timeoutMs)));
-            return Mono.firstWithSignal(sourceSignal, deadline).dematerialize();
+            Mono<Signal<Object>> sourceSignal = ((Mono<Object>) mono)
+                    .contextWrite(upstream -> upstream.put(LOGICAL_CALL_DEADLINE_CONTEXT_KEY, deadline))
+                    .materialize();
+            Mono<Signal<Object>> deadlineSignal = Mono.delay(deadline.remaining())
+                    .flatMap(ignored -> {
+                        SubscriptionReportingState registered = deadline.registeredState();
+                        if (registered != null) {
+                            return state != null
+                                    ? Mono.just(Signal.error(logicalCallTimeout(registered, timeoutMs)))
+                                    : Mono.never();
+                        }
+                        return deadline.expirePreLookup()
+                                ? Mono.just(Signal.error(new LogicalCallTimeoutException(timeoutMs, null)))
+                                : Mono.never();
+                    });
+            return Mono.firstWithSignal(sourceSignal, deadlineSignal).dematerialize();
         });
     }
 
     @SuppressWarnings("unchecked")
-    private Mono<?> applyCacheLogicalCallTimeoutMono(Mono<?> mono, long timeoutMs) {
-        if (timeoutMs <= 0) {
-            return mono;
-        }
-        return ((Mono<Object>) mono).timeout(
-                Duration.ofMillis(timeoutMs),
-                Mono.defer(() -> Mono.error(new LogicalCallTimeoutException(timeoutMs, null))));
+    private Mono<?> timeoutAtDeadline(
+            Mono<?> mono, LogicalCallDeadline deadline, SubscriptionReportingState state) {
+        Mono<Signal<Object>> sourceSignal = ((Mono<Object>) mono).materialize();
+        Mono<Signal<Object>> deadlineSignal = Mono.delay(deadline.remaining())
+                .map(ignored -> Signal.error(logicalCallTimeout(state, deadline.timeoutMs())));
+        return Mono.firstWithSignal(sourceSignal, deadlineSignal).dematerialize();
     }
 
     private Flux<?> applyLogicalCallTimeoutFlux(Flux<?> flux, long timeoutMs) {
@@ -1032,6 +1060,41 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             state.clearEvidenceWhenNoAttemptIsActive();
         }
         return new LogicalCallTimeoutException(timeoutMs, failureStage);
+    }
+
+    private static final class LogicalCallDeadline {
+        private static final Object PRE_LOOKUP_EXPIRED = new Object();
+
+        private final long timeoutMs;
+        private final long deadlineNanos;
+        private final AtomicReference<Object> owner = new AtomicReference<>();
+
+        private LogicalCallDeadline(long timeoutMs) {
+            this.timeoutMs = timeoutMs;
+            this.deadlineNanos = System.nanoTime() + Duration.ofMillis(timeoutMs).toNanos();
+        }
+
+        private long timeoutMs() {
+            return timeoutMs;
+        }
+
+        private Duration remaining() {
+            return Duration.ofNanos(Math.max(0L, deadlineNanos - System.nanoTime()));
+        }
+
+        private boolean register(SubscriptionReportingState state) {
+            Object current = owner.get();
+            return current == state || (current == null && owner.compareAndSet(null, state));
+        }
+
+        private SubscriptionReportingState registeredState() {
+            Object current = owner.get();
+            return current instanceof SubscriptionReportingState state ? state : null;
+        }
+
+        private boolean expirePreLookup() {
+            return owner.compareAndSet(null, PRE_LOOKUP_EXPIRED);
+        }
     }
 
     private void logUnsafeRetryIfNeeded(RequestPlan plan,
@@ -1482,8 +1545,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     resolved,
                     "Cache pre-lookup auth request for client [" + clientName + "] method "
                             + plan.method().toGenericString());
-            ClientRequest.Builder request = ClientRequest.create(
-                    HttpMethod.valueOf(effectiveApi.httpMethod()), requestUri);
+            WebClient.RequestBodySpec request = webClient
+                    .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
+                    .uri(requestUri);
             request.headers(headers -> {
                 resolved.headers().forEach((name, values) -> headers.put(name, List.copyOf(values)));
                 if (!resolved.headersIgnoreCase().containsKey(HttpHeaders.ACCEPT)) {
@@ -1495,19 +1559,22 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 }
             });
             if (requestBody.originalBody() != null) {
-                request.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, requestBody.originalBody());
+                request = request.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, requestBody.originalBody());
             }
             if (requestBody.rawBody() != null) {
-                request.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, requestBody.rawBody());
+                request = request.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, requestBody.rawBody());
             }
-            Object authBody = requestBody.rawBody() != null
-                    ? requestBody.rawBody()
-                    : requestBody.originalBody();
-            return cacheAuthProvider.getAuth(new AuthRequest(clientName, request.build(), authBody))
-                    .onErrorMap(error -> error instanceof AuthProviderException
-                            ? error
-                            : new AuthProviderException(clientName, error))
-                    .defaultIfEmpty(AuthContext.empty());
+            AtomicReference<AuthContext> resolvedAuth = new AtomicReference<>();
+            return request
+                    .attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE, resolvedAuth)
+                    .exchangeToMono(response -> response.releaseBody().then(Mono.defer(() -> {
+                        AuthContext authContext = resolvedAuth.get();
+                        return authContext != null
+                                ? Mono.just(authContext)
+                                : Mono.error(new IllegalStateException(
+                                "Cache pre-lookup auth did not reach the auth filter for client '"
+                                        + clientName + "'"));
+                    })));
         });
     }
 

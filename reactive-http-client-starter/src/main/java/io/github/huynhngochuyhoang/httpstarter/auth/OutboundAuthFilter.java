@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.auth;
 
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
@@ -34,6 +35,17 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
                 .or(() -> request.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE))
                 .orElse(null);
         AuthRequest authRequest = new AuthRequest(clientName, request, requestBody);
+        Object cacheProbe = request.attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE).orElse(null);
+        if (cacheProbe instanceof AtomicReference<?> reference) {
+            return resolveAuthContext(authRequest)
+                    .map(authContext -> {
+                        applyAuth(request, authContext);
+                        @SuppressWarnings("unchecked")
+                        AtomicReference<AuthContext> resolved = (AtomicReference<AuthContext>) reference;
+                        resolved.set(authContext);
+                        return ClientResponse.create(HttpStatus.NO_CONTENT).build();
+                    });
+        }
         Mono<ClientRequest> authorizedRequest = request.attribute(AuthRequest.PRE_RESOLVED_AUTH_CONTEXT_ATTRIBUTE)
                 .map(this::consumePreResolvedAuth)
                 .map(authContext -> Mono.just(applyAuth(request, authContext)))
@@ -51,12 +63,16 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
     }
 
     private Mono<ClientRequest> resolveAuthorizedRequest(ClientRequest request, AuthRequest authRequest) {
+        return resolveAuthContext(authRequest)
+                .map(authContext -> applyAuth(request, authContext));
+    }
+
+    private Mono<AuthContext> resolveAuthContext(AuthRequest authRequest) {
         return authProvider.getAuth(authRequest)
                 .onErrorMap(error -> error instanceof AuthProviderException
                         ? error
                         : new AuthProviderException(clientName, error))
-                .defaultIfEmpty(AuthContext.empty())
-                .map(authContext -> applyAuth(request, authContext));
+                .defaultIfEmpty(AuthContext.empty());
     }
 
     private Mono<ClientResponse> retryOnceOnUnauthorized(
@@ -90,6 +106,7 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
         ClientRequest.Builder builder = ClientRequest.from(original);
 
         authContext.getHeaders().forEach((name, value) -> {
+            validateHeaderName(name);
             validateHeaderValue(name, value);
             builder.headers(headers -> headers.set(name, value));
         });
@@ -99,6 +116,18 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
             builder.url(updatedUri);
         }
         return builder.build();
+    }
+
+    private void validateHeaderName(String headerName) {
+        if (headerName == null || headerName.isBlank()) {
+            throw new IllegalArgumentException("Auth header name must not be blank");
+        }
+        for (int i = 0; i < headerName.length(); i++) {
+            char ch = headerName.charAt(i);
+            if (ch <= 32 || ch >= 127 || "()<>@,;:\\\"/[]?={} \t".indexOf(ch) >= 0) {
+                throw new IllegalArgumentException("Invalid auth header name '" + headerName + "'");
+            }
+        }
     }
 
     private URI applyQueryParams(URI sourceUri, java.util.Map<String, List<String>> authQueryParams) {

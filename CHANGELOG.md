@@ -13,9 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bounded local TTL response cache.** Added an optional Caffeine-backed,
   process-local cache for explicitly selected finite `GET` `Mono` contracts.
   Hits run key/variant and configured auth gates before bypassing resilience and
-  transport; the full preparation/auth/lookup path shares the logical-call
-  budget, and retry attempts do not replay stale pre-resolved auth. Misses store
-  only final successful decoded values after checking wire status and headers.
+  transport; auth sees the same upstream WebClient/default-request headers and
+  validates its result before lookup. The full preparation/auth/lookup path uses
+  one logical-call deadline, preserving miss timeout-phase attribution, and retry
+  attempts do not replay stale pre-resolved auth. Misses store only final
+  successful decoded values after checking wire status and headers.
   Hard monotonic TTL, maximum-size eviction, generation-checked duplicate
   publication, bounded `ResponseEntity` headers, mutable-value identity, and
   factory cleanup are covered without enabling single flight, refresh, or cache

@@ -96,8 +96,19 @@ Lookup is cold and repeats for every subscription. Mandatory key, request
 variant, and configured `AuthProvider` checks run before a value can be returned.
 The per-subscription logical-call timeout, when configured, starts before cache
 body preparation and authorization, so those gates cannot make either a hit or
-miss exceed the end-to-end budget. Selected Reactor-context variants are frozen
-once and that same context snapshot is visible to pre-lookup authorization.
+miss exceed the end-to-end budget. One absolute deadline is handed to the miss
+pipeline's existing subscription-reporting state, so a timeout after response
+headers retains response-body attribution instead of being reported as an outer
+cache cancellation. Selected Reactor-context variants are frozen once and that
+same context snapshot is visible to pre-lookup authorization.
+
+Configured pre-lookup auth traverses the same WebClient `defaultRequest` and
+filters that normally run before `OutboundAuthFilter`, including Boot-provided
+and correlation/trace header mutations. The probe stops inside the auth filter,
+before later filters and transport, and validates the returned auth header names
+and values before either a hit or miss can continue. A miss reuses that validated
+context only for its first outer attempt; later resilience attempts resolve
+current auth normally.
 On a hit, the existing HTTP load publisher is not constructed or subscribed, so
 the call consumes no downstream resilience permit, redirect, pool acquisition,
 or transport dispatch. On a miss, the existing decoded `Mono` pipeline runs and

@@ -206,6 +206,28 @@ class OutboundAuthFilterTest {
     }
 
     @Test
+    void shouldResolveAndValidateCacheAuthorizationProbeWithoutDispatching() {
+        AtomicInteger exchanges = new AtomicInteger();
+        AtomicReference<AuthContext> resolved = new AtomicReference<>();
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", request ->
+                Mono.just(AuthContext.builder().header("Authorization", "Bearer probe").build()));
+        ClientRequest request = ClientRequest.create(
+                        HttpMethod.GET, URI.create("https://api.test.local/users"))
+                .header("X-Upstream", "present")
+                .attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE, resolved)
+                .build();
+
+        ClientResponse response = filter.filter(request, authorized -> {
+            exchanges.incrementAndGet();
+            return Mono.just(ClientResponse.create(HttpStatus.OK).build());
+        }).block();
+
+        assertEquals(HttpStatus.NO_CONTENT, response.statusCode());
+        assertEquals("Bearer probe", resolved.get().getHeaders().get("Authorization"));
+        assertEquals(0, exchanges.get());
+    }
+
+    @Test
     void shouldWrapAuthProviderFailure() {
         AuthProvider authProvider = request -> Mono.error(new IllegalStateException("token endpoint down"));
         OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
@@ -363,6 +385,20 @@ class OutboundAuthFilterTest {
         StepVerifier.create(filter.filter(request, req -> Mono.just(ClientResponse.create(HttpStatus.OK).build())))
                 .expectErrorMatches(error -> error instanceof IllegalArgumentException
                         && error.getMessage().contains("Invalid auth header value"))
+                .verify();
+    }
+
+    @Test
+    void shouldRejectInvalidAuthHeaderNames() {
+        AuthProvider authProvider = request -> Mono.just(AuthContext.builder()
+                .header("Bad Header", "value")
+                .build());
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
+        ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://api.test.local/users")).build();
+
+        StepVerifier.create(filter.filter(request, req -> Mono.just(ClientResponse.create(HttpStatus.OK).build())))
+                .expectErrorMatches(error -> error instanceof IllegalArgumentException
+                        && error.getMessage().contains("Invalid auth header name"))
                 .verify();
     }
 }

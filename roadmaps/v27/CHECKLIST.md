@@ -560,13 +560,16 @@ Evidence recorded on 2026-08-23:
   destruction invalidates all entries before transport disposal and advances
   the closed generation so late loads cannot publish.
 - Declarative cache lookup is cold per subscription and occurs only after the
-  Priority 5 opaque key is derived. The logical-call deadline starts before
-  cache preparation and authorization, and the frozen context variant snapshot
-  is applied to authorization and lookup. Configured auth resolves before
-  lookup and its result is consumed once by `OutboundAuthFilter`; later
-  resilience attempts resolve current auth while one-time 401 replay remains
-  attempt-local. A hit does not build or subscribe the existing load pipeline,
-  so it consumes no resilience operator or HTTP dispatch.
+  Priority 5 opaque key is derived. One logical-call deadline starts before
+  cache preparation and authorization, then transfers to the miss pipeline's
+  existing subscription-reporting state so response-body timeout attribution is
+  retained. The frozen context variant snapshot is applied to authorization and
+  lookup. Configured auth traverses normal upstream WebClient/default-request
+  header mutations and validates its result before lookup; its result is
+  consumed once by `OutboundAuthFilter`. Later resilience attempts resolve
+  current auth while one-time 401 replay remains attempt-local. A hit does not
+  build or subscribe the existing load pipeline, so it consumes no resilience
+  operator or HTTP dispatch.
 - Phase-one misses remain independent. Generation-checked publication makes the
   first successful completion win without replacing its value/TTL; deterministic
   reversed-completion and eviction tests prove late duplicates cannot restore
@@ -577,13 +580,14 @@ Evidence recorded on 2026-08-23:
   subset. Redirects and credential/session/auth-challenge responses are
   non-cacheable for both plain bodies and `ResponseEntity`; oversized retained
   headers are also non-cacheable.
-- `BoundedLocalResponseCacheContractTest` passes `15` deterministic contracts,
+- `BoundedLocalResponseCacheContractTest` passes `18` deterministic contracts,
   including the real factory-destroy path, wire-header/redirect rejection,
-  retry/auth freshness, frozen pre-lookup context, and hit-path logical timeout.
-  `OutboundAuthFilterTest` passes `13` contracts, including compatibility for
-  the prior direct pre-resolved attribute form. The complete reactor passes
-  starter `1152`, test-helper `55`, and OTel `52` tests with zero failures,
-  errors, or skips. An isolated assembled-consumer dependency tree contains the
+  retry/auth freshness, upstream auth headers and validation, frozen pre-lookup
+  context, and hit/miss logical timeout attribution. `OutboundAuthFilterTest`
+  passes `15` contracts, including the non-dispatching cache auth probe and
+  compatibility for the prior direct pre-resolved attribute form. The complete
+  reactor passes starter `1157`, test-helper `55`, and OTel `52` tests with zero
+  failures, errors, or skips. An isolated assembled-consumer dependency tree contains the
   starter but no Caffeine artifact, and `git diff --check` passes.
 
 ---
