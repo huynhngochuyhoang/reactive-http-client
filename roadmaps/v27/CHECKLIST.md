@@ -372,6 +372,11 @@ Evidence recorded on 2026-08-22:
       under `equals` semantics.
 - [x] Preflight `BigInteger` and `BigDecimal` magnitude length before allocating
       their canonical byte arrays.
+- [x] Bound the cumulative request-target projection before combining repeated
+      path containers or nested query values, then dispatch that same snapshot.
+- [x] Reconstruct supported records from one captured accessor pass and reject
+      accessors that cannot reproduce the captured component state.
+- [x] Preflight URI text length before allocating its canonical UTF-8 payload.
 
 ### [x] 5.2 Require explicit response variants
 
@@ -464,8 +469,12 @@ Evidence recorded on 2026-08-22:
 - A sixth review pass rejected incompatible concrete/covariant container arrays,
   preserved duplicate-equal identity-map entries, and preflighted arbitrary-
   precision numeric magnitudes before canonical byte allocation.
+- A seventh review pass bounded request-target string projection before
+  materialization, reconstructed records from captured component values with
+  unstable-accessor rejection, registered canonical constructors for native
+  snapshots, and preflighted URI text before UTF-8 allocation.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1121` starter tests and `55` test-helper tests with zero
+  test` passed `1124` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

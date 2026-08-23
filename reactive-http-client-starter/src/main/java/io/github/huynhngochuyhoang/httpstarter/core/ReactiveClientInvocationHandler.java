@@ -284,8 +284,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         plan, invocationArguments, cacheSelection.policy());
                 RequestArgumentResolver.ResolvedArgs frozenResolved = applyDefaultHeaders(
                         applyDefaultQueryParams(argumentResolver.resolve(plan, frozenArguments)));
-                RequestArgumentResolver.ResolvedArgs keyResolved =
-                        applyCacheKeyIdempotencyKey(plan, frozenResolved, context);
+                RequestArgumentResolver.ResolvedArgs keyResolved = CacheKeyContract.snapshotRequestTarget(
+                        applyCacheKeyIdempotencyKey(plan, frozenResolved, context));
                 CacheKeyContract.PreparedKey preparedKey = CacheKeyContract.derive(
                         concreteClient,
                         clientName,

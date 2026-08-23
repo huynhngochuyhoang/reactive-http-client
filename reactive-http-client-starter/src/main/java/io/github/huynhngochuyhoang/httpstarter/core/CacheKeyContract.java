@@ -100,6 +100,20 @@ final class CacheKeyContract {
         return frozen;
     }
 
+    static RequestArgumentResolver.ResolvedArgs snapshotRequestTarget(
+            RequestArgumentResolver.ResolvedArgs resolved) {
+        RequestTargetProjector projector = new RequestTargetProjector();
+        Map<String, Object> pathVars = new LinkedHashMap<>();
+        resolved.pathVars().forEach((name, value) -> pathVars.put(name, projector.project(value)));
+        Map<String, List<Object>> queryParams = new LinkedHashMap<>();
+        resolved.queryParams().forEach((name, values) -> queryParams.put(name, values.stream()
+                .map(projector::project)
+                .map(value -> (Object) value)
+                .toList()));
+        return new RequestArgumentResolver.ResolvedArgs(
+                pathVars, queryParams, resolved.headers(), resolved.body());
+    }
+
     static PreparedKey derive(Class<?> clientInterface,
                               String clientName,
                               RequestPlan plan,
@@ -107,6 +121,9 @@ final class CacheKeyContract {
                               RequestArgumentResolver.ResolvedArgs resolved,
                               ContextView reactorContext,
                               ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        RequestArgumentResolver.ResolvedArgs requestTarget = hasSnapshottedRequestTarget(resolved)
+                ? resolved
+                : snapshotRequestTarget(resolved);
         String context = "Reactive HTTP client '" + clientName + "' method=" + plan.method().toGenericString();
         VariantSelection variants = variants(plan, null, policy, context);
         Map<String, Object> contextValues = new LinkedHashMap<>();
@@ -122,8 +139,8 @@ final class CacheKeyContract {
         Class<?> concreteClient = clientInterface != null ? clientInterface : plan.method().getDeclaringClass();
         writer.value(concreteClient.getName());
         writer.value(resolvedMethodSignature(plan));
-        writer.value(uriPathValues(resolved.pathVars()));
-        writer.value(uriQueryValues(resolved.queryParams()));
+        writer.value(requestTarget.pathVars());
+        writer.value(requestTarget.queryParams());
 
         Map<String, Object> selectedParameters = new TreeMap<>();
         variants.parameterIndexes().forEach((name, index) -> selectedParameters.put(
@@ -137,6 +154,13 @@ final class CacheKeyContract {
         writer.value(selectedHeaders);
         writer.value(contextValues);
         return new PreparedKey(OpaqueKey.from(writer.finish()), contextValues);
+    }
+
+    private static boolean hasSnapshottedRequestTarget(RequestArgumentResolver.ResolvedArgs resolved) {
+        return resolved.pathVars().values().stream().allMatch(String.class::isInstance)
+                && resolved.queryParams().values().stream()
+                .flatMap(Collection::stream)
+                .allMatch(String.class::isInstance);
     }
 
     private static VariantSelection variants(RequestPlan plan,
@@ -497,32 +521,53 @@ final class CacheKeyContract {
         if (type.isRecord()) {
             RecordComponent[] components = type.getRecordComponents();
             budget.consume(components.length, context);
-            for (RecordComponent component : components) {
+            Object[] frozenComponents = new Object[components.length];
+            for (int index = 0; index < components.length; index++) {
+                RecordComponent component = components[index];
                 Object componentValue = recordComponentValue(component, value, context);
-                Object frozen = freeze(componentValue, depth + 1,
+                frozenComponents[index] = freeze(componentValue, depth + 1,
                         context + " record component '" + component.getName() + "'", budget);
-                if (frozen != componentValue) {
+                if (frozenComponents[index] != componentValue
+                        && (componentValue == null || !componentValue.getClass().isRecord())) {
                     throw invalid(context, "record component '" + component.getName()
                             + "' is mutable and cannot be copied without changing the record");
                 }
             }
-            return value;
+            Object snapshot = reconstructRecord(type, components, frozenComponents, context);
+            for (int index = 0; index < components.length; index++) {
+                RecordComponent component = components[index];
+                Object represented = recordComponentValue(component, snapshot, context);
+                if (!Objects.deepEquals(represented, frozenComponents[index])) {
+                    throw invalid(context, "record component '" + component.getName()
+                            + "' accessor cannot represent its captured cache-key snapshot");
+                }
+            }
+            return snapshot;
         }
         throw invalid(context, "runtime value type " + type.getTypeName() + " cannot be copied safely");
     }
 
-    private static Map<String, String> uriPathValues(Map<String, Object> pathVars) {
-        Map<String, String> values = new LinkedHashMap<>();
-        pathVars.forEach((name, value) -> values.put(name, String.valueOf(value)));
-        return values;
-    }
-
-    private static Map<String, List<String>> uriQueryValues(Map<String, List<Object>> queryParams) {
-        Map<String, List<String>> values = new LinkedHashMap<>();
-        queryParams.forEach((name, queryValues) -> values.put(name, queryValues.stream()
-                .map(String::valueOf)
-                .toList()));
-        return values;
+    private static Object reconstructRecord(Class<?> type,
+                                            RecordComponent[] components,
+                                            Object[] values,
+                                            String context) {
+        Class<?>[] componentTypes = Arrays.stream(components)
+                .map(RecordComponent::getType)
+                .toArray(Class<?>[]::new);
+        try {
+            Constructor<?> constructor = type.getDeclaredConstructor(componentTypes);
+            boolean accessible = constructor.canAccess(null) || constructor.trySetAccessible();
+            if (!accessible) {
+                throw invalid(context, "cannot access canonical constructor for record " + type.getName());
+            }
+            return constructor.newInstance(values);
+        } catch (InvocationTargetException ex) {
+            throw invalid(context, "canonical constructor for record " + type.getName()
+                    + " rejected the captured component snapshot");
+        } catch (ReflectiveOperationException | SecurityException ex) {
+            throw invalid(context, "cannot reconstruct record " + type.getName()
+                    + " from its captured component snapshot");
+        }
     }
 
     private static Object selectedParameterValue(RequestPlan plan,
@@ -828,6 +873,109 @@ final class CacheKeyContract {
     private record RequestMapEntry(Object key, Object value) {
     }
 
+    private static final class RequestTargetProjector {
+        private final ByteBudget budget = new ByteBudget();
+
+        private String project(Object value) {
+            StringBuilder projection = new StringBuilder();
+            append(projection, value, 0);
+            return projection.toString();
+        }
+
+        private void append(StringBuilder projection, Object value, int depth) {
+            if (depth > MAX_DEPTH) {
+                throw new IllegalStateException("Request-target projection nesting exceeds " + MAX_DEPTH);
+            }
+            if (value == null) {
+                appendText(projection, "null");
+                return;
+            }
+            if (value instanceof Collection<?> collection) {
+                appendText(projection, "[");
+                Iterator<?> iterator = collection.iterator();
+                while (iterator.hasNext()) {
+                    append(projection, iterator.next(), depth + 1);
+                    if (iterator.hasNext()) {
+                        appendText(projection, ", ");
+                    }
+                }
+                appendText(projection, "]");
+                return;
+            }
+            if (value instanceof Map<?, ?> map) {
+                appendText(projection, "{");
+                Iterator<? extends Map.Entry<?, ?>> iterator = map.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<?, ?> entry = iterator.next();
+                    append(projection, entry.getKey(), depth + 1);
+                    appendText(projection, "=");
+                    append(projection, entry.getValue(), depth + 1);
+                    if (iterator.hasNext()) {
+                        appendText(projection, ", ");
+                    }
+                }
+                appendText(projection, "}");
+                return;
+            }
+            if (value instanceof Optional<?> optional) {
+                if (optional.isPresent()) {
+                    appendText(projection, "Optional[");
+                    append(projection, optional.orElseThrow(), depth + 1);
+                    appendText(projection, "]");
+                } else {
+                    appendText(projection, "Optional.empty");
+                }
+                return;
+            }
+            Class<?> type = value.getClass();
+            if (type.isRecord()) {
+                appendText(projection, type.getSimpleName());
+                appendText(projection, "[");
+                RecordComponent[] components = type.getRecordComponents();
+                for (int index = 0; index < components.length; index++) {
+                    RecordComponent component = components[index];
+                    appendText(projection, component.getName());
+                    appendText(projection, "=");
+                    append(projection, recordComponentValue(
+                            component, value, "Request-target record " + type.getName()), depth + 1);
+                    if (index + 1 < components.length) {
+                        appendText(projection, ", ");
+                    }
+                }
+                appendText(projection, "]");
+                return;
+            }
+            if (type.isArray()) {
+                throw new IllegalStateException(
+                        "Array values cannot be projected into a stable cache-selected request target");
+            }
+            preflightScalar(value);
+            appendText(projection, String.valueOf(value));
+        }
+
+        private void preflightScalar(Object value) {
+            if (value instanceof BigInteger integer) {
+                budget.require(decimalLength(integer));
+            } else if (value instanceof BigDecimal decimal) {
+                budget.require((long) decimal.precision() + 16L);
+            }
+        }
+
+        private static long decimalLength(BigInteger value) {
+            if (value.signum() == 0) {
+                return 1;
+            }
+            long digits = (long) Math.floor((value.bitLength() - 1) * Math.log10(2.0d)) + 1L;
+            return digits + (value.signum() < 0 ? 1L : 0L);
+        }
+
+        private void appendText(StringBuilder projection, String value) {
+            int encodedLength = CanonicalWriter.utf8Length(value);
+            budget.consume(encodedLength);
+            projection.append(value);
+        }
+    }
+
     private static final class CanonicalWriter {
         private final ByteBudget budget;
         private final BudgetedByteArrayOutputStream bytes;
@@ -1082,7 +1230,9 @@ final class CacheKeyContract {
                 ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 DataOutputStream output = new DataOutputStream(bytes);
                 if (value instanceof URI uri) {
-                    output.write(uri.toString().getBytes(StandardCharsets.UTF_8));
+                    String text = uri.toString();
+                    requireScalarPayload(value.getClass(), utf8Length(text));
+                    output.write(text.getBytes(StandardCharsets.UTF_8));
                 } else if (value instanceof Instant instant) {
                     output.writeLong(instant.getEpochSecond());
                     output.writeInt(instant.getNano());

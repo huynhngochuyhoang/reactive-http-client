@@ -288,6 +288,9 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 CacheRecordVariant.class.getMethod("value")))
                 .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.reflection().onConstructorInvocation(
+                CacheRecordVariant.class.getDeclaredConstructor(String.class, int.class)))
+                .accepts(generationContext.getRuntimeHints());
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 CacheRecordVariant.class.getMethod("version")))
                 .accepts(generationContext.getRuntimeHints());
@@ -304,6 +307,9 @@ class ReactiveHttpClientAotSmokeTest {
                 CacheContextVariant.class.getMethod("region"))).accepts(hints);
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 CacheContextVariant.class.getMethod("tier"))).accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onConstructorInvocation(
+                CacheContextVariant.class.getDeclaredConstructor(String.class, int.class)))
+                .accepts(hints);
     }
 
     @Test
@@ -437,6 +443,13 @@ class ReactiveHttpClientAotSmokeTest {
             hints.reflection().registerType(CacheContextVariant.class, typeHint -> {});
             for (var component : CacheContextVariant.class.getRecordComponents()) {
                 hints.reflection().registerMethod(component.getAccessor(), ExecutableMode.INVOKE);
+            }
+            try {
+                hints.reflection().registerConstructor(
+                        CacheContextVariant.class.getDeclaredConstructor(String.class, int.class),
+                        ExecutableMode.INVOKE);
+            } catch (NoSuchMethodException ex) {
+                throw new IllegalStateException(ex);
             }
         }
     }

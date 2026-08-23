@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -363,6 +364,39 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void requestTargetProjectionIsBoundedBeforeRepeatedScalarsAreCombined() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        Method method = LargePathClient.class.getMethod("get", List.class);
+        RequestPlan plan = plan(LargePathClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                LargePathClient.class, "large-path", plan, config, "GET");
+        List<String> repeated = Collections.nCopies(10_000, "x".repeat(512));
+        Object[] frozen = CacheKeyContract.freezeArguments(
+                plan, new Object[]{repeated}, selection.policy());
+        RequestArgumentResolver.ResolvedArgs resolved = argumentResolver.resolve(plan, frozen);
+
+        assertThatThrownBy(() -> CacheKeyContract.snapshotRequestTarget(resolved))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cache key material exceeds 1048576 bytes");
+    }
+
+    @Test
+    void recordsAreReconstructedFromOneStableAccessorSnapshot() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("record"));
+        Method method = UnstableRecordClient.class.getMethod("get", UnstableRecord.class);
+        RequestPlan plan = plan(UnstableRecordClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                UnstableRecordClient.class, "unstable-record", plan, config, "GET");
+        UnstableRecord.READS.set(0);
+
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                plan, new Object[]{new UnstableRecord("token")}, selection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("accessor cannot represent its captured cache-key snapshot");
+    }
+
+    @Test
     void nonPublicRecordValuesCanBeFrozenAndEncoded() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         Class<?> clientType = NonPublicRecordFixture.clientType();
@@ -616,6 +650,22 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void canonicalEncodingPreflightsOversizedUriText() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("uri"));
+        URI oversized = URI.create("https://cache-key.example.invalid/" + "x".repeat(1024 * 1024));
+
+        assertThatThrownBy(() -> key(
+                UriVariantClient.class,
+                "large-uri",
+                UriVariantClient.class.getMethod("get", URI.class),
+                new Object[]{oversized},
+                config))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cache key material exceeds 1048576 bytes");
+    }
+
+    @Test
     void startupResolvesConcreteGenericRecordComponents() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         policy(config).setVaryByParameters(List.of("box"));
@@ -849,6 +899,15 @@ class CacheKeyContractTest {
     record Identity(String value, int version) {
     }
 
+    record UnstableRecord(String token) {
+        private static final AtomicInteger READS = new AtomicInteger();
+
+        @Override
+        public String token() {
+            return token + "-" + READS.incrementAndGet();
+        }
+    }
+
     record MutableRecord(List<String> values) {
     }
 
@@ -981,6 +1040,16 @@ class CacheKeyContractTest {
     interface IdentityMapClient {
         @GET("/items")
         Mono<String> get(@Body @CacheKey("entries") Map<Identity, String> entries);
+    }
+
+    interface LargePathClient {
+        @GET("/items/{values}")
+        Mono<String> get(@PathVar("values") List<String> values);
+    }
+
+    interface UnstableRecordClient {
+        @GET("/items")
+        Mono<String> get(@Body @CacheKey("record") UnstableRecord record);
     }
 
     interface ConcreteContainerArrayClient {

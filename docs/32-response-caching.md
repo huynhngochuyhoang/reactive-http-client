@@ -125,15 +125,18 @@ partition values.
 Supported selected values are null, primitive/scalar values, strings, enums,
 scalar records, arrays, typed lists/sets/maps, and optionals. The starter
 defensively freezes one snapshot per subscription and uses it for both the key
-and request materialization. Publishers, streams, resources, raw containers,
-unresolved generics, mutable DTOs, and mutable nested record components fail
-before transport dispatch. A top-level query array is supported and expands to
-ordered query values. Arrays used as path values or nested inside query elements
-are rejected because the current request-target conversion would serialize them
-by object identity; format those values as stable scalars instead. Arrays of
-containers must use a component type such as `List`, `Set`, or `Map` that can
-hold the defensive snapshot. Incompatible concrete or covariant runtime array
-components fail before dispatch instead of producing an array-store error.
+and request materialization. Supported records are reconstructed from one
+captured accessor pass; an accessor that cannot reproduce that captured state
+is rejected before dispatch. Publishers, streams, resources, raw containers,
+unresolved generics, mutable DTOs, and mutable nested record components also
+fail before transport dispatch. A top-level query array is supported and
+expands to ordered query values. Arrays used as path values or nested inside
+query elements are rejected because the current request-target conversion would
+serialize them by object identity; format those values as stable scalars
+instead. Arrays of containers must use a component type such as `List`, `Set`,
+or `Map` that can hold the defensive snapshot. Incompatible concrete or
+covariant runtime array components fail before dispatch instead of producing an
+array-store error.
 Freezing and startup validation count one depth level per nested container or
 record and enforce one cumulative 10,000-element budget across the selected
 argument graph and another across selected Reactor context values. Container
@@ -146,17 +149,19 @@ lose query, header, or body values.
 
 The canonical representation uses type tags, explicit nulls, length framing,
 container boundaries, and sorted map/set encodings for values that are not
-request-bound. Path/query dimensions first use the same frozen
-`String.valueOf` projection used by URI construction. A selected body or header
-set, or a selected body map, preserves the iteration order sent on the wire
-instead of being sorted for the key. URI variants retain their non-normalized
-text, so a literal Unicode path and an explicitly percent-escaped path remain
-distinct. These projections prevent wire-distinct requests from collapsing
-into one structural key. Canonical encoding has a cumulative 1 MiB byte limit
-that is enforced while nested frames are written. UTF-8 scalar length and
-`BigInteger`/`BigDecimal` encoded magnitude length are checked before encoded
-scalar bytes are materialized, so one oversized scalar cannot bypass the
-allocation bound. This wire projection is not a fallback for arbitrary
+request-bound. Path/query dimensions use a bounded structural string snapshot
+that is then passed to URI construction, so repeated nested values cannot build
+an unbounded intermediate projection and the key sees the exact dispatched
+value. A selected body or header set, or a selected body map, preserves the
+iteration order sent on the wire instead of being sorted for the key. URI
+variants retain their non-normalized text, so a literal Unicode path and an
+explicitly percent-escaped path remain distinct. These projections prevent
+wire-distinct requests from collapsing into one structural key. Canonical
+encoding and request-target projection each have a cumulative 1 MiB byte limit.
+UTF-8 scalar length, URI text length, and `BigInteger`/`BigDecimal` encoded
+magnitude length are checked before encoded scalar bytes are materialized, so
+one oversized scalar cannot bypass the allocation bound. This wire projection
+is not a fallback for arbitrary
 `@CacheKey` or Reactor-context values. Only the SHA-256 digest is retained as
 the local opaque key. Raw values and digest text are never exported through
 metrics, logs, traces, diagnostics, health, or support bundles. Auth tokens,
@@ -165,10 +170,10 @@ retained key text.
 
 ### Native context record values
 
-The AOT processor registers record accessors reachable from selected client
-method parameters. A record used only as a runtime `vary-by-context` value has
-no discoverable Java type in the client contract, so a native application must
-register that type explicitly:
+The AOT processor registers record accessors and canonical constructors
+reachable from selected client method parameters. A record used only as a
+runtime `vary-by-context` value has no discoverable Java type in the client
+contract, so a native application must register both explicitly:
 
 ```java
 import org.springframework.aot.hint.ExecutableMode;
@@ -184,9 +189,17 @@ final class CacheContextRuntimeHints implements RuntimeHintsRegistrar {
     @Override
     public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
         hints.reflection().registerType(SalesRegion.class, typeHint -> {});
-        for (var component : SalesRegion.class.getRecordComponents()) {
+        var components = SalesRegion.class.getRecordComponents();
+        for (var component : components) {
             hints.reflection().registerMethod(
                     component.getAccessor(), ExecutableMode.INVOKE);
+        }
+        try {
+            hints.reflection().registerConstructor(
+                    SalesRegion.class.getDeclaredConstructor(String.class, int.class),
+                    ExecutableMode.INVOKE);
+        } catch (NoSuchMethodException ex) {
+            throw new IllegalStateException(ex);
         }
     }
 }

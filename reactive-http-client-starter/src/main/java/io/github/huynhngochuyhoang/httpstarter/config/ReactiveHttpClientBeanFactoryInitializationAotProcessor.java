@@ -85,9 +85,18 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             return;
         }
         hints.registerType(candidate, typeHint -> {});
-        for (var component : candidate.getRecordComponents()) {
+        var components = candidate.getRecordComponents();
+        Class<?>[] componentTypes = new Class<?>[components.length];
+        for (int index = 0; index < components.length; index++) {
+            var component = components[index];
+            componentTypes[index] = component.getType();
             hints.registerMethod(component.getAccessor(), ExecutableMode.INVOKE);
             registerRecordAccessors(hints, ResolvableType.forType(component.getGenericType()), registeredTypes);
+        }
+        try {
+            hints.registerConstructor(candidate.getDeclaredConstructor(componentTypes), ExecutableMode.INVOKE);
+        } catch (NoSuchMethodException ex) {
+            throw new IllegalStateException("Record has no canonical constructor: " + candidate.getName(), ex);
         }
     }
 
