@@ -91,9 +91,10 @@ final class CacheKeyContract {
                 plan, null, policy, "Method " + plan.method().toGenericString());
         Set<Integer> indexes = requestArgumentIndexes(plan);
         indexes.addAll(variants.parameterIndexes().values());
+        FreezeBudget budget = new FreezeBudget();
         for (int index : indexes) {
             if (index < frozen.length) {
-                frozen[index] = freeze(frozen[index], 0, "parameter index " + index);
+                frozen[index] = freeze(frozen[index], 0, "parameter index " + index, budget);
             }
         }
         return frozen;
@@ -109,9 +110,10 @@ final class CacheKeyContract {
         String context = "Reactive HTTP client '" + clientName + "' method=" + plan.method().toGenericString();
         VariantSelection variants = variants(plan, null, policy, context);
         Map<String, Object> contextValues = new LinkedHashMap<>();
+        FreezeBudget contextBudget = new FreezeBudget();
         for (String name : variants.contextNames()) {
             Object value = reactorContext.getOrDefault(name, null);
-            contextValues.put(name, freeze(value, 0, "Reactor context '" + name + "'"));
+            contextValues.put(name, freeze(value, 0, "Reactor context '" + name + "'", contextBudget));
         }
 
         CanonicalWriter writer = new CanonicalWriter();
@@ -120,8 +122,8 @@ final class CacheKeyContract {
         Class<?> concreteClient = clientInterface != null ? clientInterface : plan.method().getDeclaringClass();
         writer.value(concreteClient.getName());
         writer.value(resolvedMethodSignature(plan));
-        writer.value(resolved.pathVars());
-        writer.value(resolved.queryParams());
+        writer.value(uriPathValues(resolved.pathVars()));
+        writer.value(uriQueryValues(resolved.queryParams()));
 
         Map<String, Object> selectedParameters = new TreeMap<>();
         variants.parameterIndexes().forEach((name, index) ->
@@ -163,6 +165,10 @@ final class CacheKeyContract {
         Set<String> availableHeaders = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         plan.headerParams().forEach(binding -> availableHeaders.add(binding.name()));
         plan.idempotencyKeyParams().forEach(binding -> availableHeaders.add(binding.name()));
+        if (plan.generatedIdempotencyKeyHeader() != null
+                && !plan.generatedIdempotencyKeyHeader().isBlank()) {
+            availableHeaders.add(plan.generatedIdempotencyKeyHeader());
+        }
         if (clientConfig != null && clientConfig.getDefaultHeaders() != null) {
             availableHeaders.addAll(clientConfig.getDefaultHeaders().keySet());
         }
@@ -214,7 +220,10 @@ final class CacheKeyContract {
                         && !selectedParameters.contains(binding.argumentIndex()))
                 || plan.idempotencyKeyParams().stream()
                 .anyMatch(binding -> !selected.contains(binding.name())
-                        && !selectedParameters.contains(binding.argumentIndex()));
+                        && !selectedParameters.contains(binding.argumentIndex()))
+                || (plan.generatedIdempotencyKeyHeader() != null
+                && !plan.generatedIdempotencyKeyHeader().isBlank()
+                && !selected.contains(plan.generatedIdempotencyKeyHeader()));
     }
 
     private static Set<Integer> requestArgumentIndexes(RequestPlan plan) {
@@ -248,7 +257,7 @@ final class CacheKeyContract {
                     && !Map.class.isAssignableFrom(raw)
                     && !Optional.class.isAssignableFrom(raw))) {
                 if (raw != null && raw.isRecord()) {
-                    validateRecord(raw, context, depth + 1);
+                    validateRecord(parameterizedType, raw, context, depth + 1);
                     return;
                 }
                 throw invalid(context, "unsupported parameterized cache-key type " + type.getTypeName());
@@ -276,7 +285,7 @@ final class CacheKeyContract {
             return;
         }
         if (raw.isRecord()) {
-            validateRecord(raw, context, depth + 1);
+            validateRecord(raw, raw, context, depth + 1);
             return;
         }
         if (Collection.class.isAssignableFrom(raw) || Map.class.isAssignableFrom(raw)
@@ -287,18 +296,64 @@ final class CacheKeyContract {
                 + " cannot be copied safely; use immutable scalars, arrays, typed lists/sets/maps, enums, or records");
     }
 
-    private static void validateRecord(Class<?> recordType, String context, int depth) {
+    private static void validateRecord(Type declaredType,
+                                       Class<?> recordType,
+                                       String context,
+                                       int depth) {
+        Map<TypeVariable<?>, Type> bindings = recordBindings(declaredType, recordType);
         for (RecordComponent component : recordType.getRecordComponents()) {
-            Type type = component.getGenericType();
-            if (type instanceof ParameterizedType || type instanceof Class<?> clazz && clazz.isArray()) {
-                throw invalid(context, "record component '" + component.getName()
-                        + "' is mutable; records used as cache-key inputs must contain immutable scalar/record values");
+            Type type = resolveType(component.getGenericType(), bindings);
+            if (type instanceof ParameterizedType
+                    || type instanceof GenericArrayType
+                    || type instanceof Class<?> clazz && clazz.isArray()) {
+                Class<?> componentRaw = rawClass(type);
+                if (componentRaw == null || !componentRaw.isRecord()) {
+                    throw invalid(context, "record component '" + component.getName()
+                            + "' is mutable; records used as cache-key inputs must contain "
+                            + "immutable scalar/record values");
+                }
             }
             validateType(type, context + " record component '" + component.getName() + "'", depth + 1);
         }
     }
 
-    private static Object freeze(Object value, int depth, String context) {
+    private static Map<TypeVariable<?>, Type> recordBindings(Type declaredType, Class<?> recordType) {
+        if (!(declaredType instanceof ParameterizedType parameterizedType)) {
+            return Map.of();
+        }
+        TypeVariable<?>[] variables = recordType.getTypeParameters();
+        Type[] arguments = parameterizedType.getActualTypeArguments();
+        Map<TypeVariable<?>, Type> bindings = new HashMap<>();
+        for (int index = 0; index < Math.min(variables.length, arguments.length); index++) {
+            bindings.put(variables[index], arguments[index]);
+        }
+        return bindings;
+    }
+
+    private static Type resolveType(Type type, Map<TypeVariable<?>, Type> bindings) {
+        if (type instanceof TypeVariable<?> variable) {
+            Type resolved = bindings.get(variable);
+            return resolved != null && resolved != variable ? resolveType(resolved, bindings) : variable;
+        }
+        if (type instanceof ParameterizedType parameterizedType) {
+            Type owner = parameterizedType.getOwnerType() != null
+                    ? resolveType(parameterizedType.getOwnerType(), bindings)
+                    : null;
+            Type[] arguments = Arrays.stream(parameterizedType.getActualTypeArguments())
+                    .map(argument -> resolveType(argument, bindings))
+                    .toArray(Type[]::new);
+            return new ResolvedParameterizedType(owner, parameterizedType.getRawType(), arguments);
+        }
+        if (type instanceof GenericArrayType arrayType) {
+            Type component = resolveType(arrayType.getGenericComponentType(), bindings);
+            return component instanceof Class<?> componentClass
+                    ? Array.newInstance(componentClass, 0).getClass()
+                    : new ResolvedGenericArrayType(component);
+        }
+        return type;
+    }
+
+    private static Object freeze(Object value, int depth, String context, FreezeBudget budget) {
         if (value == null) {
             return null;
         }
@@ -311,49 +366,53 @@ final class CacheKeyContract {
         }
         if (type.isArray()) {
             int length = Array.getLength(value);
-            requireElementCount(length, context);
+            budget.consume(length, context);
             Object copy = Array.newInstance(type.getComponentType(), length);
             for (int i = 0; i < length; i++) {
-                Array.set(copy, i, freeze(Array.get(value, i), depth + 1, context + "[" + i + "]"));
+                Array.set(copy, i, freeze(
+                        Array.get(value, i), depth + 1, context + "[" + i + "]", budget));
             }
             return copy;
         }
         if (value instanceof List<?> list) {
-            requireElementCount(list.size(), context);
+            budget.consume(list.size(), context);
             List<Object> copy = new ArrayList<>(list.size());
             int index = 0;
             for (Object element : list) {
-                copy.add(freeze(element, depth + 1, context + "[" + index + "]"));
+                copy.add(freeze(element, depth + 1, context + "[" + index + "]", budget));
                 index++;
             }
             return Collections.unmodifiableList(copy);
         }
         if (value instanceof Set<?> set) {
-            requireElementCount(set.size(), context);
+            budget.consume(set.size(), context);
             List<Object> values = new ArrayList<>(set.size());
             for (Object element : set) {
-                values.add(freeze(element, depth + 1, context + " set element"));
+                values.add(freeze(element, depth + 1, context + " set element", budget));
             }
             return Collections.unmodifiableSet(new LinkedHashSet<>(values));
         }
         if (value instanceof Map<?, ?> map) {
-            requireElementCount(map.size(), context);
+            budget.consume(map.size(), context);
             Map<Object, Object> copy = new LinkedHashMap<>();
             for (Map.Entry<?, ?> entry : map.entrySet()) {
-                Object key = freeze(entry.getKey(), depth + 1, context + " map key");
-                Object mapped = freeze(entry.getValue(), depth + 1, context + " map value");
+                Object key = freeze(entry.getKey(), depth + 1, context + " map key", budget);
+                Object mapped = freeze(entry.getValue(), depth + 1, context + " map value", budget);
                 copy.put(key, mapped);
             }
             return Collections.unmodifiableMap(copy);
         }
         if (value instanceof Optional<?> optional) {
-            return optional.map(item -> freeze(item, depth + 1, context + " optional"));
+            if (optional.isPresent()) {
+                budget.consume(1, context);
+            }
+            return optional.map(item -> freeze(item, depth + 1, context + " optional", budget));
         }
         if (type.isRecord()) {
             for (RecordComponent component : type.getRecordComponents()) {
                 Object componentValue = recordComponentValue(component, value, context);
                 Object frozen = freeze(componentValue, depth + 1,
-                        context + " record component '" + component.getName() + "'");
+                        context + " record component '" + component.getName() + "'", budget);
                 if (frozen != componentValue) {
                     throw invalid(context, "record component '" + component.getName()
                             + "' is mutable and cannot be copied without changing the record");
@@ -364,10 +423,18 @@ final class CacheKeyContract {
         throw invalid(context, "runtime value type " + type.getTypeName() + " cannot be copied safely");
     }
 
-    private static void requireElementCount(int count, String context) {
-        if (count > MAX_ELEMENTS) {
-            throw invalid(context, "contains " + count + " elements; maximum is " + MAX_ELEMENTS);
-        }
+    private static Map<String, String> uriPathValues(Map<String, Object> pathVars) {
+        Map<String, String> values = new LinkedHashMap<>();
+        pathVars.forEach((name, value) -> values.put(name, String.valueOf(value)));
+        return values;
+    }
+
+    private static Map<String, List<String>> uriQueryValues(Map<String, List<Object>> queryParams) {
+        Map<String, List<String>> values = new LinkedHashMap<>();
+        queryParams.forEach((name, queryValues) -> values.put(name, queryValues.stream()
+                .map(String::valueOf)
+                .toList()));
+        return values;
     }
 
     private static List<String> headerValues(Map<String, List<String>> headers, String requestedName) {
@@ -437,6 +504,59 @@ final class CacheKeyContract {
 
     private static IllegalStateException invalid(String context, String reason) {
         return new IllegalStateException(context + " has an invalid cache key/variant contract: " + reason);
+    }
+
+    private static final class FreezeBudget {
+        private int elements;
+
+        private void consume(int count, String context) {
+            if (count < 0 || count > MAX_ELEMENTS - elements) {
+                throw invalid(context, "cumulative element count exceeds maximum " + MAX_ELEMENTS);
+            }
+            elements += count;
+        }
+    }
+
+    private static final class ResolvedParameterizedType implements ParameterizedType {
+        private final Type ownerType;
+        private final Type rawType;
+        private final Type[] arguments;
+
+        private ResolvedParameterizedType(Type ownerType, Type rawType, Type[] arguments) {
+            this.ownerType = ownerType;
+            this.rawType = rawType;
+            this.arguments = arguments.clone();
+        }
+
+        @Override
+        public Type[] getActualTypeArguments() {
+            return arguments.clone();
+        }
+
+        @Override
+        public Type getRawType() {
+            return rawType;
+        }
+
+        @Override
+        public Type getOwnerType() {
+            return ownerType;
+        }
+
+        @Override
+        public String getTypeName() {
+            return rawType.getTypeName() + "<" + Arrays.stream(arguments)
+                    .map(Type::getTypeName)
+                    .reduce((left, right) -> left + ", " + right)
+                    .orElse("") + ">";
+        }
+    }
+
+    private record ResolvedGenericArrayType(Type genericComponentType) implements GenericArrayType {
+        @Override
+        public Type getGenericComponentType() {
+            return genericComponentType;
+        }
     }
 
     record PreparedKey(OpaqueKey key, Map<String, Object> contextValues) {

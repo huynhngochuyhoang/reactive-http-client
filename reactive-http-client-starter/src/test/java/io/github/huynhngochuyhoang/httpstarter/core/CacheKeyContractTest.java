@@ -327,6 +327,99 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void freezingEnforcesOneCumulativeElementBudgetAcrossNestedContainers() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("nested"));
+        Method method = NestedListClient.class.getMethod("get", List.class);
+        RequestPlan plan = plan(NestedListClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                NestedListClient.class, "nested", plan, config, "GET");
+        List<String> sharedChild = Collections.nCopies(10_000, "value");
+        List<List<String>> nested = Collections.nCopies(10_000, sharedChild);
+
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                plan, new Object[]{nested}, selection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cumulative element count exceeds maximum 10000");
+    }
+
+    @Test
+    void startupResolvesConcreteGenericRecordComponents() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("box"));
+
+        assertThatCode(() -> validate(GenericRecordClient.class, config)).doesNotThrowAnyException();
+        assertThatCode(() -> key(
+                GenericRecordClient.class,
+                "generic-record",
+                GenericRecordClient.class.getMethod("get", Box.class),
+                new Object[]{new Box<>("tenant-a")},
+                config)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void generatedIdempotencyHeadersRequireAndSupportExplicitPartitioning() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig unpartitioned = selectedPolicy();
+        assertRejected(GeneratedIdempotencyClient.class, unpartitioned, "dynamic request headers must be selected");
+
+        ReactiveHttpClientProperties.ClientConfig partitioned = selectedPolicy();
+        policy(partitioned).setVaryByHeaders(List.of("Idempotency-Key"));
+        validate(GeneratedIdempotencyClient.class, partitioned);
+        Method method = GeneratedIdempotencyClient.class.getMethod("get");
+        RequestPlan plan = plan(GeneratedIdempotencyClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                GeneratedIdempotencyClient.class, "generated", plan, partitioned, "GET");
+        Object[] frozen = CacheKeyContract.freezeArguments(plan, new Object[0], selection.policy());
+        RequestArgumentResolver.ResolvedArgs base = argumentResolver.resolve(plan, frozen);
+        RequestArgumentResolver.ResolvedArgs firstResolved =
+                ReactiveClientInvocationHandler.applyCacheKeyIdempotencyKey(plan, base, Context.empty());
+        RequestArgumentResolver.ResolvedArgs secondResolved =
+                ReactiveClientInvocationHandler.applyCacheKeyIdempotencyKey(plan, base, Context.empty());
+
+        CacheKeyContract.OpaqueKey first = CacheKeyContract.derive(
+                GeneratedIdempotencyClient.class, "generated", plan, frozen,
+                firstResolved, Context.empty(), selection.policy()).key();
+        CacheKeyContract.OpaqueKey second = CacheKeyContract.derive(
+                GeneratedIdempotencyClient.class, "generated", plan, frozen,
+                secondResolved, Context.empty(), selection.policy()).key();
+
+        assertThat(firstResolved.headers().get("Idempotency-Key")).hasSize(1);
+        assertThat(secondResolved.headers().get("Idempotency-Key"))
+                .isNotEqualTo(firstResolved.headers().get("Idempotency-Key"));
+        assertThat(first).isNotEqualTo(second);
+
+        ReactiveHttpClientProperties.ClientConfig acknowledged = selectedPolicy();
+        policy(acknowledged).setSharedResponse(true);
+        assertThatCode(() -> validate(GeneratedIdempotencyClient.class, acknowledged))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void uriBoundValuesUseTheSameStringProjectionAsTheWire() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        Method method = UriShapeClient.class.getMethod("get", Set.class, Map.class);
+        Set<String> firstPath = new LinkedHashSet<>(List.of("z", "a"));
+        Set<String> secondPath = new LinkedHashSet<>(List.of("a", "z"));
+        Map<String, Integer> firstQuery = new LinkedHashMap<>();
+        firstQuery.put("z", 1);
+        firstQuery.put("a", 2);
+        Map<String, Integer> secondQuery = new LinkedHashMap<>();
+        secondQuery.put("a", 2);
+        secondQuery.put("z", 1);
+
+        CacheKeyContract.OpaqueKey base = key(
+                UriShapeClient.class, "uri-shape", method,
+                new Object[]{firstPath, firstQuery}, config);
+
+        assertThat(base).isNotEqualTo(key(
+                UriShapeClient.class, "uri-shape", method,
+                new Object[]{secondPath, firstQuery}, config));
+        assertThat(base).isNotEqualTo(key(
+                UriShapeClient.class, "uri-shape", method,
+                new Object[]{firstPath, secondQuery}, config));
+    }
+
+    @Test
     void eachFreezeUsesOneDefensiveSnapshotForKeyAndRequestMaterialization() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         Method method = ListQueryClient.class.getMethod("get", List.class);
@@ -462,6 +555,9 @@ class CacheKeyContractTest {
     record MutableRecord(List<String> values) {
     }
 
+    record Box<T>(T value) {
+    }
+
     enum Mode {
         SPECIAL {
         }
@@ -589,6 +685,29 @@ class CacheKeyContractTest {
     interface IdempotencyVariantClient {
         @GET("/items")
         Mono<String> get(@IdempotencyKey String idempotencyKey);
+    }
+
+    interface NestedListClient {
+        @GET("/items")
+        Mono<String> get(@CacheKey("nested") List<List<String>> nested);
+    }
+
+    interface GenericRecordClient {
+        @GET("/items")
+        Mono<String> get(@CacheKey("box") Box<String> box);
+    }
+
+    interface GeneratedIdempotencyClient {
+        @GET("/items")
+        @IdempotencyKey
+        Mono<String> get();
+    }
+
+    interface UriShapeClient {
+        @GET("/items/{path}")
+        Mono<String> get(
+                @PathVar("path") Set<String> path,
+                @QueryParam("filters") Map<String, Integer> filters);
     }
 
     interface SensitiveHeaderClient {

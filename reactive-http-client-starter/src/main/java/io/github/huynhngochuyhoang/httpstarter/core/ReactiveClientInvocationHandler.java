@@ -285,7 +285,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 RequestArgumentResolver.ResolvedArgs frozenResolved = applyDefaultHeaders(
                         applyDefaultQueryParams(argumentResolver.resolve(plan, frozenArguments)));
                 RequestArgumentResolver.ResolvedArgs keyResolved =
-                        applyContextIdempotencyKey(plan, frozenResolved, context);
+                        applyCacheKeyIdempotencyKey(plan, frozenResolved, context);
                 CacheKeyContract.PreparedKey preparedKey = CacheKeyContract.derive(
                         concreteClient,
                         clientName,
@@ -1992,6 +1992,21 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return withHeader(resolved, idempotencyHeaderName(plan), contextKey);
         }
         return resolved;
+    }
+
+    static RequestArgumentResolver.ResolvedArgs applyCacheKeyIdempotencyKey(
+            RequestPlan plan,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            reactor.util.context.ContextView context) {
+        RequestArgumentResolver.ResolvedArgs contextResolved =
+                applyContextIdempotencyKey(plan, resolved, context);
+        if (contextResolved != resolved || hasIdempotencyKeyHeaderValue(plan, contextResolved)) {
+            return contextResolved;
+        }
+        if (StringUtils.hasText(plan.generatedIdempotencyKeyHeader())) {
+            return withHeader(contextResolved, plan.generatedIdempotencyKeyHeader(), UUID.randomUUID().toString());
+        }
+        return contextResolved;
     }
 
     private static boolean hasIdempotencyKeyHeaderValue(RequestPlan plan, RequestArgumentResolver.ResolvedArgs resolved) {

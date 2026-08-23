@@ -96,9 +96,11 @@ Mono<CatalogItem> getItem(
 ```
 
 `vary-by-parameters` names stable `@CacheKey` labels.
-`vary-by-headers` must name a declared header/idempotency parameter or a
-configured default header and is case-insensitive. `vary-by-context` reads
-string keys from the subscriber's Reactor context. Blank, duplicate, unknown
+`vary-by-headers` must name a declared header/idempotency parameter, a
+method-level generated idempotency header, or a configured default header and
+is case-insensitive. A generated idempotency header that is not selected must
+be acknowledged with `shared-response: true`. `vary-by-context` reads string
+keys from the subscriber's Reactor context. Blank, duplicate, unknown
 parameter/header, and ambiguous declarations fail startup.
 
 For an authenticated method with no explicit parameter/header/context
@@ -118,14 +120,21 @@ scalar records, arrays, typed lists/sets/maps, and optionals. The starter
 defensively freezes one snapshot per subscription and uses it for both the key
 and request materialization. Publishers, streams, resources, raw containers,
 unresolved generics, mutable DTOs, and mutable nested record components fail
-before transport dispatch.
+before transport dispatch. Freezing enforces one cumulative 10,000-element
+budget across the selected argument graph and another across selected Reactor
+context values, so shared or deeply nested containers cannot expand without a
+bound.
 
 The canonical representation uses type tags, explicit nulls, length framing,
-container boundaries, and sorted map/set encodings. Only its SHA-256 digest is
-retained as the local opaque key. Raw values and digest text are never exported
-through metrics, logs, traces, diagnostics, health, or support bundles. Auth
-tokens, credentials, and cookies selected as variants therefore never become
-ordinary retained key text.
+container boundaries, and sorted map/set encodings. Path and query dimensions
+first use the same frozen `String.valueOf` projection used by URI construction,
+so order-sensitive request-target text cannot collapse into one structural
+key. This wire projection is not a fallback for arbitrary `@CacheKey` or
+Reactor-context values. Only the SHA-256 digest is retained as the local opaque
+key. Raw values and digest text are never exported through metrics, logs,
+traces, diagnostics, health, or support bundles. Auth tokens, credentials, and
+cookies selected as variants therefore never become ordinary retained key
+text.
 
 ## Customization safety
 

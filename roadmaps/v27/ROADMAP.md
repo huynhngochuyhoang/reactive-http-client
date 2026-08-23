@@ -233,8 +233,10 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
 - Encode key inputs as a canonical typed structure with explicit null markers,
   scalar type identifiers, length framing, container boundaries, element/index
   boundaries, and canonical map-entry ordering before equality or one-way
-  derivation. Delimiter concatenation, `toString()`, identity hash codes, and
-  unframed serialized text are not valid key encodings.
+  derivation. Delimiter concatenation, generic `toString()` fallback, identity
+  hash codes, and unframed serialized text are not valid selected key/context
+  encodings. Path/query dimensions use the exact frozen string projection sent
+  through request-target construction so wire-distinct values remain distinct.
 - Path/query values and declared key parameters have stable handling for nulls,
   arrays, collections, maps, inherited generics, and ordering. Each subscription
   freezes one supported argument snapshot and uses that same snapshot for key

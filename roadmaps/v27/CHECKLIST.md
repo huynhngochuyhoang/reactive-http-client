@@ -330,8 +330,9 @@ Evidence recorded on 2026-08-22:
 - [x] Define a canonical typed structural encoding with explicit null markers,
       scalar type identifiers, length framing, container/element boundaries,
       and canonical map-entry ordering before key equality or one-way derivation.
-- [x] Reject delimiter concatenation, `toString()`, identity hash codes, and
-      unframed serialized text as cache-key encodings.
+- [x] Reject delimiter concatenation, generic `toString()` fallback, identity
+      hash codes, and unframed serialized text for selected key/context values;
+      key path/query dimensions through their exact frozen wire projection.
 - [x] Define deterministic selected-input handling for nulls, primitives,
       strings, arrays, collections, maps, enums, records, and inherited generic
       values.
@@ -409,8 +410,13 @@ Evidence recorded on 2026-08-22:
   sequential-list copying, request-order-preserving set/map snapshots,
   accessible external non-public records, complete case-insensitive header
   variants, and context idempotency-key preparation before key derivation.
+- A second review pass added a cumulative freeze budget, concrete generic-record
+  substitution, explicit method-generated idempotency variants, and URI
+  path/query wire projection. Regression tests cover shared nested containers,
+  `Box<String>`, generated-header acknowledgement/partitioning, and
+  order-sensitive path/query containers.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1102` starter tests and `55` test-helper tests with zero
+  test` passed `1106` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 
