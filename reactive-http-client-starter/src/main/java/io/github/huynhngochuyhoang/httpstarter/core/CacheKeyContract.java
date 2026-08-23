@@ -16,8 +16,10 @@ import java.lang.reflect.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.channels.ReadableByteChannel;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.*;
@@ -97,6 +99,7 @@ final class CacheKeyContract {
     static Object[] freezeArguments(RequestPlan plan,
                                     Object[] arguments,
                                     ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        validateRequestTargetContainers(plan, arguments);
         Object[] frozen = arguments != null ? arguments.clone() : new Object[0];
         VariantSelection variants = variants(
                 plan, null, policy, "Method " + plan.method().toGenericString());
@@ -188,7 +191,145 @@ final class CacheKeyContract {
     }
 
     static SerializedBodyKey serializedBodyKey(byte[] wireBytes) {
-        return new SerializedBodyKey(wireBytes != null ? wireBytes : new byte[0]);
+        byte[] bytes = wireBytes != null ? wireBytes : new byte[0];
+        requireSerializedBodyLength(bytes.length);
+        return new SerializedBodyKey(true, bytes);
+    }
+
+    static SerializedBodyKey absentSerializedBodyKey() {
+        return new SerializedBodyKey(false, new byte[0]);
+    }
+
+    static byte[] selectedStringBodyBytes(String value, Charset charset) {
+        int encodedLength = encodedLength(value, charset);
+        byte[] bytes = value.getBytes(charset);
+        if (bytes.length != encodedLength) {
+            requireSerializedBodyLength(bytes.length);
+        }
+        return bytes;
+    }
+
+    static void requireSerializedBodyLength(long length) {
+        if (length < 0 || length > MAX_CANONICAL_BYTES) {
+            throw new IllegalStateException(
+                    "Cache-selected request body exceeds " + MAX_CANONICAL_BYTES + " bytes");
+        }
+    }
+
+    private static int encodedLength(String value, Charset charset) {
+        CharsetEncoder encoder = charset.newEncoder()
+                .onMalformedInput(CodingErrorAction.REPLACE)
+                .onUnmappableCharacter(CodingErrorAction.REPLACE);
+        CharBuffer input = CharBuffer.wrap(value);
+        ByteBuffer output = ByteBuffer.allocate(8192);
+        long length = 0;
+        while (true) {
+            CoderResult result = encoder.encode(input, output, true);
+            length = addEncodedBytes(length, output);
+            if (result.isUnderflow()) {
+                break;
+            }
+            if (!result.isOverflow()) {
+                throw new IllegalStateException("Unable to measure cache-selected request body encoding");
+            }
+        }
+        while (true) {
+            CoderResult result = encoder.flush(output);
+            length = addEncodedBytes(length, output);
+            if (result.isUnderflow()) {
+                break;
+            }
+            if (!result.isOverflow()) {
+                throw new IllegalStateException("Unable to measure cache-selected request body encoding");
+            }
+        }
+        return (int) length;
+    }
+
+    private static long addEncodedBytes(long current, ByteBuffer output) {
+        long updated = current + output.position();
+        requireSerializedBodyLength(updated);
+        output.clear();
+        return updated;
+    }
+
+    private static void validateRequestTargetContainers(RequestPlan plan, Object[] arguments) {
+        if (arguments == null) {
+            return;
+        }
+        FreezeBudget budget = new FreezeBudget();
+        for (RequestPlan.NamedArgumentBinding binding : plan.pathVars()) {
+            if (binding.argumentIndex() < arguments.length) {
+                validateRequestTargetContainer(
+                        arguments[binding.argumentIndex()], 0,
+                        "path parameter '" + binding.name() + "'", budget);
+            }
+        }
+        for (RequestPlan.NamedArgumentBinding binding : plan.queryParams()) {
+            if (binding.argumentIndex() >= arguments.length) {
+                continue;
+            }
+            Object value = arguments[binding.argumentIndex()];
+            if (value instanceof Collection<?> collection) {
+                for (Object element : collection) {
+                    budget.consume(1, "query parameter '" + binding.name() + "'");
+                    validateRequestTargetContainer(
+                            element, 0, "query parameter '" + binding.name() + "' element", budget);
+                }
+            } else if (value != null && value.getClass().isArray()) {
+                int length = Array.getLength(value);
+                budget.consume(length, "query parameter '" + binding.name() + "'");
+                for (int index = 0; index < length; index++) {
+                    validateRequestTargetContainer(
+                            Array.get(value, index), 0,
+                            "query parameter '" + binding.name() + "' element", budget);
+                }
+            } else {
+                validateRequestTargetContainer(
+                        value, 0, "query parameter '" + binding.name() + "'", budget);
+            }
+        }
+    }
+
+    private static void validateRequestTargetContainer(
+            Object value, int depth, String context, FreezeBudget budget) {
+        if (value == null) {
+            return;
+        }
+        if (depth > MAX_DEPTH) {
+            throw invalid(context, "request-target projection nesting exceeds " + MAX_DEPTH);
+        }
+        if (value instanceof Collection<?> collection) {
+            rejectCustomContainerToString(value.getClass(), context);
+            for (Object element : collection) {
+                budget.consume(1, context);
+                validateRequestTargetContainer(element, depth + 1, context + " element", budget);
+            }
+        } else if (value instanceof Map<?, ?> map) {
+            rejectCustomContainerToString(value.getClass(), context);
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                budget.consume(1, context);
+                validateRequestTargetContainer(entry.getKey(), depth + 1, context + " map key", budget);
+                validateRequestTargetContainer(entry.getValue(), depth + 1, context + " map value", budget);
+            }
+        } else if (value instanceof Optional<?> optional) {
+            if (optional.isPresent()) {
+                budget.consume(1, context);
+                validateRequestTargetContainer(optional.orElseThrow(), depth + 1, context + " optional", budget);
+            }
+        }
+    }
+
+    private static void rejectCustomContainerToString(Class<?> type, String context) {
+        try {
+            Class<?> declaringType = type.getMethod("toString").getDeclaringClass();
+            if (declaringType != AbstractCollection.class
+                    && declaringType != AbstractMap.class) {
+                throw invalid(context, "custom container toString() cannot be bounded for request-target use");
+            }
+        } catch (NoSuchMethodException ex) {
+            throw invalid(context, "cannot inspect container toString() for request-target use");
+        }
     }
 
     private static boolean hasSnapshottedRequestTarget(RequestArgumentResolver.ResolvedArgs resolved) {
@@ -592,13 +733,14 @@ final class CacheKeyContract {
         String resource = "/" + recordType.getName().replace('.', '/') + ".class";
         try (InputStream input = recordType.getResourceAsStream(resource)) {
             if (input == null) {
-                return new CanonicalRecordAccessors(false, Set.of());
+                return new CanonicalRecordAccessors(false, Set.of(), false);
             }
             Map<String, RecordComponent> expected = new HashMap<>();
             for (RecordComponent component : recordType.getRecordComponents()) {
                 expected.put(accessorSignature(component.getAccessor()), component);
             }
             Set<String> canonical = new HashSet<>();
+            boolean[] defaultToString = {false};
             ClassReader reader = new ClassReader(input);
             reader.accept(new ClassVisitor(Opcodes.ASM9) {
                 @Override
@@ -609,15 +751,18 @@ final class CacheKeyContract {
                                                  String[] exceptions) {
                     String methodSignature = name + descriptor;
                     RecordComponent component = expected.get(methodSignature);
-                    return component != null
-                            ? new CanonicalRecordAccessorVisitor(
-                                    recordType, component, methodSignature, canonical)
+                    if (component != null) {
+                        return new CanonicalRecordAccessorVisitor(
+                                recordType, component, methodSignature, canonical);
+                    }
+                    return "toString".equals(name) && "()Ljava/lang/String;".equals(descriptor)
+                            ? new DefaultRecordToStringVisitor(recordType, defaultToString)
                             : null;
                 }
             }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
-            return new CanonicalRecordAccessors(true, Set.copyOf(canonical));
+            return new CanonicalRecordAccessors(true, Set.copyOf(canonical), defaultToString[0]);
         } catch (IOException ex) {
-            return new CanonicalRecordAccessors(false, Set.of());
+            return new CanonicalRecordAccessors(false, Set.of(), false);
         }
     }
 
@@ -741,7 +886,53 @@ final class CacheKeyContract {
         }
     }
 
-    private record CanonicalRecordAccessors(boolean classBytesAvailable, Set<String> signatures) {
+    private static final class DefaultRecordToStringVisitor extends MethodVisitor {
+        private final String descriptor;
+        private final boolean[] defaultToString;
+        private int step;
+        private boolean valid = true;
+
+        private DefaultRecordToStringVisitor(Class<?> recordType, boolean[] defaultToString) {
+            super(Opcodes.ASM9);
+            this.descriptor = "(L" + org.springframework.asm.Type.getInternalName(recordType)
+                    + ";)Ljava/lang/String;";
+            this.defaultToString = defaultToString;
+        }
+
+        @Override
+        public void visitVarInsn(int opcode, int varIndex) {
+            valid &= step == 0 && opcode == Opcodes.ALOAD && varIndex == 0;
+            step++;
+        }
+
+        @Override
+        public void visitInvokeDynamicInsn(String name, String descriptor,
+                                           org.springframework.asm.Handle bootstrapMethodHandle,
+                                           Object... bootstrapMethodArguments) {
+            valid &= step == 1
+                    && "toString".equals(name)
+                    && this.descriptor.equals(descriptor)
+                    && "java/lang/runtime/ObjectMethods".equals(bootstrapMethodHandle.getOwner())
+                    && "bootstrap".equals(bootstrapMethodHandle.getName());
+            step++;
+        }
+
+        @Override
+        public void visitInsn(int opcode) {
+            valid &= step == 2 && opcode == Opcodes.ARETURN;
+            step++;
+        }
+
+        @Override
+        public void visitEnd() {
+            if (valid && step == 3) {
+                defaultToString[0] = true;
+            }
+        }
+    }
+
+    private record CanonicalRecordAccessors(
+            boolean classBytesAvailable, Set<String> signatures, boolean defaultToString) {
     }
 
     private static Object selectedParameterValue(RequestPlan plan,
@@ -1022,9 +1213,11 @@ final class CacheKeyContract {
     }
 
     static final class SerializedBodyKey {
+        private final boolean present;
         private final byte[] wireBytes;
 
-        private SerializedBodyKey(byte[] wireBytes) {
+        private SerializedBodyKey(boolean present, byte[] wireBytes) {
+            this.present = present;
             this.wireBytes = wireBytes.clone();
         }
     }
@@ -1085,7 +1278,25 @@ final class CacheKeyContract {
             }
             Class<?> type = value.getClass();
             if (type.isRecord()) {
-                appendText(projection, String.valueOf(value));
+                CanonicalRecordAccessors record = CANONICAL_RECORD_ACCESSORS.get(type);
+                if (!record.defaultToString()) {
+                    throw new IllegalStateException("Record " + type.getName()
+                            + " overrides toString(); custom request-target conversion cannot be bounded");
+                }
+                appendText(projection, type.getSimpleName());
+                appendText(projection, "[");
+                RecordComponent[] components = type.getRecordComponents();
+                for (int index = 0; index < components.length; index++) {
+                    RecordComponent component = components[index];
+                    appendText(projection, component.getName());
+                    appendText(projection, "=");
+                    append(projection, recordComponentValue(
+                            component, value, "Request-target record " + type.getName()), depth + 1);
+                    if (index + 1 < components.length) {
+                        appendText(projection, ", ");
+                    }
+                }
+                appendText(projection, "]");
                 return;
             }
             if (type.isArray()) {
@@ -1157,6 +1368,7 @@ final class CacheKeyContract {
             Class<?> type = value.getClass();
             if (value instanceof SerializedBodyKey serializedBody) {
                 output.writeByte(26);
+                output.writeBoolean(serializedBody.present);
                 rawFrame(serializedBody.wireBytes);
             } else if (value instanceof String text) {
                 stringScalar(type, text);

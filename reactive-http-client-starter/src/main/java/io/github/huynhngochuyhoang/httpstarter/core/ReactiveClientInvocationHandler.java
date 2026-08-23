@@ -1326,15 +1326,20 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (body == null) {
             return Mono.just(new CacheBodyPreparation(
                     new SerializedRequestBody(null, null, null),
-                    CacheKeyContract.serializedBodyKey(new byte[0])));
+                    CacheKeyContract.absentSerializedBodyKey()));
         }
         String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         if (body instanceof byte[] bytes) {
             return Mono.just(cacheBodyPreparation(body, bytes));
         }
         if (body instanceof String text) {
-            return Mono.just(cacheBodyPreparation(
-                    body, text.getBytes(rawBodyCharset(contentTypeHeader))));
+            return Mono.fromCallable(() -> cacheBodyPreparation(
+                            body, CacheKeyContract.selectedStringBodyBytes(
+                                    text, rawBodyCharset(contentTypeHeader))))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .onErrorMap(error -> error instanceof RequestSerializationException
+                            ? error
+                            : new RequestSerializationException(clientName, error));
         }
         if (!shouldProvideJsonRawBody(contentTypeHeader)) {
             return Mono.error(new RequestSerializationException(clientName, new IllegalStateException(
@@ -1352,8 +1357,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
     private static CacheBodyPreparation cacheBodyPreparation(Object originalBody, byte[] wireBytes) {
-        byte[] stableWireBytes = Objects.requireNonNull(
-                wireBytes, "ReactiveHttpClientJsonCodec returned null request bytes").clone();
+        byte[] source = Objects.requireNonNull(
+                wireBytes, "ReactiveHttpClientJsonCodec returned null request bytes");
+        CacheKeyContract.requireSerializedBodyLength(source.length);
+        byte[] stableWireBytes = source.clone();
         return new CacheBodyPreparation(
                 new SerializedRequestBody(originalBody, stableWireBytes, stableWireBytes),
                 CacheKeyContract.serializedBodyKey(stableWireBytes));

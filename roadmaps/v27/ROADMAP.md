@@ -251,7 +251,10 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
   conversion has a stable structural projection rather than identity-based
   `String.valueOf`. Container arrays use interface component types capable of
   holding defensive snapshots; incompatible concrete declarations and
-  covariant runtime arrays fail before dispatch.
+  covariant runtime arrays fail before dispatch. Custom collection, map, and
+  record `toString()` implementations are rejected in request-target positions;
+  standard container and compiler-generated record text is reproduced
+  structurally under the projection budget.
 - Request-bound selected collections preserve the same element order used by
   URI, header, and body materialization. Request-bound body maps preserve entry
   iteration order. Canonical map/set ordering applies only to selected values
@@ -265,7 +268,9 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
   byte budget is enforced while nested canonical frames and bounded
   request-target projections are written. UTF-8, URI text, and arbitrary-
   precision numeric scalar sizes are checked before encoded arrays are
-  allocated.
+  allocated. Selected String body bytes are preflighted before allocation, all
+  serialized bodies are checked before defensive copies, and absent bodies are
+  keyed separately from present zero-length payloads.
 - Header-, locale-, tenant-, Reactor-context-, or auth-dependent responses
   require explicit variant/partition inputs or an explicit shared-response
   acknowledgement. The starter never silently assumes such responses are

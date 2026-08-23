@@ -374,8 +374,8 @@ Evidence recorded on 2026-08-22:
       their canonical byte arrays.
 - [x] Bound the cumulative request-target projection before combining repeated
       path containers or nested query values, then dispatch that same snapshot.
-- [x] Reconstruct supported records from one captured accessor pass and reject
-      accessors that cannot reproduce the captured component state.
+- [x] Retain supported caller-created records without rerunning canonical
+      constructors and reject non-canonical accessors whose value can change.
 - [x] Preflight URI text length before allocating its canonical UTF-8 payload.
 
 ### [x] 5.2 Require explicit response variants
@@ -479,11 +479,14 @@ Evidence recorded on 2026-08-22:
   resources for native validation, and preflighted URI text before UTF-8
   allocation.
 - An eighth review pass retained caller-created immutable records without
-  rerunning canonical constructors, preserved record `toString()` for path and
-  query wire projections, and made selected-body keys and requests share one
-  `ReactiveHttpClientJsonCodec` byte representation.
+  rerunning canonical constructors and made selected-body keys and requests
+  share one `ReactiveHttpClientJsonCodec` byte representation.
+- A ninth review pass rejected unbounded custom container/record request-target
+  conversions, reproduced compiler-generated record text structurally under the
+  projection budget, distinguished absent from present-empty selected bodies,
+  and preflighted selected String and serialized-body lengths before copying.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1129` starter tests and `55` test-helper tests with zero
+  test` passed `1131` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

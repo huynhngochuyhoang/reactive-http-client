@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.fixture.cache.NonPublicRecordFixture;
+import io.github.huynhngochuyhoang.httpstarter.exception.RequestSerializationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.http.HttpHeaders;
@@ -439,7 +440,7 @@ class CacheKeyContractTest {
     }
 
     @Test
-    void recordRequestTargetsPreserveTheOriginalToStringProjection() throws Exception {
+    void customRecordAndContainerRequestTargetConversionsAreRejected() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         Method method = SlugPathClient.class.getMethod("get", Slug.class);
         RequestPlan plan = plan(SlugPathClient.class, method);
@@ -448,11 +449,39 @@ class CacheKeyContractTest {
         Slug slug = new Slug("catalog-item");
         Object[] frozen = CacheKeyContract.freezeArguments(plan, new Object[]{slug}, selection.policy());
 
-        RequestArgumentResolver.ResolvedArgs resolved = CacheKeyContract.snapshotRequestTarget(
-                argumentResolver.resolve(plan, frozen));
-
         assertThat(frozen[0]).isSameAs(slug);
-        assertThat(resolved.pathVars()).containsEntry("slug", "catalog-item");
+        assertThatThrownBy(() -> CacheKeyContract.snapshotRequestTarget(
+                argumentResolver.resolve(plan, frozen)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("overrides toString()")
+                .hasMessageContaining("cannot be bounded");
+
+        Method listMethod = LargePathClient.class.getMethod("get", List.class);
+        RequestPlan listPlan = plan(LargePathClient.class, listMethod);
+        EffectiveCachePolicy.Selection listSelection = EffectiveCachePolicy.validate(
+                LargePathClient.class, "custom-list", listPlan, config, "GET");
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                listPlan, new Object[]{new PipeDelimitedList("a", "b")}, listSelection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("custom container toString() cannot be bounded");
+    }
+
+    @Test
+    void defaultRecordRequestTargetProjectionIsStructurallyBounded() {
+        LargeDefaultRecord small = new LargeDefaultRecord("left", "right");
+        RequestArgumentResolver.ResolvedArgs projected = CacheKeyContract.snapshotRequestTarget(
+                new RequestArgumentResolver.ResolvedArgs(
+                        Map.of("value", small), Map.of(), Map.of(), null));
+        assertThat(projected.pathVars())
+                .containsEntry("value", "LargeDefaultRecord[left=left, right=right]");
+
+        LargeDefaultRecord large = new LargeDefaultRecord(
+                "x".repeat(600_000), "x".repeat(600_000));
+        assertThatThrownBy(() -> CacheKeyContract.snapshotRequestTarget(
+                new RequestArgumentResolver.ResolvedArgs(
+                        Map.of("value", large), Map.of(), Map.of(), null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cache key material exceeds 1048576 bytes");
     }
 
     @Test
@@ -476,6 +505,13 @@ class CacheKeyContractTest {
                 Context.empty(), selection.policy(),
                 CacheKeyContract.serializedBodyKey("\"different\"".getBytes(StandardCharsets.UTF_8))).key();
         assertThat(codecKey).isNotEqualTo(differentWireKey);
+        CacheKeyContract.OpaqueKey absentBodyKey = CacheKeyContract.derive(
+                JsonValueBodyClient.class, "json-value", plan, frozen, resolved,
+                Context.empty(), selection.policy(), CacheKeyContract.absentSerializedBodyKey()).key();
+        CacheKeyContract.OpaqueKey emptyBodyKey = CacheKeyContract.derive(
+                JsonValueBodyClient.class, "json-value", plan, frozen, resolved,
+                Context.empty(), selection.policy(), CacheKeyContract.serializedBodyKey(new byte[0])).key();
+        assertThat(absentBodyKey).isNotEqualTo(emptyBodyKey);
 
         AtomicReference<String> dispatchedBody = new AtomicReference<>();
         WebClient webClient = WebClient.builder()
@@ -503,6 +539,37 @@ class CacheKeyContractTest {
 
         assertThat(dispatchedBody).hasValue(new String(wireBytes, StandardCharsets.UTF_8));
         assertThat(dispatchedBody).hasValue("\"wire-catalog-item\"");
+    }
+
+    @Test
+    void oversizedSelectedStringBodiesFailBeforeDispatchOrByteAllocation() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        AtomicInteger dispatches = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body("ok").build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "large-string", StringBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig());
+            StringBodyClient client = (StringBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{StringBodyClient.class}, handler);
+
+            assertThatThrownBy(() -> client.get("x".repeat(1_048_577)).block())
+                    .isInstanceOf(RequestSerializationException.class)
+                    .hasRootCauseMessage("Cache-selected request body exceeds 1048576 bytes");
+        }
+
+        assertThat(dispatches).hasValue(0);
     }
 
     @Test
@@ -971,8 +1038,9 @@ class CacheKeyContractTest {
         if (CacheKeyContract.selectsRequestBody(plan, selection.policy())) {
             Object body = resolved.body();
             try {
-                serializedBody = CacheKeyContract.serializedBodyKey(
-                        body != null ? TestJsonCodecs.jsonCodec().write(body) : new byte[0]);
+                serializedBody = body != null
+                        ? CacheKeyContract.serializedBodyKey(TestJsonCodecs.jsonCodec().write(body))
+                        : CacheKeyContract.absentSerializedBodyKey();
             } catch (Exception ex) {
                 throw new AssertionError("Unable to serialize selected test body", ex);
             }
@@ -1053,6 +1121,20 @@ class CacheKeyContractTest {
         @JsonValue
         String wireValue() {
             return "wire-" + value;
+        }
+    }
+
+    record LargeDefaultRecord(String left, String right) {
+    }
+
+    static final class PipeDelimitedList extends ArrayList<String> {
+        PipeDelimitedList(String... values) {
+            super(List.of(values));
+        }
+
+        @Override
+        public String toString() {
+            return String.join("|", this);
         }
     }
 
@@ -1213,6 +1295,11 @@ class CacheKeyContractTest {
     interface JsonValueBodyClient {
         @GET("/items")
         Mono<String> get(@Body @CacheKey("body") JsonValueBody body);
+    }
+
+    interface StringBodyClient {
+        @GET("/items")
+        Mono<String> get(@Body @CacheKey("body") String body);
     }
 
     interface CacheOnlyParameterClient {

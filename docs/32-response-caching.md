@@ -141,7 +141,10 @@ serialize them by object identity; format those values as stable scalars
 instead. Arrays of containers must use a component type such as `List`, `Set`,
 or `Map` that can hold the defensive snapshot. Incompatible concrete or
 covariant runtime array components fail before dispatch instead of producing an
-array-store error.
+array-store error. Path values and nested query elements whose collection, map,
+or record type overrides `toString()` are also rejected: arbitrary conversion
+cannot be interrupted at the projection byte limit. Standard container text and
+compiler-generated record text are reproduced structurally under that limit.
 Freezing and startup validation count one depth level per nested container or
 record and enforce one cumulative 10,000-element budget across the selected
 argument graph and another across selected Reactor context values. Container
@@ -159,16 +162,19 @@ that is then passed to URI construction, so repeated nested values cannot build
 an unbounded intermediate projection and the key sees the exact dispatched
 value. A selected body is serialized once through `ReactiveHttpClientJsonCodec`;
 its opaque key and outbound request use those exact bytes, including
-`@JsonValue` and application serializer behavior. Selected header sets preserve
-their wire order. URI
+`@JsonValue` and application serializer behavior. An absent body has a distinct
+key marker from a present zero-length body because body presence can change
+effective headers and downstream behavior. Selected header sets preserve their
+wire order. URI
 variants retain their non-normalized text, so a literal Unicode path and an
 explicitly percent-escaped path remain distinct. These projections prevent
 wire-distinct requests from collapsing into one structural key. Canonical
 encoding and request-target projection each have a cumulative 1 MiB byte limit.
-UTF-8 scalar length, URI text length, and `BigInteger`/`BigDecimal` encoded
-magnitude length are checked before encoded scalar bytes are materialized, so
-one oversized scalar cannot bypass the allocation bound. This wire projection
-is not a fallback for arbitrary
+UTF-8 scalar length, selected String body length, URI text length, and
+`BigInteger`/`BigDecimal` encoded magnitude length are checked before encoded
+bytes are materialized, so one oversized value cannot bypass the allocation
+bound. Serialized body bytes are checked before defensive key/request copies.
+This wire projection is not a fallback for arbitrary
 `@CacheKey` or Reactor-context values. Only the SHA-256 digest is retained as
 the local opaque key. Raw values and digest text are never exported through
 metrics, logs, traces, diagnostics, health, or support bundles. Auth tokens,
