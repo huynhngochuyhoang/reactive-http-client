@@ -50,7 +50,7 @@ one candidate release.
 - [x] Run release-documentation tests, reactor validation, and
       `git diff --check`.
 
-Evidence recorded on 2026-08-22:
+Evidence recorded on 2026-08-23:
 
 - A previously absent
   `target/published-baseline-repositories/v27-priority1-3.6.0/` resolved the
@@ -475,11 +475,15 @@ Evidence recorded on 2026-08-22:
   preserved duplicate-equal identity-map entries, and preflighted arbitrary-
   precision numeric magnitudes before canonical byte allocation.
 - A seventh review pass bounded request-target string projection before
-  materialization, reconstructed records from captured component values with
-  unstable-accessor rejection, registered canonical constructors for native
-  snapshots, and preflighted URI text before UTF-8 allocation.
+  materialization, rejected unstable record accessors, registered record class
+  resources for native validation, and preflighted URI text before UTF-8
+  allocation.
+- An eighth review pass retained caller-created immutable records without
+  rerunning canonical constructors, preserved record `toString()` for path and
+  query wire projections, and made selected-body keys and requests share one
+  `ReactiveHttpClientJsonCodec` byte representation.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1124` starter tests and `55` test-helper tests with zero
+  test` passed `1129` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

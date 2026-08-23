@@ -132,6 +132,18 @@ final class CacheKeyContract {
                               RequestArgumentResolver.ResolvedArgs resolved,
                               ContextView reactorContext,
                               ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        return derive(clientInterface, clientName, plan, frozenArguments, resolved,
+                reactorContext, policy, null);
+    }
+
+    static PreparedKey derive(Class<?> clientInterface,
+                              String clientName,
+                              RequestPlan plan,
+                              Object[] frozenArguments,
+                              RequestArgumentResolver.ResolvedArgs resolved,
+                              ContextView reactorContext,
+                              ReactiveHttpClientProperties.CachePolicyConfig policy,
+                              SerializedBodyKey serializedBodyKey) {
         RequestArgumentResolver.ResolvedArgs requestTarget = hasSnapshottedRequestTarget(resolved)
                 ? resolved
                 : snapshotRequestTarget(resolved);
@@ -155,7 +167,8 @@ final class CacheKeyContract {
 
         Map<String, Object> selectedParameters = new TreeMap<>();
         variants.parameterIndexes().forEach((name, index) -> selectedParameters.put(
-                name, selectedParameterValue(plan, index, frozenArguments, resolved)));
+                name, selectedParameterValue(
+                        plan, index, frozenArguments, resolved, serializedBodyKey, context)));
         writer.value(selectedParameters);
 
         Map<String, Object> selectedHeaders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -165,6 +178,17 @@ final class CacheKeyContract {
         writer.value(selectedHeaders);
         writer.value(contextValues);
         return new PreparedKey(OpaqueKey.from(writer.finish()), contextValues);
+    }
+
+    static boolean selectsRequestBody(RequestPlan plan,
+                                      ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        return plan.bodyIndex() >= 0 && variants(
+                plan, null, policy, "Method " + plan.method().toGenericString())
+                .parameterIndexes().containsValue(plan.bodyIndex());
+    }
+
+    static SerializedBodyKey serializedBodyKey(byte[] wireBytes) {
+        return new SerializedBodyKey(wireBytes != null ? wireBytes : new byte[0]);
     }
 
     private static boolean hasSnapshottedRequestTarget(RequestArgumentResolver.ResolvedArgs resolved) {
@@ -534,53 +558,19 @@ final class CacheKeyContract {
             validateCanonicalRecordAccessors(type, context);
             RecordComponent[] components = type.getRecordComponents();
             budget.consume(components.length, context);
-            Object[] frozenComponents = new Object[components.length];
-            for (int index = 0; index < components.length; index++) {
-                RecordComponent component = components[index];
+            for (RecordComponent component : components) {
                 Object componentValue = recordComponentValue(component, value, context);
-                frozenComponents[index] = freeze(componentValue, depth + 1,
+                Object frozenComponent = freeze(componentValue, depth + 1,
                         context + " record component '" + component.getName() + "'", budget);
-                if (frozenComponents[index] != componentValue
+                if (frozenComponent != componentValue
                         && (componentValue == null || !componentValue.getClass().isRecord())) {
                     throw invalid(context, "record component '" + component.getName()
                             + "' is mutable and cannot be copied without changing the record");
                 }
             }
-            Object snapshot = reconstructRecord(type, components, frozenComponents, context);
-            for (int index = 0; index < components.length; index++) {
-                RecordComponent component = components[index];
-                Object represented = recordComponentValue(component, snapshot, context);
-                if (!Objects.deepEquals(represented, frozenComponents[index])) {
-                    throw invalid(context, "record component '" + component.getName()
-                            + "' accessor cannot represent its captured cache-key snapshot");
-                }
-            }
-            return snapshot;
+            return value;
         }
         throw invalid(context, "runtime value type " + type.getTypeName() + " cannot be copied safely");
-    }
-
-    private static Object reconstructRecord(Class<?> type,
-                                            RecordComponent[] components,
-                                            Object[] values,
-                                            String context) {
-        Class<?>[] componentTypes = Arrays.stream(components)
-                .map(RecordComponent::getType)
-                .toArray(Class<?>[]::new);
-        try {
-            Constructor<?> constructor = type.getDeclaredConstructor(componentTypes);
-            boolean accessible = constructor.canAccess(null) || constructor.trySetAccessible();
-            if (!accessible) {
-                throw invalid(context, "cannot access canonical constructor for record " + type.getName());
-            }
-            return constructor.newInstance(values);
-        } catch (InvocationTargetException ex) {
-            throw invalid(context, "canonical constructor for record " + type.getName()
-                    + " rejected the captured component snapshot");
-        } catch (ReflectiveOperationException | SecurityException ex) {
-            throw invalid(context, "cannot reconstruct record " + type.getName()
-                    + " from its captured component snapshot");
-        }
     }
 
     private static void validateCanonicalRecordAccessors(Class<?> recordType, String context) {
@@ -757,7 +747,9 @@ final class CacheKeyContract {
     private static Object selectedParameterValue(RequestPlan plan,
                                                  int index,
                                                  Object[] frozenArguments,
-                                                 RequestArgumentResolver.ResolvedArgs resolved) {
+                                                 RequestArgumentResolver.ResolvedArgs resolved,
+                                                 SerializedBodyKey serializedBodyKey,
+                                                 String context) {
         for (RequestPlan.NamedArgumentBinding binding : plan.headerParams()) {
             if (binding.argumentIndex() == index) {
                 return headerValues(resolved.headers(), binding.name());
@@ -768,35 +760,13 @@ final class CacheKeyContract {
                 return headerValues(resolved.headers(), binding.name());
             }
         }
-        Object value = index < frozenArguments.length ? frozenArguments[index] : null;
-        return plan.bodyIndex() == index ? preserveRequestOrder(value) : value;
-    }
-
-    private static Object preserveRequestOrder(Object value) {
-        if (value instanceof Set<?> set) {
-            return set.stream().map(CacheKeyContract::preserveRequestOrder).toList();
-        }
-        if (value instanceof List<?> list) {
-            return list.stream().map(CacheKeyContract::preserveRequestOrder).toList();
-        }
-        if (value instanceof Map<?, ?> map) {
-            List<RequestMapEntry> entries = new ArrayList<>();
-            map.forEach((key, mapped) -> entries.add(new RequestMapEntry(
-                    preserveRequestOrder(key), preserveRequestOrder(mapped))));
-            return new RequestOrderedMap(List.copyOf(entries));
-        }
-        if (value instanceof Optional<?> optional) {
-            return optional.map(CacheKeyContract::preserveRequestOrder);
-        }
-        if (value != null && value.getClass().isArray()) {
-            int length = Array.getLength(value);
-            List<Object> ordered = new ArrayList<>(length);
-            for (int index = 0; index < length; index++) {
-                ordered.add(preserveRequestOrder(Array.get(value, index)));
+        if (plan.bodyIndex() == index) {
+            if (serializedBodyKey == null) {
+                throw invalid(context, "selected request bodies require their serialized wire bytes");
             }
-            return ordered;
+            return serializedBodyKey;
         }
-        return value;
+        return index < frozenArguments.length ? frozenArguments[index] : null;
     }
 
     private static List<String> headerValues(Map<String, List<String>> headers, String requestedName) {
@@ -1051,10 +1021,12 @@ final class CacheKeyContract {
                 new VariantSelection(Map.of(), List.of(), List.of());
     }
 
-    private record RequestOrderedMap(List<RequestMapEntry> entries) {
-    }
+    static final class SerializedBodyKey {
+        private final byte[] wireBytes;
 
-    private record RequestMapEntry(Object key, Object value) {
+        private SerializedBodyKey(byte[] wireBytes) {
+            this.wireBytes = wireBytes.clone();
+        }
     }
 
     private static final class RequestTargetProjector {
@@ -1113,20 +1085,7 @@ final class CacheKeyContract {
             }
             Class<?> type = value.getClass();
             if (type.isRecord()) {
-                appendText(projection, type.getSimpleName());
-                appendText(projection, "[");
-                RecordComponent[] components = type.getRecordComponents();
-                for (int index = 0; index < components.length; index++) {
-                    RecordComponent component = components[index];
-                    appendText(projection, component.getName());
-                    appendText(projection, "=");
-                    append(projection, recordComponentValue(
-                            component, value, "Request-target record " + type.getName()), depth + 1);
-                    if (index + 1 < components.length) {
-                        appendText(projection, ", ");
-                    }
-                }
-                appendText(projection, "]");
+                appendText(projection, String.valueOf(value));
                 return;
             }
             if (type.isArray()) {
@@ -1196,7 +1155,10 @@ final class CacheKeyContract {
                 return;
             }
             Class<?> type = value.getClass();
-            if (value instanceof String text) {
+            if (value instanceof SerializedBodyKey serializedBody) {
+                output.writeByte(26);
+                rawFrame(serializedBody.wireBytes);
+            } else if (value instanceof String text) {
                 stringScalar(type, text);
             } else if (value instanceof Boolean booleanValue) {
                 scalar(2, type, new byte[]{(byte) (booleanValue ? 1 : 0)});
@@ -1240,13 +1202,6 @@ final class CacheKeyContract {
                 for (MapEntryBytes entry : entries) {
                     countedRawFrame(entry.key());
                     countedRawFrame(entry.value());
-                }
-            } else if (value instanceof RequestOrderedMap map) {
-                output.writeByte(26);
-                output.writeInt(map.entries().size());
-                for (RequestMapEntry entry : map.entries()) {
-                    framed(entry.key(), depth + 1);
-                    framed(entry.value(), depth + 1);
                 }
             } else if (value instanceof Optional<?> optional) {
                 output.writeByte(24);
