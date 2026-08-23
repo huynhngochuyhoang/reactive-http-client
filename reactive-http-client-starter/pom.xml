@@ -59,6 +59,13 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- Local response cache implementation; required only by explicitly cache-enabled clients. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Resilience4j – optional; bring your own in consuming app -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>

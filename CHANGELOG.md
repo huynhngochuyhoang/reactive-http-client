@@ -10,18 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Bounded local TTL response cache.** Added an optional Caffeine-backed,
+  process-local cache for explicitly selected finite `GET` `Mono` contracts.
+  Hits run key/variant and configured auth gates before bypassing resilience and
+  transport; auth sees the same upstream WebClient/default-request headers and
+  validates its result before lookup. The full preparation/auth/lookup path uses
+  one logical-call deadline, preserving miss timeout-phase attribution, and retry
+  attempts do not replay stale pre-resolved auth. Low-level creation paths fail
+  closed unless authenticated caching receives the provider and resolved base
+  URL. Misses store only final successful decoded values after checking wire
+  status and headers.
+  Hard monotonic TTL, maximum-size eviction, generation-checked duplicate
+  publication, bounded `ResponseEntity` headers, mutable-value identity, and
+  factory cleanup are covered without enabling single flight, refresh, or cache
+  telemetry.
 - **Cache key, variant, and isolation contract.** Added named `@CacheKey`
   parameter partitions, explicit header/context variants, authenticated/shared
   response acknowledgement, canonical typed structural encoding, digest-only
   keys, and one defensive argument snapshot per subscription. Unknown or
-  unfreezable variants now fail before dispatch; no response storage is enabled
-  until the bounded local-cache phase.
+  unfreezable variants now fail before dispatch; phase-one storage consumes only
+  the resulting opaque isolated key.
 - **Cache opt-in and declarative eligibility grammar.** Added inert named cache
   policies, explicit client/method selection, `@CacheDisabled` method exclusion,
   finite TTL/capacity validation, and startup rejection for non-GET, streaming,
   unresolved, application-owned, and unclassified-customization contracts.
-  This change freezes the cache contract only; it does not store or reuse
-  responses before V27 key and isolation work is complete.
+  The contract remains disabled by default and is now enforced before V27
+  phase-one storage can be created.
 - **Open the V27 major development lane.** Moved reactor-only coordinates and
   assembled current-consumer/native fixtures to `4.0.0-SNAPSHOT` while keeping
   public examples plus API, consumer, and benchmark baselines on published

@@ -1,9 +1,9 @@
 # Response Caching
 
-V27 introduces an explicit local response-cache contract in four phases. This
-page currently freezes policy selection, startup eligibility, and key isolation.
-The Priority 5 implementation still does not store or reuse responses; bounded
-storage is added in phase one only after this contract.
+V27 introduces an explicit local response-cache contract in four phases. Phase
+one now provides bounded process-local TTL storage after policy selection,
+startup eligibility, and key isolation have succeeded. Request coalescing,
+refresh, and cache telemetry remain later, separately opt-in phases.
 
 ## Explicit selection
 
@@ -25,8 +25,22 @@ reactive:
               vary-by-headers: [Idempotency-Key]
 ```
 
-Omitting `cache.policy` keeps client-wide caching disabled. Adding a future
-cache implementation dependency or declaring policies never selects caching.
+Omitting `cache.policy` keeps client-wide caching disabled. Adding the cache
+implementation dependency or declaring policies never selects caching.
+
+The starter keeps Caffeine optional so applications that do not select caching
+do not acquire a cache runtime transitively. A cache-enabled application must
+provide the Boot-managed dependency:
+
+```xml
+<dependency>
+  <groupId>com.github.ben-manes.caffeine</groupId>
+  <artifactId>caffeine</artifactId>
+</dependency>
+```
+
+If a selected client starts without Caffeine, startup fails with the client and
+policy name. Cache-disabled clients do not load the implementation.
 
 Method precedence is:
 
@@ -57,14 +71,78 @@ Only a resolved `GET` returning a finite `Mono<T>` or
   resource, input stream, reader, or readable byte channel;
 - every resolved HTTP method other than `GET`, including a non-GET `@ApiRef`.
 
-When storage is added, only a final successful, non-null decoded emission is a
-cache candidate. Empty completion, cancellation, redirect, auth/decode/
+Only a final successful, non-null decoded emission is a cache candidate. Empty
+completion, cancellation, redirect, auth/decode/
 transport/resilience failure, and mapped 4xx/5xx failure never create an entry.
 
 A cached `ResponseEntity` represents the previously materialized application
-value, status, and only the bounded representation-header allowlist defined by
-the storage phase. A hit does not create a new downstream wire response.
-Per-caller and sensitive response headers are never reusable cache metadata.
+value and status. Hits retain only `Content-Type`, `Content-Language`,
+`Content-Encoding`, `ETag`, `Last-Modified`, `Cache-Control`, `Expires`, and
+`Vary`, capped at 32 values and 16 KiB of UTF-8 value text. A response carrying
+`Set-Cookie`, another `SensitiveHeaders` name, `WWW-Authenticate`, or
+`Proxy-Authenticate` is not stored. Other headers are omitted. A hit does not
+create a new downstream wire response.
+
+## Phase-one runtime behavior
+
+Each client factory owns one Caffeine cache for every selected policy. Caffeine
+provides concurrent maximum-size eviction and hard expiry from a monotonic
+ticker; wall-clock changes do not extend or shorten an entry. Factory shutdown
+invalidates every entry and prevents an already-running load from publishing
+after shutdown. Internal aggregate state exposes only policy count, configured
+capacity, and current size; entries and opaque keys are not inspectable.
+
+Lookup is cold and repeats for every subscription. Mandatory key, request
+variant, and configured `AuthProvider` checks run before a value can be returned.
+The per-subscription logical-call timeout, when configured, starts before cache
+body preparation and authorization, so those gates cannot make either a hit or
+miss exceed the end-to-end budget. One absolute deadline is handed to the miss
+pipeline's existing subscription-reporting state, so a timeout after response
+headers retains response-body attribution instead of being reported as an outer
+cache cancellation. Selected Reactor-context variants are frozen once and that
+same context snapshot is visible to pre-lookup authorization.
+
+Configured pre-lookup auth traverses the same WebClient `defaultRequest` and
+filters that normally run before `OutboundAuthFilter`, including Boot-provided
+and correlation/trace header mutations. The probe stops inside the auth filter,
+before later filters and transport, and validates the returned auth header names
+and values before either a hit or miss can continue. A miss reuses that validated
+context only for its first outer attempt; later resilience attempts resolve
+current auth normally.
+
+The starter factory and `MockReactiveHttpClient` supply the configured provider
+and resolved base URL to this pre-lookup gate. Low-level callers using
+`ReactiveClientInvocationHandler.create(...)` must use its provider-aware
+overload for authenticated cached clients. Legacy constructors and the shorter
+factory overload fail closed when a method selects caching, instead of allowing
+an authenticated first miss followed by unauthorized hits.
+
+On a hit, the existing HTTP load publisher is not constructed or subscribed, so
+the call consumes no downstream resilience permit, redirect, pool acquisition,
+or transport dispatch. On a miss, the existing decoded `Mono` pipeline runs and
+the pre-resolved auth context is consumed only by its first outer attempt. A
+Resilience4j retry resolves current auth again; the filter's one-time 401
+invalidation/replay remains inside that attempt. A failure, empty completion,
+or cancellation releases the miss token without storing.
+
+Phase one deliberately does not coalesce misses. Concurrent same-key callers
+may each dispatch. The first successful completion observed for that key and
+generation fills the cache; later duplicate completions still return their own
+value to their caller but cannot replace the winner, restart its TTL, or
+repopulate after expiry, eviction, or shutdown. Publication forces Caffeine to
+process expiry before rechecking the load token's generation.
+
+Cached application values are retained and returned by identity. The starter
+does not copy or serialize a decoded value solely for caching. Prefer immutable
+DTOs; callers that mutate a cached object must copy it on their side. A cached
+`ResponseEntity` is rebuilt only to retain the bounded safe header subset; its
+body retains the decoded object identity.
+
+Response cacheability is decided from the final wire status and headers for
+both plain `Mono<T>` and `Mono<ResponseEntity<T>>` contracts. Redirect responses
+are never stored. Responses carrying credential, cookie, authentication
+challenge, or another sensitive header are also never stored, even though a
+plain-body return type does not expose those headers to application code.
 
 ## Key and variant isolation
 

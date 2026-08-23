@@ -503,49 +503,96 @@ Evidence recorded on 2026-08-23:
 
 ## Priority 6 - Phase One: Bounded Local TTL Cache
 
-### [ ] 6.1 Integrate a proven local cache implementation
+### [x] 6.1 Integrate a proven local cache implementation
 
-- [ ] Select a maintained local cache implementation with bounded maximum-size
+- [x] Select a maintained local cache implementation with bounded maximum-size
       eviction and monotonic expiry; do not hand-roll concurrent eviction.
-- [ ] Keep implementation types out of public starter APIs unless deliberately
+- [x] Keep implementation types out of public starter APIs unless deliberately
       reviewed as long-term extension points.
-- [ ] Decide and verify dependency packaging so cache-disabled consumers do not
+- [x] Decide and verify dependency packaging so cache-disabled consumers do not
       fail when the optional implementation is absent.
-- [ ] Fail startup clearly only when a client selects caching but the required
+- [x] Fail startup clearly only when a client selects caching but the required
       implementation is unavailable.
 
-### [ ] 6.2 Implement hit, miss, and storage boundaries
+### [x] 6.2 Implement hit, miss, and storage boundaries
 
-- [ ] Build one cold per-subscription cache lookup around eligible declarative
+- [x] Build one cold per-subscription cache lookup around eligible declarative
       invocations.
-- [ ] Require the validated Priority 5 key/variant decision before any cache
+- [x] Require the validated Priority 5 key/variant decision before any cache
       lookup or response storage can occur.
-- [ ] Return an unexpired hit without downstream resilience admission, redirect,
+- [x] Return an unexpired hit without downstream resilience admission, redirect,
       pool acquisition, or HTTP dispatch only after all mandatory pre-lookup
       policy/auth/key-partition gates succeed.
-- [ ] Execute the existing logical-call pipeline once for a phase-one miss and
+- [x] Execute the existing logical-call pipeline once for a phase-one miss and
       store only its final successful decoded value.
-- [ ] Preserve phase-one behavior where concurrent misses may execute separate
+- [x] Preserve phase-one behavior where concurrent misses may execute separate
       loads; do not claim single flight before Priority 7.
-- [ ] Publish concurrent same-key loads conditionally so the first successful
+- [x] Publish concurrent same-key loads conditionally so the first successful
       fill for the observed generation wins; a late duplicate returns to its
       caller but cannot replace the entry or restart TTL.
-- [ ] Prevent a late duplicate from repopulating after expiry, eviction, refresh,
+- [x] Prevent a late duplicate from repopulating after expiry, eviction, refresh,
       or shutdown has advanced the entry generation.
-- [ ] Prove hit/miss behavior with deterministic time and dispatch counters,
+- [x] Prove hit/miss behavior with deterministic time and dispatch counters,
       including reversed duplicate-load completion order and auth/tenant/locale
       variants.
 
-### [ ] 6.3 Bound expiry, eviction, identity, and lifecycle
+### [x] 6.3 Bound expiry, eviction, identity, and lifecycle
 
-- [ ] Enforce hard TTL with monotonic time and maximum-size eviction under
+- [x] Enforce hard TTL with monotonic time and maximum-size eviction under
       concurrent access.
-- [ ] Cover expiry, replacement, size eviction, load failure, cancellation, and
+- [x] Cover expiry, replacement, size eviction, load failure, cancellation, and
       factory shutdown without retaining orphaned entries.
-- [ ] Document that cached mutable values are returned by identity and are not
+- [x] Document that cached mutable values are returned by identity and are not
       copied or serialized solely for caching.
-- [ ] Verify aggregate configured capacity and current size can be inspected
+- [x] Verify aggregate configured capacity and current size can be inspected
       without exposing entries or keys.
+
+Evidence recorded on 2026-08-23:
+
+- Caffeine `3.2.3`, managed by the Spring Boot 4 BOM, is an optional starter
+  dependency behind package-private storage/manager types. Disabled clients do
+  not link the implementation; selected clients verify availability during
+  proxy construction and fail with client/policy/dependency identity when it is
+  absent.
+- One manager per client owns one hard-TTL/maximum-size Caffeine cache per
+  selected policy. A package-private snapshot exposes only policy count,
+  aggregate configured capacity, current size, and closed state. Factory
+  destruction invalidates all entries before transport disposal and advances
+  the closed generation so late loads cannot publish.
+- Declarative cache lookup is cold per subscription and occurs only after the
+  Priority 5 opaque key is derived. One logical-call deadline starts before
+  cache preparation and authorization, then transfers to the miss pipeline's
+  existing subscription-reporting state so response-body timeout attribution is
+  retained. The frozen context variant snapshot is applied to authorization and
+  lookup. Configured auth traverses normal upstream WebClient/default-request
+  header mutations and validates its result before lookup; its result is
+  consumed once by `OutboundAuthFilter`. Later resilience attempts resolve
+  current auth while one-time 401 replay remains attempt-local. A hit does not
+  build or subscribe the existing load pipeline, so it consumes no resilience
+  operator or HTTP dispatch. The provider-aware public creation overload and
+  mock helper preserve this gate; legacy low-level entry points fail closed for
+  authenticated cached methods when provider/base-URL inputs are unavailable.
+- Phase-one misses remain independent. Generation-checked publication makes the
+  first successful completion win without replacing its value/TTL; deterministic
+  reversed-completion, expiry, and eviction tests prove late duplicates cannot
+  restore an obsolete generation. Expiry processing precedes the publication
+  generation check. Empty completion, failure, cancellation, expiry, capacity
+  eviction, and shutdown create no orphaned entry.
+- Cached values retain decoded object identity. `ResponseEntity` hits retain
+  status/body identity plus an allowlisted 32-value/16-KiB representation-header
+  subset. Redirects and credential/session/auth-challenge responses are
+  non-cacheable for both plain bodies and `ResponseEntity`; oversized retained
+  headers are also non-cacheable.
+- `BoundedLocalResponseCacheContractTest` passes `20` deterministic contracts,
+  including the real factory-destroy path, wire-header/redirect rejection,
+  public-construction auth safety, retry/auth freshness, upstream auth headers
+  and validation, frozen pre-lookup context, late expiry publication, and
+  hit/miss logical timeout attribution. `OutboundAuthFilterTest`
+  passes `15` contracts, including the non-dispatching cache auth probe and
+  compatibility for the prior direct pre-resolved attribute form. The complete
+  reactor passes starter `1159`, test-helper `55`, and OTel `52` tests with zero
+  failures, errors, or skips. An isolated assembled-consumer dependency tree
+  contains the starter but no Caffeine artifact, and `git diff --check` passes.
 
 ---
 

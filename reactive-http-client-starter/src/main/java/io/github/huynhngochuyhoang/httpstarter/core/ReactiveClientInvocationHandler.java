@@ -2,6 +2,8 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.FormFile;
 import io.github.huynhngochuyhoang.httpstarter.annotation.LogHttpExchange;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.SubscriptionReportingState.Attempt;
@@ -32,6 +34,7 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.DefaultUriBuilderFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Signal;
@@ -42,6 +45,7 @@ import reactor.util.context.ContextView;
 import java.io.*;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.net.URI;
 import java.nio.channels.ReadableByteChannel;
@@ -83,6 +87,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             "logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt";
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     private static final Object SUBSCRIPTION_STATE_CONTEXT_KEY = new Object();
+    private static final Object LOGICAL_CALL_DEADLINE_CONTEXT_KEY = new Object();
     private static final int MAX_LOGGER_CACHE_SIZE = 256;
     private static final int MAX_RESILIENCE_WARNING_KEYS = 256;
 
@@ -104,6 +109,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     private final ResilienceOperatorApplier resilienceOperatorApplier;
     private final ReactiveHttpClientJsonCodec jsonCodec;
+    private final LocalResponseCacheManager responseCacheManager;
+    private final AuthProvider cacheAuthProvider;
+    private final String baseUrl;
 
     // Observability – resolved lazily on first request to avoid ordering issues during
     // context initialization (the observer bean may not yet exist when this handler is constructed)
@@ -123,10 +131,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             ReactiveHttpClientJsonCodec jsonCodec,
             ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
         this(webClient, metadataCache, argumentResolver, errorDecoder, clientConfig, clientName, null,
-                applicationContext, resilienceOperatorApplier, jsonCodec, observabilityConfig);
+                applicationContext, resilienceOperatorApplier, jsonCodec, observabilityConfig,
+                LocalResponseCacheManager.lazy(applicationContext.getClassLoader()), null, null);
     }
 
 
+    /**
+     * Creates a handler without cache-authorization inputs. Authenticated cached methods fail closed.
+     */
     public static ReactiveClientInvocationHandler create(
             WebClient webClient,
             MethodMetadataCache metadataCache,
@@ -139,11 +151,39 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             ResilienceOperatorApplier resilienceOperatorApplier,
             ReactiveHttpClientJsonCodec jsonCodec,
             ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
+        return create(webClient, metadataCache, argumentResolver, errorDecoder, clientConfig, clientName,
+                clientInterface, applicationContext, resilienceOperatorApplier, jsonCodec,
+                observabilityConfig, null, null);
+    }
+
+    /**
+     * Creates a handler with the provider and resolved base URL required to authorize cache lookups.
+     */
+    public static ReactiveClientInvocationHandler create(
+            WebClient webClient,
+            MethodMetadataCache metadataCache,
+            RequestArgumentResolver argumentResolver,
+            DefaultErrorDecoder errorDecoder,
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            String clientName,
+            Class<?> clientInterface,
+            ApplicationContext applicationContext,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            ReactiveHttpClientJsonCodec jsonCodec,
+            ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig,
+            AuthProvider cacheAuthProvider,
+            String baseUrl) {
         ReactiveHttpClientFactoryBean.validateEffectiveResilienceContracts(
                 clientInterface, metadataCache, clientConfig, resilienceOperatorApplier, clientName);
+        LocalResponseCacheManager responseCacheManager = LocalResponseCacheManager.createForClient(
+                clientInterface,
+                clientName,
+                metadataCache,
+                clientConfig,
+                applicationContext.getClassLoader());
         return new ReactiveClientInvocationHandler(webClient, metadataCache, argumentResolver, errorDecoder,
                 clientConfig, clientName, clientInterface, applicationContext, resilienceOperatorApplier,
-                jsonCodec, observabilityConfig);
+                jsonCodec, observabilityConfig, responseCacheManager, cacheAuthProvider, baseUrl);
     }
 
     public ReactiveClientInvocationHandler(
@@ -158,6 +198,44 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             ResilienceOperatorApplier resilienceOperatorApplier,
             ReactiveHttpClientJsonCodec jsonCodec,
             ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
+        this(webClient, metadataCache, argumentResolver, errorDecoder, clientConfig, clientName,
+                clientInterface, applicationContext, resilienceOperatorApplier, jsonCodec,
+                observabilityConfig, LocalResponseCacheManager.lazy(applicationContext.getClassLoader()), null, null);
+    }
+
+    ReactiveClientInvocationHandler(
+            WebClient webClient,
+            MethodMetadataCache metadataCache,
+            RequestArgumentResolver argumentResolver,
+            DefaultErrorDecoder errorDecoder,
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            String clientName,
+            Class<?> clientInterface,
+            ApplicationContext applicationContext,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            ReactiveHttpClientJsonCodec jsonCodec,
+            ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig,
+            LocalResponseCacheManager responseCacheManager) {
+        this(webClient, metadataCache, argumentResolver, errorDecoder, clientConfig, clientName,
+                clientInterface, applicationContext, resilienceOperatorApplier, jsonCodec,
+                observabilityConfig, responseCacheManager, null, null);
+    }
+
+    ReactiveClientInvocationHandler(
+            WebClient webClient,
+            MethodMetadataCache metadataCache,
+            RequestArgumentResolver argumentResolver,
+            DefaultErrorDecoder errorDecoder,
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            String clientName,
+            Class<?> clientInterface,
+            ApplicationContext applicationContext,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            ReactiveHttpClientJsonCodec jsonCodec,
+            ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig,
+            LocalResponseCacheManager responseCacheManager,
+            AuthProvider cacheAuthProvider,
+            String baseUrl) {
         this.webClient = webClient;
         this.metadataCache = metadataCache;
         this.argumentResolver = argumentResolver;
@@ -170,6 +248,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 ? resilienceOperatorApplier
                 : new NoopResilienceOperatorApplier();
         this.jsonCodec = jsonCodec;
+        this.responseCacheManager = Objects.requireNonNull(
+                responseCacheManager, "responseCacheManager must not be null");
+        this.cacheAuthProvider = cacheAuthProvider;
+        this.baseUrl = baseUrl;
+        validateCacheAuthorizationSupportAtConstruction();
         this.observerProvider = applicationContext.getBeanProvider(HttpClientObserver.class);
         this.lifecycleHookProvider = applicationContext.getBeanProvider(ReactiveHttpClientLifecycleHook.class);
         this.observabilityConfig = observabilityConfig;
@@ -278,8 +361,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         EffectiveCachePolicy.Selection cacheSelection = EffectiveCachePolicy.validate(
                 concreteClient, clientName, plan, clientConfig, effectiveApi.httpMethod());
         if (cacheSelection.enabled()) {
+            requireCacheAuthorizationSupport();
             Object[] invocationArguments = args != null ? args.clone() : new Object[0];
-            return Mono.deferContextual(context -> {
+            Mono<?> cacheInvocation = Mono.deferContextual(context -> {
                 Object[] frozenArguments = CacheKeyContract.freezeArguments(
                         plan, invocationArguments, cacheSelection.policy());
                 RequestArgumentResolver.ResolvedArgs frozenResolved = applyDefaultHeaders(
@@ -297,17 +381,65 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                     context,
                                     cacheSelection.policy(),
                                     bodyPreparation.key());
-                            Mono<?> source = (Mono<?>) invokeResolved(
-                                    proxy, method, frozenArguments, meta, plan, effectiveApi, keyResolved,
-                                    bodyPreparation.requestBody());
-                            return source.contextWrite(preparedKey::writeContext);
+                            AtomicReference<LocalResponseCacheManager.ResponseMetadata> responseMetadata =
+                                    new AtomicReference<>();
+                            Mono<?> authorizedLookup = prepareCacheLoadBody(keyResolved, bodyPreparation)
+                                    .flatMap(preparedRequestBody -> authorizeCacheLookup(
+                                                    plan, effectiveApi, keyResolved, preparedRequestBody)
+                                            .flatMap(authContext -> responseCacheManager.getOrLoad(
+                                                    cacheSelection,
+                                                    preparedKey.key(),
+                                                    () -> {
+                                                        Mono<?> source = (Mono<?>) invokeResolved(
+                                                                proxy, method, frozenArguments, meta, plan, effectiveApi,
+                                                                keyResolved, preparedRequestBody,
+                                                                new AtomicReference<>(authContext), responseMetadata);
+                                                        return source;
+                                                    },
+                                                    responseMetadata::get)));
+                            return authorizedLookup.contextWrite(preparedKey::writeContext);
                         });
             });
+            return applyLogicalCallTimeoutMono(cacheInvocation, clientConfig.getLogicalCallTimeoutMs());
         }
 
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
                 applyDefaultQueryParams(argumentResolver.resolve(plan, args)));
-        return invokeResolved(proxy, method, args, meta, plan, effectiveApi, resolved, null);
+        return invokeResolved(proxy, method, args, meta, plan, effectiveApi, resolved, null, null, null);
+    }
+
+    LocalResponseCacheManager responseCacheManager() {
+        return responseCacheManager;
+    }
+
+    private void validateCacheAuthorizationSupportAtConstruction() {
+        if (!clientConfig.hasAuthConfigured()
+                || (cacheAuthProvider != null && StringUtils.hasText(baseUrl))
+                || clientInterface == null) {
+            return;
+        }
+        for (Method method : clientInterface.getMethods()) {
+            if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
+                continue;
+            }
+            RequestPlan plan = requestPlan(method, metadataCache.get(method));
+            if (EffectiveCachePolicy.resolve(plan, clientConfig).enabled()) {
+                throw missingCacheAuthorizationSupport();
+            }
+        }
+    }
+
+    private void requireCacheAuthorizationSupport() {
+        if (clientConfig.hasAuthConfigured()
+                && (cacheAuthProvider == null || !StringUtils.hasText(baseUrl))) {
+            throw missingCacheAuthorizationSupport();
+        }
+    }
+
+    private IllegalStateException missingCacheAuthorizationSupport() {
+        return new IllegalStateException("Authenticated response caching for client '" + clientName
+                + "' requires an AuthProvider and resolved base URL. Use the provider-aware "
+                + "ReactiveClientInvocationHandler.create overload or disable response caching.");
     }
 
     private Object invokeResolved(Object proxy,
@@ -317,7 +449,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                   RequestPlan plan,
                                   EffectiveApi effectiveApi,
                                   RequestArgumentResolver.ResolvedArgs resolved,
-                                  SerializedRequestBody preparedSerializedRequestBody) {
+                                  SerializedRequestBody preparedSerializedRequestBody,
+                                  AtomicReference<AuthContext> preResolvedAuthContext,
+                                  AtomicReference<LocalResponseCacheManager.ResponseMetadata> cacheResponseMetadata) {
         String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         RequestBodyOwnership requestBodyOwnership = new RequestBodyOwnership(resolved.body());
 
@@ -347,16 +481,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono = usesSubscriptionState
                 ? statefulRequestHeadersSpec(plan, effectiveApi, resolved, contentTypeHeader, hasAcceptHeader,
                 hasContentTypeHeader, multipartBody, lifecycleHooks, exchangeLogger, timeoutMs,
-                shouldApplyResponseTimeout, requestBodyOwnership, preparedSerializedRequestBody)
+                shouldApplyResponseTimeout, requestBodyOwnership, preparedSerializedRequestBody,
+                preResolvedAuthContext)
                 : statelessRequestHeadersSpec(plan, effectiveApi, resolved, hasAcceptHeader, hasContentTypeHeader,
                 multipartBody, timeoutMs, shouldApplyResponseTimeout, requestBodyOwnership,
-                preparedSerializedRequestBody);
+                preparedSerializedRequestBody, preResolvedAuthContext);
         boolean headRequest = HttpMethod.HEAD.matches(effectiveApi.httpMethod());
 
         if (plan.returnsFlux()) {
             Flux<?> flux = usesSubscriptionState
-                    ? exchange(requestHeadersSpecMono, response -> buildFlux(response, plan.responseType(), headRequest))
-                    : exchangeStateless(requestHeadersSpecMono, response -> buildFlux(response, plan.responseType(), headRequest));
+                    ? exchange(requestHeadersSpecMono,
+                    response -> buildFlux(response, plan.responseType(), headRequest), cacheResponseMetadata)
+                    : exchangeStateless(requestHeadersSpecMono,
+                    response -> buildFlux(response, plan.responseType(), headRequest), cacheResponseMetadata);
             flux = applyResilienceFlux(flux, plan, effectiveApi.httpMethod(), resolved);
             flux = applyLogicalCallTimeoutFlux(flux, logicalCallTimeoutMs);
             if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
@@ -391,8 +528,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 ? exchangeStreamingResponseEntity(requestHeadersSpecMono, headRequest)
                 : exchangeStreamingResponseEntityStateless(requestHeadersSpecMono, headRequest))
                 : (usesSubscriptionState
-                ? exchange(requestHeadersSpecMono, response -> buildMono(response, plan.responseType(), headRequest))
-                : exchangeStateless(requestHeadersSpecMono, response -> buildMono(response, plan.responseType(), headRequest)))
+                ? exchange(requestHeadersSpecMono,
+                response -> buildMono(response, plan.responseType(), headRequest), cacheResponseMetadata)
+                : exchangeStateless(requestHeadersSpecMono,
+                response -> buildMono(response, plan.responseType(), headRequest), cacheResponseMetadata))
                 .next();
         mono = applyResilienceMono(mono, plan, effectiveApi.httpMethod(), resolved);
         mono = applyLogicalCallTimeoutMono(mono, logicalCallTimeoutMs);
@@ -462,7 +601,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
             RequestBodyOwnership requestBodyOwnership,
-            SerializedRequestBody preparedSerializedRequestBody) {
+            SerializedRequestBody preparedSerializedRequestBody,
+            AtomicReference<AuthContext> preResolvedAuthContext) {
         // Cache the serialized body so retries reuse the bytes without re-serializing.
         Mono<SerializedRequestBody> serializedBodyMono = preparedSerializedRequestBody != null
                 ? Mono.just(preparedSerializedRequestBody)
@@ -490,7 +630,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     shouldApplyResponseTimeout,
                     state,
                     attempt,
-                    requestBodyOwnership))
+                    requestBodyOwnership,
+                    preResolvedAuthContext))
                     .doOnError(ignored -> state.clearActiveAttempt(attempt))
                     .doOnCancel(() -> state.clearActiveAttempt(attempt));
         });
@@ -506,7 +647,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             long timeoutMs,
             boolean shouldApplyResponseTimeout,
             RequestBodyOwnership requestBodyOwnership,
-            SerializedRequestBody preparedSerializedRequestBody) {
+            SerializedRequestBody preparedSerializedRequestBody,
+            AtomicReference<AuthContext> preResolvedAuthContext) {
         return Mono.deferContextual(context -> {
             if (log.isDebugEnabled()) {
                 logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), 0L);
@@ -527,7 +669,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     shouldApplyResponseTimeout,
                     null,
                     null,
-                    requestBodyOwnership));
+                    requestBodyOwnership,
+                    preResolvedAuthContext));
         });
     }
 
@@ -543,7 +686,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             boolean shouldApplyResponseTimeout,
             SubscriptionReportingState state,
             Attempt attempt,
-            RequestBodyOwnership requestBodyOwnership) {
+            RequestBodyOwnership requestBodyOwnership,
+            AtomicReference<AuthContext> preResolvedAuthContext) {
         WebClient.RequestBodySpec preparedRequestSpec = webClient
                 .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
                 .uri(uriBuilder -> DeclarativeRequestUri.build(
@@ -559,6 +703,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
         if (serializedRequestBody.rawBody() != null) {
             preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, serializedRequestBody.rawBody());
+        }
+        if (preResolvedAuthContext != null) {
+            preparedRequestSpec = preparedRequestSpec.attribute(
+                    AuthRequest.PRE_RESOLVED_AUTH_CONTEXT_ATTRIBUTE, preResolvedAuthContext);
         }
 
         for (Map.Entry<String, List<String>> header : resolved.headers().entrySet()) {
@@ -621,13 +769,16 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     private <T> Flux<T> exchange(
             Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono,
-            Function<ClientResponse, Publisher<T>> successResponseHandler) {
+            Function<ClientResponse, Publisher<T>> successResponseHandler,
+            AtomicReference<LocalResponseCacheManager.ResponseMetadata> cacheResponseMetadata) {
         return Flux.deferContextual(context -> {
             SubscriptionReportingState state = subscriptionState(context);
             return requestHeadersSpecMono.flatMapMany(requestHeadersSpec -> {
                 Attempt attempt = state.activeAttempt();
                 return requestHeadersSpec.exchangeToFlux(clientResponse -> {
-                    attempt.recordResponse(clientResponse.statusCode(), copyHeaders(clientResponse));
+                    Map<String, List<String>> responseHeaders = copyHeaders(clientResponse);
+                    attempt.recordResponse(clientResponse.statusCode(), responseHeaders);
+                    recordCacheResponse(cacheResponseMetadata, clientResponse.statusCode(), responseHeaders);
 
                     if (clientResponse.statusCode().isError()) {
                         return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
@@ -640,13 +791,28 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     private <T> Flux<T> exchangeStateless(
             Mono<WebClient.RequestHeadersSpec<?>> requestHeadersSpecMono,
-            Function<ClientResponse, Publisher<T>> successResponseHandler) {
+            Function<ClientResponse, Publisher<T>> successResponseHandler,
+            AtomicReference<LocalResponseCacheManager.ResponseMetadata> cacheResponseMetadata) {
         return requestHeadersSpecMono.flatMapMany(requestHeadersSpec -> requestHeadersSpec.exchangeToFlux(clientResponse -> {
+            if (cacheResponseMetadata != null) {
+                recordCacheResponse(
+                        cacheResponseMetadata, clientResponse.statusCode(), copyHeaders(clientResponse));
+            }
             if (clientResponse.statusCode().isError()) {
                 return decodeErrorResponse(clientResponse).flatMapMany(Mono::error);
             }
             return Flux.from(successResponseHandler.apply(clientResponse));
         }));
+    }
+
+    private void recordCacheResponse(
+            AtomicReference<LocalResponseCacheManager.ResponseMetadata> cacheResponseMetadata,
+            HttpStatusCode statusCode,
+            Map<String, List<String>> responseHeaders) {
+        if (cacheResponseMetadata != null) {
+            cacheResponseMetadata.set(new LocalResponseCacheManager.ResponseMetadata(
+                    statusCode.value(), responseHeaders));
+        }
     }
 
     // exchangeToMono/exchangeToFlux release unconsumed bodies when their handler completes;
@@ -862,13 +1028,52 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return mono;
         }
         return Mono.deferContextual(context -> {
-            SubscriptionReportingState state = subscriptionState(context);
+            LogicalCallDeadline inherited = context.getOrDefault(LOGICAL_CALL_DEADLINE_CONTEXT_KEY, null);
+            if (inherited != null) {
+                if (!context.hasKey(SUBSCRIPTION_STATE_CONTEXT_KEY)) {
+                    return mono;
+                }
+                SubscriptionReportingState state = subscriptionState(context);
+                if (!inherited.register(state)) {
+                    return Mono.error(logicalCallTimeout(state, inherited.timeoutMs()));
+                }
+                return timeoutAtDeadline(mono, inherited, state);
+            }
+
+            SubscriptionReportingState state = context.hasKey(SUBSCRIPTION_STATE_CONTEXT_KEY)
+                    ? subscriptionState(context)
+                    : null;
+            LogicalCallDeadline deadline = new LogicalCallDeadline(timeoutMs);
+            if (state != null) {
+                deadline.register(state);
+            }
             @SuppressWarnings("unchecked")
-            Mono<Signal<Object>> sourceSignal = ((Mono<Object>) mono).materialize();
-            Mono<Signal<Object>> deadline = Mono.delay(Duration.ofMillis(timeoutMs))
-                    .map(ignored -> Signal.error(logicalCallTimeout(state, timeoutMs)));
-            return Mono.firstWithSignal(sourceSignal, deadline).dematerialize();
+            Mono<Signal<Object>> sourceSignal = ((Mono<Object>) mono)
+                    .contextWrite(upstream -> upstream.put(LOGICAL_CALL_DEADLINE_CONTEXT_KEY, deadline))
+                    .materialize();
+            Mono<Signal<Object>> deadlineSignal = Mono.delay(deadline.remaining())
+                    .flatMap(ignored -> {
+                        SubscriptionReportingState registered = deadline.registeredState();
+                        if (registered != null) {
+                            return state != null
+                                    ? Mono.just(Signal.error(logicalCallTimeout(registered, timeoutMs)))
+                                    : Mono.never();
+                        }
+                        return deadline.expirePreLookup()
+                                ? Mono.just(Signal.error(new LogicalCallTimeoutException(timeoutMs, null)))
+                                : Mono.never();
+                    });
+            return Mono.firstWithSignal(sourceSignal, deadlineSignal).dematerialize();
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Mono<?> timeoutAtDeadline(
+            Mono<?> mono, LogicalCallDeadline deadline, SubscriptionReportingState state) {
+        Mono<Signal<Object>> sourceSignal = ((Mono<Object>) mono).materialize();
+        Mono<Signal<Object>> deadlineSignal = Mono.delay(deadline.remaining())
+                .map(ignored -> Signal.error(logicalCallTimeout(state, deadline.timeoutMs())));
+        return Mono.firstWithSignal(sourceSignal, deadlineSignal).dematerialize();
     }
 
     private Flux<?> applyLogicalCallTimeoutFlux(Flux<?> flux, long timeoutMs) {
@@ -894,6 +1099,41 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             state.clearEvidenceWhenNoAttemptIsActive();
         }
         return new LogicalCallTimeoutException(timeoutMs, failureStage);
+    }
+
+    private static final class LogicalCallDeadline {
+        private static final Object PRE_LOOKUP_EXPIRED = new Object();
+
+        private final long timeoutMs;
+        private final long deadlineNanos;
+        private final AtomicReference<Object> owner = new AtomicReference<>();
+
+        private LogicalCallDeadline(long timeoutMs) {
+            this.timeoutMs = timeoutMs;
+            this.deadlineNanos = System.nanoTime() + Duration.ofMillis(timeoutMs).toNanos();
+        }
+
+        private long timeoutMs() {
+            return timeoutMs;
+        }
+
+        private Duration remaining() {
+            return Duration.ofNanos(Math.max(0L, deadlineNanos - System.nanoTime()));
+        }
+
+        private boolean register(SubscriptionReportingState state) {
+            Object current = owner.get();
+            return current == state || (current == null && owner.compareAndSet(null, state));
+        }
+
+        private SubscriptionReportingState registeredState() {
+            Object current = owner.get();
+            return current instanceof SubscriptionReportingState state ? state : null;
+        }
+
+        private boolean expirePreLookup() {
+            return owner.compareAndSet(null, PRE_LOOKUP_EXPIRED);
+        }
     }
 
     private void logUnsafeRetryIfNeeded(RequestPlan plan,
@@ -1313,6 +1553,68 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorMap(e -> new RequestSerializationException(clientName, e));
+    }
+
+    private Mono<SerializedRequestBody> prepareCacheLoadBody(
+            RequestArgumentResolver.ResolvedArgs resolved,
+            CacheBodyPreparation bodyPreparation) {
+        if (bodyPreparation.requestBody() != null) {
+            return Mono.just(bodyPreparation.requestBody());
+        }
+        return serializeRequestBodyForAuth(
+                resolved.body(), resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE));
+    }
+
+    private Mono<AuthContext> authorizeCacheLookup(
+            RequestPlan plan,
+            EffectiveApi effectiveApi,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            SerializedRequestBody requestBody) {
+        if (cacheAuthProvider == null) {
+            return Mono.just(AuthContext.empty());
+        }
+        if (!StringUtils.hasText(baseUrl)) {
+            return Mono.error(new IllegalStateException(
+                    "Cache pre-lookup auth requires the resolved base URL for client '" + clientName + "'"));
+        }
+        return Mono.defer(() -> {
+            URI requestUri = DeclarativeRequestUri.build(
+                    new DefaultUriBuilderFactory(baseUrl).builder(),
+                    effectiveApi.pathTemplate(),
+                    resolved,
+                    "Cache pre-lookup auth request for client [" + clientName + "] method "
+                            + plan.method().toGenericString());
+            WebClient.RequestBodySpec request = webClient
+                    .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
+                    .uri(requestUri);
+            request.headers(headers -> {
+                resolved.headers().forEach((name, values) -> headers.put(name, List.copyOf(values)));
+                if (!resolved.headersIgnoreCase().containsKey(HttpHeaders.ACCEPT)) {
+                    headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+                }
+                if (requestBody.originalBody() != null
+                        && !resolved.headersIgnoreCase().containsKey(HttpHeaders.CONTENT_TYPE)) {
+                    headers.setContentType(MediaType.APPLICATION_JSON);
+                }
+            });
+            if (requestBody.originalBody() != null) {
+                request = request.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, requestBody.originalBody());
+            }
+            if (requestBody.rawBody() != null) {
+                request = request.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, requestBody.rawBody());
+            }
+            AtomicReference<AuthContext> resolvedAuth = new AtomicReference<>();
+            return request
+                    .attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE, resolvedAuth)
+                    .exchangeToMono(response -> response.releaseBody().then(Mono.defer(() -> {
+                        AuthContext authContext = resolvedAuth.get();
+                        return authContext != null
+                                ? Mono.just(authContext)
+                                : Mono.error(new IllegalStateException(
+                                "Cache pre-lookup auth did not reach the auth filter for client '"
+                                        + clientName + "'"));
+                    })));
+        });
     }
 
     private Mono<CacheBodyPreparation> prepareCacheSelectedBody(
