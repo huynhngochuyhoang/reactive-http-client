@@ -1349,7 +1349,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return Mono.error(new RequestSerializationException(clientName, new IllegalStateException(
                     "Cache-selected JSON request bodies require a ReactiveHttpClientJsonCodec bean")));
         }
-        return Mono.fromCallable(() -> cacheBodyPreparation(body, jsonCodec.write(body)))
+        return Mono.fromCallable(() -> cacheBodyPreparation(body, jsonCodec.writeBounded(
+                        body, CacheKeyContract.maximumSerializedBodyBytes())))
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorMap(error -> error instanceof RequestSerializationException
                         ? error

@@ -491,9 +491,11 @@ Evidence recorded on 2026-08-23:
   defensive copying can change their codec subtype; freezes only request-target
   and explicitly selected request variants; and bounds selected header
   projection before ordinary request argument resolution can materialize
-  expanded values.
+  expanded values. A further review rejects custom nested header and enum
+  conversions before invoking them, and routes selected JSON through a
+  codec-owned bounded writer instead of checking a fully allocated byte array.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1138` starter tests and `55` test-helper tests with zero
+  test` passed `1142` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

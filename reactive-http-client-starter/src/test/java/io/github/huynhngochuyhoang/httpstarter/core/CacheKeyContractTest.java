@@ -572,6 +572,40 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void selectedHeadersRejectCustomNestedContainerConversionsBeforeFreezing() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByHeaders(List.of("X-Metadata"));
+        policy(config).setSharedResponse(true);
+        Method method = LargeHeaderClient.class.getMethod("get", List.class);
+        RequestPlan plan = plan(LargeHeaderClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                LargeHeaderClient.class, "custom-header", plan, config, "GET");
+
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                plan, new Object[]{List.of(new PipeDelimitedList("a", "b"))}, selection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("selected header parameter index 0")
+                .hasMessageContaining("custom container toString() cannot be bounded");
+    }
+
+    @Test
+    void customEnumRequestConversionsAreRejectedWithoutCallingToString() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        Method method = EnumPathClient.class.getMethod("get", CustomStringMode.class);
+        RequestPlan plan = plan(EnumPathClient.class, method);
+        EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
+                EnumPathClient.class, "enum-path", plan, config, "GET");
+        CustomStringMode.TO_STRING_CALLS.set(0);
+
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                plan, new Object[]{CustomStringMode.VALUE}, selection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("overrides toString()")
+                .hasMessageContaining("explicitly formatted scalar");
+        assertThat(CustomStringMode.TO_STRING_CALLS).hasValue(0);
+    }
+
+    @Test
     void selectedBodyUsesOneCodecRepresentationForTheKeyAndWireRequest() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         policy(config).setVaryByParameters(List.of("body"));
@@ -652,6 +686,37 @@ class CacheKeyContractTest {
                     getClass().getClassLoader(), new Class<?>[]{StringBodyClient.class}, handler);
 
             assertThatThrownBy(() -> client.get("x".repeat(1_048_577)).block())
+                    .isInstanceOf(RequestSerializationException.class)
+                    .hasRootCauseMessage("Cache-selected request body exceeds 1048576 bytes");
+        }
+
+        assertThat(dispatches).hasValue(0);
+    }
+
+    @Test
+    void oversizedSelectedJsonBodiesFailThroughBoundedSerializationBeforeDispatch() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        AtomicInteger dispatches = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body("ok").build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "large-json", LargeJsonBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig());
+            LargeJsonBodyClient client = (LargeJsonBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{LargeJsonBodyClient.class}, handler);
+
+            assertThatThrownBy(() -> client.get(new LargeJsonBody("x".repeat(1_048_577))).block())
                     .isInstanceOf(RequestSerializationException.class)
                     .hasRootCauseMessage("Cache-selected request body exceeds 1048576 bytes");
         }
@@ -1214,6 +1279,21 @@ class CacheKeyContractTest {
     record LargeDefaultRecord(String left, String right) {
     }
 
+    record LargeJsonBody(String value) {
+    }
+
+    enum CustomStringMode {
+        VALUE;
+
+        private static final AtomicInteger TO_STRING_CALLS = new AtomicInteger();
+
+        @Override
+        public String toString() {
+            TO_STRING_CALLS.incrementAndGet();
+            return "custom";
+        }
+    }
+
     static final class PipeDelimitedList extends ArrayList<String> {
         PipeDelimitedList(String... values) {
             super(List.of(values));
@@ -1607,6 +1687,16 @@ class CacheKeyContractTest {
     interface LargeHeaderClient {
         @GET("/items")
         Mono<String> get(@HeaderParam("X-Metadata") List<List<String>> metadata);
+    }
+
+    interface EnumPathClient {
+        @GET("/items/{mode}")
+        Mono<String> get(@PathVar("mode") CustomStringMode mode);
+    }
+
+    interface LargeJsonBodyClient {
+        @GET("/items")
+        Mono<String> get(@Body @CacheKey("body") LargeJsonBody body);
     }
 
     interface SensitiveHeaderClient {

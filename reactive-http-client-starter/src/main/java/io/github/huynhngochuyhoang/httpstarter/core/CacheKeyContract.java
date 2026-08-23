@@ -101,10 +101,11 @@ final class CacheKeyContract {
                                     Object[] arguments,
                                     ReactiveHttpClientProperties.CachePolicyConfig policy) {
         validateRequestTargetContainers(plan, arguments);
-        validateSelectedBodyImplementation(plan, arguments, policy);
-        Object[] frozen = arguments != null ? arguments.clone() : new Object[0];
         VariantSelection variants = variants(
                 plan, null, policy, "Method " + plan.method().toGenericString());
+        validateSelectedHeaderContainers(plan, arguments, variants);
+        validateSelectedBodyImplementation(plan, arguments, variants);
+        Object[] frozen = arguments != null ? arguments.clone() : new Object[0];
         Set<Integer> indexes = requestTargetArgumentIndexes(plan);
         indexes.addAll(variants.parameterIndexes().values());
         indexes.addAll(selectedHeaderArgumentIndexes(plan, variants));
@@ -121,9 +122,11 @@ final class CacheKeyContract {
     private static void validateSelectedBodyImplementation(
             RequestPlan plan,
             Object[] arguments,
-            ReactiveHttpClientProperties.CachePolicyConfig policy) {
-        if (!selectsRequestBody(plan, policy) || arguments == null
-                || plan.bodyIndex() < 0 || plan.bodyIndex() >= arguments.length) {
+            VariantSelection variants) {
+        if (plan.bodyIndex() < 0
+                || !variants.parameterIndexes().containsValue(plan.bodyIndex())
+                || arguments == null
+                || plan.bodyIndex() >= arguments.length) {
             return;
         }
         Object body = arguments[plan.bodyIndex()];
@@ -142,6 +145,40 @@ final class CacheKeyContract {
 
     private static boolean isJdkCollectionImplementation(Class<?> type) {
         return type.getClassLoader() == null && type.getModule() == List.class.getModule();
+    }
+
+    private static void validateSelectedHeaderContainers(
+            RequestPlan plan, Object[] arguments, VariantSelection variants) {
+        if (arguments == null) {
+            return;
+        }
+        FreezeBudget budget = new FreezeBudget();
+        for (int index : selectedHeaderArgumentIndexes(plan, variants)) {
+            if (index < 0 || index >= arguments.length) {
+                continue;
+            }
+            validateProjectedHeaderValue(
+                    arguments[index], "selected header parameter index " + index, budget);
+        }
+    }
+
+    private static void validateProjectedHeaderValue(
+            Object value, String context, FreezeBudget budget) {
+        if (value instanceof Collection<?> collection) {
+            for (Object element : collection) {
+                budget.consume(1, context);
+                validateRequestTargetContainer(element, 0, context + " element", budget);
+            }
+        } else if (value != null && value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            budget.consume(length, context);
+            for (int index = 0; index < length; index++) {
+                validateRequestTargetContainer(
+                        Array.get(value, index), 0, context + " element", budget);
+            }
+        } else {
+            validateRequestTargetContainer(value, 0, context, budget);
+        }
     }
 
     private static void snapshotHeaderArguments(
@@ -256,6 +293,10 @@ final class CacheKeyContract {
         }
     }
 
+    static int maximumSerializedBodyBytes() {
+        return MAX_CANONICAL_BYTES;
+    }
+
     private static int encodedLength(String value, Charset charset) {
         CharsetEncoder encoder = charset.newEncoder()
                 .onMalformedInput(CodingErrorAction.REPLACE)
@@ -357,6 +398,19 @@ final class CacheKeyContract {
                 budget.consume(1, context);
                 validateRequestTargetContainer(optional.orElseThrow(), depth + 1, context + " optional", budget);
             }
+        } else if (value instanceof Enum<?> enumValue && overridesEnumToString(enumValue)) {
+            throw invalid(context, "enum " + enumValue.getDeclaringClass().getName()
+                    + " overrides toString(); custom request conversion cannot be bounded; "
+                    + "use an explicitly formatted scalar value");
+        }
+    }
+
+    private static boolean overridesEnumToString(Enum<?> value) {
+        try {
+            return value.getClass().getMethod("toString").getDeclaringClass() != Enum.class;
+        } catch (NoSuchMethodException ex) {
+            throw new IllegalStateException(
+                    "Cannot inspect enum request conversion for " + value.getDeclaringClass().getName(), ex);
         }
     }
 
@@ -1410,6 +1464,11 @@ final class CacheKeyContract {
             if (type.isArray()) {
                 throw new IllegalStateException(
                         "Array values cannot be projected into a stable cache-selected request target");
+            }
+            if (value instanceof Enum<?> enumValue && overridesEnumToString(enumValue)) {
+                throw new IllegalStateException("Enum " + enumValue.getDeclaringClass().getName()
+                        + " overrides toString(); custom request conversion cannot be bounded; "
+                        + "use an explicitly formatted scalar value");
             }
             preflightScalar(value);
             appendText(projection, String.valueOf(value));

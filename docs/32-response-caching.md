@@ -142,9 +142,11 @@ instead. Arrays of containers must use a component type such as `List`, `Set`,
 or `Map` that can hold the defensive snapshot. Incompatible concrete or
 covariant runtime array components fail before dispatch instead of producing an
 array-store error. Path values and nested query elements whose collection, map,
-or record type overrides `toString()` are also rejected: arbitrary conversion
-cannot be interrupted at the projection byte limit. Standard container text and
-compiler-generated record text are reproduced structurally under that limit.
+or record type overrides `toString()` are also rejected. Enums that override
+`toString()` are rejected for path, nested query, and selected header values:
+arbitrary conversion cannot be interrupted at the projection byte limit.
+Standard container text and compiler-generated record text are reproduced
+structurally under that limit.
 Freezing and startup validation count one depth level per nested container or
 record and enforce one cumulative 10,000-element budget across the selected
 argument graph and another across selected Reactor context values. Container
@@ -169,7 +171,8 @@ wire order. Application-defined `List`, `Set`, and `Map` implementations are
 rejected when used as selected bodies because replacing them with a defensive
 collection snapshot cannot preserve an arbitrary concrete-type codec serializer;
 use a JDK collection or an immutable record body. Selected header scalar and
-nested-container projections are
+nested-container projections are validated before freezing, so a nested custom
+container cannot lose its wire conversion. They are then
 materialized under the same cumulative 1 MiB bound before the ordinary request
 resolver can call `String.valueOf`. Path and query arguments are always frozen
 because they define the request target. A body or dynamic header omitted under
@@ -182,7 +185,11 @@ encoding and request-target projection each have a cumulative 1 MiB byte limit.
 UTF-8 scalar length, selected String body length, URI text length, and
 `BigInteger`/`BigDecimal` encoded magnitude length are checked before encoded
 bytes are materialized, so one oversized value cannot bypass the allocation
-bound. Serialized body bytes are checked before defensive key/request copies.
+bound. Cache-selected JSON uses `ReactiveHttpClientJsonCodec.writeBounded(...)`,
+which must enforce the 1 MiB limit while encoding. The built-in Jackson 3 codec
+writes through a capped buffer; a custom codec must implement the bounded method
+or the selected call fails before dispatch. Serialized body bytes are checked
+again before defensive key/request copies.
 This wire projection is not a fallback for arbitrary
 `@CacheKey` or Reactor-context values. Only the SHA-256 digest is retained as
 the local opaque key. Raw values and digest text are never exported through
