@@ -419,11 +419,22 @@ class CacheKeyContractTest {
     }
 
     @Test
-    void startupRejectsArraysInRequestTargetValues() {
+    void startupAllowsDirectQueryArraysAndRejectsUnstableRequestTargetArrays() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        assertThatCode(() -> validate(ArrayQueryClient.class, config))
+                .doesNotThrowAnyException();
+        Method query = ArrayQueryClient.class.getMethod("get", String[].class);
+        assertThat(key(ArrayQueryClient.class, "array-query", query,
+                new Object[]{new String[]{"z", "a"}}, config))
+                .isEqualTo(key(ArrayQueryClient.class, "array-query", query,
+                        new Object[]{new String[]{"z", "a"}}, config))
+                .isNotEqualTo(key(ArrayQueryClient.class, "array-query", query,
+                        new Object[]{new String[]{"a", "z"}}, config));
+
         assertRejected(ArrayPathClient.class, selectedPolicy(),
-                "array-valued path/query parameters cannot preserve a stable String.valueOf wire projection");
+                "array-valued path parameters cannot preserve a stable String.valueOf wire projection");
         assertRejected(NestedArrayQueryClient.class, selectedPolicy(),
-                "array-valued path/query parameters cannot preserve a stable String.valueOf wire projection");
+                "arrays nested inside query parameter values cannot preserve a stable String.valueOf wire projection");
     }
 
     @Test
@@ -905,6 +916,11 @@ class CacheKeyContractTest {
     interface ArrayPathClient {
         @GET("/items/{id}")
         Mono<String> get(@PathVar("id") String[] id);
+    }
+
+    interface ArrayQueryClient {
+        @GET("/items")
+        Mono<String> get(@QueryParam("tag") String[] tags);
     }
 
     interface NestedArrayQueryClient {

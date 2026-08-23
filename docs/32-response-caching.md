@@ -127,9 +127,10 @@ scalar records, arrays, typed lists/sets/maps, and optionals. The starter
 defensively freezes one snapshot per subscription and uses it for both the key
 and request materialization. Publishers, streams, resources, raw containers,
 unresolved generics, mutable DTOs, and mutable nested record components fail
-before transport dispatch. Arrays nested in path or query values are also
-rejected because the current request-target conversion would serialize them by
-object identity; format those values as stable scalars instead. Freezing and
+before transport dispatch. A top-level query array is supported and expands to
+ordered query values. Arrays used as path values or nested inside query elements
+are rejected because the current request-target conversion would serialize them
+by object identity; format those values as stable scalars instead. Freezing and
 startup validation count one depth level per nested container or record and
 enforce one cumulative 10,000-element budget across the selected argument graph
 and another across selected Reactor context values. Container elements,

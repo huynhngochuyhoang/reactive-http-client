@@ -242,8 +242,10 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
   freezes one supported argument snapshot and uses that same snapshot for key
   construction and request materialization. Mutable or nested values that cannot
   be copied safely are rejected rather than retained as live key/request state.
-  Arrays in path/query positions are rejected until request-target conversion
-  has a stable structural projection rather than identity-based `String.valueOf`.
+  Top-level query arrays expand into ordered query values. Arrays in path
+  positions or nested inside query elements are rejected until request-target
+  conversion has a stable structural projection rather than identity-based
+  `String.valueOf`.
 - Request-bound selected collections preserve the same element order used by
   URI, header, and body materialization. Canonical set ordering applies only to
   selected values whose wire representation is not order-sensitive.

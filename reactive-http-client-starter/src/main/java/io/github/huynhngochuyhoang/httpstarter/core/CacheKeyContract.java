@@ -255,16 +255,32 @@ final class CacheKeyContract {
     }
 
     private static void validateRequestTargetTypes(RequestPlan plan, String context) {
-        Set<Integer> indexes = new LinkedHashSet<>();
-        plan.pathVars().forEach(binding -> indexes.add(binding.argumentIndex()));
-        plan.queryParams().forEach(binding -> indexes.add(binding.argumentIndex()));
-        for (int index : indexes) {
+        for (RequestPlan.NamedArgumentBinding binding : plan.pathVars()) {
+            int index = binding.argumentIndex();
             if (index >= 0 && index < plan.parameterTypes().size()
                     && containsArrayType(plan.parameterTypes().get(index))) {
-                throw invalid(context, "array-valued path/query parameters cannot preserve a stable "
+                throw invalid(context, "array-valued path parameters cannot preserve a stable "
                         + "String.valueOf wire projection; use an explicitly formatted scalar value");
             }
         }
+        for (RequestPlan.NamedArgumentBinding binding : plan.queryParams()) {
+            int index = binding.argumentIndex();
+            if (index >= 0 && index < plan.parameterTypes().size()
+                    && containsNestedQueryArray(plan.parameterTypes().get(index))) {
+                throw invalid(context, "arrays nested inside query parameter values cannot preserve a stable "
+                        + "String.valueOf wire projection; use flattened values or explicitly formatted scalars");
+            }
+        }
+    }
+
+    private static boolean containsNestedQueryArray(Type type) {
+        if (type instanceof GenericArrayType arrayType) {
+            return containsArrayType(arrayType.getGenericComponentType());
+        }
+        if (type instanceof Class<?> clazz && clazz.isArray()) {
+            return containsArrayType(clazz.getComponentType());
+        }
+        return containsArrayType(type);
     }
 
     private static boolean containsArrayType(Type type) {
