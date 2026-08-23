@@ -569,26 +569,30 @@ Evidence recorded on 2026-08-23:
   consumed once by `OutboundAuthFilter`. Later resilience attempts resolve
   current auth while one-time 401 replay remains attempt-local. A hit does not
   build or subscribe the existing load pipeline, so it consumes no resilience
-  operator or HTTP dispatch.
+  operator or HTTP dispatch. The provider-aware public creation overload and
+  mock helper preserve this gate; legacy low-level entry points fail closed for
+  authenticated cached methods when provider/base-URL inputs are unavailable.
 - Phase-one misses remain independent. Generation-checked publication makes the
   first successful completion win without replacing its value/TTL; deterministic
-  reversed-completion and eviction tests prove late duplicates cannot restore
-  an obsolete generation. Empty completion, failure, cancellation, expiry,
-  capacity eviction, and shutdown create no orphaned entry.
+  reversed-completion, expiry, and eviction tests prove late duplicates cannot
+  restore an obsolete generation. Expiry processing precedes the publication
+  generation check. Empty completion, failure, cancellation, expiry, capacity
+  eviction, and shutdown create no orphaned entry.
 - Cached values retain decoded object identity. `ResponseEntity` hits retain
   status/body identity plus an allowlisted 32-value/16-KiB representation-header
   subset. Redirects and credential/session/auth-challenge responses are
   non-cacheable for both plain bodies and `ResponseEntity`; oversized retained
   headers are also non-cacheable.
-- `BoundedLocalResponseCacheContractTest` passes `18` deterministic contracts,
+- `BoundedLocalResponseCacheContractTest` passes `20` deterministic contracts,
   including the real factory-destroy path, wire-header/redirect rejection,
-  retry/auth freshness, upstream auth headers and validation, frozen pre-lookup
-  context, and hit/miss logical timeout attribution. `OutboundAuthFilterTest`
+  public-construction auth safety, retry/auth freshness, upstream auth headers
+  and validation, frozen pre-lookup context, late expiry publication, and
+  hit/miss logical timeout attribution. `OutboundAuthFilterTest`
   passes `15` contracts, including the non-dispatching cache auth probe and
   compatibility for the prior direct pre-resolved attribute form. The complete
-  reactor passes starter `1157`, test-helper `55`, and OTel `52` tests with zero
-  failures, errors, or skips. An isolated assembled-consumer dependency tree contains the
-  starter but no Caffeine artifact, and `git diff --check` passes.
+  reactor passes starter `1159`, test-helper `55`, and OTel `52` tests with zero
+  failures, errors, or skips. An isolated assembled-consumer dependency tree
+  contains the starter but no Caffeine artifact, and `git diff --check` passes.
 
 ---
 

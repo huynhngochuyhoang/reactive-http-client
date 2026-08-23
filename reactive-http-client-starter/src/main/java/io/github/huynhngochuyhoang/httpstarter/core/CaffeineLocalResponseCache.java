@@ -53,9 +53,13 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     public void publish(LoadToken loadToken, Object value) {
         GenerationLoadToken token = token(loadToken);
         synchronized (lifecycleMonitor) {
+            if (closed.get()) {
+                return;
+            }
+            Object currentValue = cache.getIfPresent(token.key);
             if (closed.get()
                     || token.state.generation != token.observedGeneration
-                    || cache.getIfPresent(token.key) != null) {
+                    || currentValue != null) {
                 return;
             }
             cache.put(token.key, value);

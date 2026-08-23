@@ -45,6 +45,7 @@ import reactor.util.context.ContextView;
 import java.io.*;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.net.URI;
 import java.nio.channels.ReadableByteChannel;
@@ -135,6 +136,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     }
 
 
+    /**
+     * Creates a handler without cache-authorization inputs. Authenticated cached methods fail closed.
+     */
     public static ReactiveClientInvocationHandler create(
             WebClient webClient,
             MethodMetadataCache metadataCache,
@@ -152,7 +156,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 observabilityConfig, null, null);
     }
 
-    static ReactiveClientInvocationHandler create(
+    /**
+     * Creates a handler with the provider and resolved base URL required to authorize cache lookups.
+     */
+    public static ReactiveClientInvocationHandler create(
             WebClient webClient,
             MethodMetadataCache metadataCache,
             RequestArgumentResolver argumentResolver,
@@ -245,6 +252,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 responseCacheManager, "responseCacheManager must not be null");
         this.cacheAuthProvider = cacheAuthProvider;
         this.baseUrl = baseUrl;
+        validateCacheAuthorizationSupportAtConstruction();
         this.observerProvider = applicationContext.getBeanProvider(HttpClientObserver.class);
         this.lifecycleHookProvider = applicationContext.getBeanProvider(ReactiveHttpClientLifecycleHook.class);
         this.observabilityConfig = observabilityConfig;
@@ -353,6 +361,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         EffectiveCachePolicy.Selection cacheSelection = EffectiveCachePolicy.validate(
                 concreteClient, clientName, plan, clientConfig, effectiveApi.httpMethod());
         if (cacheSelection.enabled()) {
+            requireCacheAuthorizationSupport();
             Object[] invocationArguments = args != null ? args.clone() : new Object[0];
             Mono<?> cacheInvocation = Mono.deferContextual(context -> {
                 Object[] frozenArguments = CacheKeyContract.freezeArguments(
@@ -401,6 +410,36 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     LocalResponseCacheManager responseCacheManager() {
         return responseCacheManager;
+    }
+
+    private void validateCacheAuthorizationSupportAtConstruction() {
+        if (!clientConfig.hasAuthConfigured()
+                || (cacheAuthProvider != null && StringUtils.hasText(baseUrl))
+                || clientInterface == null) {
+            return;
+        }
+        for (Method method : clientInterface.getMethods()) {
+            if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
+                continue;
+            }
+            RequestPlan plan = requestPlan(method, metadataCache.get(method));
+            if (EffectiveCachePolicy.resolve(plan, clientConfig).enabled()) {
+                throw missingCacheAuthorizationSupport();
+            }
+        }
+    }
+
+    private void requireCacheAuthorizationSupport() {
+        if (clientConfig.hasAuthConfigured()
+                && (cacheAuthProvider == null || !StringUtils.hasText(baseUrl))) {
+            throw missingCacheAuthorizationSupport();
+        }
+    }
+
+    private IllegalStateException missingCacheAuthorizationSupport() {
+        return new IllegalStateException("Authenticated response caching for client '" + clientName
+                + "' requires an AuthProvider and resolved base URL. Use the provider-aware "
+                + "ReactiveClientInvocationHandler.create overload or disable response caching.");
     }
 
     private Object invokeResolved(Object proxy,

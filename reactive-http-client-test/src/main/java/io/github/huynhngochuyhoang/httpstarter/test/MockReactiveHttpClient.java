@@ -448,7 +448,9 @@ public final class MockReactiveHttpClient<T> {
                     appCtx,
                     resilienceOperatorApplier,
                     effectiveJsonCodec,
-                    new ReactiveHttpClientProperties.ObservabilityConfig()
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    authProvider,
+                    baseUrl
             );
 
             @SuppressWarnings("unchecked")

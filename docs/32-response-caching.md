@@ -109,6 +109,14 @@ before later filters and transport, and validates the returned auth header names
 and values before either a hit or miss can continue. A miss reuses that validated
 context only for its first outer attempt; later resilience attempts resolve
 current auth normally.
+
+The starter factory and `MockReactiveHttpClient` supply the configured provider
+and resolved base URL to this pre-lookup gate. Low-level callers using
+`ReactiveClientInvocationHandler.create(...)` must use its provider-aware
+overload for authenticated cached clients. Legacy constructors and the shorter
+factory overload fail closed when a method selects caching, instead of allowing
+an authenticated first miss followed by unauthorized hits.
+
 On a hit, the existing HTTP load publisher is not constructed or subscribed, so
 the call consumes no downstream resilience permit, redirect, pool acquisition,
 or transport dispatch. On a miss, the existing decoded `Mono` pipeline runs and
@@ -121,7 +129,8 @@ Phase one deliberately does not coalesce misses. Concurrent same-key callers
 may each dispatch. The first successful completion observed for that key and
 generation fills the cache; later duplicate completions still return their own
 value to their caller but cannot replace the winner, restart its TTL, or
-repopulate after expiry, eviction, or shutdown.
+repopulate after expiry, eviction, or shutdown. Publication forces Caffeine to
+process expiry before rechecking the load token's generation.
 
 Cached application values are retained and returned by identity. The starter
 does not copy or serialize a decoded value solely for caching. Prefer immutable

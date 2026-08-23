@@ -171,6 +171,35 @@ class BoundedLocalResponseCacheContractTest {
     }
 
     @Test
+    void lateDuplicateCannotRepopulateAfterTheWinningEntryExpires() throws Exception {
+        AtomicLong ticker = new AtomicLong();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get);
+        EffectiveCachePolicy.Selection selection = selection("expired-winner", 100, 10);
+        CacheKeyContract.OpaqueKey key = key("shared");
+        Sinks.One<String> lateLoad = Sinks.one();
+        Sinks.One<String> winningLoad = Sinks.one();
+        AtomicInteger subscriptions = new AtomicInteger();
+        Mono<String> duplicate = cached(manager, selection, key, () ->
+                subscriptions.getAndIncrement() == 0 ? lateLoad.asMono() : winningLoad.asMono());
+
+        CompletableFuture<String> late = duplicate.toFuture();
+        CompletableFuture<String> winner = duplicate.toFuture();
+        winningLoad.tryEmitValue("winner").orThrow();
+        assertThat(winner.get(1, TimeUnit.SECONDS)).isEqualTo("winner");
+
+        ticker.addAndGet(Duration.ofMillis(100).toNanos());
+        lateLoad.tryEmitValue("late").orThrow();
+        assertThat(late.get(1, TimeUnit.SECONDS)).isEqualTo("late");
+
+        AtomicInteger freshLoads = new AtomicInteger();
+        assertThat(cached(manager, selection, key, () -> {
+            freshLoads.incrementAndGet();
+            return Mono.just("fresh");
+        }).block()).isEqualTo("fresh");
+        assertThat(freshLoads).hasValue(1);
+    }
+
+    @Test
     void emptyFailureAndCancellationNeverPopulateEntries() {
         LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
         EffectiveCachePolicy.Selection selection = selection("terminal", 1_000, 10);
@@ -425,8 +454,7 @@ class BoundedLocalResponseCacheContractTest {
 
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.refresh();
-            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
-            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+            ReactiveClientInvocationHandler handler = ReactiveClientInvocationHandler.create(
                     webClient,
                     new MethodMetadataCache(),
                     new RequestArgumentResolver(),
@@ -438,7 +466,6 @@ class BoundedLocalResponseCacheContractTest {
                     new NoopResilienceOperatorApplier(),
                     TestJsonCodecs.jsonCodec(),
                     new ReactiveHttpClientProperties.ObservabilityConfig(),
-                    manager,
                     authProvider,
                     "http://cache.test");
             CacheClient client = (CacheClient) Proxy.newProxyInstance(
@@ -723,6 +750,37 @@ class BoundedLocalResponseCacheContractTest {
         }
 
         assertThat(dispatches).hasValue(1);
+    }
+
+    @Test
+    void publicCreationRejectsAuthenticatedCachingWithoutAuthorizationInputs() {
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        config.setAuthProvider("cache-auth");
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .filter(new OutboundAuthFilter("cache-client", request -> Mono.just(AuthContext.empty())))
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK).body("ok").build()))
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+
+            assertThatThrownBy(() -> ReactiveClientInvocationHandler.create(
+                    webClient,
+                    new MethodMetadataCache(),
+                    new RequestArgumentResolver(),
+                    new DefaultErrorDecoder(),
+                    config,
+                    "cache-client",
+                    CacheClient.class,
+                    context,
+                    new NoopResilienceOperatorApplier(),
+                    TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Authenticated response caching")
+                    .hasMessageContaining("AuthProvider and resolved base URL");
+        }
     }
 
     @Test
