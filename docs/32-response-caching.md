@@ -135,18 +135,23 @@ startup validation count one depth level per nested container or record and
 enforce one cumulative 10,000-element budget across the selected argument graph
 and another across selected Reactor context values. Container elements,
 optional values, and record components consume that budget, so shared or deeply
-nested object graphs cannot expand without a bound.
+nested object graphs cannot expand without a bound. Runtime freezing charges
+actual iterated list, set, and map members instead of trusting reported
+container sizes. It also preserves equal-by-value elements from identity-based
+sets so the frozen request cannot silently lose query, header, or body values.
 
 The canonical representation uses type tags, explicit nulls, length framing,
 container boundaries, and sorted map/set encodings for values that are not
 request-bound. Path/query dimensions first use the same frozen
 `String.valueOf` projection used by URI construction. A selected body or header
-set preserves the iteration order sent on the wire instead of being sorted for
-the key. These projections prevent wire-distinct requests from collapsing into
-one structural key. Canonical encoding has a cumulative 1 MiB byte limit that
-is enforced while nested frames are written. UTF-8 scalar length is checked
-before encoded scalar bytes are materialized, so one oversized string cannot
-bypass the allocation bound. This wire projection is not a fallback for
+set, or a selected body map, preserves the iteration order sent on the wire
+instead of being sorted for the key. URI variants retain their non-normalized
+text, so a literal Unicode path and an explicitly percent-escaped path remain
+distinct. These projections prevent wire-distinct requests from collapsing
+into one structural key. Canonical encoding has a cumulative 1 MiB byte limit
+that is enforced while nested frames are written. UTF-8 scalar length is
+checked before encoded scalar bytes are materialized, so one oversized string
+cannot bypass the allocation bound. This wire projection is not a fallback for
 arbitrary `@CacheKey` or Reactor-context values. Only the SHA-256 digest is
 retained as the local opaque key. Raw values and digest text are never exported
 through metrics, logs, traces, diagnostics, health, or support bundles. Auth

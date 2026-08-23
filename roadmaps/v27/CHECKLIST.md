@@ -359,6 +359,13 @@ Evidence recorded on 2026-08-22:
       `String.valueOf` projection is identity-based.
 - [x] Preflight UTF-8 scalar length against the remaining canonical byte budget
       before allocating encoded scalar bytes.
+- [x] Charge the cumulative freeze budget from actual list/set/map iteration,
+      not untrusted container `size()` metadata.
+- [x] Preserve every iterated identity-set member even when distinct members are
+      equal by value.
+- [x] Preserve selected request-body map entry order while keeping cache-only
+      maps canonically order-independent.
+- [x] Keep non-normalized URI spellings distinct in canonical key material.
 
 ### [x] 5.2 Require explicit response variants
 
@@ -444,8 +451,12 @@ Evidence recorded on 2026-08-22:
   top-level multi-value query arrays while rejecting identity-based nested/path
   arrays, exercised generic-record fan-out, and preflighted oversized UTF-8
   scalars before byte-array allocation.
+- A fifth review pass charged the freeze budget per iterated collection/map
+  member, preserved duplicate-equal identity-set elements, retained selected
+  request-body map order, and stopped normalizing distinct URI spellings into
+  one key.
 - `mvn -q -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am
-  test` passed `1115` starter tests and `55` test-helper tests with zero
+  test` passed `1118` starter tests and `55` test-helper tests with zero
   failures, errors, or skips. Metadata JSON validation and `git diff --check`
   also passed.
 

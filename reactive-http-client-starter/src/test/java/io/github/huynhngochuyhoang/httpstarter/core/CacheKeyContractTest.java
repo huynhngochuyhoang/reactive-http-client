@@ -15,6 +15,7 @@ import reactor.util.context.Context;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.net.URI;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
@@ -54,6 +55,36 @@ class CacheKeyContractTest {
                 new Object[]{"x", "y", "z", first}, config))
                 .isEqualTo(key(KeyClient.class, "catalog-a", method,
                         new Object[]{"x", "y", "z", second}, config));
+    }
+
+    @Test
+    void requestBodyMapsPreserveWireOrderWhileCacheOnlyMapsRemainCanonical() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        Method method = OrderedBodyMapClient.class.getMethod("get", Map.class);
+        Map<String, String> first = new LinkedHashMap<>();
+        first.put("a", "one");
+        first.put("b", "two");
+        Map<String, String> second = new LinkedHashMap<>();
+        second.put("b", "two");
+        second.put("a", "one");
+
+        assertThat(key(OrderedBodyMapClient.class, "ordered-body", method,
+                new Object[]{first}, config))
+                .isNotEqualTo(key(OrderedBodyMapClient.class, "ordered-body", method,
+                        new Object[]{second}, config));
+    }
+
+    @Test
+    void uriVariantsPreserveTheirNonNormalizedText() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("uri"));
+        Method method = UriVariantClient.class.getMethod("get", URI.class);
+
+        assertThat(key(UriVariantClient.class, "uri-variant", method,
+                new Object[]{URI.create("https://example.test/\u00e9")}, config))
+                .isNotEqualTo(key(UriVariantClient.class, "uri-variant", method,
+                        new Object[]{URI.create("https://example.test/%C3%A9")}, config));
     }
 
     @Test
@@ -239,6 +270,40 @@ class CacheKeyContractTest {
                 resolved,
                 Context.empty(),
                 selection.policy())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void freezingChargesActualListTraversalAndPreservesIdentitySetElements() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig listConfig = selectedPolicy();
+        policy(listConfig).setVaryByParameters(List.of("values"));
+        Method listMethod = LargeScalarClient.class.getMethod("get", List.class);
+        RequestPlan listPlan = plan(LargeScalarClient.class, listMethod);
+        EffectiveCachePolicy.Selection listSelection = EffectiveCachePolicy.validate(
+                LargeScalarClient.class, "underreported-list", listPlan, listConfig, "GET");
+
+        assertThatThrownBy(() -> CacheKeyContract.freezeArguments(
+                listPlan,
+                new Object[]{new UnderreportedList<>(Collections.nCopies(10_001, "value"))},
+                listSelection.policy()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cumulative element count exceeds maximum 10000");
+
+        ReactiveHttpClientProperties.ClientConfig setConfig = selectedPolicy();
+        policy(setConfig).setVaryByParameters(List.of("mode", "values"));
+        Method setMethod = OrderedInputClient.class.getMethod("get", Mode.class, List.class, Set.class);
+        RequestPlan setPlan = plan(OrderedInputClient.class, setMethod);
+        EffectiveCachePolicy.Selection setSelection = EffectiveCachePolicy.validate(
+                OrderedInputClient.class, "identity-set", setPlan, setConfig, "GET");
+        Set<String> identitySet = Collections.newSetFromMap(new IdentityHashMap<>());
+        identitySet.add(new String("same"));
+        identitySet.add(new String("same"));
+
+        Object[] frozen = CacheKeyContract.freezeArguments(
+                setPlan, new Object[]{Mode.SPECIAL, List.of("value"), identitySet}, setSelection.policy());
+        RequestArgumentResolver.ResolvedArgs resolved = argumentResolver.resolve(setPlan, frozen);
+
+        assertThat((Set<?>) frozen[2]).hasSize(2);
+        assertThat(resolved.queryParams().get("tag")).containsExactly("same", "same");
     }
 
     @Test
@@ -792,6 +857,29 @@ class CacheKeyContractTest {
         }
     }
 
+    static final class UnderreportedList<E> extends AbstractList<E> {
+        private final List<E> values;
+
+        UnderreportedList(List<E> values) {
+            this.values = values;
+        }
+
+        @Override
+        public E get(int index) {
+            return values.get(index);
+        }
+
+        @Override
+        public int size() {
+            return 1;
+        }
+
+        @Override
+        public Iterator<E> iterator() {
+            return values.iterator();
+        }
+    }
+
     static final class MutableInput {
         private String value;
     }
@@ -803,6 +891,16 @@ class CacheKeyContractTest {
                 @QueryParam("right") String right,
                 @QueryParam("tail") String tail,
                 @CacheKey("attributes") Map<String, List<Integer>> attributes);
+    }
+
+    interface OrderedBodyMapClient {
+        @GET("/items")
+        Mono<String> get(@Body @CacheKey("body") Map<String, String> body);
+    }
+
+    interface UriVariantClient {
+        @GET("/items")
+        Mono<String> get(@CacheKey("uri") URI uri);
     }
 
     interface VariantClient {

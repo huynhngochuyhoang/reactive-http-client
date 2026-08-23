@@ -247,12 +247,17 @@ Make cross-user or cross-tenant reuse impossible without explicit user intent.
   conversion has a stable structural projection rather than identity-based
   `String.valueOf`.
 - Request-bound selected collections preserve the same element order used by
-  URI, header, and body materialization. Canonical set ordering applies only to
-  selected values whose wire representation is not order-sensitive.
+  URI, header, and body materialization. Request-bound body maps preserve entry
+  iteration order. Canonical map/set ordering applies only to selected values
+  whose wire representation is not order-sensitive. URI variants retain their
+  non-normalized textual representation.
 - One cumulative element budget includes container members, optional values,
   and record components. Startup and runtime count one level per nested record.
-  One cumulative byte budget is enforced while nested canonical frames are
-  written, and UTF-8 scalar sizes are checked before encoded arrays are allocated.
+  Runtime accounting charges actual iterated members rather than trusting
+  collection size metadata, and freezing preserves equal-by-value members of
+  identity-based sets. One cumulative byte budget is enforced while nested
+  canonical frames are written, and UTF-8 scalar sizes are checked before
+  encoded arrays are allocated.
 - Header-, locale-, tenant-, Reactor-context-, or auth-dependent responses
   require explicit variant/partition inputs or an explicit shared-response
   acknowledgement. The starter never silently assumes such responses are

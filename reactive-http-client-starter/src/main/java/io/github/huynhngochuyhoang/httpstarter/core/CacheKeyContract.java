@@ -437,27 +437,27 @@ final class CacheKeyContract {
             return copy;
         }
         if (value instanceof List<?> list) {
-            budget.consume(list.size(), context);
-            List<Object> copy = new ArrayList<>(list.size());
+            List<Object> copy = new ArrayList<>();
             int index = 0;
             for (Object element : list) {
+                budget.consume(1, context);
                 copy.add(freeze(element, depth + 1, context + "[" + index + "]", budget));
                 index++;
             }
             return Collections.unmodifiableList(copy);
         }
         if (value instanceof Set<?> set) {
-            budget.consume(set.size(), context);
-            List<Object> values = new ArrayList<>(set.size());
+            List<Object> values = new ArrayList<>();
             for (Object element : set) {
+                budget.consume(1, context);
                 values.add(freeze(element, depth + 1, context + " set element", budget));
             }
-            return Collections.unmodifiableSet(new LinkedHashSet<>(values));
+            return new IdentityPreservingSet(values);
         }
         if (value instanceof Map<?, ?> map) {
-            budget.consume(map.size(), context);
             Map<Object, Object> copy = new LinkedHashMap<>();
             for (Map.Entry<?, ?> entry : map.entrySet()) {
+                budget.consume(1, context);
                 Object key = freeze(entry.getKey(), depth + 1, context + " map key", budget);
                 Object mapped = freeze(entry.getValue(), depth + 1, context + " map value", budget);
                 copy.put(key, mapped);
@@ -516,30 +516,30 @@ final class CacheKeyContract {
             }
         }
         Object value = index < frozenArguments.length ? frozenArguments[index] : null;
-        return plan.bodyIndex() == index ? preserveRequestSetOrder(value) : value;
+        return plan.bodyIndex() == index ? preserveRequestOrder(value) : value;
     }
 
-    private static Object preserveRequestSetOrder(Object value) {
+    private static Object preserveRequestOrder(Object value) {
         if (value instanceof Set<?> set) {
-            return set.stream().map(CacheKeyContract::preserveRequestSetOrder).toList();
+            return set.stream().map(CacheKeyContract::preserveRequestOrder).toList();
         }
         if (value instanceof List<?> list) {
-            return list.stream().map(CacheKeyContract::preserveRequestSetOrder).toList();
+            return list.stream().map(CacheKeyContract::preserveRequestOrder).toList();
         }
         if (value instanceof Map<?, ?> map) {
-            Map<Object, Object> ordered = new LinkedHashMap<>();
-            map.forEach((key, mapped) -> ordered.put(
-                    preserveRequestSetOrder(key), preserveRequestSetOrder(mapped)));
-            return ordered;
+            List<RequestMapEntry> entries = new ArrayList<>();
+            map.forEach((key, mapped) -> entries.add(new RequestMapEntry(
+                    preserveRequestOrder(key), preserveRequestOrder(mapped))));
+            return new RequestOrderedMap(List.copyOf(entries));
         }
         if (value instanceof Optional<?> optional) {
-            return optional.map(CacheKeyContract::preserveRequestSetOrder);
+            return optional.map(CacheKeyContract::preserveRequestOrder);
         }
         if (value != null && value.getClass().isArray()) {
             int length = Array.getLength(value);
             List<Object> ordered = new ArrayList<>(length);
             for (int index = 0; index < length; index++) {
-                ordered.add(preserveRequestSetOrder(Array.get(value, index)));
+                ordered.add(preserveRequestOrder(Array.get(value, index)));
             }
             return ordered;
         }
@@ -623,6 +623,29 @@ final class CacheKeyContract {
                 throw invalid(context, "cumulative element count exceeds maximum " + MAX_ELEMENTS);
             }
             elements += count;
+        }
+    }
+
+    private static final class IdentityPreservingSet extends AbstractSet<Object> {
+        private final List<Object> values;
+
+        private IdentityPreservingSet(List<Object> values) {
+            this.values = Collections.unmodifiableList(new ArrayList<>(values));
+        }
+
+        @Override
+        public Iterator<Object> iterator() {
+            return values.iterator();
+        }
+
+        @Override
+        public int size() {
+            return values.size();
+        }
+
+        @Override
+        public boolean contains(Object candidate) {
+            return values.stream().anyMatch(value -> value == candidate);
         }
     }
 
@@ -738,6 +761,12 @@ final class CacheKeyContract {
                 new VariantSelection(Map.of(), List.of(), List.of());
     }
 
+    private record RequestOrderedMap(List<RequestMapEntry> entries) {
+    }
+
+    private record RequestMapEntry(Object key, Object value) {
+    }
+
     private static final class CanonicalWriter {
         private final ByteBudget budget;
         private final BudgetedByteArrayOutputStream bytes;
@@ -818,6 +847,13 @@ final class CacheKeyContract {
                 for (MapEntryBytes entry : entries) {
                     countedRawFrame(entry.key());
                     countedRawFrame(entry.value());
+                }
+            } else if (value instanceof RequestOrderedMap map) {
+                output.writeByte(26);
+                output.writeInt(map.entries().size());
+                for (RequestMapEntry entry : map.entries()) {
+                    framed(entry.key(), depth + 1);
+                    framed(entry.value(), depth + 1);
                 }
             } else if (value instanceof Optional<?> optional) {
                 output.writeByte(24);
@@ -953,7 +989,7 @@ final class CacheKeyContract {
                 ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 DataOutputStream output = new DataOutputStream(bytes);
                 if (value instanceof URI uri) {
-                    output.write(uri.toASCIIString().getBytes(StandardCharsets.US_ASCII));
+                    output.write(uri.toString().getBytes(StandardCharsets.UTF_8));
                 } else if (value instanceof Instant instant) {
                     output.writeLong(instant.getEpochSecond());
                     output.writeInt(instant.getNano());
