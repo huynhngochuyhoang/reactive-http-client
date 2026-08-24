@@ -157,6 +157,15 @@ public class MicrometerHttpClientObserver implements HttpClientObserver {
         }
     }
 
+    /**
+     * Cache-served callers are represented by dedicated cache meters and must
+     * not dilute downstream request or health samples.
+     */
+    @Override
+    public void recordCacheServed(HttpClientObserverEvent event) {
+        // Intentionally excluded from reactive.http.client.requests.
+    }
+
     private Tags buildLowCardinalityTags(HttpClientObserverEvent event) {
         return commonTags(event);
     }

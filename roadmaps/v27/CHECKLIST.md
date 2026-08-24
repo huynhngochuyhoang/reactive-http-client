@@ -897,8 +897,13 @@ Evidence recorded on 2026-08-24:
   or keys. Health parity tests prove cache gauges and refresh failures do not
   change downstream health. The operations guides include bounded support data
   plus hit, coalescing, refresh-failure, and capacity PromQL recipes.
-- `mvn -q test` passed `1198` starter, `55` test-helper, and `53` OTel
-  tests (`1306` total) with zero failures, errors, or skips. The focused
+- Follow-up regression coverage records refresh cancellation exactly once when
+  eviction wins before subscription attachment, keeps detached coalesced waiters
+  transport-empty, strongly retains the maximum-entry gauge supplier, and keeps
+  cache-served callers out of the downstream request timer and health samples
+  while preserving custom-observer and OTel terminal reporting.
+- `mvn -q test` passed `1199` starter, `55` test-helper, and `53` OTel
+  tests (`1307` total) with zero failures, errors, or skips. The focused
   no-Micrometer mock/test-helper run and `git diff --check` also passed.
 
 ---

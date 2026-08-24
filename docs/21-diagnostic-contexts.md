@@ -91,6 +91,10 @@ attempt `0`, no dispatch URL, status, server, failure stage, or wire sizes. A
 miss loader retains its final HTTP evidence. Hidden refresh is not a caller and
 does not create observer, lifecycle, exchange-log, or OTel terminal records; its
 bounded work result is emitted through cache meters and a sanitized debug log.
+If the original miss leader detaches while a coalesced waiter remains, the
+waiter stays transport-empty rather than inheriting the shared load's retries,
+status, URL, or headers. The load remains visible through bounded cache work
+meters.
 
 ## Header handling
 

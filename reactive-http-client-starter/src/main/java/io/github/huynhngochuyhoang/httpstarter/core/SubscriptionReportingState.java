@@ -25,6 +25,7 @@ final class SubscriptionReportingState {
     private final AtomicReference<AttemptSnapshot> frozenAttemptSnapshot = new AtomicReference<>();
     private final AtomicReference<TerminalSnapshot> terminalSnapshot = new AtomicReference<>();
     private final AtomicReference<HttpClientCacheOutcome> cacheOutcome = new AtomicReference<>();
+    private final AtomicBoolean cacheServed = new AtomicBoolean();
     private final AtomicBoolean hiddenCacheRefresh = new AtomicBoolean();
 
     SubscriptionReportingState(RequestArgumentResolver.ResolvedArgs initialResolved) {
@@ -119,6 +120,10 @@ final class SubscriptionReportingState {
         return cacheOutcome.get();
     }
 
+    void markCacheServed() {
+        cacheServed.set(true);
+    }
+
     void markHiddenCacheRefresh() {
         hiddenCacheRefresh.set(true);
     }
@@ -173,7 +178,8 @@ final class SubscriptionReportingState {
                 responseBody,
                 error,
                 attempt.attemptCount(),
-                cacheOutcome.get());
+                cacheOutcome.get(),
+                cacheServed.get());
         return terminalSnapshot.compareAndSet(null, candidate) ? candidate : null;
     }
 
@@ -300,7 +306,8 @@ final class SubscriptionReportingState {
             Object responseBody,
             Throwable error,
             int attemptCount,
-            HttpClientCacheOutcome cacheOutcome) {
+            HttpClientCacheOutcome cacheOutcome,
+            boolean cacheServed) {
 
         TerminalSnapshot {
             responseHeaders = responseHeaders == null || responseHeaders.isEmpty()

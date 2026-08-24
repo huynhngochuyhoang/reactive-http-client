@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -257,6 +258,60 @@ class LocalResponseCacheObservabilityTest {
         assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".evictions")
                 .tags("client.name", "catalog-client", "cache.policy", "refresh", "cause", "size")
                 .counter().count()).isEqualTo(1.0);
+        manager.close();
+    }
+
+    @Test
+    void evictionDuringRefreshAssemblyRecordsCancellationExactlyOnce() throws Exception {
+        AtomicLong ticker = new AtomicLong();
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        LocalResponseCacheMetrics metrics = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
+        metrics.registerApi("catalog.get");
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(
+                ticker::get, Schedulers.parallel(), metrics, "catalog-client");
+        EffectiveCachePolicy.Selection refresh = selection("refresh", false, 50L);
+        refresh.policy().setMaximumSize(1L);
+        CacheKeyContract.OpaqueKey firstKey = key("assembly-first");
+        CountDownLatch assembling = new CountDownLatch(1);
+        CountDownLatch continueAssembly = new CountDownLatch(1);
+
+        assertThat(load(manager, refresh, firstKey, "catalog.get", state(), state(), Mono.just("first")))
+                .isEqualTo("first");
+        ticker.addAndGet(Duration.ofMillis(50).toNanos());
+        CompletableFuture<?> staleCaller = CompletableFuture.supplyAsync(() -> manager.getOrLoad(
+                        refresh,
+                        firstKey,
+                        "catalog.get",
+                        ignored -> {
+                            assembling.countDown();
+                            try {
+                                if (!continueAssembly.await(1, TimeUnit.SECONDS)) {
+                                    throw new IllegalStateException("refresh assembly gate timed out");
+                                }
+                            }
+                            catch (InterruptedException error) {
+                                Thread.currentThread().interrupt();
+                                throw new IllegalStateException("refresh assembly interrupted", error);
+                            }
+                            return Mono.never();
+                        },
+                        LocalResponseCacheManager.ResponseMetadata::successWithoutHeaders,
+                        state(),
+                        state())
+                .block());
+
+        assertThat(assembling.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(load(manager, refresh, key("assembly-second"), "catalog.get",
+                state(), state(), Mono.just("second"))).isEqualTo("second");
+        continueAssembly.countDown();
+
+        assertThat(staleCaller.get(1, TimeUnit.SECONDS)).isEqualTo("first");
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".refreshes")
+                .tags("client.name", "catalog-client", "api.name", "catalog.get", "outcome", "cancellation")
+                .counter().count()).isEqualTo(1.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".refresh.duration")
+                .tags("client.name", "catalog-client", "api.name", "catalog.get", "outcome", "cancellation")
+                .timer().count()).isEqualTo(1L);
         manager.close();
     }
 

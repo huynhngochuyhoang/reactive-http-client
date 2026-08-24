@@ -327,7 +327,6 @@ final class LocalResponseCacheManager implements AutoCloseable {
             return;
         }
 
-        long startedAtNanos = System.nanoTime();
         if (refresh.loadState != null) {
             refresh.loadState.markHiddenCacheRefresh();
         }
@@ -336,8 +335,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
             source = (Mono<Object>) loader.apply(refresh.loadState);
         }
         catch (Throwable ignored) {
-            recordRefresh(refresh.apiName, LocalResponseCacheMetrics.WorkOutcome.FAILURE,
-                    startedAtNanos);
+            recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.FAILURE);
             finishRefresh(refresh);
             return;
         }
@@ -346,7 +344,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
             cancelled = refresh.terminal;
         }
         if (cancelled) {
-            refresh.cache.finishRefresh(refresh.refreshToken);
+            recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.CANCELLATION);
             return;
         }
 
@@ -364,14 +362,13 @@ final class LocalResponseCacheManager implements AutoCloseable {
                     .takeUntilOther(shutdown.asMono())
                     .doFinally(signal -> {
                         LocalResponseCacheMetrics.WorkOutcome outcome = workOutcome(signal);
-                        recordRefresh(refresh.apiName, outcome, startedAtNanos);
+                        recordRefreshOnce(refresh, outcome);
                         finishRefresh(refresh);
                     })
                     .subscribe(ignored -> { }, ignored -> { }, () -> { }, Context.of(context));
         }
         catch (Throwable ignored) {
-            recordRefresh(refresh.apiName, LocalResponseCacheMetrics.WorkOutcome.FAILURE,
-                    startedAtNanos);
+            recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.FAILURE);
             finishRefresh(refresh);
             return;
         }
@@ -398,6 +395,17 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
     }
 
+    private void recordRefreshOnce(InFlightRefresh refresh,
+                                   LocalResponseCacheMetrics.WorkOutcome outcome) {
+        synchronized (inFlightRefreshes) {
+            if (refresh.outcomeRecorded) {
+                return;
+            }
+            refresh.outcomeRecorded = true;
+        }
+        recordRefresh(refresh.apiName, outcome, refresh.startedAtNanos);
+    }
+
     private void finishRefresh(InFlightRefresh refresh) {
         synchronized (inFlightRefreshes) {
             if (refresh.terminal) {
@@ -418,6 +426,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
             }
             refresh.terminal = true;
         }
+        recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.CANCELLATION);
         if (refresh.sourceSubscription != null) {
             refresh.sourceSubscription.dispose();
         }
@@ -549,9 +558,6 @@ final class LocalResponseCacheManager implements AutoCloseable {
             if (flight.diagnosticOwner == member) {
                 flight.freezeDiagnosticOwner(true);
                 flight.diagnosticOwner = null;
-                if (!flight.terminal && !flight.members.isEmpty()) {
-                    flight.assignDiagnosticOwner(flight.members.iterator().next());
-                }
             }
             if (!flight.terminal && flight.members.isEmpty()) {
                 flight.terminal = true;
@@ -571,6 +577,9 @@ final class LocalResponseCacheManager implements AutoCloseable {
     private void cacheOutcome(SubscriptionReportingState state,
                               String apiName,
                               HttpClientCacheOutcome outcome) {
+        if (state != null && outcome != HttpClientCacheOutcome.MISS_LOADER) {
+            state.markCacheServed();
+        }
         if (observabilityEnabled && state != null) {
             if (state.cacheOutcome(outcome)) {
                 metrics.caller(apiName, outcome);
@@ -802,8 +811,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
         private final LocalResponseCache.RefreshToken refreshToken;
         private final SubscriptionReportingState loadState;
         private final String apiName;
+        private final long startedAtNanos = System.nanoTime();
         private Disposable sourceSubscription;
         private boolean terminal;
+        private boolean outcomeRecorded;
 
         private InFlightRefresh(FlightKey key,
                                 LocalResponseCache cache,

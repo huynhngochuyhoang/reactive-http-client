@@ -67,6 +67,7 @@ final class MicrometerLocalResponseCacheMetrics extends LocalResponseCacheMetric
                 .tags(tags)
                 .register(registry));
         own(Gauge.builder(PREFIX + ".maximum.entries", () -> maximumSize)
+                .strongReference(true)
                 .tags(tags)
                 .register(registry));
         for (LocalResponseCache.RemovalReason reason : LocalResponseCache.RemovalReason.values()) {

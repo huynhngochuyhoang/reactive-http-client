@@ -10,6 +10,7 @@ import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
+import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -996,14 +997,21 @@ class BoundedLocalResponseCacheContractTest {
     }
 
     @Test
-    void retryAfterFirstCallerTimeoutUsesFlightStateAndCompletesTheWaiterState() throws Exception {
+    void retryAfterFirstCallerTimeoutKeepsTheWaiterTransportStateIsolated() throws Exception {
         VirtualTimeScheduler scheduler = VirtualTimeScheduler.getOrSet();
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
             context.getBeanFactory().registerSingleton("cacheObserver",
                     (io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver) observed::add);
             context.refresh();
-            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+            ReactiveHttpClientProperties.ObservabilityConfig observability =
+                    new ReactiveHttpClientProperties.ObservabilityConfig();
+            observability.getCache().setEnabled(true);
+            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(
+                    System::nanoTime,
+                    Schedulers.parallel(),
+                    LocalResponseCacheMetrics.enabled(new SimpleMeterRegistry(), "cache-client"),
+                    "cache-client");
             AtomicInteger dispatches = new AtomicInteger();
             Sinks.One<ClientResponse> firstAttempt = Sinks.one();
             Sinks.One<ClientResponse> retryAttempt = Sinks.one();
@@ -1022,9 +1030,9 @@ class BoundedLocalResponseCacheContractTest {
             longConfig.getResilience().setRetry("cache-retry");
             RetryOnceApplier retryApplier = new RetryOnceApplier();
             CacheClient firstCaller = cacheClient(
-                    webClient, shortConfig, context, manager, retryApplier, null);
+                    webClient, shortConfig, context, manager, retryApplier, null, observability);
             CacheClient waiter = cacheClient(
-                    webClient, longConfig, context, manager, retryApplier, null);
+                    webClient, longConfig, context, manager, retryApplier, null, observability);
 
             CompletableFuture<String> timedOut = firstCaller
                     .get("retry-after-timeout", "principal", "tenant", "en-US").toFuture();
@@ -1052,10 +1060,12 @@ class BoundedLocalResponseCacheContractTest {
                     .findFirst()
                     .orElseThrow();
             assertThat(timeoutEvent.getAttemptCount()).isEqualTo(1);
-            assertThat(waiterEvent.getAttemptCount()).isEqualTo(2);
-            assertThat(waiterEvent.getStatusCode()).isEqualTo(200);
+            assertThat(timeoutEvent.getCacheOutcome()).isEqualTo(HttpClientCacheOutcome.MISS_LOADER);
+            assertThat(waiterEvent.getCacheOutcome()).isEqualTo(HttpClientCacheOutcome.COALESCED_WAITER);
+            assertIsolatedCacheTerminal(waiterEvent);
             assertThat(retryApplier.applications).hasValue(1);
             assertThat(retryApplier.subscriptions).hasValue(1);
+            manager.close();
         } finally {
             VirtualTimeScheduler.reset();
         }
@@ -1436,6 +1446,18 @@ class BoundedLocalResponseCacheContractTest {
             LocalResponseCacheManager manager,
             ResilienceOperatorApplier resilienceOperatorApplier,
             io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider) {
+        return cacheClient(webClient, config, context, manager, resilienceOperatorApplier,
+                authProvider, new ReactiveHttpClientProperties.ObservabilityConfig());
+    }
+
+    private CacheClient cacheClient(
+            WebClient webClient,
+            ReactiveHttpClientProperties.ClientConfig config,
+            AnnotationConfigApplicationContext context,
+            LocalResponseCacheManager manager,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider,
+            ReactiveHttpClientProperties.ObservabilityConfig observability) {
         ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                 webClient,
                 new MethodMetadataCache(),
@@ -1447,7 +1469,7 @@ class BoundedLocalResponseCacheContractTest {
                 context,
                 resilienceOperatorApplier,
                 TestJsonCodecs.jsonCodec(),
-                new ReactiveHttpClientProperties.ObservabilityConfig(),
+                observability,
                 manager,
                 authProvider,
                 "http://cache.test");
@@ -1831,6 +1853,9 @@ class BoundedLocalResponseCacheContractTest {
         policy.setRefreshTimeoutMs(500L);
         AtomicInteger dispatches = new AtomicInteger();
         List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        SimpleMeterRegistry downstreamRegistry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig observability =
+                new ReactiveHttpClientProperties.ObservabilityConfig();
         List<HttpExchangeLogContext> exchangeLogs = new CopyOnWriteArrayList<>();
         List<ReactiveHttpClientLifecycleContext> lifecycleTerminals = new CopyOnWriteArrayList<>();
         WebClient webClient = WebClient.builder()
@@ -1855,6 +1880,8 @@ class BoundedLocalResponseCacheContractTest {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.getBeanFactory().registerSingleton("cacheObserver",
                     (io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver) observed::add);
+            context.getBeanFactory().registerSingleton("micrometerHttpClientObserver",
+                    new MicrometerHttpClientObserver(downstreamRegistry, observability));
             context.getBeanFactory().registerSingleton(
                     "cacheCompositionLogger", new CacheCompositionLogger(exchangeLogs));
             context.getBeanFactory().registerSingleton("cacheLifecycleHook", new ReactiveHttpClientLifecycleHook() {
@@ -1898,6 +1925,7 @@ class BoundedLocalResponseCacheContractTest {
             assertThat(lifecycleTerminals)
                     .extracting(ReactiveHttpClientLifecycleContext::cacheOutcome)
                     .containsOnlyNulls();
+            assertThat(downstreamRegistry.get(observability.getMetricName()).timer().count()).isEqualTo(1L);
         }
     }
 

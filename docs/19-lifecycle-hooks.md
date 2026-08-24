@@ -57,6 +57,11 @@ logical-call boundary and exposes the same meaning through
 durations come from one immutable monotonic terminal snapshot. Lifecycle
 contexts intentionally do not add a duration field.
 
+Cache-served hits and coalesced waiters are delivered to custom observers
+through the default `recordCacheServed(...)` callback. The default delegates to
+`record(...)`; the built-in Micrometer observer overrides it so callers without
+their own downstream dispatch do not alter request or health metrics.
+
 Hook failures are isolated. If a hook throws from `supports(...)` or a callback,
 the starter logs a warning and continues the client call and the remaining hooks.
 

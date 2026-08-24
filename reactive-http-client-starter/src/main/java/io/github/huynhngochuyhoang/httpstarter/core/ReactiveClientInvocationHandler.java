@@ -2059,7 +2059,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     terminal.attemptCount(),
                     requestBytes,
                     responseBytes,
-                    terminal.cacheOutcome());
+                    terminal.cacheOutcome(),
+                    terminal.cacheServed());
         }
     }
 
@@ -2136,11 +2137,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             int attemptCount,
             long requestBytes,
             long responseBytes,
-            io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome cacheOutcome) {
+            io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome cacheOutcome,
+            boolean cacheServed) {
         try {
             boolean logBody = observabilityConfig != null && observabilityConfig.isLogRequestBody();
             boolean logRespBody = observabilityConfig != null && observabilityConfig.isLogResponseBody();
-            observer.record(new HttpClientObserverEvent(
+            HttpClientObserverEvent event = new HttpClientObserverEvent(
                     clientName,
                     plan.apiName(),
                     httpMethod,
@@ -2159,7 +2161,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     requestUrl != null ? requestUrl.toString() : null,
                     finalRequestObservation != null ? finalRequestObservation.headers() : Map.of(),
                     cacheOutcome
-            ));
+            );
+            if (cacheServed) {
+                observer.recordCacheServed(event);
+            }
+            else {
+                observer.record(event);
+            }
         } catch (Exception e) {
             log.warn("HttpClientObserver threw an exception – ignoring: {}", e.getMessage());
         }

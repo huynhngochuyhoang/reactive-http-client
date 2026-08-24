@@ -168,6 +168,13 @@ and credentials are never tags. Every meter is owned by the client factory and
 removed on factory destruction; recreating the factory with identical tags binds
 gauges only to the replacement cache.
 
+Among cache-selected callers, only `MISS_LOADER` contributes to the ordinary
+`reactive.http.client.requests` timer. Fresh hits, stale hits, and coalesced
+waiters have no downstream dispatch of their own, so the built-in Micrometer
+observer excludes them from that timer even when cache outcome fields are
+disabled. Custom observers and OpenTelemetry still receive their logical caller
+terminal through `HttpClientObserver.recordCacheServed(...)`.
+
 ---
 
 ## Observability configuration
@@ -209,6 +216,8 @@ and `failure.stage` tags. Timer duration sum, maximum, percentiles, and
 histogram buckets do not affect health status.
 Cache hit ratio, refresh failures, evictions, and entry pressure are operational
 signals only; no `reactive.http.client.cache.*` meter changes health status.
+Cache-served callers also do not enter the main request timer, so cache traffic
+cannot dilute the downstream error-rate denominator.
 
 ```yaml
 reactive:

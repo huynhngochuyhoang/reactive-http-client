@@ -233,7 +233,13 @@ When no method selects caching, no cache meter is registered. Caller terminal
 records use only `FRESH_HIT`, `MISS_LOADER`, `COALESCED_WAITER`, or `STALE_HIT`.
 A hit, waiter, or stale return has zero transport attempts, no status, URL,
 server, failure stage, or wire-size evidence. The miss loader retains the final
-HTTP attempt facts.
+HTTP attempt facts. If that leader detaches while a waiter remains, the waiter
+does not become a synthetic transport owner and remains transport-empty.
+
+Only miss leaders enter the ordinary Micrometer downstream request timer.
+Fresh hits, stale hits, and coalesced waiters still reach lifecycle hooks,
+exchange logs, custom observers, and OpenTelemetry, but they cannot dilute the
+health indicator's downstream error-rate denominator.
 
 Hidden refresh does not create an OpenTelemetry span or lifecycle terminal
 record. Its success, failure, cancellation, and duration are represented by

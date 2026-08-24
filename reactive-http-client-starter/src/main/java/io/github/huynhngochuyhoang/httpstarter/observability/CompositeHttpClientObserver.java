@@ -21,9 +21,23 @@ public class CompositeHttpClientObserver implements HttpClientObserver {
 
     @Override
     public void record(HttpClientObserverEvent event) {
+        record(event, false);
+    }
+
+    @Override
+    public void recordCacheServed(HttpClientObserverEvent event) {
+        record(event, true);
+    }
+
+    private void record(HttpClientObserverEvent event, boolean cacheServed) {
         for (HttpClientObserver observer : observers) {
             try {
-                observer.record(event);
+                if (cacheServed) {
+                    observer.recordCacheServed(event);
+                }
+                else {
+                    observer.record(event);
+                }
             } catch (Exception e) {
                 log.warn("HttpClientObserver [{}] threw an exception - ignoring: {}",
                         observer.getClass().getName(), e.getMessage());
