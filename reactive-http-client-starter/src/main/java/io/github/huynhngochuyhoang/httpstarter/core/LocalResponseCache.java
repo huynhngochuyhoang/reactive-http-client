@@ -5,6 +5,16 @@ interface LocalResponseCache extends AutoCloseable {
 
     Lookup lookup(CacheKeyContract.OpaqueKey key);
 
+    RefreshToken beginRefresh(EntryToken entryToken);
+
+    boolean isRefreshCurrent(RefreshToken refreshToken);
+
+    long hardExpiryRemainingNanos(RefreshToken refreshToken);
+
+    void publishRefresh(RefreshToken refreshToken, Object value);
+
+    void finishRefresh(RefreshToken refreshToken);
+
     void publish(LoadToken token, Object value);
 
     void finish(LoadToken token);
@@ -14,14 +24,14 @@ interface LocalResponseCache extends AutoCloseable {
     @Override
     void close();
 
-    record Lookup(Object value, LoadToken loadToken) {
+    record Lookup(Object value, LoadToken loadToken, EntryToken entryToken, long ageNanos) {
 
-        static Lookup hit(Object value) {
-            return new Lookup(value, null);
+        static Lookup hit(Object value, EntryToken entryToken, long ageNanos) {
+            return new Lookup(value, null, entryToken, ageNanos);
         }
 
         static Lookup miss(LoadToken loadToken) {
-            return new Lookup(null, loadToken);
+            return new Lookup(null, loadToken, null, 0);
         }
 
         boolean hit() {
@@ -30,5 +40,11 @@ interface LocalResponseCache extends AutoCloseable {
     }
 
     interface LoadToken {
+    }
+
+    interface EntryToken {
+    }
+
+    interface RefreshToken {
     }
 }

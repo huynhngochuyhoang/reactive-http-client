@@ -39,6 +39,7 @@ final class EffectiveCachePolicy {
         }
         requireBound(context, "ttl-ms", policy.getTtlMs(), MAX_TTL_MS);
         requireBound(context, "maximum-size", policy.getMaximumSize(), MAXIMUM_SIZE);
+        validateRefreshBounds(context, policy);
 
         if (!"GET".equals(effectiveHttpMethod)) {
             throw invalid(context, "only GET methods are cache-eligible but the resolved HTTP method is "
@@ -115,6 +116,27 @@ final class EffectiveCachePolicy {
         }
         if (value > maximum) {
             throw invalid(context, property + " must be <= " + maximum + " but was " + value);
+        }
+    }
+
+    private static void validateRefreshBounds(
+            String context, ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        Long refreshAfterMs = policy.getRefreshAfterMs();
+        Long refreshTimeoutMs = policy.getRefreshTimeoutMs();
+        if (refreshAfterMs == null && refreshTimeoutMs == null) {
+            return;
+        }
+        if (refreshAfterMs == null) {
+            throw invalid(context, "refresh-after-ms is required when refresh-timeout-ms is configured");
+        }
+        if (refreshTimeoutMs == null) {
+            throw invalid(context, "refresh-timeout-ms is required when refresh-after-ms is configured");
+        }
+        requireBound(context, "refresh-after-ms", refreshAfterMs, MAX_TTL_MS);
+        requireBound(context, "refresh-timeout-ms", refreshTimeoutMs, MAX_TTL_MS);
+        if (refreshAfterMs >= policy.getTtlMs()) {
+            throw invalid(context, "refresh-after-ms must be strictly less than ttl-ms but was "
+                    + refreshAfterMs + " with ttl-ms " + policy.getTtlMs());
         }
     }
 

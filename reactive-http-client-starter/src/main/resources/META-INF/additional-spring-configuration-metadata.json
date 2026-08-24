@@ -443,6 +443,18 @@
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
     },
     {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].refresh-after-ms",
+      "type": "java.lang.Long",
+      "description": "Optional access-driven refresh threshold in milliseconds. When configured, it must be positive and strictly below ttl-ms, and refresh-timeout-ms is required.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].refresh-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "Required positive finite refresh deadline in milliseconds when refresh-after-ms is configured. The effective deadline is also capped by hard expiry and factory shutdown.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
+    },
+    {
       "name": "reactive.http.clients.[name].cache.policies.[policy-name].shared-response",
       "type": "java.lang.Boolean",
       "description": "Explicitly acknowledge that omitted caller, auth, header, and context variants may share one response. Explicitly selected dimensions still partition the response. Default: false.",

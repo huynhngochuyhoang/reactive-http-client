@@ -7,13 +7,17 @@ import org.springframework.util.ClassUtils;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.context.Context;
 import reactor.util.context.ContextView;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
@@ -40,18 +44,21 @@ final class LocalResponseCacheManager implements AutoCloseable {
 
     private final ClassLoader classLoader;
     private final LongSupplier ticker;
+    private final Scheduler refreshScheduler;
     private final Map<PolicyBounds, LocalResponseCache> caches = new LinkedHashMap<>();
     private final Map<FlightKey, InFlightLoad> inFlightLoads = new HashMap<>();
+    private final Map<FlightKey, InFlightRefresh> inFlightRefreshes = new HashMap<>();
     private final Sinks.Empty<Void> shutdown = Sinks.empty();
     private final AtomicBoolean closed = new AtomicBoolean();
 
-    private LocalResponseCacheManager(ClassLoader classLoader, LongSupplier ticker) {
+    private LocalResponseCacheManager(ClassLoader classLoader, LongSupplier ticker, Scheduler refreshScheduler) {
         this.classLoader = classLoader;
         this.ticker = ticker;
+        this.refreshScheduler = refreshScheduler;
     }
 
     static LocalResponseCacheManager lazy(ClassLoader classLoader) {
-        return new LocalResponseCacheManager(classLoader, System::nanoTime);
+        return new LocalResponseCacheManager(classLoader, System::nanoTime, Schedulers.parallel());
     }
 
     static LocalResponseCacheManager createForClient(
@@ -75,7 +82,12 @@ final class LocalResponseCacheManager implements AutoCloseable {
     }
 
     static LocalResponseCacheManager testing(LongSupplier ticker) {
-        return new LocalResponseCacheManager(LocalResponseCacheManager.class.getClassLoader(), ticker);
+        return new LocalResponseCacheManager(LocalResponseCacheManager.class.getClassLoader(), ticker, Schedulers.parallel());
+    }
+
+    static LocalResponseCacheManager testing(LongSupplier ticker, Scheduler refreshScheduler) {
+        return new LocalResponseCacheManager(
+                LocalResponseCacheManager.class.getClassLoader(), ticker, refreshScheduler);
     }
 
     Mono<?> getOrLoad(EffectiveCachePolicy.Selection selection,
@@ -101,17 +113,18 @@ final class LocalResponseCacheManager implements AutoCloseable {
             LocalResponseCache cache = cache(selection, "unknown");
             if (selection.policy().isSingleFlight()) {
                 return coalescedLoad(
-                        cache, key, loader, responseMetadata, callerState, proposedLoadState, context);
+                        selection, cache, key, loader, responseMetadata, callerState, proposedLoadState, context);
             }
             LocalResponseCache.Lookup lookup = cache.lookup(key);
             if (lookup.hit()) {
-                return Mono.just(lookup.value());
+                return cachedHit(selection, cache, key, lookup, loader, responseMetadata, proposedLoadState, context);
             }
             return load(cache, lookup.loadToken(), () -> loader.apply(null), responseMetadata);
         });
     }
 
-    private Mono<?> coalescedLoad(LocalResponseCache cache,
+    private Mono<?> coalescedLoad(EffectiveCachePolicy.Selection selection,
+                                  LocalResponseCache cache,
                                   CacheKeyContract.OpaqueKey key,
                                   Function<SubscriptionReportingState, Mono<?>> loader,
                                   Supplier<ResponseMetadata> responseMetadata,
@@ -119,37 +132,191 @@ final class LocalResponseCacheManager implements AutoCloseable {
                                   SubscriptionReportingState proposedLoadState,
                                   ContextView context) {
         FlightKey flightKey = new FlightKey(cache, key);
-        InFlightLoad flight;
-        FlightMember member;
-        boolean created;
+        InFlightLoad flight = null;
+        FlightMember member = null;
+        LocalResponseCache.Lookup cachedLookup = null;
+        boolean created = false;
         synchronized (inFlightLoads) {
             if (closed.get()) {
                 return Mono.error(new IllegalStateException("The local response cache has been closed"));
             }
             LocalResponseCache.Lookup lookup = cache.lookup(key);
             if (lookup.hit()) {
-                return Mono.just(lookup.value());
-            }
-
-            LocalResponseCache.LoadToken token = lookup.loadToken();
-            InFlightLoad existing = inFlightLoads.get(flightKey);
-            if (existing != null) {
-                cache.finish(token);
-                flight = existing;
-                created = false;
+                cachedLookup = lookup;
             }
             else {
-                flight = new InFlightLoad(flightKey, cache, token, proposedLoadState);
-                inFlightLoads.put(flightKey, flight);
-                created = true;
+                LocalResponseCache.LoadToken token = lookup.loadToken();
+                InFlightLoad existing = inFlightLoads.get(flightKey);
+                if (existing != null) {
+                    cache.finish(token);
+                    flight = existing;
+                }
+                else {
+                    flight = new InFlightLoad(flightKey, cache, token, proposedLoadState);
+                    inFlightLoads.put(flightKey, flight);
+                    created = true;
+                }
+                member = flight.reserve(callerState);
             }
-            member = flight.reserve(callerState);
         }
 
+        if (cachedLookup != null) {
+            return cachedHit(selection, cache, key, cachedLookup, loader, responseMetadata,
+                    proposedLoadState, context);
+        }
         if (created) {
             startFlight(flight, loader, responseMetadata, context);
         }
         return flight.publisher(member);
+    }
+
+    private Mono<?> cachedHit(EffectiveCachePolicy.Selection selection,
+                              LocalResponseCache cache,
+                              CacheKeyContract.OpaqueKey key,
+                              LocalResponseCache.Lookup lookup,
+                              Function<SubscriptionReportingState, Mono<?>> loader,
+                              Supplier<ResponseMetadata> responseMetadata,
+                              SubscriptionReportingState refreshState,
+                              ContextView context) {
+        ReactiveHttpClientProperties.CachePolicyConfig policy = selection.policy();
+        if (policy.isRefreshEnabled()
+                && lookup.ageNanos() >= TimeUnit.MILLISECONDS.toNanos(policy.getRefreshAfterMs())) {
+            triggerRefresh(cache, key, lookup, loader, responseMetadata, refreshState, context, policy);
+        }
+        return Mono.just(lookup.value());
+    }
+
+    private void triggerRefresh(LocalResponseCache cache,
+                                CacheKeyContract.OpaqueKey key,
+                                LocalResponseCache.Lookup lookup,
+                                Function<SubscriptionReportingState, Mono<?>> loader,
+                                Supplier<ResponseMetadata> responseMetadata,
+                                SubscriptionReportingState refreshState,
+                                ContextView context,
+                                ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        LocalResponseCache.RefreshToken token;
+        try {
+            token = cache.beginRefresh(lookup.entryToken());
+        }
+        catch (IllegalStateException ignored) {
+            return;
+        }
+        if (token == null) {
+            return;
+        }
+
+        FlightKey refreshKey = new FlightKey(cache, key);
+        InFlightRefresh refresh = new InFlightRefresh(refreshKey, cache, token, refreshState);
+        boolean rejected;
+        synchronized (inFlightRefreshes) {
+            rejected = closed.get() || inFlightRefreshes.containsKey(refreshKey);
+            if (!rejected) {
+                inFlightRefreshes.put(refreshKey, refresh);
+            }
+        }
+        if (rejected) {
+            cache.finishRefresh(token);
+            return;
+        }
+        if (!cache.isRefreshCurrent(token)) {
+            cancelRefresh(refreshKey);
+            return;
+        }
+        startRefresh(refresh, loader, responseMetadata, context, policy.getRefreshTimeoutMs());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void startRefresh(InFlightRefresh refresh,
+                              Function<SubscriptionReportingState, Mono<?>> loader,
+                              Supplier<ResponseMetadata> responseMetadata,
+                              ContextView context,
+                              long refreshTimeoutMs) {
+        long deadlineNanos = Math.min(
+                TimeUnit.MILLISECONDS.toNanos(refreshTimeoutMs),
+                refresh.cache.hardExpiryRemainingNanos(refresh.refreshToken));
+        if (deadlineNanos <= 0) {
+            cancelRefresh(refresh.key);
+            return;
+        }
+
+        Mono<Object> source;
+        try {
+            source = (Mono<Object>) loader.apply(refresh.loadState);
+        }
+        catch (Throwable ignored) {
+            finishRefresh(refresh);
+            return;
+        }
+        boolean cancelled;
+        synchronized (inFlightRefreshes) {
+            cancelled = refresh.terminal;
+        }
+        if (cancelled) {
+            refresh.cache.finishRefresh(refresh.refreshToken);
+            return;
+        }
+
+        Disposable subscription;
+        try {
+            subscription = source
+                    .doOnSuccess(value -> {
+                        if (value != null) {
+                            cacheCandidate(value, responseMetadata.get())
+                                    .ifPresent(candidate -> refresh.cache.publishRefresh(
+                                            refresh.refreshToken, candidate));
+                        }
+                    })
+                    .timeout(Duration.ofNanos(deadlineNanos), refreshScheduler)
+                    .takeUntilOther(shutdown.asMono())
+                    .doFinally(ignored -> finishRefresh(refresh))
+                    .subscribe(ignored -> { }, ignored -> { }, () -> { }, Context.of(context));
+        }
+        catch (Throwable ignored) {
+            finishRefresh(refresh);
+            return;
+        }
+
+        boolean dispose;
+        synchronized (inFlightRefreshes) {
+            dispose = refresh.terminal;
+            if (!dispose) {
+                refresh.sourceSubscription = subscription;
+            }
+        }
+        if (dispose) {
+            subscription.dispose();
+        }
+    }
+
+    private void finishRefresh(InFlightRefresh refresh) {
+        synchronized (inFlightRefreshes) {
+            if (refresh.terminal) {
+                return;
+            }
+            refresh.terminal = true;
+            inFlightRefreshes.remove(refresh.key, refresh);
+        }
+        refresh.cache.finishRefresh(refresh.refreshToken);
+    }
+
+    private void cancelRefresh(FlightKey key) {
+        InFlightRefresh refresh;
+        synchronized (inFlightRefreshes) {
+            refresh = inFlightRefreshes.remove(key);
+            if (refresh == null || refresh.terminal) {
+                return;
+            }
+            refresh.terminal = true;
+        }
+        if (refresh.sourceSubscription != null) {
+            refresh.sourceSubscription.dispose();
+        }
+        refresh.cache.finishRefresh(refresh.refreshToken);
+    }
+
+    private void cancelRefreshForRemoval(
+            LocalResponseCache cache, CacheKeyContract.OpaqueKey key) {
+        cancelRefresh(new FlightKey(cache, key));
     }
 
     private Mono<?> load(LocalResponseCache cache,
@@ -305,6 +472,12 @@ final class LocalResponseCacheManager implements AutoCloseable {
             });
             inFlightLoads.clear();
         }
+        List<InFlightRefresh> refreshes;
+        synchronized (inFlightRefreshes) {
+            refreshes = List.copyOf(inFlightRefreshes.values());
+            refreshes.forEach(refresh -> refresh.terminal = true);
+            inFlightRefreshes.clear();
+        }
         shutdown.tryEmitEmpty();
         for (InFlightLoad flight : flights) {
             if (!flight.sourceStarted) {
@@ -314,6 +487,12 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 flight.sourceSubscription.dispose();
             }
             flight.result.tryEmitEmpty();
+        }
+        for (InFlightRefresh refresh : refreshes) {
+            if (refresh.sourceSubscription != null) {
+                refresh.sourceSubscription.dispose();
+            }
+            refresh.cache.finishRefresh(refresh.refreshToken);
         }
         synchronized (caches) {
             caches.values().forEach(LocalResponseCache::close);
@@ -330,7 +509,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
             throw new IllegalStateException("Cache policy '" + selection.policyName() + "' for client '"
                     + clientName + "' has not passed startup validation");
         }
-        PolicyBounds bounds = new PolicyBounds(selection.policyName(), policy.getTtlMs(), policy.getMaximumSize());
+        PolicyBounds bounds = new PolicyBounds(
+                selection.policyName(), policy.getTtlMs(), policy.getMaximumSize(),
+                policy.getRefreshAfterMs() != null ? policy.getRefreshAfterMs() : 0,
+                policy.getRefreshTimeoutMs() != null ? policy.getRefreshTimeoutMs() : 0);
         synchronized (caches) {
             if (closed.get()) {
                 throw new IllegalStateException(
@@ -346,7 +528,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
                     + policyName + "', but optional dependency com.github.ben-manes.caffeine:caffeine is not available. "
                     + "Add Caffeine at runtime or disable response caching for this client.");
         }
-        return new CaffeineLocalResponseCache(bounds.ttlMs, bounds.maximumSize, ticker);
+        return new CaffeineLocalResponseCache(
+                bounds.ttlMs, bounds.maximumSize, ticker, this::cancelRefreshForRemoval);
     }
 
     private java.util.Optional<Object> cacheCandidate(Object value, ResponseMetadata responseMetadata) {
@@ -435,10 +618,30 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
     }
 
-    private record PolicyBounds(String policyName, long ttlMs, long maximumSize) {
+    private record PolicyBounds(
+            String policyName, long ttlMs, long maximumSize, long refreshAfterMs, long refreshTimeoutMs) {
     }
 
     private record FlightKey(LocalResponseCache cache, CacheKeyContract.OpaqueKey key) {
+    }
+
+    private static final class InFlightRefresh {
+        private final FlightKey key;
+        private final LocalResponseCache cache;
+        private final LocalResponseCache.RefreshToken refreshToken;
+        private final SubscriptionReportingState loadState;
+        private Disposable sourceSubscription;
+        private boolean terminal;
+
+        private InFlightRefresh(FlightKey key,
+                                LocalResponseCache cache,
+                                LocalResponseCache.RefreshToken refreshToken,
+                                SubscriptionReportingState loadState) {
+            this.key = key;
+            this.cache = cache;
+            this.refreshToken = refreshToken;
+            this.loadState = loadState;
+        }
     }
 
     private final class InFlightLoad {

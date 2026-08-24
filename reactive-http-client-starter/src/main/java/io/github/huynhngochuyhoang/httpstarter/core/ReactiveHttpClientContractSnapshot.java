@@ -182,7 +182,9 @@ public final class ReactiveHttpClientContractSnapshot {
                 + ",varyHeaders=" + variantNames(cache.varyByHeaders())
                 + ",varyContext=" + variantNames(cache.varyByContext())
                 + ",sharedResponse=" + cache.sharedResponse()
-                + ",singleFlight=" + cache.singleFlight();
+                + ",singleFlight=" + cache.singleFlight()
+                + ",refreshAfter=" + cache.refreshAfterMs() + "ms"
+                + ",refreshTimeout=" + cache.refreshTimeoutMs() + "ms";
     }
 
     private static String variantNames(List<String> names) {

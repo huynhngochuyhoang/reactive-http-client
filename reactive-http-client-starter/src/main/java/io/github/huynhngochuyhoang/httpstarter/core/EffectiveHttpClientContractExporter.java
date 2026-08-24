@@ -160,7 +160,9 @@ final class EffectiveHttpClientContractExporter {
                 variants.headerNames(),
                 variants.contextNames(),
                 variants.sharedResponse(),
-                policy != null && policy.isSingleFlight());
+                policy != null && policy.isSingleFlight(),
+                policy != null && policy.getRefreshAfterMs() != null ? policy.getRefreshAfterMs() : 0,
+                policy != null && policy.getRefreshTimeoutMs() != null ? policy.getRefreshTimeoutMs() : 0);
     }
 
     private static String authMode(ReactiveHttpClientProperties.ClientConfig clientConfig) {

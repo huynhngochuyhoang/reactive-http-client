@@ -3,8 +3,8 @@
 V27 introduces an explicit local response-cache contract in four phases. Phase
 one provides bounded process-local TTL storage after policy selection, startup
 eligibility, and key isolation have succeeded. Phase two adds separately opt-in
-request coalescing. Refresh and cache telemetry remain later, separately opt-in
-phases.
+request coalescing, and phase three adds separately opt-in refresh on access.
+Cache telemetry remains a later, separately opt-in phase.
 
 ## Explicit selection
 
@@ -24,6 +24,8 @@ reactive:
               ttl-ms: 60000
               maximum-size: 10000
               single-flight: true
+              refresh-after-ms: 30000
+              refresh-timeout-ms: 5000
               vary-by-headers: [Idempotency-Key]
 ```
 
@@ -57,6 +59,11 @@ policy must exist and must define:
 
 - `ttl-ms`: `1` through `31536000000` (365 days).
 - `maximum-size`: `1` through `1000000` entries.
+
+Refresh remains disabled when both refresh settings are absent. Selecting it requires
+`refresh-after-ms` to be positive and strictly below `ttl-ms`, plus a
+positive `refresh-timeout-ms` no greater than 365 days. Supplying only one
+refresh setting fails startup.
 
 Missing, zero, negative, or larger values fail startup and identify the
 concrete client, Java method, policy source, and `@ApiRef` key when applicable.
@@ -169,8 +176,35 @@ Success, failure, and empty completion are fanned out to current callers, then
 the in-flight state is removed. A later caller can load again after failure,
 empty completion, cancellation, or shutdown. Coordination is per cache and key;
 a slow or failed load does not execute under a global load lock or block another
-key. Cache refresh and cache-specific metrics remain disabled until their later
-V27 phases are implemented.
+key. Cache-specific metrics remain disabled until their later V27 phase is implemented.
+
+## Phase-three refresh on access
+
+Set both `refresh-after-ms` and `refresh-timeout-ms` on a selected policy to
+refresh an aging entry when it is accessed. Before `refresh-after-ms`, an access is
+a normal fresh hit. From that threshold until hard `ttl-ms` expiry, the access
+returns the current value and starts at most one hidden refresh for that cache key.
+Concurrent stale accesses keep receiving the current value and do not join or start
+another refresh. Miss single flight and refresh ownership use separate state.
+
+The triggering subscription supplies the already validated frozen arguments, key
+variants, Reactor context, and pre-lookup authorization result. The refresh bypasses
+only recursive cache lookup; its transport work uses the normal auth, Resilience4j,
+redirect, request/response timeout, body, and decoding pipeline. No scheduler invents
+a request or retains the invocation that originally populated the entry.
+
+Refresh success generation-checks and atomically replaces the exact triggering entry,
+then restarts its age. Failure is hidden from the stale caller and leaves the current
+value available only until its original hard expiry. Each refresh is cancelled at the
+earliest of `refresh-timeout-ms`, the entry hard-expiry deadline, or factory
+shutdown. Expiry, size eviction, replacement, and shutdown invalidate its publication
+token, so cancellation or a late signal cannot revive an old entry. A post-expiry
+caller follows the ordinary miss and optional miss-single-flight path.
+
+Refresh uses Reactor shared scheduling only for its finite timeout; the cache manager
+owns no scheduler or thread. Factory shutdown disposes active refresh subscriptions,
+clears refresh/cache state, and releases the captured key, context, auth, and invocation
+references.
 
 Cached application values are retained and returned by identity. The starter
 does not copy or serialize a decoded value solely for caching. Prefer immutable
@@ -407,5 +441,6 @@ Proxy startup, AOT processing, effective-contract export, diagnostics, and
 `MockReactiveHttpClient` use the same `MethodMetadataCache`-backed grammar.
 Replacement metadata caches remain authoritative. Contract snapshots expose a
 bounded `Cache` cell with source, TTL, maximum size, normalized variants,
-shared-response acknowledgement, and the single-flight decision. Policy names,
+shared-response acknowledgement, the single-flight decision, and bounded refresh
+threshold/timeout values. Policy names,
 raw values, and opaque key digests are not exported.

@@ -646,6 +646,60 @@ class BoundedLocalResponseCacheContractTest {
     }
 
     @Test
+    void refreshUsesThePreparedAuthAndResiliencePipelineWithoutDelayingTheStaleCaller() {
+        AtomicLong ticker = new AtomicLong();
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        config.setAuthProvider("cache-auth");
+        config.getResilience().setEnabled(true);
+        config.getResilience().setCircuitBreaker("catalog-cb");
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                config.getCache().getPolicies().get("local");
+        policy.setVaryByParameters(List.of("principal", "tenant"));
+        policy.setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        policy.setRefreshAfterMs(50L);
+        policy.setRefreshTimeoutMs(500L);
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+        RecordingCircuitBreakerApplier applier = new RecordingCircuitBreakerApplier();
+        io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider = request -> {
+            authCalls.incrementAndGet();
+            return Mono.just(AuthContext.builder().header("Authorization", "Bearer refresh-token").build());
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .filter(new OutboundAuthFilter("cache-client", authProvider))
+                .exchangeFunction(request -> {
+                    assertThat(request.headers().getFirst(HttpHeaders.AUTHORIZATION))
+                            .isEqualTo("Bearer refresh-token");
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                            .body("dispatch-" + dispatches.incrementAndGet())
+                            .build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get);
+            CacheClient client = cacheClient(webClient, config, context, manager, applier, authProvider);
+
+            assertThat(client.get("42", "principal", "tenant", "en-US").block())
+                    .isEqualTo("dispatch-1");
+            ticker.addAndGet(Duration.ofMillis(50).toNanos());
+            assertThat(client.get("42", "principal", "tenant", "en-US").block())
+                    .isEqualTo("dispatch-1");
+
+            assertThat(dispatches).hasValue(2);
+            assertThat(authCalls).hasValue(2);
+            assertThat(applier.applications).hasValue(2);
+            assertThat(applier.subscriptions).hasValue(2);
+            assertThat(client.get("42", "principal", "tenant", "en-US").block())
+                    .isEqualTo("dispatch-2");
+            manager.close();
+        }
+    }
+
+    @Test
     void configuredAuthRunsBeforeHitsAndIsReusedByTheMissFilter() {
         ReactiveHttpClientProperties.ClientConfig config = config();
         config.setAuthProvider("cache-auth");
@@ -1502,6 +1556,186 @@ class BoundedLocalResponseCacheContractTest {
         }
     }
 
+    @Test
+    void refreshOnAccessReturnsStaleAndStartsOnlyOneRefresh() {
+        AtomicLong ticker = new AtomicLong();
+        VirtualTimeScheduler scheduler = VirtualTimeScheduler.create();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get, scheduler);
+        EffectiveCachePolicy.Selection selection = refreshSelection("refresh", 1_000, 10, 100, 500);
+        CacheKeyContract.OpaqueKey key = key("refresh");
+        Sinks.One<String> refresh = Sinks.one();
+        AtomicInteger subscriptions = new AtomicInteger();
+        Mono<String> call = cached(manager, selection, key, () -> Mono.defer(() -> {
+            int subscription = subscriptions.incrementAndGet();
+            return subscription == 1 ? Mono.just("initial") : refresh.asMono();
+        }));
+
+        assertThat(call.block()).isEqualTo("initial");
+        ticker.addAndGet(Duration.ofMillis(100).toNanos());
+
+        assertThat(call.block()).isEqualTo("initial");
+        assertThat(call.block()).isEqualTo("initial");
+        assertThat(subscriptions).hasValue(2);
+
+        refresh.tryEmitValue("refreshed").orThrow();
+        assertThat(call.block()).isEqualTo("refreshed");
+        assertThat(subscriptions).hasValue(2);
+        manager.close();
+        scheduler.dispose();
+    }
+
+    @Test
+    void refreshFailurePreservesTheValueOnlyUntilHardExpiry() {
+        AtomicLong ticker = new AtomicLong();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get);
+        EffectiveCachePolicy.Selection selection = refreshSelection("failure", 200, 10, 50, 100);
+        AtomicInteger subscriptions = new AtomicInteger();
+        Mono<String> call = cached(manager, selection, key("failure"), () -> Mono.defer(() -> {
+            int subscription = subscriptions.incrementAndGet();
+            if (subscription == 1) {
+                return Mono.just("initial");
+            }
+            if (subscription == 2) {
+                return Mono.error(new IllegalStateException("refresh failed"));
+            }
+            return Mono.just("after-expiry");
+        }));
+
+        assertThat(call.block()).isEqualTo("initial");
+        ticker.addAndGet(Duration.ofMillis(50).toNanos());
+        assertThat(call.block()).isEqualTo("initial");
+        assertThat(subscriptions).hasValue(2);
+
+        ticker.addAndGet(Duration.ofMillis(150).toNanos());
+        assertThat(call.block()).isEqualTo("after-expiry");
+        assertThat(subscriptions).hasValue(3);
+        manager.close();
+    }
+
+    @Test
+    void refreshTimeoutAndHardExpiryCancelWorkAndRejectLateResults() {
+        AtomicLong ticker = new AtomicLong();
+        VirtualTimeScheduler scheduler = VirtualTimeScheduler.create();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get, scheduler);
+        EffectiveCachePolicy.Selection selection = refreshSelection("deadline", 200, 10, 50, 75);
+        Sinks.One<String> firstRefresh = Sinks.one();
+        Sinks.One<String> secondRefresh = Sinks.one();
+        AtomicInteger subscriptions = new AtomicInteger();
+        AtomicInteger cancellations = new AtomicInteger();
+        Mono<String> call = cached(manager, selection, key("deadline"), () -> Mono.defer(() -> {
+            int subscription = subscriptions.incrementAndGet();
+            if (subscription == 1) {
+                return Mono.just("initial");
+            }
+            if (subscription == 4) {
+                return Mono.just("after-expiry");
+            }
+            return (subscription == 2 ? firstRefresh : secondRefresh).asMono()
+                    .doOnCancel(cancellations::incrementAndGet);
+        }));
+
+        assertThat(call.block()).isEqualTo("initial");
+        ticker.addAndGet(Duration.ofMillis(50).toNanos());
+        assertThat(call.block()).isEqualTo("initial");
+        scheduler.advanceTimeBy(Duration.ofMillis(75));
+        assertThat(cancellations).hasValue(1);
+
+        assertThat(call.block()).isEqualTo("initial");
+        assertThat(subscriptions).hasValue(3);
+        ticker.addAndGet(Duration.ofMillis(150).toNanos());
+        assertThat(call.block()).isEqualTo("after-expiry");
+        assertThat(cancellations).hasValue(2);
+        secondRefresh.tryEmitValue("late-refresh");
+        assertThat(call.block()).isEqualTo("after-expiry");
+
+        manager.close();
+        scheduler.dispose();
+    }
+
+    @Test
+    void evictionCancelsRefreshAndRefreshUsesTheTriggeringContext() {
+        AtomicLong ticker = new AtomicLong();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get);
+        EffectiveCachePolicy.Selection selection = refreshSelection("eviction-refresh", 1_000, 1, 50, 500);
+        Sinks.One<String> refresh = Sinks.one();
+        AtomicReference<String> refreshTenant = new AtomicReference<>();
+        AtomicInteger cancellations = new AtomicInteger();
+        AtomicInteger subscriptions = new AtomicInteger();
+        Mono<String> firstKey = cached(manager, selection, key("one"), () -> Mono.deferContextual(context -> {
+            int subscription = subscriptions.incrementAndGet();
+            if (subscription == 1) {
+                return Mono.just("one");
+            }
+            refreshTenant.set(context.get("tenant"));
+            return refresh.asMono().doOnCancel(cancellations::incrementAndGet);
+        }));
+
+        assertThat(firstKey.contextWrite(context -> context.put("tenant", "initial")).block()).isEqualTo("one");
+        ticker.addAndGet(Duration.ofMillis(50).toNanos());
+        assertThat(firstKey.contextWrite(context -> context.put("tenant", "live-trigger")).block()).isEqualTo("one");
+        assertThat(refreshTenant).hasValue("live-trigger");
+
+        assertThat(cached(manager, selection, key("two"), () -> Mono.just("two")).block()).isEqualTo("two");
+        assertThat(cancellations).hasValue(1);
+        refresh.tryEmitValue("late");
+        assertThat(cached(manager, selection, key("two"), () -> Mono.just("unexpected")).block())
+                .isEqualTo("two");
+        manager.close();
+    }
+
+    @Test
+    void hardExpiryDeadlineCancelsRefreshWithoutAnotherCacheAccess() {
+        VirtualTimeScheduler scheduler = VirtualTimeScheduler.create();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(
+                () -> scheduler.now(TimeUnit.NANOSECONDS), scheduler);
+        EffectiveCachePolicy.Selection selection = refreshSelection("hard-deadline", 200, 10, 50, 500);
+        AtomicInteger subscriptions = new AtomicInteger();
+        AtomicInteger cancellations = new AtomicInteger();
+        Mono<String> call = cached(manager, selection, key("hard-deadline"), () -> Mono.defer(() -> {
+            if (subscriptions.incrementAndGet() == 1) {
+                return Mono.just("initial");
+            }
+            return Mono.<String>never().doOnCancel(cancellations::incrementAndGet);
+        }));
+
+        assertThat(call.block()).isEqualTo("initial");
+        scheduler.advanceTimeBy(Duration.ofMillis(50));
+        assertThat(call.block()).isEqualTo("initial");
+        scheduler.advanceTimeBy(Duration.ofMillis(149));
+        assertThat(cancellations).hasValue(0);
+        scheduler.advanceTimeBy(Duration.ofMillis(1));
+        assertThat(cancellations).hasValue(1);
+
+        manager.close();
+        scheduler.dispose();
+    }
+
+    @Test
+    void factoryShutdownCancelsAnActiveRefreshAndClearsOwnedState() {
+        AtomicLong ticker = new AtomicLong();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get);
+        EffectiveCachePolicy.Selection selection = refreshSelection("shutdown-refresh", 1_000, 10, 50, 500);
+        AtomicInteger subscriptions = new AtomicInteger();
+        AtomicInteger cancellations = new AtomicInteger();
+        Mono<String> call = cached(manager, selection, key("shutdown-refresh"), () -> Mono.defer(() -> {
+            if (subscriptions.incrementAndGet() == 1) {
+                return Mono.just("initial");
+            }
+            return Mono.<String>never().doOnCancel(cancellations::incrementAndGet);
+        }));
+
+        assertThat(call.block()).isEqualTo("initial");
+        ticker.addAndGet(Duration.ofMillis(50).toNanos());
+        assertThat(call.block()).isEqualTo("initial");
+        assertThat(subscriptions).hasValue(2);
+
+        manager.close();
+
+        assertThat(cancellations).hasValue(1);
+        assertThat(manager.snapshot()).isEqualTo(
+                new LocalResponseCacheManager.Snapshot(0, 0, 0, true));
+    }
+
     private static String load(LocalResponseCacheManager manager,
                                EffectiveCachePolicy.Selection selection,
                                CacheKeyContract.OpaqueKey key,
@@ -1539,6 +1773,16 @@ class BoundedLocalResponseCacheContractTest {
         policy.setTtlMs(ttlMs);
         policy.setMaximumSize(maximumSize);
         policy.setSingleFlight(singleFlight);
+        return new EffectiveCachePolicy.Selection(true, EffectiveCachePolicy.Source.CLIENT, name, policy);
+    }
+
+    private static EffectiveCachePolicy.Selection refreshSelection(
+            String name, long ttlMs, long maximumSize, long refreshAfterMs, long refreshTimeoutMs) {
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(ttlMs);
+        policy.setMaximumSize(maximumSize);
+        policy.setRefreshAfterMs(refreshAfterMs);
+        policy.setRefreshTimeoutMs(refreshTimeoutMs);
         return new EffectiveCachePolicy.Selection(true, EffectiveCachePolicy.Source.CLIENT, name, policy);
     }
 
