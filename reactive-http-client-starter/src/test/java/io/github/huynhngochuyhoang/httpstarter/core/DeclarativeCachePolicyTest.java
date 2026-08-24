@@ -49,15 +49,15 @@ class DeclarativeCachePolicyTest {
         assertThat(policies.get("inherited")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         true, "client", 1_000L, 100L,
-                        List.of(), List.of("idempotency-key"), List.of(), false, false));
+                        List.of(), List.of("idempotency-key"), List.of(), false, false, 0, 0));
         assertThat(policies.get("overridden")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         true, "method", 2_000L, 200L,
-                        List.of(), List.of("idempotency-key"), List.of(), false, false));
+                        List.of(), List.of("idempotency-key"), List.of(), false, false, 0, 0));
         assertThat(policies.get("excluded")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         false, "method-disabled", 0L, 0L,
-                        List.of(), List.of(), List.of(), false, false));
+                        List.of(), List.of(), List.of(), false, false, 0, 0));
     }
 
     @Test
@@ -69,6 +69,8 @@ class DeclarativeCachePolicyTest {
         policy.setVaryByContext(List.of(" region ", "locale"));
         policy.setSharedResponse(true);
         policy.setSingleFlight(true);
+        policy.setRefreshAfterMs(400L);
+        policy.setRefreshTimeoutMs(250L);
         config.setDefaultHeaders(Map.of("X-Tenant", "public"));
 
         EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
@@ -76,7 +78,7 @@ class DeclarativeCachePolicyTest {
 
         assertThat(contract.cache()).isEqualTo(new EffectiveHttpClientContract.CachePolicy(
                 true, "client", 1_000L, 100L,
-                List.of("tenant"), List.of("x-tenant"), List.of("locale", "region"), true, true));
+                List.of("tenant"), List.of("x-tenant"), List.of("locale", "region"), true, true, 400, 250));
     }
 
     @Test
@@ -227,6 +229,14 @@ class DeclarativeCachePolicyTest {
                 .hasMessageContaining("cachePolicy='selected'")
                 .hasMessageContaining("method=")
                 .hasMessageContaining(reason);
+    }
+
+    private void assertInvalidRefresh(Long refreshAfterMs, Long refreshTimeoutMs, String reason) {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy(1_000L, 100L);
+        ReactiveHttpClientProperties.CachePolicyConfig policy = config.getCache().getPolicies().get("selected");
+        policy.setRefreshAfterMs(refreshAfterMs);
+        policy.setRefreshTimeoutMs(refreshTimeoutMs);
+        assertInvalidBounds(config, reason);
     }
 
     private void assertRejected(Class<?> client,

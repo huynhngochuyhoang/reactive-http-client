@@ -363,6 +363,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (cacheSelection.enabled()) {
             requireCacheAuthorizationSupport();
             boolean singleFlight = cacheSelection.policy().isSingleFlight();
+            boolean refreshOnAccess = cacheSelection.policy().isRefreshEnabled();
             Object[] invocationArguments = args != null ? args.clone() : new Object[0];
             Mono<?> cacheInvocation = Mono.deferContextual(context -> {
                 Object[] frozenArguments = CacheKeyContract.freezeArguments(
@@ -397,13 +398,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                                                 keyResolved, preparedRequestBody,
                                                                 new AtomicReference<>(authContext), responseMetadata,
                                                                 loadState);
-                                                if (singleFlight) {
+                                                if (singleFlight || refreshOnAccess) {
                                                     return responseCacheManager.getOrLoad(
                                                             cacheSelection,
                                                             preparedKey.key(),
                                                             loader,
                                                             responseMetadata::get,
-                                                            subscriptionState(context),
+                                                            singleFlight ? subscriptionState(context) : null,
                                                             new SubscriptionReportingState(keyResolved));
                                                 }
                                                 return responseCacheManager.getOrLoad(

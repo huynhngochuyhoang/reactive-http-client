@@ -40,6 +40,8 @@ record EffectiveHttpClientContract(
                        List<String> varyByHeaders,
                        List<String> varyByContext,
                        boolean sharedResponse,
-                       boolean singleFlight) {
+                       boolean singleFlight,
+                       long refreshAfterMs,
+                       long refreshTimeoutMs) {
     }
 }

@@ -282,11 +282,15 @@ class ReactiveHttpClientPropertiesTest {
         yaml.put("reactive.http.clients.users.cache.policies.local.ttl-ms", 1_000);
         yaml.put("reactive.http.clients.users.cache.policies.local.maximum-size", 100);
         yaml.put("reactive.http.clients.users.cache.policies.local.single-flight", true);
+        yaml.put("reactive.http.clients.users.cache.policies.local.refresh-after-ms", 500);
+        yaml.put("reactive.http.clients.users.cache.policies.local.refresh-timeout-ms", 250);
 
         ReactiveHttpClientProperties.CachePolicyConfig policy = bind(yaml)
                 .getClients().get("users").getCache().getPolicies().get("local");
 
         assertTrue(policy.isSingleFlight());
+        assertEquals(500L, policy.getRefreshAfterMs());
+        assertEquals(250L, policy.getRefreshTimeoutMs());
     }
 
     @Test

@@ -663,45 +663,71 @@ Evidence recorded on 2026-08-23 and revalidated on 2026-08-24:
 
 ## Priority 8 - Phase Three: Refresh on Access
 
-### [ ] 8.1 Add a bounded refresh state machine
+### [x] 8.1 Add a bounded refresh state machine
 
-- [ ] Keep refresh disabled unless explicitly selected for a cache policy.
-- [ ] Require positive `refresh-after` strictly below the hard TTL.
-- [ ] Require a positive finite refresh timeout and cap each refresh at the
+- [x] Keep refresh disabled unless explicitly selected for a cache policy.
+- [x] Require positive `refresh-after` strictly below the hard TTL.
+- [x] Require a positive finite refresh timeout and cap each refresh at the
       earliest of that deadline, hard expiry, and factory shutdown.
-- [ ] Return the current value after refresh-after and trigger at most one
+- [x] Return the current value after refresh-after and trigger at most one
       access-driven refresh for that key.
-- [ ] Keep concurrent stale callers on the current value without starting
+- [x] Keep concurrent stale callers on the current value without starting
       duplicate refresh loads.
-- [ ] Separate miss single-flight and refresh single-flight transitions.
+- [x] Separate miss single-flight and refresh single-flight transitions.
 
-### [ ] 8.2 Preserve hard expiry and live invocation context
+### [x] 8.2 Preserve hard expiry and live invocation context
 
-- [ ] Use the live triggering invocation's validated key/variant context rather
+- [x] Use the live triggering invocation's validated key/variant context rather
       than retaining arbitrary argument graphs or scheduling invented requests.
-- [ ] Run refresh through the same pre-lookup gates, auth, selected resilience
+- [x] Run refresh through the same pre-lookup gates, auth, selected resilience
       operators, redirects, request/response timeouts, and transport pipeline as
       a miss while bypassing recursive cache lookup.
-- [ ] Atomically replace on refresh success and restart entry age.
-- [ ] Preserve the current value on refresh failure only until hard TTL.
-- [ ] Never serve stale after hard expiry; a later caller follows normal miss
+- [x] Atomically replace on refresh success and restart entry age.
+- [x] Preserve the current value on refresh failure only until hard TTL.
+- [x] Never serve stale after hard expiry; a later caller follows normal miss
       and single-flight behavior.
-- [ ] Cancel a refresh at hard expiry and prevent its late result from
+- [x] Cancel a refresh at hard expiry and prevent its late result from
       repopulating the cache.
-- [ ] Use a non-terminating refresh fixture to prove deadline cancellation and
+- [x] Use a non-terminating refresh fixture to prove deadline cancellation and
       release of invocation/auth/key state after the stale caller completes.
-- [ ] Cover refresh failure, cancellation, late completion, hard-expiry race,
+- [x] Cover refresh failure, cancellation, late completion, hard-expiry race,
       and eviction during refresh deterministically.
 
-### [ ] 8.3 Own refresh shutdown and resources
+### [x] 8.3 Own refresh shutdown and resources
 
-- [ ] Cancel or await cache-owned refresh work under the factory's existing
+- [x] Cancel or await cache-owned refresh work under the factory's existing
       aggregate shutdown deadline.
-- [ ] Prevent late refresh completion from repopulating a closed or evicted
+- [x] Prevent late refresh completion from repopulating a closed or evicted
       cache.
-- [ ] Release values, key snapshots, invocation context, and in-flight state on
+- [x] Release values, key snapshots, invocation context, and in-flight state on
       shutdown.
-- [ ] Prove no cache scheduler/thread/resource survives factory destruction.
+- [x] Prove no cache scheduler/thread/resource survives factory destruction.
+
+Evidence recorded on 2026-08-24:
+
+- `refresh-after-ms` and `refresh-timeout-ms` are nullable policy fields, so
+  refresh remains off unless both are selected. Startup requires positive bounded
+  values and a refresh threshold strictly below hard TTL; generated metadata and
+  effective-contract snapshots expose the normalized decision.
+- Caffeine entries retain monotonic write age and issue opaque generation-bound
+  refresh tokens. One manager-owned refresh map per cache/key is independent from
+  miss single flight. Stale callers return the current object immediately while one
+  hidden load reuses the triggering frozen arguments, Reactor context, prepared auth,
+  resilience, redirect, timeout, transport, response-header, and decode path without
+  recursively entering cache lookup.
+- Refresh success replaces only the exact current generation and restarts age. Failure
+  leaves the old value only to hard TTL. The effective timeout is the earlier of the
+  configured refresh deadline and remaining hard TTL; Caffeine removal callbacks,
+  factory shutdown, and Reactor timeout cancel work, while generation checks reject
+  late completion after expiry, size eviction, replacement, or closure. The manager
+  uses Reactor shared scheduling and owns no scheduler or thread.
+- `BoundedLocalResponseCacheContractTest` uses a monotonic test ticker, Reactor
+  virtual time, controllable sinks, and a declarative auth/resilience fixture to prove
+  fresh versus stale access, one concurrent refresh, success, failure, timeout, hard
+  expiry, late completion, size eviction, live triggering context, pipeline reuse, and
+  factory shutdown. The focused cache suite passes `38` tests. The complete
+  reactor passes starter `1179`, test-helper `55`, and OTel `52` tests with
+  zero failures, errors, or skips.
 
 ---
 

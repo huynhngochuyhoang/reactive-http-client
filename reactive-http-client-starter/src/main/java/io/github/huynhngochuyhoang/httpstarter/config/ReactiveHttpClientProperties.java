@@ -788,6 +788,10 @@ public class ReactiveHttpClientProperties {
         private boolean sharedResponse;
         /** Coalesce concurrent same-key misses into one shared load. Default: false. */
         private boolean singleFlight;
+        /** Start access-driven refresh after this age in milliseconds. Null keeps refresh disabled. */
+        private Long refreshAfterMs;
+        /** Maximum refresh duration in milliseconds. Required when refresh is selected. */
+        private Long refreshTimeoutMs;
 
         public Long getTtlMs() { return ttlMs; }
         public void setTtlMs(Long ttlMs) { this.ttlMs = ttlMs; }
@@ -815,6 +819,14 @@ public class ReactiveHttpClientProperties {
 
         public boolean isSingleFlight() { return singleFlight; }
         public void setSingleFlight(boolean singleFlight) { this.singleFlight = singleFlight; }
+
+        public Long getRefreshAfterMs() { return refreshAfterMs; }
+        public void setRefreshAfterMs(Long refreshAfterMs) { this.refreshAfterMs = refreshAfterMs; }
+
+        public Long getRefreshTimeoutMs() { return refreshTimeoutMs; }
+        public void setRefreshTimeoutMs(Long refreshTimeoutMs) { this.refreshTimeoutMs = refreshTimeoutMs; }
+
+        public boolean isRefreshEnabled() { return refreshAfterMs != null || refreshTimeoutMs != null; }
     }
 
     // ---- resilience sub-config ----

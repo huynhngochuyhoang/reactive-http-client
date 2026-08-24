@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Bounded refresh on access.** Cache policies can now opt into refresh with
+  `refresh-after-ms` and a mandatory finite `refresh-timeout-ms`. Stale
+  accesses return the current value while one generation-bound hidden refresh
+  reuses the triggering invocation context and normal auth, resilience, redirect,
+  timeout, transport, and decode pipeline. Success restarts entry age; failure
+  preserves the value only to hard TTL; timeout, expiry, eviction, and factory
+  shutdown cancel owned work and reject late publication.
 - **Opt-in response-cache request coalescing.** Cache policies can now enable
   `single-flight` to share one same-key miss load while preserving each caller's
   logical timeout, cancellation, and terminal record. Retry, one-time auth
@@ -30,8 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   status and headers.
   Hard monotonic TTL, maximum-size eviction, generation-checked duplicate
   publication, bounded `ResponseEntity` headers, mutable-value identity, and
-  factory cleanup are covered without enabling single flight by default,
-  refresh, or cache telemetry.
+  factory cleanup are covered without enabling single flight, refresh, or cache
+  telemetry by default.
 - **Cache key, variant, and isolation contract.** Added named `@CacheKey`
   parameter partitions, explicit header/context variants, authenticated/shared
   response acknowledgement, canonical typed structural encoding, digest-only
