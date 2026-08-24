@@ -1,9 +1,10 @@
 # Response Caching
 
 V27 introduces an explicit local response-cache contract in four phases. Phase
-one now provides bounded process-local TTL storage after policy selection,
-startup eligibility, and key isolation have succeeded. Request coalescing,
-refresh, and cache telemetry remain later, separately opt-in phases.
+one provides bounded process-local TTL storage after policy selection, startup
+eligibility, and key isolation have succeeded. Phase two adds separately opt-in
+request coalescing. Refresh and cache telemetry remain later, separately opt-in
+phases.
 
 ## Explicit selection
 
@@ -22,6 +23,7 @@ reactive:
             catalog-read:
               ttl-ms: 60000
               maximum-size: 10000
+              single-flight: true
               vary-by-headers: [Idempotency-Key]
 ```
 
@@ -131,6 +133,44 @@ generation fills the cache; later duplicate completions still return their own
 value to their caller but cannot replace the winner, restart its TTL, or
 repopulate after expiry, eviction, or shutdown. Publication forces Caffeine to
 process expiry before rechecking the load token's generation.
+
+## Phase-two request coalescing
+
+Set `single-flight: true` on a selected policy to coalesce concurrent misses for
+the same opaque isolated key. The default is `false`; selecting caching does not
+silently enable coalescing. Keys from another method, policy, client, or request
+variant remain independent.
+
+Every caller still runs its mandatory key, context, and authorization gates.
+After those gates report the same miss key, one leader owns the downstream load
+and waiters share its final decoded signal. Resilience4j retry, one-time `401`
+auth invalidation/replay, redirects, request-body insertion, pool acquisition,
+and transport dispatch therefore occur only inside the leader load, not once per
+waiter. Cache recheck and waiter reservation are one atomic per-key transition:
+a caller delayed after an earlier miss observes a value filled in the meantime,
+and a reserved waiter keeps its flight alive before attaching to the result.
+Completed or abandoned flight publishers cannot reconnect and start an
+untracked second load.
+
+Logical-call deadlines remain subscription-local. A waiter timing out or being
+cancelled detaches only that caller while another interested caller keeps the
+load alive. The first caller's timeout likewise cannot truncate a later
+waiter's budget. Request/attempt timeouts remain inside the leader pipeline. If
+the final interested caller leaves, the leader is cancelled and its abandoned
+result cannot populate the cache.
+
+Transport attempts use a flight-owned reporting state rather than the first
+caller's terminal state. If that caller detaches, its attempt evidence is frozen
+and a surviving waiter becomes the diagnostic owner for later retries. A retry
+therefore cannot mutate an already-terminal caller, while the final attempt is
+still represented by one active caller's terminal record.
+
+Success, failure, and empty completion are fanned out to current callers, then
+the in-flight state is removed. A later caller can load again after failure,
+empty completion, cancellation, or shutdown. Coordination is per cache and key;
+a slow or failed load does not execute under a global load lock or block another
+key. Cache refresh and cache-specific metrics remain disabled until their later
+V27 phases are implemented.
 
 Cached application values are retained and returned by identity. The starter
 does not copy or serialize a decoded value solely for caching. Prefer immutable
@@ -275,8 +315,9 @@ metrics, logs, traces, diagnostics, health, or support bundles. Auth tokens,
 credentials, and cookies selected as variants therefore never become ordinary
 retained key text.
 
-Effective-contract snapshots include normalized cache isolation policy next to
-TTL and maximum size. Parameter and context names are trimmed and sorted;
+Effective-contract snapshots include normalized cache isolation policy and the
+`singleFlight` decision next to TTL and maximum size. Parameter and context
+names are trimmed and sorted;
 case-insensitive header names are trimmed, sorted, and rendered lowercase; and
 `shared-response` is explicit. Variant names use quoted, escaped list entries so
 punctuation cannot make different policies render identically. Approval diffs
@@ -365,5 +406,6 @@ it `INCOMPATIBLE`; classification is not a bypass mechanism.
 Proxy startup, AOT processing, effective-contract export, diagnostics, and
 `MockReactiveHttpClient` use the same `MethodMetadataCache`-backed grammar.
 Replacement metadata caches remain authoritative. Contract snapshots expose a
-bounded `Cache` cell with only source, TTL, and maximum size; policy names,
+bounded `Cache` cell with source, TTL, maximum size, normalized variants,
+shared-response acknowledgement, and the single-flight decision. Policy names,
 raw values, and opaque key digests are not exported.

@@ -450,6 +450,13 @@
       "defaultValue": false
     },
     {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].single-flight",
+      "type": "java.lang.Boolean",
+      "description": "Coalesce concurrent misses for the same isolated cache key into one shared load. Each caller retains its own timeout and cancellation. Default: false.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig",
+      "defaultValue": false
+    },
+    {
       "name": "reactive.http.clients.[name].cache.customizations",
       "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties.CacheCustomizationSafety>",
       "description": "Explicit cache-safety decisions keyed by applicable Boot WebClientCustomizer, ReactiveHttpClientCustomizer, or replacement WebClient.Builder bean name. Unknown and INCOMPATIBLE customizations reject selected caching.",

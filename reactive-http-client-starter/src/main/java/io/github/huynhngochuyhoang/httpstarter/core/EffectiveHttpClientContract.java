@@ -39,6 +39,7 @@ record EffectiveHttpClientContract(
                        List<String> varyByParameters,
                        List<String> varyByHeaders,
                        List<String> varyByContext,
-                       boolean sharedResponse) {
+                       boolean sharedResponse,
+                       boolean singleFlight) {
     }
 }

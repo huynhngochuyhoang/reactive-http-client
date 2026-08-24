@@ -49,15 +49,15 @@ class DeclarativeCachePolicyTest {
         assertThat(policies.get("inherited")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         true, "client", 1_000L, 100L,
-                        List.of(), List.of("idempotency-key"), List.of(), false));
+                        List.of(), List.of("idempotency-key"), List.of(), false, false));
         assertThat(policies.get("overridden")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         true, "method", 2_000L, 200L,
-                        List.of(), List.of("idempotency-key"), List.of(), false));
+                        List.of(), List.of("idempotency-key"), List.of(), false, false));
         assertThat(policies.get("excluded")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         false, "method-disabled", 0L, 0L,
-                        List.of(), List.of(), List.of(), false));
+                        List.of(), List.of(), List.of(), false, false));
     }
 
     @Test
@@ -68,6 +68,7 @@ class DeclarativeCachePolicyTest {
         policy.setVaryByHeaders(List.of(" X-Tenant "));
         policy.setVaryByContext(List.of(" region ", "locale"));
         policy.setSharedResponse(true);
+        policy.setSingleFlight(true);
         config.setDefaultHeaders(Map.of("X-Tenant", "public"));
 
         EffectiveHttpClientContract contract = EffectiveHttpClientContractExporter.export(
@@ -75,7 +76,7 @@ class DeclarativeCachePolicyTest {
 
         assertThat(contract.cache()).isEqualTo(new EffectiveHttpClientContract.CachePolicy(
                 true, "client", 1_000L, 100L,
-                List.of("tenant"), List.of("x-tenant"), List.of("locale", "region"), true));
+                List.of("tenant"), List.of("x-tenant"), List.of("locale", "region"), true, true));
     }
 
     @Test

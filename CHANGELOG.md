@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Opt-in response-cache request coalescing.** Cache policies can now enable
+  `single-flight` to share one same-key miss load while preserving each caller's
+  logical timeout, cancellation, and terminal record. Retry, one-time auth
+  replay, redirects, request-body insertion, and transport dispatch stay inside
+  a flight-owned leader state. Cache recheck and member reservation are atomic,
+  removed flights cannot reconnect, and failure, empty completion, final-caller
+  cancellation, and factory shutdown remove in-flight state without populating
+  abandoned results.
 - **Bounded local TTL response cache.** Added an optional Caffeine-backed,
   process-local cache for explicitly selected finite `GET` `Mono` contracts.
   Hits run key/variant and configured auth gates before bypassing resilience and
@@ -22,8 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   status and headers.
   Hard monotonic TTL, maximum-size eviction, generation-checked duplicate
   publication, bounded `ResponseEntity` headers, mutable-value identity, and
-  factory cleanup are covered without enabling single flight, refresh, or cache
-  telemetry.
+  factory cleanup are covered without enabling single flight by default,
+  refresh, or cache telemetry.
 - **Cache key, variant, and isolation contract.** Added named `@CacheKey`
   parameter partitions, explicit header/context variants, authenticated/shared
   response acknowledgement, canonical typed structural encoding, digest-only

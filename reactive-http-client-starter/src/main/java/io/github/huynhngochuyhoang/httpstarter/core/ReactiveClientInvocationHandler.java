@@ -362,6 +362,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 concreteClient, clientName, plan, clientConfig, effectiveApi.httpMethod());
         if (cacheSelection.enabled()) {
             requireCacheAuthorizationSupport();
+            boolean singleFlight = cacheSelection.policy().isSingleFlight();
             Object[] invocationArguments = args != null ? args.clone() : new Object[0];
             Mono<?> cacheInvocation = Mono.deferContextual(context -> {
                 Object[] frozenArguments = CacheKeyContract.freezeArguments(
@@ -370,6 +371,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         applyDefaultQueryParams(argumentResolver.resolve(plan, frozenArguments)));
                 RequestArgumentResolver.ResolvedArgs keyResolved = CacheKeyContract.snapshotRequestTarget(
                         applyCacheKeyIdempotencyKey(plan, frozenResolved, context));
+                if (singleFlight) {
+                    subscriptionState(context).prepareInitialResolved(keyResolved);
+                }
                 return prepareCacheSelectedBody(plan, keyResolved, cacheSelection.policy())
                         .flatMap(bodyPreparation -> {
                             CacheKeyContract.PreparedKey preparedKey = CacheKeyContract.derive(
@@ -386,30 +390,83 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                             Mono<?> authorizedLookup = prepareCacheLoadBody(keyResolved, bodyPreparation)
                                     .flatMap(preparedRequestBody -> authorizeCacheLookup(
                                                     plan, effectiveApi, keyResolved, preparedRequestBody)
-                                            .flatMap(authContext -> responseCacheManager.getOrLoad(
-                                                    cacheSelection,
-                                                    preparedKey.key(),
-                                                    () -> {
-                                                        Mono<?> source = (Mono<?>) invokeResolved(
+                                            .flatMap(authContext -> {
+                                                Function<SubscriptionReportingState, Mono<?>> loader = loadState ->
+                                                        (Mono<?>) invokeResolved(
                                                                 proxy, method, frozenArguments, meta, plan, effectiveApi,
                                                                 keyResolved, preparedRequestBody,
-                                                                new AtomicReference<>(authContext), responseMetadata);
-                                                        return source;
-                                                    },
-                                                    responseMetadata::get)));
+                                                                new AtomicReference<>(authContext), responseMetadata,
+                                                                loadState);
+                                                if (singleFlight) {
+                                                    return responseCacheManager.getOrLoad(
+                                                            cacheSelection,
+                                                            preparedKey.key(),
+                                                            loader,
+                                                            responseMetadata::get,
+                                                            subscriptionState(context),
+                                                            new SubscriptionReportingState(keyResolved));
+                                                }
+                                                return responseCacheManager.getOrLoad(
+                                                        cacheSelection,
+                                                        preparedKey.key(),
+                                                        () -> loader.apply(null),
+                                                        responseMetadata::get);
+                                            }));
                             return authorizedLookup.contextWrite(preparedKey::writeContext);
                         });
             });
+            if (singleFlight) {
+                return singleFlightCaller(
+                        cacheInvocation, proxy, method, meta, plan, effectiveApi, clientConfig.getLogicalCallTimeoutMs());
+            }
             return applyLogicalCallTimeoutMono(cacheInvocation, clientConfig.getLogicalCallTimeoutMs());
         }
 
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
                 applyDefaultQueryParams(argumentResolver.resolve(plan, args)));
-        return invokeResolved(proxy, method, args, meta, plan, effectiveApi, resolved, null, null, null);
+        return invokeResolved(proxy, method, args, meta, plan, effectiveApi, resolved, null, null, null, null);
     }
 
     LocalResponseCacheManager responseCacheManager() {
         return responseCacheManager;
+    }
+
+    private Mono<?> singleFlightCaller(Mono<?> cacheInvocation,
+                                       Object proxy,
+                                       Method method,
+                                       MethodMetadata meta,
+                                       RequestPlan plan,
+                                       EffectiveApi effectiveApi,
+                                       long logicalCallTimeoutMs) {
+        return Mono.defer(() -> {
+            SubscriptionReportingState state = new SubscriptionReportingState(
+                    new RequestArgumentResolver.ResolvedArgs(Map.of(), Map.of(), Map.of(), null));
+            Mono<?> caller = applyLogicalCallTimeoutMono(cacheInvocation, logicalCallTimeoutMs);
+            HttpExchangeLogger exchangeLogger = resolveExchangeLogger(proxy, method, meta);
+            HttpClientObserver observer = getObserver();
+            List<ReactiveHttpClientLifecycleHook> lifecycleHooks = getLifecycleHooks();
+            if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
+                Mono<?> reportedCaller = caller;
+                caller = Mono.deferContextual(context -> {
+                    Map<String, List<String>> inboundHeaders = context.hasKey(
+                            InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                            ? context.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                            : Map.of();
+                    return reportedCaller
+                            .doOnSuccess(body -> completeAndReportTerminal(
+                                    TerminalSignal.SUCCESS, body, null, lifecycleHooks, exchangeLogger, observer,
+                                    plan, effectiveApi, state, inboundHeaders))
+                            .doOnError(error -> completeAndReportTerminal(
+                                    TerminalSignal.ERROR, null, error, lifecycleHooks, exchangeLogger, observer,
+                                    plan, effectiveApi, state, inboundHeaders))
+                            .doOnCancel(() -> completeAndReportTerminal(
+                                    TerminalSignal.CANCEL, null,
+                                    new CancellationException("Request was cancelled"), lifecycleHooks,
+                                    exchangeLogger, observer, plan, effectiveApi, state, inboundHeaders));
+                });
+            }
+            return caller.contextWrite(context -> context.put(SUBSCRIPTION_STATE_CONTEXT_KEY, state));
+        });
     }
 
     private void validateCacheAuthorizationSupportAtConstruction() {
@@ -451,7 +508,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                   RequestArgumentResolver.ResolvedArgs resolved,
                                   SerializedRequestBody preparedSerializedRequestBody,
                                   AtomicReference<AuthContext> preResolvedAuthContext,
-                                  AtomicReference<LocalResponseCacheManager.ResponseMetadata> cacheResponseMetadata) {
+                                  AtomicReference<LocalResponseCacheManager.ResponseMetadata> cacheResponseMetadata,
+                                  SubscriptionReportingState sharedLoadState) {
+        boolean coalescedCacheLoad = sharedLoadState != null;
         String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         RequestBodyOwnership requestBodyOwnership = new RequestBodyOwnership(resolved.body());
 
@@ -534,8 +593,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 response -> buildMono(response, plan.responseType(), headRequest), cacheResponseMetadata))
                 .next();
         mono = applyResilienceMono(mono, plan, effectiveApi.httpMethod(), resolved);
-        mono = applyLogicalCallTimeoutMono(mono, logicalCallTimeoutMs);
-        if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
+        if (!coalescedCacheLoad) {
+            mono = applyLogicalCallTimeoutMono(mono, logicalCallTimeoutMs);
+        }
+        if (!coalescedCacheLoad && (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty())) {
             Mono<?> capturedMono = mono;
             mono = Mono.deferContextual(ctx -> {
                 AtomicReference<Map<String, List<String>>> inboundHeadersRef = new AtomicReference<>(
@@ -559,7 +620,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             });
         }
         mono = releaseRequestBodyOnTermination(mono, requestBodyOwnership);
-        return usesSubscriptionState ? mono.contextWrite(context -> withSubscriptionState(context, resolved)) : mono;
+        if (!usesSubscriptionState) {
+            return mono;
+        }
+        return mono.contextWrite(context -> sharedLoadState != null
+                ? context.put(SUBSCRIPTION_STATE_CONTEXT_KEY, sharedLoadState)
+                : withSubscriptionState(context, resolved));
     }
 
     // -------------------------------------------------------------------------

@@ -144,6 +144,7 @@ class ReactiveHttpClientContractSnapshotTest {
         policy.setVaryByHeaders(java.util.List.of(" X-Tenant "));
         policy.setVaryByContext(java.util.List.of(" region ", "locale"));
         policy.setSharedResponse(true);
+        policy.setSingleFlight(true);
         config.getCache().setPolicy("selected");
         config.getCache().getPolicies().put("selected", policy);
         config.setDefaultHeaders(Map.of("X-Tenant", "public"));
@@ -154,7 +155,7 @@ class ReactiveHttpClientContractSnapshotTest {
 
         assertThat(snapshot).contains(
                 "client:ttl=5000ms,max=25,varyParameters=[\"tenant\"],varyHeaders=[\"x-tenant\"],"
-                        + "varyContext=[\"locale\",\"region\"],sharedResponse=true");
+                        + "varyContext=[\"locale\",\"region\"],sharedResponse=true,singleFlight=true");
     }
 
     @Test

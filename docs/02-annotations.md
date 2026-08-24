@@ -550,5 +550,7 @@ Mono<CatalogState> liveState();
 ```
 
 Selected caching is restricted to `GET` methods returning a finite `Mono<T>` or
-`Mono<ResponseEntity<T>>`. See [Response Caching](32-response-caching.md) for
-the full eligibility, key isolation, and customization-safety contract.
+`Mono<ResponseEntity<T>>`. A selected policy may separately enable same-key
+request coalescing with `single-flight: true`; it remains disabled by default.
+See [Response Caching](32-response-caching.md) for the full eligibility, key
+isolation, coalescing, and customization-safety contract.

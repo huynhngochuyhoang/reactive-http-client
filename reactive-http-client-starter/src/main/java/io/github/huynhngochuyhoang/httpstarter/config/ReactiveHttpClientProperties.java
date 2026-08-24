@@ -786,6 +786,8 @@ public class ReactiveHttpClientProperties {
         private List<String> varyByContext = new ArrayList<>();
         /** Explicit acknowledgement that omitted caller/auth variants share one response. */
         private boolean sharedResponse;
+        /** Coalesce concurrent same-key misses into one shared load. Default: false. */
+        private boolean singleFlight;
 
         public Long getTtlMs() { return ttlMs; }
         public void setTtlMs(Long ttlMs) { this.ttlMs = ttlMs; }
@@ -810,6 +812,9 @@ public class ReactiveHttpClientProperties {
 
         public boolean isSharedResponse() { return sharedResponse; }
         public void setSharedResponse(boolean sharedResponse) { this.sharedResponse = sharedResponse; }
+
+        public boolean isSingleFlight() { return singleFlight; }
+        public void setSingleFlight(boolean singleFlight) { this.singleFlight = singleFlight; }
     }
 
     // ---- resilience sub-config ----
