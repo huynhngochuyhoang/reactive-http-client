@@ -39,6 +39,7 @@ record EffectiveHttpClientContract(
                        List<String> varyByParameters,
                        List<String> varyByHeaders,
                        List<String> varyByContext,
+                       List<String> nonCacheableResponseHeaders,
                        boolean sharedResponse,
                        boolean singleFlight,
                        long refreshAfterMs,

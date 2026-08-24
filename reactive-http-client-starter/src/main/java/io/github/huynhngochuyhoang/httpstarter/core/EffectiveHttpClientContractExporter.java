@@ -159,6 +159,7 @@ final class EffectiveHttpClientContractExporter {
                 variants.parameterNames(),
                 variants.headerNames(),
                 variants.contextNames(),
+                EffectiveCachePolicy.normalizedNonCacheableResponseHeaders(policy),
                 variants.sharedResponse(),
                 policy != null && policy.isSingleFlight(),
                 policy != null && policy.getRefreshAfterMs() != null ? policy.getRefreshAfterMs() : 0,

@@ -733,50 +733,74 @@ Evidence recorded on 2026-08-24:
 
 ## Priority 9 - Cache, Resilience, Auth, Redirect, and Timeout Composition
 
-### [ ] 9.1 Freeze operator boundaries
+### [x] 9.1 Freeze operator boundaries
 
-- [ ] Place lookup after mandatory cache-aware policy, authorization, tenant,
+- [x] Place lookup after mandatory cache-aware policy, authorization, tenant,
       and key-partition gates but before downstream resilience, redirect, pool,
       and transport work.
-- [ ] Reject caching for a client with any unclassified Boot/per-client
+- [x] Reject caching for a client with any unclassified Boot/per-client
       customizer or builder mutation; a hit cannot bypass dynamic request,
       authorization, tenant, exchange-function, filter, codec, connector, or
       response-transformation behavior.
-- [ ] Keep a miss leader behaviorally identical to an uncached invocation until
+- [x] Keep a miss leader behaviorally identical to an uncached invocation until
       its final successful decoded value is stored.
-- [ ] Make refresh bypass lookup only and reuse the miss auth/resilience/
+- [x] Make refresh bypass lookup only and reuse the miss auth/resilience/
       redirect/timeout/transport pipeline, with separate hidden-refresh terminal
       reporting.
-- [ ] Include lookup and each caller's coalesced wait in that caller's logical
+- [x] Include lookup and each caller's coalesced wait in that caller's logical
       timeout without placing any caller-specific outer deadline inside the
       shared load publisher.
-- [ ] Keep non-GET/unsafe methods ineligible regardless of idempotency keys.
-- [ ] Do not infer read invalidation from any write method.
+- [x] Keep non-GET/unsafe methods ineligible regardless of idempotency keys.
+- [x] Do not infer read invalidation from any write method.
 
-### [ ] 9.2 Preserve terminal-state isolation
+### [x] 9.2 Preserve terminal-state isolation
 
-- [ ] Prevent prior load/refresh URL, status, headers, error, failure stage,
+- [x] Prevent prior load/refresh URL, status, headers, error, failure stage,
       attempt count, body size, and dispatch facts from leaking into a hit.
-- [ ] Prevent leader terminal state from being shared as a waiter's
+- [x] Prevent leader terminal state from being shared as a waiter's
       subscription-local terminal state.
-- [ ] Keep generated idempotency keys, prepared headers, attempt cleanup, and
+- [x] Keep generated idempotency keys, prepared headers, attempt cleanup, and
       logical timing isolated per caller/load as applicable.
-- [ ] Cover hit, miss, waiter, timeout, cancellation, auth failure, open circuit,
+- [x] Cover hit, miss, waiter, timeout, cancellation, auth failure, open circuit,
       redirect, retry exhaustion, and refresh failure in one composition suite.
 
-### [ ] 9.3 Preserve envelope and object contracts
+### [x] 9.3 Preserve envelope and object contracts
 
-- [ ] Return cached `Mono<T>` values without re-decoding or re-serializing.
-- [ ] Preserve cached `ResponseEntity<T>` value and status while copying only a
+- [x] Return cached `Mono<T>` values without re-decoding or re-serializing.
+- [x] Preserve cached `ResponseEntity<T>` value and status while copying only a
       documented bounded allowlist of representation headers.
-- [ ] Treat `Set-Cookie`, auth challenges, `SensitiveHeaders`, and configured
+- [x] Treat `Set-Cookie`, auth challenges, `SensitiveHeaders`, and configured
       per-caller response headers as non-cacheable, and never replay
       non-allowlisted headers to later callers.
-- [ ] Verify load responses and cache hits document their header difference and
+- [x] Verify load responses and cache hits document their header difference and
       never expose the first caller's session/identity headers.
-- [ ] Prove mutable-value identity behavior and document caller responsibility.
-- [ ] Reject any later response shape that cannot retain deterministic ownership
+- [x] Prove mutable-value identity behavior and document caller responsibility.
+- [x] Reject any later response shape that cannot retain deterministic ownership
       and terminal semantics.
+
+
+Evidence recorded on 2026-08-24:
+
+- `BoundedLocalResponseCacheContractTest` now serves as the deterministic feature-
+  composition suite. Existing real-transport and controlled-publisher cases cover
+  coalesced miss/waiter ownership, both timeout directions, cancellation, redirects,
+  one-time auth replay, retries, and refresh; focused additions cover auth rejection,
+  open-circuit rejection, retry exhaustion, failed refresh, successful hits, and an
+  explicit write without inferred invalidation. Hits and pre-dispatch failures retain
+  zero attempts with no prior URL, status, request headers, response size, or failure
+  stage, while dispatched failures retain only their final attempt evidence.
+- Lookup remains after frozen key/context and mandatory pre-lookup auth gates but before
+  downstream resilience and transport. Miss leaders and refreshes reuse the normal load
+  pipeline; each coalesced caller owns its logical deadline and terminal state. The
+  existing startup inventory still rejects every applicable Boot/per-client builder
+  customization unless it is explicitly classified `SAFE`.
+- Cache policies now expose a bounded, case-insensitive
+  `non-cacheable-response-headers` list. Final wire metadata is checked for plain and
+  `ResponseEntity` responses; configured per-caller headers, `SensitiveHeaders`,
+  cookies, and auth challenges prevent storage. Cached envelopes preserve body identity
+  and status while retaining only the documented representation-header allowlist.
+- The focused cache/configuration/metadata/snapshot run passes `114` tests with zero
+  failures, errors, or skips.
 
 ---
 

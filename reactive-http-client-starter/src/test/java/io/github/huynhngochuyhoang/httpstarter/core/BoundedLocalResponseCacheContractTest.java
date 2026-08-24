@@ -9,6 +9,8 @@ import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutExcep
 import io.github.huynhngochuyhoang.httpstarter.filter.CorrelationIdWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.StaticApplicationContext;
@@ -429,6 +431,7 @@ class BoundedLocalResponseCacheContractTest {
     void responseEntitiesRetainOnlyRepresentationHeadersAndSensitiveResponsesAreNotStored() {
         LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
         EffectiveCachePolicy.Selection selection = selection("entity", 1_000, 10);
+        selection.policy().setNonCacheableResponseHeaders(List.of("x-caller-session"));
         AtomicInteger safeLoads = new AtomicInteger();
         ResponseEntity<String> source = ResponseEntity.status(203)
                 .header(HttpHeaders.CONTENT_TYPE, "application/json")
@@ -460,6 +463,24 @@ class BoundedLocalResponseCacheContractTest {
         sensitive.block();
         sensitive.block();
         assertThat(sensitiveLoads).hasValue(2);
+
+        for (String headerName : List.of(
+                HttpHeaders.AUTHORIZATION,
+                HttpHeaders.WWW_AUTHENTICATE,
+                HttpHeaders.PROXY_AUTHENTICATE,
+                "X-Caller-Session")) {
+            AtomicInteger privateLoads = new AtomicInteger();
+            Mono<ResponseEntity<String>> privateResponse = cached(
+                    manager, selection, key("private-" + headerName), () -> {
+                        privateLoads.incrementAndGet();
+                        return Mono.just(ResponseEntity.ok()
+                                .header(headerName, "private")
+                                .body("private"));
+                    });
+            privateResponse.block();
+            privateResponse.block();
+            assertThat(privateLoads).as(headerName).hasValue(2);
+        }
 
         AtomicInteger oversizedLoads = new AtomicInteger();
         Mono<ResponseEntity<String>> oversized = cached(manager, selection, key("oversized"), () -> {
@@ -1431,6 +1452,54 @@ class BoundedLocalResponseCacheContractTest {
                 getClass().getClassLoader(), new Class<?>[]{CacheClient.class}, handler);
     }
 
+    private TerminalCacheClient terminalCacheClient(
+            WebClient webClient,
+            ReactiveHttpClientProperties.ClientConfig config,
+            AnnotationConfigApplicationContext context,
+            LocalResponseCacheManager manager,
+            ResilienceOperatorApplier resilienceOperatorApplier,
+            io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider) {
+        ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                webClient,
+                new MethodMetadataCache(),
+                new RequestArgumentResolver(),
+                new DefaultErrorDecoder(),
+                config,
+                "cache-client",
+                TerminalCacheClient.class,
+                context,
+                resilienceOperatorApplier,
+                TestJsonCodecs.jsonCodec(),
+                new ReactiveHttpClientProperties.ObservabilityConfig(),
+                manager,
+                authProvider,
+                "http://cache.test");
+        return (TerminalCacheClient) Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{TerminalCacheClient.class}, handler);
+    }
+
+    private ReadWriteCacheClient readWriteCacheClient(
+            WebClient webClient,
+            ReactiveHttpClientProperties.ClientConfig config,
+            AnnotationConfigApplicationContext context,
+            LocalResponseCacheManager manager) {
+        ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                webClient,
+                new MethodMetadataCache(),
+                new RequestArgumentResolver(),
+                new DefaultErrorDecoder(),
+                config,
+                "read-write-cache-client",
+                ReadWriteCacheClient.class,
+                context,
+                new NoopResilienceOperatorApplier(),
+                TestJsonCodecs.jsonCodec(),
+                new ReactiveHttpClientProperties.ObservabilityConfig(),
+                manager);
+        return (ReadWriteCacheClient) Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{ReadWriteCacheClient.class}, handler);
+    }
+
     private ResponseCacheClient responseCacheClient(
             WebClient webClient,
             ReactiveHttpClientProperties.ClientConfig config,
@@ -1736,6 +1805,280 @@ class BoundedLocalResponseCacheContractTest {
                 new LocalResponseCacheManager.Snapshot(0, 0, 0, true));
     }
 
+
+    @Test
+    void failedRefreshAndSubsequentHitDoNotInheritLoadTerminalEvidence() {
+        AtomicLong ticker = new AtomicLong();
+        ReactiveHttpClientProperties.ClientConfig config = singleFlightConfig(0);
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                config.getCache().getPolicies().get("local");
+        policy.setRefreshAfterMs(50L);
+        policy.setRefreshTimeoutMs(500L);
+        AtomicInteger dispatches = new AtomicInteger();
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        List<HttpExchangeLogContext> exchangeLogs = new CopyOnWriteArrayList<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> {
+                    if (dispatches.incrementAndGet() == 1) {
+                        return Mono.just(ClientResponse.create(HttpStatus.PARTIAL_CONTENT)
+                                .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                                .header(HttpHeaders.CONTENT_LENGTH, "6")
+                                .header("X-Load-Evidence", "first")
+                                .body("cached")
+                                .build());
+                    }
+                    return Mono.just(ClientResponse.create(HttpStatus.SERVICE_UNAVAILABLE)
+                            .header("X-Refresh-Evidence", "failed")
+                            .body("refresh failed")
+                            .build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.getBeanFactory().registerSingleton("cacheObserver",
+                    (io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver) observed::add);
+            context.getBeanFactory().registerSingleton(
+                    "cacheCompositionLogger", new CacheCompositionLogger(exchangeLogs));
+            context.refresh();
+            TerminalCacheClient client = terminalCacheClient(
+                    webClient,
+                    config,
+                    context,
+                    LocalResponseCacheManager.testing(ticker::get),
+                    new NoopResilienceOperatorApplier(),
+                    null);
+
+            String loaded = client.get("terminal", "principal", "tenant", "en-US").block();
+            ticker.addAndGet(Duration.ofMillis(50).toNanos());
+            String stale = client.get("terminal", "principal", "tenant", "en-US").block();
+
+            assertThat(stale).isSameAs(loaded);
+            assertThat(dispatches).hasValue(2);
+            assertThat(observed).hasSize(2);
+            assertThat(observed.get(0).getAttemptCount()).isEqualTo(1);
+            assertThat(observed.get(0).getStatusCode()).isEqualTo(206);
+            assertThat(observed.get(0).getRequestUrl()).endsWith("/catalog/terminal");
+            assertThat(observed.get(0).getResponseBytes()).isEqualTo(6);
+            assertIsolatedCacheTerminal(observed.get(1));
+            assertThat(observed.get(1).getError()).isNull();
+            assertThat(exchangeLogs).hasSize(2);
+            assertThat(exchangeLogs.get(0).responseHeaders()).containsKey("X-Load-Evidence");
+            assertThat(exchangeLogs.get(1).responseHeaders()).isEmpty();
+            assertThat(exchangeLogs.get(1).responseStatus()).isNull();
+            assertThat(exchangeLogs.get(1).requestUrl()).isNull();
+            assertThat(exchangeLogs.get(1).error()).isNull();
+            assertThat(exchangeLogs.get(1).subscriptionAttemptCount()).isZero();
+        }
+    }
+
+
+    @Test
+    void authFailureCannotReturnAHitAndDoesNotLeakIntoTheLaterHit() {
+        ReactiveHttpClientProperties.ClientConfig config = singleFlightConfig(0);
+        config.setAuthProvider("cache-auth");
+        AtomicBoolean reject = new AtomicBoolean();
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider = request -> {
+            authCalls.incrementAndGet();
+            return reject.get()
+                    ? Mono.error(new IllegalStateException("caller rejected"))
+                    : Mono.just(AuthContext.empty());
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .filter(new OutboundAuthFilter("cache-client", authProvider))
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body("authorized-" + dispatches.incrementAndGet())
+                        .build()))
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.getBeanFactory().registerSingleton("cacheObserver",
+                    (io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver) observed::add);
+            context.refresh();
+            CacheClient client = cacheClient(
+                    webClient,
+                    config,
+                    context,
+                    LocalResponseCacheManager.testing(System::nanoTime),
+                    new NoopResilienceOperatorApplier(),
+                    authProvider);
+
+            assertThat(client.get("auth", "principal", "tenant", "en-US").block())
+                    .isEqualTo("authorized-1");
+            reject.set(true);
+            assertThatThrownBy(() -> client.get("auth", "principal", "tenant", "en-US").block())
+                    .hasRootCauseMessage("caller rejected");
+            reject.set(false);
+            assertThat(client.get("auth", "principal", "tenant", "en-US").block())
+                    .isEqualTo("authorized-1");
+
+            assertThat(authCalls).hasValue(3);
+            assertThat(dispatches).hasValue(1);
+            assertThat(observed).hasSize(3);
+            assertThat(observed.get(1).getError()).isNotNull();
+            assertIsolatedCacheTerminal(observed.get(1));
+            assertIsolatedCacheTerminal(observed.get(2));
+            assertThat(observed.get(2).getError()).isNull();
+        }
+    }
+
+
+    @Test
+    void openCircuitAndRetryExhaustionNeverPopulateOrLeakIntoLaterHits() {
+        ReactiveHttpClientProperties.ClientConfig circuitConfig = singleFlightConfig(0);
+        circuitConfig.getResilience().setEnabled(true);
+        circuitConfig.getResilience().setCircuitBreaker("cache-circuit");
+        AtomicInteger circuitDispatches = new AtomicInteger();
+        List<HttpClientObserverEvent> circuitEvents = new CopyOnWriteArrayList<>();
+        ToggleCircuitBreakerApplier circuitApplier = new ToggleCircuitBreakerApplier();
+        WebClient circuitWebClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body("circuit-" + circuitDispatches.incrementAndGet())
+                        .build()))
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.getBeanFactory().registerSingleton("circuitObserver",
+                    (io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver) circuitEvents::add);
+            context.refresh();
+            CacheClient client = cacheClient(
+                    circuitWebClient,
+                    circuitConfig,
+                    context,
+                    LocalResponseCacheManager.testing(System::nanoTime),
+                    circuitApplier,
+                    null);
+
+            assertThatThrownBy(() -> client.get("circuit", "principal", "tenant", "en-US").block())
+                    .satisfies(error -> assertThat(hasCause(error, CallNotPermittedException.class)).isTrue());
+            circuitApplier.reject.set(false);
+            assertThat(client.get("circuit", "principal", "tenant", "en-US").block())
+                    .isEqualTo("circuit-1");
+            assertThat(client.get("circuit", "principal", "tenant", "en-US").block())
+                    .isEqualTo("circuit-1");
+
+            assertThat(circuitDispatches).hasValue(1);
+            assertThat(circuitApplier.applications).hasValue(2);
+            assertThat(circuitEvents).hasSize(3);
+            assertIsolatedCacheTerminal(circuitEvents.get(0));
+            assertThat(circuitEvents.get(0).getError()).isInstanceOf(CallNotPermittedException.class);
+            assertThat(circuitEvents.get(1).getAttemptCount()).isEqualTo(1);
+            assertIsolatedCacheTerminal(circuitEvents.get(2));
+            assertThat(circuitEvents.get(2).getError()).isNull();
+        }
+
+        ReactiveHttpClientProperties.ClientConfig retryConfig = singleFlightConfig(0);
+        retryConfig.getResilience().setEnabled(true);
+        retryConfig.getResilience().setRetry("cache-retry");
+        AtomicBoolean fail = new AtomicBoolean(true);
+        AtomicInteger retryDispatches = new AtomicInteger();
+        List<HttpClientObserverEvent> retryEvents = new CopyOnWriteArrayList<>();
+        WebClient retryWebClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> {
+                    int dispatch = retryDispatches.incrementAndGet();
+                    return Mono.just(fail.get()
+                            ? ClientResponse.create(HttpStatus.SERVICE_UNAVAILABLE)
+                                    .header("X-Retry-Evidence", Integer.toString(dispatch))
+                                    .body("retry")
+                                    .build()
+                            : ClientResponse.create(HttpStatus.OK)
+                                    .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                                    .body("recovered")
+                                    .build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.getBeanFactory().registerSingleton("retryObserver",
+                    (io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver) retryEvents::add);
+            context.refresh();
+            CacheClient client = cacheClient(
+                    retryWebClient,
+                    retryConfig,
+                    context,
+                    LocalResponseCacheManager.testing(System::nanoTime),
+                    new RetryOnceApplier(),
+                    null);
+
+            assertThatThrownBy(() -> client.get("retry", "principal", "tenant", "en-US").block())
+                    .satisfies(error -> assertThat(hasCause(error,
+                            io.github.huynhngochuyhoang.httpstarter.exception.RemoteServiceException.class)).isTrue());
+            fail.set(false);
+            assertThat(client.get("retry", "principal", "tenant", "en-US").block())
+                    .isEqualTo("recovered");
+            assertThat(client.get("retry", "principal", "tenant", "en-US").block())
+                    .isEqualTo("recovered");
+
+            assertThat(retryDispatches).hasValue(3);
+            assertThat(retryEvents).hasSize(3);
+            assertThat(retryEvents.get(0).getAttemptCount()).isEqualTo(2);
+            assertThat(retryEvents.get(0).getStatusCode()).isEqualTo(503);
+            assertThat(retryEvents.get(0).getError()).isNotNull();
+            assertThat(retryEvents.get(1).getAttemptCount()).isEqualTo(1);
+            assertIsolatedCacheTerminal(retryEvents.get(2));
+            assertThat(retryEvents.get(2).getError()).isNull();
+        }
+    }
+
+
+    @Test
+    void cachedReadsDoNotSuppressWritesOrInferInvalidation() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(60_000L);
+        policy.setMaximumSize(10L);
+        policy.setSharedResponse(true);
+        config.getCache().getPolicies().put("local", policy);
+        AtomicInteger reads = new AtomicInteger();
+        AtomicInteger writes = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                        .body(request.method() == org.springframework.http.HttpMethod.GET
+                                ? "read-" + reads.incrementAndGet()
+                                : "write-" + writes.incrementAndGet())
+                        .build()))
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReadWriteCacheClient client = readWriteCacheClient(
+                    webClient, config, context, LocalResponseCacheManager.testing(System::nanoTime));
+
+            assertThat(client.read("42").block()).isEqualTo("read-1");
+            assertThat(client.read("42").block()).isEqualTo("read-1");
+            assertThat(client.write("42").block()).isEqualTo("write-1");
+            assertThat(client.read("42").block()).isEqualTo("read-1");
+        }
+
+        assertThat(reads).hasValue(1);
+        assertThat(writes).hasValue(1);
+    }
+
+    private static void assertIsolatedCacheTerminal(HttpClientObserverEvent event) {
+        assertThat(event.getAttemptCount()).isZero();
+        assertThat(event.getStatusCode()).isNull();
+        assertThat(event.getRequestUrl()).isNull();
+        assertThat(event.getRequestHeaders()).isEmpty();
+        assertThat(event.getRequestBytes()).isZero();
+        assertThat(event.getResponseBytes()).isEqualTo(HttpClientObserverEvent.UNKNOWN_SIZE);
+        assertThat(event.getFailureStage()).isNull();
+    }
+
     private static String load(LocalResponseCacheManager manager,
                                EffectiveCachePolicy.Selection selection,
                                CacheKeyContract.OpaqueKey key,
@@ -1816,6 +2159,26 @@ class BoundedLocalResponseCacheContractTest {
                          @HeaderParam("Accept-Language") String language);
     }
 
+    @ReactiveHttpClient(name = "cache-client")
+    @LogHttpExchange(logger = CacheCompositionLogger.class)
+    interface TerminalCacheClient {
+        @GET("/catalog/{id}")
+        Mono<String> get(@PathVar("id") String id,
+                         @CacheKey("principal") String principal,
+                         @CacheKey("tenant") String tenant,
+                         @HeaderParam("Accept-Language") String language);
+    }
+
+    @ReactiveHttpClient(name = "read-write-cache-client")
+    interface ReadWriteCacheClient {
+        @GET("/catalog/{id}")
+        @CacheResponse("local")
+        Mono<String> read(@PathVar("id") String id);
+
+        @POST("/catalog/{id}")
+        Mono<String> write(@PathVar("id") String id);
+    }
+
     @ReactiveHttpClient(name = "response-cache-client")
     interface ResponseCacheClient {
         @GET("/plain/{id}")
@@ -1849,6 +2212,33 @@ class BoundedLocalResponseCacheContractTest {
         @Override
         public boolean canRetryMoreThanOnce(String instanceName) {
             return true;
+        }
+    }
+
+    private static final class CacheCompositionLogger implements HttpExchangeLogger {
+        private final List<HttpExchangeLogContext> logs;
+
+        private CacheCompositionLogger(List<HttpExchangeLogContext> logs) {
+            this.logs = logs;
+        }
+
+        @Override
+        public void log(HttpExchangeLogContext context) {
+            logs.add(context);
+        }
+    }
+
+    private static final class ToggleCircuitBreakerApplier extends NoopResilienceOperatorApplier {
+        private final CircuitBreaker circuitBreaker = CircuitBreaker.ofDefaults("cache-open");
+        private final AtomicBoolean reject = new AtomicBoolean(true);
+        private final AtomicInteger applications = new AtomicInteger();
+
+        @Override
+        public <T> Mono<T> applyCircuitBreaker(Mono<T> mono, String instanceName) {
+            applications.incrementAndGet();
+            return Mono.defer(() -> reject.get()
+                    ? Mono.error(CallNotPermittedException.createCallNotPermittedException(circuitBreaker))
+                    : mono);
         }
     }
 
