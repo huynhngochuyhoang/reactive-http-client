@@ -65,7 +65,10 @@ the starter logs a warning and continues the client call and the remaining hooks
 `ReactiveHttpClientLifecycleContext` exposes the logical client name, API name,
 HTTP method, path template, resolved path/query/header values, request body,
 resolved request URL when available, response status when available, terminal
-error when available, and attempt number.
+error when available, attempt number, and a bounded terminal cache outcome when
+cache observability is separately enabled. The cache outcome is `null` for
+non-cache calls and when that opt-in is disabled; it never contains a cache key
+or value. Hidden refresh work does not invoke lifecycle terminal callbacks.
 
 Context values are read-only snapshots. Use filters, auth providers, or a
 `ReactiveHttpClientCustomizer` when you need to mutate a request.

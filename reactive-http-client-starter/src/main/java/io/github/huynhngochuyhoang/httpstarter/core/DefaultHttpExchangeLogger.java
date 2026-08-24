@@ -40,6 +40,13 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
         Map<String, List<String>> responseHeaders = logHeaders ? redactResponseHeaders(context.responseHeaders()) : Map.of();
         Object requestBody = shouldLogBodies(context) ? context.requestBody() : OMITTED;
         Object responseBody = shouldLogBodies(context) ? context.responseBody() : OMITTED;
+        if (context.cacheOutcome() != null) {
+            log.info("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms subscriptionAttemptCount={} cacheOutcome={}",
+                    context.clientName(), context.httpMethod(), context.pathTemplate(), inboundHeaders,
+                    requestHeaders, requestBody, context.responseStatus(), responseHeaders, responseBody,
+                    context.durationMs(), context.subscriptionAttemptCount(), context.cacheOutcome().name());
+            return;
+        }
         log.info("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms subscriptionAttemptCount={}",
                 context.clientName(),
                 context.httpMethod(),
@@ -63,6 +70,15 @@ public class DefaultHttpExchangeLogger implements HttpExchangeLogger {
         Object responseBody = shouldLogBodies(context) ? context.responseBody() : OMITTED;
         ErrorCategory errorCategory = ErrorCategories.from(context.error(), context.responseStatus());
         HttpClientFailureStage failureStage = context.failureStage();
+        if (context.cacheOutcome() != null) {
+            log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms subscriptionAttemptCount={} errorType={} errorCategory={} failureStage={} cacheOutcome={}",
+                    context.clientName(), context.httpMethod(), context.pathTemplate(), inboundHeaders,
+                    requestHeaders, requestBody, context.responseStatus(), responseHeaders, responseBody,
+                    context.durationMs(), context.subscriptionAttemptCount(), context.error().getClass().getName(),
+                    errorCategory != null ? errorCategory.name() : "none",
+                    failureStage != null ? failureStage.name() : "none", context.cacheOutcome().name());
+            return;
+        }
         log.warn("[{}] {} {} inboundHeaders={} reqHeaders={} reqBody={} respStatus={} respHeaders={} respBody={} duration={}ms subscriptionAttemptCount={} errorType={} errorCategory={} failureStage={}",
                 context.clientName(),
                 context.httpMethod(),

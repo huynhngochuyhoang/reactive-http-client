@@ -55,7 +55,10 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     private static final Set<String> CLIENT_SCHEMA_FIELDS = Set.of(
             "clientName", "clientInterface", "baseUrlSource", "poolSource",
             "poolMaxConnections", "poolPendingAcquireTimeoutMs", "poolMetricsEnabled",
-            "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
+            "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams",
+            "cachePhase", "cachePolicyCount", "cacheTtlMs", "cacheRefreshAfterMs",
+            "cacheSingleFlight", "cacheMaximumSize", "cacheEntryCount", "cacheEvictions",
+            "cacheMetricsEnabled", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
             "compressionEnabled", "codecMaxInMemorySizeMb",
             "resilienceConfigured", "retry", "rateLimiter",
             "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
@@ -106,6 +109,46 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .doesNotContain("secretAuthProviderBean")
                 .doesNotContain("secret-token")
                 .doesNotContain("Authorization");
+    }
+
+    @Test
+    void providerSnapshotExportsOnlyBoundedAggregateCacheState() {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(60_000L);
+        policy.setRefreshAfterMs(30_000L);
+        policy.setRefreshTimeoutMs(5_000L);
+        policy.setMaximumSize(100L);
+        policy.setSingleFlight(true);
+        policy.setSharedResponse(true);
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().setPolicy("catalog");
+        config.getCache().getPolicies().put("catalog", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.getObservability().getCache().setEnabled(true);
+        properties.setClients(Map.of("diagnostic-client", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider));
+
+        assertThat(client)
+                .containsEntry("cachePhase", "refresh-on-access")
+                .containsEntry("cachePolicyCount", 1)
+                .containsEntry("cacheTtlMs", 60_000L)
+                .containsEntry("cacheRefreshAfterMs", 30_000L)
+                .containsEntry("cacheSingleFlight", "enabled")
+                .containsEntry("cacheMaximumSize", 100L)
+                .containsEntry("cacheEntryCount", null)
+                .containsEntry("cacheEvictions", null)
+                .containsEntry("cacheMetricsEnabled", true);
+        assertThat(ReactiveHttpClientDiagnosticsSnapshot.toJson(provider))
+                .doesNotContain("cache key")
+                .doesNotContain("cache value")
+                .doesNotContain("tenant")
+                .doesNotContain("Authorization");
+        assertThat(beanFactory.containsSingleton("diagnosticClient")).isFalse();
     }
 
     @Test
@@ -1058,7 +1101,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("| Inherited endpoint count | `1` |")
                 .contains("Strict retry validation")
                 .contains("Strict body-signing validation")
-                .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName() + "` | `property` | `global:maxConnections=200, pendingAcquireTimeoutMs=5000, metrics=false, protocol=HTTP/1.1, capacity=connections, maxConcurrentStreams=unknown` | `client:500` |")
+                .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName() + "` | `property` | `global:maxConnections=200, pendingAcquireTimeoutMs=5000, metrics=false, protocol=HTTP/1.1, capacity=connections, maxConcurrentStreams=unknown` | `phase=disabled")
                 .contains("configured=true, retry=unavailable")
                 .contains("| `provider-bean` | `true` | `2` | `1` |");
         assertThat(json)
@@ -1129,6 +1172,15 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                       "poolProtocol": "HTTP/1.1",
                       "poolCapacityBasis": "connections",
                       "poolMaxConcurrentStreams": null,
+                      "cachePhase": "disabled",
+                      "cachePolicyCount": 0,
+                      "cacheTtlMs": null,
+                      "cacheRefreshAfterMs": null,
+                      "cacheSingleFlight": "disabled",
+                      "cacheMaximumSize": 0,
+                      "cacheEntryCount": 0,
+                      "cacheEvictions": 0,
+                      "cacheMetricsEnabled": false,
                       "timeoutSource": "client",
                       "timeoutMs": 750,
                       "logicalCallTimeoutMs": 0,
@@ -1228,9 +1280,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .contains("| Client count | `1` |")
                 .contains("| Endpoint count | `2` |")
                 .contains("| Inherited endpoint count | `1` |")
-                .contains("| Client | Interface | Base URL source | Pool | Response timeout | Logical-call budget | Compression | Decoded aggregate limit | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |")
+                .contains("| Client | Interface | Base URL source | Pool | Cache | Response timeout | Logical-call budget | Compression | Decoded aggregate limit | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |")
                 .contains("| `diagnostic-client` | `" + DiagnosticClient.class.getName()
-                        + "` | `property` | `unknown` | `client:500` | `unknown` | `unknown` | `unknown` |")
+                        + "` | `property` | `unknown` | `unknown` | `client:500` | `unknown` | `unknown` | `unknown` |")
                 .contains("| `unknown` | `unknown` | `provider-bean` | `true` | `2` | `1` |");
     }
 
@@ -1404,7 +1456,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(List.of(summary));
         Map<String, Object> snapshot = ReactiveHttpClientDiagnosticsSnapshot.toMap(List.of(summary));
 
-        assertThat(markdown).contains("| `summary-client` | `com.example.SummaryClient` | `property` | `unknown` | `disabled:0` | `unknown` | `unknown` | `unknown` | `configured=false, retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled` | `unknown` | `unknown` |");
+        assertThat(markdown).contains("| `summary-client` | `com.example.SummaryClient` | `property` | `unknown` | `unknown` | `disabled:0` | `unknown` | `unknown` | `unknown` | `configured=false, retry=disabled, rateLimiter=disabled, circuitBreaker=disabled, bulkhead=disabled` | `unknown` | `unknown` |");
         assertThat(json)
                 .contains("\"logicalCallTimeoutMs\": null")
                 .contains("\"compressionEnabled\": null")

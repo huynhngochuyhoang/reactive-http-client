@@ -34,6 +34,7 @@ public final class HttpClientObserverEvent {
     private final Integer serverPort;
     private final String requestUrl;
     private final Map<String, String> requestHeaders;
+    private final HttpClientCacheOutcome cacheOutcome;
 
     /**
      * @deprecated Use {@link #HttpClientObserverEvent(String, String, String, String, Integer, long, Throwable, ErrorCategory, Object, Object)}
@@ -152,6 +153,30 @@ public final class HttpClientObserverEvent {
             Integer serverPort,
             String requestUrl,
             Map<String, String> requestHeaders) {
+        this(clientName, apiName, httpMethod, uriPath, statusCode, durationMs, error, errorCategory,
+                requestBody, responseBody, attemptCount, requestBytes, responseBytes, serverAddress, serverPort,
+                requestUrl, requestHeaders, null);
+    }
+
+    public HttpClientObserverEvent(
+            String clientName,
+            String apiName,
+            String httpMethod,
+            String uriPath,
+            Integer statusCode,
+            long durationMs,
+            Throwable error,
+            ErrorCategory errorCategory,
+            Object requestBody,
+            Object responseBody,
+            int attemptCount,
+            long requestBytes,
+            long responseBytes,
+            String serverAddress,
+            Integer serverPort,
+            String requestUrl,
+            Map<String, String> requestHeaders,
+            HttpClientCacheOutcome cacheOutcome) {
         this.clientName = clientName;
         this.apiName = apiName;
         this.httpMethod = httpMethod;
@@ -171,6 +196,7 @@ public final class HttpClientObserverEvent {
         this.requestHeaders = requestHeaders == null || requestHeaders.isEmpty()
                 ? Map.of()
                 : Map.copyOf(new LinkedHashMap<>(requestHeaders));
+        this.cacheOutcome = cacheOutcome;
     }
 
     /** The logical name of the client (value of {@code @ReactiveHttpClient(name = ...)}). */
@@ -264,6 +290,9 @@ public final class HttpClientObserverEvent {
     /** Final outbound request headers after WebClient filters have run. */
     public Map<String, String> getRequestHeaders() { return requestHeaders; }
 
+    /** Bounded cache result, or {@code null} when cache observability is disabled or not applicable. */
+    public HttpClientCacheOutcome getCacheOutcome() { return cacheOutcome; }
+
     /** {@code true} when {@link #getError()} is non-null. */
     public boolean isError() { return error != null; }
 
@@ -282,6 +311,7 @@ public final class HttpClientObserverEvent {
                 ", error=" + (error != null ? error.getClass().getSimpleName() : "none") +
                 ", errorCategory=" + (errorCategory != null ? errorCategory.name() : "none") +
                 ", failureStage=" + (getFailureStage() != null ? getFailureStage().name() : "none") +
+                ", cacheOutcome=" + (cacheOutcome != null ? cacheOutcome.name() : "none") +
                 '}';
     }
 }

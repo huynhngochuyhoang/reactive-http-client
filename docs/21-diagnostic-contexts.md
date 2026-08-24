@@ -16,6 +16,7 @@ available.
 | Error body | No dedicated error-body field. `responseBody()` is the decoded success body and is `null` for error responses | No dedicated error-body field. `getResponseBody()` is the optionally retained decoded success body and is `null` for error responses | No | Bounded `responseBody()` plus `responseBodyTruncated()` and `retainedResponseBodyBytes()` |
 | Duration | `durationMs()` for the logical call | `getDurationMs()` for the logical call | No | No |
 | Subscription-attempt count | Terminal `subscriptionAttemptCount()` for the logical call | Terminal `getAttemptCount()` for the logical call | `attemptNumber()` identifies the current callback attempt; terminal callbacks receive the final attempt number | No |
+| Cache outcome | Bounded `cacheOutcome()` when separately enabled | Bounded `getCacheOutcome()` when separately enabled | Bounded terminal `cacheOutcome()` when separately enabled | No |
 | Proven failure stage | `failureStage()` | `getFailureStage()` | `failureStage()` | No |
 
 ## Call and dispatch boundaries
@@ -83,6 +84,14 @@ and derived failure stage.
 
 For `Mono<ResponseEntity<Flux<DataBuffer>>>`, terminal lifecycle, observer, and exchange-log records describe response-envelope completion. They do not indicate that the inner streamed body was subscribed or fully consumed. A later inner-body timeout or cancellation does not rewrite the already reported successful envelope terminal record. Direct `Flux<DataBuffer>` methods report terminal state when the stream itself completes, errors, or is cancelled.
 
+When cache observability is separately enabled, each cache-selected caller has
+one bounded terminal outcome: `FRESH_HIT`, `MISS_LOADER`,
+`COALESCED_WAITER`, or `STALE_HIT`. Hits, waiters, and stale returns report
+attempt `0`, no dispatch URL, status, server, failure stage, or wire sizes. A
+miss loader retains its final HTTP evidence. Hidden refresh is not a caller and
+does not create observer, lifecycle, exchange-log, or OTel terminal records; its
+bounded work result is emitted through cache meters and a sanitized debug log.
+
 ## Header handling
 
 Custom `HttpExchangeLogger` implementations receive raw final outbound request
@@ -118,12 +127,14 @@ error rates, thresholds, and reasons for the latest health-probe window. Duratio
 sums, time-window maxima, percentiles, and histogram buckets are not health
 inputs. It does not describe configured endpoints or per-call payload metadata.
 Pool-acquire failures add a bounded `poolAcquireFailureCount` for the same probe window.
+Cache hit ratio, refresh failure, eviction pressure, and entry count do not
+change this health result.
 
 Use exchange logging for per-call request/response metadata, and use the diagnostics provider when support output needs configured-client summaries.
 
 ## Runtime diagnostics provider
 
-Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, configured pool protocol/capacity basis with an unknown peer stream limit, per-attempt response-timeout summary, logical-call budget, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
+Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, configured pool protocol/capacity basis with an unknown peer stream limit, bounded cache phase/policy/TTL/refresh/single-flight/capacity/entry/eviction state, per-attempt response-timeout summary, logical-call budget, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, cache entries or keys, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
 
 Use `ReactiveHttpClientDiagnosticsSnapshot` when a support bundle, startup log,
 or local custom endpoint needs deterministic Markdown or JSON output from those
@@ -172,7 +183,10 @@ endpoint use the same logical fields. Provider-backed entries include the config
 `compressionEnabled` policy and `codecMaxInMemorySizeMb` decoded unary aggregate
 limit; collection overloads render those provider-only values as `null` in map/JSON
 and `unknown` in Markdown. Collection-only pool and strict-validation facts retain
-the same unknown semantics. The fixture and JVM
+the same unknown semantics. Cache phase, policy count, minimum TTL and refresh
+threshold, single-flight state, aggregate maximum size, entry count, eviction
+count, and cache-metrics enablement follow the same provider/collection unknown
+rules. No snapshot path enumerates cache entries. The fixture and JVM
 and native checks reject removal, rename, type drift, or accidental secret-bearing
 fields.
 
@@ -240,7 +254,7 @@ management:
 The endpoint id is `rhttpclients`. A read operation returns diagnostics schema v1 JSON with
 `schemaVersion`, `projectVersion`, `clientCount`, `endpointCount`, `inheritedEndpointCount`, and
 one `clients` entry per registered client. Each client entry includes client
-name, interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, timeout source/value, `logicalCallTimeoutMs`, configured compression, decoded aggregate limit, resilience summary, auth
+name, interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, bounded aggregate cache policy/runtime state, timeout source/value, `logicalCallTimeoutMs`, configured compression, decoded aggregate limit, resilience summary, auth
 mode, redirect-following flag, strict unsafe-retry and strict body-signing
 validation flags, endpoint count, and inherited endpoint count. Strict flags are
 true only when the corresponding validation path is active for the resolved

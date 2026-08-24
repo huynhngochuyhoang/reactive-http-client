@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Separately opt-in cache observability.** Added bounded hit/miss,
+  coalescing, stale-serving, load, refresh, eviction, entry, and capacity meters;
+  one cache outcome on caller lifecycle/log/observer/OTel records; aggregate-only
+  cache diagnostics; and factory-owned meter removal. Cache keys and values are
+  never exported, hidden refresh creates no detached span, cache signals do not
+  affect downstream health, and enabling metrics cannot activate caching.
 - **Cache feature-composition contract.** Cache lookup now has deterministic
   boundaries across authorization, resilience, redirects, logical deadlines,
   single-flight waiters, and access-driven refresh. Terminal evidence remains

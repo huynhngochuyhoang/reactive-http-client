@@ -4,6 +4,7 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.observability.CompositeHttpClientObserver;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.micrometer.core.instrument.Timer;
@@ -80,6 +81,24 @@ class OpenTelemetryHttpClientObserverTest {
         assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_API_NAME)).isEqualTo("user.get");
         assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_ATTEMPT_COUNT)).isEqualTo(1L);
         assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_RESPONSE_BYTES)).isEqualTo(256L);
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_CACHE_OUTCOME)).isNull();
+    }
+
+    @Test
+    void cacheOutcomeAddsOneBoundedAttributeWithoutKeyOrValueMaterial() {
+        observer.record(new HttpClientObserverEvent(
+                "catalog-client", "catalog.get", "GET", "/catalog/{id}",
+                null, 2L, null, null, null, null,
+                0, 0L, HttpClientObserverEvent.UNKNOWN_SIZE, null, null,
+                null, Map.of(), HttpClientCacheOutcome.FRESH_HIT));
+
+        SpanData span = onlySpan();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_CACHE_OUTCOME))
+                .isEqualTo("FRESH_HIT");
+        assertThat(span.getAttributes().toString())
+                .doesNotContain("cache-key")
+                .doesNotContain("tenant-value")
+                .doesNotContain("Authorization");
     }
 
     @Test

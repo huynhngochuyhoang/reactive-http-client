@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 
 import java.net.URI;
@@ -25,8 +26,17 @@ public record ReactiveHttpClientLifecycleContext(
         URI requestUrl,
         Integer statusCode,
         Throwable error,
-        int attemptNumber
+        int attemptNumber,
+        HttpClientCacheOutcome cacheOutcome
 ) {
+
+    public ReactiveHttpClientLifecycleContext(
+            String clientName, String apiName, String httpMethod, String pathTemplate,
+            Map<String, Object> pathVars, Map<String, List<Object>> queryParams, Map<String, String> headers,
+            Object requestBody, URI requestUrl, Integer statusCode, Throwable error, int attemptNumber) {
+        this(clientName, apiName, httpMethod, pathTemplate, pathVars, queryParams, headers, requestBody,
+                requestUrl, statusCode, error, attemptNumber, null);
+    }
 
     public ReactiveHttpClientLifecycleContext {
         pathVars = pathVars != null ? Map.copyOf(pathVars) : Map.of();
@@ -44,6 +54,21 @@ public record ReactiveHttpClientLifecycleContext(
             Integer statusCode,
             Throwable error,
             int attemptNumber) {
+        return from(clientName, plan, httpMethod, pathTemplate, resolved, requestUrl,
+                statusCode, error, attemptNumber, null);
+    }
+
+    static ReactiveHttpClientLifecycleContext from(
+            String clientName,
+            RequestPlan plan,
+            String httpMethod,
+            String pathTemplate,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            URI requestUrl,
+            Integer statusCode,
+            Throwable error,
+            int attemptNumber,
+            HttpClientCacheOutcome cacheOutcome) {
         return new ReactiveHttpClientLifecycleContext(
                 clientName,
                 plan.apiName(),
@@ -56,7 +81,8 @@ public record ReactiveHttpClientLifecycleContext(
                 requestUrl,
                 statusCode,
                 error,
-                attemptNumber);
+                attemptNumber,
+                cacheOutcome);
     }
 
     /** Proven transport failure stage, or {@code null} when it cannot be attributed safely. */

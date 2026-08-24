@@ -806,72 +806,100 @@ Evidence recorded on 2026-08-24:
 
 ## Priority 10 - Phase Four: Cache Metrics, Observability, and Diagnostics
 
-### [ ] 10.1 Freeze one cache outcome vocabulary
+### [x] 10.1 Freeze one cache outcome vocabulary
 
-- [ ] Define bounded caller outcomes for fresh hit, miss loader, coalesced
+- [x] Define bounded caller outcomes for fresh hit, miss loader, coalesced
       waiter, and stale hit with refresh.
-- [ ] Define bounded hidden-work outcomes for load/refresh success, failure, and
+- [x] Define bounded hidden-work outcomes for load/refresh success, failure, and
       cancellation plus TTL and size eviction.
-- [ ] Add public event/context fields only after null/unknown behavior and
+- [x] Add public event/context fields only after null/unknown behavior and
       compatibility constructors are reviewed.
-- [ ] Keep raw keys, values, arguments, headers, bodies, URLs, tenant values,
+- [x] Keep raw keys, values, arguments, headers, bodies, URLs, tenant values,
       and credentials out of every outcome model.
-- [ ] Add a separate cache-observability opt-in that defaults false and remains
+- [x] Add a separate cache-observability opt-in that defaults false and remains
       subordinate to the existing global observability master gate.
 
-### [ ] 10.2 Implement and verify Micrometer meters
+### [x] 10.2 Implement and verify Micrometer meters
 
-- [ ] Add a lookup counter by bounded client, API name, and `hit`/`miss` result.
-- [ ] Add separate coalesced, stale-serving, load, refresh, and eviction facts
+- [x] Add a lookup counter by bounded client, API name, and `hit`/`miss` result.
+- [x] Add separate coalesced, stale-serving, load, refresh, and eviction facts
       without making hit ratio ambiguous.
-- [ ] Add load/refresh duration only under distinct meter names and correct
+- [x] Add load/refresh duration only under distinct meter names and correct
       registry time units.
-- [ ] Export current entry count, configured maximum size, and eviction count
+- [x] Export current entry count, configured maximum size, and eviction count
       under starter-specific names that cannot collide with cache-library meters.
-- [ ] Track every cache meter registration as factory-owned state and remove all
+- [x] Track every cache meter registration as factory-owned state and remove all
       counters, timers, summaries, and gauges from the `MeterRegistry` during
       factory destruction.
-- [ ] Prove destroy is idempotent, releases cache references, and prevents late
+- [x] Prove destroy is idempotent, releases cache references, and prevents late
       load/refresh completion from recording into removed meters.
-- [ ] Destroy and recreate a factory with the same meter tags against one live
+- [x] Destroy and recreate a factory with the same meter tags against one live
       registry; verify the replacement gauge observes only the new cache and no
       stale meter registration is reused.
-- [ ] Verify meter absence when caching is unselected and prove metrics enablement
+- [x] Verify meter absence when caching is unselected and prove metrics enablement
       cannot activate caching.
-- [ ] Verify a cache-enabled, cache-observability-disabled client records no
+- [x] Verify a cache-enabled, cache-observability-disabled client records no
       cache-library stats, cache meters, cache OTel attributes, or cache-specific
       log/context fields.
-- [ ] Add Prometheus scrape tests for names, types, tags, zero-series behavior,
+- [x] Add Prometheus scrape tests for names, types, tags, zero-series behavior,
       hit ratio, coalescing ratio, refresh failure rate, and capacity pressure.
 
-### [ ] 10.3 Align terminal observability surfaces
+### [x] 10.3 Align terminal observability surfaces
 
-- [ ] Report a hit once with `attemptCount=0`, `requestDispatched=false`, and no
+- [x] Report a hit once with `attemptCount=0`, `requestDispatched=false`, and no
       invented HTTP status, server, transport stage, or wire byte count.
-- [ ] Keep miss-loader HTTP facts while distinguishing coalesced waiters and
+- [x] Keep miss-loader HTTP facts while distinguishing coalesced waiters and
       stale hits from dispatched calls.
-- [ ] Align lifecycle, observer, exchange logger, Micrometer, and OTel on the
+- [x] Align lifecycle, observer, exchange logger, Micrometer, and OTel on the
       same bounded caller cache outcome.
-- [ ] Add one bounded cache outcome attribute to built-in OTel logical-call
+- [x] Add one bounded cache outcome attribute to built-in OTel logical-call
       spans without exporting keys or values.
-- [ ] Keep hidden refresh from silently creating detached OTel spans; expose it
+- [x] Keep hidden refresh from silently creating detached OTel spans; expose it
       through reviewed bounded meters and sanitized logs unless a later explicit
       span opt-in is approved.
-- [ ] Prove exactly one terminal record per caller for hit, miss, waiter, stale
+- [x] Prove exactly one terminal record per caller for hit, miss, waiter, stale
       hit, timeout, cancellation, load failure, and refresh failure.
 
-### [ ] 10.4 Align diagnostics, health, and operations
+### [x] 10.4 Align diagnostics, health, and operations
 
-- [ ] Export only bounded policy and aggregate state: enabled phase, TTL,
+- [x] Export only bounded policy and aggregate state: enabled phase, TTL,
       refresh threshold, single-flight state, maximum size, entry count, and
       evictions.
-- [ ] Never enumerate cache entries or expose keys through the diagnostics
+- [x] Never enumerate cache entries or expose keys through the diagnostics
       endpoint, snapshot helper, health, or support bundle.
-- [ ] Keep hit ratio, refresh failure, eviction pressure, and entry count as
+- [x] Keep hit ratio, refresh failure, eviction pressure, and entry count as
       operational signals that do not mark downstream health UP/DOWN by
       themselves.
-- [ ] Add bounded support-bundle examples and PromQL/dashboard recipes for each
+- [x] Add bounded support-bundle examples and PromQL/dashboard recipes for each
       supported cache signal.
+
+Evidence recorded on 2026-08-24:
+
+- `HttpClientCacheOutcome` freezes the four caller-visible values, while
+  load/refresh work and TTL/size evictions use separate bounded meter tags.
+  Existing event/context constructors preserve `null` for unselected or
+  metrics-disabled caching; no cache key or selected value enters a public
+  observability surface.
+- `reactive.http.observability.cache.enabled` defaults to `false`, requires
+  the global observability gate, and does not activate caching. The optional
+  Micrometer implementation is isolated from the always-loaded cache facade,
+  preserving no-Micrometer test-helper consumers.
+- Factory-owned `reactive.http.client.cache.*` counters, timers, and gauges
+  cover lookups, caller outcomes, coalescing, stale serving, loads, refreshes,
+  TTL/size evictions, entries, and maximum entries. Deterministic tests cover
+  zero series, Prometheus names/tags and ratios, registry time units,
+  idempotent removal, late completion, and same-tag factory recreation.
+- Lifecycle hooks, observers, exchange logs, Micrometer, and OTel share the
+  caller outcome. Non-dispatched hits/waiters/stale callers retain zero attempts
+  and unknown wire size; hidden refreshes produce bounded work meters and
+  sanitized DEBUG facts without detached caller terminals or OTel spans.
+- Diagnostics expose only bounded policy/aggregate cache state and never entries
+  or keys. Health parity tests prove cache gauges and refresh failures do not
+  change downstream health. The operations guides include bounded support data
+  plus hit, coalescing, refresh-failure, and capacity PromQL recipes.
+- `mvn -q test` passed `1198` starter, `55` test-helper, and `53` OTel
+  tests (`1306` total) with zero failures, errors, or skips. The focused
+  no-Micrometer mock/test-helper run and `git diff --check` also passed.
 
 ---
 

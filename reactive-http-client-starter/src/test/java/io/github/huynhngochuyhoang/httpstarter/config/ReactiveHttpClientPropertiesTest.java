@@ -44,6 +44,20 @@ class ReactiveHttpClientPropertiesTest {
     }
 
     @Test
+    void cacheObservabilityIsSeparatelyOptInAndBindsUnderTheMasterSwitch() {
+        ReactiveHttpClientProperties defaults = new ReactiveHttpClientProperties();
+        assertTrue(defaults.getObservability().isEnabled());
+        assertFalse(defaults.getObservability().getCache().isEnabled());
+
+        ReactiveHttpClientProperties bound = bind(Map.of(
+                "reactive.http.observability.enabled", true,
+                "reactive.http.observability.cache.enabled", true));
+
+        assertTrue(bound.getObservability().isEnabled());
+        assertTrue(bound.getObservability().getCache().isEnabled());
+    }
+
+    @Test
     void shouldBindLegacyAuthProviderBeanName() {
         Map<String, Object> yaml = new LinkedHashMap<>();
         yaml.put("reactive.http.clients.users.auth-provider", "userServiceAuthProvider");

@@ -976,6 +976,7 @@ public class ReactiveHttpClientProperties {
 
         private HealthConfig health = new HealthConfig();
         private HistogramConfig histogram = new HistogramConfig();
+        private CacheObservabilityConfig cache = new CacheObservabilityConfig();
         private DiagnosticsEndpointConfig diagnosticsEndpoint = new DiagnosticsEndpointConfig();
 
         public boolean isEnabled() { return enabled; }
@@ -1006,6 +1007,11 @@ public class ReactiveHttpClientProperties {
             this.histogram = histogram != null ? histogram : new HistogramConfig();
         }
 
+        public CacheObservabilityConfig getCache() { return cache; }
+        public void setCache(CacheObservabilityConfig cache) {
+            this.cache = cache != null ? cache : new CacheObservabilityConfig();
+        }
+
         public DiagnosticsEndpointConfig getDiagnosticsEndpoint() { return diagnosticsEndpoint; }
         public void setDiagnosticsEndpoint(DiagnosticsEndpointConfig diagnosticsEndpoint) {
             this.diagnosticsEndpoint = diagnosticsEndpoint != null
@@ -1014,9 +1020,16 @@ public class ReactiveHttpClientProperties {
         }
     }
 
-    /**
-     * Opt-in Actuator endpoint for sanitized configured-client diagnostics.
-     */
+    /** Separately opt-in response-cache metrics and terminal outcome reporting. */
+    public static class CacheObservabilityConfig {
+        /** Enable bounded cache metrics and terminal outcome fields. Default: false. */
+        private boolean enabled;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    }
+
+    /** Opt-in Actuator endpoint for sanitized configured-client diagnostics. */
     public static class DiagnosticsEndpointConfig {
         /** Enable the rhttpclients Actuator endpoint. Default: false. */
         private boolean enabled = false;

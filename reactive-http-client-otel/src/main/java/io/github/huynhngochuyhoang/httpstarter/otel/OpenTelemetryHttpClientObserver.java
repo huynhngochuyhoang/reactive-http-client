@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
  *       absent for automatically decompressed or chunked responses</li>
  *   <li>{@code rhttp.failure.stage} - concrete DNS, proxy, TLS, connection, pool, write, or response
  *       phase only when terminal evidence proves it</li>
+ *   <li>{@code rhttp.cache.outcome} - bounded caller cache result when cache observability is enabled</li>
  * </ul>
  *
  * <p>The built-in observer does not export request or response bodies, headers,
@@ -79,6 +80,7 @@ public class OpenTelemetryHttpClientObserver implements HttpClientObserver {
     static final AttributeKey<Long> ATTR_REQUEST_BYTES = AttributeKey.longKey("rhttp.request.bytes");
     static final AttributeKey<Long> ATTR_RESPONSE_BYTES = AttributeKey.longKey("rhttp.response.bytes");
     static final AttributeKey<String> ATTR_FAILURE_STAGE = AttributeKey.stringKey("rhttp.failure.stage");
+    static final AttributeKey<String> ATTR_CACHE_OUTCOME = AttributeKey.stringKey("rhttp.cache.outcome");
     static final AttributeKey<String> ATTR_EXCEPTION_TYPE = AttributeKey.stringKey("exception.type");
 
     private final Tracer tracer;
@@ -129,6 +131,9 @@ public class OpenTelemetryHttpClientObserver implements HttpClientObserver {
             }
             if (event.getFailureStage() != null) {
                 builder.setAttribute(ATTR_FAILURE_STAGE, event.getFailureStage().name());
+            }
+            if (event.getCacheOutcome() != null) {
+                builder.setAttribute(ATTR_CACHE_OUTCOME, event.getCacheOutcome().name());
             }
 
             String errorType = resolveErrorType(event);

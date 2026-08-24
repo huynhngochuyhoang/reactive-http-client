@@ -4,7 +4,7 @@ V27 introduces an explicit local response-cache contract in four phases. Phase
 one provides bounded process-local TTL storage after policy selection, startup
 eligibility, and key isolation have succeeded. Phase two adds separately opt-in
 request coalescing, and phase three adds separately opt-in refresh on access.
-Cache telemetry remains a later, separately opt-in phase.
+Phase four adds separately opt-in bounded metrics and terminal cache outcomes.
 
 ## Explicit selection
 
@@ -178,7 +178,7 @@ Success, failure, and empty completion are fanned out to current callers, then
 the in-flight state is removed. A later caller can load again after failure,
 empty completion, cancellation, or shutdown. Coordination is per cache and key;
 a slow or failed load does not execute under a global load lock or block another
-key. Cache-specific metrics remain disabled until their later V27 phase is implemented.
+key. Cache-specific metrics remain disabled unless cache observability is explicitly selected.
 
 ## Phase-three refresh on access
 
@@ -213,6 +213,35 @@ does not copy or serialize a decoded value solely for caching. Prefer immutable
 DTOs; callers that mutate a cached object must copy it on their side. A cached
 `ResponseEntity` is rebuilt only to retain the bounded safe header subset; its
 body retains the decoded object identity.
+
+## Phase-four observability
+
+Cache telemetry is independent from cache selection and defaults off. Enable it
+only under the existing global observability gate:
+
+```yaml
+reactive:
+  http:
+    observability:
+      enabled: true
+      cache:
+        enabled: true
+```
+
+This setting does not select a cache policy and does not enable Caffeine stats.
+When no method selects caching, no cache meter is registered. Caller terminal
+records use only `FRESH_HIT`, `MISS_LOADER`, `COALESCED_WAITER`, or `STALE_HIT`.
+A hit, waiter, or stale return has zero transport attempts, no status, URL,
+server, failure stage, or wire-size evidence. The miss loader retains the final
+HTTP attempt facts.
+
+Hidden refresh does not create an OpenTelemetry span or lifecycle terminal
+record. Its success, failure, cancellation, and duration are represented by
+bounded cache meters and a metadata-only debug log containing client, API, and
+outcome. Cache keys, selected values, arguments, headers, bodies, URLs, tenant
+values, and credentials are never meter tags or cache outcome fields. See
+[Observability](08-observability.md#response-cache-metrics-separately-opt-in)
+for the complete meter and dashboard contract.
 
 Response cacheability is decided from the final wire status and headers for
 both plain `Mono<T>` and `Mono<ResponseEntity<T>>` contracts. Redirect responses

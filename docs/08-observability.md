@@ -140,6 +140,34 @@ SLO analysis and `histogram_quantile`. It is disabled by default.
 > `error.category`, and `failure.stage` to keep its label set bounded. Enabling
 > server-address labels remains a separate explicit cardinality decision.
 
+### Response-cache metrics *(separately opt-in)*
+
+Cache meters require all three conditions: global observability is enabled, a
+method explicitly selects a cache policy, and
+`reactive.http.observability.cache.enabled=true`. The cache-observability switch
+does not select caching and does not enable Caffeine's library statistics.
+
+| Meter | Type | Tags | Meaning |
+|---|---|---|---|
+| `reactive.http.client.cache.lookups` | Counter | `client.name`, `api.name`, `result=hit|miss` | One cache lookup result per caller. Use only this meter for hit ratio. |
+| `reactive.http.client.cache.callers` | Counter | `client.name`, `api.name`, `outcome=FRESH_HIT|MISS_LOADER|COALESCED_WAITER|STALE_HIT` | One bounded cache outcome per caller, aligned with lifecycle/log/observer/OTel. |
+| `reactive.http.client.cache.coalesced` | Counter | `client.name`, `api.name` | Miss callers that joined an existing single flight. |
+| `reactive.http.client.cache.stale` | Counter | `client.name`, `api.name` | Stale values returned while refresh was considered or started. |
+| `reactive.http.client.cache.loads` | Counter | `client.name`, `api.name`, `outcome=success|failure|cancellation` | Terminal miss-load work. |
+| `reactive.http.client.cache.load.duration` | Timer | same as `loads` | Miss-load work duration; Prometheus exports seconds. |
+| `reactive.http.client.cache.refreshes` | Counter | `client.name`, `api.name`, `outcome=success|failure|cancellation` | Terminal hidden-refresh work. |
+| `reactive.http.client.cache.refresh.duration` | Timer | same as `refreshes` | Hidden-refresh work duration; Prometheus exports seconds. |
+| `reactive.http.client.cache.evictions` | Counter | `client.name`, `cache.policy`, `cause=ttl|size` | Automatic TTL or maximum-size removal. Replacement and shutdown are not eviction causes. |
+| `reactive.http.client.cache.entries` | Gauge | `client.name`, `cache.policy` | Current estimated entries. |
+| `reactive.http.client.cache.maximum.entries` | Gauge | `client.name`, `cache.policy` | Configured maximum entries. |
+
+All result/outcome/cause values are fixed vocabularies. Selected APIs and
+policies register zero-valued series so an idle cache is distinguishable from a
+missing integration. Cache keys, values, arguments, headers, URLs, tenant values,
+and credentials are never tags. Every meter is owned by the client factory and
+removed on factory destruction; recreating the factory with identical tags binds
+gauges only to the replacement cache.
+
 ---
 
 ## Observability configuration
@@ -154,6 +182,8 @@ reactive:
       include-server-address: false       # opt-in server.address/server.port tags and span attributes
       log-request-body: false             # expose request body to custom observer events
       log-response-body: false            # expose decoded success body to custom observer events
+      cache:
+        enabled: false                    # separately opt-in cache metrics/outcome fields
       histogram:
         enabled: false                    # opt-in latency histogram (SLO buckets)
         slo-boundaries-ms: [50, 100, 200, 500, 1000, 2000, 5000]
@@ -177,6 +207,8 @@ rates computed from probe-to-probe deltas. The bean name remains
 Health reads only the configured main timer's count and its `error.category`
 and `failure.stage` tags. Timer duration sum, maximum, percentiles, and
 histogram buckets do not affect health status.
+Cache hit ratio, refresh failures, evictions, and entry pressure are operational
+signals only; no `reactive.http.client.cache.*` meter changes health status.
 
 ```yaml
 reactive:
@@ -430,6 +462,64 @@ The result is a rolling arithmetic mean, not a percentile or retry-event rate.
 Values can be below `1` when zero-attempt rejections occur and above `1` when
 Retry resubscribes. Redirect and auth-replay dispatches do not increase it.
 
+### Cache hit ratio (dimensionless)
+
+```promql
+sum by (client_name, api_name) (
+  rate(reactive_http_client_cache_lookups_total{result="hit"}[5m])
+)
+/
+clamp_min(
+  sum by (client_name, api_name) (
+    rate(reactive_http_client_cache_lookups_total[5m])
+  ),
+  0.000000001
+)
+```
+
+Use only lookup hit and miss series in this ratio. Coalesced waiters and stale
+serving have separate counters and must not be added to either side.
+
+### Cache coalescing ratio (dimensionless)
+
+```promql
+sum by (client_name, api_name) (
+  rate(reactive_http_client_cache_coalesced_total[5m])
+)
+/
+clamp_min(
+  sum by (client_name, api_name) (
+    rate(reactive_http_client_cache_lookups_total{result="miss"}[5m])
+  ),
+  0.000000001
+)
+```
+
+This is the fraction of miss callers that joined an existing load, not a
+downstream request reduction percentage.
+
+### Cache refresh failure rate (failures per second)
+
+```promql
+sum by (client_name, api_name) (
+  rate(reactive_http_client_cache_refreshes_total{outcome="failure"}[5m])
+)
+```
+
+Correlate this with stale-serving rate and hard-expiry misses. A refresh failure
+is hidden from the stale caller and does not itself mark downstream health DOWN.
+
+### Cache capacity pressure (dimensionless)
+
+```promql
+reactive_http_client_cache_entries
+/
+clamp_min(reactive_http_client_cache_maximum_entries, 1)
+```
+
+Aggregate with `max by (client_name, cache_policy)` when dashboards combine
+registries. Values near `1` indicate capacity pressure, not an error condition.
+
 ### Pool pressure (gauge counts, not utilization percentages)
 
 For HTTP/1.1, inspect queued acquisitions over five minutes:
@@ -460,6 +550,7 @@ limit are not exported in these gauge series. Correlate pending work with
 | Layer | Scope | Use it for | Do not infer |
 |---|---|---|---|
 | Starter logical-call Micrometer | One terminal timer/attempt sample per caller subscription; conditional size samples | User-visible duration, outcome, category, final attempt count, known sizes | Wire dispatch count or which resilience operator emitted an event |
+| Starter cache Micrometer | One bounded lookup result per cache caller plus hidden load/refresh work and policy gauges | Hit ratio, coalescing, stale serving, refresh reliability, evictions, and capacity | Cache keys/values, downstream health, or a distinct transport dispatch for every caller |
 | Resilience4j operator meters | CircuitBreaker call history, Retry events, and RateLimiter/Bulkhead current-state gauges | CircuitBreaker history, Retry execution/exhaustion, and current permission, waiter, or concurrency state | RateLimiter/Bulkhead rejection history; use the starter `RESILIENCE_ERROR` timer instead. Do not infer HTTP status/body ownership or downstream dispatch count. |
 | Reactor Netty transport meters | Connection-provider and remote-address transport state | Connector-level connection/pool activity and transport diagnosis | Starter logical-call outcome or bounded client API identity |
 | OpenTelemetry companion | One terminal `CLIENT` span per logical call plus inbound/outbound context propagation | Trace correlation and terminal logical-call attributes | Starter-owned child spans for retry, redirect, auth replay, or each dispatch |
@@ -472,6 +563,11 @@ The optional OTel companion records one terminal `CLIENT` span per logical
 client call using the [HTTP client semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-spans/).
 Retries, redirects, one-time auth replay, and transport dispatches remain inside
 that span; they do not create starter-owned child spans.
+
+When cache observability is enabled, caller spans add one bounded
+`rhttp.cache.outcome` value: `FRESH_HIT`, `MISS_LOADER`, `COALESCED_WAITER`, or
+`STALE_HIT`. Hidden refresh never creates a detached span; its work is represented
+by cache refresh meters and a sanitized metadata-only debug log.
 
 ### Add the dependency
 

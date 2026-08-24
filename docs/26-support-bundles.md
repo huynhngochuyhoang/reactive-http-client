@@ -551,6 +551,32 @@ Do not capture streaming payload bytes by default. For
 lifecycle, and exchange-log records describe response-envelope completion, not
 full consumption of the inner body.
 
+## Response Cache Incidents
+
+For response-cache incidents, add a separate bounded cache record before the
+general performance evidence:
+
+- Provider-backed diagnostics fields: `cachePhase`, `cachePolicyCount`,
+  `cacheTtlMs`, `cacheRefreshAfterMs`, `cacheSingleFlight`,
+  `cacheMaximumSize`, `cacheEntryCount`, `cacheEvictions`, and
+  `cacheMetricsEnabled`.
+- Lookup hit/miss rates and, when applicable, coalesced-waiter and stale-serving
+  rates for the affected bounded client/API names.
+- Load and refresh success/failure/cancellation rates and durations, plus TTL
+  and size eviction rates.
+- Current entries divided by configured maximum entries for each bounded
+  client/policy pair.
+- One caller terminal record containing only the bounded cache outcome,
+  attempt count, dispatch evidence, and ordinary structural error fields.
+
+Do not capture cache keys, key digests, cached values, selected arguments,
+headers, bodies, URLs, tenant/locale values, or credentials. A stale caller and
+its hidden refresh are different facts: the caller reports `STALE_HIT`, while
+refresh outcome and duration come from cache meters and the sanitized refresh
+debug log. Cache signals are operational context and do not independently make
+the downstream health indicator UP or DOWN. Use the PromQL recipes in
+[Observability](08-observability.md#cache-hit-ratio-dimensionless).
+
 ## Performance Investigations
 
 Minimal safe bundle:
