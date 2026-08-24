@@ -784,6 +784,8 @@ public class ReactiveHttpClientProperties {
         private List<String> varyByHeaders = new ArrayList<>();
         /** String Reactor-context keys included as key dimensions. */
         private List<String> varyByContext = new ArrayList<>();
+        /** Application-specific response headers that make a response non-cacheable. */
+        private List<String> nonCacheableResponseHeaders = new ArrayList<>();
         /** Explicit acknowledgement that omitted caller/auth variants share one response. */
         private boolean sharedResponse;
         /** Coalesce concurrent same-key misses into one shared load. Default: false. */
@@ -812,6 +814,13 @@ public class ReactiveHttpClientProperties {
         public List<String> getVaryByContext() { return varyByContext; }
         public void setVaryByContext(List<String> varyByContext) {
             this.varyByContext = varyByContext != null ? new ArrayList<>(varyByContext) : new ArrayList<>();
+        }
+
+        public List<String> getNonCacheableResponseHeaders() { return nonCacheableResponseHeaders; }
+        public void setNonCacheableResponseHeaders(List<String> nonCacheableResponseHeaders) {
+            this.nonCacheableResponseHeaders = nonCacheableResponseHeaders != null
+                    ? new ArrayList<>(nonCacheableResponseHeaders)
+                    : new ArrayList<>();
         }
 
         public boolean isSharedResponse() { return sharedResponse; }

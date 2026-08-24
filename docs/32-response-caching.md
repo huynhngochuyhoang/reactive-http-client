@@ -88,9 +88,11 @@ A cached `ResponseEntity` represents the previously materialized application
 value and status. Hits retain only `Content-Type`, `Content-Language`,
 `Content-Encoding`, `ETag`, `Last-Modified`, `Cache-Control`, `Expires`, and
 `Vary`, capped at 32 values and 16 KiB of UTF-8 value text. A response carrying
-`Set-Cookie`, another `SensitiveHeaders` name, `WWW-Authenticate`, or
-`Proxy-Authenticate` is not stored. Other headers are omitted. A hit does not
-create a new downstream wire response.
+`Set-Cookie`, another `SensitiveHeaders` name, `WWW-Authenticate`,
+`Proxy-Authenticate`, or a name selected through
+`non-cacheable-response-headers` is not stored. Other headers are omitted. The
+load caller sees the original response headers; a later hit sees only the retained
+representation allowlist and does not create a new downstream wire response.
 
 ## Phase-one runtime behavior
 
@@ -215,8 +217,32 @@ body retains the decoded object identity.
 Response cacheability is decided from the final wire status and headers for
 both plain `Mono<T>` and `Mono<ResponseEntity<T>>` contracts. Redirect responses
 are never stored. Responses carrying credential, cookie, authentication
-challenge, or another sensitive header are also never stored, even though a
-plain-body return type does not expose those headers to application code.
+challenge, another sensitive header, or a configured per-caller response header
+are also never stored, even though a plain-body return type does not expose those
+headers to application code. Header names are case-insensitive, limited to 32
+valid names, and exported in normalized effective-contract snapshots.
+
+## Feature-composition boundary
+
+Each subscription freezes its arguments and selected context, constructs the
+opaque key, and passes mandatory policy and authorization gates before lookup.
+Only then can a hit return. A hit does not subscribe the resilience, redirect,
+pool, transport, or decode pipeline. A miss leader and an access-driven refresh
+run that existing pipeline unchanged; storage occurs only after its final
+successful decoded value passes status and response-header checks.
+
+With single flight, every caller owns its logical-call deadline and terminal
+reporting state. Waiters may follow the leader load evidence while interested,
+but timeout or cancellation freezes only that caller. A hit, auth rejection, or
+open-circuit rejection has no URL, response status, response headers, transport
+failure stage, or attempt evidence from a prior load or refresh. Retry exhaustion
+retains only its final attempt facts, and a failed hidden refresh does not rewrite
+the stale caller result.
+
+Caching remains a read optimization. Selected non-`GET` methods fail startup
+even when an idempotency key is present. An unselected write still dispatches
+normally, does not invalidate cached reads, and is never suppressed by a cached
+result.
 
 ## Key and variant isolation
 
@@ -237,6 +263,7 @@ reactive:
               vary-by-parameters: [tenant]
               vary-by-headers: [Accept-Language, Idempotency-Key]
               vary-by-context: [salesRegion]
+              non-cacheable-response-headers: [X-Caller-Session, X-Identity]
 ```
 
 ```java

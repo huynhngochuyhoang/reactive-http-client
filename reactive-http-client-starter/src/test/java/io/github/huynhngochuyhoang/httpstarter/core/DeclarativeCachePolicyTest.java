@@ -49,15 +49,15 @@ class DeclarativeCachePolicyTest {
         assertThat(policies.get("inherited")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         true, "client", 1_000L, 100L,
-                        List.of(), List.of("idempotency-key"), List.of(), false, false, 0, 0));
+                        List.of(), List.of("idempotency-key"), List.of(), List.of(), false, false, 0, 0));
         assertThat(policies.get("overridden")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         true, "method", 2_000L, 200L,
-                        List.of(), List.of("idempotency-key"), List.of(), false, false, 0, 0));
+                        List.of(), List.of("idempotency-key"), List.of(), List.of(), false, false, 0, 0));
         assertThat(policies.get("excluded")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         false, "method-disabled", 0L, 0L,
-                        List.of(), List.of(), List.of(), false, false, 0, 0));
+                        List.of(), List.of(), List.of(), List.of(), false, false, 0, 0));
     }
 
     @Test
@@ -67,6 +67,7 @@ class DeclarativeCachePolicyTest {
         policy.setVaryByParameters(List.of(" tenant "));
         policy.setVaryByHeaders(List.of(" X-Tenant "));
         policy.setVaryByContext(List.of(" region ", "locale"));
+        policy.setNonCacheableResponseHeaders(List.of(" X-Session ", "X-Caller"));
         policy.setSharedResponse(true);
         policy.setSingleFlight(true);
         policy.setRefreshAfterMs(400L);
@@ -78,7 +79,33 @@ class DeclarativeCachePolicyTest {
 
         assertThat(contract.cache()).isEqualTo(new EffectiveHttpClientContract.CachePolicy(
                 true, "client", 1_000L, 100L,
-                List.of("tenant"), List.of("x-tenant"), List.of("locale", "region"), true, true, 400, 250));
+                List.of("tenant"), List.of("x-tenant"), List.of("locale", "region"),
+                List.of("x-caller", "x-session"), true, true, 400, 250));
+    }
+
+    @Test
+    void configuredNonCacheableResponseHeadersAreBoundedAndValidated() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy(1_000L, 100L);
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                config.getCache().getPolicies().get("selected");
+        policy.setNonCacheableResponseHeaders(List.of(" X-Caller ", "x-caller"));
+
+        assertThatCode(() -> validate(EligibleClient.class, "eligible-cache", config))
+                .doesNotThrowAnyException();
+        assertThat(EffectiveHttpClientContractExporter.export(
+                        EligibleClient.class, "eligible-cache", config, metadataCache).get(0)
+                .cache().nonCacheableResponseHeaders())
+                .containsExactly("x-caller");
+
+        policy.setNonCacheableResponseHeaders(List.of("Bad Header"));
+        assertThatThrownBy(() -> validate(EligibleClient.class, "eligible-cache", config))
+                .hasMessageContaining("invalid header name");
+
+        policy.setNonCacheableResponseHeaders(java.util.stream.IntStream.range(0, 33)
+                .mapToObj(index -> "X-Caller-" + index)
+                .toList());
+        assertThatThrownBy(() -> validate(EligibleClient.class, "eligible-cache", config))
+                .hasMessageContaining("must contain at most 32");
     }
 
     @Test

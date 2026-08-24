@@ -119,7 +119,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
             if (lookup.hit()) {
                 return cachedHit(selection, cache, key, lookup, loader, responseMetadata, proposedLoadState, context);
             }
-            return load(cache, lookup.loadToken(), () -> loader.apply(null), responseMetadata);
+            return load(selection.policy(), cache, lookup.loadToken(),
+                    () -> loader.apply(null), responseMetadata);
         });
     }
 
@@ -165,7 +166,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
                     proposedLoadState, context);
         }
         if (created) {
-            startFlight(flight, loader, responseMetadata, context);
+            startFlight(selection.policy(), flight, loader, responseMetadata, context);
         }
         return flight.publisher(member);
     }
@@ -222,17 +223,17 @@ final class LocalResponseCacheManager implements AutoCloseable {
             cancelRefresh(refreshKey);
             return;
         }
-        startRefresh(refresh, loader, responseMetadata, context, policy.getRefreshTimeoutMs());
+        startRefresh(policy, refresh, loader, responseMetadata, context);
     }
 
     @SuppressWarnings("unchecked")
-    private void startRefresh(InFlightRefresh refresh,
+    private void startRefresh(ReactiveHttpClientProperties.CachePolicyConfig policy,
+                              InFlightRefresh refresh,
                               Function<SubscriptionReportingState, Mono<?>> loader,
                               Supplier<ResponseMetadata> responseMetadata,
-                              ContextView context,
-                              long refreshTimeoutMs) {
+                              ContextView context) {
         long deadlineNanos = Math.min(
-                TimeUnit.MILLISECONDS.toNanos(refreshTimeoutMs),
+                TimeUnit.MILLISECONDS.toNanos(policy.getRefreshTimeoutMs()),
                 refresh.cache.hardExpiryRemainingNanos(refresh.refreshToken));
         if (deadlineNanos <= 0) {
             cancelRefresh(refresh.key);
@@ -261,7 +262,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
             subscription = source
                     .doOnSuccess(value -> {
                         if (value != null) {
-                            cacheCandidate(value, responseMetadata.get())
+                            cacheCandidate(policy, value, responseMetadata.get())
                                     .ifPresent(candidate -> refresh.cache.publishRefresh(
                                             refresh.refreshToken, candidate));
                         }
@@ -319,7 +320,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
         cancelRefresh(new FlightKey(cache, key));
     }
 
-    private Mono<?> load(LocalResponseCache cache,
+    private Mono<?> load(ReactiveHttpClientProperties.CachePolicyConfig policy,
+                         LocalResponseCache cache,
                          LocalResponseCache.LoadToken token,
                          Supplier<Mono<?>> loader,
                          Supplier<ResponseMetadata> responseMetadata) {
@@ -334,7 +336,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
             return source
                     .doOnSuccess(value -> {
                         if (value != null) {
-                            cacheCandidate(value, responseMetadata.get())
+                            cacheCandidate(policy, value, responseMetadata.get())
                                     .ifPresent(candidate -> cache.publish(token, candidate));
                         }
                     })
@@ -343,7 +345,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
     }
 
     @SuppressWarnings("unchecked")
-    private void startFlight(InFlightLoad flight,
+    private void startFlight(ReactiveHttpClientProperties.CachePolicyConfig policy,
+                             InFlightLoad flight,
                              Function<SubscriptionReportingState, Mono<?>> loader,
                              Supplier<ResponseMetadata> responseMetadata,
                              ContextView context) {
@@ -356,6 +359,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
 
         Mono<Object> source = (Mono<Object>) load(
+                policy,
                 flight.cache,
                 flight.loadToken,
                 () -> loader.apply(flight.loadState),
@@ -532,17 +536,20 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 bounds.ttlMs, bounds.maximumSize, ticker, this::cancelRefreshForRemoval);
     }
 
-    private java.util.Optional<Object> cacheCandidate(Object value, ResponseMetadata responseMetadata) {
+    private java.util.Optional<Object> cacheCandidate(
+            ReactiveHttpClientProperties.CachePolicyConfig policy,
+            Object value,
+            ResponseMetadata responseMetadata) {
         if (responseMetadata != null
                 && (isRedirect(responseMetadata.statusCode())
-                || hasNonCacheableHeaders(responseMetadata.headers()))) {
+                || hasNonCacheableHeaders(policy, responseMetadata.headers()))) {
             return java.util.Optional.empty();
         }
         if (!(value instanceof ResponseEntity<?> entity)) {
             return java.util.Optional.of(value);
         }
         if (isRedirect(entity.getStatusCode().value())
-                || hasNonCacheableHeaders(entity.getHeaders())) {
+                || hasNonCacheableHeaders(policy, entity.getHeaders())) {
             return java.util.Optional.empty();
         }
         HttpHeaders retained = new HttpHeaders();
@@ -573,20 +580,27 @@ final class LocalResponseCacheManager implements AutoCloseable {
         return java.util.Optional.of(new ResponseEntity<>(entity.getBody(), retained, entity.getStatusCode()));
     }
 
-    private boolean hasNonCacheableHeaders(Map<String, ? extends java.util.List<String>> headers) {
-        return hasNonCacheableHeaderNames(headers.keySet());
+    private boolean hasNonCacheableHeaders(
+            ReactiveHttpClientProperties.CachePolicyConfig policy,
+            Map<String, ? extends java.util.List<String>> headers) {
+        return hasNonCacheableHeaderNames(policy, headers.keySet());
     }
 
-    private boolean hasNonCacheableHeaders(HttpHeaders headers) {
-        return hasNonCacheableHeaderNames(
+    private boolean hasNonCacheableHeaders(
+            ReactiveHttpClientProperties.CachePolicyConfig policy, HttpHeaders headers) {
+        return hasNonCacheableHeaderNames(policy,
                 headers.headerSet().stream().map(Map.Entry::getKey).toList());
     }
 
-    private boolean hasNonCacheableHeaderNames(Iterable<String> headerNames) {
+    private boolean hasNonCacheableHeaderNames(
+            ReactiveHttpClientProperties.CachePolicyConfig policy, Iterable<String> headerNames) {
+        java.util.List<String> configured =
+                EffectiveCachePolicy.normalizedNonCacheableResponseHeaders(policy);
         for (String headerName : headerNames) {
             String normalized = headerName.toLowerCase(Locale.ROOT);
             if (SensitiveHeaders.isSensitive(headerName)
-                    || NON_CACHEABLE_RESPONSE_HEADERS.contains(normalized)) {
+                    || NON_CACHEABLE_RESPONSE_HEADERS.contains(normalized)
+                    || configured.contains(normalized)) {
                 return true;
             }
         }

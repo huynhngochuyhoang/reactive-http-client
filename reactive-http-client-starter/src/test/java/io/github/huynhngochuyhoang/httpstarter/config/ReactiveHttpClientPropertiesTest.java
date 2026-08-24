@@ -284,6 +284,8 @@ class ReactiveHttpClientPropertiesTest {
         yaml.put("reactive.http.clients.users.cache.policies.local.single-flight", true);
         yaml.put("reactive.http.clients.users.cache.policies.local.refresh-after-ms", 500);
         yaml.put("reactive.http.clients.users.cache.policies.local.refresh-timeout-ms", 250);
+        yaml.put("reactive.http.clients.users.cache.policies.local.non-cacheable-response-headers",
+                "X-Session,X-Caller");
 
         ReactiveHttpClientProperties.CachePolicyConfig policy = bind(yaml)
                 .getClients().get("users").getCache().getPolicies().get("local");
@@ -291,6 +293,7 @@ class ReactiveHttpClientPropertiesTest {
         assertTrue(policy.isSingleFlight());
         assertEquals(500L, policy.getRefreshAfterMs());
         assertEquals(250L, policy.getRefreshTimeoutMs());
+        assertEquals(List.of("X-Session", "X-Caller"), policy.getNonCacheableResponseHeaders());
     }
 
     @Test

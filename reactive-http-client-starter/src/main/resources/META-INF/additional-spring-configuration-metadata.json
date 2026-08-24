@@ -443,6 +443,12 @@
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
     },
     {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].non-cacheable-response-headers",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Application-specific response header names that make a response non-cacheable, matched case-insensitively. At most 32 valid header names.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
+    },
+    {
       "name": "reactive.http.clients.[name].cache.policies.[policy-name].refresh-after-ms",
       "type": "java.lang.Long",
       "description": "Optional access-driven refresh threshold in milliseconds. When configured, it must be positive and strictly below ttl-ms, and refresh-timeout-ms is required.",

@@ -181,6 +181,7 @@ public final class ReactiveHttpClientContractSnapshot {
                 + ",varyParameters=" + variantNames(cache.varyByParameters())
                 + ",varyHeaders=" + variantNames(cache.varyByHeaders())
                 + ",varyContext=" + variantNames(cache.varyByContext())
+                + ",nonCacheableResponseHeaders=" + variantNames(cache.nonCacheableResponseHeaders())
                 + ",sharedResponse=" + cache.sharedResponse()
                 + ",singleFlight=" + cache.singleFlight()
                 + ",refreshAfter=" + cache.refreshAfterMs() + "ms"

@@ -7,14 +7,14 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.ResponseEntity;
 
 import java.lang.reflect.*;
-import java.util.Arrays;
-import java.util.Map;
+import java.util.*;
 
 /** Internal, startup-only resolution of an explicitly selected response-cache policy. */
 final class EffectiveCachePolicy {
 
     static final long MAX_TTL_MS = 365L * 24 * 60 * 60 * 1000;
     static final long MAXIMUM_SIZE = 1_000_000L;
+    static final int MAX_NON_CACHEABLE_RESPONSE_HEADERS = 32;
 
     private EffectiveCachePolicy() {
     }
@@ -40,6 +40,7 @@ final class EffectiveCachePolicy {
         requireBound(context, "ttl-ms", policy.getTtlMs(), MAX_TTL_MS);
         requireBound(context, "maximum-size", policy.getMaximumSize(), MAXIMUM_SIZE);
         validateRefreshBounds(context, policy);
+        normalizedNonCacheableResponseHeaders(context, policy);
 
         if (!"GET".equals(effectiveHttpMethod)) {
             throw invalid(context, "only GET methods are cache-eligible but the resolved HTTP method is "
@@ -138,6 +139,46 @@ final class EffectiveCachePolicy {
             throw invalid(context, "refresh-after-ms must be strictly less than ttl-ms but was "
                     + refreshAfterMs + " with ttl-ms " + policy.getTtlMs());
         }
+    }
+
+    static List<String> normalizedNonCacheableResponseHeaders(
+            ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        return normalizedNonCacheableResponseHeaders("Response-cache policy", policy);
+    }
+
+    private static List<String> normalizedNonCacheableResponseHeaders(
+            String context, ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        if (policy == null || policy.getNonCacheableResponseHeaders() == null) {
+            return List.of();
+        }
+        if (policy.getNonCacheableResponseHeaders().size() > MAX_NON_CACHEABLE_RESPONSE_HEADERS) {
+            throw invalid(context, "non-cacheable-response-headers must contain at most "
+                    + MAX_NON_CACHEABLE_RESPONSE_HEADERS + " names");
+        }
+        TreeSet<String> normalized = new TreeSet<>();
+        for (String headerName : policy.getNonCacheableResponseHeaders()) {
+            String name = headerName != null ? headerName.trim() : "";
+            if (!isHeaderName(name)) {
+                throw invalid(context, "non-cacheable-response-headers contains an invalid header name: "
+                        + String.valueOf(headerName));
+            }
+            normalized.add(name.toLowerCase(Locale.ROOT));
+        }
+        return List.copyOf(normalized);
+    }
+
+    private static boolean isHeaderName(String value) {
+        if (value.isEmpty() || value.length() > 128) {
+            return false;
+        }
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character <= 32 || character >= 127
+                    || "()<>@,;:\\\"/[]?={} \t".indexOf(character) >= 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void validateMaterializedType(String context, Type type) {

@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Cache feature-composition contract.** Cache lookup now has deterministic
+  boundaries across authorization, resilience, redirects, logical deadlines,
+  single-flight waiters, and access-driven refresh. Terminal evidence remains
+  caller/load-local across hits, failures, retries, cancellation, and hidden
+  refresh work; cached reads neither suppress writes nor infer invalidation.
+  Cache policies can also reject up to 32 application-specific per-caller
+  response headers through `non-cacheable-response-headers`, while cached
+  `ResponseEntity` hits retain only the bounded representation-header allowlist.
 - **Bounded refresh on access.** Cache policies can now opt into refresh with
   `refresh-after-ms` and a mandatory finite `refresh-timeout-ms`. Stale
   accesses return the current value while one generation-bound hidden refresh
