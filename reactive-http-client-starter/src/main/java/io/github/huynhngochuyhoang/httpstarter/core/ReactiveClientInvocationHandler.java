@@ -12,10 +12,7 @@ import io.github.huynhngochuyhoang.httpstarter.core.SubscriptionReportingState.T
 import io.github.huynhngochuyhoang.httpstarter.core.SubscriptionReportingState.TerminalSnapshot;
 import io.github.huynhngochuyhoang.httpstarter.exception.*;
 import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
-import io.github.huynhngochuyhoang.httpstarter.observability.CompositeHttpClientObserver;
-import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
-import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
-import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
+import io.github.huynhngochuyhoang.httpstarter.observability.*;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,15 +172,36 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             String baseUrl) {
         ReactiveHttpClientFactoryBean.validateEffectiveResilienceContracts(
                 clientInterface, metadataCache, clientConfig, resilienceOperatorApplier, clientName);
+        Object meterRegistry = cacheMeterRegistry(applicationContext, observabilityConfig);
         LocalResponseCacheManager responseCacheManager = LocalResponseCacheManager.createForClient(
                 clientInterface,
                 clientName,
                 metadataCache,
                 clientConfig,
-                applicationContext.getClassLoader());
+                applicationContext.getClassLoader(),
+                observabilityConfig,
+                meterRegistry);
         return new ReactiveClientInvocationHandler(webClient, metadataCache, argumentResolver, errorDecoder,
                 clientConfig, clientName, clientInterface, applicationContext, resilienceOperatorApplier,
                 jsonCodec, observabilityConfig, responseCacheManager, cacheAuthProvider, baseUrl);
+    }
+
+    private static Object cacheMeterRegistry(
+            ApplicationContext applicationContext,
+            ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig) {
+        if (observabilityConfig == null
+                || !observabilityConfig.isEnabled()
+                || observabilityConfig.getCache() == null
+                || !observabilityConfig.getCache().isEnabled()
+                || !org.springframework.util.ClassUtils.isPresent(
+                        "io.micrometer.core.instrument.MeterRegistry", applicationContext.getClassLoader())) {
+            return null;
+        }
+        Class<?> meterRegistryType = org.springframework.util.ClassUtils.resolveClassName(
+                "io.micrometer.core.instrument.MeterRegistry", applicationContext.getClassLoader());
+        org.springframework.beans.factory.ObjectProvider<?> provider =
+                applicationContext.getBeanProvider(meterRegistryType);
+        return provider != null ? provider.getIfAvailable() : null;
     }
 
     public ReactiveClientInvocationHandler(
@@ -362,8 +380,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 concreteClient, clientName, plan, clientConfig, effectiveApi.httpMethod());
         if (cacheSelection.enabled()) {
             requireCacheAuthorizationSupport();
-            boolean singleFlight = cacheSelection.policy().isSingleFlight();
-            boolean refreshOnAccess = cacheSelection.policy().isRefreshEnabled();
             Object[] invocationArguments = args != null ? args.clone() : new Object[0];
             Mono<?> cacheInvocation = Mono.deferContextual(context -> {
                 Object[] frozenArguments = CacheKeyContract.freezeArguments(
@@ -372,9 +388,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         applyDefaultQueryParams(argumentResolver.resolve(plan, frozenArguments)));
                 RequestArgumentResolver.ResolvedArgs keyResolved = CacheKeyContract.snapshotRequestTarget(
                         applyCacheKeyIdempotencyKey(plan, frozenResolved, context));
-                if (singleFlight) {
-                    subscriptionState(context).prepareInitialResolved(keyResolved);
-                }
+                SubscriptionReportingState callerState = subscriptionState(context);
+                callerState.prepareInitialResolved(keyResolved);
                 return prepareCacheSelectedBody(plan, keyResolved, cacheSelection.policy())
                         .flatMap(bodyPreparation -> {
                             CacheKeyContract.PreparedKey preparedKey = CacheKeyContract.derive(
@@ -398,29 +413,20 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                                                 keyResolved, preparedRequestBody,
                                                                 new AtomicReference<>(authContext), responseMetadata,
                                                                 loadState);
-                                                if (singleFlight || refreshOnAccess) {
-                                                    return responseCacheManager.getOrLoad(
-                                                            cacheSelection,
-                                                            preparedKey.key(),
-                                                            loader,
-                                                            responseMetadata::get,
-                                                            singleFlight ? subscriptionState(context) : null,
-                                                            new SubscriptionReportingState(keyResolved));
-                                                }
                                                 return responseCacheManager.getOrLoad(
                                                         cacheSelection,
                                                         preparedKey.key(),
-                                                        () -> loader.apply(null),
-                                                        responseMetadata::get);
+                                                        plan.apiName(),
+                                                        loader,
+                                                        responseMetadata::get,
+                                                        callerState,
+                                                        new SubscriptionReportingState(keyResolved));
                                             }));
                             return authorizedLookup.contextWrite(preparedKey::writeContext);
                         });
             });
-            if (singleFlight) {
-                return singleFlightCaller(
-                        cacheInvocation, proxy, method, meta, plan, effectiveApi, clientConfig.getLogicalCallTimeoutMs());
-            }
-            return applyLogicalCallTimeoutMono(cacheInvocation, clientConfig.getLogicalCallTimeoutMs());
+            return cacheCaller(
+                    cacheInvocation, proxy, method, meta, plan, effectiveApi, clientConfig.getLogicalCallTimeoutMs());
         }
 
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
@@ -432,7 +438,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return responseCacheManager;
     }
 
-    private Mono<?> singleFlightCaller(Mono<?> cacheInvocation,
+    private Mono<?> cacheCaller(Mono<?> cacheInvocation,
                                        Object proxy,
                                        Method method,
                                        MethodMetadata meta,
@@ -512,10 +518,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                   AtomicReference<LocalResponseCacheManager.ResponseMetadata> cacheResponseMetadata,
                                   SubscriptionReportingState sharedLoadState) {
         boolean coalescedCacheLoad = sharedLoadState != null;
+        boolean hiddenCacheRefresh = sharedLoadState != null && sharedLoadState.hiddenCacheRefresh();
         String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         RequestBodyOwnership requestBodyOwnership = new RequestBodyOwnership(resolved.body());
 
-        HttpExchangeLogger exchangeLogger = resolveExchangeLogger(proxy, method, meta);
+        HttpExchangeLogger exchangeLogger = hiddenCacheRefresh ? null : resolveExchangeLogger(proxy, method, meta);
 
         boolean hasAcceptHeader = resolved.headersIgnoreCase().containsKey(HttpHeaders.ACCEPT);
         boolean hasContentTypeHeader = contentTypeHeader != null;
@@ -528,8 +535,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 : null;
 
         // Resolve observer once per invocation to avoid repeated volatile reads
-        HttpClientObserver observer = getObserver();
-        List<ReactiveHttpClientLifecycleHook> lifecycleHooks = getLifecycleHooks();
+        HttpClientObserver observer = hiddenCacheRefresh ? null : getObserver();
+        List<ReactiveHttpClientLifecycleHook> lifecycleHooks = hiddenCacheRefresh ? List.of() : getLifecycleHooks();
 
         // Apply when: (a) caller set an explicit @TimeoutMs (including 0 to disable), or (b) a resilience timeout resolved to > 0.
         boolean shouldApplyResponseTimeout = plan.timeoutMs() != MethodMetadata.TIMEOUT_NOT_SET
@@ -680,7 +687,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     plan, resolved, context, state.generatedIdempotencyKey());
             Attempt attempt = state.beginAttempt(preparedResolved);
             notifyLifecycleAttempt(
-                    lifecycleHooks, plan, effectiveApi, preparedResolved, null, null, null, attempt.number());
+                    lifecycleHooks, plan, effectiveApi, preparedResolved, null, null, null,
+                    attempt.number(), state.cacheOutcome());
             if (exchangeLogger == null && state.markFirstAttemptStarted()) {
                 logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.elapsedMillis());
             }
@@ -1792,12 +1800,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             URI requestUrl,
             HttpStatusCode statusCode,
             Throwable error,
-            int attemptNumber) {
+            int attemptNumber,
+            io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome cacheOutcome) {
         if (hooks.isEmpty()) {
             return;
         }
         ReactiveHttpClientLifecycleContext context = lifecycleContext(
-                plan, effectiveApi, resolved, requestUrl, statusCode, error, attemptNumber);
+                plan, effectiveApi, resolved, requestUrl, statusCode, error, attemptNumber, cacheOutcome);
         if (attemptNumber <= 1) {
             invokeLifecycleHooks(hooks, "onStart", hook -> hook.onStart(context));
         } else {
@@ -1812,12 +1821,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             RequestArgumentResolver.ResolvedArgs resolved,
             URI requestUrl,
             HttpStatusCode statusCode,
-            int attemptNumber) {
+            int attemptNumber,
+            io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome cacheOutcome) {
         if (hooks.isEmpty()) {
             return;
         }
         ReactiveHttpClientLifecycleContext context = lifecycleContext(
-                plan, effectiveApi, resolved, requestUrl, statusCode, null, attemptNumber);
+                plan, effectiveApi, resolved, requestUrl, statusCode, null, attemptNumber, cacheOutcome);
         invokeLifecycleHooks(hooks, "onSuccess", hook -> hook.onSuccess(context));
     }
 
@@ -1829,12 +1839,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             URI requestUrl,
             HttpStatusCode statusCode,
             Throwable error,
-            int attemptNumber) {
+            int attemptNumber,
+            io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome cacheOutcome) {
         if (hooks.isEmpty()) {
             return;
         }
         ReactiveHttpClientLifecycleContext context = lifecycleContext(
-                plan, effectiveApi, resolved, requestUrl, statusCode, error, attemptNumber);
+                plan, effectiveApi, resolved, requestUrl, statusCode, error, attemptNumber, cacheOutcome);
         invokeLifecycleHooks(hooks, "onError", hook -> hook.onError(context));
     }
 
@@ -1846,12 +1857,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             URI requestUrl,
             HttpStatusCode statusCode,
             Throwable error,
-            int attemptNumber) {
+            int attemptNumber,
+            io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome cacheOutcome) {
         if (hooks.isEmpty()) {
             return;
         }
         ReactiveHttpClientLifecycleContext context = lifecycleContext(
-                plan, effectiveApi, resolved, requestUrl, statusCode, error, attemptNumber);
+                plan, effectiveApi, resolved, requestUrl, statusCode, error, attemptNumber, cacheOutcome);
         invokeLifecycleHooks(hooks, "onCancel", hook -> hook.onCancel(context));
     }
 
@@ -1862,7 +1874,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             URI requestUrl,
             HttpStatusCode statusCode,
             Throwable error,
-            int attemptNumber) {
+            int attemptNumber,
+            io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome cacheOutcome) {
         return ReactiveHttpClientLifecycleContext.from(
                 clientName,
                 plan,
@@ -1872,7 +1885,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 requestUrl,
                 statusCode != null ? statusCode.value() : null,
                 error,
-                attemptNumber);
+                attemptNumber,
+                cacheOutcome);
     }
 
     private void invokeLifecycleHooks(
@@ -1985,13 +1999,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         switch (signal) {
             case SUCCESS -> notifyLifecycleSuccess(
                     lifecycleHooks, plan, effectiveApi, terminal.preparedResolved(), terminal.requestUrl(),
-                    terminal.responseStatus(), terminal.attemptCount());
+                    terminal.responseStatus(), terminal.attemptCount(), terminal.cacheOutcome());
             case ERROR -> notifyLifecycleError(
                     lifecycleHooks, plan, effectiveApi, terminal.preparedResolved(), terminal.finalRequestUrl(),
-                    terminal.responseStatus(), terminal.error(), terminal.attemptCount());
+                    terminal.responseStatus(), terminal.error(), terminal.attemptCount(), terminal.cacheOutcome());
             case CANCEL -> notifyLifecycleCancel(
                     lifecycleHooks, plan, effectiveApi, terminal.preparedResolved(), terminal.requestUrl(),
-                    terminal.responseStatus(), terminal.error(), terminal.attemptCount());
+                    terminal.responseStatus(), terminal.error(), terminal.attemptCount(), terminal.cacheOutcome());
         }
         reportExchange(
                 exchangeLogger,
@@ -2024,7 +2038,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     terminal.responseBody(),
                     terminal.error(),
                     inboundHeaders,
-                    terminal.attemptCount());
+                    terminal.attemptCount(),
+                    terminal.cacheOutcome());
         }
         if (observer != null) {
             long requestBytes = measureRequestBodyBytes(plan, terminal);
@@ -2043,7 +2058,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     terminal.responseBody(),
                     terminal.attemptCount(),
                     requestBytes,
-                    responseBytes);
+                    responseBytes,
+                    terminal.cacheOutcome(),
+                    terminal.cacheServed());
         }
     }
 
@@ -2059,7 +2076,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Object responseBody,
             Throwable error,
             Map<String, List<String>> inboundHeaders,
-            int subscriptionAttemptCount) {
+            int subscriptionAttemptCount,
+            io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome cacheOutcome) {
         exchangeLogger.log(new HttpExchangeLogContext(
                 clientName,
                 httpMethod,
@@ -2076,7 +2094,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 durationMs,
                 subscriptionAttemptCount,
                 error,
-                clientConfig.getLogPreset()
+                clientConfig.getLogPreset(),
+                cacheOutcome
         ));
     }
 
@@ -2117,11 +2136,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             Object responseBody,
             int attemptCount,
             long requestBytes,
-            long responseBytes) {
+            long responseBytes,
+            io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome cacheOutcome,
+            boolean cacheServed) {
         try {
             boolean logBody = observabilityConfig != null && observabilityConfig.isLogRequestBody();
             boolean logRespBody = observabilityConfig != null && observabilityConfig.isLogResponseBody();
-            observer.record(new HttpClientObserverEvent(
+            HttpClientObserverEvent event = new HttpClientObserverEvent(
                     clientName,
                     plan.apiName(),
                     httpMethod,
@@ -2138,8 +2159,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     requestUrl != null ? requestUrl.getHost() : null,
                     resolveServerPort(requestUrl),
                     requestUrl != null ? requestUrl.toString() : null,
-                    finalRequestObservation != null ? finalRequestObservation.headers() : Map.of()
-            ));
+                    finalRequestObservation != null ? finalRequestObservation.headers() : Map.of(),
+                    cacheOutcome
+            );
+            if (cacheServed) {
+                observer.recordCacheServed(event);
+            }
+            else {
+                observer.record(event);
+            }
         } catch (Exception e) {
             log.warn("HttpClientObserver threw an exception – ignoring: {}", e.getMessage());
         }
@@ -2296,9 +2324,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     /**
      * Best-effort application request body size before transport content coding. String bodies
      * use the declared content-type charset of the final dispatched attempt. Pre-dispatch failures
-     * fall back to the prepared request headers. Arbitrary and multipart bodies remain unknown.
+     * fall back to the prepared request headers. Non-dispatched cache callers, arbitrary bodies,
+     * and multipart bodies remain unknown.
      */
     private long measureRequestBodyBytes(RequestPlan plan, TerminalSnapshot terminal) {
+        if (terminal.cacheOutcome() != null
+                && terminal.cacheOutcome() != HttpClientCacheOutcome.MISS_LOADER) {
+            return HttpClientObserverEvent.UNKNOWN_SIZE;
+        }
         if (plan.multipart()) {
             return HttpClientObserverEvent.UNKNOWN_SIZE;
         }

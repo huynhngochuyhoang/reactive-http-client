@@ -75,14 +75,15 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
         out.append("| Client count | `").append(clients.size()).append("` |\n");
         out.append("| Endpoint count | `").append(endpointCountEntries(clients)).append("` |\n");
         out.append("| Inherited endpoint count | `").append(inheritedEndpointCountEntries(clients)).append("` |\n\n");
-        out.append("| Client | Interface | Base URL source | Pool | Response timeout | Logical-call budget | Compression | Decoded aggregate limit | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |\n");
-        out.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+        out.append("| Client | Interface | Base URL source | Pool | Cache | Response timeout | Logical-call budget | Compression | Decoded aggregate limit | Resilience | Strict retry validation | Strict body-signing validation | Auth mode | Redirects | Endpoints | Inherited endpoints |\n");
+        out.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
         for (SnapshotClient entry : clients) {
             ReactiveHttpClientDiagnosticsProvider.ClientSummary client = entry.summary();
             out.append("| `").append(markdown(client.clientName())).append("` ");
             out.append("| `").append(markdown(client.clientInterface())).append("` ");
             out.append("| `").append(markdown(client.baseUrlSource())).append("` ");
             out.append("| `").append(markdown(pool(entry.pool()))).append("` ");
+            out.append("| `").append(markdown(cache(entry.cache()))).append("` ");
             out.append("| `").append(markdown(timeout(client.timeout()))).append("` ");
             out.append("| `").append(logicalCallTimeout(entry.logicalCallTimeoutMs())).append("` ");
             out.append("| `").append(strictFlag(entry.compressionEnabled())).append("` ");
@@ -135,6 +136,15 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             clientMap.put("poolProtocol", poolProtocol(entry.pool()));
             clientMap.put("poolCapacityBasis", poolCapacityBasis(entry.pool()));
             clientMap.put("poolMaxConcurrentStreams", poolMaxConcurrentStreams(entry.pool()));
+            clientMap.put("cachePhase", cachePhase(entry.cache()));
+            clientMap.put("cachePolicyCount", cachePolicyCount(entry.cache()));
+            clientMap.put("cacheTtlMs", cacheTtlMs(entry.cache()));
+            clientMap.put("cacheRefreshAfterMs", cacheRefreshAfterMs(entry.cache()));
+            clientMap.put("cacheSingleFlight", cacheSingleFlight(entry.cache()));
+            clientMap.put("cacheMaximumSize", cacheMaximumSize(entry.cache()));
+            clientMap.put("cacheEntryCount", cacheEntryCount(entry.cache()));
+            clientMap.put("cacheEvictions", cacheEvictions(entry.cache()));
+            clientMap.put("cacheMetricsEnabled", cacheMetricsEnabled(entry.cache()));
             clientMap.put("timeoutSource", client.timeout().source());
             clientMap.put("timeoutMs", client.timeout().timeoutMs());
             clientMap.put("logicalCallTimeoutMs", entry.logicalCallTimeoutMs());
@@ -194,6 +204,15 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             field(out, 3, "poolProtocol", poolProtocol(entry.pool()), true);
             field(out, 3, "poolCapacityBasis", poolCapacityBasis(entry.pool()), true);
             nullableField(out, 3, "poolMaxConcurrentStreams", poolMaxConcurrentStreams(entry.pool()), true);
+            field(out, 3, "cachePhase", cachePhase(entry.cache()), true);
+            nullableField(out, 3, "cachePolicyCount", cachePolicyCount(entry.cache()), true);
+            nullableField(out, 3, "cacheTtlMs", cacheTtlMs(entry.cache()), true);
+            nullableField(out, 3, "cacheRefreshAfterMs", cacheRefreshAfterMs(entry.cache()), true);
+            field(out, 3, "cacheSingleFlight", cacheSingleFlight(entry.cache()), true);
+            nullableField(out, 3, "cacheMaximumSize", cacheMaximumSize(entry.cache()), true);
+            nullableField(out, 3, "cacheEntryCount", cacheEntryCount(entry.cache()), true);
+            nullableField(out, 3, "cacheEvictions", cacheEvictions(entry.cache()), true);
+            field(out, 3, "cacheMetricsEnabled", cacheMetricsEnabled(entry.cache()), true);
             field(out, 3, "timeoutSource", client.timeout().source(), true);
             field(out, 3, "timeoutMs", client.timeout().timeoutMs(), true);
             nullableField(out, 3, "logicalCallTimeoutMs", entry.logicalCallTimeoutMs(), true);
@@ -225,7 +244,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
     }
 
     private static SnapshotClient snapshotClient(ReactiveHttpClientDiagnosticsProvider.ClientSummary summary) {
-        return new SnapshotClient(summary, null, null, null, null, null, null);
+        return new SnapshotClient(summary, null, null, null, null, null, null, null);
     }
 
     private static SnapshotClient snapshotClient(ReactiveHttpClientDiagnosticsProvider.ClientSnapshotEntry entry) {
@@ -234,6 +253,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
                 entry.strictUnsafeRetryValidation(),
                 entry.strictBodySigningValidation(),
                 entry.pool(),
+                entry.cache(),
                 entry.logicalCallTimeoutMs(),
                 entry.compressionEnabled(),
                 entry.codecMaxInMemorySizeMb());
@@ -274,6 +294,10 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
         boundedText("circuitBreaker", resilience.circuitBreaker());
         boundedText("bulkhead", resilience.bulkhead());
         boundedText("authMode", summary.authMode());
+        if (entry.cache() != null) {
+            boundedText("cachePhase", entry.cache().phase());
+            boundedText("cacheSingleFlight", entry.cache().singleFlight());
+        }
         if (summary.endpointCount() < 0 || summary.inheritedEndpointCount() < 0
                 || summary.inheritedEndpointCount() > summary.endpointCount()) {
             throw new IllegalArgumentException("Diagnostics snapshot contains invalid endpoint counts for client "
@@ -303,6 +327,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             Boolean strictUnsafeRetryValidation,
             Boolean strictBodySigningValidation,
             ReactiveHttpClientDiagnosticsProvider.PoolSummary pool,
+            ReactiveHttpClientDiagnosticsProvider.CacheSummary cache,
             Long logicalCallTimeoutMs,
             Boolean compressionEnabled,
             Integer codecMaxInMemorySizeMb
@@ -369,6 +394,57 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     private static Long poolMaxConcurrentStreams(ReactiveHttpClientDiagnosticsProvider.PoolSummary pool) {
         return pool != null ? pool.maxConcurrentStreams() : null;
+    }
+
+    private static String cache(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        if (cache == null) {
+            return "unknown";
+        }
+        return "phase=" + cache.phase()
+                + ", policies=" + cache.policyCount()
+                + ", ttlMs=" + cache.ttlMs()
+                + ", refreshAfterMs=" + (cache.refreshAfterMs() != null ? cache.refreshAfterMs() : "disabled")
+                + ", singleFlight=" + cache.singleFlight()
+                + ", maximumSize=" + cache.maximumSize()
+                + ", entries=" + (cache.entryCount() != null ? cache.entryCount() : "unknown")
+                + ", evictions=" + (cache.evictions() != null ? cache.evictions() : "unknown")
+                + ", metrics=" + cache.metricsEnabled();
+    }
+
+    private static String cachePhase(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.phase() : "unknown";
+    }
+
+    private static Integer cachePolicyCount(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.policyCount() : null;
+    }
+
+    private static Long cacheTtlMs(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.ttlMs() : null;
+    }
+
+    private static Long cacheRefreshAfterMs(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.refreshAfterMs() : null;
+    }
+
+    private static String cacheSingleFlight(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.singleFlight() : "unknown";
+    }
+
+    private static Long cacheMaximumSize(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.maximumSize() : null;
+    }
+
+    private static Long cacheEntryCount(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.entryCount() : null;
+    }
+
+    private static Long cacheEvictions(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.evictions() : null;
+    }
+
+    private static Boolean cacheMetricsEnabled(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.metricsEnabled() : null;
     }
 
     private static String timeout(ReactiveHttpClientDiagnosticsProvider.TimeoutSummary timeout) {

@@ -75,6 +75,9 @@ class ReactiveHttpClientAotSmokeTest {
                 ReactiveHttpClientProperties.DiagnosticsEndpointConfig.class.getMethod("setEnabled", boolean.class)))
                 .accepts(hints);
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                ReactiveHttpClientProperties.CacheObservabilityConfig.class.getMethod("setEnabled", boolean.class)))
+                .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 ReactiveHttpClientProperties.CachePolicyConfig.class.getMethod("setTtlMs", Long.class)))
                 .accepts(hints);
         assertThat(ReactiveHttpClientProperties.class.getDeclaredClasses())

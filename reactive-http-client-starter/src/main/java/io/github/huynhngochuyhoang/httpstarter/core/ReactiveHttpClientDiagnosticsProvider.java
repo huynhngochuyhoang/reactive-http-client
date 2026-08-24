@@ -103,6 +103,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 strictUnsafeRetryValidation(clientInterface, clientConfig, resilienceDiagnostics),
                 strictBodySigningValidation(clientConfig, authProviderFactories),
                 poolSummary(clientConfig),
+                cacheSummary(registration, clientInterface, clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
                 clientConfig.isCompressionEnabled(),
                 clientConfig.getCodecMaxInMemorySizeMb());
@@ -200,13 +201,13 @@ public class ReactiveHttpClientDiagnosticsProvider {
         }
         if (objectType instanceof Class<?> clazz && clazz.isInterface()
                 && clazz.isAnnotationPresent(ReactiveHttpClient.class)) {
-            return new ClientRegistration(clazz, starterFactory);
+            return new ClientRegistration(beanName, clazz, starterFactory);
         }
         if (objectType instanceof String className) {
             try {
                 Class<?> clazz = ClassUtils.resolveClassName(className, beanFactory.getBeanClassLoader());
                 if (clazz.isInterface() && clazz.isAnnotationPresent(ReactiveHttpClient.class)) {
-                    return new ClientRegistration(clazz, starterFactory);
+                    return new ClientRegistration(beanName, clazz, starterFactory);
                 }
             } catch (IllegalArgumentException ignored) {
                 return null;
@@ -232,7 +233,71 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 && ReactiveHttpClientFactoryBean.class.isAssignableFrom(resolvedBeanType);
     }
 
-    private record ClientRegistration(Class<?> clientInterface, boolean starterFactory) {
+    private record ClientRegistration(String beanName, Class<?> clientInterface, boolean starterFactory) {
+    }
+
+    private CacheSummary cacheSummary(ClientRegistration registration,
+                                      Class<?> clientInterface,
+                                      ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        if (!registration.starterFactory()) {
+            return new CacheSummary("disabled", 0, null, null, "disabled", 0, 0L, 0L, false);
+        }
+        List<ReactiveHttpClientProperties.CachePolicyConfig> selected = new ArrayList<>();
+        for (Method method : clientInterface.getMethods()) {
+            if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
+                continue;
+            }
+            RequestPlan plan = RequestPlan.from(metadataCache.get(method), clientInterface);
+            EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.resolve(plan, clientConfig);
+            if (selection.enabled() && selected.stream().noneMatch(policy -> policy == selection.policy())) {
+                selected.add(selection.policy());
+            }
+        }
+        if (selected.isEmpty()) {
+            return new CacheSummary("disabled", 0, null, null, "disabled", 0, 0L, 0L, false);
+        }
+        String phase = selected.stream().anyMatch(ReactiveHttpClientProperties.CachePolicyConfig::isRefreshEnabled)
+                ? "refresh-on-access"
+                : selected.stream().anyMatch(ReactiveHttpClientProperties.CachePolicyConfig::isSingleFlight)
+                ? "single-flight"
+                : "local-ttl";
+        String singleFlight = selected.stream().allMatch(ReactiveHttpClientProperties.CachePolicyConfig::isSingleFlight)
+                ? "enabled"
+                : selected.stream().noneMatch(ReactiveHttpClientProperties.CachePolicyConfig::isSingleFlight)
+                ? "disabled"
+                : "mixed";
+        long ttlMs = selected.stream().map(ReactiveHttpClientProperties.CachePolicyConfig::getTtlMs)
+                .filter(Objects::nonNull).mapToLong(Long::longValue).min().orElse(0L);
+        Long refreshAfterMs = selected.stream()
+                .map(ReactiveHttpClientProperties.CachePolicyConfig::getRefreshAfterMs)
+                .filter(Objects::nonNull).mapToLong(Long::longValue).min().stream().boxed().findFirst().orElse(null);
+        long maximumSize = selected.stream().map(ReactiveHttpClientProperties.CachePolicyConfig::getMaximumSize)
+                .filter(Objects::nonNull).mapToLong(Long::longValue).sum();
+        LocalResponseCacheManager.Snapshot runtime = existingCacheSnapshot(registration);
+        boolean metricsEnabled = properties.getObservability() != null
+                && properties.getObservability().isEnabled()
+                && properties.getObservability().getCache() != null
+                && properties.getObservability().getCache().isEnabled();
+        return new CacheSummary(
+                phase,
+                selected.size(),
+                ttlMs,
+                refreshAfterMs,
+                singleFlight,
+                maximumSize,
+                runtime != null ? runtime.currentSize() : null,
+                runtime != null ? runtime.evictions() : null,
+                metricsEnabled);
+    }
+
+    private LocalResponseCacheManager.Snapshot existingCacheSnapshot(ClientRegistration registration) {
+        if (!registration.starterFactory() || !beanFactory.containsSingleton(registration.beanName())) {
+            return null;
+        }
+        Object singleton = beanFactory.getSingleton(registration.beanName());
+        return singleton instanceof ReactiveHttpClientFactoryBean<?> factory
+                ? factory.responseCacheSnapshot()
+                : null;
     }
 
     private static EffectiveHttpClientContract.TimeoutPolicy representativeTimeout(List<EffectiveHttpClientContract> contracts) {
@@ -794,9 +859,23 @@ public class ReactiveHttpClientDiagnosticsProvider {
             Boolean strictUnsafeRetryValidation,
             Boolean strictBodySigningValidation,
             PoolSummary pool,
+            CacheSummary cache,
             long logicalCallTimeoutMs,
             boolean compressionEnabled,
             int codecMaxInMemorySizeMb
+    ) {
+    }
+
+    record CacheSummary(
+            String phase,
+            int policyCount,
+            Long ttlMs,
+            Long refreshAfterMs,
+            String singleFlight,
+            long maximumSize,
+            Long entryCount,
+            Long evictions,
+            boolean metricsEnabled
     ) {
     }
 

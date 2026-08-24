@@ -23,7 +23,8 @@ class ReactiveHttpClientConfigurationMetadataTest {
     private static final Set<String> CONFIGURATION_EXAMPLE_LANGUAGES = Set.of("properties", "yaml", "yml");
     private static final Set<String> METRIC_NAME_PREFIXES = Set.of(
             "reactive.http.client.requests",
-            "reactive.http.client.connection.pool");
+            "reactive.http.client.connection.pool",
+            "reactive.http.client.cache");
 
     @Test
     void documentsImportantConfigurationProperties() throws IOException {
@@ -61,6 +62,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "reactive.http.clients.[name].tls.trust-store",
                 "reactive.http.observability.enabled",
                 "reactive.http.observability.metric-name",
+                "reactive.http.observability.cache.enabled",
                 "reactive.http.observability.health.enabled",
                 "reactive.http.observability.histogram.enabled",
                 "reactive.http.observability.diagnostics-endpoint.enabled",
@@ -569,6 +571,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
         assertDefaultValue(metadata, "reactive.http.observability.include-server-address", false);
         assertDefaultValue(metadata, "reactive.http.observability.log-request-body", false);
         assertDefaultValue(metadata, "reactive.http.observability.log-response-body", false);
+        assertDefaultValue(metadata, "reactive.http.observability.cache.enabled", false);
         assertDefaultValue(metadata, "reactive.http.observability.health.enabled", true);
         assertDefaultValue(metadata, "reactive.http.observability.diagnostics-endpoint.enabled", false);
         assertDefaultValue(metadata, "reactive.http.observability.health.error-rate-threshold", 0.5);

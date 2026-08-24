@@ -21,6 +21,8 @@ interface LocalResponseCache extends AutoCloseable {
 
     long estimatedSize();
 
+    long evictionCount();
+
     @Override
     void close();
 
@@ -46,5 +48,18 @@ interface LocalResponseCache extends AutoCloseable {
     }
 
     interface RefreshToken {
+    }
+
+    enum RemovalReason {
+        TTL,
+        SIZE;
+
+        String tagValue() {
+            return name().toLowerCase(java.util.Locale.ROOT);
+        }
+    }
+
+    interface RemovalObserver {
+        void onRemoval(LocalResponseCache cache, CacheKeyContract.OpaqueKey key, RemovalReason reason);
     }
 }

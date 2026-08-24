@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiConsumer;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
 /** Caffeine-backed storage with generation-checked publication for duplicate phase-one loads. */
@@ -21,15 +21,16 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     private final Cache<CacheKeyContract.OpaqueKey, CachedEntry> cache;
     private final long ttlNanos;
     private final LongSupplier ticker;
-    private final BiConsumer<LocalResponseCache, CacheKeyContract.OpaqueKey> removalCallback;
+    private final RemovalObserver removalObserver;
+    private final AtomicLong evictions = new AtomicLong();
 
     CaffeineLocalResponseCache(long ttlMs,
                                long maximumSize,
                                LongSupplier ticker,
-                               BiConsumer<LocalResponseCache, CacheKeyContract.OpaqueKey> removalCallback) {
+                               RemovalObserver removalObserver) {
         this.ttlNanos = TimeUnit.MILLISECONDS.toNanos(ttlMs);
         this.ticker = ticker;
-        this.removalCallback = removalCallback;
+        this.removalObserver = removalObserver;
         this.cache = Caffeine.newBuilder()
                 .maximumSize(maximumSize)
                 .expireAfterWrite(Duration.ofMillis(ttlMs))
@@ -183,6 +184,11 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     }
 
     @Override
+    public long evictionCount() {
+        return evictions.get();
+    }
+
+    @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) {
             return;
@@ -205,8 +211,16 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
                 removeUnusedGeneration(key, state);
             }
         }
-        if (cause != RemovalCause.REPLACED && removalCallback != null) {
-            removalCallback.accept(this, key);
+        RemovalReason reason = switch (cause) {
+            case EXPIRED -> RemovalReason.TTL;
+            case SIZE -> RemovalReason.SIZE;
+            default -> null;
+        };
+        if (reason != null) {
+            evictions.incrementAndGet();
+            if (removalObserver != null) {
+                removalObserver.onRemoval(this, key, reason);
+            }
         }
     }
 

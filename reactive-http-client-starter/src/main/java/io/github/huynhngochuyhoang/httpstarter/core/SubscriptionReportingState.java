@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import org.springframework.http.HttpStatusCode;
 
 import java.net.URI;
@@ -23,6 +24,9 @@ final class SubscriptionReportingState {
     private final AtomicReference<SubscriptionReportingState> followedAttemptState = new AtomicReference<>();
     private final AtomicReference<AttemptSnapshot> frozenAttemptSnapshot = new AtomicReference<>();
     private final AtomicReference<TerminalSnapshot> terminalSnapshot = new AtomicReference<>();
+    private final AtomicReference<HttpClientCacheOutcome> cacheOutcome = new AtomicReference<>();
+    private final AtomicBoolean cacheServed = new AtomicBoolean();
+    private final AtomicBoolean hiddenCacheRefresh = new AtomicBoolean();
 
     SubscriptionReportingState(RequestArgumentResolver.ResolvedArgs initialResolved) {
         this.initialResolved = new AtomicReference<>(initialResolved);
@@ -107,6 +111,27 @@ final class SubscriptionReportingState {
         return TimeUnit.NANOSECONDS.toMillis(Math.max(0L, elapsedNanos));
     }
 
+    boolean cacheOutcome(HttpClientCacheOutcome outcome) {
+        return outcome != null && terminalSnapshot.get() == null
+                && cacheOutcome.compareAndSet(null, outcome);
+    }
+
+    HttpClientCacheOutcome cacheOutcome() {
+        return cacheOutcome.get();
+    }
+
+    void markCacheServed() {
+        cacheServed.set(true);
+    }
+
+    void markHiddenCacheRefresh() {
+        hiddenCacheRefresh.set(true);
+    }
+
+    boolean hiddenCacheRefresh() {
+        return hiddenCacheRefresh.get();
+    }
+
     boolean markFirstAttemptStarted() {
         return firstAttempt.compareAndSet(true, false);
     }
@@ -152,7 +177,9 @@ final class SubscriptionReportingState {
                 attempt.evidence().responseHeaders(),
                 responseBody,
                 error,
-                attempt.attemptCount());
+                attempt.attemptCount(),
+                cacheOutcome.get(),
+                cacheServed.get());
         return terminalSnapshot.compareAndSet(null, candidate) ? candidate : null;
     }
 
@@ -278,7 +305,9 @@ final class SubscriptionReportingState {
             Map<String, List<String>> responseHeaders,
             Object responseBody,
             Throwable error,
-            int attemptCount) {
+            int attemptCount,
+            HttpClientCacheOutcome cacheOutcome,
+            boolean cacheServed) {
 
         TerminalSnapshot {
             responseHeaders = responseHeaders == null || responseHeaders.isEmpty()

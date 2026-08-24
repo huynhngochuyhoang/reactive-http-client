@@ -38,6 +38,24 @@ class Boot4HttpClientHealthIndicatorTest {
     }
 
     @Test
+    void cacheOperationalMetersDoNotChangeDownstreamHealth() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        registry.counter("reactive.http.client.cache.refreshes",
+                "client.name", "catalog", "api.name", "get", "outcome", "failure")
+                .increment(100);
+        registry.gauge("reactive.http.client.cache.entries",
+                java.util.List.of(
+                        io.micrometer.core.instrument.Tag.of("client.name", "catalog"),
+                        io.micrometer.core.instrument.Tag.of("cache.policy", "local")),
+                new java.util.concurrent.atomic.AtomicInteger(100));
+
+        Health health = indicator(registry, defaults()).health();
+
+        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        assertThat(health.getDetails()).doesNotContainKey("catalog");
+    }
+
+    @Test
     void reportsDownWhenErrorRateExceedsThreshold() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ReactiveHttpClientProperties.ObservabilityConfig config = defaults();

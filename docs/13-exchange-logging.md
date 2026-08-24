@@ -219,6 +219,11 @@ When `@LogHttpExchange` is used without a `logger` attribute (i.e. `logger = Def
 not guaranteed HTTP network sends. For example, request-body serialization can
 fail before dispatch after an attempt has started.
 
+`cacheOutcome()` is `null` unless response-cache observability is separately
+enabled for a cache-selected method. Its only values are `FRESH_HIT`,
+`MISS_LOADER`, `COALESCED_WAITER`, and `STALE_HIT`; it never carries a cache
+key or value. Hits and waiters have no invented transport status or URL.
+
 ---
 
 ## Structured logging example
@@ -234,6 +239,9 @@ HttpExchangeLogger structuredExchangeLogger(ObjectMapper mapper) {
         fields.put("status", context.responseStatus());
         fields.put("durationMs", context.durationMs());
         fields.put("subscriptionAttemptCount", context.subscriptionAttemptCount());
+        if (context.cacheOutcome() != null) {
+            fields.put("cacheOutcome", context.cacheOutcome().name());
+        }
         if (context.error() != null) {
             fields.put("errorType", context.error().getClass().getName());
             fields.put("errorCategory",

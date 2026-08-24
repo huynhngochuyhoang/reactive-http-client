@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -79,6 +80,33 @@ class DefaultHttpExchangeLoggerTest {
     }
 
     @Test
+    void cacheOutcomeLoggingUsesOnlyTheBoundedValue(CapturedOutput output) {
+        logger.log(new HttpExchangeLogContext(
+                "orders",
+                "GET",
+                "/orders/{id}",
+                null,
+                Map.of("id", "42"),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                null,
+                null,
+                Map.of(),
+                null,
+                10,
+                0,
+                null,
+                ReactiveHttpClientProperties.LogPreset.METADATA_ONLY,
+                HttpClientCacheOutcome.FRESH_HIT));
+
+        assertThat(output)
+                .contains("cacheOutcome=FRESH_HIT")
+                .doesNotContain("cache-key")
+                .doesNotContain("cached-value");
+    }
+
+    @Test
     void legacyContextConstructorDefaultsToMetadataOnlyPreset() {
         HttpExchangeLogContext context = new HttpExchangeLogContext(
                 "orders",
@@ -98,6 +126,7 @@ class DefaultHttpExchangeLoggerTest {
         assertThat(context.logPreset()).isEqualTo(ReactiveHttpClientProperties.LogPreset.METADATA_ONLY);
         assertThat(context.requestUrl()).isNull();
         assertThat(context.subscriptionAttemptCount()).isEqualTo(1);
+        assertThat(context.cacheOutcome()).isNull();
     }
 
     private static HttpExchangeLogContext context(ReactiveHttpClientProperties.LogPreset preset) {

@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 
 import java.net.URI;
@@ -43,8 +44,31 @@ public record HttpExchangeLogContext(
         long durationMs,
         int subscriptionAttemptCount,
         Throwable error,
-        ReactiveHttpClientProperties.LogPreset logPreset
+        ReactiveHttpClientProperties.LogPreset logPreset,
+        HttpClientCacheOutcome cacheOutcome
 ) {
+    public HttpExchangeLogContext(
+            String clientName,
+            String httpMethod,
+            String pathTemplate,
+            URI requestUrl,
+            Map<String, Object> pathVariables,
+            Map<String, List<Object>> queryParameters,
+            Map<String, List<String>> inboundHeaders,
+            Map<String, String> requestHeaders,
+            Object requestBody,
+            Integer responseStatus,
+            Map<String, List<String>> responseHeaders,
+            Object responseBody,
+            long durationMs,
+            int subscriptionAttemptCount,
+            Throwable error,
+            ReactiveHttpClientProperties.LogPreset logPreset) {
+        this(clientName, httpMethod, pathTemplate, requestUrl, pathVariables, queryParameters, inboundHeaders,
+                requestHeaders, requestBody, responseStatus, responseHeaders, responseBody, durationMs,
+                subscriptionAttemptCount, error, logPreset, null);
+    }
+
     /** Proven transport failure stage, or {@code null} when it cannot be attributed safely. */
     public HttpClientFailureStage failureStage() {
         return HttpClientFailureStage.from(error, responseStatus, requestUrl != null);

@@ -22,4 +22,15 @@ public interface HttpClientObserver {
      * @param event contains all data about the completed request/response cycle
      */
     void record(HttpClientObserverEvent event);
+
+    /**
+     * Called for a logical caller completed from cache-owned work without owning
+     * a downstream HTTP dispatch. Custom observers receive these events by
+     * default; downstream-only observers may override this method.
+     *
+     * @param event contains the caller's terminal cache result
+     */
+    default void recordCacheServed(HttpClientObserverEvent event) {
+        record(event);
+    }
 }
