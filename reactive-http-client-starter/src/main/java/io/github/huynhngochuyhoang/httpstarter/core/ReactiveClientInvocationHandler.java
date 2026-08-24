@@ -390,18 +390,28 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                             Mono<?> authorizedLookup = prepareCacheLoadBody(keyResolved, bodyPreparation)
                                     .flatMap(preparedRequestBody -> authorizeCacheLookup(
                                                     plan, effectiveApi, keyResolved, preparedRequestBody)
-                                            .flatMap(authContext -> responseCacheManager.getOrLoad(
-                                                    cacheSelection,
-                                                    preparedKey.key(),
-                                                    () -> {
-                                                        Mono<?> source = (Mono<?>) invokeResolved(
+                                            .flatMap(authContext -> {
+                                                Function<SubscriptionReportingState, Mono<?>> loader = loadState ->
+                                                        (Mono<?>) invokeResolved(
                                                                 proxy, method, frozenArguments, meta, plan, effectiveApi,
                                                                 keyResolved, preparedRequestBody,
                                                                 new AtomicReference<>(authContext), responseMetadata,
-                                                                singleFlight);
-                                                        return source;
-                                                    },
-                                                    responseMetadata::get)));
+                                                                loadState);
+                                                if (singleFlight) {
+                                                    return responseCacheManager.getOrLoad(
+                                                            cacheSelection,
+                                                            preparedKey.key(),
+                                                            loader,
+                                                            responseMetadata::get,
+                                                            subscriptionState(context),
+                                                            new SubscriptionReportingState(keyResolved));
+                                                }
+                                                return responseCacheManager.getOrLoad(
+                                                        cacheSelection,
+                                                        preparedKey.key(),
+                                                        () -> loader.apply(null),
+                                                        responseMetadata::get);
+                                            }));
                             return authorizedLookup.contextWrite(preparedKey::writeContext);
                         });
             });
@@ -414,7 +424,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
                 applyDefaultQueryParams(argumentResolver.resolve(plan, args)));
-        return invokeResolved(proxy, method, args, meta, plan, effectiveApi, resolved, null, null, null, false);
+        return invokeResolved(proxy, method, args, meta, plan, effectiveApi, resolved, null, null, null, null);
     }
 
     LocalResponseCacheManager responseCacheManager() {
@@ -499,7 +509,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                   SerializedRequestBody preparedSerializedRequestBody,
                                   AtomicReference<AuthContext> preResolvedAuthContext,
                                   AtomicReference<LocalResponseCacheManager.ResponseMetadata> cacheResponseMetadata,
-                                  boolean coalescedCacheLoad) {
+                                  SubscriptionReportingState sharedLoadState) {
+        boolean coalescedCacheLoad = sharedLoadState != null;
         String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         RequestBodyOwnership requestBodyOwnership = new RequestBodyOwnership(resolved.body());
 
@@ -609,9 +620,12 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             });
         }
         mono = releaseRequestBodyOnTermination(mono, requestBodyOwnership);
-        return usesSubscriptionState
-                ? mono.contextWrite(context -> withSubscriptionState(context, resolved, coalescedCacheLoad))
-                : mono;
+        if (!usesSubscriptionState) {
+            return mono;
+        }
+        return mono.contextWrite(context -> sharedLoadState != null
+                ? context.put(SUBSCRIPTION_STATE_CONTEXT_KEY, sharedLoadState)
+                : withSubscriptionState(context, resolved));
     }
 
     // -------------------------------------------------------------------------
@@ -2388,16 +2402,6 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             reactor.util.context.Context context,
             RequestArgumentResolver.ResolvedArgs resolved) {
         return context.put(SUBSCRIPTION_STATE_CONTEXT_KEY, new SubscriptionReportingState(resolved));
-    }
-
-    private static reactor.util.context.Context withSubscriptionState(
-            reactor.util.context.Context context,
-            RequestArgumentResolver.ResolvedArgs resolved,
-            boolean preserveExisting) {
-        if (preserveExisting && context.hasKey(SUBSCRIPTION_STATE_CONTEXT_KEY)) {
-            return context;
-        }
-        return withSubscriptionState(context, resolved);
     }
 
     private static String generatedIdempotencyKey(AtomicReference<String> generatedIdempotencyKey) {

@@ -65,6 +65,37 @@ class SubscriptionReportingStateTest {
     }
 
     @Test
+    void detachedCallerFreezesLoadEvidenceWhilePromotedCallerTracksLaterRetry() {
+        SubscriptionReportingState load = new SubscriptionReportingState(RESOLVED);
+        SubscriptionReportingState firstCaller = new SubscriptionReportingState(RESOLVED);
+        SubscriptionReportingState waiter = new SubscriptionReportingState(RESOLVED);
+        firstCaller.followAttemptEvidenceFrom(load);
+        SubscriptionReportingState.Attempt firstAttempt = load.beginAttempt(RESOLVED);
+        firstAttempt.observeRequestUrl(URI.create("http://test.local/first"));
+        firstAttempt.recordResponse(HttpStatus.SERVICE_UNAVAILABLE, Map.of());
+
+        firstCaller.freezeAttemptEvidenceForDetachFrom(load);
+        SubscriptionReportingState.TerminalSnapshot firstTerminal = firstCaller.complete(
+                SubscriptionReportingState.TerminalSignal.ERROR, null, new RuntimeException("caller timeout"));
+        load.clearActiveAttempt(firstAttempt);
+        waiter.followAttemptEvidenceFrom(load);
+        SubscriptionReportingState.Attempt retry = load.beginAttempt(RESOLVED);
+        retry.observeRequestUrl(URI.create("http://test.local/retry"));
+        retry.recordResponse(HttpStatus.OK, Map.of());
+        waiter.freezeAttemptEvidenceFrom(load);
+        SubscriptionReportingState.TerminalSnapshot waiterTerminal = waiter.complete(
+                SubscriptionReportingState.TerminalSignal.SUCCESS, "done", null);
+
+        assertThat(firstTerminal.attemptCount()).isEqualTo(1);
+        assertThat(firstTerminal.requestUrl()).hasToString("http://test.local/first");
+        assertThat(firstCaller.terminalSnapshot()).isSameAs(firstTerminal);
+        assertThat(firstCaller.attemptCount()).isEqualTo(1);
+        assertThat(waiterTerminal.attemptCount()).isEqualTo(2);
+        assertThat(waiterTerminal.requestUrl()).hasToString("http://test.local/retry");
+        assertThat(waiterTerminal.responseStatus()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
     void exactlyOneCompetingTerminalSignalWinsWithOneImmutableSnapshot() throws InterruptedException {
         SubscriptionReportingState state = new SubscriptionReportingState(RESOLVED);
         SubscriptionReportingState.Attempt attempt = state.beginAttempt(RESOLVED);

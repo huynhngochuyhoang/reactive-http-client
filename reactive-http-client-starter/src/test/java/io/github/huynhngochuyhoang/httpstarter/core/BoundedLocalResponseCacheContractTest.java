@@ -31,6 +31,7 @@ import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.server.HttpServer;
 import reactor.test.scheduler.VirtualTimeScheduler;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -159,6 +160,48 @@ class BoundedLocalResponseCacheContractTest {
     }
 
     @Test
+    void singleFlightRechecksTheCacheBeforeInstallingAFlightFromAStaleMiss() throws Exception {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("stale-miss", 1_000, 10, true);
+        CacheKeyContract.OpaqueKey key = key("shared");
+        AtomicInteger staleLoads = new AtomicInteger();
+        AtomicInteger winningLoads = new AtomicInteger();
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AtomicReference<Thread> pausedThread = new AtomicReference<>();
+        CountDownLatch started = new CountDownLatch(1);
+        Field flightsField = LocalResponseCacheManager.class.getDeclaredField("inFlightLoads");
+        flightsField.setAccessible(true);
+        Object flightMonitor = flightsField.get(manager);
+
+        try {
+            CompletableFuture<String> paused;
+            synchronized (flightMonitor) {
+                paused = CompletableFuture.supplyAsync(() -> {
+                    pausedThread.set(Thread.currentThread());
+                    started.countDown();
+                    return cached(manager, selection, key, () -> {
+                        staleLoads.incrementAndGet();
+                        return Mono.just("stale");
+                    }).block();
+                }, executor);
+                assertThat(started.await(1, TimeUnit.SECONDS)).isTrue();
+                awaitThreadState(pausedThread.get(), Thread.State.BLOCKED);
+
+                assertThat(cached(manager, selection, key, () -> {
+                    winningLoads.incrementAndGet();
+                    return Mono.just("winner");
+                }).block()).isEqualTo("winner");
+            }
+
+            assertThat(paused.get(1, TimeUnit.SECONDS)).isEqualTo("winner");
+            assertThat(winningLoads).hasValue(1);
+            assertThat(staleLoads).hasValue(0);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void singleFlightDetachesCallersAndCancelsOnlyAfterTheLastCallerLeaves() {
         LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
         EffectiveCachePolicy.Selection selection = selection("cancellation", 1_000, 10, true);
@@ -184,6 +227,49 @@ class BoundedLocalResponseCacheContractTest {
             return Mono.just("replacement");
         }).block()).isEqualTo("replacement");
         assertThat(replacementLoads).hasValue(1);
+    }
+
+    @Test
+    void reservedFlightMemberCannotReconnectAnUntrackedSource() throws Exception {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("reserved-member", 1_000, 10, true);
+        Sinks.One<String> load = Sinks.one();
+        AtomicInteger subscriptions = new AtomicInteger();
+        AtomicInteger cancellations = new AtomicInteger();
+        Mono<String> call = cached(manager, selection, key("shared"), () -> Mono.defer(() -> {
+            subscriptions.incrementAndGet();
+            return load.asMono().doOnCancel(cancellations::incrementAndGet);
+        }));
+        Disposable current = call.subscribe();
+
+        Field flightsField = LocalResponseCacheManager.class.getDeclaredField("inFlightLoads");
+        flightsField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> flights = (Map<Object, Object>) flightsField.get(manager);
+        Mono<?> delayedMember;
+        synchronized (flights) {
+            Object flight = flights.values().iterator().next();
+            java.lang.reflect.Method reserve = flight.getClass()
+                    .getDeclaredMethod("reserve", SubscriptionReportingState.class);
+            reserve.setAccessible(true);
+            Object member = reserve.invoke(flight, new Object[]{null});
+            java.lang.reflect.Method publisher = flight.getClass()
+                    .getDeclaredMethod("publisher", member.getClass());
+            publisher.setAccessible(true);
+            delayedMember = (Mono<?>) publisher.invoke(flight, member);
+        }
+
+        current.dispose();
+        assertThat(cancellations).hasValue(0);
+        AtomicReference<Object> value = new AtomicReference<>();
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        delayedMember.subscribe(value::set, error::set);
+        load.tryEmitValue("shared-value").orThrow();
+
+        assertThat(value).hasValue("shared-value");
+        assertThat(error.get()).isNull();
+        assertThat(subscriptions).hasValue(1);
+        assertThat(cancellations).hasValue(0);
     }
 
     @Test
@@ -832,6 +918,72 @@ class BoundedLocalResponseCacheContractTest {
     }
 
     @Test
+    void retryAfterFirstCallerTimeoutUsesFlightStateAndCompletesTheWaiterState() throws Exception {
+        VirtualTimeScheduler scheduler = VirtualTimeScheduler.getOrSet();
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+            context.getBeanFactory().registerSingleton("cacheObserver",
+                    (io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver) observed::add);
+            context.refresh();
+            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+            AtomicInteger dispatches = new AtomicInteger();
+            Sinks.One<ClientResponse> firstAttempt = Sinks.one();
+            Sinks.One<ClientResponse> retryAttempt = Sinks.one();
+            WebClient webClient = WebClient.builder()
+                    .baseUrl("http://cache.test")
+                    .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                    .exchangeFunction(request -> dispatches.incrementAndGet() == 1
+                            ? firstAttempt.asMono()
+                            : retryAttempt.asMono())
+                    .build();
+            ReactiveHttpClientProperties.ClientConfig shortConfig = singleFlightConfig(50);
+            ReactiveHttpClientProperties.ClientConfig longConfig = singleFlightConfig(200);
+            shortConfig.getResilience().setEnabled(true);
+            shortConfig.getResilience().setRetry("cache-retry");
+            longConfig.getResilience().setEnabled(true);
+            longConfig.getResilience().setRetry("cache-retry");
+            RetryOnceApplier retryApplier = new RetryOnceApplier();
+            CacheClient firstCaller = cacheClient(
+                    webClient, shortConfig, context, manager, retryApplier, null);
+            CacheClient waiter = cacheClient(
+                    webClient, longConfig, context, manager, retryApplier, null);
+
+            CompletableFuture<String> timedOut = firstCaller
+                    .get("retry-after-timeout", "principal", "tenant", "en-US").toFuture();
+            CompletableFuture<String> surviving = waiter
+                    .get("retry-after-timeout", "principal", "tenant", "en-US").toFuture();
+            assertThat(dispatches).hasValue(1);
+            scheduler.advanceTimeBy(Duration.ofMillis(50));
+
+            assertThatThrownBy(() -> timedOut.get(1, TimeUnit.SECONDS))
+                    .satisfies(error -> assertThat(hasCause(error, LogicalCallTimeoutException.class)).isTrue());
+            firstAttempt.tryEmitValue(ClientResponse.create(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("retry")
+                    .build()).orThrow();
+            assertThat(dispatches).hasValue(2);
+            retryAttempt.tryEmitValue(ok("waiter-success")).orThrow();
+
+            assertThat(surviving.get(1, TimeUnit.SECONDS)).isEqualTo("waiter-success");
+            assertThat(observed).hasSize(2);
+            HttpClientObserverEvent timeoutEvent = observed.stream()
+                    .filter(event -> hasCause(event.getError(), LogicalCallTimeoutException.class))
+                    .findFirst()
+                    .orElseThrow();
+            HttpClientObserverEvent waiterEvent = observed.stream()
+                    .filter(event -> event.getError() == null)
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(timeoutEvent.getAttemptCount()).isEqualTo(1);
+            assertThat(waiterEvent.getAttemptCount()).isEqualTo(2);
+            assertThat(waiterEvent.getStatusCode()).isEqualTo(200);
+            assertThat(retryApplier.applications).hasValue(1);
+            assertThat(retryApplier.subscriptions).hasValue(1);
+        } finally {
+            VirtualTimeScheduler.reset();
+        }
+    }
+
+    @Test
     void redirectDispatchesRemainInsideOneCoalescedLeader() throws Exception {
         AtomicInteger initialDispatches = new AtomicInteger();
         AtomicInteger redirectedDispatches = new AtomicInteger();
@@ -1289,6 +1441,14 @@ class BoundedLocalResponseCacheContractTest {
             current = current.getCause() != current ? current.getCause() : null;
         }
         return null;
+    }
+
+    private static void awaitThreadState(Thread thread, Thread.State expectedState) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (thread.getState() != expectedState && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
+        assertThat(thread.getState()).isEqualTo(expectedState);
     }
 
     private static void assertTimeoutDirection(boolean firstCallerTimesOut) {

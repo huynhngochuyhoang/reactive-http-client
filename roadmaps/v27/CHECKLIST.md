@@ -635,25 +635,29 @@ Evidence recorded on 2026-08-23:
 - [x] Cover waiter timeout/cancellation while the leader retries, redirects, or
       refreshes auth.
 
-Evidence recorded on 2026-08-23:
+Evidence recorded on 2026-08-23 and revalidated on 2026-08-24:
 
 - `single-flight` is a default-false cache-policy property and is included in
   generated configuration metadata and effective-contract snapshots.
-  `LocalResponseCacheManager` owns one reference-counted in-flight publisher
-  per cache and opaque key; phase-one duplicate-miss behavior is unchanged
-  when the property is false.
+  `LocalResponseCacheManager` owns one in-flight state machine per cache and
+  opaque key. Cache recheck and member reservation are atomic, and its terminal
+  sink cannot reconnect after removal. Phase-one duplicate-miss behavior is
+  unchanged when the property is false.
 - Subscription-local reporting wraps each coalesced caller. Logical-call
   deadlines and cancellation detach only that caller, while request/attempt
-  timeouts remain inside the shared leader. Last-caller cancellation and
-  factory shutdown cancel the load without publishing a late cache entry.
+  timeouts remain inside the shared leader. The transport uses a flight-owned
+  reporting state and freezes attempt evidence into the current diagnostic
+  owner, so later retries never mutate an already-terminal caller. Last-caller
+  cancellation and factory shutdown cancel the load without publishing a late
+  cache entry.
 - `BoundedLocalResponseCacheContractTest` uses virtual time, latches, a real
   Reactor Netty redirect server, an auth-refresh-plus-retry fixture, and a real
   body inserter to prove both timeout directions, one dispatch/body
   subscription, independent keys/policies, deterministic terminal fan-out,
-  leader-only replay, and waiter cancellation during replay.
-- Focused cache/configuration/contract tests pass `81` tests. The complete
-  reactor passes starter `1168`, test-helper `55`, and OTel `52` tests with
-  zero failures, errors, or skips.
+  leader-only replay, waiter cancellation during replay, stale-miss recheck,
+  and delayed reserved-member attachment. The cache contract suite passes `31`
+  tests. The complete reactor passes starter `1172`, test-helper `55`, and OTel
+  `52` tests with zero failures, errors, or skips.
 
 ---
 

@@ -14,8 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `single-flight` to share one same-key miss load while preserving each caller's
   logical timeout, cancellation, and terminal record. Retry, one-time auth
   replay, redirects, request-body insertion, and transport dispatch stay inside
-  the leader; failure, empty completion, final-caller cancellation, and factory
-  shutdown remove in-flight state without populating abandoned results.
+  a flight-owned leader state. Cache recheck and member reservation are atomic,
+  removed flights cannot reconnect, and failure, empty completion, final-caller
+  cancellation, and factory shutdown remove in-flight state without populating
+  abandoned results.
 - **Bounded local TTL response cache.** Added an optional Caffeine-backed,
   process-local cache for explicitly selected finite `GET` `Mono` contracts.
   Hits run key/variant and configured auth gates before bypassing resilience and

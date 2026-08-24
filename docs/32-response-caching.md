@@ -146,7 +146,11 @@ After those gates report the same miss key, one leader owns the downstream load
 and waiters share its final decoded signal. Resilience4j retry, one-time `401`
 auth invalidation/replay, redirects, request-body insertion, pool acquisition,
 and transport dispatch therefore occur only inside the leader load, not once per
-waiter.
+waiter. Cache recheck and waiter reservation are one atomic per-key transition:
+a caller delayed after an earlier miss observes a value filled in the meantime,
+and a reserved waiter keeps its flight alive before attaching to the result.
+Completed or abandoned flight publishers cannot reconnect and start an
+untracked second load.
 
 Logical-call deadlines remain subscription-local. A waiter timing out or being
 cancelled detaches only that caller while another interested caller keeps the
@@ -154,6 +158,12 @@ load alive. The first caller's timeout likewise cannot truncate a later
 waiter's budget. Request/attempt timeouts remain inside the leader pipeline. If
 the final interested caller leaves, the leader is cancelled and its abandoned
 result cannot populate the cache.
+
+Transport attempts use a flight-owned reporting state rather than the first
+caller's terminal state. If that caller detaches, its attempt evidence is frozen
+and a surviving waiter becomes the diagnostic owner for later retries. A retry
+therefore cannot mutate an already-terminal caller, while the final attempt is
+still represented by one active caller's terminal record.
 
 Success, failure, and empty completion are fanned out to current callers, then
 the in-flight state is removed. A later caller can load again after failure,

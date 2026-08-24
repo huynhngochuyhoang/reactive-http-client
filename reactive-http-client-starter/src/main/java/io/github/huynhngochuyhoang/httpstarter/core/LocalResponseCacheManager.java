@@ -4,14 +4,18 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.ClassUtils;
+import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.util.context.Context;
+import reactor.util.context.ContextView;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -84,46 +88,68 @@ final class LocalResponseCacheManager implements AutoCloseable {
                       CacheKeyContract.OpaqueKey key,
                       Supplier<Mono<?>> loader,
                       Supplier<ResponseMetadata> responseMetadata) {
-        return Mono.defer(() -> {
+        return getOrLoad(selection, key, ignored -> loader.get(), responseMetadata, null, null);
+    }
+
+    Mono<?> getOrLoad(EffectiveCachePolicy.Selection selection,
+                      CacheKeyContract.OpaqueKey key,
+                      Function<SubscriptionReportingState, Mono<?>> loader,
+                      Supplier<ResponseMetadata> responseMetadata,
+                      SubscriptionReportingState callerState,
+                      SubscriptionReportingState proposedLoadState) {
+        return Mono.deferContextual(context -> {
             LocalResponseCache cache = cache(selection, "unknown");
+            if (selection.policy().isSingleFlight()) {
+                return coalescedLoad(
+                        cache, key, loader, responseMetadata, callerState, proposedLoadState, context);
+            }
+            LocalResponseCache.Lookup lookup = cache.lookup(key);
+            if (lookup.hit()) {
+                return Mono.just(lookup.value());
+            }
+            return load(cache, lookup.loadToken(), () -> loader.apply(null), responseMetadata);
+        });
+    }
+
+    private Mono<?> coalescedLoad(LocalResponseCache cache,
+                                  CacheKeyContract.OpaqueKey key,
+                                  Function<SubscriptionReportingState, Mono<?>> loader,
+                                  Supplier<ResponseMetadata> responseMetadata,
+                                  SubscriptionReportingState callerState,
+                                  SubscriptionReportingState proposedLoadState,
+                                  ContextView context) {
+        FlightKey flightKey = new FlightKey(cache, key);
+        InFlightLoad flight;
+        FlightMember member;
+        boolean created;
+        synchronized (inFlightLoads) {
+            if (closed.get()) {
+                return Mono.error(new IllegalStateException("The local response cache has been closed"));
+            }
             LocalResponseCache.Lookup lookup = cache.lookup(key);
             if (lookup.hit()) {
                 return Mono.just(lookup.value());
             }
 
             LocalResponseCache.LoadToken token = lookup.loadToken();
-            if (selection.policy().isSingleFlight()) {
-                return coalescedLoad(cache, key, token, loader, responseMetadata);
-            }
-            return load(cache, token, loader, responseMetadata);
-        });
-    }
-
-    private Mono<?> coalescedLoad(LocalResponseCache cache,
-                                  CacheKeyContract.OpaqueKey key,
-                                  LocalResponseCache.LoadToken token,
-                                  Supplier<Mono<?>> loader,
-                                  Supplier<ResponseMetadata> responseMetadata) {
-        FlightKey flightKey = new FlightKey(cache, key);
-        synchronized (inFlightLoads) {
-            if (closed.get()) {
-                cache.finish(token);
-                return Mono.error(new IllegalStateException("The local response cache has been closed"));
-            }
             InFlightLoad existing = inFlightLoads.get(flightKey);
             if (existing != null) {
                 cache.finish(token);
-                return existing.publisher;
+                flight = existing;
+                created = false;
             }
-
-            InFlightLoad created = new InFlightLoad();
-            Mono<?> source = load(cache, token, loader, responseMetadata)
-                    .takeUntilOther(shutdown.asMono())
-                    .doFinally(ignored -> removeFlight(flightKey, created));
-            created.publisher = source.share();
-            inFlightLoads.put(flightKey, created);
-            return created.publisher;
+            else {
+                flight = new InFlightLoad(flightKey, cache, token, proposedLoadState);
+                inFlightLoads.put(flightKey, flight);
+                created = true;
+            }
+            member = flight.reserve(callerState);
         }
+
+        if (created) {
+            startFlight(flight, loader, responseMetadata, context);
+        }
+        return flight.publisher(member);
     }
 
     private Mono<?> load(LocalResponseCache cache,
@@ -149,9 +175,107 @@ final class LocalResponseCacheManager implements AutoCloseable {
         });
     }
 
-    private void removeFlight(FlightKey key, InFlightLoad flight) {
+    @SuppressWarnings("unchecked")
+    private void startFlight(InFlightLoad flight,
+                             Function<SubscriptionReportingState, Mono<?>> loader,
+                             Supplier<ResponseMetadata> responseMetadata,
+                             ContextView context) {
         synchronized (inFlightLoads) {
-            inFlightLoads.remove(key, flight);
+            if (flight.terminal) {
+                flight.cache.finish(flight.loadToken);
+                return;
+            }
+            flight.sourceStarted = true;
+        }
+
+        Mono<Object> source = (Mono<Object>) load(
+                flight.cache,
+                flight.loadToken,
+                () -> loader.apply(flight.loadState),
+                responseMetadata).takeUntilOther(shutdown.asMono());
+        Disposable subscription;
+        try {
+            subscription = source.subscribe(
+                    value -> completeFlightValue(flight, value),
+                    error -> completeFlightError(flight, error),
+                    () -> completeFlightEmpty(flight),
+                    Context.of(context));
+        }
+        catch (Throwable error) {
+            flight.cache.finish(flight.loadToken);
+            completeFlightError(flight, error);
+            return;
+        }
+
+        boolean dispose;
+        synchronized (inFlightLoads) {
+            dispose = flight.terminal;
+            if (!dispose) {
+                flight.sourceSubscription = subscription;
+            }
+        }
+        if (dispose) {
+            subscription.dispose();
+        }
+    }
+
+    private void completeFlightValue(InFlightLoad flight, Object value) {
+        if (finishFlight(flight)) {
+            flight.result.tryEmitValue(value);
+        }
+    }
+
+    private void completeFlightError(InFlightLoad flight, Throwable error) {
+        if (finishFlight(flight)) {
+            flight.result.tryEmitError(error);
+        }
+    }
+
+    private void completeFlightEmpty(InFlightLoad flight) {
+        if (finishFlight(flight)) {
+            flight.result.tryEmitEmpty();
+        }
+    }
+
+    private boolean finishFlight(InFlightLoad flight) {
+        synchronized (inFlightLoads) {
+            if (flight.terminal) {
+                return false;
+            }
+            flight.terminal = true;
+            inFlightLoads.remove(flight.key, flight);
+            flight.freezeDiagnosticOwner(false);
+            return true;
+        }
+    }
+
+    private void releaseFlightMember(InFlightLoad flight, FlightMember member) {
+        Disposable sourceToCancel = null;
+        boolean abandoned = false;
+        synchronized (inFlightLoads) {
+            if (!member.released.compareAndSet(false, true)) {
+                return;
+            }
+            flight.members.remove(member);
+            if (flight.diagnosticOwner == member) {
+                flight.freezeDiagnosticOwner(true);
+                flight.diagnosticOwner = null;
+                if (!flight.terminal && !flight.members.isEmpty()) {
+                    flight.assignDiagnosticOwner(flight.members.iterator().next());
+                }
+            }
+            if (!flight.terminal && flight.members.isEmpty()) {
+                flight.terminal = true;
+                inFlightLoads.remove(flight.key, flight);
+                sourceToCancel = flight.sourceSubscription;
+                abandoned = true;
+            }
+        }
+        if (sourceToCancel != null) {
+            sourceToCancel.dispose();
+        }
+        if (abandoned) {
+            flight.result.tryEmitEmpty();
         }
     }
 
@@ -172,9 +296,24 @@ final class LocalResponseCacheManager implements AutoCloseable {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        shutdown.tryEmitEmpty();
+        List<InFlightLoad> flights;
         synchronized (inFlightLoads) {
+            flights = List.copyOf(inFlightLoads.values());
+            flights.forEach(flight -> {
+                flight.terminal = true;
+                flight.freezeDiagnosticOwner(true);
+            });
             inFlightLoads.clear();
+        }
+        shutdown.tryEmitEmpty();
+        for (InFlightLoad flight : flights) {
+            if (!flight.sourceStarted) {
+                flight.cache.finish(flight.loadToken);
+            }
+            if (flight.sourceSubscription != null) {
+                flight.sourceSubscription.dispose();
+            }
+            flight.result.tryEmitEmpty();
         }
         synchronized (caches) {
             caches.values().forEach(LocalResponseCache::close);
@@ -302,7 +441,66 @@ final class LocalResponseCacheManager implements AutoCloseable {
     private record FlightKey(LocalResponseCache cache, CacheKeyContract.OpaqueKey key) {
     }
 
-    private static final class InFlightLoad {
-        private Mono<?> publisher;
+    private final class InFlightLoad {
+        private final FlightKey key;
+        private final LocalResponseCache cache;
+        private final LocalResponseCache.LoadToken loadToken;
+        private final SubscriptionReportingState loadState;
+        private final Sinks.One<Object> result = Sinks.one();
+        private final Set<FlightMember> members = new LinkedHashSet<>();
+        private FlightMember diagnosticOwner;
+        private Disposable sourceSubscription;
+        private boolean sourceStarted;
+        private boolean terminal;
+
+        private InFlightLoad(FlightKey key,
+                             LocalResponseCache cache,
+                             LocalResponseCache.LoadToken loadToken,
+                             SubscriptionReportingState loadState) {
+            this.key = key;
+            this.cache = cache;
+            this.loadToken = loadToken;
+            this.loadState = loadState;
+        }
+
+        private FlightMember reserve(SubscriptionReportingState callerState) {
+            FlightMember member = new FlightMember(callerState);
+            members.add(member);
+            if (diagnosticOwner == null) {
+                assignDiagnosticOwner(member);
+            }
+            return member;
+        }
+
+        private void assignDiagnosticOwner(FlightMember member) {
+            diagnosticOwner = member;
+            if (member.callerState != null) {
+                member.callerState.followAttemptEvidenceFrom(loadState);
+            }
+        }
+
+        private void freezeDiagnosticOwner(boolean detached) {
+            if (diagnosticOwner != null && diagnosticOwner.callerState != null) {
+                if (detached) {
+                    diagnosticOwner.callerState.freezeAttemptEvidenceForDetachFrom(loadState);
+                }
+                else {
+                    diagnosticOwner.callerState.freezeAttemptEvidenceFrom(loadState);
+                }
+            }
+        }
+
+        private Mono<?> publisher(FlightMember member) {
+            return result.asMono().doFinally(ignored -> releaseFlightMember(this, member));
+        }
+    }
+
+    private static final class FlightMember {
+        private final SubscriptionReportingState callerState;
+        private final AtomicBoolean released = new AtomicBoolean();
+
+        private FlightMember(SubscriptionReportingState callerState) {
+            this.callerState = callerState;
+        }
     }
 }

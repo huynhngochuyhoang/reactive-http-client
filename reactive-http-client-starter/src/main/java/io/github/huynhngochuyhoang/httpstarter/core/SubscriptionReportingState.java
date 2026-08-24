@@ -20,6 +20,8 @@ final class SubscriptionReportingState {
     private final AtomicBoolean firstAttempt = new AtomicBoolean(true);
     private final AtomicReference<Attempt> activeAttempt = new AtomicReference<>();
     private final AtomicReference<Attempt> latestAttempt = new AtomicReference<>();
+    private final AtomicReference<SubscriptionReportingState> followedAttemptState = new AtomicReference<>();
+    private final AtomicReference<AttemptSnapshot> frozenAttemptSnapshot = new AtomicReference<>();
     private final AtomicReference<TerminalSnapshot> terminalSnapshot = new AtomicReference<>();
 
     SubscriptionReportingState(RequestArgumentResolver.ResolvedArgs initialResolved) {
@@ -37,6 +39,37 @@ final class SubscriptionReportingState {
         return generatedIdempotencyKey;
     }
 
+    void followAttemptEvidenceFrom(SubscriptionReportingState source) {
+        if (source != null && source != this && terminalSnapshot.get() == null
+                && frozenAttemptSnapshot.get() == null) {
+            followedAttemptState.compareAndSet(null, source);
+        }
+    }
+
+    void freezeAttemptEvidenceFrom(SubscriptionReportingState source) {
+        if (source == null || source == this) {
+            return;
+        }
+        if (terminalSnapshot.get() != null) {
+            followedAttemptState.compareAndSet(source, null);
+            return;
+        }
+        frozenAttemptSnapshot.compareAndSet(null, source.attemptSnapshot());
+        followedAttemptState.compareAndSet(source, null);
+    }
+
+    void freezeAttemptEvidenceForDetachFrom(SubscriptionReportingState source) {
+        if (source == null || source == this) {
+            return;
+        }
+        if (terminalSnapshot.get() != null) {
+            followedAttemptState.compareAndSet(source, null);
+            return;
+        }
+        frozenAttemptSnapshot.compareAndSet(null, source.attemptSnapshotForDetach());
+        followedAttemptState.compareAndSet(source, null);
+    }
+
     synchronized Attempt beginAttempt(RequestArgumentResolver.ResolvedArgs preparedResolved) {
         int number = attemptCount.incrementAndGet();
         Attempt attempt = new Attempt(number, preparedResolved);
@@ -46,10 +79,26 @@ final class SubscriptionReportingState {
     }
 
     Attempt activeAttempt() {
+        SubscriptionReportingState followed = followedAttemptState.get();
+        if (followed != null && frozenAttemptSnapshot.get() == null) {
+            return followed.activeAttempt();
+        }
         return activeAttempt.get();
     }
 
     int attemptCount() {
+        TerminalSnapshot terminal = terminalSnapshot.get();
+        if (terminal != null) {
+            return terminal.attemptCount();
+        }
+        AttemptSnapshot frozen = frozenAttemptSnapshot.get();
+        if (frozen != null) {
+            return frozen.attemptCount();
+        }
+        SubscriptionReportingState followed = followedAttemptState.get();
+        if (followed != null) {
+            return followed.attemptCount();
+        }
         return attemptCount.get();
     }
 
@@ -75,6 +124,14 @@ final class SubscriptionReportingState {
     }
 
     synchronized void clearEvidenceWhenNoAttemptIsActive() {
+        SubscriptionReportingState followed = followedAttemptState.get();
+        if (followed != null) {
+            freezeAttemptEvidenceForDetachFrom(followed);
+            return;
+        }
+        if (frozenAttemptSnapshot.get() != null) {
+            return;
+        }
         if (activeAttempt.get() == null) {
             Attempt attempt = latestAttempt.get();
             if (attempt != null) {
@@ -84,20 +141,45 @@ final class SubscriptionReportingState {
     }
 
     synchronized TerminalSnapshot complete(TerminalSignal signal, Object responseBody, Throwable error) {
-        Attempt attempt = latestAttempt.get();
-        AttemptEvidence evidence = attempt != null ? attempt.evidence() : AttemptEvidence.empty();
+        AttemptSnapshot attempt = terminalAttemptSnapshot();
         TerminalSnapshot candidate = new TerminalSnapshot(
                 signal,
-                attempt != null ? attempt.preparedResolved() : initialResolved.get(),
-                evidence.requestUrl(),
-                evidence.finalRequestObservation(),
+                attempt.preparedResolved(),
+                attempt.evidence().requestUrl(),
+                attempt.evidence().finalRequestObservation(),
                 elapsedMillis(),
-                evidence.responseStatus(),
-                evidence.responseHeaders(),
+                attempt.evidence().responseStatus(),
+                attempt.evidence().responseHeaders(),
                 responseBody,
                 error,
-                attemptCount.get());
+                attempt.attemptCount());
         return terminalSnapshot.compareAndSet(null, candidate) ? candidate : null;
+    }
+
+    private AttemptSnapshot terminalAttemptSnapshot() {
+        AttemptSnapshot frozen = frozenAttemptSnapshot.get();
+        if (frozen != null) {
+            return frozen;
+        }
+        SubscriptionReportingState followed = followedAttemptState.get();
+        return followed != null ? followed.attemptSnapshot() : attemptSnapshot();
+    }
+
+    private synchronized AttemptSnapshot attemptSnapshot() {
+        Attempt attempt = latestAttempt.get();
+        return new AttemptSnapshot(
+                attempt != null ? attempt.preparedResolved() : initialResolved.get(),
+                attempt != null ? attempt.evidence() : AttemptEvidence.empty(),
+                attemptCount.get());
+    }
+
+    private synchronized AttemptSnapshot attemptSnapshotForDetach() {
+        Attempt attempt = latestAttempt.get();
+        Attempt active = activeAttempt.get();
+        return new AttemptSnapshot(
+                attempt != null ? attempt.preparedResolved() : initialResolved.get(),
+                attempt != null && attempt == active ? attempt.evidence() : AttemptEvidence.empty(),
+                attemptCount.get());
     }
 
     TerminalSnapshot terminalSnapshot() {
@@ -108,6 +190,12 @@ final class SubscriptionReportingState {
         SUCCESS,
         ERROR,
         CANCEL
+    }
+
+    private record AttemptSnapshot(
+            RequestArgumentResolver.ResolvedArgs preparedResolved,
+            AttemptEvidence evidence,
+            int attemptCount) {
     }
 
     static final class Attempt {
