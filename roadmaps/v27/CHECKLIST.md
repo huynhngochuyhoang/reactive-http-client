@@ -931,7 +931,7 @@ Evidence recorded on 2026-08-24:
 - [x] Preserve reports from failed stages without uploading stale prior-run
       evidence.
 
-### [x] 11.3 Revalidate AOT, native, and shutdown
+### [ ] 11.3 Revalidate AOT, native, and shutdown
 
 - [x] Add precise runtime hints for selected public cache metadata and required
       implementation resources without broad package reflection.
@@ -943,7 +943,7 @@ Evidence recorded on 2026-08-24:
       refresh work within the shared shutdown deadline.
 - [x] Prove destruction removes factory-owned cache meters before same-tag
       recreation and leaves no registry reference to the closed cache.
-- [x] Record clean commit, GraalVM/JDK versions, dependency list, executable
+- [ ] Record clean commit, GraalVM/JDK versions, dependency list, executable
       status, and binary SHA-256.
 
 Evidence recorded on 2026-08-25:
@@ -956,7 +956,7 @@ Evidence recorded on 2026-08-25:
 - The isolated `v27-current-parity` Boot 4 consumer profile covers disabled,
   method-selected, client-selected/excluded, TTL, capacity, single-flight,
   refresh, explicit Retry, and enabled-only resilience. The fresh-repository
-  verifier passed `55` mock and `4` assembled-consumer tests and retained
+  verifier passed `56` test-helper and `4` assembled-consumer tests and retained
   effective POM, dependency tree, classpath, Surefire reports, artifact hashes,
   stage provenance, and no-reactor-output-leakage evidence. Follow-up consumer
   evidence also proves that cache-enabled mock consumers receive Caffeine
@@ -981,7 +981,15 @@ Evidence recorded on 2026-08-25:
   `4.0.0-SNAPSHOT`, the full dependency list, and `executableStatus=passed`.
   Its SHA-256 is
   `90c983475ac3d5bdafd49aa708b3fc8d9ca4eda2699a2070d7dc3d55342d00e2`,
-  superseding the provisional dirty-tree validation.
+  superseding the provisional dirty-tree validation. This immutable evidence
+  predates the follow-up eviction and non-deterministic mock-ownership fixes.
+- Follow-up lifecycle coverage proves explicit eviction advances active load
+  generations without cancelling caller-visible work, preventing a pending
+  single flight from repopulating the cache. Every mock construction path now
+  retains and closes its cache manager; a non-deterministic cache-enabled mock
+  cancels active work during `close()`. The full reactor and fresh isolated
+  consumer verifier pass. Clean native provenance remains open until these
+  review fixes are committed and rerun from that commit.
 - Factory-destruction coverage proves active load/refresh cancellation, entry
   release, aggregate shutdown completion, meter removal, and same-tag registry
   recreation without retaining the closed cache.

@@ -193,6 +193,7 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
         requireOpen();
         synchronized (lifecycleMonitor) {
             requireOpen();
+            generations.values().forEach(state -> state.generation++);
             cache.invalidateAll();
             cache.cleanUp();
         }

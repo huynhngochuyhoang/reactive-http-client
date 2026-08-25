@@ -202,6 +202,34 @@ class MockReactiveHttpClientTest {
         }
     }
 
+    @Test
+    void closeTerminatesCacheWorkWithoutDeterministicTime() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = cacheConfig(true, null, 10);
+        Sinks.One<DataBuffer> body = Sinks.one();
+        AtomicInteger cancellations = new AtomicInteger();
+        MockReactiveHttpClient<CacheMockClient> mock = MockReactiveHttpClient
+                .forClient(CacheMockClient.class)
+                .clientConfig(config)
+                .respondTo(HttpMethod.GET, "/cache/close", exchange ->
+                        ClientResponse.create(org.springframework.http.HttpStatus.OK)
+                                .header("Content-Type", "text/plain")
+                                .body(body.asMono().flux().doOnCancel(cancellations::incrementAndGet))
+                                .build())
+                .build();
+        try {
+            CompletableFuture<String> active = mock.proxy().get("close").toFuture();
+            assertThat(mock.loadCount("/cache/close")).isEqualTo(1);
+
+            mock.close();
+
+            assertThat(active.get(1, TimeUnit.SECONDS)).isNull();
+            assertThat(cancellations).hasValue(1);
+        }
+        finally {
+            mock.close();
+        }
+    }
+
     interface ApiRefUriClient {
         @ApiRef("lookup")
         Mono<String> find(

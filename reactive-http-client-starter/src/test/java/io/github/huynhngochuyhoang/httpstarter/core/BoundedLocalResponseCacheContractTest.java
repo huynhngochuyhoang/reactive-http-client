@@ -322,6 +322,33 @@ class BoundedLocalResponseCacheContractTest {
     }
 
     @Test
+    void explicitEvictionPreventsAnActiveSingleFlightFromRepopulatingTheCache() throws Exception {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("explicit-eviction", 1_000, 10, true);
+        CacheKeyContract.OpaqueKey key = key("shared");
+        Sinks.One<String> load = Sinks.one();
+        AtomicInteger subscriptions = new AtomicInteger();
+
+        CompletableFuture<String> active = cached(manager, selection, key, () -> {
+            subscriptions.incrementAndGet();
+            return load.asMono();
+        }).toFuture();
+        manager.evictAllForTesting();
+
+        load.tryEmitValue("pre-eviction").orThrow();
+        assertThat(active.get(1, TimeUnit.SECONDS)).isEqualTo("pre-eviction");
+        assertThat(manager.snapshot().currentSize()).isZero();
+        assertThat(cached(manager, selection, key, () -> {
+            subscriptions.incrementAndGet();
+            return Mono.just("fresh");
+        }).block()).isEqualTo("fresh");
+        assertThat(cached(manager, selection, key, () -> Mono.just("unexpected")).block())
+                .isEqualTo("fresh");
+        assertThat(subscriptions).hasValue(2);
+        manager.close();
+    }
+
+    @Test
     void lateDuplicateCannotRepopulateAfterCapacityEviction() throws Exception {
         LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
         EffectiveCachePolicy.Selection selection = selection("eviction", 1_000, 1);

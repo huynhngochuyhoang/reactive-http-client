@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 
 /**
  * Builder that produces a proxy for a {@code @ReactiveHttpClient} interface backed
@@ -138,7 +139,7 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
     }
 
     private void requireCacheControl() {
-        if (cacheControl == null) {
+        if (cacheTickerNanos == null || cacheControl == null) {
             throw new IllegalStateException(
                     "Deterministic cache time was not enabled on this mock builder");
         }
@@ -558,33 +559,15 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
                 }
             }
 
-            ReactiveClientInvocationHandler handler;
-            MockResponseCacheSupport.Control cacheControl = null;
-            if (cacheTickerNanos != null) {
-                MockResponseCacheSupport.Session session = MockResponseCacheSupport.create(
-                        webClient, methodMetadataCache, clientConfig, clientName, clientInterface,
-                        appCtx, resilienceOperatorApplier, effectiveJsonCodec, observabilityConfig,
-                        authProvider, baseUrl, cacheTickerNanos::get);
-                handler = session.handler();
-                cacheControl = session.control();
-            }
-            else {
-                handler = ReactiveClientInvocationHandler.create(
-                        webClient,
-                        methodMetadataCache,
-                        new RequestArgumentResolver(),
-                        new DefaultErrorDecoder(),
-                        clientConfig,
-                        clientName,
-                        clientInterface,
-                        appCtx,
-                        resilienceOperatorApplier,
-                        effectiveJsonCodec,
-                        observabilityConfig,
-                        authProvider,
-                        baseUrl
-                );
-            }
+            LongSupplier cacheTicker = cacheTickerNanos != null
+                    ? cacheTickerNanos::get
+                    : System::nanoTime;
+            MockResponseCacheSupport.Session cacheSession = MockResponseCacheSupport.create(
+                    webClient, methodMetadataCache, clientConfig, clientName, clientInterface,
+                    appCtx, resilienceOperatorApplier, effectiveJsonCodec, observabilityConfig,
+                    authProvider, baseUrl, cacheTicker);
+            ReactiveClientInvocationHandler handler = cacheSession.handler();
+            MockResponseCacheSupport.Control cacheControl = cacheSession.control();
 
             @SuppressWarnings("unchecked")
             T proxy = (T) Proxy.newProxyInstance(
