@@ -931,7 +931,7 @@ Evidence recorded on 2026-08-24:
 - [x] Preserve reports from failed stages without uploading stale prior-run
       evidence.
 
-### [ ] 11.3 Revalidate AOT, native, and shutdown
+### [x] 11.3 Revalidate AOT, native, and shutdown
 
 - [x] Add precise runtime hints for selected public cache metadata and required
       implementation resources without broad package reflection.
@@ -943,7 +943,7 @@ Evidence recorded on 2026-08-24:
       refresh work within the shared shutdown deadline.
 - [x] Prove destruction removes factory-owned cache meters before same-tag
       recreation and leaves no registry reference to the closed cache.
-- [ ] Record clean commit, GraalVM/JDK versions, dependency list, executable
+- [x] Record clean commit, GraalVM/JDK versions, dependency list, executable
       status, and binary SHA-256.
 
 Evidence recorded on 2026-08-25:
@@ -975,11 +975,13 @@ Evidence recorded on 2026-08-25:
   open-circuit dispatch, and exact total dispatch count. Its SHA-256 is
   `4bceb1e8a5faf326b1a3c903a25dca1b38b77b6e3d01694f502af18d441e5846`;
   this immutable evidence predates the follow-up AOT properties fix.
-- The follow-up dirty tree compiled and ran the same native fixture with Java
-  and GraalVM `25.0.3`; its provisional executable SHA-256 is
-  `6e183423f9dd609a171bf5de37a1881dd1c7d825e5d29bb56ca8c1d3ed0cf900`.
-  Clean provenance remains open until these review fixes are committed and the
-  native proof is rerun from that commit.
+- Follow-up clean commit `8b0a0a596e20395b64b8b3c14725b284b4aaa445`
+  compiled and ran the same fixture with Java and GraalVM `25.0.3` and Spring
+  Boot `4.0.0`. The refreshed provenance records `sourceState=clean`, starter
+  `4.0.0-SNAPSHOT`, the full dependency list, and `executableStatus=passed`.
+  Its SHA-256 is
+  `90c983475ac3d5bdafd49aa708b3fc8d9ca4eda2699a2070d7dc3d55342d00e2`,
+  superseding the provisional dirty-tree validation.
 - Factory-destruction coverage proves active load/refresh cancellation, entry
   release, aggregate shutdown completion, meter removal, and same-tag registry
   recreation without retaining the closed cache.
