@@ -25,6 +25,10 @@ class DocumentationReleaseArtifactTest {
     private static final Pattern MARKDOWN_LINK = Pattern.compile("!?\\[[^]]*]\\(([^)\\s]+)(?:\\s+\"[^\"]*\")?\\)");
     private static final Pattern UNIX_ABSOLUTE_PATH = Pattern.compile("(^|[\\s`\\\"=:(])(/(?!/)[^\\s`|)]+)");
     private static final Pattern WINDOWS_ABSOLUTE_PATH = Pattern.compile("(^|[\\s`\\\"=:(])([A-Za-z]:[\\\\\\/][^\\s`|)]+)");
+    private static final Set<String> SENSITIVE_SUPPORT_FIXTURE_FIELD_FRAGMENTS = Set.of(
+            "argument", "header", "body", "bodies", "url", "identity", "identities",
+            "authorization", "credential", "tenant", "cookie", "secret", "token",
+            "cachekey", "keydigest", "cachedvalue");
     private static final Pattern PROJECT_VERSION_SNIPPET = Pattern.compile(
             "<groupId>io\\.github\\.huynhngochuyhoang</groupId>\\s*"
                     + "<artifactId>reactive-http-client-[^<]+</artifactId>\\s*"
@@ -248,6 +252,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(fixture.path("evictions").path("size").isInt()).isTrue();
         assertThat(fixture.path("evictions").path("ttl").isInt()).isTrue();
 
+        assertThat(sensitiveSupportFixtureFieldNames(fixture))
+                .as("sensitive response-cache support fixture field names")
+                .isEmpty();
+
         String fixtureText = Files.readString(fixturePath);
         assertThat(fixtureText)
                 .doesNotContainIgnoringCase("cacheKey")
@@ -256,11 +264,6 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContainIgnoringCase("authorization")
                 .doesNotContainIgnoringCase("credential")
                 .doesNotContainIgnoringCase("tenant")
-                .doesNotContainIgnoringCase("\"arguments\"")
-                .doesNotContainIgnoringCase("\"headers\"")
-                .doesNotContainIgnoringCase("\"bodies\"")
-                .doesNotContainIgnoringCase("\"urls\"")
-                .doesNotContainIgnoringCase("\"identities\"")
                 .doesNotContain("http://", "https://");
     }
 
@@ -3665,6 +3668,31 @@ class DocumentationReleaseArtifactTest {
             rows.add(new PublicSurfaceRow(stripBackticks(columns[1].trim()), columns[4].trim()));
         }
         return rows;
+    }
+
+    private static List<String> sensitiveSupportFixtureFieldNames(JsonNode node) {
+        List<String> sensitiveNames = new ArrayList<>();
+        collectSensitiveSupportFixtureFieldNames(node, sensitiveNames);
+        return sensitiveNames;
+    }
+
+    private static void collectSensitiveSupportFixtureFieldNames(
+            JsonNode node, List<String> sensitiveNames) {
+        if (node.isObject()) {
+            for (Map.Entry<String, JsonNode> property : node.properties()) {
+                String normalizedName = property.getKey()
+                        .replaceAll("[^A-Za-z0-9]", "")
+                        .toLowerCase(Locale.ROOT);
+                if (SENSITIVE_SUPPORT_FIXTURE_FIELD_FRAGMENTS.stream()
+                        .anyMatch(normalizedName::contains)) {
+                    sensitiveNames.add(property.getKey());
+                }
+                collectSensitiveSupportFixtureFieldNames(property.getValue(), sensitiveNames);
+            }
+        }
+        else if (node.isArray()) {
+            node.forEach(child -> collectSensitiveSupportFixtureFieldNames(child, sensitiveNames));
+        }
     }
 
     private static String stripBackticks(String value) {

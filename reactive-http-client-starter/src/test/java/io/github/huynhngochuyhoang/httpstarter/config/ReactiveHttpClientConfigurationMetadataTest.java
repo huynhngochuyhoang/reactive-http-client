@@ -111,7 +111,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "java.lang.Long", "java.lang.Float", "java.lang.Double", "java.lang.Character",
                 "java.lang.String");
         Map<String, String> propertyTypes = new HashMap<>();
-        for (Path metadataFile : metadataFiles(projectRoot())) {
+        for (Path metadataFile : allMetadataFiles(projectRoot())) {
             JsonNode metadata = metadata(metadataFile);
             for (JsonNode property : metadata.path("properties")) {
                 propertyTypes.put(property.path("name").asText(),
@@ -119,11 +119,11 @@ class ReactiveHttpClientConfigurationMetadataTest {
             }
         }
         List<String> scalarGroups = new ArrayList<>();
-        for (Path metadataFile : metadataFiles(projectRoot())) {
+        for (Path metadataFile : allMetadataFiles(projectRoot())) {
             JsonNode metadata = metadata(metadataFile);
             for (JsonNode group : metadata.path("groups")) {
                 String name = group.path("name").asText();
-                String type = rawClassName(group.path("type").asText());
+                String type = rawClassName(group.path("type").asText(""));
                 String propertyType = propertyTypes.get(name);
                 if (scalarTypes.contains(type)
                         || (propertyType != null && scalarTypes.contains(propertyType))) {
