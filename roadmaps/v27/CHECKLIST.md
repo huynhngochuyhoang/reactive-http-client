@@ -931,7 +931,7 @@ Evidence recorded on 2026-08-24:
 - [x] Preserve reports from failed stages without uploading stale prior-run
       evidence.
 
-### [ ] 11.3 Revalidate AOT, native, and shutdown
+### [x] 11.3 Revalidate AOT, native, and shutdown
 
 - [x] Add precise runtime hints for selected public cache metadata and required
       implementation resources without broad package reflection.
@@ -943,7 +943,7 @@ Evidence recorded on 2026-08-24:
       refresh work within the shared shutdown deadline.
 - [x] Prove destruction removes factory-owned cache meters before same-tag
       recreation and leaves no registry reference to the closed cache.
-- [ ] Record clean commit, GraalVM/JDK versions, dependency list, executable
+- [x] Record clean commit, GraalVM/JDK versions, dependency list, executable
       status, and binary SHA-256.
 
 Evidence recorded on 2026-08-25:
@@ -964,14 +964,13 @@ Evidence recorded on 2026-08-25:
   narrow: public cache annotations/configuration, selected record accessors,
   and the exact Caffeine `SSLMSW` constructor/`FACTORY` lookup used by the
   starter's bounded expire-after-write cache.
-- GraalVM `25.0.3` compiled and ran the expanded Boot `4.0.0` fixture. The native
-  executable proved one load plus one hit, one refresh dispatch, explicit
-  two-attempt Retry, zero open-circuit dispatch, and exact total dispatch count.
-  The final dirty-tree rebuild also compiled and ran after replacing the
-  deprecated broad constructor category with exact executable hints.
-  Provisional SHA-256 is
-  `76c0a159c6b1f043fd18adb2c6d062e3d0610875a1d4193bae3d2a6e5b176436`;
-  immutable clean-commit provenance remains intentionally open.
+- Clean commit `9d537313520d62d6261c0baa18697db886b4cce7` compiled and ran
+  the expanded Boot `4.0.0` fixture with Java and GraalVM `25.0.3`. The
+  provenance records `sourceState=clean`, starter `4.0.0-SNAPSHOT`, the full
+  dependency list, and `executableStatus=passed`. The executable proved one
+  load plus one hit, one refresh dispatch, explicit two-attempt Retry, zero
+  open-circuit dispatch, and exact total dispatch count. Its SHA-256 is
+  `4bceb1e8a5faf326b1a3c903a25dca1b38b77b6e3d01694f502af18d441e5846`.
 - Factory-destruction coverage proves active load/refresh cancellation, entry
   release, aggregate shutdown completion, meter removal, and same-tag registry
   recreation without retaining the closed cache.
