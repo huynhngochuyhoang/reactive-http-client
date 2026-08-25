@@ -39,6 +39,12 @@
             <artifactId>reactor-core</artifactId>
         </dependency>
 
+        <!-- Required by cache-enabled MockReactiveHttpClient consumers. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- spring-test for MockClientHttpRequest (compile scope: this module is test-helper code) -->
         <dependency>
             <groupId>org.springframework</groupId>

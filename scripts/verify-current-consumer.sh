@@ -73,16 +73,19 @@ stage="mock-tests"
 copy_mock_reports
 
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
-  -Dconsumer.v26.observability=true clean test
+  -Dconsumer.v26.observability=true -Dconsumer.v27.parity=true clean test
 stage="consumer-tests"
 copy_consumer_reports
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
+  -Dconsumer.v27.parity=true \
   help:effective-pom -Doutput="$EVIDENCE_DIR/effective-poms/boot4-current-consumer.xml"
 stage="consumer-effective-pom"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
+  -Dconsumer.v27.parity=true \
   dependency:tree -DoutputFile="$EVIDENCE_DIR/dependency-tree.txt"
 stage="dependency-tree"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
+  -Dconsumer.v27.parity=true \
   dependency:build-classpath -Dmdep.outputFile="$EVIDENCE_DIR/classpath.txt"
 stage="classpath"
 
@@ -90,6 +93,8 @@ if grep -Eq "$ROOT_DIR/reactive-http-client-(starter|test|otel)/target/(test-)?c
     "$EVIDENCE_DIR/classpath.txt" "$EVIDENCE_DIR/dependency-tree.txt"; then
   fail "assembled consumer resolved reactor output directories"
 fi
+grep -q "/com/github/ben-manes/caffeine/caffeine/" "$EVIDENCE_DIR/classpath.txt" \
+  || fail "cache-enabled mock consumer did not receive transitive Caffeine storage"
 stage="reactor-leakage-checked"
 
 CHECKSUMS="$EVIDENCE_DIR/project-artifact-sha256.txt"

@@ -189,6 +189,17 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     }
 
     @Override
+    public void invalidateAll() {
+        requireOpen();
+        synchronized (lifecycleMonitor) {
+            requireOpen();
+            generations.values().forEach(state -> state.generation++);
+            cache.invalidateAll();
+            cache.cleanUp();
+        }
+    }
+
+    @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) {
             return;

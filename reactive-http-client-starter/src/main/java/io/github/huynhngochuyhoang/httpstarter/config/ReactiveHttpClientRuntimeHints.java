@@ -8,6 +8,7 @@ import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
+import org.springframework.util.ClassUtils;
 
 import java.lang.reflect.Modifier;
 
@@ -17,6 +18,8 @@ import java.lang.reflect.Modifier;
 public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
     private static final String AUTH_PROVIDER_FACTORY_CANDIDATES =
             "io.github.huynhngochuyhoang.httpstarter.core.AuthProviderFactoryCandidates";
+    static final String CAFFEINE_LOCAL_CACHE =
+            "com.github.benmanes.caffeine.cache.SSLMSW";
 
     static final String POM_PROPERTIES_RESOURCE =
             "META-INF/maven/io.github.huynhngochuyhoang/reactive-http-client-starter/pom.properties";
@@ -91,6 +94,17 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
         registerFactoryBeanCacheLookup(hints);
         hints.resources().registerPattern(POM_PROPERTIES_RESOURCE);
         registerAuthProviderFactoryLookup(hints, classLoader);
+        if (ClassUtils.isPresent("com.github.benmanes.caffeine.cache.Caffeine", classLoader)) {
+            try {
+                Class<?> cacheType = Class.forName(CAFFEINE_LOCAL_CACHE, false, classLoader);
+                for (var constructor : cacheType.getDeclaredConstructors()) {
+                    hints.reflection().registerConstructor(constructor, ExecutableMode.INVOKE);
+                }
+                hints.reflection().registerField(cacheType.getDeclaredField("FACTORY"));
+            } catch (ClassNotFoundException | NoSuchFieldException ex) {
+                throw new IllegalStateException(ex);
+            }
+        }
     }
 
     private static void registerAuthProviderFactoryLookup(RuntimeHints hints, ClassLoader classLoader) {

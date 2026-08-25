@@ -41,10 +41,43 @@ the supplied parser instead of a helper-owned default.
 
 The mock does not negotiate an HTTP protocol or TLS, compress wire bytes, acquire a
 pooled connection, apply socket backpressure, measure wire or pool timing, or prove
-connection reuse. Those behaviors belong to a real client connector and server. Use the
+connection reuse or native cleanup. Those behaviors belong to a real client connector and server. Use the
 assembled-consumer and transport fixtures described in [Native and release
 compatibility](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)
 when a test depends on transport ownership.
+
+### Deterministic response-cache tests
+
+`withDeterministicCacheTime()` keeps production cache policy, key, auth,
+single-flight, and refresh behavior while replacing only the cache clock. It does
+not select caching. Supply the same `ClientConfig` used by the application, or use
+`cachePolicy(name, ttl, maximumSize)` to define an inert policy selected by a
+method-level `@CacheResponse`.
+
+```java
+try (MockReactiveHttpClient<CatalogClient> mock = MockReactiveHttpClient
+        .forClient(CatalogClient.class)
+        .cachePolicy("catalog", Duration.ofMinutes(1), 100)
+        .withDeterministicCacheTime()
+        .respondTo(HttpMethod.GET, "/catalog/42",
+                exchange -> MockReactiveHttpClient.json(200, "{\"id\":42}"))
+        .build()) {
+    mock.proxy().get("42").block();
+    mock.proxy().get("42").block();
+
+    assertThat(mock.loadCount("/catalog/42")).isEqualTo(1);
+    assertThat(mock.cacheEntryCount()).isEqualTo(1);
+    assertThat(mock.cacheOutcomes()).containsExactly(MISS_LOADER, FRESH_HIT);
+
+    mock.advanceCacheTime(Duration.ofMinutes(1));
+    mock.evictCacheEntries();
+}
+```
+
+The load count is the number of in-process `ExchangeFunction` invocations, not a
+wire-dispatch count. Explicit eviction is test-only cache control. These assertions
+do not prove socket cancellation, pool reuse, transport backpressure, or native
+resource cleanup.
 
 ### Basic setup
 

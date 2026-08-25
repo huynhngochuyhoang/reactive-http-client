@@ -653,6 +653,10 @@ Supported Boot 4 native-image path:
   client metrics.
 - A native open-circuit rejection that reaches no transport dispatch and records
   one finite logical-call duration with zero subscription attempts.
+- One cache miss, one cache hit without dispatch, and one access-driven refresh
+  through the real loopback transport, with exact aggregate dispatch counts.
+- Explicit retry-only activation that produces exactly two loopback dispatches;
+  merely enabling resilience does not activate unrelated operators.
 - Opt-in gzip negotiation and transparent JSON response decompression over the
   real loopback transport.
 - The optional `rhttpclients` Actuator endpoint and reactive health indicator.
@@ -689,9 +693,10 @@ must be accompanied by a successful executable smoke run.
 
 Limits:
 
-- The scheduled native smoke uses real Reactor Netty loopback requests and one
-  Resilience4j open-circuit rejection. It does not exercise custom TLS
-  configuration, other Resilience4j operators, or OTel exporters.
+- The scheduled native smoke uses real Reactor Netty loopback requests, local
+  cache hit/load/refresh behavior, explicit Retry, and one Resilience4j
+  open-circuit rejection. It does not exercise custom TLS configuration,
+  RateLimiter/Bulkhead composition, or OTel exporters.
 - Optional libraries still require native support and runtime hints from their
   owners, including Resilience4j, alternate TLS providers, and OpenTelemetry
   exporters.

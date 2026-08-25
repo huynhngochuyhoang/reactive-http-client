@@ -335,6 +335,60 @@ class LocalResponseCacheObservabilityTest {
     }
 
     @Test
+    void factoryDestroyCancelsLoadsAndRefreshesClearsEntriesAndAllowsSameTagRecreation() throws Exception {
+        AtomicLong ticker = new AtomicLong();
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        LocalResponseCacheMetrics metrics = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
+        metrics.registerApi("catalog.get");
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(
+                ticker::get, Schedulers.parallel(), metrics, "catalog-client");
+        EffectiveCachePolicy.Selection refresh = selection("refresh", false, 50L);
+        AtomicLong refreshCancellations = new AtomicLong();
+        assertThat(load(manager, refresh, key("refresh"), "catalog.get",
+                state(), state(), Mono.just("initial"))).isEqualTo("initial");
+        ticker.addAndGet(Duration.ofMillis(50).toNanos());
+        assertThat(load(manager, refresh, key("refresh"), "catalog.get", state(), state(),
+                Mono.<String>never().doOnCancel(refreshCancellations::incrementAndGet)))
+                .isEqualTo("initial");
+
+        AtomicLong loadCancellations = new AtomicLong();
+        CompletableFuture<?> load = call(manager, selection("single", true, null), key("load"),
+                "catalog.get", state(), state(),
+                Mono.<String>never().doOnCancel(loadCancellations::incrementAndGet)).toFuture();
+        assertThat(manager.snapshot().currentSize()).isEqualTo(1);
+        assertThat(registry.getMeters()).anyMatch(LocalResponseCacheObservabilityTest::isCacheMeter);
+
+        ReactiveHttpClientFactoryBean<CacheObservedClient> factory = new ReactiveHttpClientFactoryBean<>();
+        Field cacheManager = ReactiveHttpClientFactoryBean.class.getDeclaredField("responseCacheManager");
+        cacheManager.setAccessible(true);
+        cacheManager.set(factory, manager);
+        long startedAtNanos = System.nanoTime();
+
+        factory.destroy();
+
+        assertThat(System.nanoTime() - startedAtNanos).isLessThan(Duration.ofSeconds(1).toNanos());
+        assertThat(load).isDone();
+        assertThat(loadCancellations).hasValue(1);
+        assertThat(refreshCancellations).hasValue(1);
+        assertThat(manager.snapshot()).isEqualTo(
+                new LocalResponseCacheManager.Snapshot(0, 0, 0, 0, true));
+        assertThat(registry.getMeters()).noneMatch(LocalResponseCacheObservabilityTest::isCacheMeter);
+
+        LocalResponseCacheMetrics replacementMetrics =
+                LocalResponseCacheMetrics.enabled(registry, "catalog-client");
+        replacementMetrics.registerApi("catalog.get");
+        LocalResponseCacheManager replacement = LocalResponseCacheManager.testing(
+                ticker::get, Schedulers.parallel(), replacementMetrics, "catalog-client");
+        assertThat(load(replacement, selection("refresh", false, 50L), key("replacement"),
+                "catalog.get", state(), state(), Mono.just("replacement"))).isEqualTo("replacement");
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".entries")
+                .tags("client.name", "catalog-client", "cache.policy", "refresh")
+                .gauge().value()).isEqualTo(1.0);
+        replacement.close();
+        assertThat(registry.getMeters()).noneMatch(LocalResponseCacheObservabilityTest::isCacheMeter);
+    }
+
+    @Test
     void callerOutcomesDistinguishMissHitWaiterAndStaleWithoutKeyMaterial() throws Exception {
         AtomicLong ticker = new AtomicLong();
         LocalResponseCacheMetrics metrics = LocalResponseCacheMetrics.enabled(
@@ -469,6 +523,7 @@ class LocalResponseCacheObservabilityTest {
         @Override public void finish(LoadToken token) { }
         @Override public long estimatedSize() { return size.get(); }
         @Override public long evictionCount() { return 0; }
+        @Override public void invalidateAll() { size.set(0); }
         @Override public void close() { }
     }
 }
