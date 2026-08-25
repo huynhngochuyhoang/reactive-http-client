@@ -179,7 +179,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("Blank method annotation values fail startup")
                 .contains("Missing active method-annotation instances fail proxy construction")
                 .contains("Client-level instance properties are not registry-membership fail-fast checks")
-                .contains("strict-unsafe-retry-validation");
+                .contains("Client-level names may be absent from")
+                .contains("`resilience4j.*.instances`; Resilience4j")
+                .contains("strict-unsafe-retry-validation")
+                .doesNotContain("named Resilience4j instance must also exist");
         assertThat(quickStart)
                 .contains("## Preparing resilience configuration for `4.0.0`")
                 .contains("`enabled: true` alone selects no operator")
@@ -190,7 +193,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(caching)
                 .contains("## Local-only consistency and invalidation")
                 .contains("does not coordinate entries between application instances")
-                .contains("does not invalidate cached reads after a write")
+                .contains("An unselected")
+                .contains("or explicitly disabled `POST`, `PUT`, `PATCH`, or `DELETE`")
+                .contains("A selected write method fails proxy construction")
+                .contains("does not invalidate related cached reads")
                 .contains("not a distributed-cache abstraction");
         assertThat(production)
                 .contains("## Response caching (`4.0.0` candidate)")
@@ -203,6 +209,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("cache:\n        enabled: true");
         assertThat(observability)
                 .contains("### Cache miss and load rate (events per second)")
+                .contains("Terminal miss-load work:")
+                .contains("therefore does not")
+                .contains("prove that a transport dispatch occurred")
+                .contains("ordinary request metrics")
                 .contains("### Cache eviction pressure (evictions per second)")
                 .contains("### Cache capacity pressure (dimensionless)")
                 .contains("reactive_http_client_cache_entries\n  /\n  clamp_min(\n"

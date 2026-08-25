@@ -151,11 +151,14 @@ deployments. After a rollout or downstream change, per-instance divergence is
 expected until each local entry expires, is evicted, is refreshed through
 access, or its factory shuts down.
 
-The starter does not invalidate cached reads after a write. A `POST`, `PUT`,
-`PATCH`, or `DELETE` always follows its normal request path, but it does not
-search for related read keys or broadcast invalidation. Choose a TTL that bounds
-acceptable staleness, and use an application-owned invalidation/coherence system
-when writes must be visible sooner.
+The starter does not invalidate related cached reads after a write. An unselected
+or explicitly disabled `POST`, `PUT`, `PATCH`, or `DELETE` follows its normal
+request path without searching for related read keys or broadcasting invalidation.
+A selected write method fails proxy construction because response caching supports
+only eligible `GET` methods; apply `@CacheDisabled` when a client-level policy
+would otherwise select it. Choose a TTL that bounds acceptable staleness, and use
+an application-owned invalidation/coherence system when writes must be visible
+sooner.
 
 This feature is not a distributed-cache abstraction. It provides no shared
 storage, cross-instance single flight, distributed locks, write-through policy,

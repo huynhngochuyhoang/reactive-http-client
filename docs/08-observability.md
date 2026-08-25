@@ -517,7 +517,7 @@ Miss callers:
 )
 ```
 
-Terminal downstream loads:
+Terminal miss-load work:
 
 ```promql
 (
@@ -534,8 +534,11 @@ Terminal downstream loads:
 ```
 
 Both results are events per second. The first counts callers that observed a
-miss. The second counts completed miss-load work across success, failure, and
-cancellation. With single flight, several misses can correspond to one load.
+miss. The second counts terminal miss-load work across success, failure, and
+cancellation. It includes pre-dispatch admission failures and therefore does not
+prove that a transport dispatch occurred. Use the ordinary request metrics or
+request-dispatch diagnostics when measuring downstream traffic. With single
+flight, several misses can correspond to one load.
 
 ### Cache coalescing ratio (dimensionless)
 

@@ -38,8 +38,10 @@ The effective policy uses four stable states on every starter surface:
 ## Explicit single-operator examples
 
 Start with only the operator the client needs. Every example below is complete
-at the starter-property layer; the named Resilience4j instance must also exist in
-the application's `resilience4j.*.instances` configuration.
+at the starter-property layer. Client-level names may be absent from
+`resilience4j.*.instances`; Resilience4j then creates the selected name from the
+registry defaults. Define a named instance only when it needs configuration that
+differs from those defaults.
 
 ### Retry only
 
