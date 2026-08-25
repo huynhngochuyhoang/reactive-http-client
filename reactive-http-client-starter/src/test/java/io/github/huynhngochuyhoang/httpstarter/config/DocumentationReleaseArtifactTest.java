@@ -213,6 +213,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("therefore does not")
                 .contains("prove that a transport dispatch occurred")
                 .contains("ordinary request metrics")
+                .contains("zero branch retains every cache-selected API")
+                .contains("A zero series does not prove that refresh is configured or active")
+                .doesNotContain("zero branch retains refresh-enabled groups")
                 .contains("### Cache eviction pressure (evictions per second)")
                 .contains("### Cache capacity pressure (dimensionless)")
                 .contains("reactive_http_client_cache_entries\n  /\n  clamp_min(\n"

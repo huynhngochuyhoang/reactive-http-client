@@ -585,8 +585,8 @@ that have no coalesced waiters.
 
 Correlate this with stale-serving rate and hard-expiry misses. A refresh failure
 is hidden from the stale caller and does not itself mark downstream health DOWN.
-The zero branch retains refresh-enabled groups with refresh activity but no
-failures.
+The zero branch retains every cache-selected API, including policies without
+refresh. A zero series does not prove that refresh is configured or active.
 
 ### Cache eviction pressure (evictions per second)
 
