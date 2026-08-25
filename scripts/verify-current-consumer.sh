@@ -93,6 +93,8 @@ if grep -Eq "$ROOT_DIR/reactive-http-client-(starter|test|otel)/target/(test-)?c
     "$EVIDENCE_DIR/classpath.txt" "$EVIDENCE_DIR/dependency-tree.txt"; then
   fail "assembled consumer resolved reactor output directories"
 fi
+grep -q "/com/github/ben-manes/caffeine/caffeine/" "$EVIDENCE_DIR/classpath.txt" \
+  || fail "cache-enabled mock consumer did not receive transitive Caffeine storage"
 stage="reactor-leakage-checked"
 
 CHECKSUMS="$EVIDENCE_DIR/project-artifact-sha256.txt"

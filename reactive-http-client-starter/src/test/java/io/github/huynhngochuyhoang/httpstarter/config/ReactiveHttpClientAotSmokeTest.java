@@ -370,6 +370,42 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorUsesPrimaryProgrammaticPropertiesBeforeEnvironmentBinding() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition clientDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        clientDefinition.getPropertyValues().add("type", InheritedCacheAotClient.class);
+        clientDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, InheritedCacheAotClient.class);
+        context.registerBeanDefinition(InheritedCacheAotClient.class.getName(), clientDefinition);
+
+        RootBeanDefinition defaultProperties = new RootBeanDefinition(ReactiveHttpClientProperties.class);
+        context.registerBeanDefinition("defaultReactiveHttpClientProperties", defaultProperties);
+
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        policy.setSharedResponse(true);
+        policy.setVaryByParameters(List.of("tenant"));
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("inherited-cache-aot", config));
+        RootBeanDefinition customProperties = new RootBeanDefinition(ReactiveHttpClientProperties.class);
+        customProperties.setInstanceSupplier(() -> properties);
+        customProperties.setPrimary(true);
+        context.registerBeanDefinition("customReactiveHttpClientProperties", customProperties);
+
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+
+        assertThat(contribution).isNotNull();
+        assertThat(context.getBeanFactory().containsSingleton("customReactiveHttpClientProperties")).isTrue();
+        assertThat(context.getBeanFactory().containsSingleton("defaultReactiveHttpClientProperties")).isFalse();
+        context.close();
+    }
+
+    @Test
     void beanFactoryAotProcessorGuardsRecursiveGenericParameterTraversal() throws Exception {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);

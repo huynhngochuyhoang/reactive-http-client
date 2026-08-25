@@ -63,9 +63,6 @@
    <activation>
     <property><name>consumer.v27.parity</name><value>true</value></property>
    </activation>
-   <dependencies>
-    <dependency><groupId>com.github.ben-manes.caffeine</groupId><artifactId>caffeine</artifactId></dependency>
-   </dependencies>
    <build>
     <plugins>
      <plugin>

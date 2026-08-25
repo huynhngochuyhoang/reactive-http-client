@@ -87,8 +87,23 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
     }
 
     private ReactiveHttpClientProperties properties(ConfigurableListableBeanFactory beanFactory) {
-        for (String beanName : beanFactory.getBeanNamesForType(
-                ReactiveHttpClientProperties.class, false, false)) {
+        String[] beanNames = beanFactory.getBeanNamesForType(
+                ReactiveHttpClientProperties.class, false, false);
+        List<String> primaryBeanNames = new ArrayList<>();
+        for (String beanName : beanNames) {
+            if (beanFactory.containsBeanDefinition(beanName)
+                    && beanFactory.getBeanDefinition(beanName).isPrimary()) {
+                primaryBeanNames.add(beanName);
+            }
+        }
+        if (primaryBeanNames.size() == 1) {
+            return beanFactory.getBean(primaryBeanNames.get(0), ReactiveHttpClientProperties.class);
+        }
+        if (primaryBeanNames.size() > 1) {
+            return beanFactory.getBeanProvider(ReactiveHttpClientProperties.class)
+                    .getIfAvailable(ReactiveHttpClientProperties::new);
+        }
+        for (String beanName : beanNames) {
             if (beanFactory.containsSingleton(beanName)) {
                 return beanFactory.getBean(beanName, ReactiveHttpClientProperties.class);
             }

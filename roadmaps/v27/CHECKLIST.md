@@ -931,7 +931,7 @@ Evidence recorded on 2026-08-24:
 - [x] Preserve reports from failed stages without uploading stale prior-run
       evidence.
 
-### [x] 11.3 Revalidate AOT, native, and shutdown
+### [ ] 11.3 Revalidate AOT, native, and shutdown
 
 - [x] Add precise runtime hints for selected public cache metadata and required
       implementation resources without broad package reflection.
@@ -943,7 +943,7 @@ Evidence recorded on 2026-08-24:
       refresh work within the shared shutdown deadline.
 - [x] Prove destruction removes factory-owned cache meters before same-tag
       recreation and leaves no registry reference to the closed cache.
-- [x] Record clean commit, GraalVM/JDK versions, dependency list, executable
+- [ ] Record clean commit, GraalVM/JDK versions, dependency list, executable
       status, and binary SHA-256.
 
 Evidence recorded on 2026-08-25:
@@ -958,19 +958,28 @@ Evidence recorded on 2026-08-25:
   refresh, explicit Retry, and enabled-only resilience. The fresh-repository
   verifier passed `55` mock and `4` assembled-consumer tests and retained
   effective POM, dependency tree, classpath, Surefire reports, artifact hashes,
-  stage provenance, and no-reactor-output-leakage evidence.
-- AOT validation now binds cache policy from the AOT environment while retaining
-  starter-factory and replacement-metadata ownership. Runtime hints remain
-  narrow: public cache annotations/configuration, selected record accessors,
-  and the exact Caffeine `SSLMSW` constructor/`FACTORY` lookup used by the
-  starter's bounded expire-after-write cache.
-- Clean commit `9d537313520d62d6261c0baa18697db886b4cce7` compiled and ran
+  stage provenance, and no-reactor-output-leakage evidence. Follow-up consumer
+  evidence also proves that cache-enabled mock consumers receive Caffeine
+  transitively from `reactive-http-client-test` without declaring it directly.
+- AOT validation selects a unique primary programmatic
+  `ReactiveHttpClientProperties` bean before binding the AOT environment, while
+  retaining starter-factory and replacement-metadata ownership. Runtime hints
+  remain narrow: public cache annotations/configuration, selected record
+  accessors, and the exact Caffeine `SSLMSW` constructor/`FACTORY` lookup used by
+  the starter's bounded expire-after-write cache.
+- The original clean commit `9d537313520d62d6261c0baa18697db886b4cce7` compiled and ran
   the expanded Boot `4.0.0` fixture with Java and GraalVM `25.0.3`. The
   provenance records `sourceState=clean`, starter `4.0.0-SNAPSHOT`, the full
   dependency list, and `executableStatus=passed`. The executable proved one
   load plus one hit, one refresh dispatch, explicit two-attempt Retry, zero
   open-circuit dispatch, and exact total dispatch count. Its SHA-256 is
-  `4bceb1e8a5faf326b1a3c903a25dca1b38b77b6e3d01694f502af18d441e5846`.
+  `4bceb1e8a5faf326b1a3c903a25dca1b38b77b6e3d01694f502af18d441e5846`;
+  this immutable evidence predates the follow-up AOT properties fix.
+- The follow-up dirty tree compiled and ran the same native fixture with Java
+  and GraalVM `25.0.3`; its provisional executable SHA-256 is
+  `6e183423f9dd609a171bf5de37a1881dd1c7d825e5d29bb56ca8c1d3ed0cf900`.
+  Clean provenance remains open until these review fixes are committed and the
+  native proof is rerun from that commit.
 - Factory-destruction coverage proves active load/refresh cancellation, entry
   release, aggregate shutdown completion, meter removal, and same-tag registry
   recreation without retaining the closed cache.

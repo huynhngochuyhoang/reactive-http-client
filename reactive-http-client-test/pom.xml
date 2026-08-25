@@ -39,11 +39,10 @@
             <artifactId>reactor-core</artifactId>
         </dependency>
 
-        <!-- Optional in production; present when cache-enabled mock tests select local storage. -->
+        <!-- Required by cache-enabled MockReactiveHttpClient consumers. -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <!-- spring-test for MockClientHttpRequest (compile scope: this module is test-helper code) -->
