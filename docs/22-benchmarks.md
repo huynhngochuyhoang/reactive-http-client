@@ -90,6 +90,21 @@ The smoke command is only a harness check. It proves the benchmark classes
 compile, start, execute, and write result files. Do not publish smoke numbers as
 project performance evidence.
 
+For the V27 cache and resilience audit, select the baseline-compatible disabled
+row, the bounded starter-only cache rows, and the two explicit resilience rows:
+
+```bash
+mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am clean verify \
+  -Dbenchmark.commit=working-tree-dirty \
+  -Dbenchmark.include='.*(cacheDisabledProxyInvocationCreatesPublisher|cacheKeyConstructionPathQueryHeader|cacheAllocation.*|cacheLoopbackStarter.*|starterFeature(ResilienceEnabledOnly|RetryWrapper)GetNoBody).*'
+```
+
+This remains smoke-only even when every row passes. The cache-disabled row is a
+no-network publisher-construction audit. Cache key/allocation rows perform no
+transport I/O. Cache loopback rows use one starter client, one connector, and one
+loopback server; miss, coalesced miss, and refresh each assert one dispatch, while
+hit asserts zero. They are not raw `WebClient` overhead comparisons.
+
 Run a longer release-quality benchmark for the current workspace. The `-am` flag
 intentionally builds the reactor starter under test:
 
@@ -155,6 +170,42 @@ baseline artifact. Its report is written under
 so it does not overwrite the current-workspace release report.
 For an exact historical release environment, check out the release tag and run
 the current-workspace command from that checkout.
+
+The V27 current-vs-published default-path audit uses the same
+`cacheDisabledProxyInvocationCreatesPublisher` method on both artifacts. Run the
+current cache/resilience set with the release profile, then run only the
+baseline-compatible disabled row against published `3.6.0`:
+
+```bash
+mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am clean verify \
+  -Dbenchmark.commit=EXAMPLE_COMMIT_OR_STATE \
+  -Dbenchmark.result.dir=../target/release-evidence/v27/priority12/current-cache \
+  -Dbenchmark.include='.*(cacheKeyConstructionPathQueryHeader|cacheAllocation.*|cacheLoopbackStarter.*|starterFeature(ResilienceEnabledOnly|RetryWrapper)GetNoBody).*'
+
+mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify \
+  -Dbenchmark.commit=EXAMPLE_COMMIT_OR_STATE \
+  -Dbenchmark.result.dir=../target/release-evidence/v27/priority12/current-default \
+  -Dbenchmark.include='.*cacheDisabledProxyInvocationCreatesPublisher.*'
+
+test ! -e target/published-baseline-repositories/benchmark-v27-3.6.0 && \
+mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-v27-3.6.0 \
+  -Pbenchmarks,benchmark-release,benchmark-published-baseline \
+  -pl reactive-http-client-benchmarks clean verify \
+  -Dbenchmark.starter.version=3.6.0 -Dbenchmark.commit=3.6.0 \
+  -Dbenchmark.result.dir=../target/release-evidence/v27/priority12/published-starter-3.6.0 \
+  -Dbenchmark.include='.*cacheDisabledProxyInvocationCreatesPublisher.*' && \
+scripts/verify-published-baseline-provenance.sh benchmark-v27 3.6.0 \
+  target/release-evidence/v27/priority12/published-baseline-provenance \
+  reactive-http-client-starter
+```
+
+The published-baseline profile excludes the V27-only cache benchmark source so
+the current harness remains source-compatible with `3.6.0`. The root-level
+evidence directories survive the benchmark module's baseline `clean`; preserve
+their JSON, Markdown, environment, dependency, command, commit/state, and
+Central-provenance artifacts when reviewing the pair. A dirty-tree audit can
+guide attribution but cannot be promoted or cited as public numerical evidence.
 
 Release-quality runs write JMH JSON under:
 
@@ -398,6 +449,13 @@ The benchmark module currently includes:
 - A no-network optional diagnostics audit for disabled diagnostics,
   metadata-only exchange logging, Micrometer observation with `SimpleMeterRegistry`,
   and the on-demand runtime diagnostics provider.
+- A V27 cache audit with a baseline-compatible cache-disabled invocation row;
+  bounded no-network key, hit, miss, publication, waiter, size-eviction, and
+  refresh rows; and starter-only loopback miss, hit, coalesced-miss, and
+  refresh-on-access rows.
+- Explicit resilience rows for enabled-only pass-through and retry-only wrapping.
+  Focused contract tests separately prove zero lazy-registry initialization for
+  enabled-only clients and no unrelated registry initialization for retry-only.
 
 Both smoke and release-quality commands write a Markdown report next to the JMH
 JSON. For example, the smoke profile writes `smoke-only-jmh.md` and the
@@ -431,6 +489,11 @@ different scenario shapes:
   `runtimeDiagnosticsProvider...`. These rows remain in raw results as
   `No-network starter invocation` and are excluded from optional feature
   summary tables.
+- `cacheDisabled...`, `cacheKey...`, and `cacheAllocation...` identify the
+  baseline-compatible disabled path, key construction, and bounded no-network
+  allocation paths respectively. `cacheLoopbackStarter...` identifies
+  starter-only cache workloads and never feeds the three-client comparison
+  summary.
 
 Report generation fails for an unknown prefix, an unknown
 `clientSideOverhead` surface, or an empty scenario suffix. Add the classification
@@ -459,7 +522,8 @@ emits percentile rows such as `p0.50`, `p0.95`, and `p0.99` in the JMH output.
 The release-quality profile adds the JMH GC profiler so allocation rate is present
 in the release JSON where the JVM can report it reliably. Expected HTTP error
 scenarios catch and validate the mapped exception instead of failing the JMH run;
-unexpected benchmark failures remain visible as JMH errors. The loopback server
+unexpected benchmark failures remain visible as JMH errors, and the runner fails
+the build when any selected benchmark produces no result row. The loopback server
 also tracks invalid request counts and reports the first mismatch when a client
 does not send the shared scenario shape.
 

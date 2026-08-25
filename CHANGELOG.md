@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **V27 cache and resilience performance audit.** Added a baseline-compatible
+  cache-disabled invocation row; separately classified bounded key, hit, miss,
+  publication, waiter, eviction, refresh, and loopback cache workloads; and an
+  enabled-only resilience row. Harness execution rejects missing selected rows,
+  never compare local hits with raw network calls, and keep smoke/dirty-tree
+  numbers non-publishable. Runtime registry resolution now initializes only
+  operators selected by the effective client contract.
 - **Separately opt-in cache observability.** Added bounded hit/miss,
   coalescing, stale-serving, load, refresh, eviction, entry, and capacity meters;
   one cache outcome on caller lifecycle/log/observer/OTel records; aggregate-only

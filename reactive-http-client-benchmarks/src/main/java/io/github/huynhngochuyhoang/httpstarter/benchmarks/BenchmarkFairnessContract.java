@@ -13,6 +13,8 @@ final class BenchmarkFairnessContract {
 
     private static final String CLIENT_SIDE_PREFIX = "clientSideOverhead";
     private static final String LOOPBACK_BENCHMARK = LoopbackClientComparisonBenchmark.class.getName();
+    private static final String CACHE_BENCHMARK =
+            "io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark";
     private static final List<String> CLIENT_SURFACES = List.of(
             "RawWebClient",
             "SpringHttpExchange",
@@ -22,6 +24,10 @@ final class BenchmarkFairnessContract {
     }
 
     static void validateDiscoveredBenchmarks() {
+        validate(discoveredBenchmarks());
+    }
+
+    static List<BenchmarkMethod> discoveredBenchmarks() {
         LinkedHashSet<BenchmarkMethod> methods = new LinkedHashSet<>();
         try {
             var resources = Thread.currentThread().getContextClassLoader()
@@ -36,7 +42,7 @@ final class BenchmarkFairnessContract {
         } catch (IOException ex) {
             throw new IllegalStateException("Unable to read the generated JMH benchmark list", ex);
         }
-        validate(List.copyOf(methods));
+        return List.copyOf(methods);
     }
 
     static void validate(List<BenchmarkMethod> methods) {
@@ -54,6 +60,11 @@ final class BenchmarkFairnessContract {
             if (loopback != loopbackClassification) {
                 throw new IllegalStateException("Benchmark method [" + method.owner() + "#" + method.name()
                         + "] mixes loopback and no-network classification");
+            }
+            if (method.name().startsWith("cacheLoopbackStarter")
+                    && !CACHE_BENCHMARK.equals(method.owner())) {
+                throw new IllegalStateException("Cache loopback benchmark [" + method.owner() + "#"
+                        + method.name() + "] must be owned by the V27 cache benchmark fixture");
             }
             if (!method.name().startsWith(CLIENT_SIDE_PREFIX)) {
                 continue;

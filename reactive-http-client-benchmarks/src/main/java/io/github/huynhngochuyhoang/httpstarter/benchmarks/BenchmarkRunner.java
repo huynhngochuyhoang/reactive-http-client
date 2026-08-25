@@ -1,5 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.benchmarks;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.openjdk.jmh.Main;
 import org.springframework.core.SpringVersion;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -14,8 +16,13 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 public final class BenchmarkRunner {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private BenchmarkRunner() {
     }
@@ -24,7 +31,34 @@ public final class BenchmarkRunner {
         BenchmarkFairnessContract.validateDiscoveredBenchmarks();
         writeEnvironmentMetadata(args);
         Main.main(args);
+        validateSelectedBenchmarksCompleted(args);
         BenchmarkMarkdownReport.writeIfResultFilePresent(args);
+    }
+
+    static void validateSelectedBenchmarksCompleted(String[] args) throws IOException {
+        Path resultFile = resultFile(args);
+        if (resultFile == null || !Files.exists(resultFile) || args.length == 0) {
+            return;
+        }
+        Pattern include = Pattern.compile(args[0]);
+        Set<String> expected = new TreeSet<>();
+        for (BenchmarkFairnessContract.BenchmarkMethod method
+                : BenchmarkFairnessContract.discoveredBenchmarks()) {
+            String name = method.owner() + "." + method.name();
+            if (include.matcher(name).find()) {
+                expected.add(name);
+            }
+        }
+        JsonNode results = OBJECT_MAPPER.readTree(resultFile.toFile());
+        Set<String> completed = new TreeSet<>();
+        if (results.isArray()) {
+            results.forEach(result -> completed.add(result.path("benchmark").asText()));
+        }
+        expected.removeAll(completed);
+        if (!expected.isEmpty()) {
+            throw new IllegalStateException("JMH did not produce results for selected benchmarks " + expected
+                    + "; inspect the benchmark output for setup or execution failures");
+        }
     }
 
     private static void writeEnvironmentMetadata(String[] args) throws IOException {

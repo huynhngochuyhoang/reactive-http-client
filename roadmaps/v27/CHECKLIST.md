@@ -1005,39 +1005,78 @@ Evidence recorded on 2026-08-25:
 
 ## Priority 12 - Performance and Allocation Evidence
 
-### [ ] 12.1 Extend the benchmark harness fairly
+### [x] 12.1 Extend the benchmark harness fairly
 
-- [ ] Add no-network benchmarks for cache-disabled invocation and key lookup.
-- [ ] Add equivalent loopback scenarios for cache miss, hit, coalesced miss, and
+- [x] Add no-network benchmarks for cache-disabled invocation and key lookup.
+- [x] Add equivalent loopback scenarios for cache miss, hit, coalesced miss, and
       refresh-on-access.
-- [ ] Keep all compared clients on equivalent transport/server conditions and
+- [x] Keep all compared clients on equivalent transport/server conditions and
       label starter-specific work explicitly.
-- [ ] Never compare a local cache hit to a raw WebClient network call as
+- [x] Never compare a local cache hit to a raw WebClient network call as
       abstraction-overhead evidence.
-- [ ] Keep smoke runs non-publishable and redirect metadata logging away from
+- [x] Keep smoke runs non-publishable and redirect metadata logging away from
       benchmark console I/O.
 
-### [ ] 12.2 Audit default and resilience overhead
+### [x] 12.2 Audit default and resilience overhead
 
-- [ ] Compare caching disabled against published `3.6.0` for throughput,
+- [x] Compare caching disabled against published `3.6.0` for throughput,
       average time, and allocation without making a public claim from smoke data.
-- [ ] Prove enabled-only resilience performs no operator lookup/subscription and
+- [x] Prove enabled-only resilience performs no operator lookup/subscription and
       explicit retry-only does not initialize unrelated operators.
-- [ ] Attribute any default-path regression to concrete allocations or operator
+- [x] Attribute any default-path regression to concrete allocations or operator
       work before optimizing.
-- [ ] Preserve report environment, resolved dependency versions, commit/state,
+- [x] Preserve report environment, resolved dependency versions, commit/state,
       commands, and current-vs-published pairing.
 
-### [ ] 12.3 Audit cache memory and allocation ownership
+### [x] 12.3 Audit cache memory and allocation ownership
 
-- [ ] Measure key construction, hit, miss, loader, waiter, eviction, and refresh
+- [x] Measure key construction, hit, miss, loader, waiter, eviction, and refresh
       allocations separately.
-- [ ] Verify completed in-flight entries do not retain request graphs, Reactor
+- [x] Verify completed in-flight entries do not retain request graphs, Reactor
       context, auth tokens, or caller subscriptions.
-- [ ] Measure maximum-size and refresh overhead under bounded representative
+- [x] Measure maximum-size and refresh overhead under bounded representative
       policies rather than unbounded synthetic cardinality.
-- [ ] Promote a versioned report only from a clean commit when release notes make
+- [x] Promote a versioned report only from a clean commit when release notes make
       numerical performance claims.
+
+Evidence recorded on 2026-08-25:
+
+- The current harness adds one baseline-compatible no-network disabled-cache row,
+  separately classified no-network key/allocation rows, and starter-only loopback
+  miss, hit, coalesced-miss, and refresh rows. The loopback fixtures share one
+  connector/server and assert dispatch deltas of one, zero, one, and one. Report
+  classification and fairness tests reject raw-network comparisons for local
+  cache hits and reject missing selected JMH result rows.
+- Release-profile target-only evidence is retained under
+  `target/release-evidence/v27/priority12/`: current default, current cache and
+  explicit-resilience rows, the isolated published `3.6.0` default row, their
+  environment files, command/tree-state records, and the generated comparison.
+  The baseline repository is isolated and its starter POM/JAR hashes plus Maven
+  Central markers pass the shared `benchmark-v27` provenance verifier.
+- The initial current default audit exposed repeated invocation-time cache-policy
+  validation. JFR attributed the excess to collection/stream construction around
+  static method policy metadata. Cache selection is now validated once per
+  relevant method, ordinary cache-disabled methods bypass selection, disabled
+  resilience bypasses effective-operator construction, and the final comparison
+  stays within the repository's informational review thresholds. No numerical
+  result is claimed in release notes.
+- Lazy-registry contracts prove enabled-only resilience creates no registry and
+  retry-only creates only its Retry registry. The factory now resolves only
+  operators selected by the effective policy, so unrelated CircuitBreaker,
+  Bulkhead, and RateLimiter registries are neither looked up nor initialized.
+- The release-profile cache audit records normalized allocation independently for
+  key construction, fresh hit, miss token, loader publication, coalesced waiter,
+  size eviction, and refresh. It uses a `256`-entry maximum, a finite key ring,
+  and `64` refresh keys rather than unbounded cardinality.
+- A deterministic ownership test completes one single-flight load, then inspects
+  cache and in-flight state to prove only the opaque key and response value remain;
+  request arguments, Reactor context, auth state, and caller subscription state
+  are not retained. The final suites pass starter `1207`, test-helper `58`, OTel
+  `53`, and benchmark `17` tests with zero failures, errors, or skips;
+  `git diff --check` also passes.
+- The benchmarked workspace is intentionally recorded as dirty, so no versioned
+  report was promoted. `CHANGELOG.md` contains no numerical performance claim;
+  a future claim requires a clean committed rerun and promoted report.
 
 ---
 

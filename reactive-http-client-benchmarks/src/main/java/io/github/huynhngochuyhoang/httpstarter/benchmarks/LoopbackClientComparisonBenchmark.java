@@ -209,6 +209,13 @@ public class LoopbackClientComparisonBenchmark {
     }
 
     @Benchmark
+    public BenchmarkUser starterFeatureResilienceEnabledOnlyGetNoBody() {
+        return validateUser("starter resilience enabled-only",
+                clients.starterResilienceEnabledOnlyClient.currentUser().block(),
+                LoopbackBenchmarkServer.CURRENT_USER);
+    }
+
+    @Benchmark
     public BenchmarkUser starterFeatureRetryWrapperGetNoBody() {
         return validateUser("starter retry wrapper", clients.starterRetryClient.currentUser().block(),
                 LoopbackBenchmarkServer.CURRENT_USER);
@@ -257,6 +264,7 @@ public class LoopbackClientComparisonBenchmark {
         starterErrorMappingProblemDetailSmallBody();
         starterFeatureExchangeLoggingMetadataOnlyGetNoBody();
         starterFeatureMicrometerObserverGetNoBody();
+        starterFeatureResilienceEnabledOnlyGetNoBody();
         starterFeatureRetryWrapperGetNoBody();
         starterFeatureRateLimiterWrapperGetNoBody();
         starterFeatureCircuitBreakerWrapperGetNoBody();

@@ -49,6 +49,7 @@ final class BenchmarkClients implements AutoCloseable {
             StarterClientResources problemDetailStarter,
             StarterClientResources exchangeLoggingStarter,
             StarterClientResources micrometerStarter,
+            StarterClientResources resilienceEnabledOnlyStarter,
             StarterClientResources retryStarter,
             StarterClientResources rateLimiterStarter,
             StarterClientResources circuitBreakerStarter) {
@@ -59,6 +60,7 @@ final class BenchmarkClients implements AutoCloseable {
                 problemDetailStarter,
                 exchangeLoggingStarter,
                 micrometerStarter,
+                resilienceEnabledOnlyStarter,
                 retryStarter,
                 rateLimiterStarter,
                 circuitBreakerStarter);
@@ -68,6 +70,7 @@ final class BenchmarkClients implements AutoCloseable {
         this.starterProblemDetailClient = problemDetailStarter.client;
         this.starterExchangeLoggingClient = exchangeLoggingStarter.client;
         this.starterMicrometerClient = micrometerStarter.client;
+        this.starterResilienceEnabledOnlyClient = resilienceEnabledOnlyStarter.client;
         this.starterRetryClient = retryStarter.client;
         this.starterRateLimiterClient = rateLimiterStarter.client;
         this.starterCircuitBreakerClient = circuitBreakerStarter.client;
@@ -79,6 +82,7 @@ final class BenchmarkClients implements AutoCloseable {
     final StarterBenchmarkClient starterProblemDetailClient;
     final StarterBenchmarkClient starterExchangeLoggingClient;
     final StarterBenchmarkClient starterMicrometerClient;
+    final StarterBenchmarkClient starterResilienceEnabledOnlyClient;
     final StarterBenchmarkClient starterRetryClient;
     final StarterBenchmarkClient starterRateLimiterClient;
     final StarterBenchmarkClient starterCircuitBreakerClient;
@@ -118,15 +122,25 @@ final class BenchmarkClients implements AutoCloseable {
                 context.registerBean(HttpClientObserver.class, () -> new MicrometerHttpClientObserver(
                         new SimpleMeterRegistry(),
                         properties.getObservability())));
+        StarterClientResources resilienceEnabledOnlyStarter = createStarter(
+                baseUrl,
+                "benchmark-starter-resilience-enabled-only",
+                config -> config.getResilience().setEnabled(true),
+                (context, properties) -> { });
         StarterClientResources retryStarter = createStarter(baseUrl, "benchmark-starter-retry", config -> {
             config.getResilience().setEnabled(true);
+            config.getResilience().setRetry("default");
             config.getResilience().setRetryMethods(Set.of("GET"));
         }, (context, properties) -> context.registerBean(RetryRegistry.class, RetryRegistry::ofDefaults));
-        StarterClientResources rateLimiterStarter = createStarter(baseUrl, "benchmark-starter-rate-limiter", config ->
-                config.getResilience().setEnabled(true),
+        StarterClientResources rateLimiterStarter = createStarter(baseUrl, "benchmark-starter-rate-limiter", config -> {
+                config.getResilience().setEnabled(true);
+                config.getResilience().setRateLimiter("default");
+            },
                 (context, properties) -> context.registerBean(RateLimiterRegistry.class, RateLimiterRegistry::ofDefaults));
-        StarterClientResources circuitBreakerStarter = createStarter(baseUrl, "benchmark-starter-circuit-breaker", config ->
-                config.getResilience().setEnabled(true),
+        StarterClientResources circuitBreakerStarter = createStarter(baseUrl, "benchmark-starter-circuit-breaker", config -> {
+                config.getResilience().setEnabled(true);
+                config.getResilience().setCircuitBreaker("default");
+            },
                 (context, properties) -> context.registerBean(CircuitBreakerRegistry.class, CircuitBreakerRegistry::ofDefaults));
 
         return new BenchmarkClients(
@@ -138,6 +152,7 @@ final class BenchmarkClients implements AutoCloseable {
                 problemDetailStarter,
                 exchangeLoggingStarter,
                 micrometerStarter,
+                resilienceEnabledOnlyStarter,
                 retryStarter,
                 rateLimiterStarter,
                 circuitBreakerStarter);

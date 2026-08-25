@@ -10,6 +10,9 @@ import io.github.huynhngochuyhoang.httpstarter.core.NoopResilienceOperatorApplie
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveClientInvocationHandler;
 import io.github.huynhngochuyhoang.httpstarter.core.RequestArgumentResolver;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
@@ -24,6 +27,7 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
 public class StarterInvocationBenchmark {
@@ -80,6 +84,13 @@ public class StarterInvocationBenchmark {
 
     @Benchmark
     public Mono<BenchmarkUser> proxyInvocationCreatesPublisher() {
+        return starterClient.findUser("42", "summary", "benchmark");
+    }
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput, Mode.AverageTime})
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public Mono<BenchmarkUser> cacheDisabledProxyInvocationCreatesPublisher() {
         return starterClient.findUser("42", "summary", "benchmark");
     }
 
