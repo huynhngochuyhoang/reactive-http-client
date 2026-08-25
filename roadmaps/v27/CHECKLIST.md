@@ -931,7 +931,7 @@ Evidence recorded on 2026-08-24:
 - [x] Preserve reports from failed stages without uploading stale prior-run
       evidence.
 
-### [ ] 11.3 Revalidate AOT, native, and shutdown
+### [x] 11.3 Revalidate AOT, native, and shutdown
 
 - [x] Add precise runtime hints for selected public cache metadata and required
       implementation resources without broad package reflection.
@@ -943,7 +943,7 @@ Evidence recorded on 2026-08-24:
       refresh work within the shared shutdown deadline.
 - [x] Prove destruction removes factory-owned cache meters before same-tag
       recreation and leaves no registry reference to the closed cache.
-- [ ] Record clean commit, GraalVM/JDK versions, dependency list, executable
+- [x] Record clean commit, GraalVM/JDK versions, dependency list, executable
       status, and binary SHA-256.
 
 Evidence recorded on 2026-08-25:
@@ -988,8 +988,15 @@ Evidence recorded on 2026-08-25:
   single flight from repopulating the cache. Every mock construction path now
   retains and closes its cache manager; a non-deterministic cache-enabled mock
   cancels active work during `close()`. The full reactor and fresh isolated
-  consumer verifier pass. Clean native provenance remains open until these
-  review fixes are committed and rerun from that commit.
+  consumer verifier pass.
+- Final clean commit `addfc3ba466f8dce881f545ac0bc543894aebf21` compiled and
+  ran the expanded fixture with Java and GraalVM `25.0.3` and Spring Boot
+  `4.0.0`. The final provenance records `sourceState=clean`, starter
+  `4.0.0-SNAPSHOT`, the full dependency list, and `executableStatus=passed`.
+  Its SHA-256 is
+  `bd5e557f9cc32e12f5c7fb5294986e2a8c1d2bb250a19bcf350c3cb4febb5522`,
+  superseding the earlier native records and closing the follow-up eviction and
+  mock-ownership evidence gap.
 - Factory-destruction coverage proves active load/refresh cancellation, entry
   release, aggregate shutdown completion, meter removal, and same-tag registry
   recreation without retaining the closed cache.
