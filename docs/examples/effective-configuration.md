@@ -130,7 +130,14 @@ reactive:
 ## Explicit Local Response Cache
 
 This `4.0.0` candidate example selects one bounded local policy explicitly.
-Single flight, access refresh, and cache telemetry are independent choices.
+Single flight, access refresh, and cache telemetry are independent choices. It is
+startup-valid as written only when `catalog-api` has no applicable customization
+beans. Before enabling it in an existing application, inventory every applicable
+Boot `WebClientCustomizer`, matching `ReactiveHttpClientCustomizer`, and replacement
+`WebClient.Builder` bean. For each reviewed customization, add its exact Spring bean
+name under `cache.customizations` with `SAFE`. Missing and `INCOMPATIBLE`
+classifications reject proxy construction; see
+[Customization safety](../32-response-caching.md#customization-safety).
 
 ```yaml
 reactive:

@@ -28,7 +28,7 @@ class DocumentationReleaseArtifactTest {
     private static final Set<String> SENSITIVE_SUPPORT_FIXTURE_FIELD_FRAGMENTS = Set.of(
             "argument", "header", "body", "bodies", "url", "identity", "identities",
             "authorization", "credential", "tenant", "cookie", "secret", "token",
-            "cachekey", "keydigest", "cachedvalue",
+            "key", "digest", "value", "payload",
             "path", "query", "uri", "requesttarget", "requestvariant");
     private static final Pattern PROJECT_VERSION_SNIPPET = Pattern.compile(
             "<groupId>io\\.github\\.huynhngochuyhoang</groupId>\\s*"
@@ -213,7 +213,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("## Explicit Local Response Cache")
                 .contains("policy: catalog-read")
                 .contains("maximum-size: 10000")
-                .contains("cache:\n        enabled: true");
+                .contains("cache:\n        enabled: true")
+                .contains("inventory every applicable")
+                .contains("Boot `WebClientCustomizer`, matching `ReactiveHttpClientCustomizer`")
+                .contains("For each reviewed customization, add its exact Spring bean")
+                .contains("name under `cache.customizations` with `SAFE`")
+                .contains("Missing and `INCOMPATIBLE`")
+                .contains("classifications reject proxy construction");
         assertThat(observability)
                 .contains("### Cache miss and load rate (events per second)")
                 .contains("Terminal miss-load work:")
@@ -280,7 +286,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void responseCacheSupportFixtureGuardRejectsRequestTargetFieldNames() throws IOException {
+    void responseCacheSupportFixtureGuardRejectsSensitiveFieldNames() throws IOException {
         JsonNode unsafeFixture = OBJECT_MAPPER.readTree("""
                 {
                   "requestPath": "/customers/123",
@@ -288,14 +294,19 @@ class DocumentationReleaseArtifactTest {
                     "queryParameters": "customer=123",
                     "requestVariant": "tenant-a",
                     "requestTarget": "/customers/{id}",
-                    "uri": "/customers/123"
+                    "uri": "/customers/123",
+                    "entryKey": "opaque-entry",
+                    "cacheDigest": "opaque-digest",
+                    "responseValue": "cached-response",
+                    "payload": "cached-payload"
                   }
                 }
                 """);
 
         assertThat(sensitiveSupportFixtureFieldNames(unsafeFixture))
                 .containsExactlyInAnyOrder(
-                        "requestPath", "queryParameters", "requestVariant", "requestTarget", "uri");
+                        "requestPath", "queryParameters", "requestVariant", "requestTarget", "uri",
+                        "entryKey", "cacheDigest", "responseValue", "payload");
     }
 
     @Test
