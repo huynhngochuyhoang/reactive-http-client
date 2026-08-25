@@ -23,6 +23,7 @@ import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.annotation.*;
 import org.springframework.context.aot.ApplicationContextAotGenerator;
+import org.springframework.core.env.MapPropertySource;
 import org.springframework.javapoet.ClassName;
 import reactor.core.publisher.Mono;
 
@@ -95,6 +96,14 @@ class ReactiveHttpClientAotSmokeTest {
                 candidates.getDeclaredMethod("authProviderFactoryLookup", AuthProviderFactory.class)))
                 .accepts(hints);
         assertThat(RuntimeHintsPredicates.resource().forResource(ReactiveHttpClientRuntimeHints.POM_PROPERTIES_RESOURCE))
+                .accepts(hints);
+        Class<?> caffeineCache = Class.forName(ReactiveHttpClientRuntimeHints.CAFFEINE_LOCAL_CACHE);
+        assertThat(caffeineCache.getDeclaredConstructors())
+                .allSatisfy(constructor -> assertThat(
+                        RuntimeHintsPredicates.reflection().onConstructorInvocation(constructor))
+                        .accepts(hints));
+        assertThat(RuntimeHintsPredicates.reflection().onField(
+                caffeineCache.getDeclaredField("FACTORY")))
                 .accepts(hints);
     }
 
@@ -301,6 +310,66 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorValidatesInheritedCacheMetadataAndRegistersItsRecordAccessors()
+            throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", InheritedCacheAotClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, InheritedCacheAotClient.class);
+        context.registerBeanDefinition(InheritedCacheAotClient.class.getName(), beanDefinition);
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        policy.setSharedResponse(true);
+        policy.setVaryByParameters(List.of("tenant"));
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("inherited-cache-aot", config));
+        context.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+        DefaultGenerationContext generationContext = newGenerationContext();
+
+        contribution.applyTo(generationContext, null);
+
+        assertThat(RuntimeHintsPredicates.proxies().forInterfaces(InheritedCacheAotClient.class))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                InheritedCacheAotOperations.class.getMethod("get", CacheRecordVariant.class)))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                CacheRecordVariant.class.getMethod("value")))
+                .accepts(generationContext.getRuntimeHints());
+        context.close();
+    }
+
+    @Test
+    void beanFactoryAotProcessorBindsCachePolicyFromTheAotEnvironment() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource(
+                "aot-cache-policy",
+                Map.of(
+                        "reactive.http.clients.inherited-cache-aot.cache.policies.selected.ttl-ms", "1000",
+                        "reactive.http.clients.inherited-cache-aot.cache.policies.selected.maximum-size", "100",
+                        "reactive.http.clients.inherited-cache-aot.cache.policies.selected.shared-response", "true",
+                        "reactive.http.clients.inherited-cache-aot.cache.policies.selected.vary-by-parameters[0]",
+                        "tenant")));
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", InheritedCacheAotClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, InheritedCacheAotClient.class);
+        context.registerBeanDefinition(InheritedCacheAotClient.class.getName(), beanDefinition);
+
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+
+        assertThat(contribution).isNotNull();
+        context.close();
+    }
+
+    @Test
     void beanFactoryAotProcessorGuardsRecursiveGenericParameterTraversal() throws Exception {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
@@ -474,6 +543,16 @@ class ReactiveHttpClientAotSmokeTest {
         @GET("/items")
         @CacheResponse("selected")
         Mono<String> get(@CacheKey("tenant") List<CacheRecordVariant> tenant);
+    }
+
+    interface InheritedCacheAotOperations {
+        @GET("/items")
+        @CacheResponse("selected")
+        Mono<String> get(@CacheKey("tenant") CacheRecordVariant tenant);
+    }
+
+    @ReactiveHttpClient(name = "inherited-cache-aot", baseUrl = "http://inherited-cache-aot.test")
+    interface InheritedCacheAotClient extends InheritedCacheAotOperations {
     }
 
     @ReactiveHttpClient(name = "recursive-generic-aot", baseUrl = "http://recursive-generic-aot.test")

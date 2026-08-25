@@ -11,6 +11,8 @@ import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
 import io.github.huynhngochuyhoang.httpstarter.exception.ProblemDetailRemoteServiceException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -47,19 +49,18 @@ public class NativeSmokeApplication {
         AtomicReference<String> observedAuth = new AtomicReference<>();
         AtomicReference<String> observedAcceptEncoding = new AtomicReference<>();
         AtomicInteger dispatchCount = new AtomicInteger();
+        AtomicInteger cachedDispatchCount = new AtomicInteger();
+        AtomicInteger retryDispatchCount = new AtomicInteger();
         CountDownLatch openCircuitDispatch = new CountDownLatch(1);
+        CountDownLatch refreshDispatch = new CountDownLatch(1);
         DisposableServer server = loopbackServer(
-                observedAuth, observedAcceptEncoding, dispatchCount, openCircuitDispatch);
+                observedAuth, observedAcceptEncoding, dispatchCount, cachedDispatchCount,
+                retryDispatchCount, openCircuitDispatch, refreshDispatch);
         SpringApplication application = new SpringApplication(NativeSmokeApplication.class);
         application.setWebApplicationType(WebApplicationType.NONE);
         application.setDefaultProperties(Map.of(
-                "reactive.http.clients.native-smoke.base-url", "http://127.0.0.1:" + server.port(),
-                "reactive.http.clients.native-smoke.auth-provider", "nativeAuthProvider",
-                "reactive.http.clients.native-smoke.compression-enabled", "true",
-                "reactive.http.clients.native-smoke.resilience.enabled", "true",
-                "reactive.http.clients.native-smoke.apis.native-problem.method", "GET",
-                "reactive.http.clients.native-smoke.apis.native-problem.path", "/api/problem",
-                "reactive.http.observability.diagnostics-endpoint.enabled", "true"));
+                "reactive.http.clients.native-smoke.base-url",
+                "http://127.0.0.1:" + server.port()));
         try (ConfigurableApplicationContext context = application.run(args)) {
             NativeSmokeClient client = context.getBean(NativeSmokeClient.class);
             NativeOrderResponse order = client.getOrder().block(Duration.ofSeconds(5));
@@ -99,6 +100,26 @@ public class NativeSmokeApplication {
                         "Open-circuit rejection unexpectedly reached the loopback server");
             }
 
+            NativeOrderResponse firstCached = client.getCachedOrder().block(Duration.ofSeconds(5));
+            NativeOrderResponse cachedHit = client.getCachedOrder().block(Duration.ofSeconds(5));
+            require(firstCached != null && "cached-1".equals(firstCached.message())
+                            && firstCached.equals(cachedHit),
+                    "native cache miss/hit contract failed");
+            require(cachedDispatchCount.get() == 1,
+                    "native cache hit unexpectedly dispatched to the loopback server");
+            sleep(Duration.ofMillis(120));
+            NativeOrderResponse stale = client.getCachedOrder().block(Duration.ofSeconds(5));
+            require(firstCached.equals(stale), "refresh-on-access did not return the stale value");
+            await(refreshDispatch, "native cache refresh did not dispatch");
+            NativeOrderResponse refreshed = awaitCachedValue(client, "cached-2");
+            require("cached-2".equals(refreshed.message()) && cachedDispatchCount.get() == 2,
+                    "native cache refresh did not replace the cached value exactly once");
+
+            NativeOrderResponse retried = client.getRetryOnly().block(Duration.ofSeconds(5));
+            require(retried != null && "retry-2".equals(retried.message())
+                            && retryDispatchCount.get() == 2,
+                    "explicit retry-only activation did not produce exactly two dispatches");
+
             require(context.containsBean("reactiveHttpClientDiagnosticsEndpoint"),
                     "opt-in diagnostics endpoint was not registered");
             require(context.containsBean("reactiveHttpClientHealthIndicator"),
@@ -118,6 +139,9 @@ public class NativeSmokeApplication {
                     "clientName", "clientInterface", "baseUrlSource", "poolSource",
                     "poolMaxConnections", "poolPendingAcquireTimeoutMs", "poolMetricsEnabled",
                     "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams",
+                    "cachePhase", "cachePolicyCount", "cacheTtlMs", "cacheRefreshAfterMs",
+                    "cacheSingleFlight", "cacheMaximumSize", "cacheEntryCount",
+                    "cacheEvictions", "cacheMetricsEnabled",
                     "timeoutSource", "timeoutMs", "logicalCallTimeoutMs", "compressionEnabled",
                     "codecMaxInMemorySizeMb", "resilienceConfigured", "retry", "rateLimiter",
                     "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
@@ -150,6 +174,13 @@ public class NativeSmokeApplication {
                             && providerClient.get("poolProtocol") instanceof String
                             && providerClient.get("poolCapacityBasis") instanceof String
                             && providerClient.get("poolMaxConcurrentStreams") == null
+                            && providerClient.get("cachePolicyCount") instanceof Integer
+                            && providerClient.get("cacheTtlMs") instanceof Long
+                            && providerClient.get("cacheRefreshAfterMs") instanceof Long
+                            && providerClient.get("cacheMaximumSize") instanceof Long
+                            && providerClient.get("cacheEntryCount") instanceof Long
+                            && providerClient.get("cacheEvictions") instanceof Long
+                            && providerClient.get("cacheMetricsEnabled") instanceof Boolean
                             && providerClient.get("timeoutMs") instanceof Long
                             && providerClient.get("logicalCallTimeoutMs") instanceof Long
                             && providerClient.get("compressionEnabled") instanceof Boolean
@@ -163,6 +194,15 @@ public class NativeSmokeApplication {
                             && "unknown".equals(collectionClient.get("poolProtocol"))
                             && "unknown".equals(collectionClient.get("poolCapacityBasis"))
                             && collectionClient.get("poolMaxConcurrentStreams") == null
+                            && "unknown".equals(collectionClient.get("cachePhase"))
+                            && collectionClient.get("cachePolicyCount") == null
+                            && collectionClient.get("cacheTtlMs") == null
+                            && collectionClient.get("cacheRefreshAfterMs") == null
+                            && "unknown".equals(collectionClient.get("cacheSingleFlight"))
+                            && collectionClient.get("cacheMaximumSize") == null
+                            && collectionClient.get("cacheEntryCount") == null
+                            && collectionClient.get("cacheEvictions") == null
+                            && collectionClient.get("cacheMetricsEnabled") == null
                             && collectionClient.get("logicalCallTimeoutMs") == null
                             && collectionClient.get("compressionEnabled") == null
                             && collectionClient.get("codecMaxInMemorySizeMb") == null
@@ -196,6 +236,8 @@ public class NativeSmokeApplication {
             require(rejectedAttempts != null && rejectedAttempts.count() == 1
                             && rejectedAttempts.totalAmount() == 0,
                     "Open-circuit terminal did not record zero subscription attempts");
+            require(dispatchCount.get() == 7,
+                    "native smoke observed an unexpected total dispatch count: " + dispatchCount.get());
         } finally {
             server.disposeNow(Duration.ofSeconds(5));
         }
@@ -219,11 +261,24 @@ public class NativeSmokeApplication {
         return registry;
     }
 
+    @Bean
+    RetryRegistry retryRegistry() {
+        RetryRegistry registry = RetryRegistry.of(RetryConfig.custom()
+                .maxAttempts(2)
+                .waitDuration(Duration.ZERO)
+                .build());
+        registry.retry("native-retry");
+        return registry;
+    }
+
     private static DisposableServer loopbackServer(
             AtomicReference<String> observedAuth,
             AtomicReference<String> observedAcceptEncoding,
             AtomicInteger dispatchCount,
-            CountDownLatch openCircuitDispatch) {
+            AtomicInteger cachedDispatchCount,
+            AtomicInteger retryDispatchCount,
+            CountDownLatch openCircuitDispatch,
+            CountDownLatch refreshDispatch) {
         return HttpServer.create()
                 .port(0)
                 .route(routes -> routes
@@ -256,8 +311,61 @@ public class NativeSmokeApplication {
                             return response.header("Content-Type", "application/json")
                                     .sendString(Mono.just("{\"code\":\"unexpected\",\"message\":\"dispatched\"}"))
                                     .then();
+                        })
+                        .get("/api/cached-order", (request, response) -> {
+                            dispatchCount.incrementAndGet();
+                            int dispatch = cachedDispatchCount.incrementAndGet();
+                            if (dispatch == 2) {
+                                refreshDispatch.countDown();
+                            }
+                            return response.header("Content-Type", "application/json")
+                                    .sendString(Mono.just("{\"code\":\"ok\",\"message\":\"cached-"
+                                            + dispatch + "\"}"))
+                                    .then();
+                        })
+                        .get("/api/retry-only", (request, response) -> {
+                            dispatchCount.incrementAndGet();
+                            int dispatch = retryDispatchCount.incrementAndGet();
+                            if (dispatch == 1) {
+                                return response.status(503).send();
+                            }
+                            return response.header("Content-Type", "application/json")
+                                    .sendString(Mono.just("{\"code\":\"ok\",\"message\":\"retry-"
+                                            + dispatch + "\"}"))
+                                    .then();
                         }))
                 .bindNow(Duration.ofSeconds(5));
+    }
+
+    private static NativeOrderResponse awaitCachedValue(NativeSmokeClient client, String message) {
+        long deadline = System.nanoTime() + Duration.ofSeconds(2).toNanos();
+        NativeOrderResponse value;
+        do {
+            value = client.getCachedOrder().block(Duration.ofSeconds(1));
+            if (value != null && message.equals(value.message())) {
+                return value;
+            }
+            sleep(Duration.ofMillis(10));
+        } while (System.nanoTime() < deadline);
+        throw new IllegalStateException("Timed out waiting for refreshed cache value " + message);
+    }
+
+    private static void await(CountDownLatch latch, String message) {
+        try {
+            require(latch.await(2, TimeUnit.SECONDS), message);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for native smoke evidence", error);
+        }
+    }
+
+    private static void sleep(Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for native smoke state", error);
+        }
     }
 
     private static byte[] gzip(String value) {

@@ -5,6 +5,7 @@ import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.*;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
@@ -21,9 +22,11 @@ import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Proxy;
 import java.net.URI;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -51,21 +54,34 @@ import java.util.function.Function;
  * serves the request. Unmatched requests produce an HTTP 404 response so the
  * test fails loudly instead of hanging.
  */
-public final class MockReactiveHttpClient<T> {
+public final class MockReactiveHttpClient<T> implements AutoCloseable {
 
     private final T proxy;
     private final List<RecordedExchange> exchanges;
     private final List<Matcher> matchers;
     private final AtomicReference<ClientResponse> fallback;
+    private final MockResponseCacheSupport.Control cacheControl;
+    private final AtomicLong cacheTickerNanos;
+    private final List<HttpClientCacheOutcome> cacheOutcomes;
+    private final StaticApplicationContext applicationContext;
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     private MockReactiveHttpClient(T proxy,
                                    List<RecordedExchange> exchanges,
                                    List<Matcher> matchers,
-                                   AtomicReference<ClientResponse> fallback) {
+                                   AtomicReference<ClientResponse> fallback,
+                                   MockResponseCacheSupport.Control cacheControl,
+                                   AtomicLong cacheTickerNanos,
+                                   List<HttpClientCacheOutcome> cacheOutcomes,
+                                   StaticApplicationContext applicationContext) {
         this.proxy = proxy;
         this.exchanges = exchanges;
         this.matchers = matchers;
         this.fallback = fallback;
+        this.cacheControl = cacheControl;
+        this.cacheTickerNanos = cacheTickerNanos;
+        this.cacheOutcomes = cacheOutcomes;
+        this.applicationContext = applicationContext;
     }
 
     /** Returns the proxy implementing {@code T} — invoke its methods to exercise the client. */
@@ -77,6 +93,67 @@ public final class MockReactiveHttpClient<T> {
     /** The most recently recorded exchange, or {@code null} if none. */
     public RecordedExchange lastExchange() {
         return exchanges.isEmpty() ? null : exchanges.get(exchanges.size() - 1);
+    }
+
+    /** Advances the opt-in deterministic cache clock without sleeping. */
+    public void advanceCacheTime(Duration duration) {
+        Objects.requireNonNull(duration, "duration");
+        if (cacheTickerNanos == null) {
+            throw new IllegalStateException(
+                    "Deterministic cache time was not enabled on this mock builder");
+        }
+        long nanos = duration.toNanos();
+        if (nanos < 0) {
+            throw new IllegalArgumentException("duration must not be negative");
+        }
+        cacheTickerNanos.updateAndGet(current -> Math.addExact(current, nanos));
+    }
+
+    /** Returns the current number of locally cached entries. */
+    public long cacheEntryCount() {
+        requireCacheControl();
+        return cacheControl.entryCount();
+    }
+
+    /** Returns the number of in-process downstream loads recorded by this mock. */
+    public int loadCount() {
+        return exchanges.size();
+    }
+
+    /** Returns the number of in-process downstream loads for one request path. */
+    public long loadCount(String path) {
+        Objects.requireNonNull(path, "path");
+        return exchanges.stream().filter(exchange -> path.equals(exchange.uri().getPath())).count();
+    }
+
+    /** Returns caller-visible cache outcomes in terminal order. */
+    public List<HttpClientCacheOutcome> cacheOutcomes() {
+        return List.copyOf(cacheOutcomes);
+    }
+
+    /** Explicitly evicts every entry owned by this mock client. */
+    public void evictCacheEntries() {
+        requireCacheControl();
+        cacheControl.evictAll();
+    }
+
+    private void requireCacheControl() {
+        if (cacheControl == null) {
+            throw new IllegalStateException(
+                    "Deterministic cache time was not enabled on this mock builder");
+        }
+    }
+
+    /** Releases cache state and the isolated application context. */
+    @Override
+    public void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+        if (cacheControl != null) {
+            cacheControl.close();
+        }
+        applicationContext.close();
     }
 
     /**
@@ -218,6 +295,9 @@ public final class MockReactiveHttpClient<T> {
         private AuthProvider authProvider;
         private ReactiveHttpClientJsonCodec jsonCodec;
         private HttpClientObserver observer;
+        private AtomicLong cacheTickerNanos;
+        private final ReactiveHttpClientProperties.ObservabilityConfig observabilityConfig =
+                new ReactiveHttpClientProperties.ObservabilityConfig();
         private final List<ReactiveHttpClientLifecycleHook> lifecycleHooks = new ArrayList<>();
         private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> exchangeLoggers =
                 new LinkedHashMap<>();
@@ -267,6 +347,40 @@ public final class MockReactiveHttpClient<T> {
         public Builder<T> clientConfig(ReactiveHttpClientProperties.ClientConfig clientConfig) {
             this.clientConfig = clientConfig != null ? clientConfig : new ReactiveHttpClientProperties.ClientConfig();
             return this;
+        }
+
+        /**
+         * Installs a deterministic response-cache clock and captures cache outcomes.
+         * This does not select caching; configure a policy through {@link #clientConfig}
+         * or {@link #cachePolicy} and select it on the client or method.
+         */
+        public Builder<T> withDeterministicCacheTime() {
+            if (cacheTickerNanos == null) {
+                cacheTickerNanos = new AtomicLong();
+            }
+            observabilityConfig.getCache().setEnabled(true);
+            return this;
+        }
+
+        /** Defines one inert local-cache policy and enables deterministic cache time. */
+        public Builder<T> cachePolicy(String policyName, Duration ttl, long maximumSize) {
+            if (policyName == null || policyName.isBlank()) {
+                throw new IllegalArgumentException("policyName must not be blank");
+            }
+            Objects.requireNonNull(ttl, "ttl");
+            if (ttl.isZero() || ttl.isNegative()) {
+                throw new IllegalArgumentException("ttl must be positive");
+            }
+            if (maximumSize < 1) {
+                throw new IllegalArgumentException("maximumSize must be at least 1");
+            }
+            ReactiveHttpClientProperties.CachePolicyConfig policy =
+                    new ReactiveHttpClientProperties.CachePolicyConfig();
+            policy.setTtlMs(ttl.toMillis());
+            policy.setMaximumSize(maximumSize);
+            policy.setVaryByHeaders(List.of("Idempotency-Key"));
+            clientConfig.getCache().getPolicies().put(policyName, policy);
+            return withDeterministicCacheTime();
         }
 
         /** Uses a replacement metadata cache for validation and invocation. */
@@ -417,6 +531,13 @@ public final class MockReactiveHttpClient<T> {
                 appCtx.getBeanFactory().registerSingleton(
                         "mockHttpExchangeLogger" + exchangeLoggerIndex++, exchangeLogger);
             }
+            List<HttpClientCacheOutcome> cacheOutcomes = new CopyOnWriteArrayList<>();
+            appCtx.getBeanFactory().registerSingleton("mockCacheOutcomeObserver",
+                    (HttpClientObserver) event -> {
+                        if (event.getCacheOutcome() != null) {
+                            cacheOutcomes.add(event.getCacheOutcome());
+                        }
+                    });
             if (observer != null) {
                 appCtx.getBeanFactory().registerSingleton("mockHttpClientObserver", observer);
             }
@@ -437,21 +558,33 @@ public final class MockReactiveHttpClient<T> {
                 }
             }
 
-            ReactiveClientInvocationHandler handler = ReactiveClientInvocationHandler.create(
-                    webClient,
-                    methodMetadataCache,
-                    new RequestArgumentResolver(),
-                    new DefaultErrorDecoder(),
-                    clientConfig,
-                    clientName,
-                    clientInterface,
-                    appCtx,
-                    resilienceOperatorApplier,
-                    effectiveJsonCodec,
-                    new ReactiveHttpClientProperties.ObservabilityConfig(),
-                    authProvider,
-                    baseUrl
-            );
+            ReactiveClientInvocationHandler handler;
+            MockResponseCacheSupport.Control cacheControl = null;
+            if (cacheTickerNanos != null) {
+                MockResponseCacheSupport.Session session = MockResponseCacheSupport.create(
+                        webClient, methodMetadataCache, clientConfig, clientName, clientInterface,
+                        appCtx, resilienceOperatorApplier, effectiveJsonCodec, observabilityConfig,
+                        authProvider, baseUrl, cacheTickerNanos::get);
+                handler = session.handler();
+                cacheControl = session.control();
+            }
+            else {
+                handler = ReactiveClientInvocationHandler.create(
+                        webClient,
+                        methodMetadataCache,
+                        new RequestArgumentResolver(),
+                        new DefaultErrorDecoder(),
+                        clientConfig,
+                        clientName,
+                        clientInterface,
+                        appCtx,
+                        resilienceOperatorApplier,
+                        effectiveJsonCodec,
+                        observabilityConfig,
+                        authProvider,
+                        baseUrl
+                );
+            }
 
             @SuppressWarnings("unchecked")
             T proxy = (T) Proxy.newProxyInstance(
@@ -459,7 +592,8 @@ public final class MockReactiveHttpClient<T> {
                     new Class<?>[]{clientInterface},
                     handler);
 
-            return new MockReactiveHttpClient<>(proxy, exchanges, liveMatchers, fallbackRef);
+            return new MockReactiveHttpClient<>(proxy, exchanges, liveMatchers, fallbackRef,
+                    cacheControl, cacheTickerNanos, cacheOutcomes, appCtx);
         }
     }
 

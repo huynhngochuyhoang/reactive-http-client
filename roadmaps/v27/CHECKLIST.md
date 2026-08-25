@@ -910,41 +910,71 @@ Evidence recorded on 2026-08-24:
 
 ## Priority 11 - Mock, Consumer, AOT, Native, and Shutdown Parity
 
-### [ ] 11.1 Extend the mock helper without claiming wire evidence
+### [x] 11.1 Extend the mock helper without claiming wire evidence
 
-- [ ] Add deterministic clock/policy setup and hit/miss/coalesced/refresh
+- [x] Add deterministic clock/policy setup and hit/miss/coalesced/refresh
       assertions to `MockReactiveHttpClient`.
-- [ ] Expose load counts and explicit eviction for tests without leaking the
+- [x] Expose load counts and explicit eviction for tests without leaking the
       selected cache implementation into public APIs.
-- [ ] Preserve production client names, metadata-cache replacement, auth,
+- [x] Preserve production client names, metadata-cache replacement, auth,
       lifecycle ordering, observers, and final-request behavior.
-- [ ] Document that the helper does not prove transport dispatch, pool reuse,
+- [x] Document that the helper does not prove transport dispatch, pool reuse,
       socket cancellation, or native cleanup.
 
-### [ ] 11.2 Prove assembled Boot 4 consumer behavior
+### [x] 11.2 Prove assembled Boot 4 consumer behavior
 
-- [ ] Cover cache-disabled, one-method opt-in, client-wide opt-in/exclusion,
+- [x] Cover cache-disabled, one-method opt-in, client-wide opt-in/exclusion,
       TTL expiry, capacity eviction, single flight, and refresh.
-- [ ] Cover explicit retry-only activation and enabled-only no-operator behavior.
-- [ ] Record effective POM, dependency tree, classpath, test reports, source
+- [x] Cover explicit retry-only activation and enabled-only no-operator behavior.
+- [x] Record effective POM, dependency tree, classpath, test reports, source
       commit/state, and no-reactor-leakage checks incrementally.
-- [ ] Preserve reports from failed stages without uploading stale prior-run
+- [x] Preserve reports from failed stages without uploading stale prior-run
       evidence.
 
 ### [ ] 11.3 Revalidate AOT, native, and shutdown
 
-- [ ] Add precise runtime hints for selected public cache metadata and required
+- [x] Add precise runtime hints for selected public cache metadata and required
       implementation resources without broad package reflection.
-- [ ] Keep starter-factory ownership and replacement metadata-cache boundaries
+- [x] Keep starter-factory ownership and replacement metadata-cache boundaries
       during AOT validation.
-- [ ] Compile and run native smoke for one cached read, one actual load, one
+- [x] Compile and run native smoke for one cached read, one actual load, one
       refresh, and explicit retry-only activation while counting all dispatches.
-- [ ] Prove factory destruction clears entries and terminates coalesced loads and
+- [x] Prove factory destruction clears entries and terminates coalesced loads and
       refresh work within the shared shutdown deadline.
-- [ ] Prove destruction removes factory-owned cache meters before same-tag
+- [x] Prove destruction removes factory-owned cache meters before same-tag
       recreation and leaves no registry reference to the closed cache.
 - [ ] Record clean commit, GraalVM/JDK versions, dependency list, executable
       status, and binary SHA-256.
+
+Evidence recorded on 2026-08-25:
+
+- `MockReactiveHttpClient` now has an opt-in deterministic cache clock, inert
+  policy helper, cache outcomes, load counts, entry count, and explicit
+  eviction. Its tests preserve auth, replacement metadata, lifecycle,
+  observer, client-name, and final-request behavior and explicitly avoid wire,
+  pool, socket, or native claims.
+- The isolated `v27-current-parity` Boot 4 consumer profile covers disabled,
+  method-selected, client-selected/excluded, TTL, capacity, single-flight,
+  refresh, explicit Retry, and enabled-only resilience. The fresh-repository
+  verifier passed `55` mock and `4` assembled-consumer tests and retained
+  effective POM, dependency tree, classpath, Surefire reports, artifact hashes,
+  stage provenance, and no-reactor-output-leakage evidence.
+- AOT validation now binds cache policy from the AOT environment while retaining
+  starter-factory and replacement-metadata ownership. Runtime hints remain
+  narrow: public cache annotations/configuration, selected record accessors,
+  and the exact Caffeine `SSLMSW` constructor/`FACTORY` lookup used by the
+  starter's bounded expire-after-write cache.
+- GraalVM `25.0.3` compiled and ran the expanded Boot `4.0.0` fixture. The native
+  executable proved one load plus one hit, one refresh dispatch, explicit
+  two-attempt Retry, zero open-circuit dispatch, and exact total dispatch count.
+  The final dirty-tree rebuild also compiled and ran after replacing the
+  deprecated broad constructor category with exact executable hints.
+  Provisional SHA-256 is
+  `76c0a159c6b1f043fd18adb2c6d062e3d0610875a1d4193bae3d2a6e5b176436`;
+  immutable clean-commit provenance remains intentionally open.
+- Factory-destruction coverage proves active load/refresh cancellation, entry
+  release, aggregate shutdown completion, meter removal, and same-tag registry
+  recreation without retaining the closed cache.
 
 ---
 

@@ -33,6 +33,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.context.annotation.Scope;
+import org.springframework.core.env.Environment;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -64,8 +65,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class ReactiveHttpClientAutoConfiguration {
 
     @Bean
-    public static BeanFactoryInitializationAotProcessor reactiveHttpClientBeanFactoryInitializationAotProcessor() {
-        return new ReactiveHttpClientBeanFactoryInitializationAotProcessor();
+    public static BeanFactoryInitializationAotProcessor reactiveHttpClientBeanFactoryInitializationAotProcessor(
+            Environment environment) {
+        return new ReactiveHttpClientBeanFactoryInitializationAotProcessor(environment);
     }
 
     @Bean

@@ -13,7 +13,10 @@ import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContrib
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.ResolvableType;
+import org.springframework.core.env.Environment;
 import org.springframework.util.ClassUtils;
 
 import java.lang.reflect.Type;
@@ -27,6 +30,16 @@ import java.util.Set;
  */
 public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements BeanFactoryInitializationAotProcessor {
 
+    private final Environment environment;
+
+    public ReactiveHttpClientBeanFactoryInitializationAotProcessor() {
+        this(null);
+    }
+
+    ReactiveHttpClientBeanFactoryInitializationAotProcessor(Environment environment) {
+        this.environment = environment;
+    }
+
     @Override
     public BeanFactoryInitializationAotContribution processAheadOfTime(ConfigurableListableBeanFactory beanFactory) {
         List<Class<?>> clientInterfaces = findClientInterfaces(beanFactory);
@@ -35,8 +48,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         }
         MethodMetadataCache metadataCache = beanFactory.getBeanProvider(MethodMetadataCache.class)
                 .getIfAvailable(MethodMetadataCache::new);
-        ReactiveHttpClientProperties properties = beanFactory.getBeanProvider(ReactiveHttpClientProperties.class)
-                .getIfAvailable(ReactiveHttpClientProperties::new);
+        ReactiveHttpClientProperties properties = properties(beanFactory);
         clientInterfaces.forEach(clientInterface -> {
             ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
             if (annotation != null) {
@@ -72,6 +84,22 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 }
             });
         });
+    }
+
+    private ReactiveHttpClientProperties properties(ConfigurableListableBeanFactory beanFactory) {
+        for (String beanName : beanFactory.getBeanNamesForType(
+                ReactiveHttpClientProperties.class, false, false)) {
+            if (beanFactory.containsSingleton(beanName)) {
+                return beanFactory.getBean(beanName, ReactiveHttpClientProperties.class);
+            }
+        }
+        if (environment != null) {
+            return Binder.get(environment)
+                    .bind("reactive.http", Bindable.of(ReactiveHttpClientProperties.class))
+                    .orElseGet(ReactiveHttpClientProperties::new);
+        }
+        return beanFactory.getBeanProvider(ReactiveHttpClientProperties.class)
+                .getIfAvailable(ReactiveHttpClientProperties::new);
     }
 
     private static void registerRecordAccessors(RuntimeHints runtimeHints,

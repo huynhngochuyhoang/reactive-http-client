@@ -304,7 +304,7 @@ class Boot4ConsumerApplicationTest {
             Boot4HttpClientHealthIndicator healthIndicator,
             InMemorySpanExporter spanExporter) {
         assertTerminalMeter(meterRegistry, "direct", "200", "none", 1);
-        assertTerminalMeter(meterRegistry, "problem", "400", "CLIENT_ERROR", 2);
+        assertTerminalMeter(meterRegistry, "problem", "400", "CLIENT_ERROR", 1);
         assertTerminalMeter(meterRegistry, "openCircuit", "NONE", "RESILIENCE_ERROR", 0);
 
         HttpClientObserverEvent openCircuit = observedEvent("openCircuit");

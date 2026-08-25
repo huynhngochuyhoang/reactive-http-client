@@ -1635,6 +1635,8 @@ class DocumentationReleaseArtifactTest {
                 ".github/native-smoke/src/main/java/io/github/huynhngochuyhoang/httpstarter/nativesmoke/NativeSmokeClient.java"));
         String nativeApplication = Files.readString(root.resolve(
                 ".github/native-smoke/src/main/java/io/github/huynhngochuyhoang/httpstarter/nativesmoke/NativeSmokeApplication.java"));
+        String nativeProperties = Files.readString(root.resolve(
+                ".github/native-smoke/src/main/resources/application.properties"));
         String nativePom = Files.readString(root.resolve(".github/native-smoke/pom.xml"));
         String nativeWorkflow = Files.readString(root.resolve(".github/workflows/native-smoke.yml"));
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
@@ -1664,9 +1666,10 @@ class DocumentationReleaseArtifactTest {
                 "extends NativeSmokeOperations<NativeOrderResponse>",
                 "@ApiRef(\"native-problem\")",
                 "@GET(\"/api/compressed-order\")");
-        assertThat(nativeApplication).contains(
+        assertThat(nativeProperties).contains(
                 "apis.native-problem.method",
-                "compression-enabled",
+                "compression-enabled");
+        assertThat(nativeApplication).contains(
                 "Content-Encoding\", \"gzip",
                 "compression negotiation header did not reach loopback server",
                 "ProblemDetailRemoteServiceException",

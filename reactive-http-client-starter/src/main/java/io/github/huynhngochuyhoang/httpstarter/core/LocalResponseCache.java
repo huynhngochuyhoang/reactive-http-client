@@ -23,6 +23,8 @@ interface LocalResponseCache extends AutoCloseable {
 
     long evictionCount();
 
+    void invalidateAll();
+
     @Override
     void close();
 

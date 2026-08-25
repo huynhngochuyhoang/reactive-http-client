@@ -9,6 +9,7 @@ import io.github.huynhngochuyhoang.httpstarter.core.*;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategories;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -40,7 +41,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -54,6 +57,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * library errors.
  */
 class MockReactiveHttpClientTest {
+
+    @ReactiveHttpClient(name = "mock-cache-client")
+    interface CacheMockClient {
+        @GET("/cache/{id}")
+        @CacheResponse("local")
+        Mono<String> get(@PathVar("id") String id);
+    }
 
     interface StrictUnsafeMockClient {
         @POST("/strict")
@@ -84,6 +94,112 @@ class MockReactiveHttpClientTest {
         @POST("/cached")
         @CacheResponse("selected")
         Mono<String> create();
+    }
+
+    @Test
+    void deterministicCacheControlsPreserveAuthMetadataLifecycleAndFinalRequestFacts() {
+        ReactiveHttpClientProperties.ClientConfig config = cacheConfig(false, null, 2);
+        CountingMethodMetadataCache metadataCache = new CountingMethodMetadataCache();
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger loads = new AtomicInteger();
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        List<ReactiveHttpClientLifecycleContext> terminals = new CopyOnWriteArrayList<>();
+
+        try (MockReactiveHttpClient<CacheMockClient> mock = MockReactiveHttpClient
+                .forClient(CacheMockClient.class)
+                .clientConfig(config)
+                .withDeterministicCacheTime()
+                .methodMetadataCache(metadataCache)
+                .withAuthProvider(request -> {
+                    authCalls.incrementAndGet();
+                    return Mono.just(AuthContext.builder().header("X-Mock-Auth", "authorized").build());
+                })
+                .withObserver(observed::add)
+                .withLifecycleHook(new ReactiveHttpClientLifecycleHook() {
+                    @Override
+                    public void onSuccess(ReactiveHttpClientLifecycleContext context) {
+                        terminals.add(context);
+                    }
+                })
+                .respondTo(HttpMethod.GET, "/cache/one", exchange -> {
+                    loads.incrementAndGet();
+                    assertThat(exchange.headers().getFirst("X-Mock-Auth")).isEqualTo("authorized");
+                    return MockReactiveHttpClient.text(200, "value-" + loads.get());
+                })
+                .respondTo(HttpMethod.GET, "/cache/two", exchange -> {
+                    loads.incrementAndGet();
+                    return MockReactiveHttpClient.text(200, "value-" + loads.get());
+                })
+                .build()) {
+            assertThat(mock.proxy().get("one").block()).isEqualTo("value-1");
+            assertThat(mock.proxy().get("one").block()).isEqualTo("value-1");
+            assertThat(mock.loadCount("/cache/one")).isEqualTo(1);
+            assertThat(mock.cacheEntryCount()).isEqualTo(1);
+            assertThat(mock.cacheOutcomes()).containsExactly(
+                    HttpClientCacheOutcome.MISS_LOADER,
+                    HttpClientCacheOutcome.FRESH_HIT);
+            assertThat(authCalls).hasValue(2);
+            assertThat(metadataCache.getCalls).isPositive();
+            assertThat(observed).extracting(HttpClientObserverEvent::getClientName)
+                    .containsOnly("mock-cache-client");
+            assertThat(terminals).hasSize(2);
+            RecordedExchangeAssertions.assertThat(mock.lastExchange())
+                    .hasMethod(HttpMethod.GET)
+                    .hasPath("/cache/one")
+                    .hasStatusCode(200);
+
+            mock.advanceCacheTime(java.time.Duration.ofSeconds(1));
+            assertThat(mock.proxy().get("one").block()).isEqualTo("value-2");
+            assertThat(mock.loadCount("/cache/one")).isEqualTo(2);
+
+            assertThat(mock.proxy().get("two").block()).isEqualTo("value-3");
+            assertThat(mock.cacheEntryCount()).isEqualTo(2);
+            mock.evictCacheEntries();
+            assertThat(mock.cacheEntryCount()).isZero();
+            assertThat(mock.proxy().get("one").block()).isEqualTo("value-4");
+            assertThat(mock.loadCount()).isEqualTo(4);
+        }
+    }
+
+    @Test
+    void deterministicCacheCoalescesOneLoadAndRefreshesAfterClockAdvance() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = cacheConfig(true, 50L, 10);
+        AtomicInteger loads = new AtomicInteger();
+        Sinks.One<org.springframework.core.io.buffer.DataBuffer> firstBody = Sinks.one();
+
+        try (MockReactiveHttpClient<CacheMockClient> mock = MockReactiveHttpClient
+                .forClient(CacheMockClient.class)
+                .clientConfig(config)
+                .withDeterministicCacheTime()
+                .respondTo(HttpMethod.GET, "/cache/shared", exchange -> {
+                    int load = loads.incrementAndGet();
+                    if (load == 1) {
+                        return ClientResponse.create(org.springframework.http.HttpStatus.OK)
+                                .header("Content-Type", "text/plain")
+                                .body(firstBody.asMono().flux())
+                                .build();
+                    }
+                    return MockReactiveHttpClient.text(200, "value-" + load);
+                })
+                .build()) {
+            CompletableFuture<String> leader = mock.proxy().get("shared").toFuture();
+            CompletableFuture<String> waiter = mock.proxy().get("shared").toFuture();
+
+            assertThat(mock.loadCount("/cache/shared")).isEqualTo(1);
+            firstBody.tryEmitValue(new DefaultDataBufferFactory()
+                    .wrap("value-1".getBytes(StandardCharsets.UTF_8))).orThrow();
+            assertThat(leader.get(1, TimeUnit.SECONDS)).isEqualTo("value-1");
+            assertThat(waiter.get(1, TimeUnit.SECONDS)).isEqualTo("value-1");
+            assertThat(mock.cacheOutcomes()).containsExactlyInAnyOrder(
+                    HttpClientCacheOutcome.MISS_LOADER,
+                    HttpClientCacheOutcome.COALESCED_WAITER);
+
+            mock.advanceCacheTime(java.time.Duration.ofMillis(50));
+            assertThat(mock.proxy().get("shared").block()).isEqualTo("value-1");
+            assertThat(mock.proxy().get("shared").block()).isEqualTo("value-2");
+            assertThat(loads).hasValue(2);
+            assertThat(mock.cacheOutcomes()).contains(HttpClientCacheOutcome.STALE_HIT);
+        }
     }
 
     interface ApiRefUriClient {
@@ -1517,6 +1633,24 @@ class MockReactiveHttpClientTest {
         config.getResilience().setRetry("mock");
         config.getResilience().setRetryMethods(Set.of("POST"));
         config.getResilience().setStrictUnsafeRetryValidation(true);
+        return config;
+    }
+
+    private static ReactiveHttpClientProperties.ClientConfig cacheConfig(
+            boolean singleFlight, Long refreshAfterMs, long maximumSize) {
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(maximumSize);
+        policy.setSharedResponse(true);
+        policy.setSingleFlight(singleFlight);
+        if (refreshAfterMs != null) {
+            policy.setRefreshAfterMs(refreshAfterMs);
+            policy.setRefreshTimeoutMs(250L);
+        }
+        ReactiveHttpClientProperties.ClientConfig config =
+                new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("local", policy);
         return config;
     }
 

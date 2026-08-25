@@ -96,14 +96,28 @@ final class LocalResponseCacheManager implements AutoCloseable {
             ClassLoader classLoader,
             ReactiveHttpClientProperties.ObservabilityConfig observability,
             Object meterRegistry) {
+        return createForClient(clientInterface, clientName, metadataCache, clientConfig,
+                classLoader, observability, meterRegistry, System::nanoTime, Schedulers.parallel());
+    }
+
+    static LocalResponseCacheManager createForClient(
+            Class<?> clientInterface,
+            String clientName,
+            MethodMetadataCache metadataCache,
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            ClassLoader classLoader,
+            ReactiveHttpClientProperties.ObservabilityConfig observability,
+            Object meterRegistry,
+            LongSupplier ticker,
+            Scheduler refreshScheduler) {
         boolean cacheObservabilityEnabled = observability != null
                 && observability.isEnabled()
                 && observability.getCache() != null
                 && observability.getCache().isEnabled();
         LocalResponseCacheManager manager = new LocalResponseCacheManager(
                 classLoader,
-                System::nanoTime,
-                Schedulers.parallel(),
+                Objects.requireNonNull(ticker, "ticker"),
+                Objects.requireNonNull(refreshScheduler, "refreshScheduler"),
                 cacheObservabilityEnabled
                         ? LocalResponseCacheMetrics.enabled(meterRegistry, clientName)
                         : LocalResponseCacheMetrics.disabled(),
@@ -615,6 +629,25 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 evictions = Math.addExact(evictions, entry.getValue().evictionCount());
             }
             return new Snapshot(caches.size(), capacity, size, evictions, closed.get());
+        }
+    }
+
+    void evictAllForTesting() {
+        if (closed.get()) {
+            throw new IllegalStateException(
+                    "The local response cache for client '" + clientName + "' has been closed");
+        }
+        List<FlightKey> refreshKeys;
+        synchronized (inFlightRefreshes) {
+            refreshKeys = List.copyOf(inFlightRefreshes.keySet());
+        }
+        refreshKeys.forEach(this::cancelRefresh);
+        synchronized (caches) {
+            if (closed.get()) {
+                throw new IllegalStateException(
+                        "The local response cache for client '" + clientName + "' has been closed");
+            }
+            caches.values().forEach(LocalResponseCache::invalidateAll);
         }
     }
 
