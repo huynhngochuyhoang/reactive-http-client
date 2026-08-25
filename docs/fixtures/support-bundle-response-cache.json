@@ -2,6 +2,8 @@
   "schemaVersion": 1,
   "captureScope": "aggregate-response-cache",
   "window": {
+    "startedAt": "EXAMPLE_WINDOW_START",
+    "endedAt": "EXAMPLE_WINDOW_END",
     "duration": 300,
     "unit": "seconds"
   },
@@ -26,6 +28,17 @@
     "missLoaders": 45,
     "coalescedWaiters": 35,
     "staleHits": 220
+  },
+  "terminalCaller": {
+    "terminalRecordCreated": true,
+    "cacheOutcome": "STALE_HIT",
+    "subscriptionAttemptCount": 0,
+    "requestDispatched": false,
+    "cancellation": false,
+    "responseStatus": 200,
+    "errorType": null,
+    "errorCategory": "NONE",
+    "failureStage": null
   },
   "loads": {
     "success": 42,

@@ -109,8 +109,8 @@ common terminal outcomes:
   structural status, category, stage, attempt, and dispatch facts.
 - [Aggregate response-cache incident](fixtures/support-bundle-response-cache.json)
   records one bounded time window of configuration, lookup, caller, load,
-  refresh, eviction, and capacity counts without cache material or request
-  variants.
+  refresh, eviction, and capacity counts plus one sanitized caller terminal
+  record, without cache material or request variants.
 
 These fixtures are illustrative sanitized records, not raw logger output. They
 contain fake client and path-template metadata only. Default support output must
@@ -583,10 +583,10 @@ the downstream health indicator UP or DOWN. Use the PromQL recipes in
 
 Use the source-controlled
 [aggregate fixture](fixtures/support-bundle-response-cache.json) as the shape
-for bounded aggregate cache facts. Keep the capture window and every duration
-unit explicit. The fixture is not a dump format: do not add keys, digests,
-values, arguments, request variants, header/body content, concrete URLs,
-identity values, or credentials.
+for bounded aggregate cache facts and one sanitized caller terminal record. Keep
+the capture-window start, end, and every duration unit explicit. The fixture is
+not a dump format: do not add keys, digests, values, arguments, request variants,
+header/body content, concrete URLs, identity values, or credentials.
 
 ## Performance Investigations
 

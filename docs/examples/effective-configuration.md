@@ -130,7 +130,10 @@ reactive:
 ## Explicit Local Response Cache
 
 This `4.0.0` candidate example selects one bounded local policy explicitly.
-Single flight, access refresh, and cache telemetry are independent choices. It is
+Single flight, access refresh, and cache telemetry are independent choices. Add
+the optional runtime described in the
+[Caffeine dependency instructions](../32-response-caching.md#explicit-selection)
+before selecting the policy. With that dependency present, this example is
 startup-valid as written only when `catalog-api` has no applicable customization
 beans. Before enabling it in an existing application, inventory every applicable
 Boot `WebClientCustomizer`, matching `ReactiveHttpClientCustomizer`, and replacement

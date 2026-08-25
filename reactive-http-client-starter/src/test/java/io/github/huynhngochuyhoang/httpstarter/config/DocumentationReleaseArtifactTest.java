@@ -219,7 +219,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("For each reviewed customization, add its exact Spring bean")
                 .contains("name under `cache.customizations` with `SAFE`")
                 .contains("Missing and `INCOMPATIBLE`")
-                .contains("classifications reject proxy construction");
+                .contains("classifications reject proxy construction")
+                .contains("Caffeine dependency instructions")
+                .contains("With that dependency present");
         assertThat(observability)
                 .contains("### Cache miss and load rate (events per second)")
                 .contains("Terminal miss-load work:")
@@ -252,11 +254,14 @@ class DocumentationReleaseArtifactTest {
                 .contains("does not imply distributed coherence");
         assertThat(supportBundles)
                 .contains("[Aggregate response-cache incident](fixtures/support-bundle-response-cache.json)")
-                .contains("bounded aggregate cache facts");
+                .contains("bounded aggregate cache facts")
+                .contains("one sanitized caller terminal record");
         assertThat(changelog)
                 .contains("**V27 migration and operations documentation.");
 
         assertThat(fixture.path("schemaVersion").isInt()).isTrue();
+        assertThat(fixture.path("window").path("startedAt").isTextual()).isTrue();
+        assertThat(fixture.path("window").path("endedAt").isTextual()).isTrue();
         assertThat(fixture.path("window").path("duration").isInt()).isTrue();
         assertThat(fixture.path("window").path("unit").asText()).isEqualTo("seconds");
         assertThat(fixture.path("cache").path("cachePhase").asText()).isEqualTo("refresh-on-access");
@@ -269,6 +274,32 @@ class DocumentationReleaseArtifactTest {
         assertThat(fixture.path("refreshes").path("failure").isInt()).isTrue();
         assertThat(fixture.path("evictions").path("size").isInt()).isTrue();
         assertThat(fixture.path("evictions").path("ttl").isInt()).isTrue();
+
+        JsonNode terminalCaller = fixture.path("terminalCaller");
+        assertThat(terminalCaller.isObject()).isTrue();
+        assertThat(terminalCaller.path("cacheOutcome").asText()).isEqualTo("STALE_HIT");
+        assertThat(terminalCaller.has("subscriptionAttemptCount")).isTrue();
+        assertThat(terminalCaller.path("subscriptionAttemptCount").isIntegralNumber()).isTrue();
+        assertThat(terminalCaller.path("subscriptionAttemptCount").asInt()).isZero();
+        assertThat(terminalCaller.has("requestDispatched")).isTrue();
+        assertThat(terminalCaller.path("requestDispatched").isBoolean()).isTrue();
+        assertThat(terminalCaller.path("requestDispatched").asBoolean()).isFalse();
+        assertThat(terminalCaller.has("terminalRecordCreated")).isTrue();
+        assertThat(terminalCaller.path("terminalRecordCreated").isBoolean()).isTrue();
+        assertThat(terminalCaller.path("terminalRecordCreated").asBoolean()).isTrue();
+        assertThat(terminalCaller.has("cancellation")).isTrue();
+        assertThat(terminalCaller.path("cancellation").isBoolean()).isTrue();
+        assertThat(terminalCaller.path("cancellation").asBoolean()).isFalse();
+        assertThat(terminalCaller.has("responseStatus")).isTrue();
+        assertThat(terminalCaller.path("responseStatus").isIntegralNumber()).isTrue();
+        assertThat(terminalCaller.path("responseStatus").asInt()).isEqualTo(200);
+        assertThat(terminalCaller.has("errorType")).isTrue();
+        assertThat(terminalCaller.path("errorType").isNull()).isTrue();
+        assertThat(terminalCaller.has("errorCategory")).isTrue();
+        assertThat(terminalCaller.path("errorCategory").isTextual()).isTrue();
+        assertThat(terminalCaller.path("errorCategory").asText()).isEqualTo("NONE");
+        assertThat(terminalCaller.has("failureStage")).isTrue();
+        assertThat(terminalCaller.path("failureStage").isNull()).isTrue();
 
         assertThat(sensitiveSupportFixtureFieldNames(fixture))
                 .as("sensitive response-cache support fixture field names")
