@@ -1082,39 +1082,79 @@ Evidence recorded on 2026-08-25:
 
 ## Priority 13 - Migration and Operations Documentation
 
-### [ ] 13.1 Publish the `3.x` to `4.0.0` resilience migration
+### [x] 13.1 Publish the `3.x` to `4.0.0` resilience migration
 
-- [ ] Document the old implicit activation behavior and new explicit selection
+- [x] Document the old implicit activation behavior and new explicit selection
       in one migration table.
-- [ ] Show retry-only, each other single operator, named instances, and explicit
+- [x] Show retry-only, each other single operator, named instances, and explicit
       all-four `default` configuration.
-- [ ] Explain method annotation precedence, blank values, retry eligibility, and
+- [x] Explain method annotation precedence, blank values, retry eligibility, and
       strict validation.
-- [ ] Update quick start, resilience, production checklist, changelog, and
+- [x] Update quick start, resilience, production checklist, changelog, and
       generated examples consistently.
 
-### [ ] 13.2 Publish the cache contract and examples
+### [x] 13.2 Publish the cache contract and examples
 
-- [ ] Document explicit client/method opt-in, required TTL/capacity, precedence,
+- [x] Document explicit client/method opt-in, required TTL/capacity, precedence,
       and method exclusion.
-- [ ] Explain local-only scope, per-instance divergence, key variants,
+- [x] Explain local-only scope, per-instance divergence, key variants,
       auth/tenant isolation, mutable object identity, and no write invalidation.
-- [ ] Document phase-one duplicate concurrent misses, phase-two single flight,
+- [x] Document phase-one duplicate concurrent misses, phase-two single flight,
       phase-three access refresh/hard TTL, and phase-four telemetry.
-- [ ] List unsupported methods, return types, streaming shapes, failures, empty
+- [x] List unsupported methods, return types, streaming shapes, failures, empty
       values, and distributed-cache expectations.
-- [ ] Use only fake `.example.invalid` hosts and secret-free placeholders.
+- [x] Use only fake `.example.invalid` hosts and secret-free placeholders.
 
-### [ ] 13.3 Consolidate operational guidance and drift guards
+### [x] 13.3 Consolidate operational guidance and drift guards
 
-- [ ] Add hit-ratio, miss/load, coalescing, refresh failure, eviction pressure,
+- [x] Add hit-ratio, miss/load, coalescing, refresh failure, eviction pressure,
       and capacity dashboard recipes with units and zero-series handling.
-- [ ] Add support-bundle fixtures containing bounded aggregate cache facts and
+- [x] Add support-bundle fixtures containing bounded aggregate cache facts and
       no key/value material.
-- [ ] Generate configuration examples/reference from metadata and reject group
+- [x] Generate configuration examples/reference from metadata and reject group
       names used as scalar properties.
-- [ ] Validate every public Markdown link, property name, placeholder host, and
+- [x] Validate every public Markdown link, property name, placeholder host, and
       promoted benchmark reference.
+
+Evidence recorded on 2026-08-25:
+
+- The `3.x` to `4.0.0` migration guide now keeps the published implicit
+  behavior and target explicit behavior in one table, then gives retry-only,
+  CircuitBreaker-only, Bulkhead-only, RateLimiter-only, named-instance, and
+  all-four `default` configurations. It records method/client precedence,
+  blank-value rejection, Retry eligibility, unavailable operators, and strict
+  unsafe-retry activation.
+- Quick start and the Resilience4j guide teach explicit single-operator
+  selection while retaining published `3.6.0` coordinates. The production
+  checklist, effective-configuration examples, examples index, and changelog
+  identify response caching as a `4.0.0` candidate and keep each cache phase
+  separately opt-in.
+- The response-cache guide now states process-local ownership, expected
+  per-instance divergence, retained object identity, no automatic write
+  invalidation, and no distributed coherence. Its existing eligibility,
+  isolation, auth/customizer, phase-one duplicate-miss, single-flight, refresh,
+  telemetry, native, and unsupported-shape contracts remain the canonical
+  detailed reference.
+- Observability now includes zero-preserving, unit-labeled hit ratio, miss/load,
+  coalescing, refresh-failure, size/TTL eviction, and capacity recipes.
+  Operations triage separates local instance behavior, hidden refresh, hard TTL,
+  size pressure, write invalidation, and mutation diagnosis.
+- `docs/fixtures/support-bundle-response-cache.json` records only a bounded
+  time window of sanitized configured-cache fields and aggregate caller/load/
+  refresh/eviction counts. Tests reject cache material, request variants,
+  headers, bodies, URLs, identities, tenant data, and credentials.
+- The metadata-validated effective example covers policy selection, TTL,
+  capacity, single flight, refresh, header variants, and the separate cache
+  observability switch. Configuration metadata tests reject all primitive,
+  boxed, and String scalar group types and retain generated-reference/property
+  parity.
+- `DocumentationReleaseArtifactTest` passes `42` tests and
+  `ReactiveHttpClientConfigurationMetadataTest` passes `18` tests with zero
+  failures, errors, or skips. These suites validate public Markdown links,
+  documented/generated properties, placeholder hosts, support fixtures, and
+  promoted benchmark references. The complete starter module passes `1208`
+  tests with zero failures, errors, or skips, and `git diff --check` also
+  passes.
 
 ---
 

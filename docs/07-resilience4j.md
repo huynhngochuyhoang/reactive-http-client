@@ -45,6 +45,26 @@ before changing generation-specific Resilience4j modules.
 
 ## Enabling resilience for a client
 
+Start with one operator and add another only when the client needs it:
+
+```yaml
+reactive:
+  http:
+    clients:
+      user-service:
+        resilience:
+          enabled: true
+          retry: user-service
+          retry-methods: [GET, HEAD]
+```
+
+In the `4.0.0` contract, `enabled: true` alone selects no operator. The
+master switch permits explicitly named client properties and method annotations;
+it does not infer `default` Retry, CircuitBreaker, Bulkhead, or RateLimiter
+instances. See the [3.x to 4.x migration matrix](31-3x-to-4x-resilience-migration.md#migration-matrix).
+
+Select all four only when all four policies are intentional:
+
 ```yaml
 reactive:
   http:

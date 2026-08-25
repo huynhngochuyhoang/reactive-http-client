@@ -107,6 +107,10 @@ common terminal outcomes:
   uses milliseconds explicitly and separates a zero-attempt resilience
   rejection, a dispatched transport failure, and a downstream HTTP failure by
   structural status, category, stage, attempt, and dispatch facts.
+- [Aggregate response-cache incident](fixtures/support-bundle-response-cache.json)
+  records one bounded time window of configuration, lookup, caller, load,
+  refresh, eviction, and capacity counts without cache material or request
+  variants.
 
 These fixtures are illustrative sanitized records, not raw logger output. They
 contain fake client and path-template metadata only. Default support output must
@@ -576,6 +580,13 @@ refresh outcome and duration come from cache meters and the sanitized refresh
 debug log. Cache signals are operational context and do not independently make
 the downstream health indicator UP or DOWN. Use the PromQL recipes in
 [Observability](08-observability.md#cache-hit-ratio-dimensionless).
+
+Use the source-controlled
+[aggregate fixture](fixtures/support-bundle-response-cache.json) as the shape
+for bounded aggregate cache facts. Keep the capture window and every duration
+unit explicit. The fixture is not a dump format: do not add keys, digests,
+values, arguments, request variants, header/body content, concrete URLs,
+identity values, or credentials.
 
 ## Performance Investigations
 

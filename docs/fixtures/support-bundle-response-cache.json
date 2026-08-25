@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "captureScope": "aggregate-response-cache",
+  "window": {
+    "duration": 300,
+    "unit": "seconds"
+  },
+  "clientName": "catalog-api",
+  "apiName": "getCatalogItem",
+  "cache": {
+    "cachePhase": "refresh-on-access",
+    "cachePolicyCount": 1,
+    "cacheTtlMs": 60000,
+    "cacheRefreshAfterMs": 30000,
+    "cacheSingleFlight": "enabled",
+    "cacheMetricsEnabled": true,
+    "cacheMaximumSize": 10000,
+    "cacheEntryCount": 8250
+  },
+  "lookups": {
+    "hits": 920,
+    "misses": 80
+  },
+  "callers": {
+    "freshHits": 700,
+    "missLoaders": 45,
+    "coalescedWaiters": 35,
+    "staleHits": 220
+  },
+  "loads": {
+    "success": 42,
+    "failure": 2,
+    "cancellation": 1,
+    "duration": {
+      "sum": 1840,
+      "unit": "milliseconds"
+    }
+  },
+  "refreshes": {
+    "success": 18,
+    "failure": 2,
+    "cancellation": 1,
+    "duration": {
+      "sum": 735,
+      "unit": "milliseconds"
+    }
+  },
+  "evictions": {
+    "size": 14,
+    "ttl": 37
+  }
+}

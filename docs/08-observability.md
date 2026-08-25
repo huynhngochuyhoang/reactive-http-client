@@ -474,8 +474,16 @@ Retry resubscribes. Redirect and auth-replay dispatches do not increase it.
 ### Cache hit ratio (dimensionless)
 
 ```promql
-sum by (client_name, api_name) (
-  rate(reactive_http_client_cache_lookups_total{result="hit"}[5m])
+(
+  sum by (client_name, api_name) (
+    rate(reactive_http_client_cache_lookups_total{result="hit"}[5m])
+  )
+  or on (client_name, api_name)
+  (
+    0 * sum by (client_name, api_name) (
+      rate(reactive_http_client_cache_lookups_total[5m])
+    )
+  )
 )
 /
 clamp_min(
@@ -487,13 +495,61 @@ clamp_min(
 ```
 
 Use only lookup hit and miss series in this ratio. Coalesced waiters and stale
-serving have separate counters and must not be added to either side.
+serving have separate counters and must not be added to either side. The
+zero-valued branch keeps an idle selected cache or a cache with misses but no
+hits visible as `0` instead of dropping the client/API group.
+
+### Cache miss and load rate (events per second)
+
+Miss callers:
+
+```promql
+(
+  sum by (client_name, api_name) (
+    rate(reactive_http_client_cache_lookups_total{result="miss"}[5m])
+  )
+  or on (client_name, api_name)
+  (
+    0 * sum by (client_name, api_name) (
+      rate(reactive_http_client_cache_lookups_total[5m])
+    )
+  )
+)
+```
+
+Terminal downstream loads:
+
+```promql
+(
+  sum by (client_name, api_name) (
+    rate(reactive_http_client_cache_loads_total[5m])
+  )
+  or on (client_name, api_name)
+  (
+    0 * sum by (client_name, api_name) (
+      rate(reactive_http_client_cache_lookups_total[5m])
+    )
+  )
+)
+```
+
+Both results are events per second. The first counts callers that observed a
+miss. The second counts completed miss-load work across success, failure, and
+cancellation. With single flight, several misses can correspond to one load.
 
 ### Cache coalescing ratio (dimensionless)
 
 ```promql
-sum by (client_name, api_name) (
-  rate(reactive_http_client_cache_coalesced_total[5m])
+(
+  sum by (client_name, api_name) (
+    rate(reactive_http_client_cache_coalesced_total[5m])
+  )
+  or on (client_name, api_name)
+  (
+    0 * sum by (client_name, api_name) (
+      rate(reactive_http_client_cache_lookups_total{result="miss"}[5m])
+    )
+  )
 )
 /
 clamp_min(
@@ -505,25 +561,80 @@ clamp_min(
 ```
 
 This is the fraction of miss callers that joined an existing load, not a
-downstream request reduction percentage.
+downstream request reduction percentage. The zero branch retains miss groups
+that have no coalesced waiters.
 
 ### Cache refresh failure rate (failures per second)
 
 ```promql
-sum by (client_name, api_name) (
-  rate(reactive_http_client_cache_refreshes_total{outcome="failure"}[5m])
+(
+  sum by (client_name, api_name) (
+    rate(reactive_http_client_cache_refreshes_total{outcome="failure"}[5m])
+  )
+  or on (client_name, api_name)
+  (
+    0 * sum by (client_name, api_name) (
+      rate(reactive_http_client_cache_refreshes_total[5m])
+    )
+  )
 )
 ```
 
 Correlate this with stale-serving rate and hard-expiry misses. A refresh failure
 is hidden from the stale caller and does not itself mark downstream health DOWN.
+The zero branch retains refresh-enabled groups with refresh activity but no
+failures.
+
+### Cache eviction pressure (evictions per second)
+
+Maximum-size evictions:
+
+```promql
+(
+  sum by (client_name, cache_policy) (
+    rate(reactive_http_client_cache_evictions_total{cause="size"}[5m])
+  )
+  or on (client_name, cache_policy)
+  (
+    0 * max by (client_name, cache_policy) (
+      reactive_http_client_cache_maximum_entries
+    )
+  )
+)
+```
+
+TTL evictions:
+
+```promql
+(
+  sum by (client_name, cache_policy) (
+    rate(reactive_http_client_cache_evictions_total{cause="ttl"}[5m])
+  )
+  or on (client_name, cache_policy)
+  (
+    0 * max by (client_name, cache_policy) (
+      reactive_http_client_cache_maximum_entries
+    )
+  )
+)
+```
+
+Both results are evictions per second. The zero-valued capacity branch keeps a
+selected idle policy visible. Sustained size eviction together with capacity
+near `1` suggests pressure; TTL eviction reflects expiry activity and is not
+itself evidence that maximum size is too small.
 
 ### Cache capacity pressure (dimensionless)
 
 ```promql
-reactive_http_client_cache_entries
+max by (client_name, cache_policy) (
+  reactive_http_client_cache_entries
+)
 /
-clamp_min(reactive_http_client_cache_maximum_entries, 1)
+clamp_min(
+  max by (client_name, cache_policy) (
+    reactive_http_client_cache_maximum_entries
+  ), 1)
 ```
 
 Aggregate with `max by (client_name, cache_policy)` when dashboards combine

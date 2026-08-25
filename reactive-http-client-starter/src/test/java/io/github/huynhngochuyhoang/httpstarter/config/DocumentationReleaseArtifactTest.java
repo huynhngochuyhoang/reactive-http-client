@@ -153,6 +153,99 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v27MigrationAndCacheOperationsDocumentationAreComplete() throws IOException {
+        Path root = projectRoot();
+        String migration = Files.readString(root.resolve("docs/31-3x-to-4x-resilience-migration.md"));
+        String quickStart = Files.readString(root.resolve("docs/01-quick-start.md"));
+        String resilience = Files.readString(root.resolve("docs/07-resilience4j.md"));
+        String caching = Files.readString(root.resolve("docs/32-response-caching.md"));
+        String production = Files.readString(root.resolve("docs/16-production-checklist.md"));
+        String observability = Files.readString(root.resolve("docs/08-observability.md"));
+        String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String examples = Files.readString(root.resolve("docs/examples/effective-configuration.md"));
+        String changelog = Files.readString(root.resolve("CHANGELOG.md"));
+        Path fixturePath = root.resolve("docs/fixtures/support-bundle-response-cache.json");
+        JsonNode fixture = OBJECT_MAPPER.readTree(fixturePath.toFile());
+
+        assertThat(migration)
+                .contains("## Explicit single-operator examples")
+                .contains("### Retry only")
+                .contains("### CircuitBreaker only")
+                .contains("### Bulkhead only")
+                .contains("### RateLimiter only")
+                .contains("### All four published defaults")
+                .contains("## Method precedence and validation")
+                .contains("Blank method annotation values fail startup")
+                .contains("strict-unsafe-retry-validation");
+        assertThat(quickStart)
+                .contains("## Preparing resilience configuration for `4.0.0`")
+                .contains("`enabled: true` alone selects no operator")
+                .contains("[Response Caching](32-response-caching.md)");
+        assertThat(resilience)
+                .contains("Start with one operator")
+                .contains("`enabled: true` alone selects no operator");
+        assertThat(caching)
+                .contains("## Local-only consistency and invalidation")
+                .contains("does not coordinate entries between application instances")
+                .contains("does not invalidate cached reads after a write")
+                .contains("not a distributed-cache abstraction");
+        assertThat(production)
+                .contains("## Response caching (`4.0.0` candidate)")
+                .contains("Do not enable `single-flight`, refresh, or cache telemetry implicitly")
+                .contains("per-instance divergence");
+        assertThat(examples)
+                .contains("## Explicit Local Response Cache")
+                .contains("policy: catalog-read")
+                .contains("maximum-size: 10000")
+                .contains("cache:\n        enabled: true");
+        assertThat(observability)
+                .contains("### Cache miss and load rate (events per second)")
+                .contains("### Cache eviction pressure (evictions per second)")
+                .contains("zero-valued branch keeps an idle selected cache")
+                .contains("cause=\"size\"")
+                .contains("cause=\"ttl\"");
+        assertThat(operations)
+                .contains("## Response cache behavior")
+                .contains("per-instance divergence is expected")
+                .contains("does not imply distributed coherence");
+        assertThat(supportBundles)
+                .contains("[Aggregate response-cache incident](fixtures/support-bundle-response-cache.json)")
+                .contains("bounded aggregate cache facts");
+        assertThat(changelog)
+                .contains("**V27 migration and operations documentation.");
+
+        assertThat(fixture.path("schemaVersion").isInt()).isTrue();
+        assertThat(fixture.path("window").path("duration").isInt()).isTrue();
+        assertThat(fixture.path("window").path("unit").asText()).isEqualTo("seconds");
+        assertThat(fixture.path("cache").path("cachePhase").asText()).isEqualTo("refresh-on-access");
+        assertThat(fixture.path("cache").path("cachePolicyCount").isInt()).isTrue();
+        assertThat(fixture.path("cache").path("cacheMaximumSize").isInt()).isTrue();
+        assertThat(fixture.path("cache").path("cacheEntryCount").isInt()).isTrue();
+        assertThat(fixture.path("lookups").path("hits").isInt()).isTrue();
+        assertThat(fixture.path("lookups").path("misses").isInt()).isTrue();
+        assertThat(fixture.path("loads").path("success").isInt()).isTrue();
+        assertThat(fixture.path("refreshes").path("failure").isInt()).isTrue();
+        assertThat(fixture.path("evictions").path("size").isInt()).isTrue();
+        assertThat(fixture.path("evictions").path("ttl").isInt()).isTrue();
+
+        String fixtureText = Files.readString(fixturePath);
+        assertThat(fixtureText)
+                .doesNotContainIgnoringCase("cacheKey")
+                .doesNotContainIgnoringCase("keyDigest")
+                .doesNotContainIgnoringCase("cachedValue")
+                .doesNotContainIgnoringCase("authorization")
+                .doesNotContainIgnoringCase("credential")
+                .doesNotContainIgnoringCase("tenant")
+                .doesNotContainIgnoringCase("\"arguments\"")
+                .doesNotContainIgnoringCase("\"headers\"")
+                .doesNotContainIgnoringCase("\"bodies\"")
+                .doesNotContainIgnoringCase("\"urls\"")
+                .doesNotContainIgnoringCase("\"identities\"")
+                .doesNotContain("http://", "https://");
+    }
+
+    @Test
     void v23OperationsGuidanceIsAlignedBoundedDiscoverableAndVersionScoped() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

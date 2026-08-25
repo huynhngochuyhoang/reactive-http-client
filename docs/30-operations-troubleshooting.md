@@ -46,6 +46,7 @@ historical evidence.
 | Timeout before or after status | Concrete exception, final status, final-attempt dispatch evidence, optional failure stage | [Timeout phases](#timeout-phases) |
 | Upload stalls, cancellation, leaked buffers, or incomplete stream | Declared body/return shape, subscription and cancellation boundary, consumer release/forwarding path | [Streaming ownership](#streaming-ownership) |
 | OAuth2 refresh storm, token endpoint failure, or downstream 401 | Logical client name, sanitized auth mode, token endpoint status and safe headers, refresh/cooldown timing | [OAuth2 refresh](#oauth2-refresh) |
+| Unexpected stale value, miss storm, refresh failure, or cache capacity pressure | Effective cache phase/TTL/capacity, bounded hit/miss/load/refresh/eviction rates, process instance | [Response cache behavior](#response-cache-behavior) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
 
 ## Evidence boundary
@@ -264,6 +265,39 @@ See [Streaming Requests and Responses](11-streaming.md).
 
 See [Refreshing bearer auth](06-auth-providers.md#refreshingbearerauthprovider-cached-token-with-auto-refresh)
 and [OAuth2 client credentials](06-auth-providers.md#oauth2clientcredentialstokenprovider-standard-oauth-20-client-credentials).
+
+## Response cache behavior
+
+- Confirm the method explicitly selects the expected named policy and remains an
+  eligible finite `GET Mono` contract. A definition alone is inert.
+- Record one bounded window of hit/miss, caller outcome, load, refresh,
+  size/TTL eviction, current-entry, and maximum-entry metrics. Keep ratios,
+  events per second, durations, and gauges in their documented units.
+- Compare instances separately; the cache is process-local, so per-instance divergence is expected.
+  After rollout, local eviction, refresh, or uneven traffic, combining instances
+  in one ratio can hide a cold or saturated pod.
+- A high miss rate with fewer loads can be healthy single-flight coalescing.
+  Compare miss callers, terminal loads, and coalesced waiters before diagnosing
+  missing dispatches.
+- A stale hit returns the current value while at most one hidden refresh runs.
+  Correlate refresh failure/cancellation with hard-TTL misses; the stale caller
+  does not receive the hidden refresh error.
+- Sustained size evictions with `entries / maximum.entries` near `1` indicate
+  capacity pressure. TTL evictions indicate expiry activity and do not alone
+  prove that capacity is too small.
+- A successful write does not invalidate a cached read; the local cache does not imply distributed coherence.
+  It provides no cluster-wide single flight or cross-instance refresh. Use
+  application-owned invalidation when the TTL staleness bound is
+  insufficient.
+- Cache hits retain decoded object identity. Check whether application code
+  mutates returned DTOs before attributing a changed hit to the downstream.
+
+Use the zero-preserving
+[cache dashboard recipes](08-observability.md#cache-hit-ratio-dimensionless)
+and capture the bounded
+[response-cache incident fixture](26-support-bundles.md#response-cache-incidents).
+Never collect cache keys, values, selected arguments, headers, bodies, tenant
+values, or credentials.
 
 ## Failure attribution
 

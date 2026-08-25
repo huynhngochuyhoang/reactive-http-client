@@ -135,6 +135,39 @@ subscription. Use the canonical [retry/replay composition contract](07-resilienc
 and [request-body repeatability matrix](11-streaming.md#request-body-repeatability-matrix)
 for the detailed ownership rules.
 
+## Response caching (`4.0.0` candidate)
+
+- Select a named policy explicitly at the client or method. A policy definition
+  alone is inert, and `@CacheDisabled` excludes a method.
+- Require finite `ttl-ms` and `maximum-size`. Keep TTL no longer than the
+  business staleness budget, not merely the available heap.
+- Partition every response-changing path, query, stable tenant/auth scope,
+  locale, and other declared variant. Use `shared-response: true` only after
+  reviewing the deliberate sharing boundary.
+- Treat cached decoded values as immutable because hits return the retained
+  object identity.
+- Expect per-instance divergence during deployments. The cache is process-local,
+  does not coordinate pods, and performs no automatic write invalidation.
+- Keep unsupported non-GET, streaming, unresolved, and application-owned body
+  contracts uncached. Empty values and failures are never stored.
+- Classify every applicable WebClient/customizer mutation before caching; a hit
+  can bypass the downstream request pipeline.
+- Do not enable `single-flight`, refresh, or cache telemetry implicitly. Each
+  phase is separately opt-in:
+
+| Selection | Additional behavior |
+|---|---|
+| Named policy with TTL/capacity only | Local bounded cache; concurrent misses may dispatch independently and the first successful fill wins. |
+| `single-flight: true` | Same-key concurrent misses share one load; callers retain separate timeout/cancellation. |
+| `refresh-after-ms` plus `refresh-timeout-ms` | A stale access returns the current value and may start one bounded hidden refresh before hard TTL. |
+| `reactive.http.observability.cache.enabled: true` under the global gate | Bounded cache meters and terminal cache outcomes; it does not select caching. |
+
+Use [Response Caching](32-response-caching.md) for the complete eligibility,
+isolation, auth/customizer, and native contract. Use the
+[cache dashboard recipes](08-observability.md#cache-hit-ratio-dimensionless)
+and [response-cache support bundle](26-support-bundles.md#response-cache-incidents)
+for production evidence.
+
 ## Observability
 
 - Keep `reactive.http.observability.enabled: true`.

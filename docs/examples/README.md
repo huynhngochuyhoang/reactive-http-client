@@ -7,6 +7,8 @@ package names, credentials, and upstream URLs.
 ## Effective Configuration
 
 See [Effective Configuration Examples](effective-configuration.md) for metadata-validated starter configuration snippets covering inherited clients, auth, proxy/TLS, redirects, strict retry, strict body signing, and diagnostics.
+The V27 section also covers explicitly selected local caching, finite TTL and
+capacity, single flight, bounded refresh, key variants, and cache telemetry.
 
 ## Production Policy
 

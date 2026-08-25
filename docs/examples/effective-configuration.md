@@ -127,6 +127,37 @@ reactive:
           strict-unsafe-retry-validation: true
 ```
 
+## Explicit Local Response Cache
+
+This `4.0.0` candidate example selects one bounded local policy explicitly.
+Single flight, access refresh, and cache telemetry are independent choices.
+
+```yaml
+reactive:
+  http:
+    clients:
+      catalog-api:
+        base-url: https://catalog-api.example.invalid
+        cache:
+          policy: catalog-read
+          policies:
+            catalog-read:
+              ttl-ms: 60000
+              maximum-size: 10000
+              single-flight: true
+              refresh-after-ms: 30000
+              refresh-timeout-ms: 5000
+              vary-by-headers:
+                - Idempotency-Key
+    observability:
+      enabled: true
+      cache:
+        enabled: true
+```
+
+Cache metrics remain disabled when `observability.cache.enabled` is false, and
+the observability setting never selects the policy.
+
 ## Diagnostics Endpoint
 
 ```yaml
