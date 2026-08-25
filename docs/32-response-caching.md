@@ -143,6 +143,29 @@ value to their caller but cannot replace the winner, restart its TTL, or
 repopulate after expiry, eviction, or shutdown. Publication forces Caffeine to
 process expiry before rechecking the load token's generation.
 
+## Local-only consistency and invalidation
+
+The cache belongs to one reactive client factory in one application process. It
+does not coordinate entries between application instances, pods, regions, or
+deployments. After a rollout or downstream change, per-instance divergence is
+expected until each local entry expires, is evicted, is refreshed through
+access, or its factory shuts down.
+
+The starter does not invalidate related cached reads after a write. An unselected
+or explicitly disabled `POST`, `PUT`, `PATCH`, or `DELETE` follows its normal
+request path without searching for related read keys or broadcasting invalidation.
+A selected write method fails proxy construction because response caching supports
+only eligible `GET` methods; apply `@CacheDisabled` when a client-level policy
+would otherwise select it. Choose a TTL that bounds acceptable staleness, and use
+an application-owned invalidation/coherence system when writes must be visible
+sooner.
+
+This feature is not a distributed-cache abstraction. It provides no shared
+storage, cross-instance single flight, distributed locks, write-through policy,
+event-bus invalidation, or cluster-wide refresh. Cached decoded objects are also
+returned by identity within the process; callers must treat them as immutable or
+copy them before mutation.
+
 ## Phase-two request coalescing
 
 Set `single-flight: true` on a selected policy to coalesce concurrent misses for

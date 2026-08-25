@@ -35,7 +35,15 @@ The effective policy uses four stable states on every starter surface:
 | instance name | The selected operator is available and active. |
 | `unknown` | Diagnostics cannot prove availability without creating a lazy registry or `FactoryBean` product. Runtime client construction still resolves its normal dependencies. |
 
-Equivalent explicit single-operator configuration:
+## Explicit single-operator examples
+
+Start with only the operator the client needs. Every example below is complete
+at the starter-property layer. Client-level names may be absent from
+`resilience4j.*.instances`; Resilience4j then creates the selected name from the
+registry defaults. Define a named instance only when it needs configuration that
+differs from those defaults.
+
+### Retry only
 
 ```yaml
 reactive:
@@ -47,8 +55,51 @@ reactive:
           retry: default
 ```
 
-Do not add CircuitBreaker, Bulkhead, or RateLimiter properties unless those
-operators are intended for this client.
+Retry remains limited by `retry-methods`, whose default is `GET,HEAD`.
+Use a named instance such as `retry: orders-read` instead of `default` when
+that client has a dedicated policy.
+
+### CircuitBreaker only
+
+```yaml
+reactive:
+  http:
+    clients:
+      catalog-api:
+        resilience:
+          enabled: true
+          circuit-breaker: catalog-read
+```
+
+### Bulkhead only
+
+```yaml
+reactive:
+  http:
+    clients:
+      inventory-api:
+        resilience:
+          enabled: true
+          bulkhead: inventory-read
+```
+
+### RateLimiter only
+
+```yaml
+reactive:
+  http:
+    clients:
+      partner-api:
+        resilience:
+          enabled: true
+          rate-limiter: partner-read
+```
+
+Do not add another operator property unless that operator is intended for the
+client. A named value and the literal value `default` are both explicit
+selections.
+
+### All four published defaults
 
 To retain the published `3.6.0` enabled-only behavior exactly, select all four
 default instances explicitly:
@@ -65,6 +116,37 @@ reactive:
           circuit-breaker: default
           bulkhead: default
 ```
+
+## Method precedence and validation
+
+The effective selection is deterministic for each method:
+
+1. A non-blank method annotation such as `@Retry("orders-read")` overrides
+   the matching client-level instance.
+2. Blank method annotation values fail startup; they do not disable an
+   inherited client selection.
+3. Without a method annotation, the non-blank client property is used.
+4. An absent or blank client property disables that operator for the method.
+5. `resilience.enabled: false` disables every operator regardless of an
+   annotation or instance property.
+
+Retry has one additional eligibility gate. The resolved HTTP method must be in
+`retry-methods`; an ineligible method reports Retry as disabled even when an
+instance is selected. A selected method annotation is validated only when its
+operator is available, and Retry annotations are validated only when the method
+is eligible. Missing active method-annotation instances fail proxy construction.
+Client-level instance properties are not registry-membership fail-fast checks:
+when a selected client-level name is absent, Resilience4j resolves it from the
+registry defaults instead of the starter rejecting proxy construction for the
+missing named instance.
+
+`strict-unsafe-retry-validation: true` runs only when the effective Retry is
+available, eligible, and can make more than one attempt. It does not activate
+Retry. Startup accepts an unsafe method only when it can prove a non-overridable
+idempotency-key contract; nullable runtime headers and Reactor-context values
+remain runtime checks. See
+[Strict unsafe-retry validation](07-resilience4j.md#strict-unsafe-retry-validation)
+for the full proof rules.
 
 ## Initial API report
 

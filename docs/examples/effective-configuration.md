@@ -127,6 +127,47 @@ reactive:
           strict-unsafe-retry-validation: true
 ```
 
+## Explicit Local Response Cache
+
+This `4.0.0` candidate example selects one bounded local policy explicitly.
+Single flight, access refresh, and cache telemetry are independent choices. Add
+the optional runtime described in the
+[Caffeine dependency instructions](../32-response-caching.md#explicit-selection)
+before selecting the policy. With that dependency present, this example is
+startup-valid as written only when `catalog-api` has no applicable customization
+beans. Before enabling it in an existing application, inventory every applicable
+Boot `WebClientCustomizer`, matching `ReactiveHttpClientCustomizer`, and replacement
+`WebClient.Builder` bean. For each reviewed customization, add its exact Spring bean
+name under `cache.customizations` with `SAFE`. Missing and `INCOMPATIBLE`
+classifications reject proxy construction; see
+[Customization safety](../32-response-caching.md#customization-safety).
+
+```yaml
+reactive:
+  http:
+    clients:
+      catalog-api:
+        base-url: https://catalog-api.example.invalid
+        cache:
+          policy: catalog-read
+          policies:
+            catalog-read:
+              ttl-ms: 60000
+              maximum-size: 10000
+              single-flight: true
+              refresh-after-ms: 30000
+              refresh-timeout-ms: 5000
+              vary-by-headers:
+                - Idempotency-Key
+    observability:
+      enabled: true
+      cache:
+        enabled: true
+```
+
+Cache metrics remain disabled when `observability.cache.enabled` is false, and
+the observability setting never selects the policy.
+
 ## Diagnostics Endpoint
 
 ```yaml

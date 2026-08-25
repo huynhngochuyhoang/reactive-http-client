@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **V27 migration and operations documentation.** Completed the `3.6.0` to
+  `4.0.0` explicit-resilience migration matrix and single-operator examples;
+  published the four-phase local-cache eligibility, isolation, invalidation,
+  telemetry, and unsupported-shape contract; added zero-preserving cache
+  dashboard recipes with explicit units; and added an aggregate-only cache
+  support fixture. Metadata and documentation guards now cover cache examples,
+  group/property drift, links, placeholder hosts, and fixture redaction.
 - **V27 cache and resilience performance audit.** Added a baseline-compatible
   cache-disabled invocation row; separately classified bounded key, hit, miss,
   publication, waiter, eviction, refresh, and loopback cache workloads; and an

@@ -105,13 +105,30 @@ class ReactiveHttpClientConfigurationMetadataTest {
 
     @Test
     void configurationMetadataGroupsDoNotUseScalarValueTypes() throws IOException {
+        Set<String> scalarTypes = Set.of(
+                "boolean", "byte", "short", "int", "long", "float", "double", "char",
+                "java.lang.Boolean", "java.lang.Byte", "java.lang.Short", "java.lang.Integer",
+                "java.lang.Long", "java.lang.Float", "java.lang.Double", "java.lang.Character",
+                "java.lang.String");
+        Map<String, String> propertyTypes = new HashMap<>();
+        for (Path metadataFile : allMetadataFiles(projectRoot())) {
+            JsonNode metadata = metadata(metadataFile);
+            for (JsonNode property : metadata.path("properties")) {
+                propertyTypes.put(property.path("name").asText(),
+                        rawClassName(property.path("type").asText()));
+            }
+        }
         List<String> scalarGroups = new ArrayList<>();
-        for (Path metadataFile : metadataFiles(projectRoot())) {
+        for (Path metadataFile : allMetadataFiles(projectRoot())) {
             JsonNode metadata = metadata(metadataFile);
             for (JsonNode group : metadata.path("groups")) {
-                if ("java.lang.Boolean".equals(group.path("type").asText())) {
+                String name = group.path("name").asText();
+                String type = rawClassName(group.path("type").asText(""));
+                String propertyType = propertyTypes.get(name);
+                if (scalarTypes.contains(type)
+                        || (propertyType != null && scalarTypes.contains(propertyType))) {
                     scalarGroups.add(projectRoot().relativize(metadataFile) + " -> "
-                            + group.path("name").asText());
+                            + name + " uses group type " + type + " and property type " + propertyType);
                 }
             }
         }
@@ -318,6 +335,13 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "reactive.http.clients.[name].resilience.retry",
                 "reactive.http.clients.[name].resilience.retry-methods",
                 "reactive.http.clients.[name].resilience.strict-unsafe-retry-validation",
+                "reactive.http.clients.[name].cache.policy",
+                "reactive.http.clients.[name].cache.policies.[policy-name].ttl-ms",
+                "reactive.http.clients.[name].cache.policies.[policy-name].maximum-size",
+                "reactive.http.clients.[name].cache.policies.[policy-name].single-flight",
+                "reactive.http.clients.[name].cache.policies.[policy-name].refresh-after-ms",
+                "reactive.http.clients.[name].cache.policies.[policy-name].refresh-timeout-ms",
+                "reactive.http.clients.[name].cache.policies.[policy-name].vary-by-headers",
                 "reactive.http.network.proxy.type",
                 "reactive.http.network.proxy.host",
                 "reactive.http.network.proxy.port",
@@ -327,6 +351,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "reactive.http.network.tls.trust-store",
                 "reactive.http.network.tls.trust-store-password",
                 "reactive.http.network.tls.trust-store-type",
+                "reactive.http.observability.cache.enabled",
                 "reactive.http.observability.diagnostics-endpoint.enabled"
         );
         assertThat(exampleProperties).noneMatch(property -> property.startsWith("reactive.http.observability.otel"));

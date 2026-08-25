@@ -25,6 +25,11 @@ class DocumentationReleaseArtifactTest {
     private static final Pattern MARKDOWN_LINK = Pattern.compile("!?\\[[^]]*]\\(([^)\\s]+)(?:\\s+\"[^\"]*\")?\\)");
     private static final Pattern UNIX_ABSOLUTE_PATH = Pattern.compile("(^|[\\s`\\\"=:(])(/(?!/)[^\\s`|)]+)");
     private static final Pattern WINDOWS_ABSOLUTE_PATH = Pattern.compile("(^|[\\s`\\\"=:(])([A-Za-z]:[\\\\\\/][^\\s`|)]+)");
+    private static final Set<String> SENSITIVE_SUPPORT_FIXTURE_FIELD_FRAGMENTS = Set.of(
+            "argument", "header", "body", "bodies", "url", "identity", "identities",
+            "authorization", "credential", "tenant", "cookie", "secret", "token",
+            "key", "digest", "value", "payload",
+            "path", "query", "uri", "requesttarget", "requestvariant");
     private static final Pattern PROJECT_VERSION_SNIPPET = Pattern.compile(
             "<groupId>io\\.github\\.huynhngochuyhoang</groupId>\\s*"
                     + "<artifactId>reactive-http-client-[^<]+</artifactId>\\s*"
@@ -150,6 +155,189 @@ class DocumentationReleaseArtifactTest {
                 .contains("SalesRegion.class.getRecordComponents()")
                 .contains("component.getAccessor(), ExecutableMode.INVOKE")
                 .contains("Native applications that do not\nregister a context-only record");
+    }
+
+    @Test
+    void v27MigrationAndCacheOperationsDocumentationAreComplete() throws IOException {
+        Path root = projectRoot();
+        String migration = Files.readString(root.resolve("docs/31-3x-to-4x-resilience-migration.md"));
+        String quickStart = Files.readString(root.resolve("docs/01-quick-start.md"));
+        String resilience = Files.readString(root.resolve("docs/07-resilience4j.md"));
+        String caching = Files.readString(root.resolve("docs/32-response-caching.md"));
+        String production = Files.readString(root.resolve("docs/16-production-checklist.md"));
+        String observability = Files.readString(root.resolve("docs/08-observability.md"));
+        String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String examples = Files.readString(root.resolve("docs/examples/effective-configuration.md"));
+        String changelog = Files.readString(root.resolve("CHANGELOG.md"));
+        Path fixturePath = root.resolve("docs/fixtures/support-bundle-response-cache.json");
+        JsonNode fixture = OBJECT_MAPPER.readTree(fixturePath.toFile());
+
+        assertThat(migration)
+                .contains("## Explicit single-operator examples")
+                .contains("### Retry only")
+                .contains("### CircuitBreaker only")
+                .contains("### Bulkhead only")
+                .contains("### RateLimiter only")
+                .contains("### All four published defaults")
+                .contains("## Method precedence and validation")
+                .contains("Blank method annotation values fail startup")
+                .contains("Missing active method-annotation instances fail proxy construction")
+                .contains("Client-level instance properties are not registry-membership fail-fast checks")
+                .contains("Client-level names may be absent from")
+                .contains("`resilience4j.*.instances`; Resilience4j")
+                .contains("strict-unsafe-retry-validation")
+                .doesNotContain("named Resilience4j instance must also exist");
+        assertThat(quickStart)
+                .contains("## Preparing resilience configuration for `4.0.0`")
+                .contains("`enabled: true` alone selects no operator")
+                .contains("[Response Caching](32-response-caching.md)");
+        assertThat(resilience)
+                .contains("Start with one operator")
+                .contains("`enabled: true` alone selects no operator");
+        assertThat(caching)
+                .contains("## Local-only consistency and invalidation")
+                .contains("does not coordinate entries between application instances")
+                .contains("An unselected")
+                .contains("or explicitly disabled `POST`, `PUT`, `PATCH`, or `DELETE`")
+                .contains("A selected write method fails proxy construction")
+                .contains("does not invalidate related cached reads")
+                .contains("not a distributed-cache abstraction");
+        assertThat(production)
+                .contains("## Response caching (`4.0.0` candidate)")
+                .contains("Do not enable `single-flight`, refresh, or cache telemetry implicitly")
+                .contains("per-instance divergence")
+                .contains("Empty completions and failures are never stored")
+                .doesNotContain("Empty values and failures are never stored");
+        assertThat(examples)
+                .contains("## Explicit Local Response Cache")
+                .contains("policy: catalog-read")
+                .contains("maximum-size: 10000")
+                .contains("cache:\n        enabled: true")
+                .contains("inventory every applicable")
+                .contains("Boot `WebClientCustomizer`, matching `ReactiveHttpClientCustomizer`")
+                .contains("For each reviewed customization, add its exact Spring bean")
+                .contains("name under `cache.customizations` with `SAFE`")
+                .contains("Missing and `INCOMPATIBLE`")
+                .contains("classifications reject proxy construction")
+                .contains("Caffeine dependency instructions")
+                .contains("With that dependency present");
+        assertThat(observability)
+                .contains("### Cache miss and load rate (events per second)")
+                .contains("Terminal miss-load work:")
+                .contains("therefore does not")
+                .contains("prove that a transport dispatch occurred")
+                .contains("ordinary request metrics")
+                .contains("recipes below preserve")
+                .contains("scrape-target labels")
+                .contains("sum without (result)")
+                .contains("sum without (outcome)")
+                .contains("sum without (cause)")
+                .doesNotContain("sum by (client_name, api_name) (\n    rate(reactive_http_client_cache_")
+                .doesNotContain("sum by (client_name, cache_policy) (\n    rate(reactive_http_client_cache_evictions_")
+                .contains("zero branch retains every cache-selected API")
+                .contains("A zero series does not prove that refresh is configured or active")
+                .doesNotContain("zero branch retains refresh-enabled groups")
+                .contains("### Cache eviction pressure (evictions per second)")
+                .contains("### Cache capacity pressure (dimensionless)")
+                .contains("reactive_http_client_cache_entries\n  /\n  clamp_min(\n"
+                        + "    reactive_http_client_cache_maximum_entries, 1")
+                .contains("per scrape target before aggregation")
+                .contains("zero-valued branch keeps an idle selected cache")
+                .contains("cause=\"size\"")
+                .contains("cause=\"ttl\"");
+        assertThat(operations)
+                .contains("| **4.0.0-SNAPSHOT only:** Unexpected stale value")
+                .contains("[Response cache behavior (4.0.0-SNAPSHOT)](#response-cache-behavior-400-snapshot-only)")
+                .contains("## Response cache behavior (4.0.0-SNAPSHOT only)")
+                .contains("per-instance divergence is expected")
+                .contains("does not imply distributed coherence");
+        assertThat(supportBundles)
+                .contains("[Aggregate response-cache incident](fixtures/support-bundle-response-cache.json)")
+                .contains("bounded aggregate cache facts")
+                .contains("one sanitized caller terminal record");
+        assertThat(changelog)
+                .contains("**V27 migration and operations documentation.");
+
+        assertThat(fixture.path("schemaVersion").isInt()).isTrue();
+        assertThat(fixture.path("window").path("startedAt").isTextual()).isTrue();
+        assertThat(fixture.path("window").path("endedAt").isTextual()).isTrue();
+        assertThat(fixture.path("window").path("duration").isInt()).isTrue();
+        assertThat(fixture.path("window").path("unit").asText()).isEqualTo("seconds");
+        assertThat(fixture.path("cache").path("cachePhase").asText()).isEqualTo("refresh-on-access");
+        assertThat(fixture.path("cache").path("cachePolicyCount").isInt()).isTrue();
+        assertThat(fixture.path("cache").path("cacheMaximumSize").isInt()).isTrue();
+        assertThat(fixture.path("cache").path("cacheEntryCount").isInt()).isTrue();
+        assertThat(fixture.path("lookups").path("hits").isInt()).isTrue();
+        assertThat(fixture.path("lookups").path("misses").isInt()).isTrue();
+        assertThat(fixture.path("loads").path("success").isInt()).isTrue();
+        assertThat(fixture.path("refreshes").path("failure").isInt()).isTrue();
+        assertThat(fixture.path("evictions").path("size").isInt()).isTrue();
+        assertThat(fixture.path("evictions").path("ttl").isInt()).isTrue();
+
+        JsonNode terminalCaller = fixture.path("terminalCaller");
+        assertThat(terminalCaller.isObject()).isTrue();
+        assertThat(terminalCaller.path("cacheOutcome").asText()).isEqualTo("STALE_HIT");
+        assertThat(terminalCaller.has("subscriptionAttemptCount")).isTrue();
+        assertThat(terminalCaller.path("subscriptionAttemptCount").isIntegralNumber()).isTrue();
+        assertThat(terminalCaller.path("subscriptionAttemptCount").asInt()).isZero();
+        assertThat(terminalCaller.has("requestDispatched")).isTrue();
+        assertThat(terminalCaller.path("requestDispatched").isBoolean()).isTrue();
+        assertThat(terminalCaller.path("requestDispatched").asBoolean()).isFalse();
+        assertThat(terminalCaller.has("terminalRecordCreated")).isTrue();
+        assertThat(terminalCaller.path("terminalRecordCreated").isBoolean()).isTrue();
+        assertThat(terminalCaller.path("terminalRecordCreated").asBoolean()).isTrue();
+        assertThat(terminalCaller.has("cancellation")).isTrue();
+        assertThat(terminalCaller.path("cancellation").isBoolean()).isTrue();
+        assertThat(terminalCaller.path("cancellation").asBoolean()).isFalse();
+        assertThat(terminalCaller.has("responseStatus")).isTrue();
+        assertThat(terminalCaller.path("responseStatus").isIntegralNumber()).isTrue();
+        assertThat(terminalCaller.path("responseStatus").asInt()).isEqualTo(200);
+        assertThat(terminalCaller.has("errorType")).isTrue();
+        assertThat(terminalCaller.path("errorType").isNull()).isTrue();
+        assertThat(terminalCaller.has("errorCategory")).isTrue();
+        assertThat(terminalCaller.path("errorCategory").isTextual()).isTrue();
+        assertThat(terminalCaller.path("errorCategory").asText()).isEqualTo("NONE");
+        assertThat(terminalCaller.has("failureStage")).isTrue();
+        assertThat(terminalCaller.path("failureStage").isNull()).isTrue();
+
+        assertThat(sensitiveSupportFixtureFieldNames(fixture))
+                .as("sensitive response-cache support fixture field names")
+                .isEmpty();
+
+        String fixtureText = Files.readString(fixturePath);
+        assertThat(fixtureText)
+                .doesNotContainIgnoringCase("cacheKey")
+                .doesNotContainIgnoringCase("keyDigest")
+                .doesNotContainIgnoringCase("cachedValue")
+                .doesNotContainIgnoringCase("authorization")
+                .doesNotContainIgnoringCase("credential")
+                .doesNotContainIgnoringCase("tenant")
+                .doesNotContain("http://", "https://");
+    }
+
+    @Test
+    void responseCacheSupportFixtureGuardRejectsSensitiveFieldNames() throws IOException {
+        JsonNode unsafeFixture = OBJECT_MAPPER.readTree("""
+                {
+                  "requestPath": "/customers/123",
+                  "nested": {
+                    "queryParameters": "customer=123",
+                    "requestVariant": "tenant-a",
+                    "requestTarget": "/customers/{id}",
+                    "uri": "/customers/123",
+                    "entryKey": "opaque-entry",
+                    "cacheDigest": "opaque-digest",
+                    "responseValue": "cached-response",
+                    "payload": "cached-payload"
+                  }
+                }
+                """);
+
+        assertThat(sensitiveSupportFixtureFieldNames(unsafeFixture))
+                .containsExactlyInAnyOrder(
+                        "requestPath", "queryParameters", "requestVariant", "requestTarget", "uri",
+                        "entryKey", "cacheDigest", "responseValue", "payload");
     }
 
     @Test
@@ -3553,6 +3741,31 @@ class DocumentationReleaseArtifactTest {
             rows.add(new PublicSurfaceRow(stripBackticks(columns[1].trim()), columns[4].trim()));
         }
         return rows;
+    }
+
+    private static List<String> sensitiveSupportFixtureFieldNames(JsonNode node) {
+        List<String> sensitiveNames = new ArrayList<>();
+        collectSensitiveSupportFixtureFieldNames(node, sensitiveNames);
+        return sensitiveNames;
+    }
+
+    private static void collectSensitiveSupportFixtureFieldNames(
+            JsonNode node, List<String> sensitiveNames) {
+        if (node.isObject()) {
+            for (Map.Entry<String, JsonNode> property : node.properties()) {
+                String normalizedName = property.getKey()
+                        .replaceAll("[^A-Za-z0-9]", "")
+                        .toLowerCase(Locale.ROOT);
+                if (SENSITIVE_SUPPORT_FIXTURE_FIELD_FRAGMENTS.stream()
+                        .anyMatch(normalizedName::contains)) {
+                    sensitiveNames.add(property.getKey());
+                }
+                collectSensitiveSupportFixtureFieldNames(property.getValue(), sensitiveNames);
+            }
+        }
+        else if (node.isArray()) {
+            node.forEach(child -> collectSensitiveSupportFixtureFieldNames(child, sensitiveNames));
+        }
     }
 
     private static String stripBackticks(String value) {
