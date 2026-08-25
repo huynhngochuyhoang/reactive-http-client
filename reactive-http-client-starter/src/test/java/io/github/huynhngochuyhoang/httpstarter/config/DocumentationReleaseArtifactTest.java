@@ -239,7 +239,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("cause=\"size\"")
                 .contains("cause=\"ttl\"");
         assertThat(operations)
-                .contains("## Response cache behavior")
+                .contains("| **4.0.0-SNAPSHOT only:** Unexpected stale value")
+                .contains("[Response cache behavior (4.0.0-SNAPSHOT)](#response-cache-behavior-400-snapshot-only)")
+                .contains("## Response cache behavior (4.0.0-SNAPSHOT only)")
                 .contains("per-instance divergence is expected")
                 .contains("does not imply distributed coherence");
         assertThat(supportBundles)

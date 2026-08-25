@@ -1148,11 +1148,11 @@ Evidence recorded on 2026-08-25:
   observability switch. Configuration metadata tests reject all primitive,
   boxed, and String scalar group types and retain generated-reference/property
   parity.
-- `DocumentationReleaseArtifactTest` passes `42` tests and
+- `DocumentationReleaseArtifactTest` passes `43` tests and
   `ReactiveHttpClientConfigurationMetadataTest` passes `18` tests with zero
   failures, errors, or skips. These suites validate public Markdown links,
   documented/generated properties, placeholder hosts, support fixtures, and
-  promoted benchmark references. The complete starter module passes `1208`
+  promoted benchmark references. The complete starter module passes `1209`
   tests with zero failures, errors, or skips, and `git diff --check` also
   passes.
 
