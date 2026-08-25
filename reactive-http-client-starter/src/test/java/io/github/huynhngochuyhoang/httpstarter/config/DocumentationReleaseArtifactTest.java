@@ -177,6 +177,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("### All four published defaults")
                 .contains("## Method precedence and validation")
                 .contains("Blank method annotation values fail startup")
+                .contains("Missing active method-annotation instances fail proxy construction")
+                .contains("Client-level instance properties are not registry-membership fail-fast checks")
                 .contains("strict-unsafe-retry-validation");
         assertThat(quickStart)
                 .contains("## Preparing resilience configuration for `4.0.0`")
@@ -202,6 +204,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(observability)
                 .contains("### Cache miss and load rate (events per second)")
                 .contains("### Cache eviction pressure (evictions per second)")
+                .contains("### Cache capacity pressure (dimensionless)")
+                .contains("reactive_http_client_cache_entries\n  /\n  clamp_min(\n"
+                        + "    reactive_http_client_cache_maximum_entries, 1")
+                .contains("per scrape target before aggregation")
                 .contains("zero-valued branch keeps an idle selected cache")
                 .contains("cause=\"size\"")
                 .contains("cause=\"ttl\"");

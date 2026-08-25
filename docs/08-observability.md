@@ -629,16 +629,17 @@ itself evidence that maximum size is too small.
 ```promql
 max by (client_name, cache_policy) (
   reactive_http_client_cache_entries
+  /
+  clamp_min(
+    reactive_http_client_cache_maximum_entries, 1
+  )
 )
-/
-clamp_min(
-  max by (client_name, cache_policy) (
-    reactive_http_client_cache_maximum_entries
-  ), 1)
 ```
 
-Aggregate with `max by (client_name, cache_policy)` when dashboards combine
-registries. Values near `1` indicate capacity pressure, not an error condition.
+Prometheus matches the two gauges per scrape target before aggregation, retaining
+labels such as `job`, `instance`, or `pod` for the division. The outer
+`max by (client_name, cache_policy)` then shows the most saturated instance.
+Values near `1` indicate capacity pressure, not an error condition.
 
 ### Pool pressure (gauge counts, not utilization percentages)
 

@@ -132,7 +132,11 @@ Retry has one additional eligibility gate. The resolved HTTP method must be in
 `retry-methods`; an ineligible method reports Retry as disabled even when an
 instance is selected. A selected method annotation is validated only when its
 operator is available, and Retry annotations are validated only when the method
-is eligible. Missing active named instances fail proxy construction.
+is eligible. Missing active method-annotation instances fail proxy construction.
+Client-level instance properties are not registry-membership fail-fast checks:
+when a selected client-level name is absent, Resilience4j resolves it from the
+registry defaults instead of the starter rejecting proxy construction for the
+missing named instance.
 
 `strict-unsafe-retry-validation: true` runs only when the effective Retry is
 available, eligible, and can make more than one attempt. It does not activate
