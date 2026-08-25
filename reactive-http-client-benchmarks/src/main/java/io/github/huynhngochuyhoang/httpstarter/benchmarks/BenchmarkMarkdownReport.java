@@ -144,6 +144,8 @@ final class BenchmarkMarkdownReport {
         markdown.append("- Smoke-only results prove the harness starts and writes artifacts; do not publish them as performance evidence.\n");
         markdown.append("- Optional starter feature rows enable exactly one feature at a time and are not claims about default runtime overhead.\n");
         markdown.append("- Starter-only rows measure starter-specific work, such as Problem Detail error mapping, where the baselines do not install equivalent behavior.\n");
+        markdown.append("- Cache loopback rows compare cache workloads only with equivalent cache workloads; a local hit is never compared with a raw WebClient network call as abstraction-overhead evidence.\n");
+        markdown.append("- Cache allocation rows isolate bounded starter-owned key, lookup, publication, waiter, eviction, and refresh work without transport I/O.\n");
         markdown.append("- Local loopback, JVM warmup, CPU scheduling, and Netty event-loop behavior affect the numbers; use this report as trend evidence for named scenarios.\n");
         markdown.append("- Review thresholds are manual signals; this harness does not enforce hard performance gates.\n\n");
 
@@ -247,6 +249,27 @@ final class BenchmarkMarkdownReport {
     }
 
     private static Classification classification(String benchmarkName) {
+        if (benchmarkName.startsWith("cacheDisabled")) {
+            requireScenario(benchmarkName, benchmarkName.substring("cacheDisabled".length()));
+            return new Classification("No-network cache-disabled invocation", "Starter", benchmarkName,
+                    false, false, sortPrefix("cache-disabled", benchmarkName));
+        }
+        if (benchmarkName.startsWith("cacheKey")) {
+            requireScenario(benchmarkName, benchmarkName.substring("cacheKey".length()));
+            return new Classification("No-network cache-key construction", "Starter", benchmarkName,
+                    false, true, sortPrefix("cache-key", benchmarkName));
+        }
+        if (benchmarkName.startsWith("cacheAllocation")) {
+            requireScenario(benchmarkName, benchmarkName.substring("cacheAllocation".length()));
+            return new Classification("No-network cache allocation path", "Starter", benchmarkName,
+                    false, true, sortPrefix("cache-allocation", benchmarkName));
+        }
+        if (benchmarkName.startsWith("cacheLoopbackStarter")) {
+            String scenario = benchmarkName.substring("cacheLoopbackStarter".length());
+            requireScenario(benchmarkName, scenario);
+            return new Classification("Starter cache loopback workload", "Starter", scenario,
+                    false, true, sortPrefix("cache-loopback", scenario));
+        }
         if (benchmarkName.startsWith("clientSideOverhead")) {
             String remainder = benchmarkName.substring("clientSideOverhead".length());
             ClientAndScenario clientAndScenario = clientAndScenario(remainder);

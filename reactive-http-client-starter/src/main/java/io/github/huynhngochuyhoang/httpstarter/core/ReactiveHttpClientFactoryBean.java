@@ -130,10 +130,16 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 .getIfAvailable(DefaultErrorDecoder::new)
                 .forClient(clientName);
 
-        Object circuitBreakerRegistry = resolveSafely("io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry");
-        Object retryRegistry = resolveSafely("io.github.resilience4j.retry.RetryRegistry");
-        Object bulkheadRegistry = resolveSafely("io.github.resilience4j.bulkhead.BulkheadRegistry");
-        Object rateLimiterRegistry = resolveSafely("io.github.resilience4j.ratelimiter.RateLimiterRegistry");
+        Set<ResilienceOperatorApplier.InstanceType> selectedOperators = selectedResilienceOperators(
+                type, metadataCache, config);
+        Object circuitBreakerRegistry = selectedOperators.contains(ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER)
+                ? resolveSafely("io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry") : null;
+        Object retryRegistry = selectedOperators.contains(ResilienceOperatorApplier.InstanceType.RETRY)
+                ? resolveSafely("io.github.resilience4j.retry.RetryRegistry") : null;
+        Object bulkheadRegistry = selectedOperators.contains(ResilienceOperatorApplier.InstanceType.BULKHEAD)
+                ? resolveSafely("io.github.resilience4j.bulkhead.BulkheadRegistry") : null;
+        Object rateLimiterRegistry = selectedOperators.contains(ResilienceOperatorApplier.InstanceType.RATE_LIMITER)
+                ? resolveSafely("io.github.resilience4j.ratelimiter.RateLimiterRegistry") : null;
         ResilienceOperatorApplier resilienceOperatorApplier = resolveResilienceOperatorApplier(
                 circuitBreakerRegistry, retryRegistry, bulkheadRegistry, rateLimiterRegistry);
         ReactiveHttpClientJsonCodec jsonCodec = applicationContext.getBeanProvider(ReactiveHttpClientJsonCodec.class).getIfAvailable();
@@ -924,6 +930,46 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         } catch (ClassNotFoundException ignored) {
             return null;
         }
+    }
+
+    private static Set<ResilienceOperatorApplier.InstanceType> selectedResilienceOperators(
+            Class<?> clientInterface,
+            MethodMetadataCache metadataCache,
+            ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig != null
+                ? clientConfig.getResilience() : null;
+        if (clientInterface == null || resilience == null || !resilience.isEnabled()) {
+            return Set.of();
+        }
+        EnumSet<ResilienceOperatorApplier.InstanceType> selected =
+                EnumSet.noneOf(ResilienceOperatorApplier.InstanceType.class);
+        EffectiveResiliencePolicy.OperatorAvailability selectedAvailability =
+                (type, publisherShape) -> true;
+        for (Method method : clientInterface.getMethods()) {
+            if (!isDeclarativeClientMethod(method)) {
+                continue;
+            }
+            MethodMetadata metadata = metadataCache.get(method);
+            RequestPlan plan = RequestPlan.from(metadata, clientInterface);
+            EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
+                    plan,
+                    diagnosticHttpMethod(metadata, clientConfig),
+                    resilience,
+                    selectedAvailability);
+            if (policy.retry().active()) {
+                selected.add(ResilienceOperatorApplier.InstanceType.RETRY);
+            }
+            if (policy.rateLimiter().active()) {
+                selected.add(ResilienceOperatorApplier.InstanceType.RATE_LIMITER);
+            }
+            if (policy.circuitBreaker().active()) {
+                selected.add(ResilienceOperatorApplier.InstanceType.CIRCUIT_BREAKER);
+            }
+            if (policy.bulkhead().active()) {
+                selected.add(ResilienceOperatorApplier.InstanceType.BULKHEAD);
+            }
+        }
+        return selected;
     }
 
     private ResilienceOperatorApplier resolveResilienceOperatorApplier(

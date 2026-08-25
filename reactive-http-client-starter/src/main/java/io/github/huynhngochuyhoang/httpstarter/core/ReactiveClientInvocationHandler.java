@@ -96,6 +96,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final String clientName;
     private final Class<?> clientInterface;
     private final Map<Method, RequestPlan> requestPlanCache = new ConcurrentHashMap<>();
+    private final Map<Method, EffectiveCachePolicy.Selection> cacheSelectionCache = new ConcurrentHashMap<>();
     private final ApplicationContext applicationContext;
     private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> loggerCache = new ConcurrentHashMap<>();
     private final AtomicBoolean loggerCacheLimitWarningLogged = new AtomicBoolean(false);
@@ -376,9 +377,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
 
         Class<?> concreteClient = clientInterface != null ? clientInterface : method.getDeclaringClass();
-        EffectiveCachePolicy.Selection cacheSelection = EffectiveCachePolicy.validate(
-                concreteClient, clientName, plan, clientConfig, effectiveApi.httpMethod());
-        if (cacheSelection.enabled()) {
+        EffectiveCachePolicy.Selection cacheSelection = requiresCacheSelection(plan)
+                ? cacheSelection(method, concreteClient, plan, effectiveApi.httpMethod())
+                : null;
+        if (cacheSelection != null && cacheSelection.enabled()) {
             requireCacheAuthorizationSupport();
             Object[] invocationArguments = args != null ? args.clone() : new Object[0];
             Mono<?> cacheInvocation = Mono.deferContextual(context -> {
@@ -645,6 +647,28 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return meta.getRequestPlan() != null ? meta.getRequestPlan() : RequestPlan.from(meta);
         }
         return requestPlanCache.computeIfAbsent(method, ignored -> RequestPlan.from(meta, clientInterface));
+    }
+
+    private EffectiveCachePolicy.Selection cacheSelection(Method method,
+                                                           Class<?> concreteClient,
+                                                           RequestPlan plan,
+                                                           String effectiveHttpMethod) {
+        EffectiveCachePolicy.Selection selection = cacheSelectionCache.get(method);
+        if (selection != null) {
+            return selection;
+        }
+        EffectiveCachePolicy.Selection validated = EffectiveCachePolicy.validate(
+                concreteClient, clientName, plan, clientConfig, effectiveHttpMethod);
+        EffectiveCachePolicy.Selection existing = cacheSelectionCache.putIfAbsent(method, validated);
+        return existing != null ? existing : validated;
+    }
+
+    private boolean requiresCacheSelection(RequestPlan plan) {
+        if (!plan.cacheKeyParams().isEmpty() || StringUtils.hasText(plan.cachePolicyName())) {
+            return true;
+        }
+        ReactiveHttpClientProperties.CacheConfig cache = clientConfig.getCache();
+        return cache != null && StringUtils.hasText(cache.getPolicy());
     }
 
     private boolean usesSubscriptionState(RequestPlan plan,
@@ -1039,6 +1063,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                          String httpMethod,
                                          RequestArgumentResolver.ResolvedArgs resolved) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
+        if (resilience == null || !resilience.isEnabled()) {
+            return mono;
+        }
         EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
                 plan, httpMethod, resilience,
                 EffectiveResiliencePolicy.availability(resilienceOperatorApplier));
@@ -1071,6 +1098,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                         String httpMethod,
                                         RequestArgumentResolver.ResolvedArgs resolved) {
         ReactiveHttpClientProperties.ResilienceConfig resilience = clientConfig.getResilience();
+        if (resilience == null || !resilience.isEnabled()) {
+            return flux;
+        }
         EffectiveResiliencePolicy policy = EffectiveResiliencePolicy.resolve(
                 plan, httpMethod, resilience,
                 EffectiveResiliencePolicy.availability(resilienceOperatorApplier));

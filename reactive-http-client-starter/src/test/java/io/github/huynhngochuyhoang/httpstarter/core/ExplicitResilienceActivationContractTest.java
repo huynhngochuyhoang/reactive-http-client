@@ -2,7 +2,12 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -15,6 +20,7 @@ import reactor.core.publisher.Mono;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -243,6 +249,32 @@ class ExplicitResilienceActivationContractTest {
                         + "rate-limiter -> retry -> request-attempt");
     }
 
+    @Test
+    void enabledOnlyFactoryDoesNotInitializeAnyLazyRegistry() {
+        RegistryCreationCounts counts = new RegistryCreationCounts();
+
+        try (FactoryFixture ignored = factoryClient(enabledOnlyConfig(), counts)) {
+            assertThat(counts.retry).hasValue(0);
+            assertThat(counts.rateLimiter).hasValue(0);
+            assertThat(counts.circuitBreaker).hasValue(0);
+            assertThat(counts.bulkhead).hasValue(0);
+        }
+    }
+
+    @Test
+    void retryOnlyFactoryInitializesNoUnrelatedLazyRegistry() {
+        ReactiveHttpClientProperties.ClientConfig config = enabledOnlyConfig();
+        config.getResilience().setRetry("default");
+        RegistryCreationCounts counts = new RegistryCreationCounts();
+
+        try (FactoryFixture ignored = factoryClient(config, counts)) {
+            assertThat(counts.retry).hasValue(1);
+            assertThat(counts.rateLimiter).hasValue(0);
+            assertThat(counts.circuitBreaker).hasValue(0);
+            assertThat(counts.bulkhead).hasValue(0);
+        }
+    }
+
     private static ReactiveHttpClientProperties.ClientConfig enabledOnlyConfig() {
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.getResilience().setEnabled(true);
@@ -263,6 +295,40 @@ class ExplicitResilienceActivationContractTest {
             assertThat(applier.subscriptions()).containsExactly("mono:" + operator + "=selected");
             assertThat(fixture.dispatches()).hasValue(1);
         }
+    }
+
+    private static FactoryFixture factoryClient(
+            ReactiveHttpClientProperties.ClientConfig config,
+            RegistryCreationCounts counts) {
+        config.setBaseUrl("http://explicit-resilience.test");
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("registry-selection-client", config));
+
+        GenericApplicationContext context = new GenericApplicationContext();
+        context.registerBean(ReactiveHttpClientProperties.class, () -> properties);
+        context.registerBean(RetryRegistry.class, () -> {
+            counts.retry.incrementAndGet();
+            return RetryRegistry.ofDefaults();
+        }, definition -> definition.setLazyInit(true));
+        context.registerBean(RateLimiterRegistry.class, () -> {
+            counts.rateLimiter.incrementAndGet();
+            return RateLimiterRegistry.ofDefaults();
+        }, definition -> definition.setLazyInit(true));
+        context.registerBean(CircuitBreakerRegistry.class, () -> {
+            counts.circuitBreaker.incrementAndGet();
+            return CircuitBreakerRegistry.ofDefaults();
+        }, definition -> definition.setLazyInit(true));
+        context.registerBean(BulkheadRegistry.class, () -> {
+            counts.bulkhead.incrementAndGet();
+            return BulkheadRegistry.ofDefaults();
+        }, definition -> definition.setLazyInit(true));
+        context.refresh();
+
+        ReactiveHttpClientFactoryBean<RegistrySelectionClient> factory = new ReactiveHttpClientFactoryBean<>();
+        factory.setType(RegistrySelectionClient.class);
+        factory.setApplicationContext(context);
+        factory.getObject();
+        return new FactoryFixture(context, factory);
     }
 
     private static ClientFixture client(
@@ -319,6 +385,12 @@ class ExplicitResilienceActivationContractTest {
         Mono<String> methodOverrides();
     }
 
+    @ReactiveHttpClient(name = "registry-selection-client")
+    interface RegistrySelectionClient {
+        @GET("/value")
+        Mono<String> value();
+    }
+
     private record ClientFixture(
             StaticApplicationContext context,
             BaselineClient client,
@@ -327,6 +399,23 @@ class ExplicitResilienceActivationContractTest {
         public void close() {
             context.close();
         }
+    }
+
+    private record FactoryFixture(
+            GenericApplicationContext context,
+            ReactiveHttpClientFactoryBean<RegistrySelectionClient> factory) implements AutoCloseable {
+        @Override
+        public void close() {
+            factory.destroy();
+            context.close();
+        }
+    }
+
+    private static final class RegistryCreationCounts {
+        private final AtomicInteger retry = new AtomicInteger();
+        private final AtomicInteger rateLimiter = new AtomicInteger();
+        private final AtomicInteger circuitBreaker = new AtomicInteger();
+        private final AtomicInteger bulkhead = new AtomicInteger();
     }
 
     private static final class RecordingApplier implements ResilienceOperatorApplier {

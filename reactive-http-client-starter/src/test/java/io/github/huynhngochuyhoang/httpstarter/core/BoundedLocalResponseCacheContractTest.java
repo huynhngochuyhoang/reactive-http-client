@@ -166,6 +166,54 @@ class BoundedLocalResponseCacheContractTest {
     }
 
     @Test
+    void completedSingleFlightRetainsOnlyOpaqueKeyAndResponseValue() throws Exception {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("retention", 1_000, 10, true);
+        CacheKeyContract.OpaqueKey key = key("retention");
+        Object requestGraph = new Object();
+        Object contextValue = new Object();
+        String authToken = "Bearer benchmark-secret";
+        Object callerSubscription = new Object();
+        Object responseValue = new Object();
+
+        Object result = manager.getOrLoad(selection, key, () -> Mono.deferContextual(context -> {
+                    assertThat((Object) context.get("tenant")).isSameAs(contextValue);
+                    assertThat((Object) context.get("auth")).isSameAs(authToken);
+                    assertThat(List.of(requestGraph, callerSubscription)).hasSize(2);
+                    return Mono.just(responseValue);
+                }))
+                .contextWrite(context -> context.put("tenant", contextValue).put("auth", authToken))
+                .block();
+
+        assertThat(result).isSameAs(responseValue);
+        assertThat(privateMap(manager, "inFlightLoads")).isEmpty();
+        assertThat(privateMap(manager, "inFlightRefreshes")).isEmpty();
+
+        Map<?, ?> caches = privateMap(manager, "caches");
+        assertThat(caches).hasSize(1);
+        CaffeineLocalResponseCache cache = (CaffeineLocalResponseCache) caches.values().iterator().next();
+        Field storageField = CaffeineLocalResponseCache.class.getDeclaredField("cache");
+        storageField.setAccessible(true);
+        com.github.benmanes.caffeine.cache.Cache<?, ?> storage =
+                (com.github.benmanes.caffeine.cache.Cache<?, ?>) storageField.get(cache);
+        assertThat(storage.asMap()).hasSize(1);
+        Map.Entry<?, ?> stored = storage.asMap().entrySet().iterator().next();
+        assertThat(stored.getKey()).isInstanceOf(CacheKeyContract.OpaqueKey.class);
+
+        Field valueField = stored.getValue().getClass().getDeclaredField("value");
+        valueField.setAccessible(true);
+        assertThat(valueField.get(stored.getValue())).isSameAs(responseValue);
+        for (Field field : stored.getValue().getClass().getDeclaredFields()) {
+            field.setAccessible(true);
+            assertThat(field.get(stored.getValue()))
+                    .isNotSameAs(requestGraph)
+                    .isNotSameAs(contextValue)
+                    .isNotSameAs(authToken)
+                    .isNotSameAs(callerSubscription);
+        }
+    }
+
+    @Test
     void singleFlightRechecksTheCacheBeforeInstallingAFlightFromAStaleMiss() throws Exception {
         LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
         EffectiveCachePolicy.Selection selection = selection("stale-miss", 1_000, 10, true);
@@ -2273,6 +2321,13 @@ class BoundedLocalResponseCacheContractTest {
 
     private static CacheKeyContract.OpaqueKey key(String value) {
         return CacheKeyContract.OpaqueKey.from(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<?, ?> privateMap(Object target, String fieldName) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return (Map<?, ?>) field.get(target);
     }
 
     private static ClientResponse ok(String body) {

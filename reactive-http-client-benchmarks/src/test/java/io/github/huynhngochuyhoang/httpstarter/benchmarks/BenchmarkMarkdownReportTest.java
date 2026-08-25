@@ -85,6 +85,27 @@ class BenchmarkMarkdownReportTest {
     }
 
     @Test
+    void classifiesCacheRowsWithoutCreatingRawNetworkComparisons() throws Exception {
+        String report = renderReport(
+                result("io.github.huynhngochuyhoang.httpstarter.benchmarks.StarterInvocationBenchmark.cacheDisabledProxyInvocationCreatesPublisher",
+                        "avgt", 2.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark.cacheKeyConstructionPathQueryHeader",
+                        "avgt", 3.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark.cacheAllocationFreshHit",
+                        "avgt", 1.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark.cacheLoopbackStarterHit",
+                        "avgt", 4.0, "us/op"));
+
+        assertThat(report)
+                .contains("local hit is never compared with a raw WebClient network call")
+                .contains("| cacheDisabledProxyInvocationCreatesPublisher | No-network cache-disabled invocation |")
+                .contains("| cacheKeyConstructionPathQueryHeader | No-network cache-key construction |")
+                .contains("| cacheAllocationFreshHit | No-network cache allocation path |")
+                .contains("| cacheLoopbackStarterHit | Starter cache loopback workload |")
+                .doesNotContain("| Cache Loopback Starter Hit | 4 us/op |");
+    }
+
+    @Test
     void rendersBoot4SameStackContextAndCompleteVersionMetadata() throws Exception {
         Properties environment = new Properties();
         environment.setProperty("stackContext", "Spring Boot 4 migration candidate");
@@ -114,11 +135,11 @@ class BenchmarkMarkdownReportTest {
 
     @Test
     void everyCurrentBenchmarkMethodHasAnExplicitClassification() throws Exception {
-        Stream<Class<?>> benchmarkTypes = Stream.of(
+        Stream<Class<?>> benchmarkTypes = Stream.concat(Stream.of(
                 LoopbackClientComparisonBenchmark.class,
                 StarterInvocationBenchmark.class,
                 StarterInvocationInternalsBenchmark.class,
-                StarterDiagnosticsOverheadBenchmark.class);
+                StarterDiagnosticsOverheadBenchmark.class), optionalV27CacheBenchmark());
 
         String[] results = benchmarkTypes
                 .flatMap(type -> Arrays.stream(type.getDeclaredMethods()))
@@ -128,6 +149,15 @@ class BenchmarkMarkdownReportTest {
                 .toArray(String[]::new);
 
         assertThat(renderReport(results)).contains("## Raw Results");
+    }
+
+    private static Stream<Class<?>> optionalV27CacheBenchmark() {
+        try {
+            return Stream.of(Class.forName(
+                    "io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark"));
+        } catch (ClassNotFoundException ignored) {
+            return Stream.empty();
+        }
     }
 
     @Test
@@ -190,6 +220,19 @@ class BenchmarkMarkdownReportTest {
                 "avgt", 1.0, "us/op")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must include a scenario after its classification prefix");
+    }
+
+    @Test
+    void rejectsSelectedBenchmarksThatProduceNoResultRow() throws Exception {
+        Path result = tempDir.resolve("incomplete-jmh.json");
+        Files.writeString(result, "[]");
+        String selected = ".*cacheDisabledProxyInvocationCreatesPublisher.*";
+
+        assertThatThrownBy(() -> BenchmarkRunner.validateSelectedBenchmarksCompleted(
+                new String[]{selected, "-rff", result.toString()}))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cacheDisabledProxyInvocationCreatesPublisher")
+                .hasMessageContaining("setup or execution failures");
     }
 
     private String renderReport(String... results) throws Exception {
