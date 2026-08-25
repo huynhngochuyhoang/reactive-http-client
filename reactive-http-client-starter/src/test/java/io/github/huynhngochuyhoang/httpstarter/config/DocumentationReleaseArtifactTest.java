@@ -28,7 +28,8 @@ class DocumentationReleaseArtifactTest {
     private static final Set<String> SENSITIVE_SUPPORT_FIXTURE_FIELD_FRAGMENTS = Set.of(
             "argument", "header", "body", "bodies", "url", "identity", "identities",
             "authorization", "credential", "tenant", "cookie", "secret", "token",
-            "cachekey", "keydigest", "cachedvalue");
+            "cachekey", "keydigest", "cachedvalue",
+            "path", "query", "uri", "requesttarget", "requestvariant");
     private static final Pattern PROJECT_VERSION_SNIPPET = Pattern.compile(
             "<groupId>io\\.github\\.huynhngochuyhoang</groupId>\\s*"
                     + "<artifactId>reactive-http-client-[^<]+</artifactId>\\s*"
@@ -205,7 +206,9 @@ class DocumentationReleaseArtifactTest {
         assertThat(production)
                 .contains("## Response caching (`4.0.0` candidate)")
                 .contains("Do not enable `single-flight`, refresh, or cache telemetry implicitly")
-                .contains("per-instance divergence");
+                .contains("per-instance divergence")
+                .contains("Empty completions and failures are never stored")
+                .doesNotContain("Empty values and failures are never stored");
         assertThat(examples)
                 .contains("## Explicit Local Response Cache")
                 .contains("policy: catalog-read")
@@ -217,6 +220,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("therefore does not")
                 .contains("prove that a transport dispatch occurred")
                 .contains("ordinary request metrics")
+                .contains("recipes below preserve")
+                .contains("scrape-target labels")
+                .contains("sum without (result)")
+                .contains("sum without (outcome)")
+                .contains("sum without (cause)")
+                .doesNotContain("sum by (client_name, api_name) (\n    rate(reactive_http_client_cache_")
+                .doesNotContain("sum by (client_name, cache_policy) (\n    rate(reactive_http_client_cache_evictions_")
                 .contains("zero branch retains every cache-selected API")
                 .contains("A zero series does not prove that refresh is configured or active")
                 .doesNotContain("zero branch retains refresh-enabled groups")
@@ -265,6 +275,25 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContainIgnoringCase("credential")
                 .doesNotContainIgnoringCase("tenant")
                 .doesNotContain("http://", "https://");
+    }
+
+    @Test
+    void responseCacheSupportFixtureGuardRejectsRequestTargetFieldNames() throws IOException {
+        JsonNode unsafeFixture = OBJECT_MAPPER.readTree("""
+                {
+                  "requestPath": "/customers/123",
+                  "nested": {
+                    "queryParameters": "customer=123",
+                    "requestVariant": "tenant-a",
+                    "requestTarget": "/customers/{id}",
+                    "uri": "/customers/123"
+                  }
+                }
+                """);
+
+        assertThat(sensitiveSupportFixtureFieldNames(unsafeFixture))
+                .containsExactlyInAnyOrder(
+                        "requestPath", "queryParameters", "requestVariant", "requestTarget", "uri");
     }
 
     @Test

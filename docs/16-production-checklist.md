@@ -149,7 +149,7 @@ for the detailed ownership rules.
 - Expect per-instance divergence during deployments. The cache is process-local,
   does not coordinate pods, and performs no automatic write invalidation.
 - Keep unsupported non-GET, streaming, unresolved, and application-owned body
-  contracts uncached. Empty values and failures are never stored.
+  contracts uncached. Empty completions and failures are never stored.
 - Classify every applicable WebClient/customizer mutation before caching; a hit
   can bypass the downstream request pipeline.
 - Do not enable `single-flight`, refresh, or cache telemetry implicitly. Each

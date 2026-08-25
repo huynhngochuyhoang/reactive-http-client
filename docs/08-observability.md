@@ -475,19 +475,19 @@ Retry resubscribes. Redirect and auth-replay dispatches do not increase it.
 
 ```promql
 (
-  sum by (client_name, api_name) (
+  sum without (result) (
     rate(reactive_http_client_cache_lookups_total{result="hit"}[5m])
   )
-  or on (client_name, api_name)
+  or
   (
-    0 * sum by (client_name, api_name) (
+    0 * sum without (result) (
       rate(reactive_http_client_cache_lookups_total[5m])
     )
   )
 )
 /
 clamp_min(
-  sum by (client_name, api_name) (
+  sum without (result) (
     rate(reactive_http_client_cache_lookups_total[5m])
   ),
   0.000000001
@@ -499,18 +499,25 @@ serving have separate counters and must not be added to either side. The
 zero-valued branch keeps an idle selected cache or a cache with misses but no
 hits visible as `0` instead of dropping the client/API group.
 
+The hit, miss/load, coalescing, refresh, and eviction recipes below preserve
+scrape-target labels by aggregating away only their fixed `result`, `outcome`,
+or `cause` dimension. Labels such as `job`, `instance`, `pod`, and
+deployment-specific target labels therefore remain on every result. Compare
+those per-target series for local-cache divergence. Add a separately labeled
+fleet aggregation only when a fleet view is intentional.
+
 ### Cache miss and load rate (events per second)
 
 Miss callers:
 
 ```promql
 (
-  sum by (client_name, api_name) (
+  sum without (result) (
     rate(reactive_http_client_cache_lookups_total{result="miss"}[5m])
   )
-  or on (client_name, api_name)
+  or
   (
-    0 * sum by (client_name, api_name) (
+    0 * sum without (result) (
       rate(reactive_http_client_cache_lookups_total[5m])
     )
   )
@@ -521,12 +528,12 @@ Terminal miss-load work:
 
 ```promql
 (
-  sum by (client_name, api_name) (
+  sum without (outcome) (
     rate(reactive_http_client_cache_loads_total[5m])
   )
-  or on (client_name, api_name)
+  or
   (
-    0 * sum by (client_name, api_name) (
+    0 * sum without (result) (
       rate(reactive_http_client_cache_lookups_total[5m])
     )
   )
@@ -544,19 +551,17 @@ flight, several misses can correspond to one load.
 
 ```promql
 (
-  sum by (client_name, api_name) (
-    rate(reactive_http_client_cache_coalesced_total[5m])
-  )
-  or on (client_name, api_name)
+  rate(reactive_http_client_cache_coalesced_total[5m])
+  or
   (
-    0 * sum by (client_name, api_name) (
+    0 * sum without (result) (
       rate(reactive_http_client_cache_lookups_total{result="miss"}[5m])
     )
   )
 )
 /
 clamp_min(
-  sum by (client_name, api_name) (
+  sum without (result) (
     rate(reactive_http_client_cache_lookups_total{result="miss"}[5m])
   ),
   0.000000001
@@ -571,12 +576,12 @@ that have no coalesced waiters.
 
 ```promql
 (
-  sum by (client_name, api_name) (
+  sum without (outcome) (
     rate(reactive_http_client_cache_refreshes_total{outcome="failure"}[5m])
   )
-  or on (client_name, api_name)
+  or
   (
-    0 * sum by (client_name, api_name) (
+    0 * sum without (outcome) (
       rate(reactive_http_client_cache_refreshes_total[5m])
     )
   )
@@ -594,14 +599,12 @@ Maximum-size evictions:
 
 ```promql
 (
-  sum by (client_name, cache_policy) (
+  sum without (cause) (
     rate(reactive_http_client_cache_evictions_total{cause="size"}[5m])
   )
-  or on (client_name, cache_policy)
+  or
   (
-    0 * max by (client_name, cache_policy) (
-      reactive_http_client_cache_maximum_entries
-    )
+    0 * reactive_http_client_cache_maximum_entries
   )
 )
 ```
@@ -610,22 +613,20 @@ TTL evictions:
 
 ```promql
 (
-  sum by (client_name, cache_policy) (
+  sum without (cause) (
     rate(reactive_http_client_cache_evictions_total{cause="ttl"}[5m])
   )
-  or on (client_name, cache_policy)
+  or
   (
-    0 * max by (client_name, cache_policy) (
-      reactive_http_client_cache_maximum_entries
-    )
+    0 * reactive_http_client_cache_maximum_entries
   )
 )
 ```
 
 Both results are evictions per second. The zero-valued capacity branch keeps a
-selected idle policy visible. Sustained size eviction together with capacity
-near `1` suggests pressure; TTL eviction reflects expiry activity and is not
-itself evidence that maximum size is too small.
+selected idle policy visible per target. Sustained size eviction together with
+capacity near `1` suggests pressure; TTL eviction reflects expiry activity and
+is not itself evidence that maximum size is too small.
 
 ### Cache capacity pressure (dimensionless)
 
