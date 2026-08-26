@@ -1,13 +1,13 @@
 # Native Image and Release Compatibility
 
-Sections without a version label describe the current `4.0.0` release
-candidate. Sections labeled V18, V19, or V20 preserve release-era
+Sections without a version label describe the current `4.1.0-SNAPSHOT`
+development line. Sections labeled V18, V19, V20, or V27 preserve release-era
 evidence and are not current commands. Use the command in the first applicable
 current section; historical sections remain for provenance only.
 
 ## Supported Spring Boot baseline
 
-The published `3.x` line and current `4.x` release candidate require Java 21 and
+The published and current `4.x` lines require Java 21 and
 Spring Boot `4.0.0` or later. Default dependency management uses Spring Boot
 `4.0.0`; CI also exercises the current `4.1.0` line. The published `2.x` line
 remains the separate Spring Boot 3.5 maintenance lane.
@@ -134,10 +134,10 @@ The Central-only settings file is optional when the configured Maven mirror
 already contains Boot 4. It changes repository resolution only; it does not
 select source sets or alter publishing.
 
-### V27 major release candidate
+### V27 major release evidence
 
-V27 keeps published `3.6.0` as the strict API and consumer baseline while the
-reactor is cut as the `4.0.0` release candidate. The
+V27 kept published `3.6.0` as the strict API and consumer baseline while the
+reactor was cut as the `4.0.0` release candidate. The
 [3.x to 4.x resilience migration report](31-3x-to-4x-resilience-migration.md)
 records the behavior reason for the major version and the initial API result.
 The report-only `major-api-report` profile is additional classification
@@ -147,9 +147,17 @@ Strict mode enables both japicmp binary- and source-incompatibility failures;
 the report-only profile disables both failure switches so reviewed major changes
 can still be rendered after either strict step fails.
 
-Generated readiness reports `4.0.0` as pending publication while public
-consumer coordinates remain on `3.6.0`. Publication and all post-Central
-baseline movement stay deferred until the V27 go/no-go decision.
+The final candidate readiness reported `4.0.0` as pending publication while
+public consumer coordinates remained on `3.6.0`. Tag `v4.0.0` and the V27
+checklist preserve that release evidence.
+
+### Post-`4.0.0` development lane
+
+After Maven Central verification, public consumer, strict API, assembled
+consumer, and benchmark baselines moved to published `4.0.0`. Reactor-only
+coordinates now use `4.1.0-SNAPSHOT`. Normal CI runs only strict root and
+starter-module comparisons against `4.0.0`; the V27 report-only major lane is
+historical evidence and is not a post-release compatibility command.
 
 ### Publishable module staging
 
@@ -353,25 +361,25 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `4.0.0` release candidate compares
-strictly against published `3.6.0`:
+from the current reactor version. The `4.1.0-SNAPSHOT` development line compares
+strictly against published `4.0.0`:
 
 ```bash
-test ! -e target/published-baseline-repositories/api-root-3.6.0 && \
+test ! -e target/published-baseline-repositories/api-root-4.0.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.6.0 \
+  -Dmaven.repo.local=target/published-baseline-repositories/api-root-4.0.0 \
   -Papi-compatibility -DskipTests verify && \
-scripts/verify-published-baseline-provenance.sh api-root 3.6.0 \
-  target/release-evidence/published-baselines/api-root-3.6.0 \
+scripts/verify-published-baseline-provenance.sh api-root 4.0.0 \
+  target/release-evidence/published-baselines/api-root-4.0.0 \
   reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
 bash scripts/verify-api-compatibility-fixtures.sh
 ```
 
-For release evidence, resolve the three `3.6.0` jars into a fresh target-local
+For release evidence, resolve the three `4.0.0` jars into a fresh target-local
 Maven repository and pass that repository through `-Dmaven.repo.local` to the
 japicmp build. The frozen `scripts/verify-major-api-delta.sh` remains historical
 evidence for the reviewed `2.14.1` to `3.0.0` migration and is no longer part of
-normal minor-line CI. The V27
+normal minor-line CI. The historical V27
 [`3.6.0` to `4.0.0` report](api-report-3.6.0-to-4.0.0.md) and
 `scripts/verify-v27-major-api-delta.sh` freeze the current cross-major result.
 A fresh repository prevents a stale or locally installed
@@ -389,19 +397,23 @@ For module-scoped compatibility checks, the inherited baseline guard must still
 run before japicmp:
 
 ```bash
-test ! -e target/published-baseline-repositories/api-starter-3.6.0 && \
+test ! -e target/published-baseline-repositories/api-starter-4.0.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/api-starter-3.6.0 \
+  -Dmaven.repo.local=target/published-baseline-repositories/api-starter-4.0.0 \
   -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify && \
-scripts/verify-published-baseline-provenance.sh api-starter 3.6.0 \
-  target/release-evidence/published-baselines/api-starter-3.6.0 \
+scripts/verify-published-baseline-provenance.sh api-starter 4.0.0 \
+  target/release-evidence/published-baselines/api-starter-4.0.0 \
   reactive-http-client-starter
 ```
 
 The Maven profiles produce japicmp reports under each module's
 `target/japicmp/` directory. `api-compatibility` fails on binary and source
-incompatibilities for the current line. For V27, run the report-only comparison
-and its exact-delta guard before accepting the generated reports:
+incompatibilities for the current line.
+
+### Historical V27 major comparison
+
+The following command is reproducible from the `v4.0.0` release tree. It is not
+a current `4.1.0-SNAPSHOT` CI command:
 
 ```bash
 test ! -e target/published-baseline-repositories/api-major-report-3.6.0 && \
@@ -749,7 +761,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=4.0.0 native:compile
+  -Dreactive-http-client.version=4.1.0-SNAPSHOT native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
@@ -903,7 +915,7 @@ runs the complete mock parity classes, then runs the assembled consumer against
 the installed jars. It rejects reactor `target/classes` leakage and records
 separate mock and real-server test reports, the consumer classpath, dependency
 tree, effective POM, artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-4.0.0/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
+`target/release-evidence/current-consumer/current-4.1.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
 test stage. An `EXIT` trap repeats that filtered copy before preserving the original
 verifier status, including when either test stage fails.
 It also records the last completed stage and exit status when a later
@@ -926,19 +938,19 @@ evidence lanes. From a clean checkout, resolve the latest published parent,
 starter, test helper, and OTel companion exclusively through Maven Central:
 
 ```bash
-scripts/verify-published-release-artifacts.sh 3.6.0
-scripts/verify-published-consumer.sh 3.6.0
+scripts/verify-published-release-artifacts.sh 4.0.0
+scripts/verify-published-consumer.sh 4.0.0
 ```
 
 The consumer command refuses an existing
-`target/published-baseline-repositories/consumer-3.6.0` directory instead of reusing it.
-It runs the same Boot 4 application fixture against published `3.6.0`, verifies
+`target/published-baseline-repositories/consumer-4.0.0` directory instead of reusing it.
+It runs the same Boot 4 application fixture against published `4.0.0`, verifies
 the Maven Central `_remote.repositories` marker for the parent and every project artifact,
 rejects reactor `target/classes` entries, and writes target-only dependency
 trees, classpaths, consumer/module effective POMs, published parent/module POM
 and jar SHA-256 values, test reports, fixture commit state, completed stage, exit
 status, and provenance under
-`target/release-evidence/published-consumer/published-3.6.0/`.
+`target/release-evidence/published-consumer/published-4.0.0/`.
 Fresh Surefire XML is copied immediately after the consumer test stage. Its `EXIT`
 trap repeats that filtered copy and retains the evidence when a test, Central marker,
 classpath, or checksum check fails.
@@ -946,7 +958,7 @@ classpath, or checksum check fails.
 The release-artifact command uses its own fresh repository and additionally
 requires the starter, test-helper, and OTel source and Javadoc jars. Its
 target-only Central markers, checksums, and provenance are written under
-`target/release-evidence/published-baselines/release-artifacts-3.6.0/`.
+`target/release-evidence/published-baselines/release-artifacts-4.0.0/`.
 
 The manually dispatched `Published Consumer Smoke` workflow runs both commands
 and uploads only their published-release evidence directories. The normal

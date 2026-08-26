@@ -1,10 +1,10 @@
 # Reactive HTTP Client - Roadmap V27
 
-> **Status:** active
+> **Status:** completed and released as `4.0.0`
 > **Theme:** fail-safe feature activation and explicit bounded response reuse
-> **Target release:** `4.0.0` (SemVer-major candidate)
+> **Target release:** `4.0.0` (released 2026-08-26)
 > **Starting development line:** `3.7.0-SNAPSHOT`
-> **Published/API baseline:** `3.6.0`
+> **Published/API baseline at completion:** `4.0.0`
 
 ## Starting State
 

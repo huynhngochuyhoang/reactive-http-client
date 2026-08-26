@@ -6,9 +6,9 @@
 - Spring Boot 4.x
 - Maven 3.8+
 
-This guide targets starter `3.x` on Spring Boot 4. Boot 3.5 applications should
+This guide targets starter `4.x` on Spring Boot 4. Boot 3.5 applications should
 remain on starter `2.14.1` until they complete the
-[3.x migration](28-spring-boot-4-jackson-migration.md).
+[4.x migration](28-spring-boot-4-jackson-migration.md).
 
 ## Add the dependency
 
@@ -16,7 +16,7 @@ remain on starter `2.14.1` until they complete the
 <dependency>
   <groupId>io.github.huynhngochuyhoang</groupId>
   <artifactId>reactive-http-client-starter</artifactId>
-  <version>3.6.0</version>
+  <version>4.0.0</version>
 </dependency>
 ```
 
@@ -141,19 +141,18 @@ reactive:
           circuit-breaker: partner-users
 ```
 
-## Preparing resilience configuration for `4.0.0`
+## Resilience configuration in `4.0.0`
 
-The examples above name Retry and CircuitBreaker explicitly and therefore avoid
-the V27 activation ambiguity. Published `3.6.0` can still infer available
-`default` operators from `enabled: true`; in the `4.0.0` contract,
-`enabled: true` alone selects no operator. Add only the instance properties
-the client intends to use. The complete old/new table and all-four compatibility
-configuration are in the
+The examples above name Retry and CircuitBreaker explicitly. Published `4.0.0`
+uses the fail-safe activation contract: `enabled: true` alone selects no
+operator. Add only the instance properties the client intends to use. The
+complete `3.6.0` to `4.0.0` table and all-four compatibility configuration are
+in the
 [3.x to 4.x resilience migration](31-3x-to-4x-resilience-migration.md).
 
-Response caching is also a `4.0.0` candidate feature, not a published
-`3.6.0` capability. Its explicit policy, isolation, and unsupported-shape
-rules are documented in [Response Caching](32-response-caching.md).
+Response caching is available in published `4.0.0`. Its explicit policy,
+isolation, and unsupported-shape rules are documented in
+[Response Caching](32-response-caching.md).
 
 For the detailed rules behind those fields, see [Timeouts](04-timeouts.md),
 [Outbound auth](06-auth-providers.md), [Resilience4j](07-resilience4j.md),
@@ -325,5 +324,5 @@ reactive:
 | Exchange logging | [13-exchange-logging.md](13-exchange-logging.md) |
 | Test helpers | [14-test-helpers.md](14-test-helpers.md) |
 | Conflict and cardinality guardrails | [18-conflict-cardinality-guardrails.md](18-conflict-cardinality-guardrails.md) |
-| Response caching (`4.0.0` candidate) | [32-response-caching.md](32-response-caching.md) |
+| Response caching (`4.0.0+`) | [32-response-caching.md](32-response-caching.md) |
 | Configuration properties | [configuration-properties.md](configuration-properties.md) |

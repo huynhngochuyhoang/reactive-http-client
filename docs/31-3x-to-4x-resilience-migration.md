@@ -1,8 +1,7 @@
 # Starter 3.x to 4.x Resilience Migration
 
-This is the migration report for the `4.0.0` release candidate. Published
-consumer coordinates remain `3.6.0`; `4.0.0` stays unavailable to consumers
-until the V27 go/no-go decision and Maven Central verification are complete.
+This is the migration report for published `4.0.0`. Applications upgrading
+from `3.6.0` must make each intended Resilience4j operator explicit.
 
 The major version is required by one behavior change: selecting
 `reactive.http.clients.<name>.resilience.enabled=true` will no longer select all
@@ -154,18 +153,25 @@ candidate adds reviewed cache and terminal-diagnostics APIs but contains no
 incompatible Java API row relative to published `3.6.0`. The behavior migration
 above is not represented by a Java signature diff.
 
-Strict compatibility remains the release guard and is run for the root reactor
-and starter module from separate, previously absent Maven Central repositories:
+Strict compatibility remains the release guard and was run for the root reactor
+and starter module from separate, previously absent Maven Central repositories.
+These are historical `3.6.0`-to-`4.0.0` reproduction commands: run them from a
+clean checkout of tag `v4.0.0`, not from the current development checkout. Each
+command verifies the candidate version and pins the historical baseline:
 
 ```bash
+test "$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)" = "4.0.0" && \
 test ! -e target/published-baseline-repositories/api-root-3.6.0 && \
 mvn -s .mvn/maven-central-settings.xml \
   -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.6.0 \
+  -Dapi.compatibility.baseline.version=3.6.0 \
   -Papi-compatibility -DskipTests verify
 
+test "$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)" = "4.0.0" && \
 test ! -e target/published-baseline-repositories/api-starter-3.6.0 && \
 mvn -s .mvn/maven-central-settings.xml \
   -Dmaven.repo.local=target/published-baseline-repositories/api-starter-3.6.0 \
+  -Dapi.compatibility.baseline.version=3.6.0 \
   -pl reactive-http-client-starter \
   -Papi-compatibility -DskipTests verify
 ```
@@ -176,9 +182,11 @@ report-only profile disables both failure switches so the report still runs
 after a strict failure:
 
 ```bash
+test "$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)" = "4.0.0" && \
 test ! -e target/published-baseline-repositories/api-major-report-3.6.0 && \
 mvn -s .mvn/maven-central-settings.xml \
   -Dmaven.repo.local=target/published-baseline-repositories/api-major-report-3.6.0 \
+  -Dapi.compatibility.baseline.version=3.6.0 \
   -Papi-compatibility,major-api-report -DskipTests verify
 ```
 
@@ -188,7 +196,7 @@ implicitly accepted consequence of the major version.
 
 ## Release state
 
-- Release candidate: `4.0.0`.
-- Latest published and API baseline: `3.6.0`.
-- Public README and quick-start coordinates: `3.6.0`.
-- `4.0.0` publication: pending the V27 go/no-go decision and Central verification.
+- Released major: `4.0.0` from tag `v4.0.0`.
+- Latest published and API baseline: `4.0.0`.
+- Public README and quick-start coordinates: `4.0.0`.
+- Development continues on `4.1.0-SNAPSHOT` after Maven Central verification.

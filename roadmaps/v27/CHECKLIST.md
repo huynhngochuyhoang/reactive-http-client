@@ -1337,18 +1337,48 @@ Immutable evidence recorded on 2026-08-26:
   staging upload, tag verification, and Maven Central publication remain 15.3
   work and are not claimed by this evidence.
 
-### [ ] 15.3 Record the mutually exclusive decision
+### [x] 15.3 Record the mutually exclusive decision
 
-- [ ] **Go path:** tag and publish `4.0.0` from the matching immutable commit.
-- [ ] **Go path:** verify every Maven Central artifact and assembled published
+- [x] **Go path:** tag and publish `4.0.0` from the matching immutable commit.
+- [x] **Go path:** verify every Maven Central artifact and assembled published
       consumer before moving public/API/consumer/benchmark baselines.
-- [ ] **Go path:** open the next snapshot line and archive V27 only after Central
+- [x] **Go path:** open the next snapshot line and archive V27 only after Central
       verification succeeds.
 - [ ] **No-go path:** publish nothing and record every blocker, reproduction,
       retained evidence path, and follow-up scope.
-- [ ] Update roadmap/checklist/index/changelog status to match the selected path.
-- [ ] Run final release-documentation tests, reactor validation, and
+- [x] Update roadmap/checklist/index/changelog status to match the selected path.
+- [x] Run final release-documentation tests, reactor validation, and
       `git diff --check`.
+
+Post-publication evidence recorded on 2026-08-26:
+
+- Tag `v4.0.0` points at clean release commit
+  `183301048370c17a6ec1cd20bd759f8961070fff`. The fresh Maven Central release
+  verifier resolves the parent POM plus every starter, test-helper, and OTel
+  POM, binary, source, and Javadoc artifact (`13` files total), verifies Central
+  remote markers, and records SHA-256 values under
+  `target/release-evidence/published-baselines/release-artifacts-4.0.0/`.
+- `scripts/verify-published-consumer.sh 4.0.0` passes the independent Boot 4
+  assembled consumer using only Central artifacts. Its provenance records
+  `completedStage=evidence-verified`, `exitStatus=0`, the matching release
+  commit, and a clean fixture tree under
+  `target/release-evidence/published-consumer/published-4.0.0/`.
+- Public README/quick-start coordinates, published consumer, strict API, and
+  benchmark baselines now use `4.0.0`. Reactor-only module, benchmark,
+  assembled-consumer, and native-fixture coordinates use `4.1.0-SNAPSHOT`.
+  Strict root and starter-only japicmp comparisons pass against separately
+  resolved Central `4.0.0` repositories with provenance under
+  `target/release-evidence/published-baselines/api-root-4.0.0/` and
+  `target/release-evidence/published-baselines/api-starter-4.0.0/`.
+- The current assembled-consumer verifier passes the cache/resilience mock and
+  real Boot 4 fixture on `4.1.0-SNAPSHOT`, including `56` mock-helper and `4`
+  assembled-consumer tests. V27 is archived as completed and released;
+  no V28 roadmap or release lane is active, and generated readiness keeps the
+  next `4.1.0` candidate deferred until scope is selected.
+- Java 21 `mvn -B -ntp clean verify` passes `1,209` starter, `58` test-helper,
+  and `53` OTel tests (`1,320` total). The release-documentation suite passes
+  all `43` tests, the generation-packaging guard passes for binary/source/
+  Javadoc artifacts, and `git diff --check` reports no whitespace errors.
 
 ## Completion Rule
 
