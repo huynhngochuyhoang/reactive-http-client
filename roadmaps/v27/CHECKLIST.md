@@ -1160,38 +1160,76 @@ Evidence recorded on 2026-08-25:
 
 ## Priority 14 - Public API and Compatibility Evidence
 
-### [ ] 14.1 Freeze the intended public surface
+### [x] 14.1 Freeze the intended public surface
 
-- [ ] Inventory cache annotations, configuration models, event/context fields,
+- [x] Inventory cache annotations, configuration models, event/context fields,
       diagnostics fields, and test-helper APIs before release.
-- [ ] Include every documented extension/helper and nested public type in the
+- [x] Include every documented extension/helper and nested public type in the
       japicmp filter; explicitly document intentional exclusions.
-- [ ] Keep cache implementation classes package-private or optional-integration
+- [x] Keep cache implementation classes package-private or optional-integration
       internals unless a public dependency is deliberately accepted.
-- [ ] Review constructors and mutable models for binary/source compatibility and
+- [x] Review constructors and mutable models for binary/source compatibility and
       safe future evolution.
 
-### [ ] 14.2 Guard the reviewed major delta
+### [x] 14.2 Guard the reviewed major delta
 
-- [ ] Generate root and starter major API reports against published `3.6.0` in
+- [x] Generate root and starter major API reports against published `3.6.0` in
       report-only mode.
-- [ ] Source-control the exact reviewed incompatible delta and fail on any
+- [x] Source-control the exact reviewed incompatible delta and fail on any
       unreviewed removal, modification, or incompatible addition.
-- [ ] Keep strict module-scoped compatibility commands for future post-`4.0.0`
+- [x] Keep strict module-scoped compatibility commands for future post-`4.0.0`
       lines and prove their baseline guard in fixtures.
-- [ ] Update the public API compatibility guide with exact reproducible commands
+- [x] Update the public API compatibility guide with exact reproducible commands
       and isolated repositories.
 
-### [ ] 14.3 Revalidate dependency and packaging evidence
+### [x] 14.3 Revalidate dependency and packaging evidence
 
-- [ ] Record the cache implementation dependency version and optional/transitive
+- [x] Record the cache implementation dependency version and optional/transitive
       behavior in generated POM and dependency evidence.
-- [ ] Run the supported Spring Boot/Framework, Reactor Netty, Netty, Jackson,
+- [x] Run the supported Spring Boot/Framework, Reactor Netty, Netty, Jackson,
       Micrometer, OTel, Resilience4j, and cache-library matrix.
-- [ ] Verify parent/module POM, binary, source, and Javadoc artifacts contain only
+- [x] Verify parent/module POM, binary, source, and Javadoc artifacts contain only
       current generation classes/resources and no stale outputs.
-- [ ] Run full reactor tests, current/published consumers, AOT, native, metadata,
+- [x] Run full reactor tests, current/published consumers, AOT, native, metadata,
       documentation, and packaging guards from clean inputs.
+
+Evidence recorded on 2026-08-26:
+
+- The reviewed report-only root and starter comparisons resolve published
+  `3.6.0` from separate fresh Maven Central repositories. The resulting
+  incompatible delta is empty; the compatible additions are the cache
+  annotations and policy models, cache terminal facts, bounded JSON writing,
+  observer callback, request-context cache controls, and test-helper cache APIs.
+  `config/api-delta-3.6.0-to-4.0.0.txt` is the exact reviewed delta, and
+  `scripts/verify-v27-major-api-delta.sh` rejects any later removed, modified,
+  or incompatible added row. Its synthetic fixture proves `+++!`, `***!`, and
+  `---!` rows are all retained.
+- `docs/api-report-3.6.0-to-4.0.0.md` and the current compatibility guide record
+  reproducible root, starter, strict, report-only, provenance, and guard
+  commands. The public-surface inventory covers cache annotations, nested
+  configuration models, event/context fields, diagnostics, and mock controls.
+  Cache engines and policy/key validators remain package-private;
+  `MockResponseCacheSupport` remains an explicitly excluded `@hidden` bridge.
+  Mutable cache property models retain accessor evolution, while enum and
+  terminal-model additions avoid constructor churn.
+- The Java 21 supported-matrix verifier passes Spring Boot `4.0.0` and `4.1.0`
+  from fresh repositories. Each row records Spring Framework, Reactor Netty,
+  Netty, Jackson, Micrometer, OTel, Resilience4j, and Caffeine versions and
+  passes `1323` tests with zero failures, errors, or skips, an assembled
+  consumer, optional-integration checks, and strict published-baseline API
+  provenance. Caffeine resolves to `3.2.3` and `3.2.4` respectively; it remains
+  optional in the starter and transitive only in the cache-capable test helper.
+- A clean full-reactor `mvn clean verify`, the generation-packaging guard, the
+  current `4.0.0-SNAPSHOT` consumer, the published `3.6.0` consumer, and the
+  complete published parent/module POM, binary, source, and Javadoc bundle all
+  pass. Metadata, documentation, AOT, and optional-integration tests are retained
+  in `target/release-evidence/v27-priority14/matrix/`.
+- GraalVM `25.0.3` compiles and runs the native fixture from a clean archive of
+  commit `eea5bd869720291afe52187a1f604d003711ab17` with an isolated repository.
+  The executable SHA-256 is
+  `b117fe5fd798eac6768233339f8a14da1df65fbe66c30d0771a92caa717af484`;
+  dependency and provenance records are under
+  `target/release-evidence/v27-priority14/native/`.
 
 ---
 

@@ -28,5 +28,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: supported-dependency-matrix
-          path: target/release-evidence/v24-priority9/matrix/
+          path: target/release-evidence/v27-priority14/matrix/
           retention-days: 14

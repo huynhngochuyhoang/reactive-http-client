@@ -83,6 +83,28 @@ reports, commands, and provenance are copied to
 `target/release-evidence/v24-priority9/matrix/`. The manual
 `Supported Dependency Matrix` workflow runs and uploads the same contract.
 
+### V27 supported-matrix and cache dependency revalidation
+
+V27 reruns the same Boot `4.0.0` minimum and `4.1.0` forward rows after the
+explicit resilience activation migration and local response-cache addition.
+The matrix records Caffeine alongside Framework, Reactor Netty, Netty, Jackson,
+Micrometer, OTel, and Resilience4j. Boot `4.0.0` manages Caffeine `3.2.3`; Boot
+`4.1.0` manages `3.2.4`.
+
+The starter POM keeps Caffeine optional, so cache-disabled clients do not gain a
+transitive cache engine. The matrix requires
+`optionalImplementationIsRequiredOnlyForSelectedPolicies`: a client with no
+selected cache policy starts when Caffeine is hidden, while an explicitly
+selected policy fails with the missing coordinate. The test-helper POM makes
+Caffeine transitive deliberately because `MockReactiveHttpClient.cachePolicy`
+is a supported helper feature.
+
+Current V27 evidence is written from fresh temporary Maven repositories to
+`target/release-evidence/v27-priority14/matrix/`. Each row retains its
+effective POMs, dependency trees, resolved versions, optional-integration test
+markers, assembled-consumer reports, strict japicmp reports, published-baseline
+provenance, Java version, source commit, and source state.
+
 Requires a minor release: raising the Java baseline, adding a new Spring Boot
 minor line, changing optional integrations into required runtime dependencies,
 changing the Resilience4j baseline in a way that affects operator behavior or
@@ -349,7 +371,10 @@ For release evidence, resolve the three `3.6.0` jars into a fresh target-local
 Maven repository and pass that repository through `-Dmaven.repo.local` to the
 japicmp build. The frozen `scripts/verify-major-api-delta.sh` remains historical
 evidence for the reviewed `2.14.1` to `3.0.0` migration and is no longer part of
-normal minor-line CI. A fresh repository prevents a stale or locally installed
+normal minor-line CI. The V27
+[`3.6.0` to `4.0.0` report](api-report-3.6.0-to-4.0.0.md) and
+`scripts/verify-v27-major-api-delta.sh` freeze the current cross-major result.
+A fresh repository prevents a stale or locally installed
 artifact from understating the current delta. Every published baseline lane uses
 `target/published-baseline-repositories/<lane>-<version>` and records Maven
 Central markers plus SHA-256 values under
@@ -375,9 +400,26 @@ scripts/verify-published-baseline-provenance.sh api-starter 3.6.0 \
 
 The Maven profiles produce japicmp reports under each module's
 `target/japicmp/` directory. `api-compatibility` fails on binary and source
-incompatibilities for the current line. The source-controlled cross-major report
-and reviewed-delta guard retain the classified `3.0.0` removals as historical
-migration evidence. The
+incompatibilities for the current line. For V27, run the report-only comparison
+and its exact-delta guard before accepting the generated reports:
+
+```bash
+test ! -e target/published-baseline-repositories/api-major-report-3.6.0 && \
+mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/published-baseline-repositories/api-major-report-3.6.0 \
+  -Papi-compatibility,major-api-report -DskipTests verify && \
+API_COMPATIBILITY_BASELINE_REPOSITORY=target/published-baseline-repositories/api-major-report-3.6.0 \
+  bash scripts/verify-v27-major-api-delta.sh && \
+scripts/verify-published-baseline-provenance.sh api-major-report 3.6.0 \
+  target/release-evidence/published-baselines/api-major-report-3.6.0 \
+  reactive-http-client reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
+```
+
+The reviewed V27 incompatible delta is empty; compatible cache additions remain
+visible in the generated reports. The guard still extracts every incompatible
+removal, modification, and addition and compares it exactly with
+`config/api-delta-3.6.0-to-4.0.0.txt`. The historical source-controlled report
+and guard retain the classified `3.0.0` removals as migration evidence. The
 fixture script verifies that additive APIs pass while a source-only checked
 exception addition and removals of a public constructor, nested fluent method,
 or public enum constant fail. The filtered
@@ -405,26 +447,26 @@ the POM include set or lacks an explicit support status.
 
 | Japicmp include pattern | Documented public surface | Examples | Support status |
 |---|---|---|---|
-| `io.github.huynhngochuyhoang.httpstarter.annotation` | Declarative client annotations | Client, HTTP verb, argument binding, ApiRef, idempotency, timeout, and logging annotations | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.annotation` | Declarative client annotations | Client, HTTP verb, argument binding, ApiRef, idempotency, timeout, logging, `CacheResponse`, `CacheDisabled`, and `CacheKey` annotations | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.auth` | Auth extension points and built-in provider helpers | `AuthProvider`, `AuthProviderFactory`, `InvalidatableAuthProvider`, token providers, OAuth2, AWS SigV4 | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.enable` | Enablement annotation package | Starter enablement annotations | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.exception` | Public exception hierarchy | Client, remote-service, problem-detail, and auth exceptions | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.filter` | Public filter contracts | Inbound header filtering support | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.observability` | Observer contracts and events | Observer APIs and event models | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties*` | Configuration model used by tests and diagnostics | Root, client, auth, resilience, observability, proxy, TLS, and pool config models | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.observability` | Observer contracts and events | Observer APIs, event models, cache terminal callback, and `HttpClientCacheOutcome` | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties*` | Configuration model used by tests and diagnostics | Root, client, auth, resilience, observability, proxy, TLS, pool, `CacheConfig`, `CachePolicyConfig`, `CacheCustomizationSafety`, and `CacheObservabilityConfig` models | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder` | Error decoding extension surface | Default decoder customization and replacement | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.DefaultHttpExchangeLogger` | Default exchange logger | Built-in metadata, headers, and body logging implementation | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ErrorResponseContext` | Error mapper context | Error status, headers, body, and truncation metadata | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ErrorResponseMapper` | Error mapper SPI | Custom status/body-to-exception mapping | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.FileAttachment` | Multipart helper model | File upload metadata used by multipart tests and docs | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogContext` | Exchange logger context | Final outbound request and response metadata | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogContext` | Exchange logger context | Final outbound request/response metadata and cache outcome | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.HttpExchangeLogger` | Exchange logger SPI | Custom logger implementations | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache` | Replaceable metadata cache | `methodMetadataCache` bean replacement | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata*` | Metadata cache model | Public metadata returned by cache implementations | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper` | Problem Detail mapper | Built-in RFC 9457 mapper | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.*ReactiveHttpClientJsonCodec` | JSON codec SPI and Jackson 3 adapter | Starter-owned JSON byte materialization | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer` | WebClient builder customizer SPI | Per-client builder filters and codecs | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext` | Lifecycle hook context | Attempt/subscription metadata | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext` | Lifecycle hook context | Attempt/subscription metadata and cache outcome | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook` | Lifecycle hook SPI | Audit and side-effect callbacks | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider*` | Diagnostics provider and nested models | Runtime support summaries | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsSnapshot` | Diagnostics snapshot helper | JSON and Markdown support-bundle rendering | Supported |
@@ -434,7 +476,7 @@ the POM include set or lacks an explicit support status.
 | `io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot` | Request context snapshot model | Immutable context snapshot exports | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ResilienceOperatorApplier*` | Contract snapshot resilience hook | Operator availability and instance-type hook | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.SensitiveHeaders` | Header redaction helper | Custom exchange logger redaction checks | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, `RecordedExchange`, `RecordedExchangeAssertions`, `RecordedMultipartPart`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, deterministic cache clock/policy/outcome/eviction controls, `RecordedExchange`, `RecordedExchangeAssertions`, `RecordedMultipartPart`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | `OpenTelemetryHttpClientObserver`, `OpenTelemetryContextWebFilter`, `OpenTelemetryContextExchangeFilter`, and `OpenTelemetryHttpClientAutoConfiguration` | Supported |
 
 The `3.0.0` migration replaces `HttpClientHealthIndicator` with its Boot 4
@@ -444,6 +486,21 @@ and the mapper-based Jackson 2 overloads documented in the
 intentional cross-major changes from the `2.14.1` baseline. No other
 compatibility-covered type is reserved for removal. Any future deprecation must
 link to its migration note in the same change.
+
+V27 adds no incompatible Java API row relative to published `3.6.0`. Its
+resilience activation change is behavioral and configuration-driven. The cache
+annotations, nested property models, cache outcome enum/event accessors, and
+test-helper controls listed above are intentionally supported additions.
+
+Cache engines and keying machinery remain implementation details:
+`LocalResponseCache`, `LocalResponseCacheManager`, `CaffeineLocalResponseCache`,
+`LocalResponseCacheMetrics`, `MicrometerLocalResponseCacheMetrics`,
+`CacheKeyContract`, `EffectiveCachePolicy`, and `CacheCustomizationValidator`
+are package-private and excluded from japicmp. `MockResponseCacheSupport` is a
+public, `@hidden` cross-package bridge inside the optional test-helper artifact;
+it is excluded deliberately and is not an application or test extension point.
+No starter public signature exposes Caffeine or one of these internal cache
+types.
 
 ### Constructor and mutable model policy
 
@@ -469,6 +526,18 @@ current minor line:
   rendered table columns are supported approval-test helpers. Additive builder
   methods are allowed; removing builder stages, changing existing record
   components, or narrowing the render contract requires a future major release.
+- `ReactiveHttpClientProperties.CacheConfig`, `CachePolicyConfig`,
+  `CacheObservabilityConfig`, and `CacheCustomizationSafety` are mutable binding
+  models covered through `ReactiveHttpClientProperties*`. Keep no-arg
+  constructors and existing bean accessors source/binary compatible. Add new
+  settings through accessors; do not reorder or reinterpret existing enum
+  constants in a compatible line.
+- `HttpClientCacheOutcome`, `HttpClientObserverEvent.getCacheOutcome()`,
+  `HttpExchangeLogContext.cacheOutcome()`, and
+  `ReactiveHttpClientLifecycleContext.cacheOutcome()` are supported terminal
+  observability fields. Existing compatibility constructors that default the
+  outcome to `null` remain available so additive event data does not force
+  callers to rebuild their models.
 - Test helper classes under `io.github.huynhngochuyhoang.httpstarter.test`,
   including `MockReactiveHttpClient`, `RecordedExchange`,
   `RecordedExchangeAssertions`, `RecordedMultipartPart`, `ErrorCategoryAssertions`, and
@@ -477,6 +546,9 @@ current minor line:
   retry, auth, observer, lifecycle, exchange-logger, and assertion methods should
   remain
   additive in the current minor line.
+  V27 also covers `AutoCloseable`, `advanceCacheTime`, `cacheEntryCount`,
+  `cacheOutcomes`, `evictCacheEntries`, both `loadCount` methods,
+  `Builder.cachePolicy`, and `Builder.withDeterministicCacheTime`.
 - `ResilienceOperatorApplier.InstanceType` is a public nested enum used by
   diagnostics and contract snapshots. Do not remove or rename enum constants in
   the current minor line; add new constants only with corresponding docs and

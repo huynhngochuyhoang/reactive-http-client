@@ -22,7 +22,7 @@ BASELINE_VERSION="$(mvn -q -s "$SETTINGS" -DforceStdout help:evaluate -Dexpressi
 COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
 ROWS=(4.0.0 4.1.0)
 MODULES=(reactive-http-client-starter reactive-http-client-test reactive-http-client-otel)
-FINAL_EVIDENCE_ROOT="${SUPPORTED_MATRIX_EVIDENCE_ROOT:-$ROOT_DIR/target/release-evidence/v24-priority9/matrix}"
+FINAL_EVIDENCE_ROOT="${SUPPORTED_MATRIX_EVIDENCE_ROOT:-$ROOT_DIR/target/release-evidence/v27-priority14/matrix}"
 WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/reactive-http-client-matrix.XXXXXX")"
 EVIDENCE_ROOT="$WORK_ROOT/evidence"
 REPOSITORY_ROOT="$WORK_ROOT/repositories"
@@ -121,6 +121,7 @@ EOF
     autoConfigurationBacksOffWithoutOpenTelemetryBean
     autoConfigurationBacksOffWithoutOpenTelemetryApi
     userSuppliedOauth2AuthProviderFactoryOverridesBuiltInFactory
+    optionalImplementationIsRequiredOnlyForSelectedPolicies
   )
   for test_case in "${optional_integration_tests[@]}"; do
     require_test_case "$test_case"
@@ -173,6 +174,7 @@ EOF
     echo "micrometer=$(resolve_version "$tree" 'io.micrometer:micrometer-core')"
     echo "openTelemetry=$(resolve_version "$otel_tree" 'io.opentelemetry:opentelemetry-api')"
     echo "resilience4j=$(resolve_version "$tree" 'io.github.resilience4j:resilience4j-retry')"
+    echo "caffeine=$(resolve_version "$tree" 'com.github.ben-manes.caffeine:caffeine')"
     echo "junit=$(resolve_version "$tree" 'org.junit.jupiter:junit-jupiter-api')"
     echo "mockito=$(resolve_version "$tree" 'org.mockito:mockito-core')"
   } > "$evidence/resolved-versions.properties"
