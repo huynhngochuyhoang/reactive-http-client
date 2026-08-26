@@ -1274,18 +1274,18 @@ Evidence recorded on 2026-08-26:
   target-only evidence, so no report is promoted unless release wording later
   adds a numerical claim.
 
-### [ ] 15.2 Assemble immutable release evidence
+### [x] 15.2 Assemble immutable release evidence
 
-- [ ] Run clean full reactor verification from one immutable candidate commit.
-- [ ] Run reviewed major API delta, supported dependency matrix, generation
+- [x] Run clean full reactor verification from one immutable candidate commit.
+- [x] Run reviewed major API delta, supported dependency matrix, generation
       packaging, current/published consumers, cache/resilience composition,
       AOT/native, documentation, and support-bundle gates.
-- [ ] Verify complete candidate parent, starter, test-helper, and OTel POM,
+- [x] Verify complete candidate parent, starter, test-helper, and OTel POM,
       binary, source, and Javadoc artifacts.
-- [ ] Record commands, logs, test reports, dependency lists, checksums, commit,
+- [x] Record commands, logs, test reports, dependency lists, checksums, commit,
       source state, native binary hash, and benchmark disposition under one
       immutable evidence directory.
-- [ ] Cite a clean promoted benchmark report pair or keep release wording
+- [x] Cite a clean promoted benchmark report pair or keep release wording
       non-numerical.
 
 Pre-commit release-candidate preflight (not immutable release evidence):
@@ -1303,6 +1303,39 @@ Pre-commit release-candidate preflight (not immutable release evidence):
 - The changelog remains non-numerical; no `4.0.0` benchmark report is promoted.
   This preflight uses a dirty tree by construction and does not satisfy 15.2;
   the clean immutable rerun below must supersede it.
+
+Immutable evidence recorded on 2026-08-26:
+
+- Commit `a44fe08cc386a1058d1975af00144841b73a35c7` is the immutable
+  `4.0.0` candidate. Every recorded source-state check is clean. Java 21 full
+  reactor verification passes `1,209` starter, `58` test-helper, and `53` OTel
+  tests with zero failures, errors, or skips (`1,320` total).
+- Separate fresh Maven Central repositories pass the strict root, strict
+  starter, and report-only `3.6.0` API comparisons. The reviewed incompatible
+  delta remains empty; the exact-delta, API fixture, and published-baseline
+  fixture guards pass. The supported matrix passes Spring Boot `4.0.0` and
+  `4.1.0`, including full reactor, AOT, optional Caffeine, assembled consumer,
+  dependency capture, and strict API evidence.
+- The current assembled consumer passes against candidate `4.0.0`; the
+  published consumer and complete release-artifact verifier pass against Maven
+  Central `3.6.0`. The generation-packaging guard verifies the parent POM and
+  every starter, test-helper, and OTel POM, binary, source, and Javadoc artifact;
+  SHA-256 values for all `13` candidate files are retained in the bundle.
+- The focused cache/resilience composition run passes `145` tests. Oracle
+  GraalVM `25.0.3` compiles and executes the native fixture; the native binary
+  SHA-256 is
+  `5f36ffa440505dcdee1fea23d4e1d2454fe8264df71eae303188235fd429b265`.
+- The benchmark smoke profile passes and is retained only as target-derived,
+  non-promotable audit evidence. Release wording remains non-numerical, so no
+  public `docs/benchmark-report-4.0.0.md` is required or promoted.
+- The `574`-file immutable bundle is under
+  `target/release-evidence/v27/priority15/immutable-a44fe08/`. Its
+  `EVIDENCE.md` records commands, results, reports, dependency provenance,
+  candidate-artifact checksums, source commit/state, native toolchain/hash, and
+  benchmark disposition. A local `-Prelease` verification reached GPG signing
+  but could not access pinentry; that log is retained transparently. Signing,
+  staging upload, tag verification, and Maven Central publication remain 15.3
+  work and are not claimed by this evidence.
 
 ### [ ] 15.3 Record the mutually exclusive decision
 
