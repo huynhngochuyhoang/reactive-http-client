@@ -1235,31 +1235,107 @@ Evidence recorded on 2026-08-26:
 
 ## Priority 15 - V27 / `4.0.0` Go-No-Go
 
-### [ ] 15.1 Select release scope and candidate version
+### [x] 15.1 Select release scope and candidate version
 
-- [ ] Inventory the explicit resilience behavior break, all four cache phases,
+- [x] Inventory the explicit resilience behavior break, all four cache phases,
       public APIs, configuration, diagnostics schema, dependencies, docs, and
       benchmark claims.
-- [ ] Select `4.0.0` only when the resilience migration and all four cache phases
+- [x] Select `4.0.0` only when the resilience migration and all four cache phases
       are complete and supportable.
-- [ ] Reject/defer unrelated public API removals or diagnostics breaks not
+- [x] Reject/defer unrelated public API removals or diagnostics breaks not
       required by the reviewed V27 contract.
-- [ ] Record whether numerical performance wording requires a promoted current
+- [x] Record whether numerical performance wording requires a promoted current
       and published-baseline report pair.
 
-### [ ] 15.2 Assemble immutable release evidence
+Evidence recorded on 2026-08-26:
 
-- [ ] Run clean full reactor verification from one immutable candidate commit.
-- [ ] Run reviewed major API delta, supported dependency matrix, generation
+- V27 deliberately changes resilience activation from enabled-only implicit
+  defaults to explicit per-operator selection. The migration matrix, effective
+  policy, startup validation, diagnostics, mock, assembled-consumer, AOT, and
+  native contracts all use the same opt-in behavior.
+- All four response-cache phases are complete: bounded local TTL storage,
+  optional single flight, bounded refresh on access, and separately opt-in
+  metrics/observability. Eligibility, key isolation, authorization, resilience,
+  redirect, timeout, terminal-state, shutdown, and support-bundle boundaries
+  are covered before release selection.
+- The public-surface review records compatible additions for cache annotations,
+  policy/configuration models, terminal facts, request-context controls,
+  diagnostics, and test helpers. The reviewed `3.6.0` to `4.0.0` incompatible
+  japicmp delta is empty; no unrelated API removal or diagnostics schema-v1
+  break is accepted by this release.
+- Caffeine remains optional in the starter and deliberately transitive in the
+  cache-capable test helper. Public consumer, API, and benchmark baselines stay
+  on Maven Central `3.6.0` until `4.0.0` publication is verified.
+- The selected candidate is `4.0.0`: the explicit resilience behavior change
+  requires a major version, while all four cache phases and their migration and
+  operations guidance are complete and supportable.
+- The `4.0.0` changelog makes no numerical throughput, latency, or allocation
+  claim. Priority 12 retains a same-machine current/published audit pair under
+  target-only evidence, so no report is promoted unless release wording later
+  adds a numerical claim.
+
+### [x] 15.2 Assemble immutable release evidence
+
+- [x] Run clean full reactor verification from one immutable candidate commit.
+- [x] Run reviewed major API delta, supported dependency matrix, generation
       packaging, current/published consumers, cache/resilience composition,
       AOT/native, documentation, and support-bundle gates.
-- [ ] Verify complete candidate parent, starter, test-helper, and OTel POM,
+- [x] Verify complete candidate parent, starter, test-helper, and OTel POM,
       binary, source, and Javadoc artifacts.
-- [ ] Record commands, logs, test reports, dependency lists, checksums, commit,
+- [x] Record commands, logs, test reports, dependency lists, checksums, commit,
       source state, native binary hash, and benchmark disposition under one
       immutable evidence directory.
-- [ ] Cite a clean promoted benchmark report pair or keep release wording
+- [x] Cite a clean promoted benchmark report pair or keep release wording
       non-numerical.
+
+Pre-commit release-candidate preflight (not immutable release evidence):
+
+- Finalized reactor, module, benchmark, assembled-consumer, and native-fixture
+  coordinates at `4.0.0` while retaining public consumer, API, published
+  consumer, release-artifact, and benchmark baselines at `3.6.0` until Maven
+  Central publication is verified.
+- `mvn -B -ntp clean verify` passed 1,209 starter, 58 test-helper, and 53 OTel
+  tests. The run includes cache/resilience composition, AOT, metadata,
+  documentation, transport, lifecycle, observability, and shutdown contracts.
+- `bash scripts/verify-generation-packaging.sh` passed for the candidate binary,
+  source, and Javadoc artifacts. The release-document suite separately passed
+  all 43 tests, and `git diff --check` reported no whitespace errors.
+- The changelog remains non-numerical; no `4.0.0` benchmark report is promoted.
+  This preflight uses a dirty tree by construction and does not satisfy 15.2;
+  the clean immutable rerun below must supersede it.
+
+Immutable evidence recorded on 2026-08-26:
+
+- Commit `a44fe08cc386a1058d1975af00144841b73a35c7` is the immutable
+  `4.0.0` candidate. Every recorded source-state check is clean. Java 21 full
+  reactor verification passes `1,209` starter, `58` test-helper, and `53` OTel
+  tests with zero failures, errors, or skips (`1,320` total).
+- Separate fresh Maven Central repositories pass the strict root, strict
+  starter, and report-only `3.6.0` API comparisons. The reviewed incompatible
+  delta remains empty; the exact-delta, API fixture, and published-baseline
+  fixture guards pass. The supported matrix passes Spring Boot `4.0.0` and
+  `4.1.0`, including full reactor, AOT, optional Caffeine, assembled consumer,
+  dependency capture, and strict API evidence.
+- The current assembled consumer passes against candidate `4.0.0`; the
+  published consumer and complete release-artifact verifier pass against Maven
+  Central `3.6.0`. The generation-packaging guard verifies the parent POM and
+  every starter, test-helper, and OTel POM, binary, source, and Javadoc artifact;
+  SHA-256 values for all `13` candidate files are retained in the bundle.
+- The focused cache/resilience composition run passes `145` tests. Oracle
+  GraalVM `25.0.3` compiles and executes the native fixture; the native binary
+  SHA-256 is
+  `5f36ffa440505dcdee1fea23d4e1d2454fe8264df71eae303188235fd429b265`.
+- The benchmark smoke profile passes and is retained only as target-derived,
+  non-promotable audit evidence. Release wording remains non-numerical, so no
+  public `docs/benchmark-report-4.0.0.md` is required or promoted.
+- The `574`-file immutable bundle is under
+  `target/release-evidence/v27/priority15/immutable-a44fe08/`. Its
+  `EVIDENCE.md` records commands, results, reports, dependency provenance,
+  candidate-artifact checksums, source commit/state, native toolchain/hash, and
+  benchmark disposition. A local `-Prelease` verification reached GPG signing
+  but could not access pinentry; that log is retained transparently. Signing,
+  staging upload, tag verification, and Maven Central publication remain 15.3
+  work and are not claimed by this evidence.
 
 ### [ ] 15.3 Record the mutually exclusive decision
 
