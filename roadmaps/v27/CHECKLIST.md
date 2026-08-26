@@ -1235,17 +1235,44 @@ Evidence recorded on 2026-08-26:
 
 ## Priority 15 - V27 / `4.0.0` Go-No-Go
 
-### [ ] 15.1 Select release scope and candidate version
+### [x] 15.1 Select release scope and candidate version
 
-- [ ] Inventory the explicit resilience behavior break, all four cache phases,
+- [x] Inventory the explicit resilience behavior break, all four cache phases,
       public APIs, configuration, diagnostics schema, dependencies, docs, and
       benchmark claims.
-- [ ] Select `4.0.0` only when the resilience migration and all four cache phases
+- [x] Select `4.0.0` only when the resilience migration and all four cache phases
       are complete and supportable.
-- [ ] Reject/defer unrelated public API removals or diagnostics breaks not
+- [x] Reject/defer unrelated public API removals or diagnostics breaks not
       required by the reviewed V27 contract.
-- [ ] Record whether numerical performance wording requires a promoted current
+- [x] Record whether numerical performance wording requires a promoted current
       and published-baseline report pair.
+
+Evidence recorded on 2026-08-26:
+
+- V27 deliberately changes resilience activation from enabled-only implicit
+  defaults to explicit per-operator selection. The migration matrix, effective
+  policy, startup validation, diagnostics, mock, assembled-consumer, AOT, and
+  native contracts all use the same opt-in behavior.
+- All four response-cache phases are complete: bounded local TTL storage,
+  optional single flight, bounded refresh on access, and separately opt-in
+  metrics/observability. Eligibility, key isolation, authorization, resilience,
+  redirect, timeout, terminal-state, shutdown, and support-bundle boundaries
+  are covered before release selection.
+- The public-surface review records compatible additions for cache annotations,
+  policy/configuration models, terminal facts, request-context controls,
+  diagnostics, and test helpers. The reviewed `3.6.0` to `4.0.0` incompatible
+  japicmp delta is empty; no unrelated API removal or diagnostics schema-v1
+  break is accepted by this release.
+- Caffeine remains optional in the starter and deliberately transitive in the
+  cache-capable test helper. Public consumer, API, and benchmark baselines stay
+  on Maven Central `3.6.0` until `4.0.0` publication is verified.
+- The selected candidate is `4.0.0`: the explicit resilience behavior change
+  requires a major version, while all four cache phases and their migration and
+  operations guidance are complete and supportable.
+- The `4.0.0` changelog makes no numerical throughput, latency, or allocation
+  claim. Priority 12 retains a same-machine current/published audit pair under
+  target-only evidence, so no report is promoted unless release wording later
+  adds a numerical claim.
 
 ### [ ] 15.2 Assemble immutable release evidence
 
@@ -1260,6 +1287,22 @@ Evidence recorded on 2026-08-26:
       immutable evidence directory.
 - [ ] Cite a clean promoted benchmark report pair or keep release wording
       non-numerical.
+
+Pre-commit release-candidate preflight (not immutable release evidence):
+
+- Finalized reactor, module, benchmark, assembled-consumer, and native-fixture
+  coordinates at `4.0.0` while retaining public consumer, API, published
+  consumer, release-artifact, and benchmark baselines at `3.6.0` until Maven
+  Central publication is verified.
+- `mvn -B -ntp clean verify` passed 1,209 starter, 58 test-helper, and 53 OTel
+  tests. The run includes cache/resilience composition, AOT, metadata,
+  documentation, transport, lifecycle, observability, and shutdown contracts.
+- `bash scripts/verify-generation-packaging.sh` passed for the candidate binary,
+  source, and Javadoc artifacts. The release-document suite separately passed
+  all 43 tests, and `git diff --check` reported no whitespace errors.
+- The changelog remains non-numerical; no `4.0.0` benchmark report is promoted.
+  This preflight uses a dirty tree by construction and does not satisfy 15.2;
+  the clean immutable rerun below must supersede it.
 
 ### [ ] 15.3 Record the mutually exclusive decision
 

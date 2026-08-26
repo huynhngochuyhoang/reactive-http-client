@@ -1,9 +1,8 @@
 # Starter 3.x to 4.x Resilience Migration
 
-This is the initial migration report for the `4.0.0-SNAPSHOT` development
-line. Published consumer coordinates remain `3.6.0`; `4.0.0` is deferred until
-the V27 resilience and caching contracts, compatibility evidence, and release
-gates are complete.
+This is the migration report for the `4.0.0` release candidate. Published
+consumer coordinates remain `3.6.0`; `4.0.0` stays unavailable to consumers
+until the V27 go/no-go decision and Maven Central verification are complete.
 
 The major version is required by one behavior change: selecting
 `reactive.http.clients.<name>.resilience.enabled=true` will no longer select all
@@ -150,9 +149,10 @@ for the full proof rules.
 
 ## Initial API report
 
-The initial `4.0.0-SNAPSHOT` lane changes reactor coordinates only. It contains
-no reviewed binary or source incompatibility relative to published `3.6.0`.
-The behavior migration above is not represented by a Java signature diff.
+The initial `4.0.0-SNAPSHOT` lane changed reactor coordinates only. The final
+candidate adds reviewed cache and terminal-diagnostics APIs but contains no
+incompatible Java API row relative to published `3.6.0`. The behavior migration
+above is not represented by a Java signature diff.
 
 Strict compatibility remains the release guard and is run for the root reactor
 and starter module from separate, previously absent Maven Central repositories:
@@ -182,13 +182,13 @@ mvn -s .mvn/maven-central-settings.xml \
   -Papi-compatibility,major-api-report -DskipTests verify
 ```
 
-Priority 14 freezes the final reviewed incompatible delta before release. Until
-then, any strict japicmp failure is an unresolved release blocker rather than an
+Priority 14 freezes the final reviewed incompatible delta before release. Any
+strict japicmp failure remains an unresolved release blocker rather than an
 implicitly accepted consequence of the major version.
 
 ## Release state
 
-- Development version: `4.0.0-SNAPSHOT`.
+- Release candidate: `4.0.0`.
 - Latest published and API baseline: `3.6.0`.
 - Public README and quick-start coordinates: `3.6.0`.
-- `4.0.0` publication: deferred pending all V27 priorities.
+- `4.0.0` publication: pending the V27 go/no-go decision and Central verification.
