@@ -1,0 +1,2 @@
+# The reviewed 3.6.0 -> 4.0.0 incompatible japicmp delta is empty.
+# Compatible additions remain visible in the generated module reports.

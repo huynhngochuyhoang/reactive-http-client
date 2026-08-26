@@ -62,4 +62,20 @@ if mvn -q -f "$ROOT_DIR/.github/api-compatibility-fixtures/pom.xml" \
   exit 1
 fi
 
-echo "API compatibility fixtures passed: additive API accepted; source-only checked exception plus constructor, nested method, and enum constant removals rejected."
+cat > "$WORK_DIR/report-only.diff" <<'EOF'
++++  NEW METHOD: PUBLIC(+) void compatibleAddition()
+	+++! NEW EXCEPTION: java.io.IOException
+***! MODIFIED INTERFACE: PUBLIC ABSTRACT compatibility.fixture.PublicApi
+---! REMOVED METHOD: PUBLIC(-) void removed()
+EOF
+cat > "$WORK_DIR/expected-major-delta.txt" <<'EOF'
+fixture|+++! NEW EXCEPTION: java.io.IOException
+fixture|***! MODIFIED INTERFACE: PUBLIC ABSTRACT compatibility.fixture.PublicApi
+fixture|---! REMOVED METHOD: PUBLIC(-) void removed()
+EOF
+bash "$ROOT_DIR/scripts/verify-v27-major-api-delta.sh" \
+  --normalize-report fixture "$WORK_DIR/report-only.diff" \
+  > "$WORK_DIR/actual-major-delta.txt"
+diff -u "$WORK_DIR/expected-major-delta.txt" "$WORK_DIR/actual-major-delta.txt"
+
+echo "API compatibility fixtures passed: additive API accepted; source-only checked exception plus constructor, nested method, enum constant removal, and report-only incompatible additions are detected."

@@ -114,6 +114,8 @@ jobs:
           mvn -B -ntp -s .mvn/maven-central-settings.xml \
             -Dmaven.repo.local=target/published-baseline-repositories/api-major-report-3.6.0 \
             -Papi-compatibility,major-api-report -DskipTests verify && \
+          API_COMPATIBILITY_BASELINE_REPOSITORY=target/published-baseline-repositories/api-major-report-3.6.0 \
+            bash scripts/verify-v27-major-api-delta.sh && \
           scripts/verify-published-baseline-provenance.sh api-major-report 3.6.0 \
             target/release-evidence/published-baselines/api-major-report-3.6.0 \
             reactive-http-client reactive-http-client-starter reactive-http-client-test reactive-http-client-otel

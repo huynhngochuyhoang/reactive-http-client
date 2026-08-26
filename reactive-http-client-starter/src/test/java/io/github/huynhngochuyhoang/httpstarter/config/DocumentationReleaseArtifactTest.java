@@ -1200,6 +1200,9 @@ class DocumentationReleaseArtifactTest {
         String report = Files.readString(root.resolve("docs/api-report-2.14.1-to-3.0.0.md"));
         String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
         String deltaGuard = Files.readString(root.resolve("scripts/verify-major-api-delta.sh"));
+        String v27Report = Files.readString(root.resolve("docs/api-report-3.6.0-to-4.0.0.md"));
+        String v27Delta = Files.readString(root.resolve("config/api-delta-3.6.0-to-4.0.0.txt"));
+        String v27DeltaGuard = Files.readString(root.resolve("scripts/verify-v27-major-api-delta.sh"));
         String fixtureGuard = Files.readString(root.resolve("scripts/verify-api-compatibility-fixtures.sh"));
 
         assertThat(pomXml)
@@ -1216,11 +1219,32 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Papi-compatibility -DskipTests verify")
                 .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-major-report-3.6.0")
                 .contains("-Papi-compatibility,major-api-report -DskipTests verify")
+                .contains("API_COMPATIBILITY_BASELINE_REPOSITORY=target/published-baseline-repositories/api-major-report-3.6.0")
+                .contains("bash scripts/verify-v27-major-api-delta.sh")
                 .contains("bash scripts/verify-published-baseline-fixtures.sh")
                 .doesNotContain("bash scripts/verify-major-api-delta.sh");
+        assertThat(v27Report)
+                .contains("no binary- or source-incompatible rows")
+                .contains("config/api-delta-3.6.0-to-4.0.0.txt")
+                .contains("scripts/verify-v27-major-api-delta.sh")
+                .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-major-report-3.6.0")
+                .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-starter-report-3.6.0");
+        assertThat(v27Delta)
+                .contains("reviewed 3.6.0 -> 4.0.0 incompatible japicmp delta is empty");
+        assertThat(v27DeltaGuard)
+                .contains("PROJECT_VERSION\" == \"4.0.0-SNAPSHOT")
+                .contains("BASELINE_VERSION\" == \"3.6.0")
+                .contains("normalize_report \"$module\" \"$report\"")
+                .contains("api-delta-3.6.0-to-4.0.0.txt")
+                .contains("module-$BASELINE_VERSION.jar")
+                .contains("module-$BASELINE_VERSION.pom");
         assertThat(fixtureGuard)
                 .contains("compile_fixture source-breaking")
-                .contains("Expected checked-exception fixture to fail source compatibility check");
+                .contains("Expected checked-exception fixture to fail source compatibility check")
+                .contains("--normalize-report fixture")
+                .contains("+++! NEW EXCEPTION")
+                .contains("***! MODIFIED INTERFACE")
+                .contains("---! REMOVED METHOD");
         assertThat(guide)
                 .contains("<version>3.5.16</version>")
                 .contains("<reactive-http-client.version>2.14.1</reactive-http-client.version>")
@@ -1518,13 +1542,22 @@ class DocumentationReleaseArtifactTest {
                 .contains("public nested enum")
                 .contains("source-only checked\nexception addition")
                 .contains("constructor, nested fluent method,\nor public enum constant fail")
-                .contains("`MockReactiveHttpClient`, `RecordedExchange`, `RecordedExchangeAssertions`")
+                .contains("including `MockReactiveHttpClient`, `RecordedExchange`,\n  `RecordedExchangeAssertions`")
                 .contains("`ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension`")
                 .contains("`OpenTelemetryHttpClientObserver`, `OpenTelemetryContextWebFilter`")
                 .contains("`OpenTelemetryContextExchangeFilter`, and `OpenTelemetryHttpClientAutoConfiguration`")
                 .contains("When documenting a new public helper")
                 .contains("Prefer the narrowest include\npattern")
                 .contains("Keep implementation\ninternals excluded");
+        assertThat(releaseDocs)
+                .contains("`CacheResponse`, `CacheDisabled`, and `CacheKey`")
+                .contains("`CacheConfig`, `CachePolicyConfig`, `CacheCustomizationSafety`")
+                .contains("cache terminal callback, and `HttpClientCacheOutcome`")
+                .contains("deterministic cache clock/policy/outcome/eviction controls")
+                .contains("V27 adds no incompatible Java API row relative to published `3.6.0`")
+                .contains("`MockResponseCacheSupport` is a\npublic, `@hidden` cross-package bridge")
+                .contains("No starter public signature exposes Caffeine")
+                .contains("`Builder.cachePolicy`, and `Builder.withDeterministicCacheTime`");
         assertThat(includeWorkflow)
                 .contains("authoritative root and module-scoped commands")
                 .contains("[Public API compatibility](#public-api-compatibility)")
@@ -1536,7 +1569,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void v24SupportedMatrixIsResolvedAndReproducible() throws IOException {
+    void v27SupportedMatrixIsResolvedAndReproducible() throws IOException {
         Path root = projectRoot();
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
         String consumerPom = Files.readString(root.resolve(".github/boot4-consumer/pom.xml"));
@@ -1546,11 +1579,15 @@ class DocumentationReleaseArtifactTest {
         assertThat(releaseDocs)
                 .contains("### V23 resolved supported matrix")
                 .contains("### V24 supported-matrix revalidation")
+                .contains("### V27 supported-matrix and cache dependency revalidation")
                 .contains("| Spring Framework / WebFlux | `7.0.1` | `7.0.8` |")
                 .contains("| Reactor Netty HTTP | `1.3.0` | `1.3.6` |")
                 .contains("| Jackson Databind | `3.0.2` | `3.1.4` |")
                 .contains("The minimum does not move")
-                .contains("target/release-evidence/v24-priority9/matrix/");
+                .contains("Boot `4.0.0` manages Caffeine `3.2.3`")
+                .contains("Boot\n`4.1.0` manages `3.2.4`")
+                .contains("cache-disabled clients do not gain a\ntransitive cache engine")
+                .contains("target/release-evidence/v27-priority14/matrix/");
         assertThat(consumerPom)
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .contains("<artifactId>spring-boot-dependencies</artifactId>")
@@ -1569,7 +1606,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("diagnosticsEndpointSkippedWhenActuatorEndpointClassesMissing")
                 .contains("autoConfigurationBacksOffWithoutOpenTelemetryApi")
                 .contains("userSuppliedOauth2AuthProviderFactoryOverridesBuiltInFactory")
-                .contains("target/release-evidence/v24-priority9/matrix")
+                .contains("optionalImplementationIsRequiredOnlyForSelectedPolicies")
+                .contains("caffeine=$(resolve_version")
+                .contains("target/release-evidence/v27-priority14/matrix")
                 .contains("optional-integration-contracts.properties")
                 .contains("Partial matrix evidence preserved under");
         int rowLoop = verifier.indexOf("for boot_version in");
@@ -1581,7 +1620,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(workflow)
                 .contains("name: Supported Dependency Matrix")
                 .contains("scripts/verify-supported-matrix.sh")
-                .contains("target/release-evidence/v24-priority9/matrix/");
+                .contains("target/release-evidence/v27-priority14/matrix/");
     }
 
     @Test
