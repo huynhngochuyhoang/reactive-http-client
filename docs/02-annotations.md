@@ -1,9 +1,9 @@
 # Annotation Reference
 
 All annotations live in `io.github.huynhngochuyhoang.httpstarter.annotation`.
-The annotation contract is unchanged in starter `3.x`; Boot 3.5 applications
+The annotation contract is unchanged in starter `4.x`; Boot 3.5 applications
 remain on `2.14.1`, while Boot 4 applications follow the
-[3.x migration guide](28-spring-boot-4-jackson-migration.md).
+[4.x migration guide](28-spring-boot-4-jackson-migration.md).
 
 ---
 

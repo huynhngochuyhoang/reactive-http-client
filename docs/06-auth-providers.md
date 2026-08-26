@@ -2,9 +2,9 @@
 
 Every registered client can have its own auth provider that injects credentials into outbound requests automatically via a WebClient filter. Use `reactive.http.clients.<name>.auth-provider` to reference a custom `AuthProvider` bean by name, or use the object-style `reactive.http.clients.<name>.auth` block for built-in providers.
 
-Starter `3.x` runs on Boot 4 and uses the application Jackson 3 codec for
+Starter `4.x` runs on Boot 4 and uses the application Jackson 3 codec for
 materialized JSON signing bytes. Boot 3.5 applications remain on `2.14.1`; see
-the [3.x migration guide](28-spring-boot-4-jackson-migration.md) before moving
+the [4.x migration guide](28-spring-boot-4-jackson-migration.md) before moving
 custom auth providers or SigV4 JSON signing.
 
 If both are configured, `auth-provider` wins and the object-style `auth` block is ignored. The starter logs a startup warning so the precedence is visible.

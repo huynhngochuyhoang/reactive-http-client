@@ -129,7 +129,7 @@ reactive:
 
 ## Explicit Local Response Cache
 
-This `4.0.0` candidate example selects one bounded local policy explicitly.
+This `4.0.0+` example selects one bounded local policy explicitly.
 Single flight, access refresh, and cache telemetry are independent choices. Add
 the optional runtime described in the
 [Caffeine dependency instructions](../32-response-caching.md#explicit-selection)

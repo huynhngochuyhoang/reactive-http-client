@@ -135,7 +135,7 @@ subscription. Use the canonical [retry/replay composition contract](07-resilienc
 and [request-body repeatability matrix](11-streaming.md#request-body-repeatability-matrix)
 for the detailed ownership rules.
 
-## Response caching (`4.0.0` candidate)
+## Response caching (`4.0.0+`)
 
 - Select a named policy explicitly at the client or method. A policy definition
   alone is inert, and `@CacheDisabled` excludes a method.

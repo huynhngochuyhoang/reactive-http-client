@@ -368,7 +368,7 @@ RecordedExchangeAssertions.assertThat(mock.lastExchange())
 
 Installing an auth provider also enables production-style request-body preparation.
 Pass the application codec with `jsonCodec(reactiveHttpClientJsonCodec)` when DTOs
-depend on custom Jackson modules or naming rules. Starter `3.x` no longer exposes
+depend on custom Jackson modules or naming rules. Starter `4.x` no longer exposes
 the Jackson 2 `objectMapper(...)` compatibility adapter.
 For ordinary JSON DTO bodies, the provider receives raw `byte[]` matching the
 serialized body sent by the mock, so signing providers can verify payload hashes.

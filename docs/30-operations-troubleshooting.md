@@ -7,7 +7,7 @@ logs, or application metrics.
 
 ## Current release scope
 
-Current consumer instructions apply to published starter `3.6.0` on Spring Boot
+Current consumer instructions apply to published starter `4.0.0` on Spring Boot
 4. The repository may contain a newer snapshot while the next release is being
 prepared. Use the published coordinates from the [Quick Start](01-quick-start.md)
 for applications and reserve snapshot commands for the explicitly labeled
@@ -46,7 +46,7 @@ historical evidence.
 | Timeout before or after status | Concrete exception, final status, final-attempt dispatch evidence, optional failure stage | [Timeout phases](#timeout-phases) |
 | Upload stalls, cancellation, leaked buffers, or incomplete stream | Declared body/return shape, subscription and cancellation boundary, consumer release/forwarding path | [Streaming ownership](#streaming-ownership) |
 | OAuth2 refresh storm, token endpoint failure, or downstream 401 | Logical client name, sanitized auth mode, token endpoint status and safe headers, refresh/cooldown timing | [OAuth2 refresh](#oauth2-refresh) |
-| **4.0.0 candidate only:** Unexpected stale value, miss storm, refresh failure, or cache capacity pressure | Effective cache phase/TTL/capacity, bounded hit/miss/load/refresh/eviction rates, process instance | [Response cache behavior (4.0.0 candidate)](#response-cache-behavior-400-candidate-only) |
+| Unexpected stale value, miss storm, refresh failure, or cache capacity pressure | Effective cache phase/TTL/capacity, bounded hit/miss/load/refresh/eviction rates, process instance | [Response cache behavior (4.0.0+)](#response-cache-behavior-400) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
 
 ## Evidence boundary
@@ -266,7 +266,7 @@ See [Streaming Requests and Responses](11-streaming.md).
 See [Refreshing bearer auth](06-auth-providers.md#refreshingbearerauthprovider-cached-token-with-auto-refresh)
 and [OAuth2 client credentials](06-auth-providers.md#oauth2clientcredentialstokenprovider-standard-oauth-20-client-credentials).
 
-## Response cache behavior (4.0.0 candidate only)
+## Response cache behavior (4.0.0+)
 
 - Confirm the method explicitly selects the expected named policy and remains an
   eligible finite `GET Mono` contract. A definition alone is inert.

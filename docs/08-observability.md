@@ -2,9 +2,9 @@
 
 The starter ships two observability back-ends: Micrometer (default) and OpenTelemetry (optional companion module). Both implement the `HttpClientObserver` extension point and can run together.
 
-Starter `3.x` uses Boot 4 Actuator health contributor packages while preserving
+Starter `4.x` uses Boot 4 Actuator health contributor packages while preserving
 the existing metric names, diagnostics endpoint ID, and configuration keys. See
-the [3.x migration guide](28-spring-boot-4-jackson-migration.md) for import and
+the [4.x migration guide](28-spring-boot-4-jackson-migration.md) for import and
 native-image changes.
 
 ---
@@ -206,7 +206,7 @@ reactive:
 ## Actuator health indicator
 
 When `spring-boot-starter-actuator` is on the classpath and a `MeterRegistry`
-bean is present, starter `3.x` auto-registers `Boot4HttpClientHealthIndicator`.
+bean is present, starter `4.x` auto-registers `Boot4HttpClientHealthIndicator`.
 It reads the `reactive.http.client.requests` timer and reports per-client error
 rates computed from probe-to-probe deltas. The bean name remains
 `reactiveHttpClientHealthIndicator` across the migration.

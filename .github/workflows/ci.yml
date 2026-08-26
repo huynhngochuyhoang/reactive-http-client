@@ -71,7 +71,7 @@ jobs:
 
 
   api-compatibility:
-    name: Public API Compatibility (baseline 3.6.0)
+    name: Public API Compatibility (baseline 4.0.0)
     runs-on: ubuntu-latest
 
     steps:
@@ -85,40 +85,27 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Compare published APIs to 3.6.0
+      - name: Compare published APIs to 4.0.0
         run: |
-          test ! -e target/published-baseline-repositories/api-root-3.6.0 && \
+          test ! -e target/published-baseline-repositories/api-root-4.0.0 && \
           mvn -B -ntp -s .mvn/maven-central-settings.xml \
-            -Dmaven.repo.local=target/published-baseline-repositories/api-root-3.6.0 \
+            -Dmaven.repo.local=target/published-baseline-repositories/api-root-4.0.0 \
             -Papi-compatibility -DskipTests verify && \
-          scripts/verify-published-baseline-provenance.sh api-root 3.6.0 \
-            target/release-evidence/published-baselines/api-root-3.6.0 \
+          scripts/verify-published-baseline-provenance.sh api-root 4.0.0 \
+            target/release-evidence/published-baselines/api-root-4.0.0 \
             reactive-http-client reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
 
-      - name: Compare starter API to 3.6.0 from a separate repository
+      - name: Compare starter API to 4.0.0 from a separate repository
         if: always()
         run: |
-          test ! -e target/published-baseline-repositories/api-starter-3.6.0 && \
+          test ! -e target/published-baseline-repositories/api-starter-4.0.0 && \
           mvn -B -ntp -s .mvn/maven-central-settings.xml \
-            -Dmaven.repo.local=target/published-baseline-repositories/api-starter-3.6.0 \
+            -Dmaven.repo.local=target/published-baseline-repositories/api-starter-4.0.0 \
             -pl reactive-http-client-starter \
             -Papi-compatibility -DskipTests verify && \
-          scripts/verify-published-baseline-provenance.sh api-starter 3.6.0 \
-            target/release-evidence/published-baselines/api-starter-3.6.0 \
+          scripts/verify-published-baseline-provenance.sh api-starter 4.0.0 \
+            target/release-evidence/published-baselines/api-starter-4.0.0 \
             reactive-http-client-starter
-
-      - name: Generate report-only 4.0.0 major API evidence
-        if: always()
-        run: |
-          test ! -e target/published-baseline-repositories/api-major-report-3.6.0 && \
-          mvn -B -ntp -s .mvn/maven-central-settings.xml \
-            -Dmaven.repo.local=target/published-baseline-repositories/api-major-report-3.6.0 \
-            -Papi-compatibility,major-api-report -DskipTests verify && \
-          API_COMPATIBILITY_BASELINE_REPOSITORY=target/published-baseline-repositories/api-major-report-3.6.0 \
-            bash scripts/verify-v27-major-api-delta.sh && \
-          scripts/verify-published-baseline-provenance.sh api-major-report 3.6.0 \
-            target/release-evidence/published-baselines/api-major-report-3.6.0 \
-            reactive-http-client reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
 
       - name: Verify published baseline provenance fixtures
         run: bash scripts/verify-published-baseline-fixtures.sh
@@ -133,9 +120,8 @@ jobs:
           name: api-compatibility-reports
           path: |
             **/target/japicmp/*
-            target/release-evidence/published-baselines/api-root-3.6.0/
-            target/release-evidence/published-baselines/api-starter-3.6.0/
-            target/release-evidence/published-baselines/api-major-report-3.6.0/
+            target/release-evidence/published-baselines/api-root-4.0.0/
+            target/release-evidence/published-baselines/api-starter-4.0.0/
           retention-days: 7
 
   release-smoke:

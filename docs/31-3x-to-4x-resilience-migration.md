@@ -1,8 +1,7 @@
 # Starter 3.x to 4.x Resilience Migration
 
-This is the migration report for the `4.0.0` release candidate. Published
-consumer coordinates remain `3.6.0`; `4.0.0` stays unavailable to consumers
-until the V27 go/no-go decision and Maven Central verification are complete.
+This is the migration report for published `4.0.0`. Applications upgrading
+from `3.6.0` must make each intended Resilience4j operator explicit.
 
 The major version is required by one behavior change: selecting
 `reactive.http.clients.<name>.resilience.enabled=true` will no longer select all
@@ -188,7 +187,7 @@ implicitly accepted consequence of the major version.
 
 ## Release state
 
-- Release candidate: `4.0.0`.
-- Latest published and API baseline: `3.6.0`.
-- Public README and quick-start coordinates: `3.6.0`.
-- `4.0.0` publication: pending the V27 go/no-go decision and Central verification.
+- Released major: `4.0.0` from tag `v4.0.0`.
+- Latest published and API baseline: `4.0.0`.
+- Public README and quick-start coordinates: `4.0.0`.
+- Development continues on `4.1.0-SNAPSHOT` after Maven Central verification.
