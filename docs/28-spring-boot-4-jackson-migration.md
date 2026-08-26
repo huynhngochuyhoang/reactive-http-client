@@ -21,7 +21,7 @@ starter `2.14.1` when the application must remain on Boot 3.5, still calls the
 deprecated Jackson 2 constructors or mock `objectMapper(...)` adapter, or cannot
 yet update custom Boot WebClient/health imports. The `2.x` lane is limited to
 security and critical correctness maintenance; new migration work belongs on
-`3.x`.
+`4.x`.
 
 ## Maven dependencies
 
@@ -126,7 +126,7 @@ mismatch.
 
 ## Package and module changes
 
-| Contract | Boot 3.5 / 2.x | Boot 4 / 3.x | Action |
+| Contract | Boot 3.5 / 2.x | Boot 4 / 4.x | Action |
 |---|---|---|---|
 | WebClient customizer | org.springframework.boot.web.reactive.function.client.WebClientCustomizer | org.springframework.boot.webclient.WebClientCustomizer | Update Boot customizer imports. ReactiveHttpClientCustomizer is unchanged. |
 | Health API | org.springframework.boot.actuate.health | org.springframework.boot.health.contributor | Update custom health imports. |
@@ -171,7 +171,7 @@ ProblemDetailErrorResponseMapper problemDetails(ObjectMapper objectMapper) {
 }
 ```
 
-Boot 4 and starter 3.x use Jackson 3 plus the stable codec boundary:
+Boot 4 and starter 4.x use Jackson 3 plus the stable codec boundary:
 
 ```java
 import org.springframework.boot.webclient.WebClientCustomizer;
@@ -217,7 +217,7 @@ The `3.0.0` line removes these deprecated Jackson 2 migration shims:
 Use the codec constructor, MockReactiveHttpClient.Builder.jsonCodec(...), and
 codec-based handler constructors. Applications that must retain the Jackson 2
 adapter or mapper overloads must remain on the `2.14.x` maintenance line while
-they migrate. The `3.x` starter and test helper do not depend on Jackson 2.
+they migrate. The `4.x` starter and test helper do not depend on Jackson 2.
 
 `ReactiveHttpClientJsonCodec` is the stable starter serialization boundary.
 The default bean wraps Boot's application Jackson 3 `ObjectMapper`, so modules,
@@ -261,7 +261,7 @@ reactive:
         enabled: true
 ```
 
-After, Boot 4 and starter 3.x; configuration is unchanged:
+After, Boot 4 and starter 4.x; Retry must be selected explicitly:
 
 ```yaml
 reactive:
@@ -272,6 +272,7 @@ reactive:
         request-timeout-ms: 3000
         resilience:
           enabled: true
+          retry: default
           retry-methods: [GET, HEAD]
         auth:
           type: oauth2-client-credentials
@@ -284,6 +285,12 @@ reactive:
       diagnostics-endpoint:
         enabled: true
 ```
+
+This example preserves Retry only. If the 2.x application relied on implicitly
+activated CircuitBreaker, Bulkhead, or RateLimiter operators, select each
+intended operator explicitly. Use the
+[Starter 3.x to 4.x Resilience Migration](31-3x-to-4x-resilience-migration.md)
+matrix to audit every client policy.
 
 ## Actuator, AOT, and native image
 
@@ -319,7 +326,7 @@ The Boot 4 native baseline uses GraalVM Java 25 while source remains Java 21 and
 covers loopback HTTP, inherited generics, Problem Detail, auth, Micrometer,
 diagnostics, and health. Run the AOT/native fixture described in
 [Native Image and Release Compatibility](20-native-release-compatibility.md);
-do not reuse a Boot 3 native configuration for the `3.x` artifact.
+do not reuse a Boot 3 native configuration for the `4.x` artifact.
 
 ## Test-helper migration
 

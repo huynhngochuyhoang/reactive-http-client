@@ -909,6 +909,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("`retry: default`")
                 .contains("`retry-methods` only")
                 .contains("No operator is selected")
+                .contains("clean checkout of tag `v4.0.0`")
+                .contains("-Dapi.compatibility.baseline.version=3.6.0")
                 .contains("-Papi-compatibility -DskipTests verify")
                 .contains("-Papi-compatibility,major-api-report -DskipTests verify")
                 .contains("strict japicmp failure remains an unresolved release blocker")
@@ -1249,7 +1251,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("MockReactiveHttpClient.Builder.jsonCodec")
                 .contains("No reactive.http property was renamed for Boot 4")
                 .contains("Before, Boot 3.5 and starter 2.x")
-                .contains("After, Boot 4 and starter 3.x")
+                .contains("After, Boot 4 and starter 4.x; Retry must be selected explicitly")
+                .contains("retry: default")
+                .contains("[Starter 3.x to 4.x Resilience Migration](31-3x-to-4x-resilience-migration.md)")
+                .doesNotContain("Boot 4 / 3.x", "starter 3.x", "`3.x` artifact")
                 .contains("GraalVM Java 25")
                 .contains("## Choose the release lane")
                 .contains("must remain on Boot 3.5")
@@ -3714,17 +3719,6 @@ class DocumentationReleaseArtifactTest {
                 + " && scripts/verify-published-baseline-provenance.sh " + lane + " " + baselineVersion
                 + " target/release-evidence/published-baselines/" + lane + "-" + baselineVersion
                 + " " + modules;
-    }
-
-    private static String majorApiReportCommand(String baselineVersion) {
-        String lane = "api-major-report";
-        String repository = publishedBaselineRepository(lane, baselineVersion);
-        return "test ! -e " + repository
-                + " && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=" + repository
-                + " -Papi-compatibility,major-api-report -DskipTests verify"
-                + " && scripts/verify-published-baseline-provenance.sh " + lane + " " + baselineVersion
-                + " target/release-evidence/published-baselines/" + lane + "-" + baselineVersion
-                + " reactive-http-client reactive-http-client-starter reactive-http-client-test reactive-http-client-otel";
     }
 
     private static String publishedBaselineRepository(String lane, String baselineVersion) {
