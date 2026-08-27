@@ -1706,13 +1706,38 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     .attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE, resolvedAuth)
                     .exchangeToMono(response -> response.releaseBody().then(Mono.defer(() -> {
                         AuthContext authContext = resolvedAuth.get();
-                        return authContext != null
-                                ? Mono.just(authContext)
-                                : Mono.error(new IllegalStateException(
-                                "Cache pre-lookup auth did not reach the auth filter for client '"
-                                        + clientName + "'"));
+                        if (authContext == null) {
+                            return Mono.error(new IllegalStateException(
+                                    "Cache pre-lookup auth did not reach the auth filter for client '"
+                                            + clientName + "'"));
+                        }
+                        validateCacheAuthContentType(resolved, requestBody, authContext);
+                        return Mono.just(authContext);
                     })));
         });
+    }
+
+    private void validateCacheAuthContentType(
+            RequestArgumentResolver.ResolvedArgs resolved,
+            SerializedRequestBody requestBody,
+            AuthContext authContext) {
+        String authContentType = null;
+        for (Map.Entry<String, String> header : authContext.getHeaders().entrySet()) {
+            if (HttpHeaders.CONTENT_TYPE.equalsIgnoreCase(header.getKey())) {
+                authContentType = header.getValue();
+            }
+        }
+        if (authContentType == null) {
+            return;
+        }
+        String declaredContentType = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
+        String expected = effectiveCacheBodyContentType(requestBody.originalBody(), declaredContentType);
+        String replacement = effectiveCacheBodyContentType(requestBody.originalBody(), authContentType);
+        if (!Objects.equals(expected, replacement)) {
+            throw new IllegalStateException("AuthProvider for cache-selected client '" + clientName
+                    + "' cannot replace Content-Type after body identity is prepared; declare the effective "
+                    + "Content-Type before cache lookup or disable response caching");
+        }
     }
 
     private Mono<CacheBodyPreparation> prepareCacheSelectedBody(
@@ -1723,19 +1748,25 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return Mono.just(CacheBodyPreparation.UNSELECTED);
         }
         Object body = resolved.body();
+        String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
+        final String effectiveContentType;
+        try {
+            effectiveContentType = effectiveCacheBodyContentType(body, contentTypeHeader);
+        } catch (IllegalArgumentException error) {
+            return Mono.error(new RequestSerializationException(clientName, error));
+        }
         if (body == null) {
             return Mono.just(new CacheBodyPreparation(
                     new SerializedRequestBody(null, null, null),
-                    CacheKeyContract.absentSerializedBodyKey()));
+                    CacheKeyContract.absentSerializedBodyKey(effectiveContentType)));
         }
-        String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         if (body instanceof byte[] bytes) {
-            return Mono.just(cacheBodyPreparation(body, bytes));
+            return Mono.just(cacheBodyPreparation(body, bytes, effectiveContentType));
         }
         if (body instanceof String text) {
             return Mono.fromCallable(() -> cacheBodyPreparation(
                             body, CacheKeyContract.selectedStringBodyBytes(
-                                    text, rawBodyCharset(contentTypeHeader))))
+                                    text, rawBodyCharset(contentTypeHeader)), effectiveContentType))
                     .subscribeOn(Schedulers.boundedElastic())
                     .onErrorMap(error -> error instanceof RequestSerializationException
                             ? error
@@ -1750,21 +1781,38 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     "Cache-selected JSON request bodies require a ReactiveHttpClientJsonCodec bean")));
         }
         return Mono.fromCallable(() -> cacheBodyPreparation(body, jsonCodec.writeBounded(
-                        body, CacheKeyContract.maximumSerializedBodyBytes())))
+                        body, CacheKeyContract.maximumSerializedBodyBytes()), effectiveContentType))
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorMap(error -> error instanceof RequestSerializationException
                         ? error
                         : new RequestSerializationException(clientName, error));
     }
 
-    private static CacheBodyPreparation cacheBodyPreparation(Object originalBody, byte[] wireBytes) {
+    private static CacheBodyPreparation cacheBodyPreparation(
+            Object originalBody, byte[] wireBytes, String effectiveContentType) {
         byte[] source = Objects.requireNonNull(
                 wireBytes, "ReactiveHttpClientJsonCodec returned null request bytes");
         CacheKeyContract.requireSerializedBodyLength(source.length);
         byte[] stableWireBytes = source.clone();
         return new CacheBodyPreparation(
                 new SerializedRequestBody(originalBody, stableWireBytes, stableWireBytes),
-                CacheKeyContract.serializedBodyKey(stableWireBytes));
+                CacheKeyContract.serializedBodyKey(stableWireBytes, effectiveContentType));
+    }
+
+    private String effectiveCacheBodyContentType(Object body, String contentTypeHeader) {
+        if (contentTypeHeader == null) {
+            return body != null ? MediaType.APPLICATION_JSON_VALUE : null;
+        }
+        if (contentTypeHeader.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Cache-selected request bodies require a valid effective Content-Type");
+        }
+        try {
+            return MediaType.parseMediaType(contentTypeHeader).toString();
+        } catch (Exception error) {
+            throw new IllegalArgumentException(
+                    "Cache-selected request bodies require a valid effective Content-Type", error);
+        }
     }
 
     private Charset rawBodyCharset(String contentTypeHeader) {

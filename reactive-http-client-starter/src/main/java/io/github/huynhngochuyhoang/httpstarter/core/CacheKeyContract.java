@@ -268,13 +268,21 @@ final class CacheKeyContract {
     }
 
     static SerializedBodyKey serializedBodyKey(byte[] wireBytes) {
+        return serializedBodyKey(wireBytes, null);
+    }
+
+    static SerializedBodyKey serializedBodyKey(byte[] wireBytes, String effectiveContentType) {
         byte[] bytes = wireBytes != null ? wireBytes : new byte[0];
         requireSerializedBodyLength(bytes.length);
-        return new SerializedBodyKey(true, bytes);
+        return new SerializedBodyKey(true, effectiveContentType, bytes);
     }
 
     static SerializedBodyKey absentSerializedBodyKey() {
-        return new SerializedBodyKey(false, new byte[0]);
+        return absentSerializedBodyKey(null);
+    }
+
+    static SerializedBodyKey absentSerializedBodyKey(String effectiveContentType) {
+        return new SerializedBodyKey(false, effectiveContentType, new byte[0]);
     }
 
     static byte[] selectedStringBodyBytes(String value, Charset charset) {
@@ -1344,10 +1352,12 @@ final class CacheKeyContract {
 
     static final class SerializedBodyKey {
         private final boolean present;
+        private final String effectiveContentType;
         private final byte[] wireBytes;
 
-        private SerializedBodyKey(boolean present, byte[] wireBytes) {
+        private SerializedBodyKey(boolean present, String effectiveContentType, byte[] wireBytes) {
             this.present = present;
+            this.effectiveContentType = effectiveContentType;
             this.wireBytes = wireBytes.clone();
         }
     }
@@ -1536,6 +1546,7 @@ final class CacheKeyContract {
             if (value instanceof SerializedBodyKey serializedBody) {
                 output.writeByte(26);
                 output.writeBoolean(serializedBody.present);
+                framed(serializedBody.effectiveContentType, depth + 1);
                 rawFrame(serializedBody.wireBytes);
             } else if (value instanceof String text) {
                 stringScalar(type, text);

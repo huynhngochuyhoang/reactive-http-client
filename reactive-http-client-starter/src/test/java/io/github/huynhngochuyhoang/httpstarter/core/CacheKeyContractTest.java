@@ -2,13 +2,18 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.fixture.cache.NonPublicRecordFixture;
+import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
 import io.github.huynhngochuyhoang.httpstarter.exception.RequestSerializationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
@@ -609,6 +614,7 @@ class CacheKeyContractTest {
     void selectedBodyUsesOneCodecRepresentationForTheKeyAndWireRequest() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         policy(config).setVaryByParameters(List.of("body"));
+        config.setAuthProvider("capture");
         Method method = JsonValueBodyClient.class.getMethod("get", JsonValueBody.class);
         RequestPlan plan = plan(JsonValueBodyClient.class, method);
         EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.validate(
@@ -635,8 +641,16 @@ class CacheKeyContractTest {
         assertThat(absentBodyKey).isNotEqualTo(emptyBodyKey);
 
         AtomicReference<String> dispatchedBody = new AtomicReference<>();
+        AtomicReference<byte[]> signedBody = new AtomicReference<>();
+        AtomicInteger boundedWrites = new AtomicInteger();
+        ReactiveHttpClientJsonCodec codec = countingCodec(boundedWrites);
+        AuthProvider authProvider = request -> {
+            signedBody.set(((byte[]) request.requestBody()).clone());
+            return Mono.just(AuthContext.empty());
+        };
         WebClient webClient = WebClient.builder()
                 .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("json-value", authProvider))
                 .exchangeFunction(request -> {
                     dispatchedBody.set(materialize(request).getBodyAsString().block());
                     return Mono.just(ClientResponse.create(HttpStatus.OK)
@@ -650,8 +664,10 @@ class CacheKeyContractTest {
             ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                     webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
                     "json-value", JsonValueBodyClient.class, context,
-                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
-                    new ReactiveHttpClientProperties.ObservabilityConfig());
+                    new NoopResilienceOperatorApplier(), codec,
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    LocalResponseCacheManager.testing(System::nanoTime), authProvider,
+                    "http://cache-key.test");
             JsonValueBodyClient client = (JsonValueBodyClient) Proxy.newProxyInstance(
                     getClass().getClassLoader(), new Class<?>[]{JsonValueBodyClient.class}, handler);
 
@@ -660,6 +676,152 @@ class CacheKeyContractTest {
 
         assertThat(dispatchedBody).hasValue(new String(wireBytes, StandardCharsets.UTF_8));
         assertThat(dispatchedBody).hasValue("\"wire-catalog-item\"");
+        assertThat(signedBody.get()).containsExactly(wireBytes);
+        assertThat(boundedWrites).hasValue(1);
+    }
+
+    @Test
+    void semanticPostBodyIdentityIncludesEffectiveContentTypeCharsetAndPresence() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        policy(config).setSharedResponse(true);
+        AtomicInteger dispatches = new AtomicInteger();
+        List<String> requests = new ArrayList<>();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .exchangeFunction(request -> {
+                    MockClientHttpRequest materialized = materialize(request);
+                    String contentType = materialized.getHeaders().getFirst(HttpHeaders.CONTENT_TYPE);
+                    String body = materialized.getBodyAsString().block();
+                    String response = String.valueOf(contentType) + "|" + body;
+                    dispatches.incrementAndGet();
+                    requests.add(response);
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body(response).build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "semantic-body", SemanticBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    LocalResponseCacheManager.testing(System::nanoTime));
+            SemanticBodyClient client = (SemanticBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{SemanticBodyClient.class}, handler);
+
+            String text = client.query("same", MediaType.TEXT_PLAIN_VALUE).block();
+            String json = client.query("same", MediaType.APPLICATION_JSON_VALUE).block();
+            assertThat(text).isNotEqualTo(json);
+            assertThat(client.query("same", MediaType.TEXT_PLAIN_VALUE).block()).isEqualTo(text);
+            assertThat(client.query("same", MediaType.APPLICATION_JSON_VALUE).block()).isEqualTo(json);
+
+            String latin = client.query("\u00e9", "text/plain;charset=ISO-8859-1").block();
+            String utf8 = client.query("\u00e9", "text/plain;charset=UTF-8").block();
+            assertThat(latin).isNotEqualTo(utf8);
+
+            String absent = client.query(null, null).block();
+            String explicit = client.query(null, MediaType.APPLICATION_JSON_VALUE).block();
+            String presentEmpty = client.query("", null).block();
+            assertThat(absent).isNotEqualTo(explicit);
+            assertThat(presentEmpty).isEqualTo(explicit);
+        }
+
+        assertThat(dispatches).hasValue(7);
+        assertThat(requests).contains(
+                "text/plain;charset=ISO-8859-1|\u00e9",
+                "text/plain;charset=UTF-8|\u00e9",
+                "null|",
+                "application/json|");
+    }
+
+    @Test
+    void cachePreparationTimeoutDoesNotSubscribeBodyOrPublishSensitiveMaterial() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        policy(config).setSharedResponse(true);
+        config.setAuthProvider("never");
+        config.setLogicalCallTimeoutMs(25);
+        AtomicInteger dispatches = new AtomicInteger();
+        AtomicInteger bodySubscriptions = new AtomicInteger();
+        AuthProvider authProvider = request -> Mono.never();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("semantic-body", authProvider))
+                .filter((request, next) -> next.exchange(ClientRequest.from(request)
+                        .body((output, inserterContext) -> Mono.defer(() -> {
+                            bodySubscriptions.incrementAndGet();
+                            return request.body().insert(output, inserterContext);
+                        }))
+                        .build()))
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body("unexpected").build());
+                })
+                .build();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "semantic-body", SemanticBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(), manager, authProvider,
+                    "http://cache-key.test");
+            SemanticBodyClient client = (SemanticBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{SemanticBodyClient.class}, handler);
+
+            assertThatThrownBy(() -> client.query("private-body-material", MediaType.TEXT_PLAIN_VALUE).block())
+                    .hasRootCauseInstanceOf(LogicalCallTimeoutException.class)
+                    .hasMessageNotContaining("private-body-material");
+        }
+
+        assertThat(dispatches).hasValue(0);
+        assertThat(bodySubscriptions).hasValue(0);
+        assertThat(manager.snapshot().currentSize()).isZero();
+    }
+
+    @Test
+    void authCannotReplaceContentTypeAfterBodyIdentityPreparation() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        policy(config).setSharedResponse(true);
+        config.setAuthProvider("content-type");
+        AtomicInteger dispatches = new AtomicInteger();
+        AuthProvider authProvider = request -> Mono.just(AuthContext.builder()
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .build());
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("semantic-body", authProvider))
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body("unexpected").build());
+                })
+                .build();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "semantic-body", SemanticBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(), manager, authProvider,
+                    "http://cache-key.test");
+            SemanticBodyClient client = (SemanticBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{SemanticBodyClient.class}, handler);
+
+            assertThatThrownBy(() -> client.query("private-body-material", MediaType.TEXT_PLAIN_VALUE).block())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("cannot replace Content-Type")
+                    .hasMessageNotContaining("private-body-material");
+        }
+
+        assertThat(dispatches).hasValue(0);
+        assertThat(manager.snapshot().currentSize()).isZero();
     }
 
     @Test
@@ -688,6 +850,45 @@ class CacheKeyContractTest {
             assertThatThrownBy(() -> client.get("x".repeat(1_048_577)).block())
                     .isInstanceOf(RequestSerializationException.class)
                     .hasRootCauseMessage("Cache-selected request body exceeds 1048576 bytes");
+        }
+
+        assertThat(dispatches).hasValue(0);
+    }
+
+    @Test
+    void oversizedByteBodiesAndInvalidMediaTypesFailBeforeDispatch() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        policy(config).setSharedResponse(true);
+        AtomicInteger dispatches = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body("unexpected").build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "byte-body", ByteArrayBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    LocalResponseCacheManager.testing(System::nanoTime));
+            ByteArrayBodyClient client = (ByteArrayBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{ByteArrayBodyClient.class}, handler);
+
+            assertThatThrownBy(() -> client.query(
+                            new byte[1_048_577], MediaType.APPLICATION_OCTET_STREAM_VALUE).block())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("cumulative element count exceeds maximum 10000");
+            assertThatThrownBy(() -> client.query(new byte[]{1}, "not a media type").block())
+                    .isInstanceOf(RequestSerializationException.class)
+                    .cause()
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Cache-selected request bodies require a valid effective Content-Type");
         }
 
         assertThat(dispatches).hasValue(0);
@@ -1207,6 +1408,27 @@ class CacheKeyContractTest {
         return mock;
     }
 
+    private static ReactiveHttpClientJsonCodec countingCodec(AtomicInteger boundedWrites) {
+        ReactiveHttpClientJsonCodec delegate = TestJsonCodecs.jsonCodec();
+        return new ReactiveHttpClientJsonCodec() {
+            @Override
+            public byte[] write(Object value) throws Exception {
+                return delegate.write(value);
+            }
+
+            @Override
+            public byte[] writeBounded(Object value, int maximumBytes) throws Exception {
+                boundedWrites.incrementAndGet();
+                return delegate.writeBounded(value, maximumBytes);
+            }
+
+            @Override
+            public <T> T read(byte[] value, Class<T> type) throws Exception {
+                return delegate.read(value, type);
+            }
+        };
+    }
+
     private RequestPlan plan(Class<?> client, Method method) {
         return RequestPlan.from(metadataCache.get(method), client);
     }
@@ -1474,6 +1696,22 @@ class CacheKeyContractTest {
     interface JsonValueBodyClient {
         @GET("/items")
         Mono<String> get(@Body @CacheKey("body") JsonValueBody body);
+    }
+
+    interface SemanticBodyClient {
+        @POST("/items")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(
+                @Body @CacheKey("body") String body,
+                @HeaderParam("Content-Type") String contentType);
+    }
+
+    interface ByteArrayBodyClient {
+        @POST("/items")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(
+                @Body @CacheKey("body") byte[] body,
+                @HeaderParam("Content-Type") String contentType);
     }
 
     interface StringBodyClient {

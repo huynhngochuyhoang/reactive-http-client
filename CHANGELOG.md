@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decision for disabled methods, GET-friendly selections, acknowledged semantic
   reads, and invalid selections. Acknowledgement does not broaden the existing
   finite-response or application-owned request-body boundaries.
+- **Wire-equivalent body identity for semantic reads.** Body-bearing non-`GET`
+  cache keys now frame body presence, normalized effective `Content-Type` and
+  charset, and the exact bounded bytes shared by auth signing and the final
+  WebClient writer. Late auth media-type replacement and invalid dynamic media
+  types fail before lookup; raw request material remains subscription-local.
 
 ## [4.0.0] - 2026-08-26
 
