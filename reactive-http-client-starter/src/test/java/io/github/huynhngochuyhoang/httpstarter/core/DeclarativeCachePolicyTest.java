@@ -233,6 +233,43 @@ class DeclarativeCachePolicyTest {
     }
 
     @Test
+    void semanticNonGetBodiesRequireWireBytePartitionEvenWhenResponsesAreShared() {
+        ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("selected", 1_000L, 100L);
+        ReactiveHttpClientProperties.CachePolicyConfig policy = config.getCache().getPolicies().get("selected");
+        policy.setSharedResponse(true);
+
+        assertThatThrownBy(() -> validate(AcknowledgedBodyPostClient.class, "semantic-body", config))
+                .hasMessageContaining("resolvedHttpMethod=POST")
+                .hasMessageContaining("body-bearing semantic non-GET methods")
+                .hasMessageContaining("vary-by-parameters")
+                .hasMessageContaining("shared-response cannot waive wire-byte body identity");
+
+        policy.setVaryByParameters(List.of("criteria"));
+        assertThatCode(() -> validate(AcknowledgedBodyPostClient.class, "semantic-body", config))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void semanticReadCannotAcknowledgeAnUnresolvedApiRefVerb() {
+        ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("selected", 1_000L, 100L);
+
+        assertThatThrownBy(() -> validate(AcknowledgedApiRefClient.class, "semantic-api-ref", config))
+                .hasMessageContaining("resolvedHttpMethod=null")
+                .hasMessageContaining("apiRef='configured'")
+                .hasMessageContaining("require a resolved HTTP method")
+                .hasMessageContaining("configure the referenced API method");
+
+        ReactiveHttpClientProperties.ApiConfig unsupported = new ReactiveHttpClientProperties.ApiConfig();
+        unsupported.setMethod("BREW");
+        unsupported.setPath("/configured");
+        config.getApis().put("configured", unsupported);
+        assertThatThrownBy(() -> validate(AcknowledgedApiRefClient.class, "semantic-api-ref", config))
+                .hasMessageContaining("resolvedHttpMethod=BREW")
+                .hasMessageContaining("resolved HTTP method 'BREW' is unsupported")
+                .hasMessageContaining("cannot be acknowledged as a semantic read");
+    }
+
+    @Test
     void disabledAndUnselectedNonGetMethodsStayOnTheOrdinaryPath() {
         ReactiveHttpClientProperties.ClientConfig selected = selectedPolicy(1_000L, 100L);
         ReactiveHttpClientProperties.ClientConfig unselected = configWithPolicy("selected", 1_000L, 100L);
@@ -511,6 +548,12 @@ class DeclarativeCachePolicyTest {
         @POST("/query")
         @CacheResponse(value = "selected", semanticRead = true)
         Mono<String> query();
+    }
+
+    interface AcknowledgedBodyPostClient {
+        @POST("/query")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@Body @CacheKey("criteria") String criteria);
     }
 
     interface MixedSelectionClient {

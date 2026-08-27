@@ -142,8 +142,11 @@ Evidence recorded on 2026-08-27:
 - Focused grammar coverage proves all six non-GET annotation verbs plus non-GET
   `@ApiRef`, mixed interfaces, disabled/unselected methods, inherited generic
   methods, overloads, policy precedence, rich errors, and unchanged finite/body
-  rejections. Acknowledged methods still pass the existing key, auth, and
-  customization gates before cache allocation or dispatch.
+  rejections. An unresolved `@ApiRef` verb fails before semantic intent is
+  considered, and a body-bearing semantic non-GET method must select its
+  serialized wire bytes even under `shared-response`. Acknowledged methods
+  still pass the existing key, auth, and customization gates before cache
+  allocation or dispatch.
 - Startup, effective-contract, diagnostics, AOT, and mock parity are covered by
   `DeclarativeCachePolicyTest`, `ReactiveHttpClientContractSnapshotTest`,
   `ReactiveHttpClientDiagnosticsProviderTest`,
@@ -153,7 +156,7 @@ Evidence recorded on 2026-08-27:
   assertions document the method-specific guarantee and the absent client-wide
   switch. The focused documentation/metadata run passed 61 tests.
 - `mvn -B -ntp -pl reactive-http-client-starter,reactive-http-client-test -am
-  test` passed 1,218 starter tests and 59 test-helper tests with no failures,
+  test` passed 1,221 starter tests and 59 test-helper tests with no failures,
   errors, or skips. Root `mvn -B -ntp validate` passed all four reactor modules,
   and `git diff --check` passed.
 

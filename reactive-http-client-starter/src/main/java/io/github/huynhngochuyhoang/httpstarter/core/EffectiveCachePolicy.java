@@ -42,7 +42,17 @@ final class EffectiveCachePolicy {
         validateRefreshBounds(context, policy);
         normalizedNonCacheableResponseHeaders(context, policy);
 
-        if (!"GET".equals(effectiveHttpMethod) && !plan.cacheSemanticRead()) {
+        if (!hasText(effectiveHttpMethod)) {
+            throw invalid(context, "selected cache methods require a resolved HTTP method; configure the "
+                    + "referenced API method before applying semantic-read intent");
+        }
+        String normalizedHttpMethod = effectiveHttpMethod.trim().toUpperCase(Locale.ROOT);
+        if (!ReactiveHttpClientFactoryBean.isSupportedOutboundHttpMethod(normalizedHttpMethod)) {
+            throw invalid(context, "resolved HTTP method '" + effectiveHttpMethod
+                    + "' is unsupported and cannot be acknowledged as a semantic read");
+        }
+        boolean semanticNonGet = !"GET".equals(normalizedHttpMethod);
+        if (semanticNonGet && !plan.cacheSemanticRead()) {
             throw invalid(context, "selected non-GET methods require a method-specific semantic-read "
                     + "acknowledgement; add @CacheResponse(value = \"" + selection.policyName()
                     + "\", semanticRead = true) only when omitting downstream dispatch cannot omit a required "
@@ -69,6 +79,12 @@ final class EffectiveCachePolicy {
         }
         validateMaterializedType(context, cacheValueType);
         validateRequestBody(context, plan);
+        if (semanticNonGet && plan.bodyIndex() >= 0
+                && !CacheKeyContract.selectsRequestBody(plan, policy)) {
+            throw invalid(context, "body-bearing semantic non-GET methods require the @Body parameter to "
+                    + "declare @CacheKey and the policy to select that label through vary-by-parameters; "
+                    + "shared-response cannot waive wire-byte body identity");
+        }
         CacheKeyContract.validate(clientInterface, clientName, plan, clientConfig, selection);
         DeclarativeRequestParameterGrammar.validateCacheKeyActivity(
                 clientInterface, clientName, plan, selection);

@@ -67,6 +67,13 @@ or response status, and it does not provide write invalidation or replay safety.
 Its default is `false`, preserving the published `4.0.0` GET-only behavior for
 existing declarations.
 
+A body-bearing semantic non-`GET` read must annotate its `@Body` parameter with
+`@CacheKey` and select that label through `vary-by-parameters`. The resulting
+key dimension is derived from the exact prepared wire bytes. `shared-response`
+cannot waive this requirement. For `@ApiRef`, the configured method must first
+resolve to a nonblank supported verb; semantic intent does not repair missing
+API configuration.
+
 The same method annotations work on inherited endpoints, overloads, and
 `@ApiRef` methods. Policy names are trimmed and must not be blank. A selected
 policy must exist and must define:
@@ -375,9 +382,11 @@ shared across identities. The effective idempotency header alone is not an
 authenticated identity partition because it may be absent and is required for
 every non-shared policy. Select at least one additional stable parameter,
 header, or context dimension, or explicitly acknowledge `shared-response`.
-The same acknowledgement is required when dynamic headers, header maps, or a
-body are intentionally omitted. It cannot be used to remove explicitly
-selected variants; those dimensions still partition the response.
+The same acknowledgement is required when dynamic headers, header maps, or an
+eligible `GET` body are intentionally omitted. A body-bearing semantic
+non-`GET` read must always select its body through `vary-by-parameters`. The
+acknowledgement cannot remove explicitly selected variants; those dimensions
+still partition the response.
 
 Request IDs, correlation IDs, trace IDs, and similarly unique values are poor
 cache variants: they make nearly every call a miss and provide no response
@@ -433,9 +442,10 @@ nested-container projections are validated before freezing, so a nested custom
 container cannot lose its wire conversion. They are then
 materialized under the same cumulative 1 MiB bound before the ordinary request
 resolver can call `String.valueOf`. Path and query arguments are always frozen
-because they define the request target. A body or dynamic header omitted under
-`shared-response: true` is neither cache-key validated nor frozen; the explicit
-sharing acknowledgement leaves its ordinary request behavior unchanged. URI
+because they define the request target. An eligible `GET` body or dynamic
+header omitted under `shared-response: true` is neither cache-key validated nor
+frozen; the explicit sharing acknowledgement leaves its ordinary request
+behavior unchanged. Semantic non-`GET` bodies cannot use this waiver. URI
 variants retain their non-normalized text, so a literal Unicode path and an
 explicitly percent-escaped path remain distinct. These projections prevent
 wire-distinct requests from collapsing into one structural key. Canonical

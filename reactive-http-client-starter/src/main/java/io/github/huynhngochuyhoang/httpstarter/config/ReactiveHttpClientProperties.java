@@ -789,7 +789,10 @@ public class ReactiveHttpClientProperties {
         private List<String> varyByContext = new ArrayList<>();
         /** Application-specific response headers that make a response non-cacheable. */
         private List<String> nonCacheableResponseHeaders = new ArrayList<>();
-        /** Explicit acknowledgement that omitted caller/auth variants share one response. */
+        /**
+         * Explicit acknowledgement that omitted caller/auth variants share one response.
+         * This cannot waive body identity for a semantic non-GET method.
+         */
         private boolean sharedResponse;
         /** Coalesce concurrent same-key misses into one shared load. Default: false. */
         private boolean singleFlight;

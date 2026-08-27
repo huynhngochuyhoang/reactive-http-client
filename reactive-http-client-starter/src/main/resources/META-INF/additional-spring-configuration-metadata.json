@@ -469,7 +469,7 @@
     {
       "name": "reactive.http.clients.[name].cache.policies.[policy-name].shared-response",
       "type": "java.lang.Boolean",
-      "description": "Explicitly acknowledge that omitted caller, auth, header, and context variants may share one response. Explicitly selected dimensions still partition the response. Default: false.",
+      "description": "Explicitly acknowledge that omitted caller, auth, header, and context variants may share one response. Explicitly selected dimensions still partition the response. This cannot waive body identity for a semantic non-GET method. Default: false.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig",
       "defaultValue": false
     },

@@ -302,6 +302,32 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorRejectsSemanticReadWithUnresolvedApiRefVerb() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", UnresolvedApiRefCacheAotClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, UnresolvedApiRefCacheAotClient.class);
+        context.registerBeanDefinition(UnresolvedApiRefCacheAotClient.class.getName(), beanDefinition);
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("unresolved-api-ref-cache", config));
+        context.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
+
+        assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(context.getDefaultListableBeanFactory()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unresolved-api-ref-cache")
+                .hasMessageContaining("resolvedHttpMethod=null")
+                .hasMessageContaining("apiRef='query'")
+                .hasMessageContaining("require a resolved HTTP method");
+        context.close();
+    }
+
+    @Test
     void beanFactoryAotProcessorRegistersCacheKeyRecordAccessors() throws Exception {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
@@ -587,6 +613,13 @@ class ReactiveHttpClientAotSmokeTest {
     @ReactiveHttpClient(name = "semantic-read-aot", baseUrl = "http://semantic-read-aot.test")
     interface SemanticReadAotClient {
         @POST("/query")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query();
+    }
+
+    @ReactiveHttpClient(name = "unresolved-api-ref-cache", baseUrl = "http://unresolved-api-ref.test")
+    interface UnresolvedApiRefCacheAotClient {
+        @ApiRef("query")
         @CacheResponse(value = "selected", semanticRead = true)
         Mono<String> query();
     }

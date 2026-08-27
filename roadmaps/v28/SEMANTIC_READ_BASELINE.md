@@ -34,6 +34,11 @@ guarantee that a cache hit may omit downstream dispatch without omitting a
 required side effect. It does not imply idempotency, retry/replay safety, or
 write invalidation.
 
+The acknowledgement applies only after the effective HTTP method resolves. A
+body-bearing semantic non-`GET` read must select its `@Body @CacheKey` label in
+`vary-by-parameters`, which keys the prepared wire bytes; `shared-response`
+cannot waive this request identity.
+
 The V28 selection matrix is therefore:
 
 | Selection | Resolved verb | Method acknowledgement | Result |

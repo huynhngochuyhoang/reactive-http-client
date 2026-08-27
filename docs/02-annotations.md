@@ -537,6 +537,12 @@ effect. It does not declare write idempotency, retry or replay safety, or cache
 invalidation. A client-wide policy, an idempotency key, retry metadata, or a
 method name cannot provide this method-specific guarantee.
 
+For a body-bearing semantic non-`GET` read, annotate the `@Body` parameter with
+`@CacheKey` and include that label in `vary-by-parameters`. The cache key uses
+the prepared wire bytes. `shared-response: true` cannot waive body identity for
+these methods. A configured `@ApiRef` must resolve a nonblank HTTP method before
+`semanticRead` is considered.
+
 ### `@CacheKey`
 
 Gives a method parameter a stable partition label. The selected policy must

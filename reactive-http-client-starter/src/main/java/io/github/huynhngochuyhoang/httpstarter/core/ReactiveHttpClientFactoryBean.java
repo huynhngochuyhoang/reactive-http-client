@@ -1447,7 +1447,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
             throw new IllegalStateException(apiRefContext + " but " + configPrefix + ".method is blank.");
         }
         String method = apiConfig.getMethod().trim().toUpperCase(Locale.ROOT);
-        if (!SUPPORTED_OUTBOUND_HTTP_METHODS.contains(method)) {
+        if (!isSupportedOutboundHttpMethod(method)) {
             throw new IllegalStateException(apiRefContext + " but " + configPrefix + ".method ["
                     + apiConfig.getMethod() + "] is not supported. Supported methods: "
                     + SUPPORTED_OUTBOUND_HTTP_METHODS);
@@ -1455,6 +1455,10 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
         if (!StringUtils.hasText(apiConfig.getPath())) {
             throw new IllegalStateException(apiRefContext + " but " + configPrefix + ".path is blank.");
         }
+    }
+
+    static boolean isSupportedOutboundHttpMethod(String method) {
+        return method != null && SUPPORTED_OUTBOUND_HTTP_METHODS.contains(method);
     }
 
     private static Set<String> pathVarNames(MethodMetadata meta) {

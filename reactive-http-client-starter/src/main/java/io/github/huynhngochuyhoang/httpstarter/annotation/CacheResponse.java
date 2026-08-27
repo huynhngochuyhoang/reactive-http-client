@@ -15,6 +15,11 @@ import java.lang.annotation.*;
  * therefore omitting a downstream invocation, cannot omit a required side
  * effect. It does not declare write idempotency, retry safety, replay safety,
  * or cache invalidation behavior.
+ *
+ * <p>A body-bearing semantic non-{@code GET} method must select its
+ * {@code @Body @CacheKey} label through the policy's
+ * {@code vary-by-parameters}. {@code shared-response} cannot waive that
+ * wire-byte request identity.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
@@ -27,7 +32,8 @@ public @interface CacheResponse {
      * Acknowledges that this specific non-{@code GET} method is a semantic read.
      *
      * <p>The default is {@code false}. Client-wide cache selection cannot set
-     * this method-specific guarantee.
+     * this method-specific guarantee. The effective HTTP method must resolve
+     * before this acknowledgement is considered.
      */
     boolean semanticRead() default false;
 }
