@@ -141,19 +141,21 @@ final class EffectiveHttpClientContractExporter {
                 timeoutPolicy(plan, effectiveApi, clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
                 resiliencePolicy(resiliencePolicy),
-                cachePolicy(cachePolicy),
+                cachePolicy(cachePolicy, plan.cacheSemanticRead()),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 authMode(clientConfig),
                 plan.bodyRepeatability());
     }
 
     private static EffectiveHttpClientContract.CachePolicy cachePolicy(
-            EffectiveCachePolicy.Selection selection) {
+            EffectiveCachePolicy.Selection selection,
+            boolean semanticRead) {
         ReactiveHttpClientProperties.CachePolicyConfig policy = selection.policy();
         CacheKeyContract.NormalizedVariants variants = CacheKeyContract.normalizedVariants(policy);
         return new EffectiveHttpClientContract.CachePolicy(
                 selection.enabled(),
                 selection.source().value(),
+                selection.enabled() && semanticRead,
                 policy != null && policy.getTtlMs() != null ? policy.getTtlMs() : 0,
                 policy != null && policy.getMaximumSize() != null ? policy.getMaximumSize() : 0,
                 variants.parameterNames(),

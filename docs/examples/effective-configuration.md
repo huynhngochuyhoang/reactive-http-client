@@ -165,6 +165,21 @@ reactive:
         enabled: true
 ```
 
+The client-wide policy selects cache-friendly `GET` methods but does not
+acknowledge non-`GET` methods. A non-`GET` semantic read must select the policy
+on that exact method:
+
+```java
+@POST("/catalog/search")
+@CacheResponse(value = "catalog-read", semanticRead = true)
+Mono<CatalogItem> search(@QueryParam("sku") String sku);
+```
+
+There is no client-wide semantic-read switch. The declaration guarantees that
+serving a hit may omit the downstream call without omitting a required side
+effect; all ordinary response, request, key, auth, and customization checks
+still apply.
+
 Cache metrics remain disabled when `observability.cache.enabled` is false, and
 the observability setting never selects the policy.
 

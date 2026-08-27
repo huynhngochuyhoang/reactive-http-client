@@ -48,15 +48,15 @@ class DeclarativeCachePolicyTest {
                         EffectiveHttpClientContract::cache));
         assertThat(policies.get("inherited")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
-                        true, "client", 1_000L, 100L,
+                        true, "client", false, 1_000L, 100L,
                         List.of(), List.of("idempotency-key"), List.of(), List.of(), false, false, 0, 0));
         assertThat(policies.get("overridden")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
-                        true, "method", 2_000L, 200L,
+                        true, "method", false, 2_000L, 200L,
                         List.of(), List.of("idempotency-key"), List.of(), List.of(), false, false, 0, 0));
         assertThat(policies.get("excluded")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
-                        false, "method-disabled", 0L, 0L,
+                        false, "method-disabled", false, 0L, 0L,
                         List.of(), List.of(), List.of(), List.of(), false, false, 0, 0));
     }
 
@@ -78,7 +78,7 @@ class DeclarativeCachePolicyTest {
                 VariantContractClient.class, "variant-contract", config, metadataCache).get(0);
 
         assertThat(contract.cache()).isEqualTo(new EffectiveHttpClientContract.CachePolicy(
-                true, "client", 1_000L, 100L,
+                true, "client", false, 1_000L, 100L,
                 List.of("tenant"), List.of("x-tenant"), List.of("locale", "region"),
                 List.of("x-caller", "x-session"), true, true, 400, 250));
     }
@@ -129,7 +129,7 @@ class DeclarativeCachePolicyTest {
 
         assertThatCode(() -> validate(EligibleClient.class, "eligible-cache", config))
                 .doesNotThrowAnyException();
-        assertRejected(PostClient.class, config, "only GET methods");
+        assertRejected(PostClient.class, config, "method-specific semantic-read acknowledgement");
         assertRejected(FluxClient.class, config, "Flux responses are streaming");
         assertRejected(VoidClient.class, config, "Mono<Void>");
         assertRejected(StreamingEnvelopeClient.class, config, "Publisher and streaming response values");
@@ -140,6 +140,146 @@ class DeclarativeCachePolicyTest {
         assertRejected(StreamBodyClient.class, config, "streaming or application-owned request bodies");
         assertRejected(UnresolvedBodyClient.class, config, "request body type is unresolved");
         assertRejected(MultipartClient.class, config, "multipart requests are not cache-eligible");
+    }
+
+    @Test
+    void semanticReadDefaultsFalseAndIsCapturedInPublicMetadata() throws Exception {
+        MethodMetadata defaultMetadata = metadataCache.get(
+                MethodSelectedPostClient.class.getMethod("query"));
+        MethodMetadata acknowledgedMetadata = metadataCache.get(
+                AcknowledgedPostClient.class.getMethod("query"));
+
+        assertThat(CacheResponse.class.getMethod("semanticRead").getDefaultValue()).isEqualTo(false);
+        assertThat(defaultMetadata.isCacheSemanticRead()).isFalse();
+        assertThat(defaultMetadata.getRequestPlan().cacheSemanticRead()).isFalse();
+        assertThat(acknowledgedMetadata.isCacheSemanticRead()).isTrue();
+        assertThat(acknowledgedMetadata.getRequestPlan().cacheSemanticRead()).isTrue();
+    }
+
+    @Test
+    void everyUnacknowledgedNonGetVerbRetainsThePublishedGetOnlyDefault() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy(1_000L, 100L);
+        Map<String, String> verbs = Map.of(
+                "post", "POST",
+                "put", "PUT",
+                "patch", "PATCH",
+                "delete", "DELETE",
+                "head", "HEAD",
+                "options", "OPTIONS");
+
+        verbs.forEach((methodName, verb) -> {
+            try {
+                var method = UnacknowledgedVerbClient.class.getMethod(methodName);
+                RequestPlan plan = RequestPlan.from(metadataCache.get(method), UnacknowledgedVerbClient.class);
+                assertThatThrownBy(() -> EffectiveCachePolicy.validate(
+                        UnacknowledgedVerbClient.class, "verb-cache", plan, config, verb))
+                        .hasMessageContaining("Reactive HTTP client 'verb-cache'")
+                        .hasMessageContaining("concreteClient=" + UnacknowledgedVerbClient.class.getName())
+                        .hasMessageContaining("method=" + method.toGenericString())
+                        .hasMessageContaining("resolvedHttpMethod=" + verb)
+                        .hasMessageContaining("cachePolicy='selected'")
+                        .hasMessageContaining("source=client")
+                        .hasMessageContaining("@CacheResponse(value = \"selected\", semanticRead = true)")
+                        .hasMessageContaining("omitting downstream dispatch cannot omit a required side effect");
+            } catch (NoSuchMethodException ex) {
+                throw new AssertionError(ex);
+            }
+        });
+
+        assertThatThrownBy(() -> validate(MixedSelectionClient.class, "mixed-cache", config))
+                .hasMessageContaining("MixedSelectionClient")
+                .hasMessageContaining("resolvedHttpMethod=POST")
+                .hasMessageContaining("source=client");
+    }
+
+    @Test
+    void methodSelectionAlsoRequiresAnExplicitSemanticReadAcknowledgement() {
+        ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("selected", 1_000L, 100L);
+
+        assertThatThrownBy(() -> validate(MethodSelectedPostClient.class, "method-cache", config))
+                .hasMessageContaining("resolvedHttpMethod=POST")
+                .hasMessageContaining("cachePolicy='selected'")
+                .hasMessageContaining("source=method")
+                .hasMessageContaining("semanticRead = true");
+    }
+
+    @Test
+    void methodSpecificAcknowledgementSupportsEveryResolvedVerbAndApiRef() {
+        ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("selected", 1_000L, 100L);
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("POST");
+        api.setPath("/configured");
+        config.getApis().put("configured", api);
+
+        assertThatCode(() -> validate(AcknowledgedVerbClient.class, "semantic-verbs", config))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> validate(AcknowledgedApiRefClient.class, "semantic-api-ref", config))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> validate(ConcreteSemanticReadClient.class, "semantic-inherited", config))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> validate(AcknowledgedOverloadedClient.class, "semantic-overloaded", config))
+                .doesNotThrowAnyException();
+
+        List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
+                AcknowledgedVerbClient.class, "semantic-verbs", config, metadataCache);
+        assertThat(contracts)
+                .extracting(EffectiveHttpClientContract::httpMethod)
+                .containsExactlyInAnyOrder("POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS");
+        assertThat(contracts).allSatisfy(contract -> {
+            assertThat(contract.cache().enabled()).isTrue();
+            assertThat(contract.cache().source()).isEqualTo("method");
+            assertThat(contract.cache().semanticRead()).isTrue();
+        });
+    }
+
+    @Test
+    void disabledAndUnselectedNonGetMethodsStayOnTheOrdinaryPath() {
+        ReactiveHttpClientProperties.ClientConfig selected = selectedPolicy(1_000L, 100L);
+        ReactiveHttpClientProperties.ClientConfig unselected = configWithPolicy("selected", 1_000L, 100L);
+
+        assertThatCode(() -> validate(DisabledPostClient.class, "disabled-post", selected))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> validate(UnselectedPostClient.class, "unselected-post", unselected))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> validate(MixedDisabledClient.class, "mixed-disabled", selected))
+                .doesNotThrowAnyException();
+
+        EffectiveHttpClientContract.CachePolicy disabled = EffectiveHttpClientContractExporter.export(
+                DisabledPostClient.class, "disabled-post", selected, metadataCache).get(0).cache();
+        EffectiveHttpClientContract.CachePolicy absent = EffectiveHttpClientContractExporter.export(
+                UnselectedPostClient.class, "unselected-post", unselected, metadataCache).get(0).cache();
+        assertThat(disabled.enabled()).isFalse();
+        assertThat(disabled.source()).isEqualTo("method-disabled");
+        assertThat(absent.enabled()).isFalse();
+        assertThat(absent.source()).isEqualTo("disabled");
+
+        Map<String, EffectiveHttpClientContract.CachePolicy> mixed = EffectiveHttpClientContractExporter.export(
+                        MixedDisabledClient.class, "mixed-disabled", selected, metadataCache).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        EffectiveHttpClientContract::javaMethodSignature,
+                        EffectiveHttpClientContract::cache));
+        assertThat(mixed.values()).extracting(EffectiveHttpClientContract.CachePolicy::source)
+                .containsExactlyInAnyOrder("client", "method-disabled");
+    }
+
+    @Test
+    void acknowledgementDoesNotBroadenFiniteResponseOrOwnedBodyRules() {
+        ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("selected", 1_000L, 100L);
+
+        assertRejected(AcknowledgedFluxClient.class, config, "Flux responses are streaming");
+        assertRejected(AcknowledgedVoidClient.class, config, "Mono<Void>");
+        assertRejected(AcknowledgedStreamBodyClient.class, config,
+                "streaming or application-owned request bodies");
+    }
+
+    @Test
+    void namesIdempotencyAndRetryMetadataDoNotImplySemanticReadIntent() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy(1_000L, 100L);
+
+        assertThatThrownBy(() -> validate(ImplicitSafetyClient.class, "implicit-cache", config))
+                .hasMessageContaining("method-specific semantic-read acknowledgement")
+                .hasMessageContaining("resolvedHttpMethod=POST")
+                .hasMessageContaining("source=client");
     }
 
     @Test
@@ -161,7 +301,8 @@ class DeclarativeCachePolicyTest {
         assertThatThrownBy(() -> validate(ApiRefCacheClient.class, "api-ref-cache", config))
                 .hasMessageContaining("api-ref-cache")
                 .hasMessageContaining("configured")
-                .hasMessageContaining("resolved HTTP method is POST");
+                .hasMessageContaining("resolvedHttpMethod=POST")
+                .hasMessageContaining("semanticRead = true");
     }
 
     @Test
@@ -358,6 +499,107 @@ class DeclarativeCachePolicyTest {
     interface PostClient {
         @POST("/value")
         Mono<String> get();
+    }
+
+    interface MethodSelectedPostClient {
+        @POST("/query")
+        @CacheResponse("selected")
+        Mono<String> query();
+    }
+
+    interface AcknowledgedPostClient {
+        @POST("/query")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query();
+    }
+
+    interface MixedSelectionClient {
+        @GET("/read") Mono<String> read();
+        @POST("/query") Mono<String> query();
+    }
+
+    interface MixedDisabledClient {
+        @GET("/read") Mono<String> read();
+        @POST("/command") @CacheDisabled Mono<String> command();
+    }
+
+    interface UnacknowledgedVerbClient {
+        @POST("/post") Mono<String> post();
+        @PUT("/put") Mono<String> put();
+        @PATCH("/patch") Mono<String> patch();
+        @DELETE("/delete") Mono<String> delete();
+        @HEAD("/head") Mono<String> head();
+        @OPTIONS("/options") Mono<String> options();
+    }
+
+    interface AcknowledgedVerbClient {
+        @POST("/post") @CacheResponse(value = "selected", semanticRead = true) Mono<String> post();
+        @PUT("/put") @CacheResponse(value = "selected", semanticRead = true) Mono<ResponseEntity<String>> put();
+        @PATCH("/patch") @CacheResponse(value = "selected", semanticRead = true) Mono<String> patch();
+        @DELETE("/delete") @CacheResponse(value = "selected", semanticRead = true) Mono<String> delete();
+        @HEAD("/head") @CacheResponse(value = "selected", semanticRead = true) Mono<String> head();
+        @OPTIONS("/options") @CacheResponse(value = "selected", semanticRead = true) Mono<String> options();
+    }
+
+    interface AcknowledgedApiRefClient {
+        @ApiRef("configured")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query();
+    }
+
+    interface SemanticReadOperations<T> {
+        @POST("/inherited")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<T> query();
+    }
+
+    interface ConcreteSemanticReadClient extends SemanticReadOperations<String> {
+    }
+
+    interface AcknowledgedOverloadedClient {
+        @POST("/query/{id}")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@PathVar("id") String id);
+
+        @POST("/query/{id}")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@PathVar("id") long id);
+    }
+
+    interface DisabledPostClient {
+        @POST("/command")
+        @CacheDisabled
+        Mono<String> command();
+    }
+
+    interface UnselectedPostClient {
+        @POST("/command")
+        Mono<String> command();
+    }
+
+    interface AcknowledgedFluxClient {
+        @POST("/stream")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Flux<String> stream();
+    }
+
+    interface AcknowledgedVoidClient {
+        @POST("/empty")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<Void> empty();
+    }
+
+    interface AcknowledgedStreamBodyClient {
+        @POST("/stream-body")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@Body InputStream input);
+    }
+
+    interface ImplicitSafetyClient {
+        @POST("/find")
+        @IdempotencyKey
+        @Retry("retry")
+        Mono<String> find();
     }
 
     interface FluxClient {

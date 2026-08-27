@@ -157,7 +157,7 @@ class ReactiveHttpClientContractSnapshotTest {
                 .render();
 
         assertThat(snapshot).contains(
-                "client:ttl=5000ms,max=25,varyParameters=[\"tenant\"],varyHeaders=[\"x-tenant\"],"
+                "client:semanticRead=false,ttl=5000ms,max=25,varyParameters=[\"tenant\"],varyHeaders=[\"x-tenant\"],"
                         + "varyContext=[\"locale\",\"region\"],nonCacheableResponseHeaders=[\"x-session\"],sharedResponse=true,singleFlight=true,refreshAfter=2000ms,refreshTimeout=750ms");
     }
 

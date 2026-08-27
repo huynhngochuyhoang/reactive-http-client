@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Method-specific semantic-read cache opt-in.** Added
+  `@CacheResponse(semanticRead = true)` for explicitly selected non-`GET`
+  methods, including `@ApiRef` methods. The false default preserves published
+  `4.0.0` GET-only behavior; client-wide policy selection, idempotency, retry
+  metadata, and method names cannot imply the application guarantee that a
+  cache hit may safely omit downstream dispatch.
+
 ## [4.0.0] - 2026-08-26
 
 ### Changed

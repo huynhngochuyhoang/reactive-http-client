@@ -409,13 +409,13 @@
     {
       "name": "reactive.http.clients.[name].cache.policy",
       "type": "java.lang.String",
-      "description": "Optional client-wide named response-cache policy selection. Blank or absent disables client-wide caching; method-level @CacheResponse overrides it.",
+      "description": "Optional client-wide named response-cache policy selection. Blank or absent disables client-wide caching; method-level @CacheResponse overrides it. A selected non-GET method still requires @CacheResponse(semanticRead=true) on that exact method; there is no client-wide semantic-read acknowledgement.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheConfig"
     },
     {
       "name": "reactive.http.clients.[name].cache.policies",
       "type": "java.util.Map<java.lang.String,io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties.CachePolicyConfig>",
-      "description": "Named local response-cache policy definitions. Definitions are inert until selected by cache.policy or @CacheResponse.",
+      "description": "Named local response-cache policy definitions. Definitions are inert until selected by cache.policy or @CacheResponse; policy definition does not imply semantic-read intent for non-GET methods.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheConfig"
     },
     {

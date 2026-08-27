@@ -177,7 +177,8 @@ public final class ReactiveHttpClientContractSnapshot {
         if (cache == null || !cache.enabled()) {
             return cache != null ? cache.source() : "disabled";
         }
-        return cache.source() + ":ttl=" + cache.ttlMs() + "ms,max=" + cache.maximumSize()
+        return cache.source() + ":semanticRead=" + cache.semanticRead()
+                + ",ttl=" + cache.ttlMs() + "ms,max=" + cache.maximumSize()
                 + ",varyParameters=" + variantNames(cache.varyByParameters())
                 + ",varyHeaders=" + variantNames(cache.varyByHeaders())
                 + ",varyContext=" + variantNames(cache.varyByContext())

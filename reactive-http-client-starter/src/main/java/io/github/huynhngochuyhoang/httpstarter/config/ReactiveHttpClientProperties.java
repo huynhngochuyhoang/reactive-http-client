@@ -740,6 +740,9 @@ public class ReactiveHttpClientProperties {
      * <p>Policy definitions are inert. Caching is selected only by a non-blank
      * {@link #policy} or a method-level
      * {@link io.github.huynhngochuyhoang.httpstarter.annotation.CacheResponse @CacheResponse}.
+     * A selected non-{@code GET} method additionally requires
+     * {@code @CacheResponse(semanticRead = true)} on that exact method; client-wide
+     * selection cannot provide that application guarantee.
      */
     public static class CacheConfig {
         private String policy;
