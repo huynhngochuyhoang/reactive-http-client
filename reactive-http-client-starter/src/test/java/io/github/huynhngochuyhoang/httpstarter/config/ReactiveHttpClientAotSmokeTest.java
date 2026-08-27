@@ -569,12 +569,28 @@ class ReactiveHttpClientAotSmokeTest {
 
     @ReactiveHttpClient(name = "factory-method-aot", baseUrl = "http://factory-method.test")
     interface FactoryMethodAotClient {
-        @GET("/ping")
+        @POST("/ping")
+        @CacheResponse(value = "selected", semanticRead = true)
         Mono<String> ping();
     }
 
     @Configuration(proxyBeanMethods = false)
     static class FactoryMethodAotConfiguration {
+        @Bean
+        ReactiveHttpClientProperties factoryMethodAotProperties() {
+            ReactiveHttpClientProperties.CachePolicyConfig policy =
+                    new ReactiveHttpClientProperties.CachePolicyConfig();
+            policy.setTtlMs(1_000L);
+            policy.setMaximumSize(100L);
+            policy.setSharedResponse(true);
+            ReactiveHttpClientProperties.ClientConfig client =
+                    new ReactiveHttpClientProperties.ClientConfig();
+            client.getCache().getPolicies().put("selected", policy);
+            ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+            properties.setClients(Map.of("factory-method-aot", client));
+            return properties;
+        }
+
         @Bean
         @Lazy
         ReactiveHttpClientFactoryBean<FactoryMethodAotClient> factoryMethodAotClient() {

@@ -128,8 +128,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 continue;
             }
             RequestPlan plan = RequestPlan.from(metadataCache.get(method), clientInterface);
-            EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.resolve(plan, clientConfig);
-            if (selection.enabled()) {
+            EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.decide(
+                    plan, clientConfig, EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig));
+            if (decision.cacheable()) {
+                EffectiveCachePolicy.Selection selection = decision.selection();
                 manager.cache(selection, clientName);
                 manager.metrics.registerApi(plan.apiName());
             }
