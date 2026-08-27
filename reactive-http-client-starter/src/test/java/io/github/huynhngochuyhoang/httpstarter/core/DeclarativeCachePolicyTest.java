@@ -14,6 +14,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.InputStream;
+import java.io.Reader;
+import java.nio.channels.ReadableByteChannel;
 import java.util.List;
 import java.util.Map;
 
@@ -157,6 +159,26 @@ class DeclarativeCachePolicyTest {
     }
 
     @Test
+    void oneEffectiveDecisionClassifiesEveryVerbEligibilityState() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig unselected = configWithPolicy("selected", 1_000L, 100L);
+        ReactiveHttpClientProperties.ClientConfig selected = selectedPolicy(1_000L, 100L);
+
+        assertThat(decision(UnselectedClient.class, "get", unselected).eligibility())
+                .isEqualTo(EffectiveCachePolicy.Eligibility.DISABLED);
+        assertThat(decision(EligibleClient.class, "get", selected).eligibility())
+                .isEqualTo(EffectiveCachePolicy.Eligibility.GET_FRIENDLY_SELECTED);
+        assertThat(decision(AcknowledgedPostClient.class, "query", unselected).eligibility())
+                .isEqualTo(EffectiveCachePolicy.Eligibility.SEMANTIC_READ_SELECTED);
+
+        EffectiveCachePolicy.Decision invalid = decision(
+                MethodSelectedPostClient.class, "query", unselected);
+        assertThat(invalid.eligibility()).isEqualTo(EffectiveCachePolicy.Eligibility.INVALID);
+        assertThat(invalid.invalidReason())
+                .contains("method-specific semantic-read acknowledgement")
+                .contains("semanticRead = true");
+    }
+
+    @Test
     void everyUnacknowledgedNonGetVerbRetainsThePublishedGetOnlyDefault() {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy(1_000L, 100L);
         Map<String, String> verbs = Map.of(
@@ -217,8 +239,14 @@ class DeclarativeCachePolicyTest {
                 .doesNotThrowAnyException();
         assertThatCode(() -> validate(ConcreteSemanticReadClient.class, "semantic-inherited", config))
                 .doesNotThrowAnyException();
+        assertThatCode(() -> validate(MultiLevelSemanticReadClient.class, "semantic-multi-level", config))
+                .doesNotThrowAnyException();
         assertThatCode(() -> validate(AcknowledgedOverloadedClient.class, "semantic-overloaded", config))
                 .doesNotThrowAnyException();
+        assertThatCode(() -> validate(BridgeSemanticReadClient.class, "semantic-bridge", config))
+                .doesNotThrowAnyException();
+        assertThat(java.util.Arrays.stream(BridgeSemanticReadClient.class.getDeclaredMethods())
+                .anyMatch(java.lang.reflect.Method::isBridge)).isTrue();
 
         List<EffectiveHttpClientContract> contracts = EffectiveHttpClientContractExporter.export(
                 AcknowledgedVerbClient.class, "semantic-verbs", config, metadataCache);
@@ -305,8 +333,36 @@ class DeclarativeCachePolicyTest {
 
         assertRejected(AcknowledgedFluxClient.class, config, "Flux responses are streaming");
         assertRejected(AcknowledgedVoidClient.class, config, "Mono<Void>");
+        assertRejected(AcknowledgedBodilessEnvelopeClient.class, config, "bodiless ResponseEntity<Void>");
+        assertRejected(AcknowledgedRawMonoClient.class, config,
+                "raw Mono responses have no finite materialized response type");
+        assertRejected(AcknowledgedStreamingEnvelopeClient.class, config,
+                "Publisher and streaming response values");
+        assertRejected(AcknowledgedDataBufferResponseClient.class, config, "DataBuffer response values");
+        assertRejected(AcknowledgedResourceResponseClient.class, config, "Resource response values");
         assertRejected(AcknowledgedStreamBodyClient.class, config,
                 "streaming or application-owned request bodies");
+        assertRejected(AcknowledgedReaderBodyClient.class, config,
+                "streaming or application-owned request bodies");
+        assertRejected(AcknowledgedChannelBodyClient.class, config,
+                "streaming or application-owned request bodies");
+        assertRejected(AcknowledgedPublisherBodyClient.class, config,
+                "streaming or application-owned request bodies");
+        assertRejected(AcknowledgedDataBufferBodyClient.class, config,
+                "streaming or application-owned request bodies");
+        assertRejected(AcknowledgedResourceBodyClient.class, config,
+                "streaming or application-owned request bodies");
+        assertRejected(AcknowledgedMultipartClient.class, config,
+                "multipart requests are not cache-eligible");
+    }
+
+    @Test
+    void finiteMaterializedBodiesAreVerbIndependentAfterAcknowledgement() {
+        ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("selected", 1_000L, 100L);
+        config.getCache().getPolicies().get("selected").setVaryByParameters(List.of("payload"));
+
+        assertThatCode(() -> validate(AcknowledgedMaterializedBodyClient.class, "materialized-bodies", config))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -461,6 +517,16 @@ class DeclarativeCachePolicyTest {
         metadataCache.validateDeclarativeCachePolicies(client, clientName, config);
     }
 
+    private EffectiveCachePolicy.Decision decision(
+            Class<?> client,
+            String methodName,
+            ReactiveHttpClientProperties.ClientConfig config) throws NoSuchMethodException {
+        var method = client.getMethod(methodName);
+        RequestPlan plan = RequestPlan.from(metadataCache.get(method), client);
+        return EffectiveCachePolicy.decide(
+                plan, config, EffectiveCachePolicy.effectiveHttpMethod(plan, config));
+    }
+
     private static ReactiveHttpClientProperties.ClientConfig selectedPolicy(Long ttlMs, Long maximumSize) {
         ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("selected", ttlMs, maximumSize);
         config.getCache().setPolicy("selected");
@@ -599,6 +665,23 @@ class DeclarativeCachePolicyTest {
     interface ConcreteSemanticReadClient extends SemanticReadOperations<String> {
     }
 
+    interface IntermediateSemanticReadOperations<T> extends SemanticReadOperations<List<T>> {
+    }
+
+    interface MultiLevelSemanticReadClient extends IntermediateSemanticReadOperations<String> {
+    }
+
+    interface BridgeOperations<T> {
+        T query();
+    }
+
+    interface BridgeSemanticReadClient extends BridgeOperations<Mono<String>> {
+        @Override
+        @POST("/bridge")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query();
+    }
+
     interface AcknowledgedOverloadedClient {
         @POST("/query/{id}")
         @CacheResponse(value = "selected", semanticRead = true)
@@ -632,10 +715,107 @@ class DeclarativeCachePolicyTest {
         Mono<Void> empty();
     }
 
+    interface AcknowledgedBodilessEnvelopeClient {
+        @POST("/empty-entity")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<ResponseEntity<Void>> empty();
+    }
+
+    interface AcknowledgedRawMonoClient {
+        @POST("/raw")
+        @CacheResponse(value = "selected", semanticRead = true)
+        @SuppressWarnings("rawtypes")
+        Mono raw();
+    }
+
+    interface AcknowledgedStreamingEnvelopeClient {
+        @POST("/stream-entity")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<ResponseEntity<Flux<DataBuffer>>> stream();
+    }
+
+    interface AcknowledgedDataBufferResponseClient {
+        @POST("/buffer-response")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<DataBuffer> buffer();
+    }
+
+    interface AcknowledgedResourceResponseClient {
+        @POST("/resource-response")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<Resource> resource();
+    }
+
     interface AcknowledgedStreamBodyClient {
         @POST("/stream-body")
         @CacheResponse(value = "selected", semanticRead = true)
         Mono<String> query(@Body InputStream input);
+    }
+
+    interface AcknowledgedReaderBodyClient {
+        @POST("/reader-body")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@Body Reader reader);
+    }
+
+    interface AcknowledgedChannelBodyClient {
+        @POST("/channel-body")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@Body ReadableByteChannel channel);
+    }
+
+    interface AcknowledgedPublisherBodyClient {
+        @POST("/publisher-body")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@Body Publisher<String> publisher);
+    }
+
+    interface AcknowledgedDataBufferBodyClient {
+        @POST("/buffer-body")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@Body DataBuffer buffer);
+    }
+
+    interface AcknowledgedResourceBodyClient {
+        @POST("/resource-body")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@Body Resource resource);
+    }
+
+    interface AcknowledgedMultipartClient {
+        @POST("/multipart")
+        @MultipartBody
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@FormFile("file") Resource resource);
+    }
+
+    interface AcknowledgedMaterializedBodyClient {
+        @POST("/post")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<BodyValue> post(@Body @CacheKey("payload") BodyValue payload);
+
+        @PUT("/put")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<ResponseEntity<String>> put(@Body @CacheKey("payload") String payload);
+
+        @PATCH("/patch")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<byte[]> patch(@Body @CacheKey("payload") byte[] payload);
+
+        @DELETE("/delete")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<BodyValue> delete(@Body @CacheKey("payload") BodyValue payload);
+
+        @HEAD("/head")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<ResponseEntity<String>> head(@Body @CacheKey("payload") String payload);
+
+        @OPTIONS("/options")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<byte[]> options(@Body @CacheKey("payload") byte[] payload);
+    }
+
+    record BodyValue(String query) {
     }
 
     interface ImplicitSafetyClient {

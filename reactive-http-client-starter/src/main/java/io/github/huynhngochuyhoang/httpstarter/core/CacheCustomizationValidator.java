@@ -93,7 +93,8 @@ final class CacheCustomizationValidator {
                 continue;
             }
             RequestPlan plan = RequestPlan.from(metadataCache.get(method), clientInterface);
-            if (EffectiveCachePolicy.resolve(plan, clientConfig).enabled()) {
+            String httpMethod = EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig);
+            if (EffectiveCachePolicy.decide(plan, clientConfig, httpMethod).cacheable()) {
                 return method;
             }
         }

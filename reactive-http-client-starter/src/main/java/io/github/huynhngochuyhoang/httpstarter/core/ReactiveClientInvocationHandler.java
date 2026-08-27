@@ -96,7 +96,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final String clientName;
     private final Class<?> clientInterface;
     private final Map<Method, RequestPlan> requestPlanCache = new ConcurrentHashMap<>();
-    private final Map<Method, EffectiveCachePolicy.Selection> cacheSelectionCache = new ConcurrentHashMap<>();
+    private final Map<Method, EffectiveCachePolicy.Decision> cacheDecisionCache = new ConcurrentHashMap<>();
     private final ApplicationContext applicationContext;
     private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> loggerCache = new ConcurrentHashMap<>();
     private final AtomicBoolean loggerCacheLimitWarningLogged = new AtomicBoolean(false);
@@ -377,10 +377,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
 
         Class<?> concreteClient = clientInterface != null ? clientInterface : method.getDeclaringClass();
-        EffectiveCachePolicy.Selection cacheSelection = requiresCacheSelection(plan)
-                ? cacheSelection(method, concreteClient, plan, effectiveApi.httpMethod())
-                : null;
-        if (cacheSelection != null && cacheSelection.enabled()) {
+        EffectiveCachePolicy.Decision cacheDecision = cacheDecision(
+                method, concreteClient, plan, effectiveApi.httpMethod());
+        if (cacheDecision.cacheable()) {
+            EffectiveCachePolicy.Selection cacheSelection = cacheDecision.selection();
             requireCacheAuthorizationSupport();
             Object[] invocationArguments = args != null ? args.clone() : new Object[0];
             Mono<?> cacheInvocation = Mono.deferContextual(context -> {
@@ -489,7 +489,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 continue;
             }
             RequestPlan plan = requestPlan(method, metadataCache.get(method));
-            if (EffectiveCachePolicy.resolve(plan, clientConfig).enabled()) {
+            String httpMethod = EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig);
+            if (EffectiveCachePolicy.decide(plan, clientConfig, httpMethod).cacheable()) {
                 throw missingCacheAuthorizationSupport();
             }
         }
@@ -649,26 +650,18 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return requestPlanCache.computeIfAbsent(method, ignored -> RequestPlan.from(meta, clientInterface));
     }
 
-    private EffectiveCachePolicy.Selection cacheSelection(Method method,
-                                                           Class<?> concreteClient,
-                                                           RequestPlan plan,
-                                                           String effectiveHttpMethod) {
-        EffectiveCachePolicy.Selection selection = cacheSelectionCache.get(method);
-        if (selection != null) {
-            return selection;
+    private EffectiveCachePolicy.Decision cacheDecision(Method method,
+                                                        Class<?> concreteClient,
+                                                        RequestPlan plan,
+                                                        String effectiveHttpMethod) {
+        EffectiveCachePolicy.Decision decision = cacheDecisionCache.get(method);
+        if (decision != null) {
+            return decision;
         }
-        EffectiveCachePolicy.Selection validated = EffectiveCachePolicy.validate(
+        EffectiveCachePolicy.Decision validated = EffectiveCachePolicy.validateDecision(
                 concreteClient, clientName, plan, clientConfig, effectiveHttpMethod);
-        EffectiveCachePolicy.Selection existing = cacheSelectionCache.putIfAbsent(method, validated);
+        EffectiveCachePolicy.Decision existing = cacheDecisionCache.putIfAbsent(method, validated);
         return existing != null ? existing : validated;
-    }
-
-    private boolean requiresCacheSelection(RequestPlan plan) {
-        if (!plan.cacheKeyParams().isEmpty() || StringUtils.hasText(plan.cachePolicyName())) {
-            return true;
-        }
-        ReactiveHttpClientProperties.CacheConfig cache = clientConfig.getCache();
-        return cache != null && StringUtils.hasText(cache.getPolicy());
     }
 
     private boolean usesSubscriptionState(RequestPlan plan,

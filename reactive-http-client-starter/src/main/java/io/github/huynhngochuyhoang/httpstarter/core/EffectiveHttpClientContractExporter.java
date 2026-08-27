@@ -107,10 +107,10 @@ final class EffectiveHttpClientContractExporter {
             DeclarativeReturnTypeGrammar.validate(clientInterface, clientName, plan);
         }
         EffectiveApi effectiveApi = effectiveApi(plan, clientName, clientConfig);
-        EffectiveCachePolicy.Selection cachePolicy = validateDeclarativeReturnTypes
-                ? EffectiveCachePolicy.validate(
+        EffectiveCachePolicy.Decision cacheDecision = validateDeclarativeReturnTypes
+                ? EffectiveCachePolicy.validateDecision(
                         clientInterface, clientName, plan, clientConfig, effectiveApi.httpMethod())
-                : EffectiveCachePolicy.resolve(plan, clientConfig);
+                : EffectiveCachePolicy.decide(plan, clientConfig, effectiveApi.httpMethod());
         EffectiveResiliencePolicy resiliencePolicy = EffectiveResiliencePolicy.resolve(
                 plan, effectiveApi.httpMethod(), clientConfig.getResilience(), operatorAvailability);
         if (validateResilienceInstances) {
@@ -141,21 +141,21 @@ final class EffectiveHttpClientContractExporter {
                 timeoutPolicy(plan, effectiveApi, clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
                 resiliencePolicy(resiliencePolicy),
-                cachePolicy(cachePolicy, plan.cacheSemanticRead()),
+                cachePolicy(cacheDecision),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 authMode(clientConfig),
                 plan.bodyRepeatability());
     }
 
     private static EffectiveHttpClientContract.CachePolicy cachePolicy(
-            EffectiveCachePolicy.Selection selection,
-            boolean semanticRead) {
+            EffectiveCachePolicy.Decision decision) {
+        EffectiveCachePolicy.Selection selection = decision.selection();
         ReactiveHttpClientProperties.CachePolicyConfig policy = selection.policy();
         CacheKeyContract.NormalizedVariants variants = CacheKeyContract.normalizedVariants(policy);
         return new EffectiveHttpClientContract.CachePolicy(
                 selection.enabled(),
                 selection.source().value(),
-                selection.enabled() && semanticRead,
+                decision.semanticRead(),
                 policy != null && policy.getTtlMs() != null ? policy.getTtlMs() : 0,
                 policy != null && policy.getMaximumSize() != null ? policy.getMaximumSize() : 0,
                 variants.parameterNames(),

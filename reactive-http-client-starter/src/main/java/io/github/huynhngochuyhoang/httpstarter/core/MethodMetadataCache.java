@@ -72,7 +72,7 @@ public class MethodMetadataCache {
                 continue;
             }
             RequestPlan plan = RequestPlan.from(get(method), clientInterface);
-            EffectiveCachePolicy.validate(
+            EffectiveCachePolicy.validateDecision(
                     clientInterface,
                     clientName,
                     plan,

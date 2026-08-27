@@ -972,15 +972,35 @@ class MockReactiveHttpClientTest {
         policy.setMaximumSize(100L);
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.getCache().getPolicies().put("selected", policy);
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger lifecycleStarts = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
 
         assertThatThrownBy(() -> MockReactiveHttpClient.forClient(InvalidCacheMockClient.class)
                 .clientConfig(config)
+                .withAuthProvider(request -> {
+                    authCalls.incrementAndGet();
+                    return Mono.empty();
+                })
+                .withLifecycleHook(new ReactiveHttpClientLifecycleHook() {
+                    @Override
+                    public void onStart(ReactiveHttpClientLifecycleContext context) {
+                        lifecycleStarts.incrementAndGet();
+                    }
+                })
+                .respondTo(HttpMethod.POST, "/invalid", exchange -> {
+                    dispatches.incrementAndGet();
+                    return MockReactiveHttpClient.text(200, "unexpected");
+                })
                 .build())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("InvalidCacheMockClient")
                 .hasMessageContaining("method=")
                 .hasMessageContaining("resolvedHttpMethod=POST")
                 .hasMessageContaining("semanticRead = true");
+        assertThat(authCalls).hasValue(0);
+        assertThat(lifecycleStarts).hasValue(0);
+        assertThat(dispatches).hasValue(0);
     }
 
     @Test

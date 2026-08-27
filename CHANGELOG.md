@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   identity, and unresolved `@ApiRef` verbs fail before the acknowledgement is
   considered.
 
+### Changed
+- **One verb-independent cache eligibility grammar.** Startup, invocation,
+  effective contracts, diagnostics, AOT, and mocks now consume one internal
+  decision for disabled methods, GET-friendly selections, acknowledged semantic
+  reads, and invalid selections. Acknowledgement does not broaden the existing
+  finite-response or application-owned request-body boundaries.
+
 ## [4.0.0] - 2026-08-26
 
 ### Changed

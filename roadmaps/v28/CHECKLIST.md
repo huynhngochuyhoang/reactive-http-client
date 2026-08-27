@@ -164,45 +164,71 @@ Evidence recorded on 2026-08-27:
 
 ## Priority 3 - Verb-Independent Declarative Eligibility Grammar
 
-### [ ] 3.1 Centralize effective cache eligibility
+### [x] 3.1 Centralize effective cache eligibility
 
-- [ ] Replace the fixed `GET` rejection with one package-private decision that
+- [x] Replace the fixed `GET` rejection with one package-private decision that
       represents disabled, GET-friendly selected, acknowledged semantic read,
       and invalid selection.
-- [ ] Resolve annotation and `@ApiRef` verbs through the concrete client and
+- [x] Resolve annotation and `@ApiRef` verbs through the concrete client and
       inherited generic method before deciding eligibility.
-- [ ] Use the same decision in factory startup, invocation, effective-contract
+- [x] Use the same decision in factory startup, invocation, effective-contract
       export, diagnostics, AOT, and `MockReactiveHttpClient`.
-- [ ] Remove duplicated verb checks made obsolete by the effective decision.
-- [ ] Keep foreign/replacement `FactoryBean` clients and replacement metadata
+- [x] Remove duplicated verb checks made obsolete by the effective decision.
+- [x] Keep foreign/replacement `FactoryBean` clients and replacement metadata
       caches outside starter-only validation where established contracts require
       it.
 
-### [ ] 3.2 Preserve finite response and owned-request boundaries
+### [x] 3.2 Preserve finite response and owned-request boundaries
 
-- [ ] Accept only finite materialized `Mono<T>` and
+- [x] Accept only finite materialized `Mono<T>` and
       `Mono<ResponseEntity<T>>` response shapes already supported by V27.
-- [ ] Keep `Flux`, raw/unresolved values, `Mono<Void>`, bodiless envelopes,
+- [x] Keep `Flux`, raw/unresolved values, `Mono<Void>`, bodiless envelopes,
       nested publishers, `DataBuffer`, `Resource`, and streaming responses
       rejected.
-- [ ] Keep multipart, form streams, publishers, `DataBuffer`, `Resource`,
+- [x] Keep multipart, form streams, publishers, `DataBuffer`, `Resource`,
       `InputStream`, `Reader`, channels, and other application-owned request
       bodies rejected.
-- [ ] Prove valid JSON, `String`, and `byte[]` body-bearing semantic reads across
+- [x] Prove valid JSON, `String`, and `byte[]` body-bearing semantic reads across
       supported non-GET verbs.
-- [ ] Prove idempotency keys, retry annotations, response status, and method names
+- [x] Prove idempotency keys, retry annotations, response status, and method names
       cannot substitute for semantic-read intent.
 
-### [ ] 3.3 Verify every declaration path
+### [x] 3.3 Verify every declaration path
 
-- [ ] Cover direct, inherited, multi-level generic, overloaded, bridge-method,
+- [x] Cover direct, inherited, multi-level generic, overloaded, bridge-method,
       factory-method, and `@ApiRef` clients.
-- [ ] Cover annotation-only, client-policy plus method acknowledgement,
+- [x] Cover annotation-only, client-policy plus method acknowledgement,
       API-configured, disabled, missing-policy, and blank-policy cases.
-- [ ] Assert proxy construction fails before auth, body serialization/resource
+- [x] Assert proxy construction fails before auth, body serialization/resource
       acquisition, lifecycle attempt hooks, cache allocation, or dispatch.
-- [ ] Run focused grammar, factory, diagnostics, contract-export, AOT, and mock
+- [x] Run focused grammar, factory, diagnostics, contract-export, AOT, and mock
       suites before moving to key construction.
+
+Evidence recorded on 2026-08-27:
+
+- `EffectiveCachePolicy.Decision` is the package-private source of truth for
+  `DISABLED`, `GET_FRIENDLY_SELECTED`, `SEMANTIC_READ_SELECTED`, and `INVALID`.
+  Factory startup and AOT/mock validation consume it through
+  `MethodMetadataCache`; invocation, contract export, diagnostics, customization
+  checks, auth-support checks, and cache registration use the same result. The
+  sole remaining `GET` interpretation is inside that decision.
+- Concrete-client `RequestPlan` resolution covers direct and overloaded methods,
+  inherited and multi-level generic contracts, compiler bridge methods, all six
+  annotation verbs, and configured `@ApiRef` methods. The factory-method AOT
+  fixture now proves an acknowledged semantic `POST`; foreign factories and a
+  replacement `MethodMetadataCache` retain their established exclusions.
+- Grammar tests retain every finite-response and owned-request rejection for an
+  acknowledged non-GET selection, and accept JSON records, `String`, and
+  `byte[]` bodies across `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `OPTIONS`
+  only when their wire body is selected for the key. Disabled/unselected,
+  missing/blank policy, idempotency/retry, and unresolved-verb cases remain
+  fail-safe.
+- The focused cache/grammar/factory/diagnostics/contract/AOT run passed 291
+  starter tests. The mock grammar run passed 56 tests and proves invalid proxy
+  construction invokes no auth provider, lifecycle start, or dispatch.
+- `mvn -B -ntp -pl reactive-http-client-starter,reactive-http-client-test -am
+  test` passed 1,223 starter tests and 59 test-helper tests with no failures,
+  errors, or skips.
 
 ---
 

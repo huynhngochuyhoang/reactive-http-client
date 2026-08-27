@@ -24,39 +24,34 @@ final class EffectiveCachePolicy {
                               RequestPlan plan,
                               ReactiveHttpClientProperties.ClientConfig clientConfig,
                               String effectiveHttpMethod) {
-        Selection selection = resolve(plan, clientConfig);
+        return validateDecision(clientInterface, clientName, plan, clientConfig, effectiveHttpMethod).selection();
+    }
+
+    static Decision validateDecision(Class<?> clientInterface,
+                                     String clientName,
+                                     RequestPlan plan,
+                                     ReactiveHttpClientProperties.ClientConfig clientConfig,
+                                     String effectiveHttpMethod) {
+        Decision decision = decide(plan, clientConfig, effectiveHttpMethod);
+        Selection selection = decision.selection();
         if (!selection.enabled()) {
             DeclarativeRequestParameterGrammar.validateCacheKeyActivity(
                     clientInterface, clientName, plan, selection);
-            return selection;
+            return decision;
         }
 
-        Method method = plan.method();
         String context = context(clientInterface, clientName, plan, selection, effectiveHttpMethod);
         ReactiveHttpClientProperties.CachePolicyConfig policy = selection.policy();
         if (policy == null) {
-            throw invalid(context, "the selected policy is not declared under cache.policies");
+            throw invalid(context, decision.invalidReason());
         }
         requireBound(context, "ttl-ms", policy.getTtlMs(), MAX_TTL_MS);
         requireBound(context, "maximum-size", policy.getMaximumSize(), MAXIMUM_SIZE);
         validateRefreshBounds(context, policy);
         normalizedNonCacheableResponseHeaders(context, policy);
 
-        if (!hasText(effectiveHttpMethod)) {
-            throw invalid(context, "selected cache methods require a resolved HTTP method; configure the "
-                    + "referenced API method before applying semantic-read intent");
-        }
-        String normalizedHttpMethod = effectiveHttpMethod.trim().toUpperCase(Locale.ROOT);
-        if (!ReactiveHttpClientFactoryBean.isSupportedOutboundHttpMethod(normalizedHttpMethod)) {
-            throw invalid(context, "resolved HTTP method '" + effectiveHttpMethod
-                    + "' is unsupported and cannot be acknowledged as a semantic read");
-        }
-        boolean semanticNonGet = !"GET".equals(normalizedHttpMethod);
-        if (semanticNonGet && !plan.cacheSemanticRead()) {
-            throw invalid(context, "selected non-GET methods require a method-specific semantic-read "
-                    + "acknowledgement; add @CacheResponse(value = \"" + selection.policyName()
-                    + "\", semanticRead = true) only when omitting downstream dispatch cannot omit a required "
-                    + "side effect");
+        if (decision.eligibility() == Eligibility.INVALID) {
+            throw invalid(context, decision.invalidReason());
         }
         if (plan.returnsFlux()) {
             throw invalid(context, "Flux responses are streaming and cannot be cached");
@@ -79,7 +74,7 @@ final class EffectiveCachePolicy {
         }
         validateMaterializedType(context, cacheValueType);
         validateRequestBody(context, plan);
-        if (semanticNonGet && plan.bodyIndex() >= 0
+        if (decision.eligibility() == Eligibility.SEMANTIC_READ_SELECTED && plan.bodyIndex() >= 0
                 && !CacheKeyContract.selectsRequestBody(plan, policy)) {
             throw invalid(context, "body-bearing semantic non-GET methods require the @Body parameter to "
                     + "declare @CacheKey and the policy to select that label through vary-by-parameters; "
@@ -88,11 +83,46 @@ final class EffectiveCachePolicy {
         CacheKeyContract.validate(clientInterface, clientName, plan, clientConfig, selection);
         DeclarativeRequestParameterGrammar.validateCacheKeyActivity(
                 clientInterface, clientName, plan, selection);
-        return selection;
+        return decision;
     }
 
-    static Selection resolve(RequestPlan plan,
-                             ReactiveHttpClientProperties.ClientConfig clientConfig) {
+    static Decision decide(RequestPlan plan,
+                           ReactiveHttpClientProperties.ClientConfig clientConfig,
+                           String effectiveHttpMethod) {
+        Selection selection = resolveSelection(plan, clientConfig);
+        if (!selection.enabled()) {
+            return new Decision(Eligibility.DISABLED, selection, null);
+        }
+        if (selection.policy() == null) {
+            return new Decision(Eligibility.INVALID, selection,
+                    "the selected policy is not declared under cache.policies");
+        }
+        if (!hasText(effectiveHttpMethod)) {
+            return new Decision(Eligibility.INVALID, selection,
+                    "selected cache methods require a resolved HTTP method; configure the referenced API method "
+                            + "before applying semantic-read intent");
+        }
+        String normalizedHttpMethod = effectiveHttpMethod.trim().toUpperCase(Locale.ROOT);
+        if (!ReactiveHttpClientFactoryBean.isSupportedOutboundHttpMethod(normalizedHttpMethod)) {
+            return new Decision(Eligibility.INVALID, selection,
+                    "resolved HTTP method '" + effectiveHttpMethod
+                            + "' is unsupported and cannot be acknowledged as a semantic read");
+        }
+        if ("GET".equals(normalizedHttpMethod)) {
+            return new Decision(Eligibility.GET_FRIENDLY_SELECTED, selection, null);
+        }
+        if (plan.cacheSemanticRead()) {
+            return new Decision(Eligibility.SEMANTIC_READ_SELECTED, selection, null);
+        }
+        return new Decision(Eligibility.INVALID, selection,
+                "selected non-GET methods require a method-specific semantic-read acknowledgement; add "
+                        + "@CacheResponse(value = \"" + selection.policyName()
+                        + "\", semanticRead = true) only when omitting downstream dispatch cannot omit a required "
+                        + "side effect");
+    }
+
+    private static Selection resolveSelection(RequestPlan plan,
+                                               ReactiveHttpClientProperties.ClientConfig clientConfig) {
         ReactiveHttpClientProperties.CacheConfig cache = clientConfig != null && clientConfig.getCache() != null
                 ? clientConfig.getCache()
                 : new ReactiveHttpClientProperties.CacheConfig();
@@ -346,6 +376,25 @@ final class EffectiveCachePolicy {
 
         String value() {
             return value;
+        }
+    }
+
+    enum Eligibility {
+        DISABLED,
+        GET_FRIENDLY_SELECTED,
+        SEMANTIC_READ_SELECTED,
+        INVALID
+    }
+
+    record Decision(Eligibility eligibility, Selection selection, String invalidReason) {
+
+        boolean cacheable() {
+            return eligibility == Eligibility.GET_FRIENDLY_SELECTED
+                    || eligibility == Eligibility.SEMANTIC_READ_SELECTED;
+        }
+
+        boolean semanticRead() {
+            return eligibility == Eligibility.SEMANTIC_READ_SELECTED;
         }
     }
 

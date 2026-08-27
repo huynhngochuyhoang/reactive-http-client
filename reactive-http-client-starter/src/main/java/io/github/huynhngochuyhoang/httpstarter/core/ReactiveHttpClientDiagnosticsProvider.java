@@ -248,8 +248,10 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 continue;
             }
             RequestPlan plan = RequestPlan.from(metadataCache.get(method), clientInterface);
-            EffectiveCachePolicy.Selection selection = EffectiveCachePolicy.resolve(plan, clientConfig);
-            if (selection.enabled() && selected.stream().noneMatch(policy -> policy == selection.policy())) {
+            EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.decide(
+                    plan, clientConfig, EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig));
+            EffectiveCachePolicy.Selection selection = decision.selection();
+            if (decision.cacheable() && selected.stream().noneMatch(policy -> policy == selection.policy())) {
                 selected.add(selection.policy());
             }
         }
