@@ -459,7 +459,7 @@ the POM include set or lacks an explicit support status.
 
 | Japicmp include pattern | Documented public surface | Examples | Support status |
 |---|---|---|---|
-| `io.github.huynhngochuyhoang.httpstarter.annotation` | Declarative client annotations | Client, HTTP verb, argument binding, ApiRef, idempotency, timeout, logging, `CacheResponse`, `CacheDisabled`, and `CacheKey` annotations | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.annotation` | Declarative client annotations | Client, HTTP verb, argument binding, ApiRef, idempotency, timeout, logging, `CacheResponse` including `semanticRead`, `CacheDisabled`, and `CacheKey` annotations | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.auth` | Auth extension points and built-in provider helpers | `AuthProvider`, `AuthProviderFactory`, `InvalidatableAuthProvider`, token providers, OAuth2, AWS SigV4 | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.enable` | Enablement annotation package | Starter enablement annotations | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.exception` | Public exception hierarchy | Client, remote-service, problem-detail, and auth exceptions | Supported |
@@ -504,6 +504,12 @@ resilience activation change is behavioral and configuration-driven. The cache
 annotations, nested property models, cache outcome enum/event accessors, and
 test-helper controls listed above are intentionally supported additions.
 
+V28 adds `CacheResponse.semanticRead()` with a `false` default and the matching
+`MethodMetadata` getter/setter as additive minor-line API. Existing compiled and
+source declarations retain the published `4.0.0` GET-only behavior unless one
+specific non-GET method opts in. The annotation is method-scoped; no client-wide
+configuration property broadens semantic-read intent.
+
 Cache engines and keying machinery remain implementation details:
 `LocalResponseCache`, `LocalResponseCacheManager`, `CaffeineLocalResponseCache`,
 `LocalResponseCacheMetrics`, `MicrometerLocalResponseCacheMetrics`,
@@ -523,8 +529,9 @@ current minor line:
 - `MethodMetadata` and `MethodMetadataCache` are the replacement-cache surface.
   The `MethodMetadata` no-arg constructor, `TIMEOUT_NOT_SET`, getters, setters,
   mutable maps and sets returned during parsing, and immutable cached maps and
-  sets returned after parsing are compatibility-covered. Do not remove, rename,
-  narrow, or change the mutability phase of those members in a minor release.
+  sets returned after parsing are compatibility-covered. This includes the V28
+  `cacheSemanticRead` getter/setter. Do not remove, rename, narrow, or change the
+  mutability phase of those members in a minor release.
 - `ReactiveHttpClientDiagnosticsProvider.ClientSummary`, `TimeoutSummary`, and
   `ResilienceSummary` are immutable diagnostics read models. Their canonical
   record constructors and component names are compatibility-covered; add new

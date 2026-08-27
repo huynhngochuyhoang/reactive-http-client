@@ -96,6 +96,13 @@ class MockReactiveHttpClientTest {
         Mono<String> create();
     }
 
+    @ReactiveHttpClient(name = "semantic-read-mock")
+    interface SemanticReadCacheMockClient {
+        @POST("/cached-query")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query();
+    }
+
     @Test
     void deterministicCacheControlsPreserveAuthMetadataLifecycleAndFinalRequestFacts() {
         ReactiveHttpClientProperties.ClientConfig config = cacheConfig(false, null, 2);
@@ -972,7 +979,34 @@ class MockReactiveHttpClientTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("InvalidCacheMockClient")
                 .hasMessageContaining("method=")
-                .hasMessageContaining("only GET methods");
+                .hasMessageContaining("resolvedHttpMethod=POST")
+                .hasMessageContaining("semanticRead = true");
+    }
+
+    @Test
+    void mockCachesAcknowledgedSemanticReadWithoutBroadeningClientSelection() {
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        policy.setSharedResponse(true);
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+        AtomicInteger loads = new AtomicInteger();
+
+        try (MockReactiveHttpClient<SemanticReadCacheMockClient> mock = MockReactiveHttpClient
+                .forClient(SemanticReadCacheMockClient.class)
+                .clientConfig(config)
+                .withDeterministicCacheTime()
+                .respondTo(HttpMethod.POST, "/cached-query", exchange ->
+                        MockReactiveHttpClient.text(200, "value-" + loads.incrementAndGet()))
+                .build()) {
+            assertThat(mock.proxy().query().block()).isEqualTo("value-1");
+            assertThat(mock.proxy().query().block()).isEqualTo("value-1");
+            assertThat(mock.loadCount("/cached-query")).isEqualTo(1);
+            assertThat(mock.cacheOutcomes()).containsExactly(
+                    HttpClientCacheOutcome.MISS_LOADER,
+                    HttpClientCacheOutcome.FRESH_HIT);
+        }
     }
 
     @Test

@@ -404,6 +404,7 @@ public class MethodMetadataCache {
         if (cacheResponse != null) {
             requireNonBlankAnnotationValue(cacheResponse.value(), "@CacheResponse", method);
             meta.setCachePolicyName(cacheResponse.value().trim());
+            meta.setCacheSemanticRead(cacheResponse.semanticRead());
         }
         meta.setCacheDisabled(cacheDisabled != null);
 

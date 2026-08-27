@@ -15,86 +15,150 @@ wire-equivalent request identity are both proven.
 
 ## Priority 1 - Post-`4.0.0` Baseline and V28 Scope Integrity
 
-### [ ] 1.1 Align development, published, and roadmap lanes
+### [x] 1.1 Align development, published, and roadmap lanes
 
-- [ ] Keep root/module and reactor-only fixture coordinates on
+- [x] Keep root/module and reactor-only fixture coordinates on
       `4.1.0-SNAPSHOT`.
-- [ ] Keep public dependency snippets and `latest.published.version` on
+- [x] Keep public dependency snippets and `latest.published.version` on
       published `4.0.0`.
-- [ ] Keep API compatibility, published-consumer, and benchmark baselines on
+- [x] Keep API compatibility, published-consumer, and benchmark baselines on
       published `4.0.0`.
-- [ ] Keep V28 as the only active execution roadmap without rewriting completed
+- [x] Keep V28 as the only active execution roadmap without rewriting completed
       V1-V27 release evidence.
-- [ ] Record `4.1.0` only as a candidate direction; do not advertise it as
+- [x] Record `4.1.0` only as a candidate direction; do not advertise it as
       released before publication verification.
 
-### [ ] 1.2 Prove the published `4.0.0` baseline
+### [x] 1.2 Prove the published `4.0.0` baseline
 
-- [ ] Resolve the parent POM plus starter, test-helper, and OTel POM/JAR/source/
+- [x] Resolve the parent POM plus starter, test-helper, and OTel POM/JAR/source/
       Javadoc artifacts from a previously absent Central-only repository.
-- [ ] Require Maven Central remote markers and record SHA-256 values for every
+- [x] Require Maven Central remote markers and record SHA-256 values for every
       required artifact.
-- [ ] Run strict root japicmp against published `4.0.0` from a fresh repository.
-- [ ] Run strict starter-module japicmp against published `4.0.0` from a separate
+- [x] Run strict root japicmp against published `4.0.0` from a fresh repository.
+- [x] Run strict starter-module japicmp against published `4.0.0` from a separate
       fresh repository.
-- [ ] Run published-baseline fixtures for local contamination, mixed versions,
+- [x] Run published-baseline fixtures for local contamination, mixed versions,
       missing attachments, mismatched POM/JAR versions, and self-comparison.
 
-### [ ] 1.3 Keep generated readiness honest
+### [x] 1.3 Keep generated readiness honest
 
-- [ ] Report `4.1.0-SNAPSHOT` as development and `4.0.0` as the latest
+- [x] Report `4.1.0-SNAPSHOT` as development and `4.0.0` as the latest
       published/API baseline.
-- [ ] Keep the final candidate, benchmark promotion, and publication work
+- [x] Keep the final candidate, benchmark promotion, and publication work
       deferred until V28 release preparation.
-- [ ] Include every unfinished semantic-read, key/body, composition, consumer,
+- [x] Include every unfinished semantic-read, key/body, composition, consumer,
       native, benchmark, API, and documentation priority in pending readiness.
-- [ ] Run `DocumentationReleaseArtifactTest`, Maven validation, and
+- [x] Run `DocumentationReleaseArtifactTest`, Maven validation, and
       `git diff --check`; record commands and totals under this priority.
+
+Evidence recorded on 2026-08-27:
+
+- Root, starter, test-helper, benchmark, assembled-consumer, and native-smoke
+  coordinates remain on `4.1.0-SNAPSHOT`. Public README/quick-start dependency
+  snippets, `latest.published.version`, API compatibility, published-consumer,
+  and benchmark baselines remain on published `4.0.0`. The roadmap archive
+  test confirms V28 is the only active roadmap and leaves V1-V27 completed.
+- `scripts/verify-published-release-artifacts.sh 4.0.0` resolved the parent POM
+  plus the starter, test-helper, and OTel POM, binary, source, and Javadoc
+  artifacts through `.mvn/maven-central-settings.xml` from the previously
+  absent `release-artifacts-4.0.0` repository. The provenance verifier accepted
+  every Central marker, declared/embedded version, and 13 SHA-256 records copied
+  under `target/release-evidence/v28/priority1/published-baseline/`.
+- Strict root and starter-module `api-compatibility` builds passed independently
+  against published `4.0.0` from the fresh
+  `v28-priority1-api-root-4.0.0` and
+  `v28-priority1-api-starter-4.0.0` repositories. Their Central provenance and
+  7 root / 2 starter SHA-256 records are under
+  `target/release-evidence/v28/priority1/api-root/` and `api-starter/`.
+- `scripts/verify-published-baseline-fixtures.sh` rejected locally installed
+  artifacts, candidate-version contamination, missing POM/source/Javadoc
+  attachments, mismatched project/parent POM and embedded JAR versions, and
+  root/module self-comparison.
+- Generated readiness now reports `v28`, the `additive-minor` lane,
+  `4.1.0-SNAPSHOT` development, published/API baseline `4.0.0`, and a deferred,
+  unpublished `4.1.0` candidate. Its pending work explicitly retains release
+  scope, semantic-read contract, key/body identity, composition, consumer,
+  AOT/native, benchmark, API, documentation, and publication work; benchmark
+  promotion and publication remain deferred until the release cut.
+- `mvn -B -ntp -pl reactive-http-client-starter
+  -Dtest=DocumentationReleaseArtifactTest test` passed 43 tests with no failures,
+  errors, or skips. `mvn -B -ntp -s .mvn/maven-central-settings.xml validate`
+  passed all four reactor modules, and `git diff --check` passed.
 
 ---
 
 ## Priority 2 - Semantic-Read Opt-In Contract
 
-### [ ] 2.1 Characterize the published `4.0.0` behavior
+### [x] 2.1 Characterize the published `4.0.0` behavior
 
-- [ ] Add focused tests proving client- and method-selected GET caching remains
+- [x] Add focused tests proving client- and method-selected GET caching remains
       explicitly opt-in.
-- [ ] Prove selected POST, PUT, PATCH, DELETE, OPTIONS, HEAD, and non-GET
+- [x] Prove selected POST, PUT, PATCH, DELETE, OPTIONS, HEAD, and non-GET
       `@ApiRef` methods currently fail the fixed-GET eligibility guard.
-- [ ] Cover client-wide policies on mixed GET/non-GET interfaces,
+- [x] Cover client-wide policies on mixed GET/non-GET interfaces,
       `@CacheDisabled`, inherited methods, overloads, and method-level policy
       precedence.
-- [ ] Record current startup messages, effective-contract output, diagnostics,
+- [x] Record current startup messages, effective-contract output, diagnostics,
       AOT, and mock behavior before changing the grammar.
-- [ ] Freeze the existing return/body eligibility and cache outcome behavior so
+- [x] Freeze the existing return/body eligibility and cache outcome behavior so
       verb support cannot broaden unrelated cache shapes.
 
-### [ ] 2.2 Freeze the public semantic-read acknowledgement
+### [x] 2.2 Freeze the public semantic-read acknowledgement
 
-- [ ] Select one additive, method/API-specific public spelling for semantic-read
+- [x] Select one additive, method/API-specific public spelling for semantic-read
       intent before implementing runtime support.
-- [ ] Define the annotation/configuration default as absent or false so compiled
+- [x] Define the annotation/configuration default as absent or false so compiled
       and source 4.0 clients retain GET-only behavior.
-- [ ] Define exact precedence among method policy, API-specific configuration,
+- [x] Define exact precedence among method policy, API-specific configuration,
       client-wide policy, semantic-read acknowledgement, and `@CacheDisabled`.
-- [ ] Prevent a generic client-wide policy or method-name pattern from
+- [x] Prevent a generic client-wide policy or method-name pattern from
       acknowledging every non-GET endpoint.
-- [ ] Document the declaration as an application guarantee that a cache hit may
+- [x] Document the declaration as an application guarantee that a cache hit may
       suppress downstream dispatch without omitting a required side effect.
-- [ ] Add Javadoc, configuration metadata, effective examples, native hints, and
+- [x] Add Javadoc, configuration metadata, effective examples, native hints, and
       public API inventory entries for the final shape.
 
-### [ ] 2.3 Enforce the selection matrix
+### [x] 2.3 Enforce the selection matrix
 
-- [ ] Preserve selected GET behavior without requiring the new acknowledgement.
-- [ ] Reject a client-policy-selected non-GET method that has no method/API
+- [x] Preserve selected GET behavior without requiring the new acknowledgement.
+- [x] Reject a client-policy-selected non-GET method that has no method/API
       acknowledgement.
-- [ ] Reject a method-policy-selected non-GET method that has no acknowledgement.
-- [ ] Accept an acknowledged non-GET method only after all later response, body,
+- [x] Reject a method-policy-selected non-GET method that has no acknowledgement.
+- [x] Accept an acknowledged non-GET method only after all later response, body,
       key, auth, and customization checks pass.
-- [ ] Keep unselected and `@CacheDisabled` methods on the ordinary request path.
-- [ ] Include client name, declaring/concrete method, resolved verb, policy name/
+- [x] Keep unselected and `@CacheDisabled` methods on the ordinary request path.
+- [x] Include client name, declaring/concrete method, resolved verb, policy name/
       source, and correction in startup errors without printing request data.
+
+Evidence recorded on 2026-08-27:
+
+- `roadmaps/v28/SEMANTIC_READ_BASELINE.md` freezes published `4.0.0` selection,
+  startup, effective-contract, diagnostics, AOT, mock, response, and body
+  behavior before recording the additive V28 matrix.
+- `CacheResponse.semanticRead()` is the single method-scoped acknowledgement and
+  defaults to `false`. `MethodMetadata`, `RequestPlan`, and effective-contract
+  snapshots retain the resolved value. Client-wide policy selection, method
+  names, idempotency keys, retry metadata, and statuses cannot imply intent.
+- Focused grammar coverage proves all six non-GET annotation verbs plus non-GET
+  `@ApiRef`, mixed interfaces, disabled/unselected methods, inherited generic
+  methods, overloads, policy precedence, rich errors, and unchanged finite/body
+  rejections. An unresolved `@ApiRef` verb fails before semantic intent is
+  considered, and a body-bearing semantic non-GET method must select its
+  serialized wire bytes even under `shared-response`. Acknowledged methods
+  still pass the existing key, auth, and customization gates before cache
+  allocation or dispatch.
+- Startup, effective-contract, diagnostics, AOT, and mock parity are covered by
+  `DeclarativeCachePolicyTest`, `ReactiveHttpClientContractSnapshotTest`,
+  `ReactiveHttpClientDiagnosticsProviderTest`,
+  `ReactiveHttpClientAotSmokeTest`, and `MockReactiveHttpClientTest`.
+- Javadoc, configuration metadata/reference, annotation and cache guides,
+  effective configuration, public API inventory, changelog, and runtime-hint
+  assertions document the method-specific guarantee and the absent client-wide
+  switch. The focused documentation/metadata run passed 61 tests.
+- `mvn -B -ntp -pl reactive-http-client-starter,reactive-http-client-test -am
+  test` passed 1,221 starter tests and 59 test-helper tests with no failures,
+  errors, or skips. Root `mvn -B -ntp validate` passed all four reactor modules,
+  and `git diff --check` passed.
 
 ---
 

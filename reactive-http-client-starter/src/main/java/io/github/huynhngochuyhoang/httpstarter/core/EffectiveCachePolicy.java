@@ -32,7 +32,7 @@ final class EffectiveCachePolicy {
         }
 
         Method method = plan.method();
-        String context = context(clientInterface, clientName, plan, selection);
+        String context = context(clientInterface, clientName, plan, selection, effectiveHttpMethod);
         ReactiveHttpClientProperties.CachePolicyConfig policy = selection.policy();
         if (policy == null) {
             throw invalid(context, "the selected policy is not declared under cache.policies");
@@ -42,9 +42,21 @@ final class EffectiveCachePolicy {
         validateRefreshBounds(context, policy);
         normalizedNonCacheableResponseHeaders(context, policy);
 
-        if (!"GET".equals(effectiveHttpMethod)) {
-            throw invalid(context, "only GET methods are cache-eligible but the resolved HTTP method is "
-                    + String.valueOf(effectiveHttpMethod));
+        if (!hasText(effectiveHttpMethod)) {
+            throw invalid(context, "selected cache methods require a resolved HTTP method; configure the "
+                    + "referenced API method before applying semantic-read intent");
+        }
+        String normalizedHttpMethod = effectiveHttpMethod.trim().toUpperCase(Locale.ROOT);
+        if (!ReactiveHttpClientFactoryBean.isSupportedOutboundHttpMethod(normalizedHttpMethod)) {
+            throw invalid(context, "resolved HTTP method '" + effectiveHttpMethod
+                    + "' is unsupported and cannot be acknowledged as a semantic read");
+        }
+        boolean semanticNonGet = !"GET".equals(normalizedHttpMethod);
+        if (semanticNonGet && !plan.cacheSemanticRead()) {
+            throw invalid(context, "selected non-GET methods require a method-specific semantic-read "
+                    + "acknowledgement; add @CacheResponse(value = \"" + selection.policyName()
+                    + "\", semanticRead = true) only when omitting downstream dispatch cannot omit a required "
+                    + "side effect");
         }
         if (plan.returnsFlux()) {
             throw invalid(context, "Flux responses are streaming and cannot be cached");
@@ -67,6 +79,12 @@ final class EffectiveCachePolicy {
         }
         validateMaterializedType(context, cacheValueType);
         validateRequestBody(context, plan);
+        if (semanticNonGet && plan.bodyIndex() >= 0
+                && !CacheKeyContract.selectsRequestBody(plan, policy)) {
+            throw invalid(context, "body-bearing semantic non-GET methods require the @Body parameter to "
+                    + "declare @CacheKey and the policy to select that label through vary-by-parameters; "
+                    + "shared-response cannot waive wire-byte body identity");
+        }
         CacheKeyContract.validate(clientInterface, clientName, plan, clientConfig, selection);
         DeclarativeRequestParameterGrammar.validateCacheKeyActivity(
                 clientInterface, clientName, plan, selection);
@@ -299,10 +317,13 @@ final class EffectiveCachePolicy {
     private static String context(Class<?> clientInterface,
                                   String clientName,
                                   RequestPlan plan,
-                                  Selection selection) {
+                                  Selection selection,
+                                  String effectiveHttpMethod) {
         Method method = plan.method();
         return "Reactive HTTP client '" + clientName + "' concreteClient=" + clientInterface.getName()
-                + " method=" + method.toGenericString() + " cachePolicy='" + selection.policyName()
+                + " method=" + method.toGenericString()
+                + " resolvedHttpMethod=" + String.valueOf(effectiveHttpMethod)
+                + " cachePolicy='" + selection.policyName()
                 + "' source=" + selection.source().value
                 + (plan.apiRefName() != null ? " apiRef='" + plan.apiRefName() + "'" : "");
     }

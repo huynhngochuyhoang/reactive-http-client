@@ -515,14 +515,33 @@ wide selection can be overridden or excluded per method.
 
 Selects one named policy from
 `reactive.http.clients.[name].cache.policies` and takes precedence over the
-client-wide `cache.policy` value. It can be used with annotation-owned `@GET`
-methods and configured `@ApiRef` methods.
+client-wide `cache.policy` value. A selected `GET` needs no additional intent.
+A selected non-`GET` method, including a configured `@ApiRef`, must use
+`semanticRead = true` on that exact annotation:
 
 ```java
 @GET("/catalog/{id}")
 @CacheResponse("catalog-read")
 Mono<CatalogItem> getItem(@PathVar("id") String id);
 ```
+
+```java
+@POST("/catalog/search")
+@CacheResponse(value = "catalog-read", semanticRead = true)
+Mono<CatalogItem> search(@QueryParam("sku") String sku);
+```
+
+`semanticRead` defaults to `false`. Setting it is an application guarantee that
+a cache hit may omit downstream dispatch without omitting a required side
+effect. It does not declare write idempotency, retry or replay safety, or cache
+invalidation. A client-wide policy, an idempotency key, retry metadata, or a
+method name cannot provide this method-specific guarantee.
+
+For a body-bearing semantic non-`GET` read, annotate the `@Body` parameter with
+`@CacheKey` and include that label in `vary-by-parameters`. The cache key uses
+the prepared wire bytes. `shared-response: true` cannot waive body identity for
+these methods. A configured `@ApiRef` must resolve a nonblank HTTP method before
+`semanticRead` is considered.
 
 ### `@CacheKey`
 
@@ -549,8 +568,9 @@ methods. It cannot be combined with `@CacheResponse`.
 Mono<CatalogState> liveState();
 ```
 
-Selected caching is restricted to `GET` methods returning a finite `Mono<T>` or
-`Mono<ResponseEntity<T>>`. A selected policy may separately enable same-key
-request coalescing with `single-flight: true`; it remains disabled by default.
-See [Response Caching](32-response-caching.md) for the full eligibility, key
-isolation, coalescing, and customization-safety contract.
+Selected caching requires a finite `Mono<T>` or `Mono<ResponseEntity<T>>` and
+must pass the existing body, key-isolation, auth, and customization checks.
+Non-`GET` selection additionally requires `semanticRead = true`. A selected
+policy may separately enable same-key request coalescing with
+`single-flight: true`; it remains disabled by default. See
+[Response Caching](32-response-caching.md) for the full contract.

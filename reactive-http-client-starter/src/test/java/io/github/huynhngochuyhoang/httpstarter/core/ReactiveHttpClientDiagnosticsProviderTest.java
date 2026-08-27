@@ -234,7 +234,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
-    void starterClientsUseCacheEligibilityGrammarInDiagnostics() {
+    void starterClientsRejectUnacknowledgedSemanticReadsInDiagnostics() {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         GenericBeanDefinition definition = new GenericBeanDefinition();
         definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
@@ -255,7 +255,35 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .hasMessageContaining("invalid-cache-diagnostic")
                 .hasMessageContaining("concreteClient=" + InvalidCacheDiagnosticClient.class.getName())
                 .hasMessageContaining("method=")
-                .hasMessageContaining("only GET methods");
+                .hasMessageContaining("resolvedHttpMethod=POST")
+                .hasMessageContaining("semanticRead = true");
+    }
+
+    @Test
+    void starterDiagnosticsAcceptMethodSpecificSemanticReads() {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        GenericBeanDefinition definition = new GenericBeanDefinition();
+        definition.setBeanClass(ReactiveHttpClientFactoryBean.class);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, SemanticReadDiagnosticClient.class);
+        beanFactory.registerBeanDefinition("semanticReadDiagnosticClient", definition);
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        policy.setSharedResponse(true);
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("semantic-read-diagnostic", config));
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider));
+
+        assertThat(client)
+                .containsEntry("clientName", "semantic-read-diagnostic")
+                .containsEntry("cachePhase", "local-ttl")
+                .containsEntry("cachePolicyCount", 1)
+                .containsEntry("endpointCount", 1);
     }
 
     @Test
@@ -2009,6 +2037,15 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         @POST("/items")
         @CacheResponse("selected")
         Mono<String> create();
+    }
+
+    @ReactiveHttpClient(
+            name = "semantic-read-diagnostic",
+            baseUrl = "http://semantic-read-diagnostic.test")
+    interface SemanticReadDiagnosticClient {
+        @POST("/query")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query();
     }
 
     @SuppressWarnings("rawtypes")

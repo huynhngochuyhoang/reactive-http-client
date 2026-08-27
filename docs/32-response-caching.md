@@ -49,9 +49,30 @@ policy name. Cache-disabled clients do not load the implementation.
 Method precedence is:
 
 1. `@CacheDisabled` excludes the method.
-2. `@CacheResponse("name")` selects that policy.
+2. `@CacheResponse("name")` selects that policy and carries any method-specific
+   semantic-read acknowledgement.
 3. A non-blank client `cache.policy` applies.
 4. Otherwise caching is disabled.
+
+`GET` remains the cache-friendly default. A selected non-`GET` method must
+declare `@CacheResponse(value = "name", semanticRead = true)` on that exact
+method. Client-wide policy selection cannot acknowledge all non-`GET` methods;
+the annotation also takes precedence over the client policy. The same spelling
+applies to a non-`GET` method whose verb and path come from `@ApiRef`.
+
+The acknowledgement is an application guarantee that serving a cache hit may
+suppress downstream dispatch without omitting a required side effect. It is
+not inferred from an idempotency key, a retry annotation, the HTTP method name,
+or response status, and it does not provide write invalidation or replay safety.
+Its default is `false`, preserving the published `4.0.0` GET-only behavior for
+existing declarations.
+
+A body-bearing semantic non-`GET` read must annotate its `@Body` parameter with
+`@CacheKey` and select that label through `vary-by-parameters`. The resulting
+key dimension is derived from the exact prepared wire bytes. `shared-response`
+cannot waive this requirement. For `@ApiRef`, the configured method must first
+resolve to a nonblank supported verb; semantic intent does not repair missing
+API configuration.
 
 The same method annotations work on inherited endpoints, overloads, and
 `@ApiRef` methods. Policy names are trimmed and must not be blank. A selected
@@ -70,15 +91,21 @@ concrete client, Java method, policy source, and `@ApiRef` key when applicable.
 
 ## Initial eligibility
 
-Only a resolved `GET` returning a finite `Mono<T>` or
-`Mono<ResponseEntity<T>>` is eligible. Startup rejects selected caching for:
+A resolved `GET`, or an explicitly acknowledged semantic read, is eligible only
+when it returns a finite `Mono<T>` or `Mono<ResponseEntity<T>>`. Startup rejects
+selected caching for:
 
 - `Flux`, raw `Mono`, `Mono<Void>`, and streaming response envelopes;
 - `Publisher`, `DataBuffer`, `Resource`, unresolved wildcard/type-variable,
   raw generic, and unknown `Object` response values;
 - multipart requests and request bodies owned as a publisher, data buffer,
   resource, input stream, reader, or readable byte channel;
-- every resolved HTTP method other than `GET`, including a non-GET `@ApiRef`.
+- every resolved non-`GET` method without method-specific
+  `@CacheResponse(..., semanticRead = true)`, including a non-`GET` `@ApiRef`.
+
+An acknowledged method still passes every existing response, request-body,
+key, auth, and customization-safety check. The acknowledgement does not make a
+streaming, unresolved, multipart, or application-owned shape cacheable.
 
 Only a final successful, non-null decoded emission is a cache candidate. Empty
 completion, cancellation, redirect, auth/decode/
@@ -154,11 +181,12 @@ access, or its factory shuts down.
 The starter does not invalidate related cached reads after a write. An unselected
 or explicitly disabled `POST`, `PUT`, `PATCH`, or `DELETE` follows its normal
 request path without searching for related read keys or broadcasting invalidation.
-A selected write method fails proxy construction because response caching supports
-only eligible `GET` methods; apply `@CacheDisabled` when a client-level policy
-would otherwise select it. Choose a TTL that bounds acceptable staleness, and use
-an application-owned invalidation/coherence system when writes must be visible
-sooner.
+A selected non-`GET` method fails proxy construction unless that exact method is
+declared as a semantic read. Use `@CacheDisabled` when a client-level policy
+would otherwise select a command. A false semantic-read declaration is an
+application correctness defect: a hit can intentionally suppress the downstream
+call. Choose a TTL that bounds acceptable staleness, and use an application-owned
+invalidation/coherence system when writes must be visible sooner.
 
 This feature is not a distributed-cache abstraction. It provides no shared
 storage, cross-instance single flight, distributed locks, write-through policy,
@@ -298,9 +326,9 @@ retains only its final attempt facts, and a failed hidden refresh does not rewri
 the stale caller result.
 
 Caching remains a read optimization. Selected non-`GET` methods fail startup
-even when an idempotency key is present. An unselected write still dispatches
-normally, does not invalidate cached reads, and is never suppressed by a cached
-result.
+without method-specific semantic-read intent even when an idempotency key is
+present. An unselected or disabled write still dispatches normally, does not
+invalidate cached reads, and is never suppressed by a cached result.
 
 ## Key and variant isolation
 
@@ -354,9 +382,11 @@ shared across identities. The effective idempotency header alone is not an
 authenticated identity partition because it may be absent and is required for
 every non-shared policy. Select at least one additional stable parameter,
 header, or context dimension, or explicitly acknowledge `shared-response`.
-The same acknowledgement is required when dynamic headers, header maps, or a
-body are intentionally omitted. It cannot be used to remove explicitly
-selected variants; those dimensions still partition the response.
+The same acknowledgement is required when dynamic headers, header maps, or an
+eligible `GET` body are intentionally omitted. A body-bearing semantic
+non-`GET` read must always select its body through `vary-by-parameters`. The
+acknowledgement cannot remove explicitly selected variants; those dimensions
+still partition the response.
 
 Request IDs, correlation IDs, trace IDs, and similarly unique values are poor
 cache variants: they make nearly every call a miss and provide no response
@@ -412,9 +442,10 @@ nested-container projections are validated before freezing, so a nested custom
 container cannot lose its wire conversion. They are then
 materialized under the same cumulative 1 MiB bound before the ordinary request
 resolver can call `String.valueOf`. Path and query arguments are always frozen
-because they define the request target. A body or dynamic header omitted under
-`shared-response: true` is neither cache-key validated nor frozen; the explicit
-sharing acknowledgement leaves its ordinary request behavior unchanged. URI
+because they define the request target. An eligible `GET` body or dynamic
+header omitted under `shared-response: true` is neither cache-key validated nor
+frozen; the explicit sharing acknowledgement leaves its ordinary request
+behavior unchanged. Semantic non-`GET` bodies cannot use this waiver. URI
 variants retain their non-normalized text, so a literal Unicode path and an
 explicitly percent-escaped path remain distinct. These projections prevent
 wire-distinct requests from collapsing into one structural key. Canonical
@@ -525,7 +556,7 @@ it `INCOMPATIBLE`; classification is not a bypass mechanism.
 Proxy startup, AOT processing, effective-contract export, diagnostics, and
 `MockReactiveHttpClient` use the same `MethodMetadataCache`-backed grammar.
 Replacement metadata caches remain authoritative. Contract snapshots expose a
-bounded `Cache` cell with source, TTL, maximum size, normalized variants,
-shared-response acknowledgement, the single-flight decision, and bounded refresh
-threshold/timeout values. Policy names,
+bounded `Cache` cell with source, `semanticRead`, TTL, maximum size, normalized
+variants, shared-response acknowledgement, the single-flight decision, and
+bounded refresh threshold/timeout values. Policy names,
 raw values, and opaque key digests are not exported.

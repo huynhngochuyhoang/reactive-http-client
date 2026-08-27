@@ -740,6 +740,9 @@ public class ReactiveHttpClientProperties {
      * <p>Policy definitions are inert. Caching is selected only by a non-blank
      * {@link #policy} or a method-level
      * {@link io.github.huynhngochuyhoang.httpstarter.annotation.CacheResponse @CacheResponse}.
+     * A selected non-{@code GET} method additionally requires
+     * {@code @CacheResponse(semanticRead = true)} on that exact method; client-wide
+     * selection cannot provide that application guarantee.
      */
     public static class CacheConfig {
         private String policy;
@@ -786,7 +789,10 @@ public class ReactiveHttpClientProperties {
         private List<String> varyByContext = new ArrayList<>();
         /** Application-specific response headers that make a response non-cacheable. */
         private List<String> nonCacheableResponseHeaders = new ArrayList<>();
-        /** Explicit acknowledgement that omitted caller/auth variants share one response. */
+        /**
+         * Explicit acknowledgement that omitted caller/auth variants share one response.
+         * This cannot waive body identity for a semantic non-GET method.
+         */
         private boolean sharedResponse;
         /** Coalesce concurrent same-key misses into one shared load. Default: false. */
         private boolean singleFlight;

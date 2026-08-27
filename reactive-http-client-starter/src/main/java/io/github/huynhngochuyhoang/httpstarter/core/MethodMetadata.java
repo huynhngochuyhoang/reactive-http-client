@@ -70,6 +70,8 @@ public class MethodMetadata {
     private String rateLimiterInstanceName;
     /** Method-level named response-cache policy; {@code null} means inherit the client selection. */
     private String cachePolicyName;
+    /** Method-level guarantee that a selected non-GET endpoint is a semantic read. */
+    private boolean cacheSemanticRead;
     /** Explicit method exclusion from a client-wide response-cache policy. */
     private boolean cacheDisabled;
     /** index -> stable cache-key parameter label. */
@@ -167,6 +169,9 @@ public class MethodMetadata {
 
     public String getCachePolicyName() { return cachePolicyName; }
     public void setCachePolicyName(String cachePolicyName) { this.cachePolicyName = cachePolicyName; }
+
+    public boolean isCacheSemanticRead() { return cacheSemanticRead; }
+    public void setCacheSemanticRead(boolean cacheSemanticRead) { this.cacheSemanticRead = cacheSemanticRead; }
 
     public boolean isCacheDisabled() { return cacheDisabled; }
     public void setCacheDisabled(boolean cacheDisabled) { this.cacheDisabled = cacheDisabled; }

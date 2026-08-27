@@ -34,6 +34,7 @@ record EffectiveHttpClientContract(
 
     record CachePolicy(boolean enabled,
                        String source,
+                       boolean semanticRead,
                        long ttlMs,
                        long maximumSize,
                        List<String> varyByParameters,
