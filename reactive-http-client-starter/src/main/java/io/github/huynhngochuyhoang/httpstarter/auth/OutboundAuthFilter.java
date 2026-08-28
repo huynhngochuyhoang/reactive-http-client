@@ -14,6 +14,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -40,11 +41,21 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
         if (cacheProbe instanceof AtomicReference<?> reference) {
             return resolveAuthContext(authRequest)
                     .map(authContext -> {
-                        applyAuth(request, authContext);
                         @SuppressWarnings("unchecked")
                         AtomicReference<AuthContext> resolved = (AtomicReference<AuthContext>) reference;
                         resolved.set(authContext);
                         return ClientResponse.create(HttpStatus.NO_CONTENT).build();
+                    });
+        }
+        if (cacheProbe instanceof BiConsumer<?, ?> consumer) {
+            return resolveAuthContext(authRequest)
+                    .flatMap(authContext -> {
+                        ClientRequest authorizedRequest = applyAuth(request, authContext);
+                        @SuppressWarnings("unchecked")
+                        BiConsumer<ClientRequest, AuthContext> resolved =
+                                (BiConsumer<ClientRequest, AuthContext>) consumer;
+                        resolved.accept(authorizedRequest, authContext);
+                        return next.exchange(authorizedRequest);
                     });
         }
         Mono<ClientRequest> authorizedRequest = request.attribute(AuthRequest.PRE_RESOLVED_AUTH_CONTEXT_ATTRIBUTE)

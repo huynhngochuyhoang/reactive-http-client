@@ -3,10 +3,12 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientAutoConfiguration;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import org.springframework.beans.factory.BeanFactoryUtils;
+import org.springframework.beans.factory.HierarchicalBeanFactory;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.webclient.WebClientCustomizer;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.lang.reflect.Method;
@@ -45,8 +47,9 @@ final class CacheCustomizationValidator {
             applicable.add(beanName);
         }
         for (String beanName : beanNames(context, ReactiveHttpClientCustomizer.class)) {
-            ReactiveHttpClientCustomizer customizer = context.getBean(beanName, ReactiveHttpClientCustomizer.class);
-            if (customizer.supports(clientName)) {
+            Object existing = existingSingleton(context, beanName);
+            if (!(existing instanceof ReactiveHttpClientCustomizer customizer)
+                    || customizer.supports(clientName)) {
                 applicable.add(beanName);
             }
         }
@@ -103,6 +106,30 @@ final class CacheCustomizationValidator {
 
     private static String[] beanNames(ListableBeanFactory beanFactory, Class<?> type) {
         return BeanFactoryUtils.beanNamesForTypeIncludingAncestors(beanFactory, type, true, false);
+    }
+
+    private static Object existingSingleton(ListableBeanFactory beanFactory, String beanName) {
+        if (beanFactory instanceof HierarchicalBeanFactory hierarchical
+                && hierarchical.containsLocalBean(beanName)) {
+            ConfigurableListableBeanFactory localFactory = localBeanFactory(beanFactory);
+            return localFactory != null ? localFactory.getSingleton(beanName) : null;
+        }
+        if (beanFactory instanceof HierarchicalBeanFactory hierarchical
+                && hierarchical.getParentBeanFactory() instanceof ListableBeanFactory parent) {
+            return existingSingleton(parent, beanName);
+        }
+        ConfigurableListableBeanFactory localFactory = localBeanFactory(beanFactory);
+        return localFactory != null ? localFactory.getSingleton(beanName) : null;
+    }
+
+    private static ConfigurableListableBeanFactory localBeanFactory(ListableBeanFactory beanFactory) {
+        if (beanFactory instanceof ConfigurableListableBeanFactory configurable) {
+            return configurable;
+        }
+        if (beanFactory instanceof ConfigurableApplicationContext applicationContext) {
+            return applicationContext.getBeanFactory();
+        }
+        return null;
     }
 
     private static String context(Class<?> clientInterface,

@@ -739,7 +739,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
             Object value,
             ResponseMetadata responseMetadata) {
         if (responseMetadata != null
-                && (isRedirect(responseMetadata.statusCode())
+                && (!responseMetadata.requestIdentityMatches()
+                || isRedirect(responseMetadata.statusCode())
                 || hasNonCacheableHeaders(policy, responseMetadata.headers()))) {
             return java.util.Optional.empty();
         }
@@ -815,7 +816,14 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
     }
 
-    record ResponseMetadata(int statusCode, Map<String, java.util.List<String>> headers) {
+    record ResponseMetadata(
+            int statusCode,
+            Map<String, java.util.List<String>> headers,
+            boolean requestIdentityMatches) {
+
+        ResponseMetadata(int statusCode, Map<String, java.util.List<String>> headers) {
+            this(statusCode, headers, true);
+        }
 
         ResponseMetadata {
             if (headers == null || headers.isEmpty()) {
@@ -830,6 +838,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
 
         static ResponseMetadata successWithoutHeaders() {
             return new ResponseMetadata(200, Map.of());
+        }
+
+        ResponseMetadata withRequestIdentityMatches(boolean matches) {
+            return new ResponseMetadata(statusCode, headers, matches);
         }
     }
 

@@ -20,6 +20,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.ClientResponse;
@@ -101,6 +102,13 @@ class MockReactiveHttpClientTest {
         @POST("/cached-query")
         @CacheResponse(value = "selected", semanticRead = true)
         Mono<String> query();
+    }
+
+    @ReactiveHttpClient(name = "semantic-auth-mock")
+    interface SemanticAuthCacheMockClient {
+        @POST("/partitioned-query")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(@HeaderParam("X-Principal") String principal);
     }
 
     @Test
@@ -1027,6 +1035,57 @@ class MockReactiveHttpClientTest {
                     HttpClientCacheOutcome.MISS_LOADER,
                     HttpClientCacheOutcome.FRESH_HIT);
         }
+    }
+
+    @Test
+    void mockAuthParticipatesInSemanticReadPartitionValidationAndPerCallerGates() {
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        policy.setVaryByHeaders(List.of("Idempotency-Key"));
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("selected", policy);
+        AtomicInteger authCalls = new AtomicInteger();
+
+        assertThatThrownBy(() -> MockReactiveHttpClient.forClient(SemanticReadCacheMockClient.class)
+                .clientConfig(config)
+                .withAuthProvider(request -> {
+                    authCalls.incrementAndGet();
+                    return Mono.just(AuthContext.empty());
+                })
+                .build())
+                .hasMessageContaining("authenticated responses require an explicit")
+                .hasMessageContaining("partition or shared-response acknowledgement");
+        assertThat(authCalls).hasValue(0);
+        assertThat(config.hasAuthConfigured()).isFalse();
+
+        policy.setVaryByHeaders(List.of("Idempotency-Key", "X-Principal"));
+        AtomicInteger loads = new AtomicInteger();
+        try (MockReactiveHttpClient<SemanticAuthCacheMockClient> mock = MockReactiveHttpClient
+                .forClient(SemanticAuthCacheMockClient.class)
+                .clientConfig(config)
+                .withDeterministicCacheTime()
+                .withAuthProvider(request -> {
+                    authCalls.incrementAndGet();
+                    String principal = request.request().headers().getFirst("X-Principal");
+                    return Mono.just(AuthContext.builder()
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + principal)
+                            .build());
+                })
+                .respondTo(HttpMethod.POST, "/partitioned-query", exchange -> {
+                    int load = loads.incrementAndGet();
+                    return MockReactiveHttpClient.text(200,
+                            exchange.headers().getFirst(HttpHeaders.AUTHORIZATION) + ":" + load);
+                })
+                .build()) {
+            assertThat(mock.proxy().query("principal-a").block()).isEqualTo("Bearer principal-a:1");
+            assertThat(mock.proxy().query("principal-a").block()).isEqualTo("Bearer principal-a:1");
+            assertThat(mock.proxy().query("principal-b").block()).isEqualTo("Bearer principal-b:2");
+            assertThat(mock.loadCount("/partitioned-query")).isEqualTo(2);
+        }
+
+        assertThat(authCalls).hasValue(3);
+        assertThat(loads).hasValue(2);
     }
 
     @Test

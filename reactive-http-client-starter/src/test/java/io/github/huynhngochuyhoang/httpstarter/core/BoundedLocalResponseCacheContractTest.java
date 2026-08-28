@@ -1315,7 +1315,7 @@ class BoundedLocalResponseCacheContractTest {
 
         assertThat(authCalls).hasValue(2);
         assertThat(dispatches).hasValue(1);
-        assertThat(downstreamFilterCalls).hasValue(1);
+        assertThat(downstreamFilterCalls).hasValue(3);
         assertThat(authHeaders).allSatisfy(headers -> {
             assertThat(headers.getFirst("X-Boot-Default")).isEqualTo("default-value");
             assertThat(headers.getFirst("X-Trace-Id")).isEqualTo("trace-1");

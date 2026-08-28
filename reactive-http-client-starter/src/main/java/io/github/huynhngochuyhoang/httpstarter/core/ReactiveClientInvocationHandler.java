@@ -28,10 +28,10 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.DefaultUriBuilderFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Signal;
@@ -54,6 +54,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -84,12 +85,17 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     static final String RESILIENCE_SUBSCRIPTION_ORDER =
             "logical-call-timeout -> bulkhead -> circuit-breaker -> rate-limiter -> retry -> request-attempt";
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+    private static final String CACHE_FINAL_REQUEST_IDENTITY_ATTRIBUTE =
+            ReactiveClientInvocationHandler.class.getName() + ".cacheFinalRequestIdentity";
+    private static final String CACHE_REQUEST_IDENTITY_PROBE_ATTRIBUTE =
+            ReactiveClientInvocationHandler.class.getName() + ".cacheRequestIdentityProbe";
     private static final Object SUBSCRIPTION_STATE_CONTEXT_KEY = new Object();
     private static final Object LOGICAL_CALL_DEADLINE_CONTEXT_KEY = new Object();
     private static final int MAX_LOGGER_CACHE_SIZE = 256;
     private static final int MAX_RESILIENCE_WARNING_KEYS = 256;
 
     private final WebClient webClient;
+    private final WebClient cacheIdentityWebClient;
     private final MethodMetadataCache metadataCache;
     private final RequestArgumentResolver argumentResolver;
     private final DefaultErrorDecoder errorDecoder;
@@ -257,6 +263,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             AuthProvider cacheAuthProvider,
             String baseUrl) {
         this.webClient = webClient;
+        this.cacheIdentityWebClient = webClient.mutate()
+                .filter(cacheRequestIdentityFilter())
+                .build();
         this.metadataCache = metadataCache;
         this.argumentResolver = argumentResolver;
         this.errorDecoder = errorDecoder;
@@ -391,41 +400,50 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         applyDefaultQueryParams(argumentResolver.resolve(plan, frozenArguments)));
                 RequestArgumentResolver.ResolvedArgs keyResolved = CacheKeyContract.snapshotRequestTarget(
                         applyCacheKeyIdempotencyKey(plan, frozenResolved, context));
+                CacheKeyContract.PreparedContext preparedContext = CacheKeyContract.prepareContext(
+                        plan, context, cacheSelection.policy());
                 SubscriptionReportingState callerState = subscriptionState(context);
                 callerState.prepareInitialResolved(keyResolved);
                 return prepareCacheSelectedBody(plan, keyResolved, cacheSelection.policy())
                         .flatMap(bodyPreparation -> {
-                            CacheKeyContract.PreparedKey preparedKey = CacheKeyContract.derive(
-                                    concreteClient,
-                                    clientName,
-                                    plan,
-                                    frozenArguments,
-                                    keyResolved,
-                                    context,
-                                    cacheSelection.policy(),
-                                    bodyPreparation.key());
                             AtomicReference<LocalResponseCacheManager.ResponseMetadata> responseMetadata =
                                     new AtomicReference<>();
                             Mono<?> authorizedLookup = prepareCacheLoadBody(keyResolved, bodyPreparation)
                                     .flatMap(preparedRequestBody -> authorizeCacheLookup(
                                                     plan, effectiveApi, keyResolved, preparedRequestBody)
-                                            .flatMap(authContext -> {
+                                            .flatMap(authorization -> {
+                                                CacheKeyContract.PreparedKey preparedKey = CacheKeyContract.derive(
+                                                        concreteClient,
+                                                        clientName,
+                                                        plan,
+                                                        frozenArguments,
+                                                        keyResolved,
+                                                        preparedContext,
+                                                        cacheSelection.policy(),
+                                                        authorization.requestIdentity(),
+                                                        bodyPreparation.key());
+                                                AtomicReference<CacheKeyContract.FinalRequestIdentity>
+                                                        finalLoadRequestIdentity = new AtomicReference<>();
                                                 Function<SubscriptionReportingState, Mono<?>> loader = loadState ->
                                                         (Mono<?>) invokeResolved(
                                                                 proxy, method, frozenArguments, meta, plan, effectiveApi,
                                                                 keyResolved, preparedRequestBody,
-                                                                new AtomicReference<>(authContext), responseMetadata,
-                                                                loadState);
+                                                                new AtomicReference<>(authorization.authContext()), responseMetadata,
+                                                                loadState, finalLoadRequestIdentity);
                                                 return responseCacheManager.getOrLoad(
                                                         cacheSelection,
                                                         preparedKey.key(),
                                                         plan.apiName(),
                                                         loader,
-                                                        responseMetadata::get,
+                                                        () -> cacheResponseMetadata(
+                                                                responseMetadata.get(), preparedKey.key(),
+                                                                concreteClient, plan, frozenArguments, keyResolved,
+                                                                preparedContext, cacheSelection.policy(),
+                                                                finalLoadRequestIdentity.get(), bodyPreparation.key()),
                                                         callerState,
                                                         new SubscriptionReportingState(keyResolved));
                                             }));
-                            return authorizedLookup.contextWrite(preparedKey::writeContext);
+                            return authorizedLookup.contextWrite(preparedContext::writeContext);
                         });
             });
             return cacheCaller(
@@ -434,7 +452,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
                 applyDefaultQueryParams(argumentResolver.resolve(plan, args)));
-        return invokeResolved(proxy, method, args, meta, plan, effectiveApi, resolved, null, null, null, null);
+        return invokeResolved(proxy, method, args, meta, plan, effectiveApi, resolved,
+                null, null, null, null, null);
     }
 
     LocalResponseCacheManager responseCacheManager() {
@@ -520,7 +539,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                   SerializedRequestBody preparedSerializedRequestBody,
                                   AtomicReference<AuthContext> preResolvedAuthContext,
                                   AtomicReference<LocalResponseCacheManager.ResponseMetadata> cacheResponseMetadata,
-                                  SubscriptionReportingState sharedLoadState) {
+                                  SubscriptionReportingState sharedLoadState,
+                                  AtomicReference<CacheKeyContract.FinalRequestIdentity> cacheFinalRequestIdentity) {
         boolean coalescedCacheLoad = sharedLoadState != null;
         boolean hiddenCacheRefresh = sharedLoadState != null && sharedLoadState.hiddenCacheRefresh();
         String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
@@ -553,10 +573,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 ? statefulRequestHeadersSpec(plan, effectiveApi, resolved, contentTypeHeader, hasAcceptHeader,
                 hasContentTypeHeader, multipartBody, lifecycleHooks, exchangeLogger, timeoutMs,
                 shouldApplyResponseTimeout, requestBodyOwnership, preparedSerializedRequestBody,
-                preResolvedAuthContext)
+                preResolvedAuthContext, cacheFinalRequestIdentity)
                 : statelessRequestHeadersSpec(plan, effectiveApi, resolved, hasAcceptHeader, hasContentTypeHeader,
                 multipartBody, timeoutMs, shouldApplyResponseTimeout, requestBodyOwnership,
-                preparedSerializedRequestBody, preResolvedAuthContext);
+                preparedSerializedRequestBody, preResolvedAuthContext, cacheFinalRequestIdentity);
         boolean headRequest = HttpMethod.HEAD.matches(effectiveApi.httpMethod());
 
         if (plan.returnsFlux()) {
@@ -694,7 +714,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             boolean shouldApplyResponseTimeout,
             RequestBodyOwnership requestBodyOwnership,
             SerializedRequestBody preparedSerializedRequestBody,
-            AtomicReference<AuthContext> preResolvedAuthContext) {
+            AtomicReference<AuthContext> preResolvedAuthContext,
+            AtomicReference<CacheKeyContract.FinalRequestIdentity> cacheFinalRequestIdentity) {
         // Cache the serialized body so retries reuse the bytes without re-serializing.
         Mono<SerializedRequestBody> serializedBodyMono = preparedSerializedRequestBody != null
                 ? Mono.just(preparedSerializedRequestBody)
@@ -724,7 +745,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     state,
                     attempt,
                     requestBodyOwnership,
-                    preResolvedAuthContext))
+                    preResolvedAuthContext,
+                    cacheFinalRequestIdentity))
                     .doOnError(ignored -> state.clearActiveAttempt(attempt))
                     .doOnCancel(() -> state.clearActiveAttempt(attempt));
         });
@@ -741,7 +763,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             boolean shouldApplyResponseTimeout,
             RequestBodyOwnership requestBodyOwnership,
             SerializedRequestBody preparedSerializedRequestBody,
-            AtomicReference<AuthContext> preResolvedAuthContext) {
+            AtomicReference<AuthContext> preResolvedAuthContext,
+            AtomicReference<CacheKeyContract.FinalRequestIdentity> cacheFinalRequestIdentity) {
         return Mono.deferContextual(context -> {
             if (log.isDebugEnabled()) {
                 logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), 0L);
@@ -763,7 +786,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     null,
                     null,
                     requestBodyOwnership,
-                    preResolvedAuthContext));
+                    preResolvedAuthContext,
+                    cacheFinalRequestIdentity));
         });
     }
 
@@ -780,8 +804,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             SubscriptionReportingState state,
             Attempt attempt,
             RequestBodyOwnership requestBodyOwnership,
-            AtomicReference<AuthContext> preResolvedAuthContext) {
-        WebClient.RequestBodySpec preparedRequestSpec = webClient
+            AtomicReference<AuthContext> preResolvedAuthContext,
+            AtomicReference<CacheKeyContract.FinalRequestIdentity> cacheFinalRequestIdentity) {
+        WebClient requestClient = cacheFinalRequestIdentity != null ? cacheIdentityWebClient : webClient;
+        WebClient.RequestBodySpec preparedRequestSpec = requestClient
                 .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
                 .uri(uriBuilder -> DeclarativeRequestUri.build(
                         uriBuilder,
@@ -804,6 +830,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (preResolvedAuthContext != null) {
             preparedRequestSpec = preparedRequestSpec.attribute(
                     AuthRequest.PRE_RESOLVED_AUTH_CONTEXT_ATTRIBUTE, preResolvedAuthContext);
+        }
+        if (cacheFinalRequestIdentity != null) {
+            preparedRequestSpec = preparedRequestSpec.attribute(
+                    CACHE_FINAL_REQUEST_IDENTITY_ATTRIBUTE, cacheFinalRequestIdentity);
         }
 
         for (Map.Entry<String, List<String>> header : resolved.headers().entrySet()) {
@@ -1669,38 +1699,34 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 resolved.body(), resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE));
     }
 
-    private Mono<AuthContext> authorizeCacheLookup(
+    private Mono<CacheAuthorization> authorizeCacheLookup(
             RequestPlan plan,
             EffectiveApi effectiveApi,
             RequestArgumentResolver.ResolvedArgs resolved,
             SerializedRequestBody requestBody) {
-        if (cacheAuthProvider == null) {
-            return Mono.just(AuthContext.empty());
-        }
-        if (!StringUtils.hasText(baseUrl)) {
+        if (cacheAuthProvider != null && !StringUtils.hasText(baseUrl)) {
             return Mono.error(new IllegalStateException(
                     "Cache pre-lookup auth requires the resolved base URL for client '" + clientName + "'"));
         }
         return Mono.defer(() -> {
-            URI requestUri = DeclarativeRequestUri.build(
-                    new DefaultUriBuilderFactory(baseUrl).builder(),
-                    effectiveApi.pathTemplate(),
-                    resolved,
-                    "Cache pre-lookup auth request for client [" + clientName + "] method "
-                            + plan.method().toGenericString());
-            WebClient.RequestBodySpec request = webClient
+            WebClient.RequestBodySpec request = cacheIdentityWebClient
                     .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
-                    .uri(requestUri);
-            request.headers(headers -> {
-                resolved.headers().forEach((name, values) -> headers.put(name, List.copyOf(values)));
-                if (!resolved.headersIgnoreCase().containsKey(HttpHeaders.ACCEPT)) {
-                    headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-                }
-                if (requestBody.originalBody() != null
-                        && !resolved.headersIgnoreCase().containsKey(HttpHeaders.CONTENT_TYPE)) {
-                    headers.setContentType(MediaType.APPLICATION_JSON);
-                }
-            });
+                    .uri(uriBuilder -> DeclarativeRequestUri.build(
+                            uriBuilder,
+                            effectiveApi.pathTemplate(),
+                            resolved,
+                            "Cache pre-lookup request for client [" + clientName + "] method "
+                                    + plan.method().toGenericString()));
+            if (!resolved.headersIgnoreCase().containsKey(HttpHeaders.ACCEPT)) {
+                request = request.accept(MediaType.APPLICATION_JSON);
+            }
+            for (Map.Entry<String, List<String>> header : resolved.headers().entrySet()) {
+                request = request.header(header.getKey(), header.getValue().toArray(String[]::new));
+            }
+            if (requestBody.originalBody() != null
+                    && !resolved.headersIgnoreCase().containsKey(HttpHeaders.CONTENT_TYPE)) {
+                request = request.contentType(MediaType.APPLICATION_JSON);
+            }
             if (requestBody.originalBody() != null) {
                 request = request.attribute(AuthRequest.REQUEST_BODY_ATTRIBUTE, requestBody.originalBody());
             }
@@ -1712,18 +1738,73 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         AuthRequest.AUTH_CONTEXT_VALIDATOR_ATTRIBUTE, requestBody.authContextValidator());
             }
             AtomicReference<AuthContext> resolvedAuth = new AtomicReference<>();
+            AtomicReference<CacheKeyContract.FinalRequestIdentity> finalRequestIdentity = new AtomicReference<>();
+            if (cacheAuthProvider != null) {
+                BiConsumer<ClientRequest, AuthContext> probe = (ignored, authContext) ->
+                        resolvedAuth.set(authContext);
+                request = request.attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE, probe);
+            }
             return request
-                    .attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE, resolvedAuth)
+                    .attribute(CACHE_FINAL_REQUEST_IDENTITY_ATTRIBUTE, finalRequestIdentity)
+                    .attribute(CACHE_REQUEST_IDENTITY_PROBE_ATTRIBUTE, true)
                     .exchangeToMono(response -> response.releaseBody().then(Mono.defer(() -> {
-                        AuthContext authContext = resolvedAuth.get();
-                        if (authContext == null) {
+                        CacheKeyContract.FinalRequestIdentity identity = finalRequestIdentity.get();
+                        AuthContext authContext = cacheAuthProvider != null
+                                ? resolvedAuth.get()
+                                : AuthContext.empty();
+                        if (authContext == null || identity == null) {
                             return Mono.error(new IllegalStateException(
-                                    "Cache pre-lookup auth did not reach the auth filter for client '"
+                                    "Cache pre-lookup request did not reach the final request probe for client '"
                                             + clientName + "'"));
                         }
-                        return Mono.just(authContext);
+                        return Mono.just(new CacheAuthorization(authContext, identity));
                     })));
         });
+    }
+
+    private static ExchangeFilterFunction cacheRequestIdentityFilter() {
+        return (request, next) -> {
+            request.attribute(CACHE_FINAL_REQUEST_IDENTITY_ATTRIBUTE)
+                    .filter(AtomicReference.class::isInstance)
+                    .map(AtomicReference.class::cast)
+                    .ifPresent(reference -> {
+                        @SuppressWarnings("unchecked")
+                        AtomicReference<CacheKeyContract.FinalRequestIdentity> identity =
+                                (AtomicReference<CacheKeyContract.FinalRequestIdentity>) reference;
+                        identity.set(CacheKeyContract.FinalRequestIdentity.from(request));
+                    });
+            if (Boolean.TRUE.equals(request.attribute(CACHE_REQUEST_IDENTITY_PROBE_ATTRIBUTE).orElse(false))) {
+                return Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build());
+            }
+            return next.exchange(request);
+        };
+    }
+
+    private LocalResponseCacheManager.ResponseMetadata cacheResponseMetadata(
+            LocalResponseCacheManager.ResponseMetadata metadata,
+            CacheKeyContract.OpaqueKey expectedKey,
+            Class<?> concreteClient,
+            RequestPlan plan,
+            Object[] frozenArguments,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            CacheKeyContract.PreparedContext preparedContext,
+            ReactiveHttpClientProperties.CachePolicyConfig policy,
+            CacheKeyContract.FinalRequestIdentity finalRequestIdentity,
+            CacheKeyContract.SerializedBodyKey serializedBodyKey) {
+        if (metadata == null) {
+            return null;
+        }
+        boolean matches = false;
+        if (finalRequestIdentity != null) {
+            try {
+                matches = expectedKey.equals(CacheKeyContract.derive(
+                        concreteClient, clientName, plan, frozenArguments, resolved,
+                        preparedContext, policy, finalRequestIdentity, serializedBodyKey).key());
+            } catch (RuntimeException ignored) {
+                // A post-lookup mutation that cannot be represented must not publish a cache entry.
+            }
+        }
+        return metadata.withRequestIdentityMatches(matches);
     }
 
     private void validateCacheAuthContentType(String expectedContentType, AuthContext authContext) {
@@ -2742,6 +2823,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             CacheKeyContract.SerializedBodyKey key) {
         private static final CacheBodyPreparation UNSELECTED = new CacheBodyPreparation(null, null);
     }
+    private record CacheAuthorization(
+            AuthContext authContext,
+            CacheKeyContract.FinalRequestIdentity requestIdentity) {}
     private record MultipartRequestBody(
             MultiValueMap<String, HttpEntity<?>> wireBody,
             List<HttpEntity<?>> authBody) {}

@@ -10,6 +10,7 @@ import io.github.huynhngochuyhoang.httpstarter.exception.RequestSerializationExc
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
@@ -132,6 +133,63 @@ class CacheKeyContractTest {
                 config, Context.of("locale", "vi-VN")));
         assertThat(base.toString()).isEqualTo("OpaqueCacheKey")
                 .doesNotContain("tenant", "locale", "42");
+    }
+
+    @Test
+    void finalizedRequestIdentityFramesVerbTargetOrderHeadersAndContextWithoutRenderingValues() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByHeaders(List.of(
+                HttpHeaders.AUTHORIZATION, "X-Api-Version", "Idempotency-Key"));
+        policy(config).setVaryByContext(List.of("locale"));
+        Method method = SemanticAuthClient.class.getMethod("query", String.class, String.class);
+        RequestPlan plan = plan(SemanticAuthClient.class, method);
+        Object[] frozen = CacheKeyContract.freezeArguments(
+                plan, new Object[]{"42", "v1"}, policy(config));
+        RequestArgumentResolver.ResolvedArgs resolved = argumentResolver.resolve(plan, frozen);
+        ClientRequest baseRequest = finalizedRequest(
+                HttpMethod.POST,
+                "https://catalog.example.invalid/items/42?tag=a&tag=b&tenant=private-tenant",
+                "Bearer private-token",
+                "v1");
+        CacheKeyContract.OpaqueKey base = finalizedKey(
+                SemanticAuthClient.class, "semantic-auth", plan, frozen, resolved,
+                config, baseRequest, Context.of("locale", "en-US"));
+
+        assertThat(base).isNotEqualTo(finalizedKey(
+                SemanticAuthClient.class, "semantic-auth", plan, frozen, resolved, config,
+                finalizedRequest(HttpMethod.PUT,
+                        "https://catalog.example.invalid/items/42?tag=a&tag=b&tenant=private-tenant",
+                        "Bearer private-token", "v1"), Context.of("locale", "en-US")));
+        assertThat(base).isNotEqualTo(finalizedKey(
+                SemanticAuthClient.class, "semantic-auth", plan, frozen, resolved, config,
+                finalizedRequest(HttpMethod.POST,
+                        "https://other.example.invalid/items/42?tag=a&tag=b&tenant=private-tenant",
+                        "Bearer private-token", "v1"), Context.of("locale", "en-US")));
+        assertThat(base).isNotEqualTo(finalizedKey(
+                SemanticAuthClient.class, "semantic-auth", plan, frozen, resolved, config,
+                finalizedRequest(HttpMethod.POST,
+                        "https://catalog.example.invalid/other/42?tag=a&tag=b&tenant=private-tenant",
+                        "Bearer private-token", "v1"), Context.of("locale", "en-US")));
+        assertThat(base).isNotEqualTo(finalizedKey(
+                SemanticAuthClient.class, "semantic-auth", plan, frozen, resolved, config,
+                finalizedRequest(HttpMethod.POST,
+                        "https://catalog.example.invalid/items/42?tag=b&tag=a&tenant=private-tenant",
+                        "Bearer private-token", "v1"), Context.of("locale", "en-US")));
+        assertThat(base).isNotEqualTo(finalizedKey(
+                SemanticAuthClient.class, "semantic-auth", plan, frozen, resolved, config,
+                finalizedRequest(HttpMethod.POST,
+                        "https://catalog.example.invalid/items/42?tag=a&tag=b&tenant=private-tenant",
+                        "Bearer other-token", "v1"), Context.of("locale", "en-US")));
+        assertThat(base).isNotEqualTo(finalizedKey(
+                SemanticAuthClient.class, "semantic-auth", plan, frozen, resolved, config,
+                finalizedRequest(HttpMethod.POST,
+                        "https://catalog.example.invalid/items/42?tag=a&tag=b&tenant=private-tenant",
+                        "Bearer private-token", "v2"), Context.of("locale", "en-US")));
+        assertThat(base).isNotEqualTo(finalizedKey(
+                SemanticAuthClient.class, "semantic-auth", plan, frozen, resolved, config,
+                baseRequest, Context.of("locale", "vi-VN")));
+        assertThat(base.toString()).isEqualTo("OpaqueCacheKey")
+                .doesNotContain("private-token", "private-tenant", "en-US", "catalog");
     }
 
     @Test
@@ -727,6 +785,209 @@ class CacheKeyContractTest {
         assertThat(authCalls).hasValue(2);
         assertThat(dispatches).hasValue(1);
         assertThat(dispatchedBodies).containsExactly("same");
+    }
+
+    @Test
+    void semanticReadAuthHeaderPartitionsCacheHitsByFinalPrincipal() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        config.setAuthProvider("principal-auth");
+        config.setDefaultHeaders(Map.of(HttpHeaders.AUTHORIZATION, "Bearer unresolved"));
+        policy(config).setVaryByHeaders(List.of(
+                HttpHeaders.AUTHORIZATION, "X-Api-Version", "Idempotency-Key"));
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+        AuthProvider authProvider = request -> Mono.deferContextual(context -> {
+            authCalls.incrementAndGet();
+            return Mono.just(AuthContext.builder()
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + context.<String>get("principal"))
+                    .build());
+        });
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("semantic-auth", authProvider))
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .body(request.headers().getFirst(HttpHeaders.AUTHORIZATION)
+                                + ":" + request.headers().getFirst("X-Api-Version")
+                                + ":" + dispatches.incrementAndGet())
+                        .build()))
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "semantic-auth", SemanticAuthClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    LocalResponseCacheManager.testing(System::nanoTime), authProvider,
+                    "http://cache-key.test");
+            SemanticAuthClient client = (SemanticAuthClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{SemanticAuthClient.class}, handler);
+
+            Mono<String> principalA = client.query("42", "v1")
+                    .contextWrite(reactorContext -> reactorContext.put("principal", "principal-a"));
+            assertThat(principalA.block()).isEqualTo("Bearer principal-a:v1:1");
+            assertThat(principalA.block()).isEqualTo("Bearer principal-a:v1:1");
+            assertThat(client.query("42", "v1")
+                    .contextWrite(reactorContext -> reactorContext.put("principal", "principal-b"))
+                    .block()).isEqualTo("Bearer principal-b:v1:2");
+            assertThat(client.query("42", "v2")
+                    .contextWrite(reactorContext -> reactorContext.put("principal", "principal-a"))
+                    .block()).isEqualTo("Bearer principal-a:v2:3");
+        }
+
+        assertThat(authCalls).hasValue(4);
+        assertThat(dispatches).hasValue(3);
+    }
+
+    @Test
+    void unauthenticatedLookupUsesFinalizedDefaultRequestAndFilterFacts() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByHeaders(List.of("Idempotency-Key", "X-Tenant"));
+        config.setDefaultHeaders(Map.of("X-Tenant", "unresolved"));
+        AtomicReference<String> tenant = new AtomicReference<>("tenant-a");
+        AtomicInteger dispatches = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .defaultRequest(request -> request.headers(headers -> headers.set("X-Tenant", tenant.get())))
+                .filter((request, next) -> next.exchange(ClientRequest.from(request)
+                        .url(URI.create("http://cache-key.test/" + tenant.get() + "/items"))
+                        .build()))
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .body(request.url().getPath() + ":"
+                                + request.headers().getFirst("X-Tenant") + ":"
+                                + dispatches.incrementAndGet())
+                        .build()))
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "tenant-cache", BodilessCacheClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    LocalResponseCacheManager.testing(System::nanoTime));
+            BodilessCacheClient client = (BodilessCacheClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{BodilessCacheClient.class}, handler);
+
+            assertThat(client.get().block()).isEqualTo("/tenant-a/items:tenant-a:1");
+            tenant.set("tenant-b");
+            assertThat(client.get().block()).isEqualTo("/tenant-b/items:tenant-b:2");
+            tenant.set("tenant-a");
+            assertThat(client.get().block()).isEqualTo("/tenant-a/items:tenant-a:1");
+        }
+
+        assertThat(dispatches).hasValue(2);
+    }
+
+    @Test
+    void authenticatedLookupUsesPostAuthFinalizedRequestFacts() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        config.setAuthProvider("cache-auth");
+        config.setDefaultHeaders(Map.of(HttpHeaders.AUTHORIZATION, "Bearer unresolved"));
+        policy(config).setVaryByHeaders(List.of(HttpHeaders.AUTHORIZATION, "Idempotency-Key"));
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger downstreamFilterCalls = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+        AuthProvider authProvider = request -> {
+            authCalls.incrementAndGet();
+            return Mono.just(AuthContext.builder()
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer principal-a")
+                    .build());
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("cache-auth", authProvider))
+                .filter((request, next) -> {
+                    downstreamFilterCalls.incrementAndGet();
+                    return next.exchange(ClientRequest.from(request)
+                            .url(URI.create("http://cache-key.test/rewritten/items"))
+                            .build());
+                })
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .body(request.url().getPath() + ":" + dispatches.incrementAndGet())
+                        .build()))
+                .build();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "cache-auth", BodilessCacheClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(), manager, authProvider,
+                    "http://cache-key.test");
+            BodilessCacheClient client = (BodilessCacheClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{BodilessCacheClient.class}, handler);
+
+            assertThat(client.get().block()).isEqualTo("/rewritten/items:1");
+            assertThat(client.get().block()).isEqualTo("/rewritten/items:1");
+        }
+
+        assertThat(authCalls).hasValue(2);
+        assertThat(downstreamFilterCalls).hasValue(3);
+        assertThat(dispatches).hasValue(1);
+        assertThat(manager.snapshot().currentSize()).isEqualTo(1);
+    }
+
+    @Test
+    void authRefreshIdentityChangeDoesNotPublishUnderLookupKey() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        config.setAuthProvider("refreshing-principal");
+        config.setDefaultHeaders(Map.of(HttpHeaders.AUTHORIZATION, "Bearer unresolved"));
+        policy(config).setVaryByHeaders(List.of(
+                HttpHeaders.AUTHORIZATION, "X-Api-Version", "Idempotency-Key"));
+        AtomicInteger resolutions = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(AuthRequest request) {
+                String principal = resolutions.incrementAndGet() == 1 ? "principal-a" : "principal-b";
+                return Mono.just(AuthContext.builder()
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + principal)
+                        .build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                return Mono.empty();
+            }
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("semantic-auth", authProvider))
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    String authorization = request.headers().getFirst(HttpHeaders.AUTHORIZATION);
+                    HttpStatus status = "Bearer principal-a".equals(authorization)
+                            ? HttpStatus.UNAUTHORIZED
+                            : HttpStatus.OK;
+                    return Mono.just(ClientResponse.create(status).body(authorization).build());
+                })
+                .build();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "semantic-auth", SemanticAuthClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(), manager, authProvider,
+                    "http://cache-key.test");
+            SemanticAuthClient client = (SemanticAuthClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{SemanticAuthClient.class}, handler);
+
+            assertThat(client.query("42", "v1").block()).isEqualTo("Bearer principal-b");
+            assertThat(manager.snapshot().currentSize()).isZero();
+            assertThat(client.query("42", "v1").block()).isEqualTo("Bearer principal-b");
+            assertThat(manager.snapshot().currentSize()).isEqualTo(1);
+        }
+
+        assertThat(resolutions).hasValue(3);
+        assertThat(dispatches).hasValue(3);
     }
 
     @Test
@@ -1592,6 +1853,39 @@ class CacheKeyContractTest {
                 selection.policy(), serializedBody).key();
     }
 
+    private CacheKeyContract.OpaqueKey finalizedKey(
+            Class<?> client,
+            String clientName,
+            RequestPlan plan,
+            Object[] frozen,
+            RequestArgumentResolver.ResolvedArgs resolved,
+            ReactiveHttpClientProperties.ClientConfig config,
+            ClientRequest request,
+            Context context) {
+        ReactiveHttpClientProperties.CachePolicyConfig cachePolicy = policy(config);
+        return CacheKeyContract.derive(
+                client,
+                clientName,
+                plan,
+                frozen,
+                resolved,
+                CacheKeyContract.prepareContext(plan, context, cachePolicy),
+                cachePolicy,
+                CacheKeyContract.FinalRequestIdentity.from(request),
+                null).key();
+    }
+
+    private static ClientRequest finalizedRequest(
+            HttpMethod method,
+            String uri,
+            String authorization,
+            String apiVersion) {
+        return ClientRequest.create(method, URI.create(uri))
+                .header(HttpHeaders.AUTHORIZATION, authorization)
+                .header("X-Api-Version", apiVersion)
+                .build();
+    }
+
     private static MockClientHttpRequest materialize(ClientRequest request) {
         MockClientHttpRequest mock = new MockClientHttpRequest(request.method(), request.url());
         request.writeTo(mock, ExchangeStrategies.withDefaults()).block();
@@ -1894,6 +2188,14 @@ class CacheKeyContractTest {
         Mono<String> query(
                 @Body @CacheKey("body") String body,
                 @HeaderParam("Content-Type") String contentType);
+    }
+
+    interface SemanticAuthClient {
+        @POST("/items/{id}")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query(
+                @PathVar("id") String id,
+                @HeaderParam("X-Api-Version") String apiVersion);
     }
 
     interface ByteArrayBodyClient {
