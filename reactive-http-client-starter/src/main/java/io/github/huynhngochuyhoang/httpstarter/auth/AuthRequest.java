@@ -27,6 +27,9 @@ public record AuthRequest(String clientName, ClientRequest request, Object reque
     /** Internal request attribute used to reset final-request observation before auth retry. */
     public static final String REQUEST_OBSERVATION_RESET_ATTRIBUTE =
             "reactive-http-client.auth.request-observation-reset";
+    /** Internal request attribute carrying validation applied to every resolved auth context. */
+    public static final String AUTH_CONTEXT_VALIDATOR_ATTRIBUTE =
+            "reactive-http-client.auth.context-validator";
 
     public AuthRequest {
         Objects.requireNonNull(request, "request must not be null");

@@ -14,6 +14,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * WebClient filter that resolves and injects auth information for outbound requests.
@@ -103,6 +104,7 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
     }
 
     private ClientRequest applyAuth(ClientRequest original, AuthContext authContext) {
+        validateAuthContext(original, authContext);
         ClientRequest.Builder builder = ClientRequest.from(original);
 
         authContext.getHeaders().forEach((name, value) -> {
@@ -116,6 +118,16 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
             builder.url(updatedUri);
         }
         return builder.build();
+    }
+
+    private void validateAuthContext(ClientRequest request, AuthContext authContext) {
+        request.attribute(AuthRequest.AUTH_CONTEXT_VALIDATOR_ATTRIBUTE)
+                .filter(Consumer.class::isInstance)
+                .ifPresent(validator -> {
+                    @SuppressWarnings("unchecked")
+                    Consumer<AuthContext> typedValidator = (Consumer<AuthContext>) validator;
+                    typedValidator.accept(authContext);
+                });
     }
 
     private void validateHeaderName(String headerName) {

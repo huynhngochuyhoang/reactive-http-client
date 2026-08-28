@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.fixture.cache.NonPublicRecordFixture;
@@ -822,6 +823,147 @@ class CacheKeyContractTest {
 
         assertThat(dispatches).hasValue(0);
         assertThat(manager.snapshot().currentSize()).isZero();
+    }
+
+    @Test
+    void authRefreshCannotReplacePreparedContentType() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        policy(config).setSharedResponse(true);
+        config.setAuthProvider("content-type-refresh");
+        AtomicInteger dispatches = new AtomicInteger();
+        AtomicInteger resolutions = new AtomicInteger();
+        InvalidatableAuthProvider authProvider = new InvalidatableAuthProvider() {
+            @Override
+            public Mono<AuthContext> getAuth(io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest request) {
+                return Mono.just(resolutions.incrementAndGet() == 1
+                        ? AuthContext.empty()
+                        : AuthContext.builder()
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .build());
+            }
+
+            @Override
+            public Mono<Void> invalidate() {
+                return Mono.empty();
+            }
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("semantic-body", authProvider))
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.UNAUTHORIZED).build());
+                })
+                .build();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "semantic-body", SemanticBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(), manager, authProvider,
+                    "http://cache-key.test");
+            SemanticBodyClient client = (SemanticBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{SemanticBodyClient.class}, handler);
+
+            assertThatThrownBy(() -> client.query("private-body-material", MediaType.TEXT_PLAIN_VALUE).block())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("cannot replace Content-Type")
+                    .hasMessageNotContaining("private-body-material");
+        }
+
+        assertThat(resolutions).hasValue(2);
+        assertThat(dispatches).hasValue(1);
+        assertThat(manager.snapshot().currentSize()).isZero();
+    }
+
+    @Test
+    void authContentTypeComparisonIgnoresParameterOrder() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        policy(config).setSharedResponse(true);
+        config.setAuthProvider("content-type-order");
+        AtomicInteger dispatches = new AtomicInteger();
+        AuthProvider authProvider = request -> Mono.just(AuthContext.builder()
+                .header(HttpHeaders.CONTENT_TYPE, "application/json;profile=v1;charset=UTF-8")
+                .build());
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("semantic-body", authProvider))
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body("ok").build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "semantic-body", SemanticBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    LocalResponseCacheManager.testing(System::nanoTime), authProvider,
+                    "http://cache-key.test");
+            SemanticBodyClient client = (SemanticBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{SemanticBodyClient.class}, handler);
+
+            assertThat(client.query("same", "application/json;charset=UTF-8;profile=v1").block())
+                    .isEqualTo("ok");
+            assertThat(client.query("same", "application/json;profile=v1;charset=UTF-8").block())
+                    .isEqualTo("ok");
+        }
+
+        assertThat(dispatches).hasValue(1);
+    }
+
+    @Test
+    void authContentTypeValidationSkipsUnselectedAndBodilessCacheRequests() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setSharedResponse(true);
+        config.setAuthProvider("ordinary-content-type");
+        AtomicInteger dispatches = new AtomicInteger();
+        AuthProvider authProvider = request -> Mono.just(AuthContext.builder()
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+                .build());
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("ordinary-cache", authProvider))
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body("ok").build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler bodyHandler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "ordinary-cache", UnselectedStringBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    LocalResponseCacheManager.testing(System::nanoTime), authProvider,
+                    "http://cache-key.test");
+            UnselectedStringBodyClient bodyClient = (UnselectedStringBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{UnselectedStringBodyClient.class}, bodyHandler);
+            assertThat(bodyClient.get("ordinary").block()).isEqualTo("ok");
+
+            ReactiveClientInvocationHandler bodilessHandler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "ordinary-cache", BodilessCacheClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    LocalResponseCacheManager.testing(System::nanoTime), authProvider,
+                    "http://cache-key.test");
+            BodilessCacheClient bodilessClient = (BodilessCacheClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{BodilessCacheClient.class}, bodilessHandler);
+            assertThat(bodilessClient.get().block()).isEqualTo("ok");
+        }
+
+        assertThat(dispatches).hasValue(2);
     }
 
     @Test
@@ -1712,6 +1854,16 @@ class CacheKeyContractTest {
         Mono<String> query(
                 @Body @CacheKey("body") byte[] body,
                 @HeaderParam("Content-Type") String contentType);
+    }
+
+    interface UnselectedStringBodyClient {
+        @GET("/items")
+        Mono<String> get(@Body String body);
+    }
+
+    interface BodilessCacheClient {
+        @GET("/items")
+        Mono<String> get();
     }
 
     interface StringBodyClient {

@@ -435,11 +435,14 @@ its opaque key and outbound request use those exact bytes, including
 key marker from a present zero-length body because body presence can change
 effective headers and downstream behavior. The body frame also includes the
 normalized effective `Content-Type` and charset. An auth provider may repeat
-that prepared media type but cannot replace it after body identity is fixed;
-such a replacement fails before lookup. Selected header sets preserve their
-wire order. Application-defined `List`, `Set`, and `Map` implementations are
-rejected when used as selected bodies because replacing them with a defensive
-collection snapshot cannot preserve an arbitrary concrete-type codec serializer;
+that prepared media type, including with an equivalent parameter order, but
+cannot replace it after body identity is fixed. The same validation applies to
+credentials resolved after a `401`, before the replay is dispatched. It is not
+installed for bodiless or unselected-body cache calls. Selected header sets
+preserve their wire order. Application-defined `List`, `Set`, and `Map`
+implementations are rejected when used as selected bodies because replacing
+them with a defensive collection snapshot cannot preserve an arbitrary
+concrete-type codec serializer;
 use a JDK collection or an immutable record body. Selected header scalar and
 nested-container projections are validated before freezing, so a nested custom
 container cannot lose its wire conversion. They are then

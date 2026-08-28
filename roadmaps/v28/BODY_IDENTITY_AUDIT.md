@@ -30,9 +30,12 @@ final WebClient body writer; the value is not serialized again for dispatch.
   implicit content type.
 - Invalid or blank dynamic content types fail before lookup. `String` charsets
   are resolved from the same normalized media type represented in the key.
-- A pre-lookup `AuthProvider` may return the already prepared content type but
-  cannot replace it. A replacement fails before lookup or dispatch because the
-  body identity has already been fixed.
+- Every auth context applied to a selected prepared body, including one resolved
+  after `401` invalidation, may repeat the semantically equivalent content type
+  but cannot replace it. Parameters are canonicalized independently of their
+  insertion order. Initial replacement fails before lookup; refreshed
+  replacement fails before replay dispatch. Bodiless and unselected-body cache
+  calls retain ordinary auth-provided content-type behavior.
 - Boot and per-client builder customizations remain subject to the existing
   explicit `SAFE` classification. That classification is the application
   guarantee that filters, default requests, codecs, connectors, and exchange

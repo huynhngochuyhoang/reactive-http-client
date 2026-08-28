@@ -51,7 +51,7 @@ wire-equivalent request identity are both proven.
 - [x] Run `DocumentationReleaseArtifactTest`, Maven validation, and
       `git diff --check`; record commands and totals under this priority.
 
-Evidence recorded on 2026-08-27:
+Evidence recorded on 2026-08-28:
 
 - Root, starter, test-helper, benchmark, assembled-consumer, and native-smoke
   coordinates remain on `4.1.0-SNAPSHOT`. Public README/quick-start dependency
@@ -292,11 +292,14 @@ Evidence recorded on 2026-08-27:
   timeout. Existing key tests retain large scalar, byte array, record, number,
   nested container, shared-graph, serialization-bound, privacy, and completed-
   flight retention coverage.
-- Focused `CacheKeyContractTest`: **51 tests**, all passing.
-- Cache/auth/timeout/composition regression selection: **279 tests**, all
-  passing.
+- Auth media-type validation is request-scoped only to prepared body identities,
+  runs again before a `401` auth replay, and compares canonical parameter maps.
+  Focused tests prove a refreshed replacement cannot dispatch, equivalent
+  parameter orders share one entry, and unselected/bodiless calls remain valid.
+- Focused `CacheKeyContractTest`: **54 tests**, all passing.
+- Cache/auth/replay regression selection: **129 tests**, all passing.
 - Documentation and configuration-metadata guards: **61 tests**, all passing.
-- Full starter and test-helper reactor run: **1,227 starter tests** and **59
+- Full starter and test-helper reactor run: **1,230 starter tests** and **59
   test-helper tests**, all passing.
 
 ---
