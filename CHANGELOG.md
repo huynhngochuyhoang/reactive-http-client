@@ -33,9 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot change dispatched bytes or cache identity. Media-type replacement,
   including after `401` refresh, and invalid dynamic media types fail before
   dispatch, while equivalent parameter orderings remain valid.
-- **Final request isolation for cache lookup and publication.** Unauthenticated
-  lookups now run a non-dispatching terminal request probe so `defaultRequest`
-  and filter mutations contribute their finalized target and selected headers.
+- **Final request isolation for cache lookup and publication.** Authenticated and
+  unauthenticated lookups now run a non-dispatching terminal request probe so
+  `defaultRequest`, auth, and later filter mutations contribute their finalized
+  target and selected headers.
   A successful retry or `401` replay is returned but not cached when its final
   request identity differs from the pre-lookup key. Failed mock construction no
   longer leaves synthetic auth configuration on caller-owned properties.

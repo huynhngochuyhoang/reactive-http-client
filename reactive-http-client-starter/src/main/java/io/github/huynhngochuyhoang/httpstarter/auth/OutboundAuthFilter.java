@@ -38,21 +38,24 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
                 .orElse(null);
         AuthRequest authRequest = new AuthRequest(clientName, request, requestBody);
         Object cacheProbe = request.attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE).orElse(null);
-        if (cacheProbe instanceof AtomicReference<?> || cacheProbe instanceof BiConsumer<?, ?>) {
+        if (cacheProbe instanceof AtomicReference<?> reference) {
             return resolveAuthContext(authRequest)
                     .map(authContext -> {
-                        ClientRequest authorizedRequest = applyAuth(request, authContext);
-                        if (cacheProbe instanceof AtomicReference<?> reference) {
-                            @SuppressWarnings("unchecked")
-                            AtomicReference<AuthContext> resolved = (AtomicReference<AuthContext>) reference;
-                            resolved.set(authContext);
-                        } else {
-                            @SuppressWarnings("unchecked")
-                            BiConsumer<ClientRequest, AuthContext> resolved =
-                                    (BiConsumer<ClientRequest, AuthContext>) cacheProbe;
-                            resolved.accept(authorizedRequest, authContext);
-                        }
+                        @SuppressWarnings("unchecked")
+                        AtomicReference<AuthContext> resolved = (AtomicReference<AuthContext>) reference;
+                        resolved.set(authContext);
                         return ClientResponse.create(HttpStatus.NO_CONTENT).build();
+                    });
+        }
+        if (cacheProbe instanceof BiConsumer<?, ?> consumer) {
+            return resolveAuthContext(authRequest)
+                    .flatMap(authContext -> {
+                        ClientRequest authorizedRequest = applyAuth(request, authContext);
+                        @SuppressWarnings("unchecked")
+                        BiConsumer<ClientRequest, AuthContext> resolved =
+                                (BiConsumer<ClientRequest, AuthContext>) consumer;
+                        resolved.accept(authorizedRequest, authContext);
+                        return next.exchange(authorizedRequest);
                     });
         }
         Mono<ClientRequest> authorizedRequest = request.attribute(AuthRequest.PRE_RESOLVED_AUTH_CONTEXT_ATTRIBUTE)

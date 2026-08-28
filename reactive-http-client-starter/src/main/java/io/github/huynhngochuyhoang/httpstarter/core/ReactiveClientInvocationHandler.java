@@ -1737,12 +1737,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 request = request.attribute(
                         AuthRequest.AUTH_CONTEXT_VALIDATOR_ATTRIBUTE, requestBody.authContextValidator());
             }
-            AtomicReference<CacheAuthorization> resolvedAuth = new AtomicReference<>();
+            AtomicReference<AuthContext> resolvedAuth = new AtomicReference<>();
             AtomicReference<CacheKeyContract.FinalRequestIdentity> finalRequestIdentity = new AtomicReference<>();
             if (cacheAuthProvider != null) {
-                BiConsumer<ClientRequest, AuthContext> probe = (authorizedRequest, authContext) ->
-                        resolvedAuth.set(new CacheAuthorization(
-                                authContext, CacheKeyContract.FinalRequestIdentity.from(authorizedRequest)));
+                BiConsumer<ClientRequest, AuthContext> probe = (ignored, authContext) ->
+                        resolvedAuth.set(authContext);
                 request = request.attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE, probe);
             }
             return request
@@ -1750,19 +1749,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     .attribute(CACHE_REQUEST_IDENTITY_PROBE_ATTRIBUTE, true)
                     .exchangeToMono(response -> response.releaseBody().then(Mono.defer(() -> {
                         CacheKeyContract.FinalRequestIdentity identity = finalRequestIdentity.get();
-                        CacheAuthorization authorization = cacheAuthProvider != null
+                        AuthContext authContext = cacheAuthProvider != null
                                 ? resolvedAuth.get()
-                                : new CacheAuthorization(AuthContext.empty(), identity);
-                        if (identity == null && authorization != null) {
-                            identity = authorization.requestIdentity();
-                        }
-                        if (authorization == null || identity == null) {
+                                : AuthContext.empty();
+                        if (authContext == null || identity == null) {
                             return Mono.error(new IllegalStateException(
                                     "Cache pre-lookup request did not reach the final request probe for client '"
                                             + clientName + "'"));
                         }
-                        return Mono.just(new CacheAuthorization(
-                                authorization.authContext(), identity));
+                        return Mono.just(new CacheAuthorization(authContext, identity));
                     })));
         });
     }

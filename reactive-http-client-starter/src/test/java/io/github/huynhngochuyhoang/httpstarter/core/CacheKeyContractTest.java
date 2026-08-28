@@ -882,6 +882,57 @@ class CacheKeyContractTest {
     }
 
     @Test
+    void authenticatedLookupUsesPostAuthFinalizedRequestFacts() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        config.setAuthProvider("cache-auth");
+        config.setDefaultHeaders(Map.of(HttpHeaders.AUTHORIZATION, "Bearer unresolved"));
+        policy(config).setVaryByHeaders(List.of(HttpHeaders.AUTHORIZATION, "Idempotency-Key"));
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger downstreamFilterCalls = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+        AuthProvider authProvider = request -> {
+            authCalls.incrementAndGet();
+            return Mono.just(AuthContext.builder()
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer principal-a")
+                    .build());
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("cache-auth", authProvider))
+                .filter((request, next) -> {
+                    downstreamFilterCalls.incrementAndGet();
+                    return next.exchange(ClientRequest.from(request)
+                            .url(URI.create("http://cache-key.test/rewritten/items"))
+                            .build());
+                })
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .body(request.url().getPath() + ":" + dispatches.incrementAndGet())
+                        .build()))
+                .build();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "cache-auth", BodilessCacheClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(), manager, authProvider,
+                    "http://cache-key.test");
+            BodilessCacheClient client = (BodilessCacheClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{BodilessCacheClient.class}, handler);
+
+            assertThat(client.get().block()).isEqualTo("/rewritten/items:1");
+            assertThat(client.get().block()).isEqualTo("/rewritten/items:1");
+        }
+
+        assertThat(authCalls).hasValue(2);
+        assertThat(downstreamFilterCalls).hasValue(3);
+        assertThat(dispatches).hasValue(1);
+        assertThat(manager.snapshot().currentSize()).isEqualTo(1);
+    }
+
+    @Test
     void authRefreshIdentityChangeDoesNotPublishUnderLookupKey() {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
         config.setAuthProvider("refreshing-principal");

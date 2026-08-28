@@ -141,12 +141,13 @@ cache cancellation. Selected Reactor-context variants are frozen once and that
 same context snapshot is visible to pre-lookup authorization.
 
 Configured pre-lookup auth traverses the same WebClient `defaultRequest` and
-filters that normally run before `OutboundAuthFilter`, including Boot-provided
-and correlation/trace header mutations. The probe stops inside the auth filter,
-before later filters and transport, and validates the returned auth header names
-and values before either a hit or miss can continue. A miss reuses that validated
-context only for its first outer attempt; later resilience attempts resolve
-current auth normally.
+filter chain as a real request, including Boot-provided, correlation/trace, and
+post-auth SAFE customizer mutations. `OutboundAuthFilter` resolves and validates
+the auth context, then forwards the authorized request to the terminal
+non-dispatching probe. The effective method, URI, and selected headers are thus
+captured after all request filters without calling the exchange function or
+transport. A miss reuses that validated context only for its first outer attempt;
+later resilience attempts resolve current auth normally.
 
 Without configured auth, a terminal non-dispatching probe runs the same
 `defaultRequest` and filter chain before lookup. The effective method, URI, and

@@ -228,6 +228,34 @@ class OutboundAuthFilterTest {
     }
 
     @Test
+    void shouldContinueRequestAwareCacheAuthorizationProbeThroughDownstreamFilters() {
+        AtomicReference<ClientRequest> authorizedRequest = new AtomicReference<>();
+        AtomicReference<AuthContext> resolved = new AtomicReference<>();
+        AtomicInteger exchanges = new AtomicInteger();
+        OutboundAuthFilter filter = new OutboundAuthFilter("user-service", request ->
+                Mono.just(AuthContext.builder().header("Authorization", "Bearer probe").build()));
+        ClientRequest request = ClientRequest.create(
+                        HttpMethod.GET, URI.create("https://api.test.local/users"))
+                .attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE,
+                        (java.util.function.BiConsumer<ClientRequest, AuthContext>) (authorized, auth) -> {
+                            authorizedRequest.set(authorized);
+                            resolved.set(auth);
+                        })
+                .build();
+
+        ClientResponse response = filter.filter(request, authorized -> {
+            exchanges.incrementAndGet();
+            assertEquals("Bearer probe", authorized.headers().getFirst("Authorization"));
+            return Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build());
+        }).block();
+
+        assertEquals(HttpStatus.NO_CONTENT, response.statusCode());
+        assertEquals("Bearer probe", authorizedRequest.get().headers().getFirst("Authorization"));
+        assertEquals("Bearer probe", resolved.get().getHeaders().get("Authorization"));
+        assertEquals(1, exchanges.get());
+    }
+
+    @Test
     void shouldWrapAuthProviderFailure() {
         AuthProvider authProvider = request -> Mono.error(new IllegalStateException("token endpoint down"));
         OutboundAuthFilter filter = new OutboundAuthFilter("user-service", authProvider);
