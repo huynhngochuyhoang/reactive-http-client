@@ -354,6 +354,11 @@ Evidence recorded on 2026-08-28:
 - The pre-lookup auth probe returns the authorized request facts used for key
   derivation. Auth therefore runs and validates every caller before lookup, and
   principal/auth header changes cannot reuse another caller's entry.
+- Unauthenticated calls use a terminal non-dispatching probe, so
+  `defaultRequest` and filter mutations finalize the selected target/header facts
+  without reaching the exchange function. A retry or `401` replay whose final
+  identity differs from the lookup key returns normally but cannot publish under
+  that stale key.
 - Frozen context is prepared before auth and reused for authorization, key
   variants, lookup, and the miss load. Existing `401` refresh, context-header,
   and mutation contracts remain green.
@@ -361,8 +366,8 @@ Evidence recorded on 2026-08-28:
   customizers, and replacement builders across ancestor contexts. Unresolved
   lazy candidates require classification without being instantiated; known
   non-matching singleton customizers remain excluded.
-- Focused key/policy/auth/cache selection: **141 tests**, all passing.
-- Full starter/test-helper reactor: **1,235 starter tests** and **60
+- Focused key/policy/auth/cache selection: **143 tests**, all passing.
+- Full starter/test-helper reactor: **1,237 starter tests** and **60
   test-helper tests**, all passing. The mock suite proves authenticated cache
   partition validation occurs before auth invocation and that auth still gates
   each hit and miss.

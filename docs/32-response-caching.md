@@ -148,6 +148,11 @@ and values before either a hit or miss can continue. A miss reuses that validate
 context only for its first outer attempt; later resilience attempts resolve
 current auth normally.
 
+Without configured auth, a terminal non-dispatching probe runs the same
+`defaultRequest` and filter chain before lookup. The effective method, URI, and
+selected headers are therefore captured after request customization without
+calling the exchange function or transport.
+
 The starter factory and `MockReactiveHttpClient` supply the configured provider
 and resolved base URL to this pre-lookup gate. Low-level callers using
 `ReactiveClientInvocationHandler.create(...)` must use its provider-aware
@@ -162,6 +167,9 @@ the pre-resolved auth context is consumed only by its first outer attempt. A
 Resilience4j retry resolves current auth again; the filter's one-time 401
 invalidation/replay remains inside that attempt. A failure, empty completion,
 or cancellation releases the miss token without storing.
+If a retry or `401` replay changes any method, target, or selected-header fact
+that contributed to the lookup key, the successful response is returned to its
+caller but is not published under the stale identity.
 
 Phase one deliberately does not coalesce misses. Concurrent same-key callers
 may each dispatch. The first successful completion observed for that key and

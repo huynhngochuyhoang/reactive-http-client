@@ -476,13 +476,23 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
         public MockReactiveHttpClient<T> build() {
             ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
             String clientName = annotation != null ? annotation.name() : "mock-client";
-            if (authProvider != null && !clientConfig.hasAuthConfigured()) {
+            String originalAuthProvider = clientConfig.getAuthProvider();
+            boolean syntheticAuthProvider = authProvider != null && !clientConfig.hasAuthConfigured();
+            if (syntheticAuthProvider) {
                 clientConfig.setAuthProvider("mock-auth-provider");
             }
-            methodMetadataCache.validateDeclarativeRequestParameters(clientInterface, clientName);
-            methodMetadataCache.validateDeclarativeUriTemplates(clientInterface, clientName, clientConfig.getApis());
-            methodMetadataCache.validateDeclarativeReturnTypes(clientInterface, clientName);
-            methodMetadataCache.validateDeclarativeCachePolicies(clientInterface, clientName, clientConfig);
+            try {
+                methodMetadataCache.validateDeclarativeRequestParameters(clientInterface, clientName);
+                methodMetadataCache.validateDeclarativeUriTemplates(clientInterface, clientName, clientConfig.getApis());
+                methodMetadataCache.validateDeclarativeReturnTypes(clientInterface, clientName);
+                methodMetadataCache.validateDeclarativeCachePolicies(clientInterface, clientName, clientConfig);
+            }
+            catch (RuntimeException | Error failure) {
+                if (syntheticAuthProvider) {
+                    clientConfig.setAuthProvider(originalAuthProvider);
+                }
+                throw failure;
+            }
 
             List<RecordedExchange> exchanges = new CopyOnWriteArrayList<>();
             List<Matcher> liveMatchers = new CopyOnWriteArrayList<>(matchers);

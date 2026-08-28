@@ -1057,6 +1057,7 @@ class MockReactiveHttpClientTest {
                 .hasMessageContaining("authenticated responses require an explicit")
                 .hasMessageContaining("partition or shared-response acknowledgement");
         assertThat(authCalls).hasValue(0);
+        assertThat(config.hasAuthConfigured()).isFalse();
 
         policy.setVaryByHeaders(List.of("Idempotency-Key", "X-Principal"));
         AtomicInteger loads = new AtomicInteger();
