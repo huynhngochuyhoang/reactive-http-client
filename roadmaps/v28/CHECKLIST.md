@@ -51,7 +51,7 @@ wire-equivalent request identity are both proven.
 - [x] Run `DocumentationReleaseArtifactTest`, Maven validation, and
       `git diff --check`; record commands and totals under this priority.
 
-Evidence recorded on 2026-08-27:
+Evidence recorded on 2026-08-28:
 
 - Root, starter, test-helper, benchmark, assembled-consumer, and native-smoke
   coordinates remain on `4.1.0-SNAPSHOT`. Public README/quick-start dependency
@@ -130,7 +130,7 @@ Evidence recorded on 2026-08-27:
 - [x] Include client name, declaring/concrete method, resolved verb, policy name/
       source, and correction in startup errors without printing request data.
 
-Evidence recorded on 2026-08-27:
+Evidence recorded through 2026-08-28:
 
 - `roadmaps/v28/SEMANTIC_READ_BASELINE.md` freezes published `4.0.0` selection,
   startup, effective-contract, diagnostics, AOT, mock, response, and body
@@ -234,46 +234,76 @@ Evidence recorded on 2026-08-27:
 
 ## Priority 4 - Body-Bearing Request Identity
 
-### [ ] 4.1 Inventory preparation, key, auth, and wire ownership
+### [x] 4.1 Inventory preparation, key, auth, and wire ownership
 
-- [ ] Trace JSON, `String`, `byte[]`, null, and present-empty bodies from method
+- [x] Trace JSON, `String`, `byte[]`, null, and present-empty bodies from method
       arguments through cache preparation, auth materialization, and WebClient
       writing.
-- [ ] Record every point where content type, charset, codecs, customizers, or
+- [x] Record every point where content type, charset, codecs, customizers, or
       filters can change the effective bytes.
-- [ ] Identify and remove any second serialization or body copy introduced only
+- [x] Identify and remove any second serialization or body copy introduced only
       by non-GET cache eligibility.
-- [ ] Define the lifetime and owner of frozen arguments and prepared bytes for
+- [x] Define the lifetime and owner of frozen arguments and prepared bytes for
       hit, miss, waiter, refresh, timeout, cancellation, eviction, and shutdown.
 
-### [ ] 4.2 Derive one wire-equivalent body identity
+### [x] 4.2 Derive one wire-equivalent body identity
 
-- [ ] Include every supported body-bearing non-GET request's effective serialized
+- [x] Include every supported body-bearing non-GET request's effective serialized
       body bytes in cache identity by default.
-- [ ] Reuse one bounded byte representation for cache identity, built-in signing,
+- [x] Reuse one bounded byte representation for cache identity, built-in signing,
       and the final request writer where the existing contract supports it.
-- [ ] Represent effective `Content-Type` and charset whenever they can change the
+- [x] Represent effective `Content-Type` and charset whenever they can change the
       bytes or writer selected for the request.
-- [ ] Keep null body, present zero-length body, empty string, empty JSON value,
+- [x] Keep null body, present zero-length body, empty string, empty JSON value,
       and absent/explicit content type distinct when their requests differ.
-- [ ] Reject a body/customizer/codec combination whose final bytes cannot be
+- [x] Reject a body/customizer/codec combination whose final bytes cannot be
       proven before lookup.
-- [ ] Do not use `shared-response` as an implicit waiver for omitted non-GET body
+- [x] Do not use `shared-response` as an implicit waiver for omitted non-GET body
       identity; defer omission unless a separate reviewed acknowledgement is
       implemented.
 
-### [ ] 4.3 Enforce bounded preparation and cleanup
+### [x] 4.3 Enforce bounded preparation and cleanup
 
-- [ ] Apply cumulative byte, element, depth, and projection limits before large
+- [x] Apply cumulative byte, element, depth, and projection limits before large
       values or encodings allocate beyond the existing key-material cap.
-- [ ] Test large strings, byte arrays, records, numbers, nested containers,
+- [x] Test large strings, byte arrays, records, numbers, nested containers,
       shared graphs, null/empty boundaries, and serialization-limit failures.
-- [ ] Release prepared body bytes and frozen argument graphs after terminal
+- [x] Release prepared body bytes and frozen argument graphs after terminal
       completion and never retain them in cache entries or completed flights.
-- [ ] Prove cancellation/timeout before request-body subscription releases all
+- [x] Prove cancellation/timeout before request-body subscription releases all
       cache-owned preparation state and publishes no entry.
-- [ ] Verify no body/key material appears in exception messages, diagnostics,
+- [x] Verify no body/key material appears in exception messages, diagnostics,
       logs, metrics, OTel attributes, or support fixtures.
+
+Evidence recorded on 2026-08-27:
+
+- `BODY_IDENTITY_AUDIT.md` traces null, `byte[]`, `String`, and bounded JSON from
+  frozen arguments through opaque-key framing, pre-lookup auth, the WebClient
+  writer, terminal cleanup, and every supported mutation/proof boundary.
+- `CacheKeyContract.SerializedBodyKey` now frames body presence, normalized
+  effective media type/charset, and exact prepared bytes. Semantic non-`GET`
+  methods retain the mandatory selected-body rule even with `shared-response`.
+  Invalid media types and auth attempts to replace the prepared content type
+  fail before lookup or dispatch.
+- `CacheKeyContractTest` proves a semantic `POST` partitions equal bytes by media
+  type, partitions non-ASCII strings by charset bytes, distinguishes absent and
+  present-empty bodies, performs one bounded JSON serialization shared with auth
+  and the writer, and leaves no entry/body subscription after pre-dispatch
+  timeout. Existing key tests retain large scalar, byte array, record, number,
+  nested container, shared-graph, serialization-bound, privacy, and completed-
+  flight retention coverage.
+- Auth media-type validation is request-scoped only to prepared body identities,
+  runs again before a `401` auth replay, and compares canonical parameter maps.
+  Focused tests prove a refreshed replacement cannot dispatch, equivalent
+  parameter orders share one entry, and unselected/bodiless calls remain valid.
+- Each auth resolution receives a defensive raw-body copy. A mutating custom
+  provider cannot change writer bytes or publish a response under the original
+  identity for different wire content.
+- Focused `CacheKeyContractTest`: **55 tests**, all passing.
+- Cache/auth/replay regression selection: **129 tests**, all passing.
+- Documentation and configuration-metadata guards: **61 tests**, all passing.
+- Full starter and test-helper reactor run: **1,231 starter tests** and **59
+  test-helper tests**, all passing.
 
 ---
 

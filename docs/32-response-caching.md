@@ -431,12 +431,20 @@ that is then passed to URI construction, so repeated nested values cannot build
 an unbounded intermediate projection and the key sees the exact dispatched
 value. A selected body is serialized once through `ReactiveHttpClientJsonCodec`;
 its opaque key and outbound request use those exact bytes, including
-`@JsonValue` and application serializer behavior. An absent body has a distinct
+`@JsonValue` and application serializer behavior. Auth providers receive a
+per-resolution defensive copy of the serialized bytes, so provider mutation
+cannot change the writer bytes or cache identity. An absent body has a distinct
 key marker from a present zero-length body because body presence can change
-effective headers and downstream behavior. Selected header sets preserve their
-wire order. Application-defined `List`, `Set`, and `Map` implementations are
-rejected when used as selected bodies because replacing them with a defensive
-collection snapshot cannot preserve an arbitrary concrete-type codec serializer;
+effective headers and downstream behavior. The body frame also includes the
+normalized effective `Content-Type` and charset. An auth provider may repeat
+that prepared media type, including with an equivalent parameter order, but
+cannot replace it after body identity is fixed. The same validation applies to
+credentials resolved after a `401`, before the replay is dispatched. It is not
+installed for bodiless or unselected-body cache calls. Selected header sets
+preserve their wire order. Application-defined `List`, `Set`, and `Map`
+implementations are rejected when used as selected bodies because replacing
+them with a defensive collection snapshot cannot preserve an arbitrary
+concrete-type codec serializer;
 use a JDK collection or an immutable record body. Selected header scalar and
 nested-container projections are validated before freezing, so a nested custom
 container cannot lose its wire conversion. They are then

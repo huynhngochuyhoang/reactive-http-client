@@ -54,6 +54,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -748,7 +749,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             RequestArgumentResolver.ResolvedArgs preparedResolved = applyContextIdempotencyKey(plan, resolved, context);
             SerializedRequestBody requestBody = preparedSerializedRequestBody != null
                     ? preparedSerializedRequestBody
-                    : new SerializedRequestBody(preparedResolved.body(), preparedResolved.body(), null);
+                    : new SerializedRequestBody(preparedResolved.body(), preparedResolved.body(), null, null);
             return Mono.just(buildRequestHeadersSpec(
                     plan,
                     effectiveApi,
@@ -795,6 +796,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
         if (serializedRequestBody.rawBody() != null) {
             preparedRequestSpec = preparedRequestSpec.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, serializedRequestBody.rawBody());
+        }
+        if (serializedRequestBody.authContextValidator() != null) {
+            preparedRequestSpec = preparedRequestSpec.attribute(
+                    AuthRequest.AUTH_CONTEXT_VALIDATOR_ATTRIBUTE, serializedRequestBody.authContextValidator());
         }
         if (preResolvedAuthContext != null) {
             preparedRequestSpec = preparedRequestSpec.attribute(
@@ -1628,26 +1633,27 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
 
     private Mono<SerializedRequestBody> serializeRequestBodyForAuth(Object body, String contentTypeHeader) {
         if (body == null) {
-            return Mono.just(new SerializedRequestBody(null, null, null));
+            return Mono.just(new SerializedRequestBody(null, null, null, null));
         }
         if (!clientConfig.hasAuthConfigured()) {
-            return Mono.just(new SerializedRequestBody(body, body, null));
+            return Mono.just(new SerializedRequestBody(body, body, null, null));
         }
         if (isRawOrStreamingBody(body)) {
-            return Mono.just(new SerializedRequestBody(body, body, null));
+            return Mono.just(new SerializedRequestBody(body, body, null, null));
         }
         if (body instanceof byte[] bytes) {
-            return Mono.just(new SerializedRequestBody(body, bytes, bytes));
+            return Mono.just(new SerializedRequestBody(body, bytes, bytes, null));
         }
         if (body instanceof String text) {
-            return Mono.just(new SerializedRequestBody(body, text, text.getBytes(rawBodyCharset(contentTypeHeader))));
+            return Mono.just(new SerializedRequestBody(
+                    body, text, text.getBytes(rawBodyCharset(contentTypeHeader)), null));
         }
         if (!shouldProvideJsonRawBody(contentTypeHeader) || jsonCodec == null) {
-            return Mono.just(new SerializedRequestBody(body, body, null));
+            return Mono.just(new SerializedRequestBody(body, body, null, null));
         }
         return Mono.fromCallable(() -> {
                     byte[] json = jsonCodec.write(body);
-                    return new SerializedRequestBody(body, json, json);
+                    return new SerializedRequestBody(body, json, json, null);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorMap(e -> new RequestSerializationException(clientName, e));
@@ -1701,18 +1707,87 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             if (requestBody.rawBody() != null) {
                 request = request.attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, requestBody.rawBody());
             }
+            if (requestBody.authContextValidator() != null) {
+                request = request.attribute(
+                        AuthRequest.AUTH_CONTEXT_VALIDATOR_ATTRIBUTE, requestBody.authContextValidator());
+            }
             AtomicReference<AuthContext> resolvedAuth = new AtomicReference<>();
             return request
                     .attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE, resolvedAuth)
                     .exchangeToMono(response -> response.releaseBody().then(Mono.defer(() -> {
                         AuthContext authContext = resolvedAuth.get();
-                        return authContext != null
-                                ? Mono.just(authContext)
-                                : Mono.error(new IllegalStateException(
-                                "Cache pre-lookup auth did not reach the auth filter for client '"
-                                        + clientName + "'"));
+                        if (authContext == null) {
+                            return Mono.error(new IllegalStateException(
+                                    "Cache pre-lookup auth did not reach the auth filter for client '"
+                                            + clientName + "'"));
+                        }
+                        return Mono.just(authContext);
                     })));
         });
+    }
+
+    private void validateCacheAuthContentType(String expectedContentType, AuthContext authContext) {
+        String authContentType = null;
+        for (Map.Entry<String, String> header : authContext.getHeaders().entrySet()) {
+            if (HttpHeaders.CONTENT_TYPE.equalsIgnoreCase(header.getKey())) {
+                authContentType = header.getValue();
+            }
+        }
+        if (authContentType == null) {
+            return;
+        }
+        final String replacementContentType;
+        try {
+            replacementContentType = canonicalCacheContentType(MediaType.parseMediaType(authContentType));
+        } catch (Exception error) {
+            throw cacheAuthContentTypeReplacement(error);
+        }
+        if (!Objects.equals(expectedContentType, replacementContentType)) {
+            throw cacheAuthContentTypeReplacement(null);
+        }
+    }
+
+    private IllegalStateException cacheAuthContentTypeReplacement(Exception cause) {
+        String message = "AuthProvider for cache-selected client '" + clientName
+                + "' cannot replace Content-Type after body identity is prepared; declare the effective "
+                + "Content-Type before cache lookup or disable response caching";
+        if (cause != null) {
+            return new IllegalStateException(message, cause);
+        }
+        return new IllegalStateException(message);
+    }
+
+    private Consumer<AuthContext> cacheAuthContentTypeValidator(String expectedContentType) {
+        return authContext -> validateCacheAuthContentType(expectedContentType, authContext);
+    }
+
+    private static String canonicalCacheContentType(MediaType contentType) {
+        if (contentType == null) {
+            return null;
+        }
+        Map<String, String> parameters = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        contentType.getParameters().forEach((name, value) -> parameters.put(
+                name.toLowerCase(Locale.ROOT),
+                "charset".equalsIgnoreCase(name) && contentType.getCharset() != null
+                        ? contentType.getCharset().name()
+                        : value));
+        return new MediaType(contentType.getType(), contentType.getSubtype(), parameters).toString();
+    }
+
+    private MediaType effectiveCacheBodyContentType(Object body, String contentTypeHeader) {
+        if (contentTypeHeader == null) {
+            return body != null ? MediaType.APPLICATION_JSON : null;
+        }
+        if (contentTypeHeader.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Cache-selected request bodies require a valid effective Content-Type");
+        }
+        try {
+            return MediaType.parseMediaType(contentTypeHeader);
+        } catch (Exception error) {
+            throw new IllegalArgumentException(
+                    "Cache-selected request bodies require a valid effective Content-Type", error);
+        }
     }
 
     private Mono<CacheBodyPreparation> prepareCacheSelectedBody(
@@ -1723,19 +1798,33 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return Mono.just(CacheBodyPreparation.UNSELECTED);
         }
         Object body = resolved.body();
+        String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
+        final MediaType effectiveContentType;
+        final String canonicalContentType;
+        try {
+            effectiveContentType = effectiveCacheBodyContentType(body, contentTypeHeader);
+            canonicalContentType = canonicalCacheContentType(effectiveContentType);
+        } catch (IllegalArgumentException error) {
+            return Mono.error(new RequestSerializationException(clientName, error));
+        }
+        Consumer<AuthContext> authContextValidator = cacheAuthProvider != null
+                ? cacheAuthContentTypeValidator(canonicalContentType)
+                : null;
         if (body == null) {
             return Mono.just(new CacheBodyPreparation(
-                    new SerializedRequestBody(null, null, null),
-                    CacheKeyContract.absentSerializedBodyKey()));
+                    new SerializedRequestBody(null, null, null, authContextValidator),
+                    CacheKeyContract.absentSerializedBodyKey(canonicalContentType)));
         }
-        String contentTypeHeader = resolved.headersIgnoreCase().get(HttpHeaders.CONTENT_TYPE);
         if (body instanceof byte[] bytes) {
-            return Mono.just(cacheBodyPreparation(body, bytes));
+            return Mono.just(cacheBodyPreparation(body, bytes, canonicalContentType, authContextValidator));
         }
         if (body instanceof String text) {
             return Mono.fromCallable(() -> cacheBodyPreparation(
                             body, CacheKeyContract.selectedStringBodyBytes(
-                                    text, rawBodyCharset(contentTypeHeader))))
+                                    text, effectiveContentType != null && effectiveContentType.getCharset() != null
+                                            ? effectiveContentType.getCharset()
+                                            : StandardCharsets.UTF_8),
+                            canonicalContentType, authContextValidator))
                     .subscribeOn(Schedulers.boundedElastic())
                     .onErrorMap(error -> error instanceof RequestSerializationException
                             ? error
@@ -1750,21 +1839,26 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     "Cache-selected JSON request bodies require a ReactiveHttpClientJsonCodec bean")));
         }
         return Mono.fromCallable(() -> cacheBodyPreparation(body, jsonCodec.writeBounded(
-                        body, CacheKeyContract.maximumSerializedBodyBytes())))
+                        body, CacheKeyContract.maximumSerializedBodyBytes()),
+                        canonicalContentType, authContextValidator))
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorMap(error -> error instanceof RequestSerializationException
                         ? error
                         : new RequestSerializationException(clientName, error));
     }
 
-    private static CacheBodyPreparation cacheBodyPreparation(Object originalBody, byte[] wireBytes) {
+    private static CacheBodyPreparation cacheBodyPreparation(
+            Object originalBody,
+            byte[] wireBytes,
+            String effectiveContentType,
+            Consumer<AuthContext> authContextValidator) {
         byte[] source = Objects.requireNonNull(
                 wireBytes, "ReactiveHttpClientJsonCodec returned null request bytes");
         CacheKeyContract.requireSerializedBodyLength(source.length);
         byte[] stableWireBytes = source.clone();
         return new CacheBodyPreparation(
-                new SerializedRequestBody(originalBody, stableWireBytes, stableWireBytes),
-                CacheKeyContract.serializedBodyKey(stableWireBytes));
+                new SerializedRequestBody(originalBody, stableWireBytes, stableWireBytes, authContextValidator),
+                CacheKeyContract.serializedBodyKey(stableWireBytes, effectiveContentType));
     }
 
     private Charset rawBodyCharset(String contentTypeHeader) {
@@ -2638,7 +2732,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
     }
 
-    private record SerializedRequestBody(Object originalBody, Object bodyToWrite, byte[] rawBody) {}
+    private record SerializedRequestBody(
+            Object originalBody,
+            Object bodyToWrite,
+            byte[] rawBody,
+            Consumer<AuthContext> authContextValidator) {}
     private record CacheBodyPreparation(
             SerializedRequestBody requestBody,
             CacheKeyContract.SerializedBodyKey key) {
