@@ -18,6 +18,7 @@ import java.io.Reader;
 import java.nio.channels.ReadableByteChannel;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -278,6 +279,27 @@ class DeclarativeCachePolicyTest {
     }
 
     @Test
+    void semanticReadAuthRequiresARealPartitionInsteadOfAnAbsentIdempotencyHeader() {
+        ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("selected", 1_000L, 100L);
+        config.setAuthProvider("principal-auth");
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                config.getCache().getPolicies().get("selected");
+
+        assertThatThrownBy(() -> validate(AcknowledgedPostClient.class, "semantic-auth", config))
+                .hasMessageContaining("authenticated responses require an explicit")
+                .hasMessageContaining("partition or shared-response acknowledgement");
+
+        policy.setVaryByContext(List.of("tenant"));
+        assertThatCode(() -> validate(AcknowledgedPostClient.class, "semantic-auth", config))
+                .doesNotThrowAnyException();
+
+        policy.setVaryByContext(List.of());
+        policy.setSharedResponse(true);
+        assertThatCode(() -> validate(AcknowledgedPostClient.class, "semantic-auth", config))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void semanticReadCannotAcknowledgeAnUnresolvedApiRefVerb() {
         ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("selected", 1_000L, 100L);
 
@@ -447,6 +469,66 @@ class DeclarativeCachePolicyTest {
             assertThatCode(() -> metadataCache.validateDeclarativeCacheCustomizations(
                     context, EligibleClient.class, "eligible-cache", config))
                     .doesNotThrowAnyException();
+        }
+    }
+
+    @Test
+    void semanticReadCustomizationInventoryIncludesAncestorsAndLazyBeansWithoutCreatingThem() {
+        ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("selected", 1_000L, 100L);
+        AtomicInteger lazyCreations = new AtomicInteger();
+        try (GenericApplicationContext parent = new GenericApplicationContext()) {
+            parent.registerBean("parentBootMutation", WebClientCustomizer.class, () -> {
+                lazyCreations.incrementAndGet();
+                return builder -> builder.defaultHeader("X-Parent", "dynamic");
+            }, definition -> definition.setLazyInit(true));
+            parent.refresh();
+
+            try (GenericApplicationContext child = new GenericApplicationContext()) {
+                child.setParent(parent);
+                child.registerBean("orderedBootMutation", WebClientCustomizer.class,
+                        () -> builder -> builder.defaultHeader("X-Ordered", "dynamic"),
+                        definition -> definition.setLazyInit(true));
+                child.registerBean("lazyClientMutation", ReactiveHttpClientCustomizer.class, () -> {
+                    lazyCreations.incrementAndGet();
+                    return builder -> builder.defaultRequest(request -> request.header("X-Tenant", "dynamic"));
+                }, definition -> definition.setLazyInit(true));
+                child.registerBean("replacementBuilder", WebClient.Builder.class, () -> {
+                    lazyCreations.incrementAndGet();
+                    return WebClient.builder();
+                }, definition -> definition.setLazyInit(true));
+                child.getBeanFactory().registerSingleton("otherClientMutation", new ReactiveHttpClientCustomizer() {
+                    @Override
+                    public boolean supports(String clientName) {
+                        return false;
+                    }
+
+                    @Override
+                    public void customize(WebClient.Builder builder) {
+                        throw new AssertionError("Non-matching customizer must not run");
+                    }
+                });
+                child.refresh();
+
+                assertThatThrownBy(() -> metadataCache.validateDeclarativeCacheCustomizations(
+                        child, AcknowledgedPostClient.class, "semantic-customization", config))
+                        .hasMessageContaining("semantic-customization")
+                        .hasMessageContaining("has no cache-safety classification");
+                assertThat(lazyCreations).hasValue(0);
+
+                config.getCache().getCustomizations().put(
+                        "parentBootMutation", ReactiveHttpClientProperties.CacheCustomizationSafety.SAFE);
+                config.getCache().getCustomizations().put(
+                        "orderedBootMutation", ReactiveHttpClientProperties.CacheCustomizationSafety.SAFE);
+                config.getCache().getCustomizations().put(
+                        "lazyClientMutation", ReactiveHttpClientProperties.CacheCustomizationSafety.SAFE);
+                config.getCache().getCustomizations().put(
+                        "replacementBuilder", ReactiveHttpClientProperties.CacheCustomizationSafety.SAFE);
+
+                assertThatCode(() -> metadataCache.validateDeclarativeCacheCustomizations(
+                        child, AcknowledgedPostClient.class, "semantic-customization", config))
+                        .doesNotThrowAnyException();
+                assertThat(lazyCreations).hasValue(0);
+            }
         }
     }
 

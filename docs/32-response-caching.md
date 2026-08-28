@@ -332,9 +332,11 @@ invalidate cached reads, and is never suppressed by a cached result.
 
 ## Key and variant isolation
 
-Every key includes the logical and concrete client identity plus the full
-generic-resolved method signature. Path and query values are always included.
-Additional values are explicit:
+Every key includes the logical and concrete client identity, the full
+generic-resolved method signature, the effective HTTP method, and the finalized
+request URI. The URI is captured after path/query resolution and pre-lookup
+auth, so authority, path, encoded query values, and query ordering remain part
+of the opaque identity. Additional values are explicit:
 
 ```yaml
 reactive:
@@ -375,6 +377,13 @@ by its effective idempotency header or explicitly acknowledge reuse with
 `shared-response: true`. `vary-by-context` reads string keys from the
 subscriber's Reactor context. Blank, duplicate, unknown parameter/header, and
 ambiguous declarations fail startup.
+
+Selected headers are read from the finalized pre-lookup request rather than
+from the declarative argument map. Values added or replaced by `defaultRequest`,
+upstream filters, correlation propagation, or the configured `AuthProvider`
+therefore partition the key when their header name is selected. Auth still runs
+for every hit and miss, and invalid auth header names or values fail before
+lookup under the same rules as ordinary dispatch.
 
 For an authenticated method with no explicit parameter/header/context
 partition, set `shared-response: true` only when the response is deliberately
@@ -553,6 +562,12 @@ selected caching. Do not label a dynamic `defaultRequest`, authorization or
 tenant filter, exchange-function replacement, codec/connector mutation, or
 other request/response transformation `SAFE` without accounting for its full
 effect.
+
+Inventory includes ancestor contexts and replacement builders without relying
+on bean creation order. An already-created per-client customizer is filtered by
+`supports(clientName)`; an uninitialized lazy or factory-backed customizer is
+treated conservatively as applicable and must be classified. Startup, AOT, and
+diagnostics perform this inventory without creating the lazy bean.
 
 The cache runtime must execute mandatory authorization, tenant, and policy
 checks at a cache-aware pre-lookup boundary for both hits and misses. Until a

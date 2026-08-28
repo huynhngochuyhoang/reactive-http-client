@@ -8,6 +8,7 @@ import org.springframework.asm.MethodVisitor;
 import org.springframework.asm.Opcodes;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.web.reactive.function.client.ClientRequest;
 import reactor.util.context.Context;
 import reactor.util.context.ContextView;
 
@@ -213,7 +214,8 @@ final class CacheKeyContract {
                               ContextView reactorContext,
                               ReactiveHttpClientProperties.CachePolicyConfig policy) {
         return derive(clientInterface, clientName, plan, frozenArguments, resolved,
-                reactorContext, policy, null);
+                prepareContext(plan, reactorContext, policy), policy,
+                FinalRequestIdentity.declared(plan, resolved), null);
     }
 
     static PreparedKey derive(Class<?> clientInterface,
@@ -224,10 +226,16 @@ final class CacheKeyContract {
                               ContextView reactorContext,
                               ReactiveHttpClientProperties.CachePolicyConfig policy,
                               SerializedBodyKey serializedBodyKey) {
-        RequestArgumentResolver.ResolvedArgs requestTarget = hasSnapshottedRequestTarget(resolved)
-                ? resolved
-                : snapshotRequestTarget(resolved);
-        String context = "Reactive HTTP client '" + clientName + "' method=" + plan.method().toGenericString();
+        return derive(clientInterface, clientName, plan, frozenArguments, resolved,
+                prepareContext(plan, reactorContext, policy), policy,
+                FinalRequestIdentity.declared(plan, resolved), serializedBodyKey);
+    }
+
+    static PreparedContext prepareContext(
+            RequestPlan plan,
+            ContextView reactorContext,
+            ReactiveHttpClientProperties.CachePolicyConfig policy) {
+        String context = "Method " + plan.method().toGenericString();
         VariantSelection variants = variants(plan, null, policy, context);
         Map<String, Object> contextValues = new LinkedHashMap<>();
         FreezeBudget contextBudget = new FreezeBudget();
@@ -235,6 +243,23 @@ final class CacheKeyContract {
             Object value = reactorContext.getOrDefault(name, null);
             contextValues.put(name, freeze(value, 0, "Reactor context '" + name + "'", contextBudget));
         }
+        return new PreparedContext(contextValues);
+    }
+
+    static PreparedKey derive(Class<?> clientInterface,
+                              String clientName,
+                              RequestPlan plan,
+                              Object[] frozenArguments,
+                              RequestArgumentResolver.ResolvedArgs resolved,
+                              PreparedContext preparedContext,
+                              ReactiveHttpClientProperties.CachePolicyConfig policy,
+                              FinalRequestIdentity requestIdentity,
+                              SerializedBodyKey serializedBodyKey) {
+        RequestArgumentResolver.ResolvedArgs requestTarget = hasSnapshottedRequestTarget(resolved)
+                ? resolved
+                : snapshotRequestTarget(resolved);
+        String context = "Reactive HTTP client '" + clientName + "' method=" + plan.method().toGenericString();
+        VariantSelection variants = variants(plan, null, policy, context);
 
         CanonicalWriter writer = new CanonicalWriter();
         writer.value("reactive-http-cache-key-v1");
@@ -242,8 +267,10 @@ final class CacheKeyContract {
         Class<?> concreteClient = clientInterface != null ? clientInterface : plan.method().getDeclaringClass();
         writer.value(concreteClient.getName());
         writer.value(resolvedMethodSignature(plan));
-        writer.value(requestTarget.pathVars());
-        writer.value(requestTarget.queryParams());
+        writer.value(requestIdentity.httpMethod());
+        writer.value(requestIdentity.requestTarget());
+        writer.value(requestIdentity.finalized() ? null : requestTarget.pathVars());
+        writer.value(requestIdentity.finalized() ? null : requestTarget.queryParams());
 
         Map<String, Object> selectedParameters = new TreeMap<>();
         variants.parameterIndexes().forEach((name, index) -> selectedParameters.put(
@@ -253,11 +280,11 @@ final class CacheKeyContract {
 
         Map<String, Object> selectedHeaders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (String name : variants.headerNames()) {
-            selectedHeaders.put(name.toLowerCase(Locale.ROOT), headerValues(resolved.headers(), name));
+            selectedHeaders.put(name.toLowerCase(Locale.ROOT), headerValues(requestIdentity.headers(), name));
         }
         writer.value(selectedHeaders);
-        writer.value(contextValues);
-        return new PreparedKey(OpaqueKey.from(writer.finish()), contextValues);
+        writer.value(preparedContext.contextValues());
+        return new PreparedKey(OpaqueKey.from(writer.finish()));
     }
 
     static boolean selectsRequestBody(RequestPlan plan,
@@ -1288,7 +1315,13 @@ final class CacheKeyContract {
         }
     }
 
-    record PreparedKey(OpaqueKey key, Map<String, Object> contextValues) {
+    record PreparedKey(OpaqueKey key) {}
+
+    record PreparedContext(Map<String, Object> contextValues) {
+
+        PreparedContext {
+            contextValues = Collections.unmodifiableMap(new LinkedHashMap<>(contextValues));
+        }
 
         Context writeContext(Context context) {
             Context updated = context;
@@ -1298,6 +1331,34 @@ final class CacheKeyContract {
                 }
             }
             return updated;
+        }
+    }
+
+    record FinalRequestIdentity(
+            String httpMethod,
+            String requestTarget,
+            Map<String, List<String>> headers,
+            boolean finalized) {
+
+        static FinalRequestIdentity declared(
+                RequestPlan plan,
+                RequestArgumentResolver.ResolvedArgs resolved) {
+            EffectiveApi effectiveApi = plan.staticEffectiveApi();
+            return new FinalRequestIdentity(
+                    effectiveApi != null ? effectiveApi.httpMethod() : null,
+                    effectiveApi != null ? effectiveApi.pathTemplate() : null,
+                    resolved.headers(),
+                    false);
+        }
+
+        static FinalRequestIdentity from(ClientRequest request) {
+            Map<String, List<String>> headers = new LinkedHashMap<>();
+            request.headers().forEach((name, values) -> headers.put(name, List.copyOf(values)));
+            return new FinalRequestIdentity(
+                    request.method().name(),
+                    request.url().toASCIIString(),
+                    Collections.unmodifiableMap(headers),
+                    true);
         }
     }
 

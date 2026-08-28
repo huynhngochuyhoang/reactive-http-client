@@ -476,6 +476,9 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
         public MockReactiveHttpClient<T> build() {
             ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
             String clientName = annotation != null ? annotation.name() : "mock-client";
+            if (authProvider != null && !clientConfig.hasAuthConfigured()) {
+                clientConfig.setAuthProvider("mock-auth-provider");
+            }
             methodMetadataCache.validateDeclarativeRequestParameters(clientInterface, clientName);
             methodMetadataCache.validateDeclarativeUriTemplates(clientInterface, clientName, clientConfig.getApis());
             methodMetadataCache.validateDeclarativeReturnTypes(clientInterface, clientName);
@@ -551,9 +554,6 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
 
             ReactiveHttpClientJsonCodec effectiveJsonCodec = jsonCodec;
             if (authProvider != null) {
-                if (!clientConfig.hasAuthConfigured()) {
-                    clientConfig.setAuthProvider("mock-auth-provider");
-                }
                 if (effectiveJsonCodec == null) {
                     effectiveJsonCodec = new MockJsonCodecFactory().create();
                 }

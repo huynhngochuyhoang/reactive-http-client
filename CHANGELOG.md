@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot change dispatched bytes or cache identity. Media-type replacement,
   including after `401` refresh, and invalid dynamic media types fail before
   dispatch, while equivalent parameter orderings remain valid.
+- **Finalized request and authorization isolation.** Cache keys now frame the
+  effective method and complete finalized URI, then read selected headers after
+  upstream request mutations and pre-lookup auth. Different authorities,
+  targets, query ordering, principals, API versions, and context partitions
+  cannot collapse into one entry. Lazy and ancestor WebClient customizations
+  remain startup-fatal until classified, without diagnostics instantiating them.
 
 ## [4.0.0] - 2026-08-26
 

@@ -309,40 +309,63 @@ Evidence recorded on 2026-08-27:
 
 ## Priority 5 - Request Target, Headers, Auth, and Tenant Isolation
 
-### [ ] 5.1 Preserve complete request identity
+### [x] 5.1 Preserve complete request identity
 
-- [ ] Include concrete client identity, resolved method signature, request target,
+- [x] Include concrete client identity, resolved method signature, request target,
       body identity, and selected header/context variants in the opaque key.
-- [ ] Preserve bounded, wire-equivalent path/query/header projections and their
+- [x] Preserve bounded, wire-equivalent path/query/header projections and their
       order, null, type, and framing distinctions.
-- [ ] Prove different methods, verbs, bodies, media types, tenants, locales, API
+- [x] Prove different methods, verbs, bodies, media types, tenants, locales, API
       versions, and explicit variants cannot collide.
-- [ ] Keep raw and hashed key values private to cache lookup and absent from all
+- [x] Keep raw and hashed key values private to cache lookup and absent from all
       public/support surfaces.
 
-### [ ] 5.2 Preserve per-caller authorization and partitioning
+### [x] 5.2 Preserve per-caller authorization and partitioning
 
-- [ ] Run pre-lookup auth and required policy gates for every hit and miss.
-- [ ] Validate auth headers on hits with the same rules as ordinary dispatch.
-- [ ] Require authenticated responses to have a real auth/tenant partition or an
+- [x] Run pre-lookup auth and required policy gates for every hit and miss.
+- [x] Validate auth headers on hits with the same rules as ordinary dispatch.
+- [x] Require authenticated responses to have a real auth/tenant partition or an
       explicit shared-response acknowledgement; an absent idempotency header is
       not a partition.
-- [ ] Apply the frozen Reactor-context snapshot to auth, variants, lookup, and
+- [x] Apply the frozen Reactor-context snapshot to auth, variants, lookup, and
       load so mutation cannot authorize one identity and key another.
-- [ ] Prove token refresh, different principals, and context-provided headers do
+- [x] Prove token refresh, different principals, and context-provided headers do
       not cross cache entries.
 
-### [ ] 5.3 Revalidate customization safety
+### [x] 5.3 Revalidate customization safety
 
-- [ ] Reuse the complete Boot/per-client WebClient customization inventory for
+- [x] Reuse the complete Boot/per-client WebClient customization inventory for
       every newly eligible method.
-- [ ] Keep unclassified or incompatible filters, `defaultRequest`, exchange
+- [x] Keep unclassified or incompatible filters, `defaultRequest`, exchange
       functions, codecs, connectors, and response transformations startup-fatal.
-- [ ] Require customizations that mutate method, target, body, content type, or
+- [x] Require customizations that mutate method, target, body, content type, or
       variants to contribute equivalent pre-lookup facts or remain incompatible.
-- [ ] Cover parent/child contexts, ordered customizers, replacement builders,
+- [x] Cover parent/child contexts, ordered customizers, replacement builders,
       lazy beans, and mock-installed customizations without creating lazy beans
       from diagnostics.
+
+Evidence recorded on 2026-08-28:
+
+- The subscription-local key frame now includes concrete/logical client,
+  generic-resolved method signature, finalized HTTP method and URI, serialized
+  body identity, selected finalized headers, and frozen context variants. Only
+  the SHA-256 key survives derivation; request, header, auth, and context values
+  remain private.
+- The pre-lookup auth probe returns the authorized request facts used for key
+  derivation. Auth therefore runs and validates every caller before lookup, and
+  principal/auth header changes cannot reuse another caller's entry.
+- Frozen context is prepared before auth and reused for authorization, key
+  variants, lookup, and the miss load. Existing `401` refresh, context-header,
+  and mutation contracts remain green.
+- Customization validation inventories Boot customizers, per-client
+  customizers, and replacement builders across ancestor contexts. Unresolved
+  lazy candidates require classification without being instantiated; known
+  non-matching singleton customizers remain excluded.
+- Focused key/policy/auth/cache selection: **141 tests**, all passing.
+- Full starter/test-helper reactor: **1,235 starter tests** and **60
+  test-helper tests**, all passing. The mock suite proves authenticated cache
+  partition validation occurs before auth invocation and that auth still gates
+  each hit and miss.
 
 ---
 

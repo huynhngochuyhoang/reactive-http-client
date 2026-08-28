@@ -14,6 +14,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -37,13 +38,20 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
                 .orElse(null);
         AuthRequest authRequest = new AuthRequest(clientName, request, requestBody);
         Object cacheProbe = request.attribute(AuthRequest.CACHE_AUTHORIZATION_PROBE_ATTRIBUTE).orElse(null);
-        if (cacheProbe instanceof AtomicReference<?> reference) {
+        if (cacheProbe instanceof AtomicReference<?> || cacheProbe instanceof BiConsumer<?, ?>) {
             return resolveAuthContext(authRequest)
                     .map(authContext -> {
-                        applyAuth(request, authContext);
-                        @SuppressWarnings("unchecked")
-                        AtomicReference<AuthContext> resolved = (AtomicReference<AuthContext>) reference;
-                        resolved.set(authContext);
+                        ClientRequest authorizedRequest = applyAuth(request, authContext);
+                        if (cacheProbe instanceof AtomicReference<?> reference) {
+                            @SuppressWarnings("unchecked")
+                            AtomicReference<AuthContext> resolved = (AtomicReference<AuthContext>) reference;
+                            resolved.set(authContext);
+                        } else {
+                            @SuppressWarnings("unchecked")
+                            BiConsumer<ClientRequest, AuthContext> resolved =
+                                    (BiConsumer<ClientRequest, AuthContext>) cacheProbe;
+                            resolved.accept(authorizedRequest, authContext);
+                        }
                         return ClientResponse.create(HttpStatus.NO_CONTENT).build();
                     });
         }
