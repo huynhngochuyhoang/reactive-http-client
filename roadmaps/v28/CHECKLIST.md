@@ -130,7 +130,7 @@ Evidence recorded on 2026-08-28:
 - [x] Include client name, declaring/concrete method, resolved verb, policy name/
       source, and correction in startup errors without printing request data.
 
-Evidence recorded on 2026-08-27:
+Evidence recorded through 2026-08-28:
 
 - `roadmaps/v28/SEMANTIC_READ_BASELINE.md` freezes published `4.0.0` selection,
   startup, effective-contract, diagnostics, AOT, mock, response, and body
@@ -296,10 +296,13 @@ Evidence recorded on 2026-08-27:
   runs again before a `401` auth replay, and compares canonical parameter maps.
   Focused tests prove a refreshed replacement cannot dispatch, equivalent
   parameter orders share one entry, and unselected/bodiless calls remain valid.
-- Focused `CacheKeyContractTest`: **54 tests**, all passing.
+- Each auth resolution receives a defensive raw-body copy. A mutating custom
+  provider cannot change writer bytes or publish a response under the original
+  identity for different wire content.
+- Focused `CacheKeyContractTest`: **55 tests**, all passing.
 - Cache/auth/replay regression selection: **129 tests**, all passing.
 - Documentation and configuration-metadata guards: **61 tests**, all passing.
-- Full starter and test-helper reactor run: **1,230 starter tests** and **59
+- Full starter and test-helper reactor run: **1,231 starter tests** and **59
   test-helper tests**, all passing.
 
 ---

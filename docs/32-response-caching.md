@@ -431,7 +431,9 @@ that is then passed to URI construction, so repeated nested values cannot build
 an unbounded intermediate projection and the key sees the exact dispatched
 value. A selected body is serialized once through `ReactiveHttpClientJsonCodec`;
 its opaque key and outbound request use those exact bytes, including
-`@JsonValue` and application serializer behavior. An absent body has a distinct
+`@JsonValue` and application serializer behavior. Auth providers receive a
+per-resolution defensive copy of the serialized bytes, so provider mutation
+cannot change the writer bytes or cache identity. An absent body has a distinct
 key marker from a present zero-length body because body presence can change
 effective headers and downstream behavior. The body frame also includes the
 normalized effective `Content-Type` and charset. An auth provider may repeat

@@ -69,7 +69,18 @@ public class OutboundAuthFilter implements ExchangeFilterFunction {
     }
 
     private Mono<AuthContext> resolveAuthContext(AuthRequest authRequest) {
-        return authProvider.getAuth(authRequest)
+        boolean isolatePreparedBody = authRequest.request()
+                .attribute(AuthRequest.AUTH_CONTEXT_VALIDATOR_ATTRIBUTE)
+                .isPresent();
+        AuthRequest isolatedRequest = authRequest;
+        if (isolatePreparedBody && authRequest.requestBody() instanceof byte[] rawBody) {
+            byte[] isolatedBody = rawBody.clone();
+            ClientRequest providerRequest = ClientRequest.from(authRequest.request())
+                    .attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE, isolatedBody)
+                    .build();
+            isolatedRequest = new AuthRequest(authRequest.clientName(), providerRequest, isolatedBody);
+        }
+        return authProvider.getAuth(isolatedRequest)
                 .onErrorMap(error -> error instanceof AuthProviderException
                         ? error
                         : new AuthProviderException(clientName, error))

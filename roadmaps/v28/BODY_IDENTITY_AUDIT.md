@@ -18,9 +18,11 @@ body representation before authorization or cache lookup:
 
 The body identity frame contains body presence, normalized effective
 `Content-Type` including charset, and the prepared bytes. The canonical writer
-hashes that frame into the opaque key. The same prepared bytes are exposed to
-built-in/custom auth through the raw-body attribute and are supplied to the
-final WebClient body writer; the value is not serialized again for dispatch.
+hashes that frame into the opaque key. A byte-equivalent representation is
+exposed to built-in/custom auth through a per-resolution defensive raw-body
+copy. The original prepared array is supplied to the final WebClient body
+writer; auth mutation cannot change it or the key, and the value is not
+serialized again for dispatch.
 
 ## Mutation Boundaries
 

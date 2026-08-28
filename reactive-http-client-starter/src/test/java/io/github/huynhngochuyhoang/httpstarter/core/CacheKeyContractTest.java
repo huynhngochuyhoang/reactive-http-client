@@ -2,10 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
-import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
-import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
-import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
-import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
+import io.github.huynhngochuyhoang.httpstarter.auth.*;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.fixture.cache.NonPublicRecordFixture;
 import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
@@ -679,6 +676,57 @@ class CacheKeyContractTest {
         assertThat(dispatchedBody).hasValue("\"wire-catalog-item\"");
         assertThat(signedBody.get()).containsExactly(wireBytes);
         assertThat(boundedWrites).hasValue(1);
+    }
+
+    @Test
+    void mutatingAuthRawBodyCannotChangePreparedWireBytesOrCacheIdentity() {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy();
+        policy(config).setVaryByParameters(List.of("body"));
+        policy(config).setSharedResponse(true);
+        config.setAuthProvider("mutating-body");
+        AtomicInteger authCalls = new AtomicInteger();
+        AtomicInteger dispatches = new AtomicInteger();
+        List<String> dispatchedBodies = new ArrayList<>();
+        AuthProvider authProvider = request -> {
+            authCalls.incrementAndGet();
+            byte[] authBytes = (byte[]) request.requestBody();
+            authBytes[0] = 'X';
+            byte[] attributeBytes = (byte[]) request.request()
+                    .attribute(AuthRequest.REQUEST_RAW_BODY_ATTRIBUTE)
+                    .orElseThrow();
+            attributeBytes[1] = 'Y';
+            return Mono.just(AuthContext.empty());
+        };
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache-key.test")
+                .filter(new OutboundAuthFilter("semantic-body", authProvider))
+                .exchangeFunction(request -> {
+                    String body = materialize(request).getBodyAsString().block();
+                    dispatches.incrementAndGet();
+                    dispatchedBodies.add(body);
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body(body).build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient, metadataCache, argumentResolver, new DefaultErrorDecoder(), config,
+                    "semantic-body", SemanticBodyClient.class, context,
+                    new NoopResilienceOperatorApplier(), TestJsonCodecs.jsonCodec(),
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    LocalResponseCacheManager.testing(System::nanoTime), authProvider,
+                    "http://cache-key.test");
+            SemanticBodyClient client = (SemanticBodyClient) Proxy.newProxyInstance(
+                    getClass().getClassLoader(), new Class<?>[]{SemanticBodyClient.class}, handler);
+
+            assertThat(client.query("same", MediaType.TEXT_PLAIN_VALUE).block()).isEqualTo("same");
+            assertThat(client.query("same", MediaType.TEXT_PLAIN_VALUE).block()).isEqualTo("same");
+        }
+
+        assertThat(authCalls).hasValue(2);
+        assertThat(dispatches).hasValue(1);
+        assertThat(dispatchedBodies).containsExactly("same");
     }
 
     @Test
