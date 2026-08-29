@@ -232,7 +232,7 @@ reactive:
               maximum-size: 10000
               single-flight: true
               vary-by-parameters: [criteria]
-              vary-by-headers: [X-Tenant-Scope]
+              vary-by-headers: [Idempotency-Key, X-Tenant-Scope]
       reporting-rpc:
         base-url: https://reporting-rpc.example.invalid
         default-headers:
@@ -252,6 +252,7 @@ reactive:
               ttl-ms: 30000
               maximum-size: 5000
               vary-by-parameters: [criteria]
+              vary-by-headers: [Idempotency-Key]
               vary-by-context: [principalScope]
     observability:
       enabled: true
