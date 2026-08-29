@@ -700,6 +700,11 @@ Implementation evidence (2026-08-29):
   consumer tests**, retained effective POM/tree/classpath/Surefire/stage
   provenance, rejected reactor output directories, and verified transitive
   Caffeine for cache-enabled test-helper consumers.
+- `SemanticReadSingleFlightRefreshContractTest` now waits for the leader source
+  subscription and two actual in-flight members before cancellation, failure,
+  or empty completion. It no longer uses cumulative cache-meter values as a
+  scheduler barrier. The formerly flaky method passed **50/50** isolated Maven/
+  Surefire stress runs and the complete six-test contract class.
 - `scripts/verify-published-consumer.sh 4.0.0` activates the V27 compatibility
   fixture for the complete Maven invocation. A fresh Maven Central run passed
   **4 consumer tests** and retained matching effective POM, dependency tree,
@@ -722,40 +727,62 @@ Implementation evidence (2026-08-29):
 
 ## Priority 11 - Security and Operations Review
 
-### [ ] 11.1 Define the application safety review
+### [x] 11.1 Define the application safety review
 
-- [ ] Document that a false semantic-read declaration can suppress a required
+- [x] Document that a false semantic-read declaration can suppress a required
       action or share data across callers.
-- [ ] Require endpoint-owner approval for non-GET selection, including side
+- [x] Require endpoint-owner approval for non-GET selection, including side
       effects, body determinism, response variants, auth/tenant partition, TTL,
       refresh, and invalidation ownership.
-- [ ] State that idempotency, Retry configuration, HTTP status, method naming,
+- [x] State that idempotency, Retry configuration, HTTP status, method naming,
       and `Cache-Control` do not authorize local response reuse.
-- [ ] Keep ordinary writes, commands, payments, job submissions, and mutation
+- [x] Keep ordinary writes, commands, payments, job submissions, and mutation
       examples explicitly unselected.
 
-### [ ] 11.2 Update operational diagnosis
+### [x] 11.2 Update operational diagnosis
 
-- [ ] Distinguish cache-hit suppression from single flight, refresh, Resilience4j
+- [x] Distinguish cache-hit suppression from single flight, refresh, Resilience4j
       retry, redirect, auth replay, Reactor Netty retry, and downstream duplicate
       handling.
-- [ ] Document local per-instance behavior, rolling configuration differences,
+- [x] Document local per-instance behavior, rolling configuration differences,
       hard expiry, refresh failure, capacity pressure, and lack of distributed
       coherence.
-- [ ] State that the starter performs no automatic invalidation after writes and
+- [x] State that the starter performs no automatic invalidation after writes and
       offers no write-through/write-behind semantics.
-- [ ] Add sanitized support-bundle capture fields for resolved verb, bounded
+- [x] Add sanitized support-bundle capture fields for resolved verb, bounded
       semantic-read state, cache outcome, attempt count, and dispatch evidence.
 
-### [ ] 11.3 Keep examples safe and copyable
+### [x] 11.3 Keep examples safe and copyable
 
-- [ ] Use catalog search and RPC query examples with `.example.invalid` hosts.
-- [ ] Include complete cache dependency, policy, customization-safety, auth/
+- [x] Use catalog search and RPC query examples with `.example.invalid` hosts.
+- [x] Include complete cache dependency, policy, customization-safety, auth/
       tenant partition, and observability prerequisites.
-- [ ] Keep credentials in environment placeholders and omit real request bodies,
+- [x] Keep credentials in environment placeholders and omit real request bodies,
       headers, cache keys/digests, identities, and tenant values.
-- [ ] Add documentation guards for side-effecting examples and sensitive fixture
+- [x] Add documentation guards for side-effecting examples and sensitive fixture
       fields.
+
+Implementation evidence (2026-08-29):
+
+- `docs/32-response-caching.md` now requires endpoint-owner approval across side
+  effects, deterministic body identity, response variants, auth/tenant
+  partition, TTL, refresh, and invalidation ownership. Payment, job, command,
+  and mutation examples remain explicitly `@CacheDisabled`.
+- `docs/30-operations-troubleshooting.md` separates cache suppression, single
+  flight, hidden refresh, Retry, redirect, auth replay, disabled Reactor Netty
+  retry, and downstream deduplication while retaining local-only hard-expiry,
+  capacity, rollout, and invalidation boundaries.
+- `docs/26-support-bundles.md` and its aggregate fixture include only bounded
+  resolved-method, semantic-read, cache-outcome, attempt, and dispatch facts;
+  the recursive fixture guard continues to reject request/key/body/header,
+  identity, tenant, credential, value, and payload material.
+- `docs/examples/effective-configuration.md` provides catalog-search and RPC-query
+  examples with Caffeine, complete policy/isolation/customization/observability
+  prerequisites, `.example.invalid` hosts, and environment-only credentials.
+- Focused documentation verification: **62 tests**, all passing
+  (`DocumentationReleaseArtifactTest`: 44;
+  `ReactiveHttpClientConfigurationMetadataTest`: 18).
+- Full starter verification: **1,261 tests**, all passing.
 
 ---
 

@@ -149,8 +149,14 @@ for the detailed ownership rules.
 - Expect per-instance divergence during deployments. The cache is process-local,
   does not coordinate pods, and performs no automatic write invalidation.
 - Keep unacknowledged non-GET, streaming, unresolved, and application-owned body
-  contracts uncached. Set `semanticRead = true` only when suppressing that exact
-  downstream call cannot omit a required side effect.
+  contracts uncached. Require recorded endpoint-owner approval before setting
+  `semanticRead = true`, including side effects, deterministic body identity,
+  response variants, auth/tenant partition, TTL, refresh, and invalidation
+  ownership. Suppressing that exact downstream call cannot omit a required side
+  effect or cross a caller boundary.
+- Keep ordinary writes, payments, job submissions, commands, or mutations
+  unselected or explicitly `@CacheDisabled`. Idempotency, Retry, a successful
+  status, a method name, and `Cache-Control` are not cache authorization.
   Empty completions and failures are never stored.
 - Classify every applicable WebClient/customizer mutation before caching; a hit
   can bypass the downstream request pipeline.

@@ -34,6 +34,8 @@
   },
   "terminalCaller": {
     "terminalRecordCreated": true,
+    "resolvedHttpMethod": "POST",
+    "cacheSemanticReadAcknowledged": true,
     "cacheOutcome": "STALE_HIT",
     "subscriptionAttemptCount": 0,
     "requestDispatched": false,

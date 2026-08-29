@@ -634,6 +634,13 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
     }
 
+    boolean hasInFlightLoadWithMembersForTesting(int memberCount) {
+        synchronized (inFlightLoads) {
+            return inFlightLoads.values().stream()
+                    .anyMatch(flight -> flight.members.size() == memberCount);
+        }
+    }
+
     void evictAllForTesting() {
         if (closed.get()) {
             throw new IllegalStateException(

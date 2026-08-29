@@ -183,6 +183,126 @@ still apply.
 Cache metrics remain disabled when `observability.cache.enabled` is false, and
 the observability setting never selects the policy.
 
+## Semantic Read Cache Examples
+
+These examples require the optional Caffeine runtime in addition to the starter:
+
+```xml
+<dependency>
+  <groupId>com.github.ben-manes.caffeine</groupId>
+  <artifactId>caffeine</artifactId>
+</dependency>
+```
+
+Before copying the configuration, complete the
+[application safety review](../32-response-caching.md#application-safety-review)
+with the endpoint owner. Inventory every applicable Boot or starter WebClient
+customizer and replacement builder. The example bean names below are valid only
+when those exact per-client beans exist and their complete behavior has been
+reviewed `SAFE`; replace them with the exact names from the application or omit
+the map when no applicable customization exists. An unknown or incompatible
+customization must keep caching disabled.
+
+The catalog search uses OAuth2 credentials from environment placeholders and
+partitions every entry by exact JSON criteria bytes and the declared tenant
+scope header. The reporting RPC query partitions by exact JSON criteria bytes
+and a frozen Reactor-context principal scope:
+
+```yaml
+reactive:
+  http:
+    clients:
+      catalog-search:
+        base-url: https://catalog-search.example.invalid
+        default-headers:
+          Content-Type: application/json
+        auth:
+          type: oauth2-client-credentials
+          oauth2-client-credentials:
+            token-uri: https://identity.example.invalid/oauth2/token
+            client-id: ${EXAMPLE_CATALOG_CLIENT_ID}
+            client-secret: ${EXAMPLE_CATALOG_CLIENT_SECRET}
+            auth-style: form-post
+        cache:
+          customizations:
+            catalogTracingCustomizer: SAFE
+          policies:
+            catalog-search:
+              ttl-ms: 60000
+              maximum-size: 10000
+              single-flight: true
+              vary-by-parameters: [criteria]
+              vary-by-headers: [X-Tenant-Scope]
+      reporting-rpc:
+        base-url: https://reporting-rpc.example.invalid
+        default-headers:
+          Content-Type: application/json
+        auth:
+          type: oauth2-client-credentials
+          oauth2-client-credentials:
+            token-uri: https://identity.example.invalid/oauth2/token
+            client-id: ${EXAMPLE_REPORTING_CLIENT_ID}
+            client-secret: ${EXAMPLE_REPORTING_CLIENT_SECRET}
+            auth-style: form-post
+        cache:
+          customizations:
+            reportingTracingCustomizer: SAFE
+          policies:
+            reporting-query:
+              ttl-ms: 30000
+              maximum-size: 5000
+              vary-by-parameters: [criteria]
+              vary-by-context: [principalScope]
+    observability:
+      enabled: true
+      cache:
+        enabled: true
+```
+
+```java
+record CatalogSearchCriteria(String phrase, int page) {
+}
+
+@ReactiveHttpClient(
+        name = "catalog-search",
+        baseUrl = "https://catalog-search.example.invalid")
+interface CatalogSearchClient {
+
+    @POST("/catalog/search")
+    @CacheResponse(value = "catalog-search", semanticRead = true)
+    Mono<CatalogPage> search(
+            @Body @CacheKey("criteria") CatalogSearchCriteria criteria,
+            @HeaderParam("X-Tenant-Scope") String tenantScope);
+}
+```
+
+```java
+record ReportingQuery(String report, LocalDate from, LocalDate to) {
+}
+
+@ReactiveHttpClient(
+        name = "reporting-rpc",
+        baseUrl = "https://reporting-rpc.example.invalid")
+interface ReportingRpcClient {
+
+    @POST("/rpc/query")
+    @CacheResponse(value = "reporting-query", semanticRead = true)
+    Mono<ReportResult> query(
+            @Body @CacheKey("criteria") ReportingQuery criteria);
+}
+
+Mono<ReportResult> result = reportingRpcClient.query(criteria)
+        .contextWrite(context -> context.put("principalScope", principalScope));
+```
+
+The endpoint owner must approve the body determinism, response variants,
+auth/tenant partition, TTL, optional single flight, refresh decision, and
+invalidation owner for each method. Cache observability is separately selected;
+it never enables a policy. Keep credential values in environment variables and
+do not put request bodies, headers, cache keys or digests, identities, tenant
+values, or credentials in examples, diagnostics, logs, metrics, or support
+fixtures.
+
 ## Diagnostics Endpoint
 
 ```yaml
