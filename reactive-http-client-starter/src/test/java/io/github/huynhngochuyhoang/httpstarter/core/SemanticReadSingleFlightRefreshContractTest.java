@@ -275,13 +275,14 @@ class SemanticReadSingleFlightRefreshContractTest {
                     .contains("reloaded");
             assertThat(dispatches.get("/search/empty")).hasValue(2);
 
-            assertThatThrownBy(() -> contextual(client.json(
-                    "serialization", new JsonBody("value"), "application/json", "tenant", "one"), "en").block())
+            Mono<String> serializationCall = contextual(client.json(
+                    "serialization", new JsonBody("value"), "application/json", "tenant", "one"), "en");
+            assertThatThrownBy(serializationCall::block)
                     .hasCauseInstanceOf(IllegalStateException.class)
                     .hasRootCauseMessage("serialize selected body");
             assertThat(dispatches).doesNotContainKey("/json/serialization");
-            assertThat(post(client, "serialization", "body", "text/plain", "tenant", "two", "en").block())
-                    .contains("reloaded");
+            assertThat(serializationCall.block()).contains("reloaded");
+            assertThat(dispatches.get("/json/serialization")).hasValue(1);
             manager.close();
         }
     }
@@ -490,6 +491,7 @@ class SemanticReadSingleFlightRefreshContractTest {
 
     private static ReactiveHttpClientJsonCodec failingCodec() {
         ReactiveHttpClientJsonCodec delegate = TestJsonCodecs.jsonCodec();
+        AtomicBoolean failNextJsonBody = new AtomicBoolean(true);
         return new ReactiveHttpClientJsonCodec() {
             @Override
             public byte[] write(Object value) throws Exception {
@@ -498,7 +500,7 @@ class SemanticReadSingleFlightRefreshContractTest {
 
             @Override
             public byte[] writeBounded(Object value, int maximumBytes) throws Exception {
-                if (value instanceof JsonBody) {
+                if (value instanceof JsonBody && failNextJsonBody.compareAndSet(true, false)) {
                     throw new IllegalStateException("serialize selected body");
                 }
                 return delegate.writeBounded(value, maximumBytes);
