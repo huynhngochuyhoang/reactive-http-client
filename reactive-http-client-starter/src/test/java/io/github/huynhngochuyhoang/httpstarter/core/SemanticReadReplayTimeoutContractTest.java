@@ -7,8 +7,10 @@ import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.LogicalCallTimeoutException;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientFailureStage;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent;
+import io.github.huynhngochuyhoang.httpstarter.observability.MicrometerHttpClientObserver;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -449,6 +451,125 @@ class SemanticReadReplayTimeoutContractTest {
         }
     }
 
+    @Test
+    void postDecodeFailureMissAndHitAlignEveryTerminalSurfaceAndDownstreamMeter() {
+        List<HttpClientObserverEvent> observed = new CopyOnWriteArrayList<>();
+        List<HttpExchangeLogContext> exchangeLogs = new CopyOnWriteArrayList<>();
+        List<ReactiveHttpClientLifecycleContext> lifecycleTerminals = new CopyOnWriteArrayList<>();
+        AtomicInteger dispatches = new AtomicInteger();
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig observability =
+                new ReactiveHttpClientProperties.ObservabilityConfig();
+        observability.getCache().setEnabled(true);
+        ReactiveHttpClientProperties.ClientConfig config = config(0, true);
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://semantic-boundary.test")
+                .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    String body = request.url().getPath().endsWith("/decode")
+                            ? "{"
+                            : "{\"value\":\"cached\"}";
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                            .body(body)
+                            .build());
+                })
+                .build();
+
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.getBeanFactory().registerSingleton(
+                    "semanticTerminalObserver",
+                    (io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver) observed::add);
+            context.getBeanFactory().registerSingleton(
+                    "micrometerHttpClientObserver",
+                    new MicrometerHttpClientObserver(registry, observability));
+            context.getBeanFactory().registerSingleton(
+                    "capturingExchangeLogger", new CapturingExchangeLogger(exchangeLogs));
+            context.getBeanFactory().registerSingleton("semanticTerminalLifecycle", new ReactiveHttpClientLifecycleHook() {
+                @Override
+                public void onSuccess(ReactiveHttpClientLifecycleContext lifecycleContext) {
+                    lifecycleTerminals.add(lifecycleContext);
+                }
+
+                @Override
+                public void onError(ReactiveHttpClientLifecycleContext lifecycleContext) {
+                    lifecycleTerminals.add(lifecycleContext);
+                }
+            });
+            context.refresh();
+            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(
+                    System::nanoTime,
+                    reactor.core.scheduler.Schedulers.parallel(),
+                    LocalResponseCacheMetrics.enabled(registry, "semantic-boundary-client"),
+                    "semantic-boundary-client");
+            SemanticBoundaryClient client = client(
+                    webClient, config, context, manager, new NoopResilienceOperatorApplier(), null, null,
+                    observability);
+
+            assertThatThrownBy(() -> queryJson(client, "decode").block())
+                    .satisfies(error -> assertThat(
+                            hasCause(error, org.springframework.core.codec.DecodingException.class)).isTrue());
+            assertThat(queryJson(client, "success").block()).isEqualTo(new JsonResult("cached"));
+            assertThat(queryJson(client, "success").block()).isEqualTo(new JsonResult("cached"));
+
+            assertThat(dispatches).hasValue(2);
+            assertThat(observed).hasSize(3);
+            assertThat(observed).extracting(HttpClientObserverEvent::getHttpMethod).containsOnly("POST");
+            assertThat(observed).extracting(HttpClientObserverEvent::getCacheOutcome)
+                    .containsExactly(
+                            HttpClientCacheOutcome.MISS_LOADER,
+                            HttpClientCacheOutcome.MISS_LOADER,
+                            HttpClientCacheOutcome.FRESH_HIT);
+            assertThat(observed.get(0).getAttemptCount()).isEqualTo(1);
+            assertThat(observed.get(0).getStatusCode()).isEqualTo(200);
+            assertThat(observed.get(0).getError()).isNotNull();
+            assertThat(observed.get(1).getAttemptCount()).isEqualTo(1);
+            assertThat(observed.get(1).getStatusCode()).isEqualTo(200);
+            assertThat(observed.get(1).getError()).isNull();
+            assertThat(observed.get(2).getAttemptCount()).isZero();
+            assertThat(observed.get(2).getStatusCode()).isNull();
+            assertThat(observed.get(2).getRequestUrl()).isNull();
+            assertThat(observed.get(2).getRequestHeaders()).isEmpty();
+
+            assertThat(exchangeLogs).hasSize(3);
+            assertThat(exchangeLogs).extracting(HttpExchangeLogContext::httpMethod).containsOnly("POST");
+            assertThat(exchangeLogs).extracting(HttpExchangeLogContext::cacheOutcome)
+                    .containsExactly(
+                            HttpClientCacheOutcome.MISS_LOADER,
+                            HttpClientCacheOutcome.MISS_LOADER,
+                            HttpClientCacheOutcome.FRESH_HIT);
+            assertThat(exchangeLogs.get(2).subscriptionAttemptCount()).isZero();
+            assertThat(exchangeLogs.get(2).requestUrl()).isNull();
+            assertThat(exchangeLogs.get(2).requestHeaders())
+                    .doesNotContainKeys(HttpHeaders.AUTHORIZATION, HttpHeaders.COOKIE);
+            assertThat(lifecycleTerminals).hasSize(3);
+            assertThat(lifecycleTerminals).extracting(ReactiveHttpClientLifecycleContext::httpMethod)
+                    .containsOnly("POST");
+            assertThat(lifecycleTerminals).extracting(ReactiveHttpClientLifecycleContext::cacheOutcome)
+                    .containsExactly(
+                            HttpClientCacheOutcome.MISS_LOADER,
+                            HttpClientCacheOutcome.MISS_LOADER,
+                            HttpClientCacheOutcome.FRESH_HIT);
+            assertThat(lifecycleTerminals.get(2).attemptNumber()).isZero();
+            assertThat(lifecycleTerminals.get(2).requestUrl()).isNull();
+
+            assertThat(registry.find(observability.getMetricName())
+                    .tags("client.name", "semantic-boundary-client", "api.name", "queryJson")
+                    .timers().stream().mapToLong(io.micrometer.core.instrument.Timer::count).sum())
+                    .isEqualTo(2L);
+            assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".callers")
+                    .tags("client.name", "semantic-boundary-client", "api.name", "queryJson",
+                            "outcome", "MISS_LOADER")
+                    .counter().count()).isEqualTo(2.0);
+            assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".callers")
+                    .tags("client.name", "semantic-boundary-client", "api.name", "queryJson",
+                            "outcome", "FRESH_HIT")
+                    .counter().count()).isEqualTo(1.0);
+            manager.close();
+        }
+    }
+
     private static WebClient webClient(org.springframework.web.reactive.function.client.ExchangeFunction exchange) {
         return WebClient.builder()
                 .baseUrl("http://semantic-boundary.test")
@@ -489,6 +610,19 @@ class SemanticReadReplayTimeoutContractTest {
             ResilienceOperatorApplier applier,
             AuthProvider authProvider,
             String baseUrl) {
+        return client(webClient, config, context, manager, applier, authProvider, baseUrl,
+                new ReactiveHttpClientProperties.ObservabilityConfig());
+    }
+
+    private static SemanticBoundaryClient client(
+            WebClient webClient,
+            ReactiveHttpClientProperties.ClientConfig config,
+            AnnotationConfigApplicationContext context,
+            LocalResponseCacheManager manager,
+            ResilienceOperatorApplier applier,
+            AuthProvider authProvider,
+            String baseUrl,
+            ReactiveHttpClientProperties.ObservabilityConfig observability) {
         ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                 webClient,
                 new MethodMetadataCache(),
@@ -500,7 +634,7 @@ class SemanticReadReplayTimeoutContractTest {
                 context,
                 applier,
                 TestJsonCodecs.jsonCodec(),
-                new ReactiveHttpClientProperties.ObservabilityConfig(),
+                observability,
                 manager,
                 authProvider,
                 baseUrl);
@@ -512,6 +646,10 @@ class SemanticReadReplayTimeoutContractTest {
 
     private static Mono<String> query(SemanticBoundaryClient client, String target) {
         return client.query(target, "body", "text/plain", "tenant", "Bearer lookup");
+    }
+
+    private static Mono<JsonResult> queryJson(SemanticBoundaryClient client, String target) {
+        return client.queryJson(target, "body", "application/json", "tenant");
     }
 
     private static AnnotationConfigApplicationContext context() {
@@ -561,6 +699,32 @@ class SemanticReadReplayTimeoutContractTest {
                 @HeaderParam(HttpHeaders.CONTENT_TYPE) String contentType,
                 @HeaderParam("X-Tenant") String tenant,
                 @HeaderParam(HttpHeaders.AUTHORIZATION) String authorization);
+
+        @POST("/json/{target}")
+        @CacheResponse(value = "semantic", semanticRead = true)
+        @IdempotencyKey
+        @LogHttpExchange(logger = CapturingExchangeLogger.class)
+        Mono<JsonResult> queryJson(
+                @PathVar("target") String target,
+                @Body @CacheKey("payload") String payload,
+                @HeaderParam(HttpHeaders.CONTENT_TYPE) String contentType,
+                @HeaderParam("X-Tenant") String tenant);
+    }
+
+    private record JsonResult(String value) {
+    }
+
+    private static final class CapturingExchangeLogger implements HttpExchangeLogger {
+        private final List<HttpExchangeLogContext> exchanges;
+
+        private CapturingExchangeLogger(List<HttpExchangeLogContext> exchanges) {
+            this.exchanges = exchanges;
+        }
+
+        @Override
+        public void log(HttpExchangeLogContext context) {
+            exchanges.add(context);
+        }
     }
 
     private static final class RetryOnceApplier extends NoopResilienceOperatorApplier {

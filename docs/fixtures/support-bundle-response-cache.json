@@ -16,6 +16,9 @@
     "cacheRefreshAfterMs": 30000,
     "cacheSingleFlight": "enabled",
     "cacheMetricsEnabled": true,
+    "cachePolicySources": ["method"],
+    "cacheHttpMethods": ["POST"],
+    "cacheSemanticReadAcknowledged": true,
     "cacheMaximumSize": 10000,
     "cacheEntryCount": 8250
   },

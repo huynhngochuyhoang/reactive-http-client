@@ -65,6 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after `401` replay and Retry, body-preserving redirects remain inside one miss
   flight, and one caller deadline covers preparation, auth, lookup, waiting, and
   loading without losing final response-body timeout attribution.
+- **Verb-independent cache terminal and support contracts.** Semantic `POST`
+  hit, miss, decode-error, cancellation, timeout, auth, and admission paths now
+  have parity evidence with existing `GET` behavior across lifecycle hooks,
+  observers, exchange logs, Micrometer, and OpenTelemetry. Provider-backed
+  diagnostics add bounded cache policy sources, resolved HTTP methods, and
+  semantic-read acknowledgement; collection and replacement-factory snapshots
+  retain `null`/unknown semantics and no request, body, key, header, tenant, or
+  identity material is exported. Cache meter names, tags, units, zero series,
+  opt-in behavior, downstream-timer exclusion, and destroy/recreate ownership
+  remain unchanged.
 
 ---
 

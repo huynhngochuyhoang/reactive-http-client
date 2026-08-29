@@ -157,13 +157,17 @@ class ReactiveHttpClientAutoConfigurationTest {
                                     "poolMaxConcurrentStreams", "cachePhase", "cachePolicyCount",
                                     "cacheTtlMs", "cacheRefreshAfterMs", "cacheSingleFlight",
                                     "cacheMaximumSize", "cacheEntryCount", "cacheEvictions",
-                                    "cacheMetricsEnabled", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
+                                    "cacheMetricsEnabled", "cachePolicySources", "cacheHttpMethods",
+                                    "cacheSemanticReadAcknowledged", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
                                     "compressionEnabled", "codecMaxInMemorySizeMb", "resilienceConfigured", "retry", "rateLimiter", "circuitBreaker",
                                     "bulkhead", "strictUnsafeRetryValidation",
                                     "strictBodySigningValidation", "authMode", "followRedirects",
                                     "endpointCount", "inheritedEndpointCount");
                     assertThat(clients.get(0).get("poolMaxConnections")).isInstanceOf(Integer.class);
                     assertThat(clients.get(0).get("poolPendingAcquireTimeoutMs")).isInstanceOf(Long.class);
+                    assertThat(clients.get(0).get("cachePolicySources")).isInstanceOf(List.class);
+                    assertThat(clients.get(0).get("cacheHttpMethods")).isInstanceOf(List.class);
+                    assertThat(clients.get(0).get("cacheSemanticReadAcknowledged")).isInstanceOf(Boolean.class);
                     assertThat(clients.get(0).get("timeoutMs")).isInstanceOf(Long.class);
                     assertThat(clients.get(0).get("logicalCallTimeoutMs")).isInstanceOf(Long.class);
                     assertThat(clients.get(0).get("compressionEnabled")).isInstanceOf(Boolean.class);

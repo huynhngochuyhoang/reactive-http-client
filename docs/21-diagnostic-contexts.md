@@ -138,7 +138,14 @@ Use exchange logging for per-call request/response metadata, and use the diagnos
 
 ## Runtime diagnostics provider
 
-Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized registered-client summaries at runtime. The provider reports the client name, client interface, base URL source, effective pool source/maximum/pending-acquire-timeout/metrics policy, configured pool protocol/capacity basis with an unknown peer stream limit, bounded cache phase/policy/TTL/refresh/single-flight/capacity/entry/eviction state, per-attempt response-timeout summary, logical-call budget, resilience summary, auth mode, redirect-following flag, endpoint count, and inherited endpoint count. It does not expose base URL values, cache entries or keys, header values, proxy credentials, auth-provider bean names, request bodies, or response bodies.
+Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized
+registered-client summaries at runtime. The provider reports the client name,
+client interface, base URL source, effective pool policy, bounded cache phase and
+runtime state, selected cache policy sources, resolved HTTP methods, semantic-read
+acknowledgement, timeout policy, resilience summary, auth mode, redirect policy,
+and endpoint counts. The cache fields describe only aggregate configured intent;
+they do not expose policy names, request targets, cache entries or keys, selected
+values, headers, tenants, identities, request bodies, or response bodies.
 
 Use `ReactiveHttpClientDiagnosticsSnapshot` when a support bundle, startup log,
 or local custom endpoint needs deterministic Markdown or JSON output from those
@@ -151,15 +158,16 @@ String json = ReactiveHttpClientDiagnosticsSnapshot.toJson(diagnostics);
 
 Provider-backed snapshots render schema version, project version, total client count, total endpoint
 count, total inherited endpoint count, strict validation flags, and one row/object
-per client. Summary-only collection overloads render strict validation flags and effective pool policy as
-unknown because `ClientSummary` does not carry those provider-only values. The
-helper sorts clients by name and interface for stable output. The helper is explicit: calling
+per client. Summary-only collection overloads render strict validation, effective
+pool policy, and semantic cache-selection fields as unknown because
+`ClientSummary` does not carry those provider-only values. Replacement client
+factories use the same unknown semantics. The helper sorts clients by name and interface for stable output. The helper is explicit: calling
 it does not register an Actuator endpoint, controller, log line, or file writer.
 
 ### Diagnostics schema v1
 
-JSON, map, and Markdown snapshots declare schema version `1`. Within the `3.x`
-line, schema changes are additive: existing fields keep their names, types, and
+JSON, map, and Markdown snapshots declare schema version `1`. Within each
+supported major line, schema changes are additive: existing fields keep their names, types, and
 meaning; a field is not removed, retyped, or reinterpreted in a minor release.
 Consumers must ignore fields they do not recognize. The sanitized
 [source-controlled current v1 fixture](fixtures/rhttpclients-schema-v1.json) is the
@@ -190,7 +198,12 @@ and `unknown` in Markdown. Collection-only pool and strict-validation facts reta
 the same unknown semantics. Cache phase, policy count, minimum TTL and refresh
 threshold, single-flight state, aggregate maximum size, entry count, eviction
 count, and cache-metrics enablement follow the same provider/collection unknown
-rules. No snapshot path enumerates cache entries. The fixture and JVM
+rules. Provider-backed cache fields also export the bounded policy-source set
+(`method` or `client`), resolved HTTP-method set, and whether at least one
+selected method carries explicit semantic-read acknowledgement. Empty lists and
+`false` mean the provider proved no selected cache method; `null` means the fact
+cannot be proven through the collection or replacement-factory contract. No
+snapshot path enumerates cache entries. The fixture and JVM
 and native checks reject removal, rename, type drift, or accidental secret-bearing
 fields.
 
