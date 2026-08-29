@@ -75,6 +75,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   identity material is exported. Cache meter names, tags, units, zero series,
   opt-in behavior, downstream-timer exclusion, and destroy/recreate ownership
   remain unchanged.
+- **Semantic-read security and operations review.** Added an endpoint-owner
+  approval matrix for side effects, body determinism, response variants,
+  auth/tenant partition, TTL, refresh, and invalidation ownership; ordinary
+  writes and commands remain explicitly unselected. Troubleshooting now
+  separates cache suppression, single flight, refresh, Retry, redirect, auth
+  replay, disabled Reactor Netty retry, and downstream deduplication. Copyable
+  catalog/RPC examples and support fixtures use bounded structural facts,
+  `.example.invalid` hosts, and environment-only credentials.
 
 ---
 

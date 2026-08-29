@@ -351,6 +351,102 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v28SemanticReadSecurityAndOperationsGuidanceIsCompleteAndBounded() throws IOException {
+        Path root = projectRoot();
+        String caching = Files.readString(root.resolve("docs/32-response-caching.md"));
+        String safetyReview = markdownSection(
+                caching, "## Application safety review", "## Phase-one runtime behavior");
+        String normalizedSafetyReview = safetyReview.replaceAll("\\s+", " ");
+        int commandBlockStart = normalizedSafetyReview.indexOf("```java");
+        int commandBlockEnd = normalizedSafetyReview.indexOf(
+                "```", commandBlockStart + "```java".length());
+        assertThat(commandBlockStart).isNotNegative();
+        assertThat(commandBlockEnd).isGreaterThan(commandBlockStart);
+        String commandExamples = normalizedSafetyReview.substring(commandBlockStart, commandBlockEnd);
+        String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String examples = Files.readString(root.resolve("docs/examples/effective-configuration.md"));
+        String production = Files.readString(root.resolve("docs/16-production-checklist.md"));
+        JsonNode fixture = OBJECT_MAPPER.readTree(
+                root.resolve("docs/fixtures/support-bundle-response-cache.json").toFile());
+
+        assertThat(normalizedSafetyReview)
+                .contains("endpoint owner must approve")
+                .contains("A false declaration can suppress a required action")
+                .contains("share one caller's response with another caller")
+                .contains("Side effects")
+                .contains("Body determinism")
+                .contains("Response variants")
+                .contains("Auth and tenant partition")
+                .contains("TTL and hard expiry")
+                .contains("Refresh")
+                .contains("Invalidation owner")
+                .contains("Idempotency does not authorize local response reuse")
+                .contains("Retry configuration does not authorize local response reuse")
+                .contains("`Cache-Control` does not authorize local response reuse")
+                .contains("Ordinary writes, payments, job submissions, commands, and mutations stay unselected");
+        assertThat(commandExamples)
+                .contains("@POST(\"/payments\") @CacheDisabled Mono<PaymentReceipt> submitPayment")
+                .contains("@POST(\"/jobs\") @CacheDisabled Mono<JobReceipt> submitJob")
+                .contains("@PUT(\"/customers/{id}\") @CacheDisabled Mono<Customer> updateCustomer")
+                .contains("@POST(\"/commands\") @CacheDisabled Mono<CommandReceipt> executeCommand")
+                .doesNotContain("@CacheResponse", "semanticRead");
+        assertThat(operations.replaceAll("\\s+", " "))
+                .contains("### Dispatch suppression and duplicate diagnosis")
+                .contains("Cache hit")
+                .contains("Single-flight waiter")
+                .contains("Hidden refresh")
+                .contains("Resilience4j Retry")
+                .contains("Automatic redirect")
+                .contains("One-time auth replay")
+                .contains("Reactor Netty transport retry")
+                .contains("Downstream duplicate handling")
+                .contains("rolling configuration differences")
+                .contains("hard expiry")
+                .contains("refresh failure")
+                .contains("capacity pressure")
+                .contains("no distributed coherence")
+                .contains("no write-through or write-behind behavior");
+        assertThat(supportBundles.replaceAll("\\s+", " "))
+                .contains("resolved HTTP verb")
+                .contains("bounded semantic-read acknowledgement")
+                .contains("cache outcome")
+                .contains("subscription-attempt count")
+                .contains("request-dispatch evidence");
+        assertThat(examples)
+                .contains("## Semantic Read Cache Examples")
+                .contains("https://catalog-search.example.invalid")
+                .contains("https://reporting-rpc.example.invalid")
+                .contains("${EXAMPLE_CATALOG_CLIENT_ID}")
+                .contains("${EXAMPLE_CATALOG_CLIENT_SECRET}")
+                .contains("<groupId>com.github.ben-manes.caffeine</groupId>")
+                .contains("<artifactId>caffeine</artifactId>")
+                .contains("catalogTracingCustomizer: SAFE")
+                .contains("reportingTracingCustomizer: SAFE")
+                .contains("vary-by-parameters: [criteria]")
+                .contains("vary-by-headers: [Idempotency-Key, X-Tenant-Scope]")
+                .contains("vary-by-headers: [Idempotency-Key]")
+                .contains("vary-by-context: [principalScope]")
+                .contains("observability:\n      enabled: true\n      cache:\n        enabled: true")
+                .contains("@CacheResponse(value = \"catalog-search\", semanticRead = true)")
+                .contains("@CacheResponse(value = \"reporting-query\", semanticRead = true)")
+                .doesNotContain("client-secret: EXAMPLE_");
+        assertThat(production.replaceAll("\\s+", " "))
+                .contains("endpoint-owner approval")
+                .contains("payments, job submissions, commands, or mutations");
+
+        JsonNode terminalCaller = fixture.path("terminalCaller");
+        assertThat(terminalCaller.path("resolvedHttpMethod").isTextual()).isTrue();
+        assertThat(terminalCaller.path("resolvedHttpMethod").asText()).isEqualTo("POST");
+        assertThat(terminalCaller.path("cacheSemanticReadAcknowledged").isBoolean()).isTrue();
+        assertThat(terminalCaller.path("cacheSemanticReadAcknowledged").asBoolean()).isTrue();
+        assertThat(terminalCaller.path("cacheOutcome").isTextual()).isTrue();
+        assertThat(terminalCaller.path("subscriptionAttemptCount").isIntegralNumber()).isTrue();
+        assertThat(terminalCaller.path("requestDispatched").isBoolean()).isTrue();
+        assertThat(sensitiveSupportFixtureFieldNames(fixture)).isEmpty();
+    }
+
+    @Test
     void v23OperationsGuidanceIsAlignedBoundedDiscoverableAndVersionScoped() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

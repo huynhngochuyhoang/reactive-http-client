@@ -268,8 +268,35 @@ and [OAuth2 client credentials](06-auth-providers.md#oauth2clientcredentialstoke
 
 ## Response cache behavior (4.0.0+)
 
+### Dispatch suppression and duplicate diagnosis
+
+Do not infer network dispatch count from subscription-attempt count. Correlate
+the caller cache outcome, attempt count, request-dispatch evidence, load/refresh
+meters, and downstream access logs for the same bounded window:
+
+| Mechanism | Dispatch interpretation |
+|---|---|
+| Cache hit | `FRESH_HIT` or `STALE_HIT` suppresses the current caller's downstream dispatch. |
+| Single-flight waiter | `COALESCED_WAITER` has no caller transport attempt; one miss leader may dispatch for all same-key waiters. |
+| Hidden refresh | A stale caller returns locally while separately bounded refresh work may dispatch. Refresh outcome is not a second caller terminal record. |
+| Resilience4j Retry | An active Retry can create another subscription attempt and another dispatch inside the miss leader or refresh load. |
+| Automatic redirect | A followed redirect can create another wire request while the starter subscription-attempt count remains unchanged. |
+| One-time auth replay | A `401` invalidation can replay once inside one outer attempt; inspect auth replay and downstream logs separately. |
+| Reactor Netty transport retry | Factory-owned business and OAuth2 clients disable Reactor Netty's automatic transport retry. Recheck this only for a replacement connector or a low-level client not built by the starter factory. |
+| Downstream duplicate handling | A remote idempotency or deduplication store can collapse requests after dispatch; starter cache evidence cannot prove that behavior. |
+
+The cache is local to one client factory and process. During rolling configuration
+differences, instances can have different policy, capacity, age, and entry state.
+Hard expiry forces the next access through the miss path; refresh failure leaves
+the stale value only until that hard expiry; sustained size eviction near full
+capacity indicates capacity pressure. There is no distributed coherence. The
+starter performs no automatic invalidation after writes and has
+no write-through or write-behind behavior.
+
 - Confirm the method explicitly selects the expected named policy and remains an
-  eligible finite `GET Mono` contract. A definition alone is inert.
+  eligible finite `Mono` contract. A non-`GET` selection must also report the
+  expected method-specific semantic-read acknowledgement. A definition alone is
+  inert.
 - Record one bounded window of hit/miss, caller outcome, load, refresh,
   size/TTL eviction, current-entry, and maximum-entry metrics. Keep ratios,
   events per second, durations, and gauges in their documented units.

@@ -572,8 +572,12 @@ general performance evidence:
   and size eviction rates.
 - Current entries divided by configured maximum entries for each bounded
   client/policy pair.
-- One caller terminal record containing only the bounded cache outcome,
-  attempt count, dispatch evidence, and ordinary structural error fields.
+- One caller terminal record containing the resolved HTTP verb in
+  `resolvedHttpMethod`, bounded semantic-read acknowledgement in
+  `cacheSemanticReadAcknowledged`, bounded cache outcome in `cacheOutcome`,
+  subscription-attempt count in `subscriptionAttemptCount`, request-dispatch
+  evidence in `requestDispatched`, and ordinary structural error fields. These
+  are structural facts, not request-target, key, body, header, or identity data.
 
 Do not capture cache keys, key digests, cached values, selected arguments,
 headers, bodies, URLs, tenant/locale values, or credentials. A stale caller and

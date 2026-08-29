@@ -121,6 +121,67 @@ value and status. Hits retain only `Content-Type`, `Content-Language`,
 load caller sees the original response headers; a later hit sees only the retained
 representation allowlist and does not create a new downstream wire response.
 
+## Application safety review
+
+`semanticRead = true` is an application correctness and data-isolation
+decision, not an HTTP optimization hint. Before a non-`GET` method is selected,
+the endpoint owner must approve the declaration. A false declaration can
+suppress a required action on a hit or share one caller's response with another
+caller when an identity dimension is missing.
+
+Record approval for every row:
+
+| Review | Required proof |
+|---|---|
+| Side effects | Omitting a downstream invocation on every hit does not omit a payment, mutation, audit action, job submission, lock, sequence advance, or other required action. |
+| Body determinism | The selected body bytes completely identify the query and serialization does not depend on unkeyed mutable or ambient state. |
+| Response variants | Path, query, body, media type, locale, API version, and every response-changing input are represented by the final request identity. |
+| Auth and tenant partition | Principal, authorization scope, and tenant boundaries are selected explicitly, or sharing is deliberately approved for public data. |
+| TTL and hard expiry | The finite TTL is no longer than the business staleness budget, including during a downstream incident. |
+| Refresh | Hidden refresh traffic, credentials, Retry behavior, and refresh failure are acceptable; otherwise refresh remains disabled. |
+| Invalidation owner | The endpoint owner accepts TTL/eviction as the bound or names the application-owned invalidation/coherence mechanism used after writes. |
+
+No transport or response metadata substitutes for that approval. Idempotency does
+not authorize local response reuse. Retry configuration does not authorize local
+response reuse. A successful HTTP status does not authorize local response reuse.
+A method named `find` or `query` does not authorize local response reuse.
+`Cache-Control` does not authorize local response reuse. None can prove that
+suppressing a call is safe or that two callers may share one decoded value.
+
+Ordinary writes, payments, job submissions, commands, and mutations stay
+unselected. When a client-wide policy could otherwise select them, exclude each
+method explicitly:
+
+```java
+@ReactiveHttpClient(
+        name = "command-api",
+        baseUrl = "https://commands.example.invalid")
+interface CommandClient {
+
+    @POST("/payments")
+    @CacheDisabled
+    Mono<PaymentReceipt> submitPayment(@Body PaymentCommand command);
+
+    @POST("/jobs")
+    @CacheDisabled
+    Mono<JobReceipt> submitJob(@Body JobCommand command);
+
+    @PUT("/customers/{id}")
+    @CacheDisabled
+    Mono<Customer> updateCustomer(
+            @PathVar("id") String id,
+            @Body CustomerUpdate update);
+
+    @POST("/commands")
+    @CacheDisabled
+    Mono<CommandReceipt> executeCommand(@Body Command command);
+}
+```
+
+Do not add `semanticRead = true` merely to make one of these methods pass cache
+validation. Leave it unselected or disabled unless the endpoint owner can prove
+that it is a read under the complete review above.
+
 ## Phase-one runtime behavior
 
 Each client factory owns one Caffeine cache for every selected policy. Caffeine
