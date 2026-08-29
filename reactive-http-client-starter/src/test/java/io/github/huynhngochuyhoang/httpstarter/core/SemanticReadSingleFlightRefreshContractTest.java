@@ -201,8 +201,7 @@ class SemanticReadSingleFlightRefreshContractTest {
                     .filter(event -> event.getCacheOutcome() == HttpClientCacheOutcome.COALESCED_WAITER)
                     .count()).isEqualTo(2);
             manager.close();
-        }
-        finally {
+        } finally {
             registry.close();
             VirtualTimeScheduler.reset();
         }
@@ -215,6 +214,8 @@ class SemanticReadSingleFlightRefreshContractTest {
         AtomicInteger sourceCancellations = new AtomicInteger();
         Sinks.One<ClientResponse> error = Sinks.one();
         Sinks.One<ClientResponse> empty = Sinks.one();
+        CountDownLatch errorSubscribed = new CountDownLatch(1);
+        CountDownLatch emptySubscribed = new CountDownLatch(1);
         WebClient webClient = WebClient.builder()
                 .baseUrl("http://semantic-flight.test")
                 .exchangeFunction(request -> {
@@ -225,18 +226,23 @@ class SemanticReadSingleFlightRefreshContractTest {
                         return Mono.<ClientResponse>never().doOnCancel(sourceCancellations::incrementAndGet);
                     }
                     if (target.endsWith("/error") && dispatch == 1) {
-                        return error.asMono();
+                        return error.asMono().doOnSubscribe(ignored -> errorSubscribed.countDown());
                     }
                     if (target.endsWith("/empty") && dispatch == 1) {
-                        return empty.asMono();
+                        return empty.asMono().doOnSubscribe(ignored -> emptySubscribed.countDown());
                     }
                     return Mono.just(ok("reloaded-" + target));
                 })
                 .build();
         ReactiveHttpClientJsonCodec failingCodec = failingCodec();
 
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
         try (AnnotationConfigApplicationContext context = context()) {
-            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+            LocalResponseCacheManager manager = LocalResponseCacheManager.testing(
+                    System::nanoTime,
+                    reactor.core.scheduler.Schedulers.parallel(),
+                    LocalResponseCacheMetrics.enabled(registry, "semantic-flight-client"),
+                    "semantic-flight-client");
             SemanticPostClient client = client(
                     SemanticPostClient.class, "semantic-flight-client", webClient,
                     config(0, true, null, null), context, manager, failingCodec);
@@ -257,7 +263,9 @@ class SemanticReadSingleFlightRefreshContractTest {
 
             Mono<String> failedCall = post(client, "error", "body", "text/plain", "tenant", "one", "en");
             CompletableFuture<String> failedLeader = failedCall.toFuture();
+            assertThat(errorSubscribed.await(1, TimeUnit.SECONDS)).isTrue();
             CompletableFuture<String> failedWaiter = failedCall.toFuture();
+            awaitCoalesced(registry, 2);
             error.tryEmitError(new IllegalStateException("load failed")).orThrow();
             assertThatThrownBy(() -> failedLeader.get(1, TimeUnit.SECONDS)).hasRootCauseMessage("load failed");
             assertThatThrownBy(() -> failedWaiter.get(1, TimeUnit.SECONDS)).hasRootCauseMessage("load failed");
@@ -267,7 +275,9 @@ class SemanticReadSingleFlightRefreshContractTest {
 
             Mono<String> emptyCall = post(client, "empty", "body", "text/plain", "tenant", "one", "en");
             CompletableFuture<String> emptyLeader = emptyCall.toFuture();
+            assertThat(emptySubscribed.await(1, TimeUnit.SECONDS)).isTrue();
             CompletableFuture<String> emptyWaiter = emptyCall.toFuture();
+            awaitCoalesced(registry, 3);
             empty.tryEmitValue(ClientResponse.create(HttpStatus.NO_CONTENT).build()).orThrow();
             assertThat(emptyLeader.get(1, TimeUnit.SECONDS)).isNull();
             assertThat(emptyWaiter.get(1, TimeUnit.SECONDS)).isNull();
@@ -284,6 +294,9 @@ class SemanticReadSingleFlightRefreshContractTest {
             assertThat(serializationCall.block()).contains("reloaded");
             assertThat(dispatches.get("/json/serialization")).hasValue(1);
             manager.close();
+        }
+        finally {
+            registry.close();
         }
     }
 
@@ -547,6 +560,22 @@ class SemanticReadSingleFlightRefreshContractTest {
         assertThat(event.getRequestUrl()).isNull();
         assertThat(event.getStatusCode()).isNull();
         assertThat(event.getRequestHeaders()).isEmpty();
+    }
+
+    private static void awaitCoalesced(SimpleMeterRegistry registry, double expected) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (coalescedCount(registry) != expected && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
+        assertThat(coalescedCount(registry)).isEqualTo(expected);
+    }
+
+    private static double coalescedCount(SimpleMeterRegistry registry) {
+        io.micrometer.core.instrument.Counter counter = registry
+                .find(LocalResponseCacheMetrics.PREFIX + ".coalesced")
+                .tags("client.name", "semantic-flight-client", "api.name", "search")
+                .counter();
+        return counter != null ? counter.count() : 0;
     }
 
     private static void awaitValue(AtomicInteger value, int expected) {

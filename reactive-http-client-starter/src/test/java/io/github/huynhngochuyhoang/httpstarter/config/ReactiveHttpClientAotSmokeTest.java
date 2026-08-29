@@ -328,6 +328,41 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorAcceptsResolvedApiRefSemanticRead() {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        beanDefinition.getPropertyValues().add("type", ApiRefSemanticReadAotClient.class);
+        beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ApiRefSemanticReadAotClient.class);
+        context.registerBeanDefinition(ApiRefSemanticReadAotClient.class.getName(), beanDefinition);
+        ReactiveHttpClientProperties.ApiConfig api = new ReactiveHttpClientProperties.ApiConfig();
+        api.setMethod("POST");
+        api.setPath("/query");
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(100L);
+        policy.setSharedResponse(true);
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getApis().put("query", api);
+        config.getCache().getPolicies().put("selected", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("api-ref-semantic-read-aot", config));
+        context.getBeanFactory().registerSingleton("reactiveHttpClientProperties", properties);
+
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+        DefaultGenerationContext generationContext = newGenerationContext();
+        contribution.applyTo(generationContext, null);
+
+        assertThat(RuntimeHintsPredicates.proxies().forInterfaces(ApiRefSemanticReadAotClient.class))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                method(ApiRefSemanticReadAotClient.class, "query")))
+                .accepts(generationContext.getRuntimeHints());
+        context.close();
+    }
+
+    @Test
     void beanFactoryAotProcessorRegistersCacheKeyRecordAccessors() throws Exception {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
@@ -364,7 +399,7 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
-    void beanFactoryAotProcessorValidatesInheritedCacheMetadataAndRegistersItsRecordAccessors()
+    void beanFactoryAotProcessorValidatesInheritedSemanticReadMetadataAndRegistersItsRecordAccessors()
             throws Exception {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
@@ -640,6 +675,15 @@ class ReactiveHttpClientAotSmokeTest {
         Mono<String> query();
     }
 
+    @ReactiveHttpClient(
+            name = "api-ref-semantic-read-aot",
+            baseUrl = "http://api-ref-semantic-read-aot.test")
+    interface ApiRefSemanticReadAotClient {
+        @ApiRef("query")
+        @CacheResponse(value = "selected", semanticRead = true)
+        Mono<String> query();
+    }
+
     record CacheRecordVariant(String value, int version) {
     }
 
@@ -666,8 +710,8 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     interface InheritedCacheAotOperations {
-        @GET("/items")
-        @CacheResponse("selected")
+        @POST("/items/query")
+        @CacheResponse(value = "selected", semanticRead = true)
         Mono<String> get(@CacheKey("tenant") CacheRecordVariant tenant);
     }
 

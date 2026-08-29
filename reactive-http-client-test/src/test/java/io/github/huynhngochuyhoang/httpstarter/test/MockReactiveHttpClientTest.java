@@ -50,6 +50,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 /**
  * End-to-end sanity tests for the test-helper module: verify
@@ -102,6 +103,27 @@ class MockReactiveHttpClientTest {
         @POST("/cached-query")
         @CacheResponse(value = "selected", semanticRead = true)
         Mono<String> query();
+    }
+
+    @ReactiveHttpClient(name = "semantic-json-mock")
+    interface SemanticReadJsonMockClient {
+        @POST("/cached-json")
+        @CacheResponse(value = "json", semanticRead = true)
+        Mono<String> json(@Body @CacheKey("body") SemanticQuery body);
+
+        @POST("/cached-single")
+        @CacheResponse(value = "single", semanticRead = true)
+        Mono<String> single(@Body @CacheKey("body") SemanticQuery body);
+
+        @POST("/cached-refresh")
+        @CacheResponse(value = "refresh", semanticRead = true)
+        Mono<String> refresh(@Body @CacheKey("body") SemanticQuery body);
+
+        @POST("/ordinary-write")
+        Mono<String> write(@Body SemanticQuery body);
+    }
+
+    record SemanticQuery(String term) {
     }
 
     @ReactiveHttpClient(name = "semantic-auth-mock")
@@ -1038,6 +1060,108 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void mockSemanticReadJsonPreservesBodyIdentityPhasesAndOrdinaryWrites() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("json", cachePolicy(false, null, 10, "body"));
+        config.getCache().getPolicies().put("single", cachePolicy(true, null, 10, "body"));
+        config.getCache().getPolicies().put("refresh", cachePolicy(false, 50L, 10, "body"));
+        AtomicInteger jsonLoads = new AtomicInteger();
+        AtomicInteger writeLoads = new AtomicInteger();
+        AtomicInteger refreshLoads = new AtomicInteger();
+        Sinks.One<DataBuffer> singleBody = Sinks.one();
+
+        try (MockReactiveHttpClient<SemanticReadJsonMockClient> mock = MockReactiveHttpClient
+                .forClient(SemanticReadJsonMockClient.class)
+                .clientConfig(config)
+                .withDeterministicCacheTime()
+                .jsonCodec(new Jackson3ReactiveHttpClientJsonCodec(JsonMapper.builder().build()))
+                .respondTo(HttpMethod.POST, "/cached-json", exchange -> MockReactiveHttpClient.text(
+                        200, exchange.bodyAsString() + ":" + jsonLoads.incrementAndGet()))
+                .respondTo(HttpMethod.POST, "/cached-single", exchange ->
+                        ClientResponse.create(org.springframework.http.HttpStatus.OK)
+                                .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                                .body(singleBody.asMono().flux())
+                                .build())
+                .respondTo(HttpMethod.POST, "/cached-refresh", exchange -> MockReactiveHttpClient.text(
+                        200, "refresh-" + refreshLoads.incrementAndGet()))
+                .respondTo(HttpMethod.POST, "/ordinary-write", exchange -> MockReactiveHttpClient.text(
+                        200, "write-" + writeLoads.incrementAndGet()))
+                .build()) {
+            SemanticQuery alpha = new SemanticQuery("alpha");
+            SemanticQuery beta = new SemanticQuery("beta");
+            assertThat(mock.proxy().json(alpha).block()).isEqualTo("{\"term\":\"alpha\"}:1");
+            assertThat(mock.proxy().json(alpha).block()).isEqualTo("{\"term\":\"alpha\"}:1");
+            assertThat(mock.proxy().json(beta).block()).isEqualTo("{\"term\":\"beta\"}:2");
+            assertThat(jsonLoads).hasValue(2);
+            assertThat(mock.exchanges()).filteredOn(exchange -> "/cached-json".equals(exchange.uri().getPath()))
+                    .extracting(RecordedExchange::bodyAsString)
+                    .containsExactly("{\"term\":\"alpha\"}", "{\"term\":\"beta\"}");
+
+            CompletableFuture<String> leader = mock.proxy().single(alpha).toFuture();
+            CompletableFuture<String> waiter = mock.proxy().single(alpha).toFuture();
+            await().atMost(java.time.Duration.ofSeconds(1)).untilAsserted(() ->
+                    assertThat(mock.loadCount("/cached-single")).isEqualTo(1));
+            singleBody.tryEmitValue(new DefaultDataBufferFactory()
+                    .wrap("single".getBytes(StandardCharsets.UTF_8))).orThrow();
+            assertThat(leader.get(1, TimeUnit.SECONDS)).isEqualTo("single");
+            assertThat(waiter.get(1, TimeUnit.SECONDS)).isEqualTo("single");
+
+            assertThat(mock.proxy().refresh(alpha).block()).isEqualTo("refresh-1");
+            mock.advanceCacheTime(java.time.Duration.ofMillis(50));
+            assertThat(mock.proxy().refresh(alpha).block()).isEqualTo("refresh-1");
+            assertThat(mock.proxy().refresh(alpha).block()).isEqualTo("refresh-2");
+            assertThat(refreshLoads).hasValue(2);
+
+            assertThat(mock.proxy().write(alpha).block()).isEqualTo("write-1");
+            assertThat(mock.proxy().write(alpha).block()).isEqualTo("write-2");
+            assertThat(writeLoads).hasValue(2);
+
+            mock.evictCacheEntries();
+            assertThat(mock.cacheEntryCount()).isZero();
+            assertThat(mock.proxy().json(alpha).block()).isEqualTo("{\"term\":\"alpha\"}:3");
+            assertThat(mock.cacheOutcomes()).contains(
+                    HttpClientCacheOutcome.FRESH_HIT,
+                    HttpClientCacheOutcome.COALESCED_WAITER,
+                    HttpClientCacheOutcome.STALE_HIT);
+        }
+    }
+
+    @Test
+    void deterministicMockCloseCancelsAnActiveSemanticReadRefresh() {
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().getPolicies().put("json", cachePolicy(false, null, 10, "body"));
+        config.getCache().getPolicies().put("single", cachePolicy(true, null, 10, "body"));
+        config.getCache().getPolicies().put("refresh", cachePolicy(false, 50L, 10, "body"));
+        AtomicInteger loads = new AtomicInteger();
+        AtomicInteger cancellations = new AtomicInteger();
+        MockReactiveHttpClient<SemanticReadJsonMockClient> mock = MockReactiveHttpClient
+                .forClient(SemanticReadJsonMockClient.class)
+                .clientConfig(config)
+                .withDeterministicCacheTime()
+                .jsonCodec(new Jackson3ReactiveHttpClientJsonCodec(JsonMapper.builder().build()))
+                .respondTo(HttpMethod.POST, "/cached-refresh", exchange -> loads.incrementAndGet() == 1
+                        ? MockReactiveHttpClient.text(200, "initial")
+                        : ClientResponse.create(org.springframework.http.HttpStatus.OK)
+                                .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                                .body(Mono.<DataBuffer>never().doOnCancel(cancellations::incrementAndGet).flux())
+                                .build())
+                .build();
+        try {
+            assertThat(mock.proxy().refresh(new SemanticQuery("close")).block()).isEqualTo("initial");
+            mock.advanceCacheTime(java.time.Duration.ofMillis(50));
+            assertThat(mock.proxy().refresh(new SemanticQuery("close")).block()).isEqualTo("initial");
+            assertThat(loads).hasValue(2);
+
+            mock.close();
+
+            assertThat(cancellations).hasValue(1);
+        }
+        finally {
+            mock.close();
+        }
+    }
+
+    @Test
     void mockAuthParticipatesInSemanticReadPartitionValidationAndPerCallerGates() {
         ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
         policy.setTtlMs(1_000L);
@@ -1793,6 +1917,22 @@ class MockReactiveHttpClientTest {
                 new ReactiveHttpClientProperties.ClientConfig();
         config.getCache().getPolicies().put("local", policy);
         return config;
+    }
+
+    private static ReactiveHttpClientProperties.CachePolicyConfig cachePolicy(
+            boolean singleFlight, Long refreshAfterMs, long maximumSize, String bodyKey) {
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(maximumSize);
+        policy.setSharedResponse(true);
+        policy.setSingleFlight(singleFlight);
+        policy.setVaryByParameters(List.of(bodyKey));
+        if (refreshAfterMs != null) {
+            policy.setRefreshAfterMs(refreshAfterMs);
+            policy.setRefreshTimeoutMs(250L);
+        }
+        return policy;
     }
 
     @Order(10)

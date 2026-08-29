@@ -59,7 +59,8 @@ preserve_evidence() {
 trap preserve_evidence EXIT
 
 MAVEN=(mvn -q -s "$SETTINGS" -Dmaven.repo.local="$LOCAL_REPOSITORY"
-  -f "$FIXTURE_POM" -Dreactive-http-client.version="$PUBLISHED_VERSION")
+  -f "$FIXTURE_POM" -Dreactive-http-client.version="$PUBLISHED_VERSION"
+  -Dconsumer.v27.parity=true)
 
 "${MAVEN[@]}" help:effective-pom -Doutput="$EFFECTIVE_POMS/boot4-published-consumer.xml"
 stage="effective-pom"

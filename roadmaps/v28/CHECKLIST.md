@@ -652,41 +652,71 @@ Completion evidence (2026-08-29):
 
 ## Priority 10 - Mock, Consumer, AOT, Native, and Lifecycle Parity
 
-### [ ] 10.1 Extend `MockReactiveHttpClient`
+### [x] 10.1 Extend `MockReactiveHttpClient`
 
-- [ ] Expose the final semantic-read annotation/configuration contract without a
+- [x] Expose the final semantic-read annotation/configuration contract without a
       mock-only bypass.
-- [ ] Cover GET compatibility, POST JSON hit/miss, unacknowledged failure,
+- [x] Cover GET compatibility, POST JSON hit/miss, unacknowledged failure,
       ordinary uncached write, body variants, auth partition, single flight,
       refresh, eviction, and deterministic time.
-- [ ] Assert request body bytes and dispatch counts while keeping cache key/value
+- [x] Assert request body bytes and dispatch counts while keeping cache key/value
       internals inaccessible.
-- [ ] Close cache managers and active load/refresh state for deterministic and
+- [x] Close cache managers and active load/refresh state for deterministic and
       normal-clock mocks.
 
-### [ ] 10.2 Extend assembled consumers
+### [x] 10.2 Extend assembled consumers
 
-- [ ] Add current-reactor Boot 4 consumer cases for the supported non-GET shapes
+- [x] Add current-reactor Boot 4 consumer cases for the supported non-GET shapes
       without leaking reactor classes into the fixture classpath.
-- [ ] Add a published `4.0.0` consumer case proving existing GET caching and
+- [x] Add a published `4.0.0` consumer case proving existing GET caching and
       public APIs remain compatible.
-- [ ] Preserve effective POM, dependency tree, classpath, Surefire reports, and
+- [x] Preserve effective POM, dependency tree, classpath, Surefire reports, and
       stage-aware failure provenance for both consumers.
-- [ ] Ensure test-helper consumers receive or document every optional runtime
+- [x] Ensure test-helper consumers receive or document every optional runtime
       dependency required by cache-enabled mocks.
 
 ### [ ] 10.3 Extend AOT, native, and shutdown evidence
 
-- [ ] Register only the final public annotation/configuration additions and
+- [x] Register only the final public annotation/configuration additions and
       concrete client method metadata required at runtime.
-- [ ] Keep application body DTO/Jackson hints under normal application ownership.
-- [ ] Add native loopback evidence for one acknowledged POST JSON miss and hit
+- [x] Keep application body DTO/Jackson hints under normal application ownership.
+- [x] Add native loopback evidence for one acknowledged POST JSON miss and hit
       with exactly one server dispatch.
-- [ ] Observe a bounded quiet period before accepting zero dispatch on hits.
-- [ ] Prove native diagnostics contain semantic intent but no request body or key
+- [x] Observe a bounded quiet period before accepting zero dispatch on hits.
+- [x] Prove native diagnostics contain semantic intent but no request body or key
       material.
 - [ ] Run native compile/executable evidence from a clean committed tree and
       record commit, toolchain, binary hash, and reports.
+
+Implementation evidence (2026-08-29):
+
+- `MockReactiveHttpClientTest` now exercises semantic POST JSON body identity,
+  exact recorded body bytes, hit/miss dispatch counts, ordinary uncached writes,
+  single flight, refresh, eviction, deterministic time, auth partitioning, and
+  unacknowledged-method rejection through the public mock builder. Deterministic
+  refresh and existing normal-clock load shutdown cases both prove cancellation.
+- `scripts/verify-current-consumer.sh` activates the V28 fixture for tests and all
+  generated evidence. A fresh isolated run passed **60 mock tests** and **6 Boot 4
+  consumer tests**, retained effective POM/tree/classpath/Surefire/stage
+  provenance, rejected reactor output directories, and verified transitive
+  Caffeine for cache-enabled test-helper consumers.
+- `scripts/verify-published-consumer.sh 4.0.0` activates the V27 compatibility
+  fixture for the complete Maven invocation. A fresh Maven Central run passed
+  **4 consumer tests** and retained matching effective POM, dependency tree,
+  classpath, Surefire, stage, and published-artifact provenance.
+- `ReactiveHttpClientAotSmokeTest`: **21 tests**, all passing, including inherited
+  semantic-read metadata, resolved `@ApiRef` metadata, replacement metadata-cache
+  behavior, foreign factory exclusion, and concrete method/record hints.
+- The native fixture owns its `NativeQueryRequest` reflection binding, sends one
+  acknowledged JSON `POST`, proves miss/hit equality with one dispatch and a
+  100 ms quiet period, and rejects body markers and cache-key material from the
+  diagnostics snapshot. JVM packaging/execution and GraalVM native
+  compile/execution passed with GraalVM **25.0.3**; the functional native binary
+  SHA-256 was
+  `83d38a3d1078e309a056af6a46a48c762737352a6b0744a1ec2529d0a699402b`.
+- The native run above used the uncommitted Priority 10 tree. It validates
+  functionality but intentionally does not satisfy the remaining immutable
+  clean-commit provenance checkbox.
 
 ---
 
