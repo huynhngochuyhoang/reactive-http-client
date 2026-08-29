@@ -16,7 +16,7 @@ import java.util.*;
  * entries. It intentionally
  * does not include base URL values, header values, proxy credentials, auth
  * provider bean names, request bodies, or response bodies. Schema version 1 is
- * additive within the 3.x line. Rendering rejects snapshots beyond the documented
+ * additive within each supported major line. Rendering rejects snapshots beyond the documented
  * client, endpoint, text-field, and output-size limits instead of truncating them.
  */
 public final class ReactiveHttpClientDiagnosticsSnapshot {
@@ -145,6 +145,9 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             clientMap.put("cacheEntryCount", cacheEntryCount(entry.cache()));
             clientMap.put("cacheEvictions", cacheEvictions(entry.cache()));
             clientMap.put("cacheMetricsEnabled", cacheMetricsEnabled(entry.cache()));
+            clientMap.put("cachePolicySources", cachePolicySources(entry.cache()));
+            clientMap.put("cacheHttpMethods", cacheHttpMethods(entry.cache()));
+            clientMap.put("cacheSemanticReadAcknowledged", cacheSemanticReadAcknowledged(entry.cache()));
             clientMap.put("timeoutSource", client.timeout().source());
             clientMap.put("timeoutMs", client.timeout().timeoutMs());
             clientMap.put("logicalCallTimeoutMs", entry.logicalCallTimeoutMs());
@@ -213,6 +216,10 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             nullableField(out, 3, "cacheEntryCount", cacheEntryCount(entry.cache()), true);
             nullableField(out, 3, "cacheEvictions", cacheEvictions(entry.cache()), true);
             field(out, 3, "cacheMetricsEnabled", cacheMetricsEnabled(entry.cache()), true);
+            stringListField(out, 3, "cachePolicySources", cachePolicySources(entry.cache()), true);
+            stringListField(out, 3, "cacheHttpMethods", cacheHttpMethods(entry.cache()), true);
+            field(out, 3, "cacheSemanticReadAcknowledged",
+                    cacheSemanticReadAcknowledged(entry.cache()), true);
             field(out, 3, "timeoutSource", client.timeout().source(), true);
             field(out, 3, "timeoutMs", client.timeout().timeoutMs(), true);
             nullableField(out, 3, "logicalCallTimeoutMs", entry.logicalCallTimeoutMs(), true);
@@ -297,6 +304,8 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
         if (entry.cache() != null) {
             boundedText("cachePhase", entry.cache().phase());
             boundedText("cacheSingleFlight", entry.cache().singleFlight());
+            boundedTextList("cachePolicySources", entry.cache().policySources());
+            boundedTextList("cacheHttpMethods", entry.cache().httpMethods());
         }
         if (summary.endpointCount() < 0 || summary.inheritedEndpointCount() < 0
                 || summary.inheritedEndpointCount() > summary.endpointCount()) {
@@ -311,6 +320,17 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             throw new IllegalArgumentException("Diagnostics snapshot field " + field
                     + " exceeds the " + MAX_TEXT_LENGTH + " character limit");
         }
+    }
+
+    private static void boundedTextList(String field, List<String> values) {
+        if (values == null) {
+            return;
+        }
+        if (values.size() > 16) {
+            throw new IllegalArgumentException("Diagnostics snapshot field " + field
+                    + " exceeds the 16 value limit");
+        }
+        values.forEach(value -> boundedText(field, value));
     }
 
     private static String boundedOutput(StringBuilder out, String format) {
@@ -408,7 +428,10 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
                 + ", maximumSize=" + cache.maximumSize()
                 + ", entries=" + (cache.entryCount() != null ? cache.entryCount() : "unknown")
                 + ", evictions=" + (cache.evictions() != null ? cache.evictions() : "unknown")
-                + ", metrics=" + cache.metricsEnabled();
+                + ", metrics=" + cache.metricsEnabled()
+                + ", policySources=" + cache.policySources()
+                + ", httpMethods=" + cache.httpMethods()
+                + ", semanticReadAcknowledged=" + cache.semanticReadAcknowledged();
     }
 
     private static String cachePhase(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
@@ -445,6 +468,21 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     private static Boolean cacheMetricsEnabled(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
         return cache != null ? cache.metricsEnabled() : null;
+    }
+
+    private static List<String> cachePolicySources(
+            ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.policySources() : null;
+    }
+
+    private static List<String> cacheHttpMethods(
+            ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.httpMethods() : null;
+    }
+
+    private static Boolean cacheSemanticReadAcknowledged(
+            ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.semanticReadAcknowledged() : null;
     }
 
     private static String timeout(ReactiveHttpClientDiagnosticsProvider.TimeoutSummary timeout) {
@@ -524,6 +562,28 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             out.append(',');
         }
         out.append('\n');
+    }
+
+    private static void stringListField(
+            StringBuilder out, int indent, String name, List<String> values, boolean comma) {
+        indent(out, indent).append("\"").append(json(name)).append("\": ");
+        if (values == null) {
+            out.append("null");
+        }
+        else {
+            out.append("[");
+            for (int index = 0; index < values.size(); index++) {
+                if (index > 0) {
+                    out.append(", ");
+                }
+                out.append("\"").append(json(values.get(index))).append("\"");
+            }
+            out.append("]");
+        }
+        if (comma) {
+            out.append(",");
+        }
+        out.append("\n");
     }
 
     private static void nullableField(StringBuilder out, int indent, String name, Number value, boolean comma) {

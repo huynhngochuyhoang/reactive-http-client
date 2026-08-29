@@ -307,7 +307,16 @@ bounded cache meters and a metadata-only debug log containing client, API, and
 outcome. Cache keys, selected values, arguments, headers, bodies, URLs, tenant
 values, and credentials are never meter tags or cache outcome fields. See
 [Observability](08-observability.md#response-cache-metrics-separately-opt-in)
-for the complete meter and dashboard contract.
+for the complete meter and dashboard contract. Meter names, types, base units,
+tag keys, and zero-series behavior are verb-independent; the resolved HTTP method
+is intentionally not added as a cache-meter tag.
+
+Provider-backed diagnostics and effective-contract snapshots expose bounded cache
+policy source, resolved HTTP method, and semantic-read acknowledgement. Collection
+snapshot overloads and replacement client factories render provider-only semantic
+facts as `null`/unknown rather than inventing `false`. None of these outputs
+contain policy names, request targets, selected headers, bodies, keys, tenants, or
+identities.
 
 Response cacheability is decided from the final wire status and headers for
 both plain `Mono<T>` and `Mono<ResponseEntity<T>>` contracts. Redirect responses

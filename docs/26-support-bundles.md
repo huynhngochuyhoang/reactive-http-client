@@ -562,8 +562,10 @@ general performance evidence:
 
 - Provider-backed diagnostics fields: `cachePhase`, `cachePolicyCount`,
   `cacheTtlMs`, `cacheRefreshAfterMs`, `cacheSingleFlight`,
-  `cacheMaximumSize`, `cacheEntryCount`, `cacheEvictions`, and
-  `cacheMetricsEnabled`.
+  `cacheMaximumSize`, `cacheEntryCount`, `cacheEvictions`,
+  `cacheMetricsEnabled`, `cachePolicySources`, `cacheHttpMethods`, and
+  `cacheSemanticReadAcknowledged`. The last three are bounded structural
+  policy facts; they never contain request targets or selected values.
 - Lookup hit/miss rates and, when applicable, coalesced-waiter and stale-serving
   rates for the affected bounded client/API names.
 - Load and refresh success/failure/cancellation rates and durations, plus TTL

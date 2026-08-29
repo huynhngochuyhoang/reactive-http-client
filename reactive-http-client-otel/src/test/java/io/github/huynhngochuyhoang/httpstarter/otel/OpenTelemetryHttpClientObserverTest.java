@@ -87,14 +87,17 @@ class OpenTelemetryHttpClientObserverTest {
     @Test
     void cacheOutcomeAddsOneBoundedAttributeWithoutKeyOrValueMaterial() {
         observer.record(new HttpClientObserverEvent(
-                "catalog-client", "catalog.get", "GET", "/catalog/{id}",
+                "catalog-client", "catalog.search", "POST", "/catalog/search",
                 null, 2L, null, null, null, null,
                 0, 0L, HttpClientObserverEvent.UNKNOWN_SIZE, null, null,
                 null, Map.of(), HttpClientCacheOutcome.FRESH_HIT));
 
         SpanData span = onlySpan();
+        assertThat(exporter.getFinishedSpanItems()).hasSize(1);
         assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_CACHE_OUTCOME))
                 .isEqualTo("FRESH_HIT");
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_HTTP_METHOD)).isEqualTo("POST");
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_ATTEMPT_COUNT)).isZero();
         assertThat(span.getAttributes().toString())
                 .doesNotContain("cache-key")
                 .doesNotContain("tenant-value")

@@ -271,6 +271,13 @@ class DocumentationReleaseArtifactTest {
         assertThat(fixture.path("cache").path("cachePolicyCount").isInt()).isTrue();
         assertThat(fixture.path("cache").path("cacheMaximumSize").isInt()).isTrue();
         assertThat(fixture.path("cache").path("cacheEntryCount").isInt()).isTrue();
+        assertThat(fixture.path("cache").path("cachePolicySources").isArray()).isTrue();
+        assertThat(fixture.path("cache").path("cachePolicySources").get(0).asText()).isEqualTo("method");
+        assertThat(fixture.path("cache").path("cacheHttpMethods").isArray()).isTrue();
+        assertThat(fixture.path("cache").path("cacheHttpMethods").get(0).asText()).isEqualTo("POST");
+        assertThat(fixture.path("cache").has("cacheSemanticReadAcknowledged")).isTrue();
+        assertThat(fixture.path("cache").path("cacheSemanticReadAcknowledged").isBoolean()).isTrue();
+        assertThat(fixture.path("cache").path("cacheSemanticReadAcknowledged").asBoolean()).isTrue();
         assertThat(fixture.path("lookups").path("hits").isInt()).isTrue();
         assertThat(fixture.path("lookups").path("misses").isInt()).isTrue();
         assertThat(fixture.path("loads").path("success").isInt()).isTrue();

@@ -58,7 +58,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
             "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams",
             "cachePhase", "cachePolicyCount", "cacheTtlMs", "cacheRefreshAfterMs",
             "cacheSingleFlight", "cacheMaximumSize", "cacheEntryCount", "cacheEvictions",
-            "cacheMetricsEnabled", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
+            "cacheMetricsEnabled", "cachePolicySources", "cacheHttpMethods",
+            "cacheSemanticReadAcknowledged", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
             "compressionEnabled", "codecMaxInMemorySizeMb",
             "resilienceConfigured", "retry", "rateLimiter",
             "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
@@ -198,8 +199,11 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                     assertThat(summary.clientName()).isEqualTo("replacement-diagnostic");
                     assertThat(summary.endpointCount()).isEqualTo(1);
                 });
-        assertThat(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider))
-                .containsEntry("clientCount", 1);
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider));
+        assertThat(client)
+                .containsEntry("cachePolicySources", null)
+                .containsEntry("cacheHttpMethods", null)
+                .containsEntry("cacheSemanticReadAcknowledged", null);
     }
 
     @Test
@@ -283,6 +287,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("clientName", "semantic-read-diagnostic")
                 .containsEntry("cachePhase", "local-ttl")
                 .containsEntry("cachePolicyCount", 1)
+                .containsEntry("cachePolicySources", List.of("method"))
+                .containsEntry("cacheHttpMethods", List.of("POST"))
+                .containsEntry("cacheSemanticReadAcknowledged", true)
                 .containsEntry("endpointCount", 1);
     }
 
@@ -1209,6 +1216,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                       "cacheEntryCount": 0,
                       "cacheEvictions": 0,
                       "cacheMetricsEnabled": false,
+                      "cachePolicySources": [],
+                      "cacheHttpMethods": [],
+                      "cacheSemanticReadAcknowledged": false,
                       "timeoutSource": "client",
                       "timeoutMs": 750,
                       "logicalCallTimeoutMs": 0,
@@ -1299,6 +1309,9 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("codecMaxInMemorySizeMb", null)
                 .containsEntry("strictUnsafeRetryValidation", null)
                 .containsEntry("strictBodySigningValidation", null)
+                .containsEntry("cachePolicySources", null)
+                .containsEntry("cacheHttpMethods", null)
+                .containsEntry("cacheSemanticReadAcknowledged", null)
                 .containsEntry("timeoutMs", 500L)
                 .containsEntry("followRedirects", true);
 

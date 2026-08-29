@@ -240,23 +240,31 @@ public class ReactiveHttpClientDiagnosticsProvider {
                                       Class<?> clientInterface,
                                       ReactiveHttpClientProperties.ClientConfig clientConfig) {
         if (!registration.starterFactory()) {
-            return new CacheSummary("disabled", 0, null, null, "disabled", 0, 0L, 0L, false);
+            return new CacheSummary("disabled", 0, null, null, "disabled", 0, 0L, 0L, false, null, null, null);
         }
         List<ReactiveHttpClientProperties.CachePolicyConfig> selected = new ArrayList<>();
+        Set<String> policySources = new TreeSet<>();
+        Set<String> httpMethods = new TreeSet<>();
+        boolean semanticReadAcknowledged = false;
         for (Method method : clientInterface.getMethods()) {
             if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
                 continue;
             }
             RequestPlan plan = RequestPlan.from(metadataCache.get(method), clientInterface);
-            EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.decide(
-                    plan, clientConfig, EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig));
+            String httpMethod = EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig);
+            EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.decide(plan, clientConfig, httpMethod);
             EffectiveCachePolicy.Selection selection = decision.selection();
-            if (decision.cacheable() && selected.stream().noneMatch(policy -> policy == selection.policy())) {
-                selected.add(selection.policy());
+            if (decision.cacheable()) {
+                if (selected.stream().noneMatch(policy -> policy == selection.policy())) {
+                    selected.add(selection.policy());
+                }
+                policySources.add(selection.source().value());
+                httpMethods.add(httpMethod.trim().toUpperCase(Locale.ROOT));
+                semanticReadAcknowledged |= decision.semanticRead();
             }
         }
         if (selected.isEmpty()) {
-            return new CacheSummary("disabled", 0, null, null, "disabled", 0, 0L, 0L, false);
+            return new CacheSummary("disabled", 0, null, null, "disabled", 0, 0L, 0L, false, List.of(), List.of(), false);
         }
         String phase = selected.stream().anyMatch(ReactiveHttpClientProperties.CachePolicyConfig::isRefreshEnabled)
                 ? "refresh-on-access"
@@ -289,7 +297,10 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 maximumSize,
                 runtime != null ? runtime.currentSize() : null,
                 runtime != null ? runtime.evictions() : null,
-                metricsEnabled);
+                metricsEnabled,
+                List.copyOf(policySources),
+                List.copyOf(httpMethods),
+                semanticReadAcknowledged);
     }
 
     private LocalResponseCacheManager.Snapshot existingCacheSnapshot(ClientRegistration registration) {
@@ -877,7 +888,10 @@ public class ReactiveHttpClientDiagnosticsProvider {
             long maximumSize,
             Long entryCount,
             Long evictions,
-            boolean metricsEnabled
+            boolean metricsEnabled,
+            List<String> policySources,
+            List<String> httpMethods,
+            Boolean semanticReadAcknowledged
     ) {
     }
 

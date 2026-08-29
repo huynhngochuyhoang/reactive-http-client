@@ -577,38 +577,76 @@ Completion evidence (2026-08-29):
 
 ## Priority 9 - Terminal Diagnostics, Metrics, and Support Output
 
-### [ ] 9.1 Keep terminal facts aligned across verbs
+### [x] 9.1 Keep terminal facts aligned across verbs
 
-- [ ] Preserve the existing bounded cache outcome vocabulary without adding
+- [x] Preserve the existing bounded cache outcome vocabulary without adding
       verb-specific outcomes.
-- [ ] Keep one lifecycle, observer, exchange-log, Micrometer, and OTel terminal
+- [x] Keep one lifecycle, observer, exchange-log, Micrometer, and OTel terminal
       result per caller subscription.
-- [ ] Keep hits at `attemptCount=0` and `requestDispatched=false`; keep miss and
+- [x] Keep hits at `attemptCount=0` and `requestDispatched=false`; keep miss and
       refresh evidence scoped to their final load only.
-- [ ] Assert cancellation, timeout, auth failure, admission rejection, decode
+- [x] Assert cancellation, timeout, auth failure, admission rejection, decode
       error, and successful hit/miss facts across GET and POST query methods.
 
-### [ ] 9.2 Export semantic intent without sensitive material
+### [x] 9.2 Export semantic intent without sensitive material
 
-- [ ] Add bounded policy source, resolved HTTP method, and semantic-read
+- [x] Add bounded policy source, resolved HTTP method, and semantic-read
       acknowledgement to effective contracts and provider-backed diagnostics.
-- [ ] Preserve null/unknown when lazy or replacement components make a fact
+- [x] Preserve null/unknown when lazy or replacement components make a fact
       unprovable without initialization.
-- [ ] Keep collection-backed compatibility snapshot overloads from inventing
+- [x] Keep collection-backed compatibility snapshot overloads from inventing
       false semantic-read values.
-- [ ] Reject request/body/key/header/tenant/identity material from JSON,
+- [x] Reject request/body/key/header/tenant/identity material from JSON,
       Markdown, Actuator, logs, OTel, and support fixtures.
 
-### [ ] 9.3 Preserve cache meter and health contracts
+### [x] 9.3 Preserve cache meter and health contracts
 
-- [ ] Keep cache meter names, types, units, tag keys, and zero-series behavior
+- [x] Keep cache meter names, types, units, tag keys, and zero-series behavior
       stable unless a versioned schema change is explicitly approved.
-- [ ] Keep cache metrics separately opt-in and absent for unselected or
+- [x] Keep cache metrics separately opt-in and absent for unselected or
       metrics-disabled cache policies.
-- [ ] Keep cache-served callers out of downstream request timers and health
+- [x] Keep cache-served callers out of downstream request timers and health
       denominators while recording cache-specific outcomes.
-- [ ] Verify meter removal on factory destruction and correct registration after
+- [x] Verify meter removal on factory destruction and correct registration after
       destroy/recreate against a live registry.
+
+Completion evidence (2026-08-29):
+
+- `SemanticReadReplayTimeoutContractTest` now drives a body-bearing semantic
+  `POST` through decode failure, successful miss, and fresh hit while asserting
+  exactly one lifecycle, custom-observer, and exchange-log terminal record per
+  caller. The hit retains `attemptCount=0`, no status or dispatched URL, and no
+  ordinary downstream timer sample; the two dispatched miss loads remain in that
+  timer and cache-specific caller counters retain the existing outcome vocabulary.
+- The same semantic `POST` suite covers pre-dispatch auth cancellation, logical
+  timeout, admission rejection, auth replay, Retry, redirect, refresh failure,
+  and response-body timeout. `BoundedLocalResponseCacheContractTest` remains the
+  corresponding production-path `GET` terminal, detached-waiter, cancellation,
+  timeout, auth, and hit/miss evidence.
+- `OpenTelemetryHttpClientObserverTest` proves one semantic `POST` cache-hit span
+  with bounded `FRESH_HIT`, `POST`, and zero-attempt attributes and no cache-key,
+  tenant, authorization, or value material.
+- Effective contracts already export resolved `httpMethod`, cache source, and
+  `semanticRead`. Provider-backed schema-v1 snapshots now add sorted bounded
+  `cachePolicySources`, `cacheHttpMethods`, and
+  `cacheSemanticReadAcknowledged`; replacement factories and collection-backed
+  overloads emit `null` rather than false facts. Map, JSON, Markdown, Actuator,
+  the current schema fixture, and the aggregate support fixture share that contract.
+- `LocalResponseCacheObservabilityTest` preserves exact meter names, types,
+  units, bounded tag keys, deterministic zero series, separate opt-in behavior,
+  cache-served downstream-timer exclusion, complete meter removal, and clean
+  destroy/recreate registration against one live registry.
+- Focused starter verification: **187 tests**, all passing
+  (`SemanticReadReplayTimeoutContractTest`,
+  `ReactiveHttpClientDiagnosticsProviderTest`,
+  `ReactiveHttpClientAutoConfigurationTest`,
+  `LocalResponseCacheObservabilityTest`,
+  `BoundedLocalResponseCacheContractTest`, and
+  `DocumentationReleaseArtifactTest`).
+- Focused OTel verification: **29 tests**, all passing
+  (`OpenTelemetryHttpClientObserverTest`).
+- Full starter verification: **1,259 tests**, all passing. Full OTel verification:
+  **53 tests**, all passing.
 
 ---
 
