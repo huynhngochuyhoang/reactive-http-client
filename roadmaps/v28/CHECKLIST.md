@@ -500,41 +500,78 @@ Evidence recorded on 2026-08-29:
 
 ## Priority 8 - Retry, Redirect, Auth Replay, and Timeout Boundaries
 
-### [ ] 8.1 Keep cacheability separate from retry and replay safety
+### [x] 8.1 Keep cacheability separate from retry and replay safety
 
-- [ ] Preserve the configured `retry-methods` eligibility and established
+- [x] Preserve the configured `retry-methods` eligibility and established
       Resilience4j operator order.
-- [ ] Keep strict unsafe-retry validation active when a selected Retry can issue
+- [x] Keep strict unsafe-retry validation active when a selected Retry can issue
       another non-safe HTTP attempt; semantic-read intent is not proof of an
       idempotency key.
-- [ ] Keep body-preserving redirect and one-time auth replay behind the existing
+- [x] Keep body-preserving redirect and one-time auth replay behind the existing
       repeatability checks.
-- [ ] Prove a cached method with retry disabled performs no implicit transport
+- [x] Prove a cached method with retry disabled performs no implicit transport
       retry introduced by cache code.
-- [ ] Cover cache miss/refresh with retry success/failure, redirect, auth 401
+- [x] Cover cache miss/refresh with retry success/failure, redirect, auth 401
       replay, and pre-dispatch admission rejection.
 
-### [ ] 8.2 Preserve credentials and per-attempt request state
+### [x] 8.2 Preserve credentials and per-attempt request state
 
-- [ ] Consume pre-resolved auth only for the intended first outer attempt and
+- [x] Consume pre-resolved auth only for the intended first outer attempt and
       resolve current auth on later resilience attempts.
-- [ ] Reset URL, status, headers, error, failure stage, dispatch evidence, body
+- [x] Reset URL, status, headers, error, failure stage, dispatch evidence, body
       size, and attempt facts between retries/auth replay/redirects.
-- [ ] Keep refresh hidden from the stale caller while exposing its independent
+- [x] Keep refresh hidden from the stale caller while exposing its independent
       aggregate terminal result.
-- [ ] Assert final diagnostics never reuse a previous attempt's body, auth,
+- [x] Assert final diagnostics never reuse a previous attempt's body, auth,
       response headers, or classified failure.
 
-### [ ] 8.3 Preserve one logical deadline per caller
+### [x] 8.3 Preserve one logical deadline per caller
 
-- [ ] Include body preparation, auth, lookup, waiter attachment, and load waiting
+- [x] Include body preparation, auth, lookup, waiter attachment, and load waiting
       in the logical-call deadline.
-- [ ] Avoid nested equal-duration timeouts that erase response phase attribution
+- [x] Avoid nested equal-duration timeouts that erase response phase attribution
       or convert timeout into cancellation diagnostics.
-- [ ] Keep shared-load request/response timeouts independent from each caller's
+- [x] Keep shared-load request/response timeouts independent from each caller's
       outer timeout while another caller remains interested.
-- [ ] Prove cancellation and timeout before dispatch release prepared bytes and
+- [x] Prove cancellation and timeout before dispatch release prepared bytes and
       cannot publish cache state.
+
+Completion evidence (2026-08-29):
+
+- `SemanticReadReplayTimeoutContractTest` exercises acknowledged body-bearing
+  `POST` calls through the production invocation and cache paths. Retry-disabled
+  calls dispatch once, `retry-methods` remains the eligibility boundary, and an
+  active Retry retains the established application and subscription operator
+  order.
+- `ReactiveHttpClientFactoryBeanDiagnosticsTest` proves strict unsafe-retry
+  validation still rejects a cache-selected semantic `POST` without an
+  idempotency contract, while a Retry ineligible for `POST` remains inactive.
+- A real loopback `307` fixture with Reactor Netty transport retry disabled
+  proves one body-preserving redirect stays inside one miss flight, sends the
+  same bytes exactly twice, caches only the final `200`, and suppresses all
+  transport work on the following hit.
+- The auth fixture records the exact sequence `stale`, `fresh-one`, `fresh-two`,
+  and `fresh-three`: pre-resolved auth is consumed once, the hidden `401` replay
+  refreshes it, the outer Retry resolves current auth, and final request-identity
+  validation prevents publication under stale credentials.
+- Pre-dispatch CircuitBreaker rejection leaves zero dispatches and entries;
+  failed refresh retries remain hidden behind the stale value, emit one refresh
+  failure, and cannot extend that value past hard expiry.
+- Cancellation and logical timeout during pre-lookup auth leave no entry and
+  permit one later replacement load. A real stalled response body preserves the
+  final `200` and `RESPONSE_BODY` timeout stage instead of reporting cancellation,
+  then permits replacement and a subsequent hit.
+- Existing `RetryRedirectAuthReplayCompositionContractTest` remains the direct
+  repeatability, application-owned body, response-header, classified-failure,
+  and terminal-error reset proof. `BoundedLocalResponseCacheContractTest`
+  remains the shared-load deadline and detached-caller isolation proof.
+- Focused composition verification: **147 tests**, all passing
+  (`SemanticReadReplayTimeoutContractTest`,
+  `SemanticReadSingleFlightRefreshContractTest`,
+  `BoundedLocalResponseCacheContractTest`,
+  `RetryRedirectAuthReplayCompositionContractTest`, and
+  `ReactiveHttpClientFactoryBeanDiagnosticsTest`).
+- Full starter verification: **1,258 tests**, all passing.
 
 ---
 

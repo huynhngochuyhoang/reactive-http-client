@@ -58,6 +58,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   terminal evidence, fresh access-driven refresh input, hard expiry, eviction,
   cancellation, and shutdown. The existing bounded flight and refresh manager
   remains shared across eligible verbs.
+- **Retry, replay, and timeout parity for semantic reads.** Semantic-read cache
+  selection does not broaden `retry-methods`, strict unsafe-retry validation,
+  body repeatability, or Resilience4j operator order. Pre-resolved auth is
+  consumed only by the first outer attempt, request identity is revalidated
+  after `401` replay and Retry, body-preserving redirects remain inside one miss
+  flight, and one caller deadline covers preparation, auth, lookup, waiting, and
+  loading without losing final response-body timeout attribution.
 
 ---
 

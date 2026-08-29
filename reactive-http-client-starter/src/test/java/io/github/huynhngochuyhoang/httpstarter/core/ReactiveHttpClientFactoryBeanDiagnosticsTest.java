@@ -1707,6 +1707,63 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
         }
     }
 
+    @Test
+    void strictUnsafeRetryValidationStillRejectsCacheSelectedSemanticPost() {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(10L);
+        policy.setSharedResponse(true);
+        policy.setVaryByParameters(List.of("payload"));
+        config.getCache().getPolicies().put("semantic", policy);
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
+        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-semantic-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictSemanticReadRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictSemanticReadRetryClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThatThrownBy(factoryBean::getObject)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("strict unsafe retry validation")
+                    .hasMessageContaining("httpMethod=POST")
+                    .hasMessageContaining("retry=default")
+                    .hasMessageContaining("no startup-provable Idempotency-Key contract");
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
+    @Test
+    void semanticReadIntentDoesNotOverrideRetryMethodEligibility() throws Exception {
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        ReactiveHttpClientProperties.ClientConfig config = clientConfig("http://localhost:8080");
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(1_000L);
+        policy.setMaximumSize(10L);
+        policy.setSharedResponse(true);
+        policy.setVaryByParameters(List.of("payload"));
+        config.getCache().getPolicies().put("semantic", policy);
+        config.getResilience().setEnabled(true);
+        config.getResilience().setRetry("default");
+        config.getResilience().setRetryMethods(java.util.Set.of("GET"));
+        config.getResilience().setStrictUnsafeRetryValidation(true);
+        properties.getClients().put("strict-semantic-retry-client", config);
+
+        ReactiveHttpClientFactoryBean<StrictSemanticReadRetryClient> factoryBean =
+                buildFactoryBean(properties, StrictSemanticReadRetryClient.class, RetryRegistry.ofDefaults());
+        try {
+            assertThat(factoryBean.getObject()).isNotNull();
+        } finally {
+            factoryBean.destroy();
+        }
+    }
+
     private ReactiveHttpClientDiagnosticsProvider.ClientSummary diagnosticsSummary(
             ReactiveHttpClientProperties properties, Class<?> clientInterface, String clientName) {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
@@ -1741,6 +1798,7 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
             ReactiveHttpClientProperties properties, Class<T> type, RetryRegistry retryRegistry, ReactiveHttpClientJsonCodec jsonCodec,
             AuthProviderFactory... authProviderFactories) {
         ApplicationContext ctx = mock(ApplicationContext.class);
+        when(ctx.getBeanNamesForType(any(Class.class), eq(true), eq(false))).thenReturn(new String[0]);
 
         ObjectProvider<Object> defaultProvider = mock(ObjectProvider.class);
         when(defaultProvider.getIfAvailable()).thenReturn(null);
@@ -1907,6 +1965,13 @@ class ReactiveHttpClientFactoryBeanDiagnosticsTest {
     interface StrictHeaderMapOverrideRetryClient {
         @POST("/create")
         Mono<String> create(@HeaderParam Map<String, String> headers);
+    }
+
+    @ReactiveHttpClient(name = "strict-semantic-retry-client")
+    interface StrictSemanticReadRetryClient {
+        @POST("/search")
+        @CacheResponse(value = "semantic", semanticRead = true)
+        Mono<String> search(@Body @CacheKey("payload") String payload);
     }
 
     @ReactiveHttpClient(name = "strict-api-ref-retry-client")
