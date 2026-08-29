@@ -81,5 +81,28 @@
     </plugins>
    </build>
   </profile>
+  <profile>
+   <id>v28-current-parity</id>
+   <activation>
+    <property><name>consumer.v28.parity</name><value>true</value></property>
+   </activation>
+   <build>
+    <plugins>
+     <plugin>
+      <groupId>org.codehaus.mojo</groupId>
+      <artifactId>build-helper-maven-plugin</artifactId>
+      <version>3.6.1</version>
+      <executions>
+       <execution>
+        <id>add-v28-test-source</id>
+        <phase>generate-test-sources</phase>
+        <goals><goal>add-test-source</goal></goals>
+        <configuration><sources><source>src/v28-test/java</source></sources></configuration>
+       </execution>
+      </executions>
+     </plugin>
+    </plugins>
+   </build>
+  </profile>
  </profiles>
 </project>

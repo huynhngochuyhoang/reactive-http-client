@@ -40,22 +40,26 @@ import java.util.zip.GZIPOutputStream;
 
 @SpringBootApplication
 @EnableReactiveHttpClients(basePackageClasses = NativeSmokeClient.class)
-@RegisterReflectionForBinding(NativeOrderResponse.class)
+@RegisterReflectionForBinding({NativeOrderResponse.class, NativeQueryRequest.class})
 public class NativeSmokeApplication {
 
     private static final String AUTH_TOKEN = "native-secret-token";
+    private static final String QUERY_MARKER = "native-query-body-marker";
 
     public static void main(String[] args) {
         AtomicReference<String> observedAuth = new AtomicReference<>();
         AtomicReference<String> observedAcceptEncoding = new AtomicReference<>();
+        AtomicReference<String> observedQueryBody = new AtomicReference<>();
         AtomicInteger dispatchCount = new AtomicInteger();
         AtomicInteger cachedDispatchCount = new AtomicInteger();
+        AtomicInteger queryDispatchCount = new AtomicInteger();
         AtomicInteger retryDispatchCount = new AtomicInteger();
         CountDownLatch openCircuitDispatch = new CountDownLatch(1);
         CountDownLatch refreshDispatch = new CountDownLatch(1);
         DisposableServer server = loopbackServer(
-                observedAuth, observedAcceptEncoding, dispatchCount, cachedDispatchCount,
-                retryDispatchCount, openCircuitDispatch, refreshDispatch);
+                observedAuth, observedAcceptEncoding, observedQueryBody, dispatchCount,
+                cachedDispatchCount, queryDispatchCount, retryDispatchCount,
+                openCircuitDispatch, refreshDispatch);
         SpringApplication application = new SpringApplication(NativeSmokeApplication.class);
         application.setWebApplicationType(WebApplicationType.NONE);
         application.setDefaultProperties(Map.of(
@@ -107,6 +111,20 @@ public class NativeSmokeApplication {
                     "native cache miss/hit contract failed");
             require(cachedDispatchCount.get() == 1,
                     "native cache hit unexpectedly dispatched to the loopback server");
+
+            NativeQueryRequest query = new NativeQueryRequest(QUERY_MARKER);
+            NativeOrderResponse firstQuery = client.query(query).block(Duration.ofSeconds(5));
+            NativeOrderResponse queryHit = client.query(query).block(Duration.ofSeconds(5));
+            require(firstQuery != null && "query-1".equals(firstQuery.message())
+                            && firstQuery.equals(queryHit),
+                    "native semantic POST cache miss/hit contract failed");
+            require(queryDispatchCount.get() == 1 && observedQueryBody.get() != null
+                            && observedQueryBody.get().contains(QUERY_MARKER),
+                    "native semantic POST body or dispatch evidence was not preserved");
+            sleep(Duration.ofMillis(100));
+            require(queryDispatchCount.get() == 1,
+                    "native semantic POST cache hit dispatched during the quiet period");
+
             sleep(Duration.ofMillis(120));
             NativeOrderResponse stale = client.getCachedOrder().block(Duration.ofSeconds(5));
             require(firstCached.equals(stale), "refresh-on-access did not return the stale value");
@@ -141,7 +159,8 @@ public class NativeSmokeApplication {
                     "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams",
                     "cachePhase", "cachePolicyCount", "cacheTtlMs", "cacheRefreshAfterMs",
                     "cacheSingleFlight", "cacheMaximumSize", "cacheEntryCount",
-                    "cacheEvictions", "cacheMetricsEnabled",
+                    "cacheEvictions", "cacheMetricsEnabled", "cachePolicySources",
+                    "cacheHttpMethods", "cacheSemanticReadAcknowledged",
                     "timeoutSource", "timeoutMs", "logicalCallTimeoutMs", "compressionEnabled",
                     "codecMaxInMemorySizeMb", "resilienceConfigured", "retry", "rateLimiter",
                     "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
@@ -181,6 +200,11 @@ public class NativeSmokeApplication {
                             && providerClient.get("cacheEntryCount") instanceof Long
                             && providerClient.get("cacheEvictions") instanceof Long
                             && providerClient.get("cacheMetricsEnabled") instanceof Boolean
+                            && providerClient.get("cachePolicySources") instanceof List<?> sources
+                            && sources.equals(List.of("method"))
+                            && providerClient.get("cacheHttpMethods") instanceof List<?> methods
+                            && methods.equals(List.of("GET", "POST"))
+                            && Boolean.TRUE.equals(providerClient.get("cacheSemanticReadAcknowledged"))
                             && providerClient.get("timeoutMs") instanceof Long
                             && providerClient.get("logicalCallTimeoutMs") instanceof Long
                             && providerClient.get("compressionEnabled") instanceof Boolean
@@ -203,6 +227,9 @@ public class NativeSmokeApplication {
                             && collectionClient.get("cacheEntryCount") == null
                             && collectionClient.get("cacheEvictions") == null
                             && collectionClient.get("cacheMetricsEnabled") == null
+                            && collectionClient.get("cachePolicySources") == null
+                            && collectionClient.get("cacheHttpMethods") == null
+                            && collectionClient.get("cacheSemanticReadAcknowledged") == null
                             && collectionClient.get("logicalCallTimeoutMs") == null
                             && collectionClient.get("compressionEnabled") == null
                             && collectionClient.get("codecMaxInMemorySizeMb") == null
@@ -216,7 +243,9 @@ public class NativeSmokeApplication {
             require(!supportOutput.contains(AUTH_TOKEN) && !supportOutput.contains("127.0.0.1")
                             && !supportOutput.contains("Authorization")
                             && !supportOutput.contains("requestBody")
-                            && !supportOutput.contains("responseBody"),
+                            && !supportOutput.contains("responseBody")
+                            && !supportOutput.contains(QUERY_MARKER)
+                            && !supportOutput.contains("cacheKey"),
                     "diagnostics snapshot exposed sensitive transport data");
 
             MeterRegistry meterRegistry = context.getBean(MeterRegistry.class);
@@ -236,7 +265,7 @@ public class NativeSmokeApplication {
             require(rejectedAttempts != null && rejectedAttempts.count() == 1
                             && rejectedAttempts.totalAmount() == 0,
                     "Open-circuit terminal did not record zero subscription attempts");
-            require(dispatchCount.get() == 7,
+            require(dispatchCount.get() == 8,
                     "native smoke observed an unexpected total dispatch count: " + dispatchCount.get());
         } finally {
             server.disposeNow(Duration.ofSeconds(5));
@@ -274,8 +303,10 @@ public class NativeSmokeApplication {
     private static DisposableServer loopbackServer(
             AtomicReference<String> observedAuth,
             AtomicReference<String> observedAcceptEncoding,
+            AtomicReference<String> observedQueryBody,
             AtomicInteger dispatchCount,
             AtomicInteger cachedDispatchCount,
+            AtomicInteger queryDispatchCount,
             AtomicInteger retryDispatchCount,
             CountDownLatch openCircuitDispatch,
             CountDownLatch refreshDispatch) {
@@ -323,6 +354,18 @@ public class NativeSmokeApplication {
                                             + dispatch + "\"}"))
                                     .then();
                         })
+                        .post("/api/cached-query", (request, response) -> request.receive()
+                                .aggregate()
+                                .asString()
+                                .flatMap(body -> {
+                                    dispatchCount.incrementAndGet();
+                                    observedQueryBody.set(body);
+                                    int dispatch = queryDispatchCount.incrementAndGet();
+                                    return response.header("Content-Type", "application/json")
+                                            .sendString(Mono.just("{\"code\":\"ok\",\"message\":\"query-"
+                                                    + dispatch + "\"}"))
+                                            .then();
+                                }))
                         .get("/api/retry-only", (request, response) -> {
                             dispatchCount.incrementAndGet();
                             int dispatch = retryDispatchCount.incrementAndGet();

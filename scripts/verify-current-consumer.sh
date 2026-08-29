@@ -73,19 +73,19 @@ stage="mock-tests"
 copy_mock_reports
 
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
-  -Dconsumer.v26.observability=true -Dconsumer.v27.parity=true clean test
+  -Dconsumer.v26.observability=true -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true clean test
 stage="consumer-tests"
 copy_consumer_reports
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
-  -Dconsumer.v27.parity=true \
+  -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true \
   help:effective-pom -Doutput="$EVIDENCE_DIR/effective-poms/boot4-current-consumer.xml"
 stage="consumer-effective-pom"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
-  -Dconsumer.v27.parity=true \
+  -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true \
   dependency:tree -DoutputFile="$EVIDENCE_DIR/dependency-tree.txt"
 stage="dependency-tree"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
-  -Dconsumer.v27.parity=true \
+  -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true \
   dependency:build-classpath -Dmdep.outputFile="$EVIDENCE_DIR/classpath.txt"
 stage="classpath"
 
