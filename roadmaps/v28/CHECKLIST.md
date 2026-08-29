@@ -375,77 +375,126 @@ Evidence recorded on 2026-08-28:
 
 ## Priority 6 - Local Cache and Response Semantics Across Verbs
 
-### [ ] 6.1 Route acknowledged semantic reads through V27 storage
+### [x] 6.1 Route acknowledged semantic reads through V27 storage
 
-- [ ] Reuse the existing cache manager, policy bounds, monotonic TTL, size
+- [x] Reuse the existing cache manager, policy bounds, monotonic TTL, size
       eviction, and generation-checked publication path.
-- [ ] Preserve first-successful-fill-wins behavior for duplicate same-key misses
+- [x] Preserve first-successful-fill-wins behavior for duplicate same-key misses
       when single flight is disabled.
-- [ ] Prove GET and acknowledged non-GET calls have identical hit, miss, expiry,
+- [x] Prove GET and acknowledged non-GET calls have identical hit, miss, expiry,
       eviction, replacement, and shutdown behavior.
-- [ ] Keep a hit free of downstream resilience admission, redirect, pool, and
+- [x] Keep a hit free of downstream resilience admission, redirect, pool, and
       transport dispatch after mandatory pre-lookup gates.
 
-### [ ] 6.2 Preserve response eligibility and header safety
+### [x] 6.2 Preserve response eligibility and header safety
 
-- [ ] Store only fully decoded successful non-null emissions.
-- [ ] Keep errors, mapped 4xx/5xx, redirects, cancellation, and empty completion
+- [x] Store only fully decoded successful non-null emissions.
+- [x] Keep errors, mapped 4xx/5xx, redirects, cancellation, and empty completion
       non-cacheable for plain and envelope responses.
-- [ ] Inspect wire response headers before storing plain bodies and
+- [x] Inspect wire response headers before storing plain bodies and
       `ResponseEntity<T>` values.
-- [ ] Keep sensitive, configured non-cacheable, auth-challenge, cookie, and
+- [x] Keep sensitive, configured non-cacheable, auth-challenge, cookie, and
       per-caller response headers out of entries.
-- [ ] Preserve only the established bounded representation-header allowlist on
+- [x] Preserve only the established bounded representation-header allowlist on
       cached envelopes.
 
-### [ ] 6.3 Preserve value and lifecycle ownership
+### [x] 6.3 Preserve value and lifecycle ownership
 
-- [ ] Keep the documented shared object-identity behavior; do not clone or
+- [x] Keep the documented shared object-identity behavior; do not clone or
       serialize cached values solely because the verb is non-GET.
-- [ ] Prevent in-flight loads from repopulating after explicit eviction, expiry,
+- [x] Prevent in-flight loads from repopulating after explicit eviction, expiry,
       cache close, or factory destruction.
-- [ ] Recheck cache closure and generation under the same synchronization used
+- [x] Recheck cache closure and generation under the same synchronization used
       for cache/flight publication.
-- [ ] Add deterministic tests for late completion, concurrent eviction,
+- [x] Add deterministic tests for late completion, concurrent eviction,
       capacity pressure, and close/recreate with the same policy and meters.
+
+Evidence recorded on 2026-08-28:
+
+- `SemanticReadLocalCacheContractTest` drives `GET` and explicitly acknowledged
+  `POST` methods through the production invocation handler and the same
+  `LocalResponseCacheManager`. It proves identical hit identity, miss,
+  monotonic expiry, size pressure, explicit eviction, close, and hit-side
+  resilience/transport suppression.
+- The same parity suite proves first-successful-fill-wins for asynchronous
+  duplicate misses and rejects late publication after eviction for both verbs.
+  Its response matrix keeps 4xx/5xx, redirects, cancellation, empty completion,
+  cookies, auth challenges, and configured private headers out of storage while
+  retaining only bounded representation headers on cached envelopes.
+- Existing `BoundedLocalResponseCacheContractTest` remains the deterministic
+  generation/publication, expiry, factory-destruction, and shutdown proof;
+  `LocalResponseCacheObservabilityTest` remains the close/recreate proof that
+  same-tag meters observe only the replacement cache.
+- Focused cache contract and observability verification: **60 tests**, all
+  passing (`SemanticReadLocalCacheContractTest`,
+  `BoundedLocalResponseCacheContractTest`, and
+  `LocalResponseCacheObservabilityTest`).
+- Full starter verification: **1,243 tests**, all passing.
 
 ---
 
 ## Priority 7 - Single Flight and Refresh Composition
 
-### [ ] 7.1 Extend single flight to body-bearing semantic reads
+### [x] 7.1 Extend single flight to body-bearing semantic reads
 
-- [ ] Coalesce only callers with the same complete opaque request identity.
-- [ ] Prove different body bytes, content types, headers, contexts, methods,
+- [x] Coalesce only callers with the same complete opaque request identity.
+- [x] Prove different body bytes, content types, headers, contexts, methods,
       clients, and policies create independent flights.
-- [ ] Share one load and one request-body subscription while keeping each caller's
+- [x] Share one load and one request-body subscription while keeping each caller's
       timeout, cancellation, and terminal state independent.
-- [ ] Recheck the cache before creating a flight and prevent removed shared
+- [x] Recheck the cache before creating a flight and prevent removed shared
       publishers from reconnecting as detached loads.
-- [ ] Keep coalesced waiters at zero transport attempts/evidence even if the
+- [x] Keep coalesced waiters at zero transport attempts/evidence even if the
       original leader detaches and load ownership transfers internally.
 
-### [ ] 7.2 Extend refresh-on-access safely
+### [x] 7.2 Extend refresh-on-access safely
 
-- [ ] Require the same semantic-read acknowledgement and request-identity proof
+- [x] Require the same semantic-read acknowledgement and request-identity proof
       for refresh as for a miss.
-- [ ] Build refresh from the triggering invocation's fresh frozen request rather
+- [x] Build refresh from the triggering invocation's fresh frozen request rather
       than retaining a prior body publisher, auth context, or argument graph.
-- [ ] Keep one refresh flight per key with a finite refresh timeout and hard TTL/
+- [x] Keep one refresh flight per key with a finite refresh timeout and hard TTL/
       shutdown bound.
-- [ ] Preserve the current value after refresh failure only until hard expiry;
+- [x] Preserve the current value after refresh failure only until hard expiry;
       late refresh completion cannot repopulate a newer generation.
-- [ ] Record refresh success, failure, and cancellation exactly once, including
+- [x] Record refresh success, failure, and cancellation exactly once, including
       cancellation before source-subscription attachment.
 
-### [ ] 7.3 Add deterministic concurrency evidence
+### [x] 7.3 Add deterministic concurrency evidence
 
-- [ ] Cover first-caller timeout with a later waiter succeeding and waiter
+- [x] Cover first-caller timeout with a later waiter succeeding and waiter
       timeout with the leader succeeding.
-- [ ] Cover last-waiter cancellation, load error, empty completion, body
+- [x] Cover last-waiter cancellation, load error, empty completion, body
       serialization failure, hard expiry, eviction during refresh, and shutdown.
-- [ ] Use latches/probes and body-subscription/dispatch counts rather than
+- [x] Use latches/probes and body-subscription/dispatch counts rather than
       timing-only assertions.
+
+Evidence recorded on 2026-08-29:
+
+- `SemanticReadSingleFlightRefreshContractTest` exercises acknowledged semantic
+  `POST` methods through the production invocation handler and existing V27
+  cache manager. Equal complete identities share one dispatch and one request-
+  body subscription; body bytes, media type, tenant header, Reactor context,
+  target, method, client, and policy variations create independent flights.
+- Virtual-time caller tests cover both timeout directions. Every coalesced
+  waiter retains `POST` method metadata but zero attempts, URL, status, and
+  request headers after leader detachment or independent timeout.
+- Deterministic cancellation, error, empty completion, and bounded JSON
+  serialization failures prove abandoned semantic-read flights do not publish
+  or reconnect and a later caller can create one replacement flight.
+- Refresh tests prove the request header from the first stale caller drives one
+  refresh per opaque key, failure preserves the old value only to hard expiry,
+  and eviction or shutdown cancels work and rejects late publication.
+- Existing `BoundedLocalResponseCacheContractTest` remains the direct race proof
+  for the atomic cache recheck, reserved-member attachment, hard-expiry refresh
+  deadline, and generation invalidation. `LocalResponseCacheObservabilityTest`
+  remains the exact-once success/failure/cancellation proof, including eviction
+  during refresh assembly before source-subscription attachment.
+- Focused semantic and low-level cache verification: **66 tests**, all passing
+  (`SemanticReadSingleFlightRefreshContractTest`,
+  `SemanticReadLocalCacheContractTest`, `BoundedLocalResponseCacheContractTest`,
+  and `LocalResponseCacheObservabilityTest`).
+- Full starter verification: **1,249 tests**, all passing.
 
 ---
 

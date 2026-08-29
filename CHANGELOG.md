@@ -46,6 +46,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   targets, query ordering, principals, API versions, and context partitions
   cannot collapse into one entry. Lazy and ancestor WebClient customizations
   remain startup-fatal until classified, without diagnostics instantiating them.
+- **Verb-neutral local response semantics.** Acknowledged semantic non-`GET`
+  reads now have deterministic parity coverage against `GET` for bounded TTL
+  storage, duplicate-miss publication, capacity and explicit eviction,
+  response/header eligibility, object identity, cache-hit dispatch suppression,
+  and shutdown. The existing V27 cache manager remains the single storage and
+  lifecycle implementation for every eligible verb.
+- **Semantic-read single-flight and refresh parity.** Body-bearing non-`GET`
+  reads now have production-path concurrency coverage for complete-key flight
+  isolation, one request-body subscription, independent caller deadlines and
+  terminal evidence, fresh access-driven refresh input, hard expiry, eviction,
+  cancellation, and shutdown. The existing bounded flight and refresh manager
+  remains shared across eligible verbs.
+
+---
 
 ## [4.0.0] - 2026-08-26
 
