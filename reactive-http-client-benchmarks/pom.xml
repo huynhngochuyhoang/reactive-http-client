@@ -327,6 +327,9 @@
                 <benchmark.result.dir>${project.build.directory}/benchmark-reports/published-starter-${benchmark.starter.version}</benchmark.result.dir>
                 <maven.javadoc.skip>true</maven.javadoc.skip>
             </properties>
+        </profile>
+        <profile>
+            <id>benchmark-published-baseline-v28-source-exclusion</id>
             <build>
                 <plugins>
                     <plugin>

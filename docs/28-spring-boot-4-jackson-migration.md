@@ -389,7 +389,7 @@ retry, and mock helpers. Use the authoritative commands in
 for reactor and release-candidate changes. To verify released public coordinates from a
 fresh Maven Central repository, use
 [Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline).
-The latter is the adoption check for starter `4.0.0`; it does not consume
+The latter is the adoption check for starter `4.1.0`; it does not consume
 reactor classes or `4.2.0-SNAPSHOT` development artifacts.
 
 ## Migration checklist

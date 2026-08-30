@@ -238,7 +238,7 @@ mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am clean
 test ! -e target/published-baseline-repositories/benchmark-v28-release-4.0.0 && \
 mvn -s .mvn/maven-central-settings.xml \
   -Dmaven.repo.local=target/published-baseline-repositories/benchmark-v28-release-4.0.0 \
-  -Pbenchmarks,benchmark-release,benchmark-published-baseline \
+  -Pbenchmarks,benchmark-release,benchmark-published-baseline,benchmark-published-baseline-v28-source-exclusion \
   -pl reactive-http-client-benchmarks clean verify \
   -Dbenchmark.starter.version=4.0.0 -Dbenchmark.commit=4.0.0 \
   -Dbenchmark.result.dir=../target/release-evidence/v28/priority12/published-starter-4.0.0 \
@@ -254,9 +254,10 @@ mvn -Pbenchmarks,benchmark-compare -pl reactive-http-client-benchmarks -am verif
   -Dbenchmark.compare.output="$(pwd)/target/release-evidence/v28/priority12/benchmark-comparison.md"
 ```
 
-The published-baseline profile excludes the V28 fixture and its fixture test
-because the semantic-read annotation/configuration API is not present in
-`4.0.0`. Preserve the complete current report for V28-only workload review, but
+The historical `benchmark-published-baseline-v28-source-exclusion` profile
+excludes the V28 fixture and its fixture test because the semantic-read
+annotation/configuration API is not present in `4.0.0`. Preserve the complete
+current report for V28-only workload review, but
 draw release-to-release conclusions only from rows present in both JSON files.
 The smoke and release commands use different result directories so a quick
 harness check cannot overwrite release evidence.

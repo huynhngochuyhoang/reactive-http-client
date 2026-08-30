@@ -1313,6 +1313,14 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String benchmarkPom = Files.readString(root.resolve("reactive-http-client-benchmarks/pom.xml"));
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
+        String currentBaselineProfile = benchmarkPom.substring(
+                benchmarkPom.indexOf("<id>benchmark-published-baseline</id>"),
+                benchmarkPom.indexOf("<id>benchmark-published-baseline-v28-source-exclusion</id>"));
+        int currentBaselineCommandStart = benchmarkDocs.indexOf(
+                "target/published-baseline-repositories/benchmark-4.1.0 &&");
+        String currentBaselineCommand = benchmarkDocs.substring(currentBaselineCommandStart,
+                benchmarkDocs.indexOf("scripts/verify-published-baseline-provenance.sh benchmark 4.1.0",
+                        currentBaselineCommandStart));
 
         String codecFactory = Files.readString(root.resolve(
                 "reactive-http-client-benchmarks/src/main/java/io/github/huynhngochuyhoang/httpstarter/benchmarks/BenchmarkJsonCodecFactory.java"));
@@ -1323,7 +1331,14 @@ class DocumentationReleaseArtifactTest {
                 .contains("benchmark.micrometer.artifact")
                 .contains("benchmark.opentelemetry.artifact")
                 .contains("META-INF/*.SF")
+                .contains("<id>benchmark-published-baseline-v28-source-exclusion</id>")
                 .doesNotContain("<id>boot4-spike</id>");
+        assertThat(currentBaselineProfile)
+                .doesNotContain("V28SemanticReadCachePerformanceBenchmark.java",
+                        "V28SemanticReadCachePerformanceBenchmarkTest.java");
+        assertThat(currentBaselineCommand)
+                .contains("-Pbenchmarks,benchmark-release,benchmark-published-baseline")
+                .doesNotContain("benchmark-published-baseline-v28-source-exclusion");
         assertThat(codecFactory)
                 .contains("ReactiveHttpClientJsonCodec")
                 .contains("tools.jackson.databind.ObjectMapper")
@@ -1332,6 +1347,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("### Spring Boot 4 release baseline")
                 .contains("-Pbenchmarks,benchmark-smoke")
                 .contains("-Dbenchmark.commit=$(git rev-parse --short HEAD)")
+                .contains("benchmark-published-baseline-v28-source-exclusion")
                 .doesNotContain("-Dbenchmark.commit=$(git rev-parse --short HEAD)-dirty")
                 .doesNotContain("-Pboot4-spike,benchmarks")
                 .contains("Boot 3 versus Boot 4 movement is migration context")
@@ -1414,6 +1430,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("## Verify the migration")
                 .contains("[Boot 4 assembled consumer fixture](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)")
                 .contains("[Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline)")
+                .contains("The latter is the adoption check for starter `4.1.0`")
                 .contains("requires no\nconfiguration-metadata entry or reflection hint");
         assertThat(report)
                 .contains("published 2.14.1", "Frozen baseline surface")
