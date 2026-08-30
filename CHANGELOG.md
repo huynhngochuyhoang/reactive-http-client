@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.1.0] - 2026-08-30
 
-- **`4.1.0` release candidate (pending publication).** The candidate is an
-  additive minor release for method-specific semantic-read response caching.
+- **`4.1.0` published release.** This additive minor release adds
+  method-specific semantic-read response caching.
   Existing explicit `GET` behavior remains unchanged; each selected non-`GET`
   method requires its own `semanticRead = true` acknowledgement and bounded
   wire-equivalent body and request variants. Ordinary writes remain unselected.

@@ -1035,7 +1035,7 @@ Immutable evidence and decision recorded on 2026-08-30:
   disposition, and the decision record are under
   `target/release-evidence/v28/priority14/immutable-8e9a324/`.
 
-### [ ] 14.3 Publish and transition the baseline
+### [x] 14.3 Publish and transition the baseline
 
 Release cut prepared on 2026-08-30:
 
@@ -1051,13 +1051,33 @@ Release cut prepared on 2026-08-30:
   the workflow-only `MAVEN_GPG_PASSPHRASE`; signing, staged signature
   verification, publication, and post-publication checks remain open below.
 
-- [ ] On go, cut the final version only from the reviewed clean commit and run the
+- [x] On go, cut the final version only from the reviewed clean commit and run the
       publish workflow with generation-packaging checks.
-- [ ] Verify parent, starter, test-helper, and OTel POM/JAR/source/Javadoc
+- [x] Verify parent, starter, test-helper, and OTel POM/JAR/source/Javadoc
       artifacts from fresh Maven Central repositories.
-- [ ] Run an assembled consumer using only the published candidate artifacts.
-- [ ] Move public snippets, latest-published/API/consumer/benchmark baselines,
+- [x] Run an assembled consumer using only the published candidate artifacts.
+- [x] Move public snippets, latest-published/API/consumer/benchmark baselines,
       reactor snapshot, changelog, roadmap index, and readiness state only after
       Central verification.
-- [ ] Mark V28 complete only after post-publication evidence is recorded; on
+- [x] Mark V28 complete only after post-publication evidence is recorded; on
       no-go, keep the snapshot unpublished and document the blocking contract.
+
+Post-publication evidence recorded on 2026-08-30:
+
+- Tag `v4.1.0` points at clean release commit
+  `e0dde48c74d5442ea3aaf9472129ee07c7ae77e3`. The fresh Central release
+  verifier resolves the parent POM plus every starter, test-helper, and OTel
+  POM, binary, source, and Javadoc artifact (`13` files total), verifies Maven
+  Central remote markers, and records SHA-256 values under
+  `target/release-evidence/published-baselines/release-artifacts-4.1.0/`.
+- `scripts/verify-published-consumer.sh 4.1.0` passes **4** assembled-consumer
+  tests using only Central artifacts. Its provenance records the release commit,
+  a clean fixture tree, `completedStage=evidence-verified`, and `exitStatus=0`
+  under `target/release-evidence/published-consumer/published-4.1.0/`.
+- Public README/quick-start coordinates and published/API/consumer/benchmark
+  baselines now use `4.1.0`. Reactor modules, benchmark harness, native fixture,
+  and current assembled-consumer fixture move to `4.2.0-SNAPSHOT`; no unreleased
+  coordinate is advertised to consumers.
+- V28 is archived as completed and released. Generated readiness now treats
+  `4.1.0` as the published baseline and defers any `4.2.0` candidate until V29
+  scope and release evidence are selected.

@@ -5,8 +5,8 @@
 > historical evidence, not commands for the current reactor.
 
 This guide migrates published Spring Boot 3.5 starter 2.x applications to the
-Spring Boot 4 starter 4.x line. The current reactor is the `4.1.0` release candidate; use
-published `4.0.0` when consuming it from a release repository.
+Spring Boot 4 starter 4.x line. The current reactor is the `4.2.0-SNAPSHOT` development line; use
+published `4.1.0` when consuming it from a release repository.
 
 Annotations, exception categories, lifecycle hooks, observers, retry and
 idempotency behavior, diagnostics sanitization, and reactive.http property names
@@ -76,7 +76,7 @@ Boot 4 and starter 4.x:
 </parent>
 <properties>
   <java.version>21</java.version>
-  <reactive-http-client.version>4.0.0</reactive-http-client.version>
+  <reactive-http-client.version>4.1.0</reactive-http-client.version>
 </properties>
 <dependencies>
   <dependency>
@@ -112,7 +112,7 @@ mvn -q dependency:tree \
 ```
 
 All starter modules must use one released version. A Boot 4 application must
-resolve starter `4.0.0`, Boot 4 modules, Jackson 3, and Boot 4 Resilience4j
+resolve starter `4.1.0`, Boot 4 modules, Jackson 3, and Boot 4 Resilience4j
 modules. Do not combine starter `2.x` and `4.x`, or override individual Spring
 Framework/Jackson artifacts outside Boot dependency management.
 
@@ -122,7 +122,7 @@ Framework/Jackson artifacts outside Boot dependency management.
 | A customizer using `org.springframework.boot.web.reactive.function.client.WebClientCustomizer` no longer compiles | That is the Boot 3 customizer package. | Import `org.springframework.boot.webclient.WebClientCustomizer`, or use the starter-owned `ReactiveHttpClientCustomizer` when customization is client-specific. |
 | `reactiveHttpClientHealthIndicator` or `/actuator/rhttpclients` is absent | Check that Actuator is present, `reactive.http.observability.health.enabled` or `reactive.http.observability.diagnostics-endpoint.enabled` is true, and the endpoint is exposed. | Add the Boot 4 Actuator starter, use `org.springframework.boot.health.contributor` in custom health code, and expose `health,rhttpclients`. Do not add Boot 3 Actuator packages manually. |
 | `com.fasterxml.jackson.databind.ObjectMapper` is missing, or JSON signing/Problem Detail mapping has no codec | Starter 4.x uses Jackson 3 and does not ship the removed Jackson 2 adapter. | Move application modules to `tools.jackson.*`. Let Boot create the Jackson 3 mapper and default starter codec, or provide one `ReactiveHttpClientJsonCodec` bean backed by the application mapper. |
-| OTel propagation, mock helpers, or their auto-configuration is missing | Compare the starter, `reactive-http-client-otel`, and `reactive-http-client-test` versions in the tree. | Keep all three on `4.0.0`; keep the test helper test-scoped. The OTel companion remains optional and must not be copied from the `2.x` lane. |
+| OTel propagation, mock helpers, or their auto-configuration is missing | Compare the starter, `reactive-http-client-otel`, and `reactive-http-client-test` versions in the tree. | Keep all three on `4.1.0`; keep the test helper test-scoped. The OTel companion remains optional and must not be copied from the `2.x` lane. |
 | Retry operators are unavailable or Boot fails while creating Resilience4j beans | Check for Boot 3 `resilience4j-spring-boot3` or mixed Resilience4j versions. | Use the `2.4.x` BOM and `resilience4j-spring-boot4`; add only the operator modules required by the configured policies. |
 
 If the tree is correct but startup still fails, capture the condition evaluation
@@ -390,7 +390,7 @@ for reactor and release-candidate changes. To verify released public coordinates
 fresh Maven Central repository, use
 [Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline).
 The latter is the adoption check for starter `4.0.0`; it does not consume
-reactor classes or `4.1.0` release-candidate artifacts.
+reactor classes or `4.2.0-SNAPSHOT` development artifacts.
 
 ## Migration checklist
 
