@@ -14,6 +14,13 @@
                 <groupId>com.github.siom79.japicmp</groupId>
                 <artifactId>japicmp-maven-plugin</artifactId>
                 <version>0.26.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.apache.groovy</groupId>
+                        <artifactId>groovy-jsr223</artifactId>
+                        <version>4.0.30</version>
+                    </dependency>
+                </dependencies>
                 <configuration>
                     <oldVersion>
                         <file>
@@ -29,6 +36,7 @@
                     <breakBuildOnSourceIncompatibleModifications>true</breakBuildOnSourceIncompatibleModifications>
                     <parameter>
                         <onlyModified>true</onlyModified>
+                        <postAnalysisScript>${project.basedir}/../../scripts/japicmp-annotation-default-compatibility.groovy</postAnalysisScript>
                     </parameter>
                 </configuration>
                 <executions>

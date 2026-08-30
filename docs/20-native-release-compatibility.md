@@ -508,7 +508,15 @@ V28 adds `CacheResponse.semanticRead()` with a `false` default and the matching
 `MethodMetadata` getter/setter as additive minor-line API. Existing compiled and
 source declarations retain the published `4.0.0` GET-only behavior unless one
 specific non-GET method opts in. The annotation is method-scoped; no client-wide
-configuration property broadens semantic-read intent.
+configuration property broadens semantic-read intent. Japicmp reports any new
+annotation member as `METHOD_ABSTRACT_ADDED_TO_CLASS`, including a member with a
+Java annotation default. The API profile therefore applies
+`scripts/japicmp-annotation-default-compatibility.groovy`, which reclassifies
+only `CacheResponse.semanticRead()` and only after verifying the compiled method
+has an `AnnotationDefault` attribute.
+`scripts/verify-api-compatibility-fixtures.sh` separately compiles the published
+annotation use against both API forms and runs the `4.0.0`-compiled declaration
+with the current false default. Other abstract-method additions remain strict.
 
 Cache engines and keying machinery remain implementation details:
 `LocalResponseCache`, `LocalResponseCacheManager`, `CaffeineLocalResponseCache`,

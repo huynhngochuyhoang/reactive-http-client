@@ -890,41 +890,63 @@ Implementation evidence (2026-08-30):
 
 ## Priority 13 - Public API, Documentation, and Compatibility Evidence
 
-### [ ] 13.1 Freeze public and generated contracts
+### [x] 13.1 Freeze public and generated contracts
 
-- [ ] Include the final annotation member/configuration/test-helper additions in
+- [x] Include the final annotation member/configuration/test-helper additions in
       japicmp coverage and the documented public-surface inventory.
-- [ ] Prove existing compiled and source 4.0 cache clients remain compatible.
-- [ ] Regenerate configuration metadata/reference, effective configuration,
+- [x] Prove existing compiled and source 4.0 cache clients remain compatible.
+- [x] Regenerate configuration metadata/reference, effective configuration,
       effective-contract snapshots, diagnostics fixtures, Javadoc, and source
       artifacts.
-- [ ] Keep Caffeine and implementation/runtime types out of public signatures
+- [x] Keep Caffeine and implementation/runtime types out of public signatures
       unless deliberately accepted as extension APIs.
 
-### [ ] 13.2 Consolidate cache and migration guidance
+### [x] 13.2 Consolidate cache and migration guidance
 
-- [ ] Open the cache guide with existing explicit GET selection and the statement
+- [x] Open the cache guide with existing explicit GET selection and the statement
       that GET-friendly is not automatic.
-- [ ] Add one POST JSON search and one RPC query using the final semantic-read
+- [x] Add one POST JSON search and one RPC query using the final semantic-read
       acknowledgement and complete body/variant isolation.
-- [ ] State that client-wide policy alone cannot acknowledge non-GET methods and
+- [x] State that client-wide policy alone cannot acknowledge non-GET methods and
       that an unacknowledged selected method fails startup.
-- [ ] Cross-link retry/idempotency, auth, redirects, timeouts, observability,
+- [x] Cross-link retry/idempotency, auth, redirects, timeouts, observability,
       production checklist, troubleshooting, support bundles, AOT/native, and
       migration guidance.
-- [ ] Remove any wording that implies all POST/PUT/PATCH/DELETE methods are safe
+- [x] Remove any wording that implies all POST/PUT/PATCH/DELETE methods are safe
       or that caching suppresses duplicate writes.
 
-### [ ] 13.3 Assemble compatibility and packaging evidence
+### [x] 13.3 Assemble compatibility and packaging evidence
 
-- [ ] Run strict root and starter API comparison against isolated published
+- [x] Run strict root and starter API comparison against isolated published
       `4.0.0` artifacts and record provenance.
-- [ ] Run API compatibility and published-baseline fixture guards.
-- [ ] Run generated metadata/docs checks, source/Javadoc/binary packaging guard,
+- [x] Run API compatibility and published-baseline fixture guards.
+- [x] Run generated metadata/docs checks, source/Javadoc/binary packaging guard,
       current/published consumers, supported matrix, AOT, native, and
       `git diff --check`.
-- [ ] Record exact commands, versions, commit, checksums, test totals, and any
+- [x] Record exact commands, versions, commit, checksums, test totals, and any
       manual/deferred evidence under `target/release-evidence/v28/`.
+
+Implementation evidence recorded on 2026-08-30:
+
+- Strict root and starter-only japicmp comparisons pass against separate fresh
+  Maven Central `4.0.0` repositories. The API fixture compiles an existing
+  annotation use against both API forms and runs the old binary with the new
+  false default; all other abstract-method additions remain strict. Reports,
+  Central markers, and checksums are under
+  `target/release-evidence/v28/priority13/api-root-4.0.0/` and
+  `target/release-evidence/v28/priority13/api-starter-4.0.0/`.
+- Java 21 supported-matrix rows for Spring Boot `4.0.0` and `4.1.0` each pass
+  `1,377` reactor tests with no failures, including `44` release-documentation
+  tests and the AOT suite. Current `4.1.0-SNAPSHOT` consumers pass `60` mock and
+  `6` assembled tests; the independent published `4.0.0` consumer passes from
+  Central-only artifacts. Binary, source, Javadoc, metadata, effective-contract,
+  and diagnostics artifacts pass the generation-packaging guard.
+- The GraalVM `25.0.3` native image compiles and executes successfully against
+  Spring Boot `4.0.0`; its SHA-256 and dependency list are recorded with the
+  API, fixture, matrix, package, command, and source-state evidence under
+  `target/release-evidence/v28/priority13/`. This development proof records HEAD
+  `422b85590fe1617bb2a93d6b2a633d699245b59e` with a dirty source state; the
+  immutable clean-candidate rerun remains a Priority 14 release gate.
 
 ---
 
