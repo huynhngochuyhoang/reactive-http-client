@@ -16,45 +16,82 @@ proven retention fixes and record weighted-admission work as explicitly deferred
 
 ## Priority 1 - Post-`4.1.0` Baseline and V29 Scope Integrity
 
-### [ ] 1.1 Align development and published lanes
+### [x] 1.1 Align development and published lanes
 
-- [ ] Keep root/module, benchmark, native-smoke, and current-consumer coordinates
+- [x] Keep root/module, benchmark, native-smoke, and current-consumer coordinates
       on `4.2.0-SNAPSHOT`.
-- [ ] Keep README, quick-start, and other public dependency snippets on published
+- [x] Keep README, quick-start, and other public dependency snippets on published
       `4.1.0`; do not advertise the snapshot to consumers.
-- [ ] Keep `latest.published.version`, strict API compatibility, published
+- [x] Keep `latest.published.version`, strict API compatibility, published
       consumer, and published benchmark baselines on `4.1.0`.
-- [ ] Keep V1-V28 as completed release records and V29 as the only active
+- [x] Keep V1-V28 as completed release records and V29 as the only active
       execution roadmap.
-- [ ] Keep `4.2.0` as a candidate direction only; generated readiness must report
+- [x] Keep `4.2.0` as a candidate direction only; generated readiness must report
       no selected release scope while the memory investigation is unresolved.
 
-### [ ] 1.2 Reprove the published `4.1.0` baseline
+### [x] 1.2 Reprove the published `4.1.0` baseline
 
-- [ ] Resolve the parent POM plus starter, test-helper, and OTel POM/JAR/source/
+- [x] Resolve the parent POM plus starter, test-helper, and OTel POM/JAR/source/
       Javadoc artifacts from a previously absent Central-only repository.
-- [ ] Require Maven Central remote markers and record SHA-256 values for all 13
+- [x] Require Maven Central remote markers and record SHA-256 values for all 13
       release artifacts.
-- [ ] Run the assembled Boot 4 consumer using only published `4.1.0` artifacts.
-- [ ] Run strict root and starter-module japicmp against separate fresh `4.1.0`
+- [x] Run the assembled Boot 4 consumer using only published `4.1.0` artifacts.
+- [x] Run strict root and starter-module japicmp against separate fresh `4.1.0`
       repositories and preserve binary and source failure behavior.
-- [ ] Run API and published-baseline fixtures for local contamination, mixed
+- [x] Run API and published-baseline fixtures for local contamination, mixed
       versions, missing attachments, mismatched POM/JAR versions, and
       self-comparison.
 
-### [ ] 1.3 Keep generated readiness honest
+### [x] 1.3 Keep generated readiness honest
 
-- [ ] Report `4.2.0-SNAPSHOT` as development and `4.1.0` as the latest
+- [x] Report `4.2.0-SNAPSHOT` as development and `4.1.0` as the latest
       published/API/consumer/benchmark baseline.
-- [ ] Report V29 as active with an unselected release lane and a deferred,
+- [x] Report V29 as active with an unselected release lane and a deferred,
       unpublished `4.2.0` candidate.
-- [ ] Keep compatibility, consumer, benchmark, AOT, native, publication, and
+- [x] Keep compatibility, consumer, benchmark, AOT, native, publication, and
       release-scope work pending until their evidence exists.
-- [ ] Update the roadmap archive consistency guard for the V29 checklist without
+- [x] Update the roadmap archive consistency guard for the V29 checklist without
       weakening V1-V28 completion checks.
-- [ ] Run `DocumentationReleaseArtifactTest`, Maven validation, and
+- [x] Run `DocumentationReleaseArtifactTest`, Maven validation, and
       `git diff --check`; record commands, totals, commit state, and evidence
       paths under this priority.
+
+Evidence recorded on 2026-08-30 from clean commit
+`fc30a7f3a423b3d1cb387519e2cbf285377ea33d` before this checklist-only update:
+
+- Root, starter, test-helper, OTel, benchmark, native-smoke, and current-consumer
+  coordinates resolve to `4.2.0-SNAPSHOT`. README and quick-start dependency
+  snippets remain on published `4.1.0`; `latest.published.version`, strict API,
+  published-consumer, and benchmark baselines also remain `4.1.0`. The roadmap
+  guard retains V1-V28 as completed records and V29 as the sole active roadmap.
+- A previously absent Central-only repository resolved the parent POM and the
+  starter, test-helper, and OTel POM/JAR/source/Javadoc artifacts. Central remote
+  markers, declared/embedded versions, and all 13 SHA-256 records passed under
+  `target/release-evidence/v29/priority1/published-baseline/`.
+- `scripts/verify-published-consumer.sh 4.1.0` passed 4 tests with no failures,
+  errors, or skips using published artifacts only. Effective POMs, dependency
+  tree, classpath, Surefire reports, clean-commit provenance, and 7 artifact
+  hashes are under `target/release-evidence/v29/priority1/published-consumer/`.
+- Strict root and starter-only `api-compatibility` builds passed against the
+  separate `v29-priority1-api-root-4.1.0` and
+  `v29-priority1-api-starter-4.1.0` repositories. Reports plus 7 root and 2
+  starter provenance hashes are under
+  `target/release-evidence/v29/priority1/api-root/` and `api-starter/`.
+  `scripts/verify-api-compatibility-fixtures.sh` proved source-only and binary
+  incompatibilities still fail strict mode.
+- `scripts/verify-published-baseline-fixtures.sh` rejected local-only artifacts,
+  mixed candidate versions, missing source/Javadoc attachments, mismatched
+  project/parent POM and embedded JAR versions, and root/module self-comparison.
+- Generated readiness records `4.2.0-SNAPSHOT` development, published/API/
+  consumer/benchmark baseline `4.1.0`, active roadmap `v29`, release lane
+  `unselected`, and an unpublished, deferred `4.2.0` candidate with no selected
+  scope. Release-scope, compatibility, consumer, benchmark, AOT, native, and
+  publication work remain pending; the generated JSON and benchmark snippet are
+  under `target/release-evidence/v29/priority1/readiness/`.
+- `mvn -B -ntp -pl reactive-http-client-starter
+  -Dtest=DocumentationReleaseArtifactTest test` passed 44 tests with no failures,
+  errors, or skips. `mvn -B -ntp -s .mvn/maven-central-settings.xml validate`
+  passed all four reactor modules, and `git diff --check` passed.
 
 ---
 
