@@ -1,7 +1,7 @@
 # Benchmarks
 
 The commands in [Commands](#commands) are authoritative for the current
-`4.1.0-SNAPSHOT` development line and published `4.0.0` baseline. Versioned
+`4.1.0` release candidate and published `4.0.0` baseline. Versioned
 scope sections preserve V12-V20 evidence and are historical unless explicitly
 identified as current.
 
@@ -151,7 +151,7 @@ scripts/verify-published-baseline-provenance.sh benchmark 4.0.0 \
 ```
 
 The example version must match the root `api.compatibility.baseline.version`
-(`4.0.0` for this development line). When that property changes for the next
+(`4.0.0` for this release candidate). When that property changes for the next
 development cycle, update this command and the `published-starter-<version>`
 report paths together.
 V20 used `2.14.1` for its cross-major evidence. After `4.0.0` publication, the

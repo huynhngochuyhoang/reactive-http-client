@@ -675,7 +675,7 @@ Completion evidence (2026-08-29):
 - [x] Ensure test-helper consumers receive or document every optional runtime
       dependency required by cache-enabled mocks.
 
-### [ ] 10.3 Extend AOT, native, and shutdown evidence
+### [x] 10.3 Extend AOT, native, and shutdown evidence
 
 - [x] Register only the final public annotation/configuration additions and
       concrete client method metadata required at runtime.
@@ -685,7 +685,7 @@ Completion evidence (2026-08-29):
 - [x] Observe a bounded quiet period before accepting zero dispatch on hits.
 - [x] Prove native diagnostics contain semantic intent but no request body or key
       material.
-- [ ] Run native compile/executable evidence from a clean committed tree and
+- [x] Run native compile/executable evidence from a clean committed tree and
       record commit, toolchain, binary hash, and reports.
 
 Implementation evidence (2026-08-29):
@@ -719,9 +719,12 @@ Implementation evidence (2026-08-29):
   compile/execution passed with GraalVM **25.0.3**; the functional native binary
   SHA-256 was
   `83d38a3d1078e309a056af6a46a48c762737352a6b0744a1ec2529d0a699402b`.
-- The native run above used the uncommitted Priority 10 tree. It validates
-  functionality but intentionally does not satisfy the remaining immutable
-  clean-commit provenance checkbox.
+- The immutable Priority 14 rerun compiled and executed the same fixture from
+  clean commit `8e9a324fb5e231f27e1454098c6d46e0994d61df` with GraalVM
+  **25.0.3**. The clean binary SHA-256 is
+  `8d3d74a848a56854b1109ea6f6ddd4fa442dea5ce8b6c3f47c0bf3c98998b131`;
+  toolchain, dependencies, executable output, and checksums are under
+  `target/release-evidence/v28/priority14/immutable-8e9a324/native/`.
 
 ---
 
@@ -952,34 +955,101 @@ Implementation evidence recorded on 2026-08-30:
 
 ## Priority 14 - V28 / `4.1.0` Go-No-Go
 
-### [ ] 14.1 Select release scope and candidate version
+### [x] 14.1 Select release scope and candidate version
 
-- [ ] Confirm the final public change is additive and existing GET behavior is
+- [x] Confirm the final public change is additive and existing GET behavior is
       unchanged.
-- [ ] Confirm every non-GET cache path requires method/API-specific semantic-read
+- [x] Confirm every non-GET cache path requires method/API-specific semantic-read
       intent and bounded wire-equivalent request identity.
-- [ ] Select `4.1.0` only when all supported body shapes and composition cases are
+- [x] Select `4.1.0` only when all supported body shapes and composition cases are
       proven; otherwise narrow scope or record a no-go.
-- [ ] Keep unrelated API, metric-schema, distributed-cache, invalidation, and
+- [x] Keep unrelated API, metric-schema, distributed-cache, invalidation, and
       write-caching work out of the candidate.
-- [ ] Update changelog and release notes without claiming the candidate is
+- [x] Update changelog and release notes without claiming the candidate is
       published.
 
-### [ ] 14.2 Assemble immutable release evidence
+Scope decision recorded on 2026-08-30:
 
-- [ ] Run the complete reactor on the supported Java/Spring Boot matrix from a
+- Select `4.1.0` as the unpublished additive-minor candidate. The only Java API
+  addition is the false-defaulted, method-scoped `CacheResponse.semanticRead()`
+  contract; compiled and source `4.0.0` clients retain explicit `GET` behavior.
+- The supported non-`GET` scope is finite `Mono<T>`/`Mono<ResponseEntity<T>>`
+  semantic reads with bounded JSON, `String`, or `byte[]` body identity. Every
+  selected method/API must declare its own intent, and body, target, header, auth,
+  tenant, and context variants remain wire-equivalent and bounded.
+- Priorities 3-10 prove storage, response eligibility, single flight, refresh,
+  Retry, redirects, auth replay, timeouts, terminal diagnostics, metrics, mocks,
+  assembled consumers, AOT, and functional native parity for that scope. The
+  clean immutable native/evidence rerun is recorded in 14.2.
+- Distributed caching, automatic invalidation, write-through/write-behind,
+  ordinary write caching, metric-schema changes, and unrelated APIs remain out
+  of scope. `CHANGELOG.md` keeps the release under `[Unreleased]`, states that
+  `4.1.0` is unpublished, and makes no public performance claim.
+
+### [x] 14.2 Assemble immutable release evidence
+
+- [x] Run the complete reactor on the supported Java/Spring Boot matrix from a
       clean candidate commit.
-- [ ] Pass strict root/module API checks, baseline provenance, dependency review,
+- [x] Pass strict root/module API checks, baseline provenance, dependency review,
       package guard, current/published consumers, AOT, native, shutdown, docs,
       and support fixtures.
-- [ ] Complete benchmark/allocation evidence or record a no-public-claim
+- [x] Complete benchmark/allocation evidence or record a no-public-claim
       deferral.
-- [ ] Verify generated readiness lists every unresolved manual command and
+- [x] Verify generated readiness lists every unresolved manual command and
       artifact before the release decision.
-- [ ] Record one explicit go/no-go decision with candidate version, commit, date,
+- [x] Record one explicit go/no-go decision with candidate version, commit, date,
       evidence paths, and remaining risk.
 
+Immutable evidence and decision recorded on 2026-08-30:
+
+- The reviewed source is clean commit
+  `8e9a324fb5e231f27e1454098c6d46e0994d61df`. Java **21.0.11** matrix rows
+  for Spring Boot **4.0.0** and **4.1.0** each pass **1,377 reactor tests** plus
+  **3 assembled-consumer tests**, with no failures, errors, or skips. The
+  reports include **44 documentation/support tests**, **21 AOT tests**, and the
+  cache/transport shutdown suites.
+- Independent strict root and starter-only japicmp lanes pass against separate
+  fresh Maven Central `4.0.0` repositories. API and published-baseline fixtures,
+  dependency/effective-POM review, all **13** published baseline release
+  artifacts, and binary/source/Javadoc/metadata packaging checks pass with
+  provenance and checksums preserved.
+- The current isolated lane passes **60 mock tests** and **6 assembled-consumer
+  tests**; the Central-only published `4.0.0` lane passes **4 consumer tests**.
+  GraalVM **25.0.3** compiles and executes the native fixture from the same clean
+  commit. Its binary SHA-256 is
+  `8d3d74a848a56854b1109ea6f6ddd4fa442dea5ce8b6c3f47c0bf3c98998b131`.
+- Benchmark promotion is deferred under the no-public-claim path. Priority 12
+  completed the V28 re-audit before the release-scope-only candidate commit;
+  `CHANGELOG.md` makes no numerical or comparative performance claim. Any later
+  performance wording still requires a same-machine candidate/baseline rerun and
+  promoted report.
+- Generated readiness remains conservative and enumerates compatibility,
+  consumer, native, benchmark, published-artifact, and publication-preflight
+  commands. It identifies `4.1.0` as selected but unpublished and leaves final
+  release-profile/signing, Central publication, and post-publication verification
+  to 14.3.
+- Decision: **GO to the `4.1.0` release cut**. This is not a publication claim.
+  Remaining risk is the accepted cache-hit probe overhead plus the normal final
+  signing/Central workflow risk; public performance claims remain out of scope.
+  Commands, generated readiness, artifacts, reports, checksums, benchmark
+  disposition, and the decision record are under
+  `target/release-evidence/v28/priority14/immutable-8e9a324/`.
+
 ### [ ] 14.3 Publish and transition the baseline
+
+Release cut prepared on 2026-08-30:
+
+- Reactor modules, benchmark harness, native fixture, and assembled-consumer
+  fixture use final `4.1.0`; public consumer snippets and published/API
+  baselines remain on `4.0.0` until Central verification.
+- The `mvn clean verify` reactor run passes **1,377 tests**. Strict API compatibility
+  passes against a fresh Central-only `4.0.0` baseline, and the final candidate
+  passes **60 mock tests** plus **6 assembled-consumer tests** from an isolated
+  reactor repository.
+- Unsigned release-profile packaging and the generation-packaging guard pass
+  for `4.1.0`. Local signed preflight reached GPG but cannot complete without
+  the workflow-only `MAVEN_GPG_PASSPHRASE`; signing, staged signature
+  verification, publication, and post-publication checks remain open below.
 
 - [ ] On go, cut the final version only from the reviewed clean commit and run the
       publish workflow with generation-packaging checks.
