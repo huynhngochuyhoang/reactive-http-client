@@ -836,6 +836,13 @@ path are absent. The manifest keeps README and quick-start expectations on the
 latest published consumer version and reports benchmark promotion and Maven
 Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
+
+For the selected V28 scope, `releaseCandidate.scopeStatus=selected` and the
+bounded additive scope are recorded while candidate status remains `deferred`,
+`published=false`, and pending work is limited to immutable evidence, the
+go/no-go decision, and publication. Scope selection does not remove the snapshot
+suffix or make artifacts publicly resolvable.
+
 The root `latest.published.version` property owns public consumer snippets;
 `api.compatibility.baseline.version` remains an independent compatibility policy.
 

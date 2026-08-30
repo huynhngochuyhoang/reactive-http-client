@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **`4.1.0` candidate scope selected (unpublished).** The candidate is an
+  additive minor release for method-specific semantic-read response caching.
+  Existing explicit `GET` behavior remains unchanged; each selected non-`GET`
+  method requires its own `semanticRead = true` acknowledgement and bounded
+  wire-equivalent body and request variants. Ordinary writes remain unselected.
+  This scope excludes distributed caching, automatic invalidation, write-through
+  or write-behind behavior, metric-schema changes, and public performance claims.
+
 ### Added
 - **Method-specific semantic-read cache opt-in.** Added
   `@CacheResponse(semanticRead = true)` for explicitly selected non-`GET`

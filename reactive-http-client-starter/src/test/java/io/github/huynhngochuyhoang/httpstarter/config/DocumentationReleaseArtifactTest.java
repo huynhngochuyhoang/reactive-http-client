@@ -369,6 +369,8 @@ class DocumentationReleaseArtifactTest {
         String production = Files.readString(root.resolve("docs/16-production-checklist.md"));
         String boot4Migration = Files.readString(
                 root.resolve("docs/28-spring-boot-4-jackson-migration.md"));
+        String releaseNotes = markdownSection(Files.readString(root.resolve("CHANGELOG.md")),
+                "## [Unreleased]", "## [4.0.0]");
         JsonNode fixture = OBJECT_MAPPER.readTree(
                 root.resolve("docs/fixtures/support-bundle-response-cache.json").toFile());
 
@@ -394,6 +396,15 @@ class DocumentationReleaseArtifactTest {
                 .contains("explicit `GET` response caching on published\n`4.0.0` remain source and binary compatible")
                 .contains("`CacheResponse.semanticRead()` is an additive, false-defaulted member")
                 .contains("client-wide cache policy does not supply\nthat acknowledgement");
+        assertThat(releaseNotes)
+                .contains("`4.1.0` candidate scope selected (unpublished)")
+                .contains("Existing explicit `GET` behavior remains unchanged")
+                .contains("each selected non-`GET`\n  method requires its own `semanticRead = true` acknowledgement")
+                .contains("Ordinary writes remain unselected")
+                .contains("excludes distributed caching, automatic invalidation")
+                .contains("public performance claims")
+                .doesNotContain("all POST", "all PUT", "all PATCH", "all DELETE",
+                        "suppresses duplicate writes", "published `4.1.0`");
 
         assertThat(normalizedSafetyReview)
                 .contains("endpoint owner must approve")
@@ -2570,12 +2581,13 @@ class DocumentationReleaseArtifactTest {
         assertThat(readiness.path("releaseCandidate").path("version").asText()).isEqualTo("4.1.0");
         assertThat(readiness.path("releaseCandidate").path("status").asText()).isEqualTo("deferred");
         assertThat(readiness.path("releaseCandidate").path("published").asBoolean()).isFalse();
+        assertThat(readiness.path("releaseCandidate").path("scopeStatus").asText()).isEqualTo("selected");
+        assertThat(readiness.path("releaseCandidate").path("scope").asText())
+                .isEqualTo("additive method-specific semantic-read response caching");
         assertThat(readiness.path("releaseCandidate").path("migrationReport").isMissingNode()).isTrue();
         assertThat(readiness.path("releaseCandidate").path("pendingWork"))
                 .extracting(JsonNode::asText)
-                .containsExactly("release scope", "semantic-read contract", "cache key and body identity",
-                        "cache composition", "assembled consumers", "AOT and native image", "benchmarks",
-                        "API compatibility", "documentation", "publication");
+                .containsExactly("immutable release evidence", "go/no-go decision", "publication");
         assertThat(readiness.path("generatedTestEvidence").path("status").asText()).isEqualTo("pass");
         assertThat(readiness.path("manualReleaseEvidence").path("status").asText()).isEqualTo("pending");
         List<String> pendingReleaseCommands = streamText(readiness.path("manualReleaseEvidence").path("pendingCommands"));
@@ -2684,6 +2696,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(releasePrepItems.get("major-candidate").path("status").asText()).isEqualTo("deferred");
         assertThat(releasePrepItems.get("major-candidate").path("version").asText()).isEqualTo("4.1.0");
         assertThat(releasePrepItems.get("major-candidate").path("published").asBoolean()).isFalse();
+        assertThat(releasePrepItems.get("major-candidate").path("scopeStatus").asText())
+                .isEqualTo("selected");
         assertThat(streamText(releasePrepItems.get("published-baseline-artifacts").path("commands")))
                 .containsExactly("scripts/verify-published-release-artifacts.sh 4.0.0");
         assertThat(streamText(releasePrepItems.get("api-compatibility").path("commands")))
@@ -3480,9 +3494,7 @@ class DocumentationReleaseArtifactTest {
         };
         List<String> pendingWork = switch (versionContract.releaseState()) {
             case "snapshot-development" -> "4.1.0".equals(candidateVersion)
-                    ? List.of("release scope", "semantic-read contract", "cache key and body identity",
-                            "cache composition", "assembled consumers", "AOT and native image", "benchmarks",
-                            "API compatibility", "documentation", "publication")
+                    ? List.of("immutable release evidence", "go/no-go decision", "publication")
                     : List.of("release scope", "API compatibility", "assembled consumers", "benchmarks",
                             "AOT", "native image", "publication");
             case "release-candidate" -> List.of("publication");
@@ -3494,6 +3506,10 @@ class DocumentationReleaseArtifactTest {
         candidate.put("version", candidateVersion);
         candidate.put("status", status);
         candidate.put("published", "post-publication".equals(versionContract.releaseState()));
+        if ("4.1.0".equals(candidateVersion)) {
+            candidate.put("scopeStatus", "selected");
+            candidate.put("scope", "additive method-specific semantic-read response caching");
+        }
         if ("4.0.0".equals(candidateVersion)) {
             candidate.put("migrationReport", "docs/31-3x-to-4x-resilience-migration.md");
         }

@@ -952,18 +952,36 @@ Implementation evidence recorded on 2026-08-30:
 
 ## Priority 14 - V28 / `4.1.0` Go-No-Go
 
-### [ ] 14.1 Select release scope and candidate version
+### [x] 14.1 Select release scope and candidate version
 
-- [ ] Confirm the final public change is additive and existing GET behavior is
+- [x] Confirm the final public change is additive and existing GET behavior is
       unchanged.
-- [ ] Confirm every non-GET cache path requires method/API-specific semantic-read
+- [x] Confirm every non-GET cache path requires method/API-specific semantic-read
       intent and bounded wire-equivalent request identity.
-- [ ] Select `4.1.0` only when all supported body shapes and composition cases are
+- [x] Select `4.1.0` only when all supported body shapes and composition cases are
       proven; otherwise narrow scope or record a no-go.
-- [ ] Keep unrelated API, metric-schema, distributed-cache, invalidation, and
+- [x] Keep unrelated API, metric-schema, distributed-cache, invalidation, and
       write-caching work out of the candidate.
-- [ ] Update changelog and release notes without claiming the candidate is
+- [x] Update changelog and release notes without claiming the candidate is
       published.
+
+Scope decision recorded on 2026-08-30:
+
+- Select `4.1.0` as the unpublished additive-minor candidate. The only Java API
+  addition is the false-defaulted, method-scoped `CacheResponse.semanticRead()`
+  contract; compiled and source `4.0.0` clients retain explicit `GET` behavior.
+- The supported non-`GET` scope is finite `Mono<T>`/`Mono<ResponseEntity<T>>`
+  semantic reads with bounded JSON, `String`, or `byte[]` body identity. Every
+  selected method/API must declare its own intent, and body, target, header, auth,
+  tenant, and context variants remain wire-equivalent and bounded.
+- Priorities 3-10 prove storage, response eligibility, single flight, refresh,
+  Retry, redirects, auth replay, timeouts, terminal diagnostics, metrics, mocks,
+  assembled consumers, AOT, and functional native parity for that scope. The
+  clean immutable native/evidence rerun remains in 14.2.
+- Distributed caching, automatic invalidation, write-through/write-behind,
+  ordinary write caching, metric-schema changes, and unrelated APIs remain out
+  of scope. `CHANGELOG.md` keeps the release under `[Unreleased]`, states that
+  `4.1.0` is unpublished, and makes no public performance claim.
 
 ### [ ] 14.2 Assemble immutable release evidence
 
