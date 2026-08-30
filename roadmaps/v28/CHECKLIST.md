@@ -1037,6 +1037,20 @@ Immutable evidence and decision recorded on 2026-08-30:
 
 ### [ ] 14.3 Publish and transition the baseline
 
+Release cut prepared on 2026-08-30:
+
+- Reactor modules, benchmark harness, native fixture, and assembled-consumer
+  fixture use final `4.1.0`; public consumer snippets and published/API
+  baselines remain on `4.0.0` until Central verification.
+- The `mvn clean verify` reactor run passes **1,377 tests**. Strict API compatibility
+  passes against a fresh Central-only `4.0.0` baseline, and the final candidate
+  passes **60 mock tests** plus **6 assembled-consumer tests** from an isolated
+  reactor repository.
+- Unsigned release-profile packaging and the generation-packaging guard pass
+  for `4.1.0`. Local signed preflight reached GPG but cannot complete without
+  the workflow-only `MAVEN_GPG_PASSPHRASE`; signing, staged signature
+  verification, publication, and post-publication checks remain open below.
+
 - [ ] On go, cut the final version only from the reviewed clean commit and run the
       publish workflow with generation-packaging checks.
 - [ ] Verify parent, starter, test-helper, and OTel POM/JAR/source/Javadoc

@@ -1,7 +1,7 @@
 # Native Image and Release Compatibility
 
-Sections without a version label describe the current `4.1.0-SNAPSHOT`
-development line. Sections labeled V18, V19, V20, or V27 preserve release-era
+Sections without a version label describe the current `4.1.0` release
+candidate. Sections labeled V18, V19, V20, or V27 preserve release-era
 evidence and are not current commands. Use the command in the first applicable
 current section; historical sections remain for provenance only.
 
@@ -151,11 +151,12 @@ The final candidate readiness reported `4.0.0` as pending publication while
 public consumer coordinates remained on `3.6.0`. Tag `v4.0.0` and the V27
 checklist preserve that release evidence.
 
-### Post-`4.0.0` development lane
+### Post-`4.0.0` release lane
 
 After Maven Central verification, public consumer, strict API, assembled
 consumer, and benchmark baselines moved to published `4.0.0`. Reactor-only
-coordinates now use `4.1.0-SNAPSHOT`. Normal CI runs only strict root and
+coordinates now use the `4.1.0` release candidate. Normal CI runs only strict
+root and
 starter-module comparisons against `4.0.0`; the V27 report-only major lane is
 historical evidence and is not a post-release compatibility command.
 
@@ -361,7 +362,7 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `4.1.0-SNAPSHOT` development line compares
+from the current reactor version. The `4.1.0` release candidate compares
 strictly against published `4.0.0`:
 
 ```bash
@@ -413,7 +414,7 @@ incompatibilities for the current line.
 ### Historical V27 major comparison
 
 The following command is reproducible from the `v4.0.0` release tree. It is not
-a current `4.1.0-SNAPSHOT` CI command:
+a current `4.1.0` release-candidate CI command:
 
 ```bash
 test ! -e target/published-baseline-repositories/api-major-report-3.6.0 && \
@@ -776,7 +777,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=4.1.0-SNAPSHOT native:compile
+  -Dreactive-http-client.version=4.1.0 native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
@@ -937,7 +938,7 @@ runs the complete mock parity classes, then runs the assembled consumer against
 the installed jars. It rejects reactor `target/classes` leakage and records
 separate mock and real-server test reports, the consumer classpath, dependency
 tree, effective POM, artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-4.1.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
+`target/release-evidence/current-consumer/current-4.1.0/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
 test stage. An `EXIT` trap repeats that filtered copy before preserving the original
 verifier status, including when either test stage fails.
 It also records the last completed stage and exit status when a later

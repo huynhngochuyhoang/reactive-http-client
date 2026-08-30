@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- **`4.1.0` candidate scope selected (unpublished).** The candidate is an
+## [4.1.0] - 2026-08-30
+
+- **`4.1.0` release candidate (pending publication).** The candidate is an
   additive minor release for method-specific semantic-read response caching.
   Existing explicit `GET` behavior remains unchanged; each selected non-`GET`
   method requires its own `semanticRead = true` acknowledgement and bounded
@@ -1764,7 +1766,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.1.0...HEAD
+[4.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.6.0...v4.0.0
 [3.6.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.5.0...v3.6.0
 [3.5.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.4.0...v3.5.0

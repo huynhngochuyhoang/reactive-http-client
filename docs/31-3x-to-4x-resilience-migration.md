@@ -199,4 +199,4 @@ implicitly accepted consequence of the major version.
 - Released major: `4.0.0` from tag `v4.0.0`.
 - Latest published and API baseline: `4.0.0`.
 - Public README and quick-start coordinates: `4.0.0`.
-- Development continues on `4.1.0-SNAPSHOT` after Maven Central verification.
+- Current release candidate: `4.1.0`; Maven Central publication is pending.
