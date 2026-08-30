@@ -387,9 +387,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
 
         Class<?> concreteClient = clientInterface != null ? clientInterface : method.getDeclaringClass();
-        EffectiveCachePolicy.Decision cacheDecision = cacheDecision(
-                method, concreteClient, plan, effectiveApi.httpMethod());
-        if (cacheDecision.cacheable()) {
+        EffectiveCachePolicy.Decision cacheDecision = requiresCacheDecision(plan)
+                ? cacheDecision(method, concreteClient, plan, effectiveApi.httpMethod())
+                : null;
+        if (cacheDecision != null && cacheDecision.cacheable()) {
             EffectiveCachePolicy.Selection cacheSelection = cacheDecision.selection();
             requireCacheAuthorizationSupport();
             Object[] invocationArguments = args != null ? args.clone() : new Object[0];
@@ -683,6 +684,14 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 concreteClient, clientName, plan, clientConfig, effectiveHttpMethod);
         EffectiveCachePolicy.Decision existing = cacheDecisionCache.putIfAbsent(method, validated);
         return existing != null ? existing : validated;
+    }
+
+    private boolean requiresCacheDecision(RequestPlan plan) {
+        if (!plan.cacheKeyParams().isEmpty() || StringUtils.hasText(plan.cachePolicyName())) {
+            return true;
+        }
+        ReactiveHttpClientProperties.CacheConfig cache = clientConfig.getCache();
+        return cache != null && StringUtils.hasText(cache.getPolicy());
     }
 
     private boolean usesSubscriptionState(RequestPlan plan,

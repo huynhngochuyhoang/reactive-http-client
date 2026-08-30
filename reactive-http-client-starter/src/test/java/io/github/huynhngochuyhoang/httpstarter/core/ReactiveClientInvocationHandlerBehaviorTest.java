@@ -26,6 +26,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URI;
@@ -65,6 +66,31 @@ class ReactiveClientInvocationHandlerBehaviorTest {
                 .verifyComplete();
 
         assertEquals(Boolean.FALSE, reportingStatePresent.get());
+    }
+
+    @Test
+    void unselectedPostDoesNotEnterTheCacheDecisionPath() throws Throwable {
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://test.local")
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+                        .body("ok")
+                        .build()))
+                .build();
+        ReactiveClientInvocationHandler handler = createHandler(
+                webClient,
+                new ReactiveHttpClientProperties.ClientConfig(),
+                TestJsonCodecs.jsonCodec(),
+                UnselectedPostClient.class);
+        Method method = UnselectedPostClient.class.getMethod("post", String.class);
+
+        @SuppressWarnings("unchecked")
+        Mono<String> result = (Mono<String>) handler.invoke(null, method, new Object[]{"query"});
+
+        StepVerifier.create(result).expectNext("ok").verifyComplete();
+        Field decisions = ReactiveClientInvocationHandler.class.getDeclaredField("cacheDecisionCache");
+        decisions.setAccessible(true);
+        assertTrue(((Map<?, ?>) decisions.get(handler)).isEmpty());
     }
 
     @Test
@@ -1032,6 +1058,11 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     interface RequiredPathClient {
         @POST("/objects/{id}")
         Mono<String> upload(@PathVar("id") String id, @Body Flux<DataBuffer> body);
+    }
+
+    interface UnselectedPostClient {
+        @POST("/query")
+        Mono<String> post(@Body String query);
     }
 
     interface ClientWithHead {
