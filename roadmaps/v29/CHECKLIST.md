@@ -97,20 +97,41 @@ Evidence recorded on 2026-08-30 from clean commit
 
 ## Priority 2 - Production Memory Characterization
 
-### [ ] 2.1 Build a deterministic workload
+### [x] 2.1 Build a deterministic workload
 
-- [ ] Add a loopback fixture that can run cache-disabled, cold miss, warm hit,
+- [x] Add a loopback fixture that can run cache-disabled, cold miss, warm hit,
       maximum-size pressure, TTL expiry, explicit eviction, single flight,
       refresh, cancellation, and factory-close scenarios.
-- [ ] Use fixed payload shapes, key cardinality, concurrency, warmup, operation
+- [x] Use fixed payload shapes, key cardinality, concurrency, warmup, operation
       count, and observation checkpoints so scenarios are comparable.
-- [ ] Isolate scenarios in fresh application contexts or forked JVMs where prior
+- [x] Isolate scenarios in fresh application contexts or forked JVMs where prior
       cache, allocator, or class-loading state would contaminate the result.
-- [ ] Make every hidden load, waiter, refresh, server dispatch, entry, and factory
+- [x] Make every hidden load, waiter, refresh, server dispatch, entry, and factory
       lifecycle observable through bounded structural counters; do not use sleeps
       as the only synchronization.
-- [ ] Keep request and response material synthetic and sanitized in all recorded
+- [x] Keep request and response material synthetic and sanitized in all recorded
       evidence.
+
+Evidence recorded on 2026-08-30:
+
+- `ResponseCacheMemoryWorkload` runs all ten scenarios against a fresh loopback
+  server, application context, connection provider, cache manager, refresh
+  scheduler, and factory owner per scenario. It fixes a 4 KiB synthetic byte-array
+  payload, 8 keys, concurrency 8, 2 warmup calls, 8 measured calls, a 1 second
+  TTL, and named structural checkpoints. Capacity pressure alone lowers maximum
+  size from 8 to 4.
+- Response gates and bounded latches make the shared load, seven coalesced
+  waiters, hidden refresh, cancellation, and factory-close transitions
+  deterministic. `LocalResponseCacheManager.WorkloadSnapshot` records entries,
+  evictions, active loads, waiter count, refreshes, and closed state alongside
+  caller/load/server and context/factory/server lifecycle counters. Ticker
+  advancement drives expiry and refresh; no scenario uses a sleep as its proof.
+- `mvn -B -ntp -pl reactive-http-client-starter
+  -Dtest=ResponseCacheMemoryWorkloadTest,BoundedLocalResponseCacheContractTest,SemanticReadSingleFlightRefreshContractTest,LocalResponseCacheObservabilityTest
+  test` passed 63 tests with no failures, errors, or skips. The workload also
+  passed two standalone executions. Sanitized structural output is under
+  `target/release-evidence/v29/priority2/deterministic-workload.properties` and
+  contains no request target, cache key, authorization material, or payload.
 
 ### [ ] 2.2 Separate memory domains
 
