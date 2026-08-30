@@ -146,6 +146,7 @@ final class BenchmarkMarkdownReport {
         markdown.append("- Starter-only rows measure starter-specific work, such as Problem Detail error mapping, where the baselines do not install equivalent behavior.\n");
         markdown.append("- Cache loopback rows compare cache workloads only with equivalent cache workloads; a local hit is never compared with a raw WebClient network call as abstraction-overhead evidence.\n");
         markdown.append("- Cache allocation rows isolate bounded starter-owned key, lookup, publication, waiter, eviction, and refresh work without transport I/O.\n");
+        markdown.append("- Semantic POST no-network rows include bounded JSON serialization, body-key derivation, and local cache work; semantic POST loopback rows additionally perform the authenticated wire request when the scenario dispatches.\n");
         markdown.append("- Local loopback, JVM warmup, CPU scheduling, and Netty event-loop behavior affect the numbers; use this report as trend evidence for named scenarios.\n");
         markdown.append("- Review thresholds are manual signals; this harness does not enforce hard performance gates.\n\n");
 
@@ -249,6 +250,12 @@ final class BenchmarkMarkdownReport {
     }
 
     private static Classification classification(String benchmarkName) {
+        if (benchmarkName.startsWith("cacheSemanticPostNoNetwork")) {
+            String scenario = benchmarkName.substring("cacheSemanticPostNoNetwork".length());
+            requireScenario(benchmarkName, scenario);
+            return new Classification("No-network semantic POST cache path", "Starter", scenario,
+                    false, true, sortPrefix("cache-semantic-post-no-network", scenario));
+        }
         if (benchmarkName.startsWith("cacheDisabled")) {
             requireScenario(benchmarkName, benchmarkName.substring("cacheDisabled".length()));
             return new Classification("No-network cache-disabled invocation", "Starter", benchmarkName,

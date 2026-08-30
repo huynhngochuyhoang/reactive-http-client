@@ -8,13 +8,17 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 final class BenchmarkFairnessContract {
 
     private static final String CLIENT_SIDE_PREFIX = "clientSideOverhead";
     private static final String LOOPBACK_BENCHMARK = LoopbackClientComparisonBenchmark.class.getName();
-    private static final String CACHE_BENCHMARK =
-            "io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark";
+    private static final Set<String> CACHE_BENCHMARKS = Set.of(
+            "io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark",
+            "io.github.huynhngochuyhoang.httpstarter.core.V28SemanticReadCachePerformanceBenchmark");
+    private static final String SEMANTIC_POST_CACHE_BENCHMARK =
+            "io.github.huynhngochuyhoang.httpstarter.core.V28SemanticReadCachePerformanceBenchmark";
     private static final List<String> CLIENT_SURFACES = List.of(
             "RawWebClient",
             "SpringHttpExchange",
@@ -62,9 +66,14 @@ final class BenchmarkFairnessContract {
                         + "] mixes loopback and no-network classification");
             }
             if (method.name().startsWith("cacheLoopbackStarter")
-                    && !CACHE_BENCHMARK.equals(method.owner())) {
+                    && !CACHE_BENCHMARKS.contains(method.owner())) {
                 throw new IllegalStateException("Cache loopback benchmark [" + method.owner() + "#"
-                        + method.name() + "] must be owned by the V27 cache benchmark fixture");
+                        + method.name() + "] must be owned by a cache benchmark fixture");
+            }
+            if (method.name().startsWith("cacheSemanticPostNoNetwork")
+                    && !SEMANTIC_POST_CACHE_BENCHMARK.equals(method.owner())) {
+                throw new IllegalStateException("Semantic POST no-network benchmark [" + method.owner() + "#"
+                        + method.name() + "] must be owned by the V28 semantic-read cache fixture");
             }
             if (!method.name().startsWith(CLIENT_SIDE_PREFIX)) {
                 continue;

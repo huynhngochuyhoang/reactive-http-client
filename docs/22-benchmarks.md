@@ -190,7 +190,7 @@ mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verif
 test ! -e target/published-baseline-repositories/benchmark-v27-3.6.0 && \
 mvn -s .mvn/maven-central-settings.xml \
   -Dmaven.repo.local=target/published-baseline-repositories/benchmark-v27-3.6.0 \
-  -Pbenchmarks,benchmark-release,benchmark-published-baseline \
+  -Pbenchmarks,benchmark-release,benchmark-published-baseline,benchmark-published-baseline-v27-source-exclusion \
   -pl reactive-http-client-benchmarks clean verify \
   -Dbenchmark.starter.version=3.6.0 -Dbenchmark.commit=3.6.0 \
   -Dbenchmark.result.dir=../target/release-evidence/v27/priority12/published-starter-3.6.0 \
@@ -200,12 +200,66 @@ scripts/verify-published-baseline-provenance.sh benchmark-v27 3.6.0 \
   reactive-http-client-starter
 ```
 
-The published-baseline profile excludes the V27-only cache benchmark source so
-the current harness remains source-compatible with `3.6.0`. The root-level
+The explicit `benchmark-published-baseline-v27-source-exclusion` profile
+excludes the V27 and V28 cache benchmark sources so the current harness remains
+source-compatible with `3.6.0`. The root-level
 evidence directories survive the benchmark module's baseline `clean`; preserve
 their JSON, Markdown, environment, dependency, command, commit/state, and
 Central-provenance artifacts when reviewing the pair. A dirty-tree audit can
 guide attribution but cannot be promoted or cited as public numerical evidence.
+
+The V28 semantic-read audit keeps the published-`4.0.0` comparison limited to
+work that exists on both sides: cache-disabled GET/POST publisher creation and
+the V27 loopback GET miss/hit rows. The V28-only fixture measures bounded JSON
+body serialization, body-key derivation, local semantic-POST miss/hit/waiter/
+refresh work, and authenticated loopback semantic-POST work as separately
+classified current-candidate rows. A local cache hit is never compared with a
+network call as abstraction overhead.
+
+Run a quick harness check under the smoke profile:
+
+```bash
+mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am clean verify \
+  -Dbenchmark.commit=EXAMPLE_COMMIT_OR_STATE \
+  -Dbenchmark.result.dir=../target/release-evidence/v28/priority12/smoke \
+  -Dbenchmark.include='.*(cacheDisabled.*ProxyInvocationCreatesPublisher|cacheAllocation.*|cacheLoopbackStarter(Miss|Hit)|cacheKeySemanticPostJsonBody|cacheSemanticPostNoNetwork.*|cacheLoopbackStarterSemanticPost.*).*'
+```
+
+For release-quality evidence, run the current candidate from a clean commit and
+the published baseline from a previously absent isolated Maven repository:
+
+```bash
+test -z "$(git status --porcelain)" && \
+mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am clean verify \
+  -Dbenchmark.commit="$(git rev-parse HEAD)" \
+  -Dbenchmark.result.dir=../target/release-evidence/v28/priority12/current \
+  -Dbenchmark.include='.*(cacheDisabled.*ProxyInvocationCreatesPublisher|cacheAllocation.*|cacheLoopbackStarter(Miss|Hit)|cacheKeySemanticPostJsonBody|cacheSemanticPostNoNetwork.*|cacheLoopbackStarterSemanticPost.*).*'
+
+test ! -e target/published-baseline-repositories/benchmark-v28-release-4.0.0 && \
+mvn -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-v28-release-4.0.0 \
+  -Pbenchmarks,benchmark-release,benchmark-published-baseline \
+  -pl reactive-http-client-benchmarks clean verify \
+  -Dbenchmark.starter.version=4.0.0 -Dbenchmark.commit=4.0.0 \
+  -Dbenchmark.result.dir=../target/release-evidence/v28/priority12/published-starter-4.0.0 \
+  -Dbenchmark.include='.*(cacheDisabled.*ProxyInvocationCreatesPublisher|cacheLoopbackStarter(Miss|Hit)).*' && \
+scripts/verify-published-baseline-provenance.sh benchmark-v28-release 4.0.0 \
+  target/release-evidence/v28/priority12/published-baseline-provenance \
+  reactive-http-client-starter
+
+mvn -Pbenchmarks,benchmark-compare -pl reactive-http-client-benchmarks -am verify \
+  -DskipTests \
+  -Dbenchmark.compare.current="$(pwd)/target/release-evidence/v28/priority12/current/release-jmh.json" \
+  -Dbenchmark.compare.baseline="$(pwd)/target/release-evidence/v28/priority12/published-starter-4.0.0/release-jmh.json" \
+  -Dbenchmark.compare.output="$(pwd)/target/release-evidence/v28/priority12/benchmark-comparison.md"
+```
+
+The published-baseline profile excludes the V28 fixture and its fixture test
+because the semantic-read annotation/configuration API is not present in
+`4.0.0`. Preserve the complete current report for V28-only workload review, but
+draw release-to-release conclusions only from rows present in both JSON files.
+The smoke and release commands use different result directories so a quick
+harness check cannot overwrite release evidence.
 
 Release-quality runs write JMH JSON under:
 
@@ -453,6 +507,10 @@ The benchmark module currently includes:
   bounded no-network key, hit, miss, publication, waiter, size-eviction, and
   refresh rows; and starter-only loopback miss, hit, coalesced-miss, and
   refresh-on-access rows.
+- A V28 semantic-read cache audit with a baseline-compatible disabled POST JSON
+  invocation row; bounded JSON serialization/key, no-network semantic POST
+  miss/hit/waiter/refresh rows; and authenticated loopback semantic POST
+  miss/hit/coalesced-miss/refresh rows.
 - Explicit resilience rows for enabled-only pass-through and retry-only wrapping.
   Focused contract tests separately prove zero lazy-registry initialization for
   enabled-only clients and no unrelated registry initialization for retry-only.
@@ -491,9 +549,11 @@ different scenario shapes:
   summary tables.
 - `cacheDisabled...`, `cacheKey...`, and `cacheAllocation...` identify the
   baseline-compatible disabled path, key construction, and bounded no-network
-  allocation paths respectively. `cacheLoopbackStarter...` identifies
-  starter-only cache workloads and never feeds the three-client comparison
-  summary.
+  allocation/retention paths respectively.
+- `cacheSemanticPostNoNetwork...` identifies V28-only
+  local semantic POST work. `cacheLoopbackStarter...` identifies
+  starter-only GET or semantic POST cache workloads and never feeds the
+  three-client comparison summary.
 
 Report generation fails for an unknown prefix, an unknown
 `clientSideOverhead` surface, or an empty scenario suffix. Add the classification

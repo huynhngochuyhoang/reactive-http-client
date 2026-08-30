@@ -94,7 +94,11 @@ class BenchmarkMarkdownReportTest {
                 result("io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark.cacheAllocationFreshHit",
                         "avgt", 1.0, "us/op"),
                 result("io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark.cacheLoopbackStarterHit",
-                        "avgt", 4.0, "us/op"));
+                        "avgt", 4.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.core.V28SemanticReadCachePerformanceBenchmark.cacheSemanticPostNoNetworkHit",
+                        "avgt", 5.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.core.V28SemanticReadCachePerformanceBenchmark.cacheLoopbackStarterSemanticPostHit",
+                        "avgt", 6.0, "us/op"));
 
         assertThat(report)
                 .contains("local hit is never compared with a raw WebClient network call")
@@ -102,6 +106,8 @@ class BenchmarkMarkdownReportTest {
                 .contains("| cacheKeyConstructionPathQueryHeader | No-network cache-key construction |")
                 .contains("| cacheAllocationFreshHit | No-network cache allocation path |")
                 .contains("| cacheLoopbackStarterHit | Starter cache loopback workload |")
+                .contains("| cacheSemanticPostNoNetworkHit | No-network semantic POST cache path |")
+                .contains("| cacheLoopbackStarterSemanticPostHit | Starter cache loopback workload |")
                 .doesNotContain("| Cache Loopback Starter Hit | 4 us/op |");
     }
 
@@ -139,7 +145,7 @@ class BenchmarkMarkdownReportTest {
                 LoopbackClientComparisonBenchmark.class,
                 StarterInvocationBenchmark.class,
                 StarterInvocationInternalsBenchmark.class,
-                StarterDiagnosticsOverheadBenchmark.class), optionalV27CacheBenchmark());
+                StarterDiagnosticsOverheadBenchmark.class), optionalCacheBenchmarks());
 
         String[] results = benchmarkTypes
                 .flatMap(type -> Arrays.stream(type.getDeclaredMethods()))
@@ -151,10 +157,16 @@ class BenchmarkMarkdownReportTest {
         assertThat(renderReport(results)).contains("## Raw Results");
     }
 
-    private static Stream<Class<?>> optionalV27CacheBenchmark() {
+    private static Stream<Class<?>> optionalCacheBenchmarks() {
+        return Stream.of(
+                        "io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark",
+                        "io.github.huynhngochuyhoang.httpstarter.core.V28SemanticReadCachePerformanceBenchmark")
+                .flatMap(BenchmarkMarkdownReportTest::optionalClass);
+    }
+
+    private static Stream<Class<?>> optionalClass(String className) {
         try {
-            return Stream.of(Class.forName(
-                    "io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark"));
+            return Stream.of(Class.forName(className));
         } catch (ClassNotFoundException ignored) {
             return Stream.empty();
         }

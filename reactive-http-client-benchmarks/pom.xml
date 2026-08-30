@@ -334,8 +334,31 @@
                         <artifactId>maven-compiler-plugin</artifactId>
                         <configuration>
                             <excludes>
-                                <exclude>**/V27CachePerformanceBenchmark.java</exclude>
+                                <exclude>**/V28SemanticReadCachePerformanceBenchmark.java</exclude>
                             </excludes>
+                            <testExcludes>
+                                <testExclude>**/V28SemanticReadCachePerformanceBenchmarkTest.java</testExclude>
+                            </testExcludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>benchmark-published-baseline-v27-source-exclusion</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <excludes combine.self="override">
+                                <exclude>**/V27CachePerformanceBenchmark.java</exclude>
+                                <exclude>**/V28SemanticReadCachePerformanceBenchmark.java</exclude>
+                            </excludes>
+                            <testExcludes combine.self="override">
+                                <testExclude>**/V28SemanticReadCachePerformanceBenchmarkTest.java</testExclude>
+                            </testExcludes>
                         </configuration>
                     </plugin>
                 </plugins>

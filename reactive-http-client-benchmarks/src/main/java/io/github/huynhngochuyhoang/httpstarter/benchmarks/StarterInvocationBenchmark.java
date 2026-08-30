@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.benchmarks;
 
 import io.github.huynhngochuyhoang.httpstarter.benchmarks.client.BenchmarkUser;
+import io.github.huynhngochuyhoang.httpstarter.benchmarks.client.CreateUserRequest;
 import io.github.huynhngochuyhoang.httpstarter.benchmarks.client.StarterBenchmarkClient;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder;
@@ -31,6 +32,8 @@ import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
 public class StarterInvocationBenchmark {
+
+    private static final CreateUserRequest CREATE_USER = new CreateUserRequest("benchmark-user");
 
     private MethodMetadataCache metadataCache;
     private Method findUserMethod;
@@ -92,6 +95,13 @@ public class StarterInvocationBenchmark {
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
     public Mono<BenchmarkUser> cacheDisabledProxyInvocationCreatesPublisher() {
         return starterClient.findUser("42", "summary", "benchmark");
+    }
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput, Mode.AverageTime})
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public Mono<BenchmarkUser> cacheDisabledPostJsonProxyInvocationCreatesPublisher() {
+        return starterClient.createUser(CREATE_USER);
     }
 
     @Benchmark

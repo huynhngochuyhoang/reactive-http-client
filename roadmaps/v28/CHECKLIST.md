@@ -788,36 +788,103 @@ Implementation evidence (2026-08-29):
 
 ## Priority 12 - Performance and Allocation Re-Audit
 
-### [ ] 12.1 Extend benchmark classification and harness coverage
+### [x] 12.1 Extend benchmark classification and harness coverage
 
-- [ ] Keep disabled-cache and existing GET rows comparable with published
+- [x] Keep disabled-cache and existing GET rows comparable with published
       `4.0.0`.
-- [ ] Add separately classified no-network and loopback POST JSON query rows for
+- [x] Add separately classified no-network and loopback POST JSON query rows for
       miss, hit, coalesced waiter, and refresh.
-- [ ] Ensure compared implementations perform equivalent serialization, keying,
+- [x] Ensure compared implementations perform equivalent serialization, keying,
       cache lookup, and network work; do not compare a local hit to a network
       call as abstraction overhead.
-- [ ] Keep smoke rows and release-quality rows in separate paths/classifications.
+- [x] Keep smoke rows and release-quality rows in separate paths/classifications.
 
-### [ ] 12.2 Audit allocations and retention
+### [x] 12.2 Audit allocations and retention
 
-- [ ] Measure bounded body serialization, opaque key derivation, hit, miss,
+- [x] Measure bounded body serialization, opaque key derivation, hit, miss,
       waiter, refresh, eviction, and cancellation paths.
-- [ ] Confirm unselected non-GET methods gain no request-path cache allocation.
-- [ ] Use JFR/allocation evidence to verify body bytes, frozen arguments, flight
+- [x] Confirm unselected non-GET methods gain no request-path cache allocation.
+- [x] Use JFR/allocation evidence to verify body bytes, frozen arguments, flight
       state, auth context, and cache entries are released at their ownership
       boundaries.
-- [ ] Record any accepted overhead with workload shape and methodology; do not
+- [x] Record any accepted overhead with workload shape and methodology; do not
       optimize without a measured regression.
 
-### [ ] 12.3 Prepare release benchmark evidence
+### [x] 12.3 Prepare release benchmark evidence
 
-- [ ] Run the published `4.0.0` baseline from a previously absent isolated Maven
+- [x] Run the published `4.0.0` baseline from a previously absent isolated Maven
       repository and record provenance.
-- [ ] Run the current release-quality JMH command from a clean candidate commit.
-- [ ] Compare current and baseline JSON reports with stable row classification.
-- [ ] Promote a source-controlled report only if release notes make a public
+- [x] Run the current release-quality JMH command from a clean candidate commit.
+- [x] Compare current and baseline JSON reports with stable row classification.
+- [x] Promote a source-controlled report only if release notes make a public
       performance claim; otherwise record explicit deferral.
+
+Implementation evidence (2026-08-30):
+
+- `V28SemanticReadCachePerformanceBenchmark` adds bounded JSON body/key,
+  no-network semantic `POST` miss/hit/waiter/cancellation/refresh, and
+  authenticated loopback miss/hit/waiter/refresh rows. Every loopback row
+  asserts its expected dispatch delta and response body; the auth fixture also
+  asserts that it receives the serialized body bytes used by the request.
+- Benchmark classification keeps disabled controls, no-network allocation work,
+  no-network semantic `POST` work, and starter cache loopback work separate.
+  The final smoke run produced **40 rows / 20 methods** across throughput and
+  average-time modes under
+  `target/release-evidence/v28/priority12/smoke-final/`. Focused benchmark and
+  report verification passed **19 tests**.
+- Release-profile allocation evidence isolates the existing cache internals:
+  fresh hit approximately **0 B/op**, miss token **96 B/op**, loader publication
+  **344 B/op**, waiter **2,137 B/op**, refresh **2,195 B/op**, size eviction
+  **192 B/op**, and semantic-POST cancelled flight **37,327 B/op** in
+  average-time mode. The complete semantic-POST audit separately measures body
+  serialization/keying, hit, miss, waiter, and refresh at approximately
+  **35,870-38,163 B/op** for the bounded record workload.
+- `V28SemanticReadCachePerformanceBenchmarkTest` verifies completion, eviction,
+  expiry, cancellation, and shutdown release in-flight load/refresh maps while
+  retaining only the eligible response entry. A six-second JFR contains **1,630
+  allocation samples** and **23 old-object samples**; allocation is concentrated
+  in bounded JSON/key framing, while old-object candidates are JMH, Jackson,
+  Reactor Netty, and JVM infrastructure rather than body snapshots, cache keys,
+  flight state, or cache entries. Evidence is under
+  `target/release-evidence/v28/priority12/jfr/`.
+- Unselected invocations now bypass cache-policy resolution when neither the
+  method nor client selects caching. The focused behavior test proves the
+  decision cache remains empty for an ordinary `POST`; **126 cache/invocation
+  contract tests** pass. The final release-profile controls compare cleanly with
+  published `4.0.0`: cache-disabled `POST` average time is **-1.96%** with
+  **+8 B/op**, and existing `GET` average time is **+4.55%** with **+104 B/op**;
+  every control comparison remains below review thresholds. Complete starter
+  verification passed **1,262 tests**.
+- The selected V27 loopback `GET` audit triggered review at approximately
+  **+112% hit latency / +70.5% hit allocation** and **+43.2% miss latency /
+  +44.7% miss allocation**. This is accepted for the audited workload because
+  V28 must run the non-dispatching finalized-request probe so `defaultRequest`,
+  auth, URI, header, and customizer mutations participate in cache identity.
+  Skipping that work would violate the isolation contract. The local hit remains
+  classified only against equivalent cache work, never a raw network call.
+- Published `4.0.0` evidence contains **8 rows / 4 methods** from the previously
+  absent isolated repository
+  `target/published-baseline-repositories/benchmark-v28-release-4.0.0`.
+  Provenance records Maven Central markers plus starter POM SHA-256
+  `ee0a3daba0da3eb889755b9e17b79cec16bcc2d410ff13ec245f9816304f7fa1`
+  and jar SHA-256
+  `b11cd096f51d9da5f9c7ffe0f0de7478d1fde86f7383595332489bb039c6e2a8`.
+  Dirty-tree release audits and comparisons are retained under
+  `target/release-evidence/v28/priority12/` as non-promotable diagnostics.
+- Clean-candidate release evidence was produced from commit
+  `e8ba2dadbc112089bf2d32628b7470f6ba0d0266` with GraalVM/JDK **25.0.3**. The
+  primary report contains **32 rows / 16 methods**; a targeted release-quality
+  supplement contains the four semantic-POST loopback methods as **8 rows**, for
+  **40 rows / 20 methods** in total. The JSON SHA-256 values are
+  `778d223230ba065912cb6f19225dea7c79e2bc645aeaa681d5fc397d7aa5d865`
+  and `190da3c2b04530e8b03117ab334081cb8a6d5ae6dca239239b46d89e81266567`.
+- The clean comparison SHA-256 is
+  `5e7e0f46853f2540e38bdba021328c722d95e4af03bec2c9f22de08720951704`.
+  All disabled-cache control rows remain below review thresholds. The expected
+  V27 loopback `GET` probe overhead remains review-classified and accepted for
+  the isolation reason recorded above.
+- The current changelog makes no numerical performance claim, so report
+  promotion into `docs/` is explicitly deferred.
 
 ---
 
