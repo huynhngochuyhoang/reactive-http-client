@@ -1,7 +1,7 @@
 # Benchmarks
 
 The commands in [Commands](#commands) are authoritative for the current
-`4.1.0` release candidate and published `4.0.0` baseline. Versioned
+`4.2.0-SNAPSHOT` development line and published `4.1.0` baseline. Versioned
 scope sections preserve V12-V20 evidence and are historical unless explicitly
 identified as current.
 
@@ -69,15 +69,15 @@ three-surface comparison completeness without recording measurements:
 mvn -Pbenchmarks,benchmark-discovery -pl reactive-http-client-benchmarks -am clean verify
 ```
 
-Run the same current harness against published `4.0.0` on the managed Boot stack
+Run the same current harness against published `4.1.0` on the managed Boot stack
 to prove the baseline-compatible scenario set still compiles and is discoverable:
 
 ```bash
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-discovery-4.0.0 \
+  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-discovery-4.1.0 \
   -Pbenchmarks,benchmark-discovery,benchmark-published-baseline \
   -pl reactive-http-client-benchmarks clean verify \
-  -Dbenchmark.starter.version=4.0.0
+  -Dbenchmark.starter.version=4.1.0
 ```
 
 Run the quick harness smoke benchmark:
@@ -139,23 +139,23 @@ omitting `-am` so Maven resolves the published dependency instead of the current
 reactor module:
 
 ```bash
-test ! -e target/published-baseline-repositories/benchmark-4.0.0 && \
+test ! -e target/published-baseline-repositories/benchmark-4.1.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-4.0.0 \
+  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-4.1.0 \
   -Pbenchmarks,benchmark-release,benchmark-published-baseline \
   -pl reactive-http-client-benchmarks clean verify \
-  -Dbenchmark.starter.version=4.0.0 -Dbenchmark.commit=4.0.0 && \
-scripts/verify-published-baseline-provenance.sh benchmark 4.0.0 \
-  target/release-evidence/published-baselines/benchmark-4.0.0 \
+  -Dbenchmark.starter.version=4.1.0 -Dbenchmark.commit=4.1.0 && \
+scripts/verify-published-baseline-provenance.sh benchmark 4.1.0 \
+  target/release-evidence/published-baselines/benchmark-4.1.0 \
   reactive-http-client-starter
 ```
 
 The example version must match the root `api.compatibility.baseline.version`
-(`4.0.0` for this release candidate). When that property changes for the next
+(`4.1.0` for this development line). When that property changes for the next
 development cycle, update this command and the `published-starter-<version>`
 report paths together.
 V20 used `2.14.1` for its cross-major evidence. After `4.0.0` publication, the
-normal benchmark baseline moves to `4.0.0`; the historical V20 and V27 reports
+normal benchmark baseline is `4.1.0`; the historical V20 and V27 reports
 commands remain in the V20 checklist.
 
 The repository path must not exist before the run. The shared provenance verifier
@@ -238,7 +238,7 @@ mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am clean
 test ! -e target/published-baseline-repositories/benchmark-v28-release-4.0.0 && \
 mvn -s .mvn/maven-central-settings.xml \
   -Dmaven.repo.local=target/published-baseline-repositories/benchmark-v28-release-4.0.0 \
-  -Pbenchmarks,benchmark-release,benchmark-published-baseline \
+  -Pbenchmarks,benchmark-release,benchmark-published-baseline,benchmark-published-baseline-v28-source-exclusion \
   -pl reactive-http-client-benchmarks clean verify \
   -Dbenchmark.starter.version=4.0.0 -Dbenchmark.commit=4.0.0 \
   -Dbenchmark.result.dir=../target/release-evidence/v28/priority12/published-starter-4.0.0 \
@@ -254,9 +254,10 @@ mvn -Pbenchmarks,benchmark-compare -pl reactive-http-client-benchmarks -am verif
   -Dbenchmark.compare.output="$(pwd)/target/release-evidence/v28/priority12/benchmark-comparison.md"
 ```
 
-The published-baseline profile excludes the V28 fixture and its fixture test
-because the semantic-read annotation/configuration API is not present in
-`4.0.0`. Preserve the complete current report for V28-only workload review, but
+The historical `benchmark-published-baseline-v28-source-exclusion` profile
+excludes the V28 fixture and its fixture test because the semantic-read
+annotation/configuration API is not present in `4.0.0`. Preserve the complete
+current report for V28-only workload review, but
 draw release-to-release conclusions only from rows present in both JSON files.
 The smoke and release commands use different result directories so a quick
 harness check cannot overwrite release evidence.
@@ -313,9 +314,9 @@ release notes:
 Benchmark evidence:
 - Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted
 - Current candidate command: `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`
-- Published baseline command: `test ! -e target/published-baseline-repositories/benchmark-4.0.0 && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/published-baseline-repositories/benchmark-4.0.0 -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=4.0.0 -Dbenchmark.commit=4.0.0 && scripts/verify-published-baseline-provenance.sh benchmark 4.0.0 target/release-evidence/published-baselines/benchmark-4.0.0 reactive-http-client-starter`
+- Published baseline command: `test ! -e target/published-baseline-repositories/benchmark-4.1.0 && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/published-baseline-repositories/benchmark-4.1.0 -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=4.1.0 -Dbenchmark.commit=4.1.0 && scripts/verify-published-baseline-provenance.sh benchmark 4.1.0 target/release-evidence/published-baselines/benchmark-4.1.0 reactive-http-client-starter`
 - Current candidate report: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
-- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-4.0.0/release-jmh.md`
+- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-4.1.0/release-jmh.md`
 - Scenarios cited: `Get No Body`, `Post Json`
 ```
 
@@ -369,7 +370,7 @@ Compare the paired JMH JSON reports with the target-only helper after both repor
 ```bash
 mvn -Pbenchmarks,benchmark-compare -pl reactive-http-client-benchmarks -am verify \
   -Dbenchmark.compare.current=reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json \
-  -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-4.0.0/release-jmh.json
+  -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-4.1.0/release-jmh.json
 ```
 
 The helper writes `reactive-http-client-benchmarks/target/benchmark-reports/benchmark-comparison.md` by default. The comparison includes each matching benchmark method and mode, current and baseline values, absolute and relative deltas, average time, p50, p95, p99, throughput, and allocation per operation when those metrics are present. Missing current or baseline rows are listed explicitly. V13 threshold crossings are marked as `review`, but the command exits successfully by default so normal CI does not become a benchmark gate. For local release review, add `-Dbenchmark.compare.fail-on-review=true` to return a non-zero exit when any row is marked `review`. Attach or paste the generated `benchmark-comparison.md` next to the promoted report link when release notes discuss current-vs-baseline movement.

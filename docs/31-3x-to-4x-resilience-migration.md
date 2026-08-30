@@ -197,6 +197,6 @@ implicitly accepted consequence of the major version.
 ## Release state
 
 - Released major: `4.0.0` from tag `v4.0.0`.
-- Latest published and API baseline: `4.0.0`.
-- Public README and quick-start coordinates: `4.0.0`.
-- Current release candidate: `4.1.0`; Maven Central publication is pending.
+- Latest published and API baseline: `4.1.0`.
+- Public README and quick-start coordinates: `4.1.0`.
+- Development continues on `4.2.0-SNAPSHOT`; no `4.2.0` release scope is selected.

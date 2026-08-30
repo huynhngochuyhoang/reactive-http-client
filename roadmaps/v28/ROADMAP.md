@@ -1,6 +1,6 @@
 # Reactive HTTP Client - Roadmap V28
 
-> **Status:** active
+> **Status:** completed and released as `4.1.0`
 > **Theme:** explicit semantic-read response caching beyond `GET`
 > **Candidate release direction:** `4.1.0`
 > **Starting development line:** `4.1.0-SNAPSHOT`

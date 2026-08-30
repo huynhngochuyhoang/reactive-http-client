@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.huynhngochuyhoang</groupId>
         <artifactId>reactive-http-client</artifactId>
-        <version>4.1.0</version>
+        <version>4.2.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>reactive-http-client-benchmarks</artifactId>
@@ -327,6 +327,9 @@
                 <benchmark.result.dir>${project.build.directory}/benchmark-reports/published-starter-${benchmark.starter.version}</benchmark.result.dir>
                 <maven.javadoc.skip>true</maven.javadoc.skip>
             </properties>
+        </profile>
+        <profile>
+            <id>benchmark-published-baseline-v28-source-exclusion</id>
             <build>
                 <plugins>
                     <plugin>
