@@ -810,11 +810,11 @@ Implementation evidence (2026-08-29):
 - [x] Record any accepted overhead with workload shape and methodology; do not
       optimize without a measured regression.
 
-### [ ] 12.3 Prepare release benchmark evidence
+### [x] 12.3 Prepare release benchmark evidence
 
 - [x] Run the published `4.0.0` baseline from a previously absent isolated Maven
       repository and record provenance.
-- [ ] Run the current release-quality JMH command from a clean candidate commit.
+- [x] Run the current release-quality JMH command from a clean candidate commit.
 - [x] Compare current and baseline JSON reports with stable row classification.
 - [x] Promote a source-controlled report only if release notes make a public
       performance claim; otherwise record explicit deferral.
@@ -831,7 +831,7 @@ Implementation evidence (2026-08-30):
   The final smoke run produced **40 rows / 20 methods** across throughput and
   average-time modes under
   `target/release-evidence/v28/priority12/smoke-final/`. Focused benchmark and
-  report verification passed **16 tests**.
+  report verification passed **19 tests**.
 - Release-profile allocation evidence isolates the existing cache internals:
   fresh hit approximately **0 B/op**, miss token **96 B/op**, loader publication
   **344 B/op**, waiter **2,137 B/op**, refresh **2,195 B/op**, size eviction
@@ -851,8 +851,8 @@ Implementation evidence (2026-08-30):
   method nor client selects caching. The focused behavior test proves the
   decision cache remains empty for an ordinary `POST`; **126 cache/invocation
   contract tests** pass. The final release-profile controls compare cleanly with
-  published `4.0.0`: cache-disabled `POST` average time is **-1.36%** with
-  **+8 B/op**, and existing `GET` average time is **+9.48%** with **+104 B/op**;
+  published `4.0.0`: cache-disabled `POST` average time is **-1.96%** with
+  **+8 B/op**, and existing `GET` average time is **+4.55%** with **+104 B/op**;
   every control comparison remains below review thresholds. Complete starter
   verification passed **1,262 tests**.
 - The selected V27 loopback `GET` audit triggered review at approximately
@@ -871,10 +871,20 @@ Implementation evidence (2026-08-30):
   `b11cd096f51d9da5f9c7ffe0f0de7478d1fde86f7383595332489bb039c6e2a8`.
   Dirty-tree release audits and comparisons are retained under
   `target/release-evidence/v28/priority12/` as non-promotable diagnostics.
-- The current changelog makes no numerical performance claim, so no report was
-  promoted into `docs/`. The remaining checkbox requires rerunning the
-  documented release-quality current-candidate command after these changes are
-  committed and the tree is clean; the command now enforces that precondition.
+- Clean-candidate release evidence was produced from commit
+  `e8ba2dadbc112089bf2d32628b7470f6ba0d0266` with GraalVM/JDK **25.0.3**. The
+  primary report contains **32 rows / 16 methods**; a targeted release-quality
+  supplement contains the four semantic-POST loopback methods as **8 rows**, for
+  **40 rows / 20 methods** in total. The JSON SHA-256 values are
+  `778d223230ba065912cb6f19225dea7c79e2bc645aeaa681d5fc397d7aa5d865`
+  and `190da3c2b04530e8b03117ab334081cb8a6d5ae6dca239239b46d89e81266567`.
+- The clean comparison SHA-256 is
+  `5e7e0f46853f2540e38bdba021328c722d95e4af03bec2c9f22de08720951704`.
+  All disabled-cache control rows remain below review thresholds. The expected
+  V27 loopback `GET` probe overhead remains review-classified and accepted for
+  the isolation reason recorded above.
+- The current changelog makes no numerical performance claim, so report
+  promotion into `docs/` is explicitly deferred.
 
 ---
 
