@@ -367,8 +367,33 @@ class DocumentationReleaseArtifactTest {
         String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
         String examples = Files.readString(root.resolve("docs/examples/effective-configuration.md"));
         String production = Files.readString(root.resolve("docs/16-production-checklist.md"));
+        String boot4Migration = Files.readString(
+                root.resolve("docs/28-spring-boot-4-jackson-migration.md"));
         JsonNode fixture = OBJECT_MAPPER.readTree(
                 root.resolve("docs/fixtures/support-bundle-response-cache.json").toFile());
+
+        assertThat(caching)
+                .contains("Existing explicit `GET` selection remains the\ncache-friendly path; `GET` is not cached automatically")
+                .contains("### Semantic-read examples")
+                .contains("@POST(\"/catalog/search\")")
+                .contains("@ApiRef(\"report-query\")")
+                .contains("vary-by-parameters: [criteria]")
+                .contains("vary-by-headers: [Idempotency-Key, X-Tenant-Scope]")
+                .contains("vary-by-context: [principalScope]")
+                .contains("## Compatibility and related contracts")
+                .contains("existing compiled and\nsource `4.0.0` cache clients")
+                .contains("[Resilience4j](07-resilience4j.md)")
+                .contains("[Outbound Auth Providers](06-auth-providers.md)")
+                .contains("[Redirect Responses](03-error-handling.md#redirect-responses)")
+                .contains("[Timeouts](04-timeouts.md)")
+                .contains("[Production Checklist](16-production-checklist.md)")
+                .contains("[Operations Troubleshooting](30-operations-troubleshooting.md)")
+                .contains("[Support Bundles](26-support-bundles.md#response-cache-incidents)")
+                .contains("[Spring Boot 4 and Starter 4.x Migration](28-spring-boot-4-jackson-migration.md)");
+        assertThat(boot4Migration)
+                .contains("explicit `GET` response caching on published\n`4.0.0` remain source and binary compatible")
+                .contains("`CacheResponse.semanticRead()` is an additive, false-defaulted member")
+                .contains("client-wide cache policy does not supply\nthat acknowledgement");
 
         assertThat(normalizedSafetyReview)
                 .contains("endpoint owner must approve")
@@ -1605,6 +1630,8 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        String compatibilityRule = Files.readString(
+                root.resolve("scripts/japicmp-annotation-default-compatibility.groovy"));
         String includeWorkflow = markdownSection(releaseDocs, "### Compatibility include workflow",
                 "### Configuration metadata and native-hint ownership");
         List<PublicSurfaceRow> documentedRows = documentedPublicSurfaceRows(releaseDocs);
@@ -1667,7 +1694,20 @@ class DocumentationReleaseArtifactTest {
                 .contains("`cacheSemanticRead` getter/setter")
                 .contains("`MockResponseCacheSupport` is a\npublic, `@hidden` cross-package bridge")
                 .contains("No starter public signature exposes Caffeine")
-                .contains("`Builder.cachePolicy`, and `Builder.withDeterministicCacheTime`");
+                .contains("`Builder.cachePolicy`, and `Builder.withDeterministicCacheTime`")
+                .contains("`METHOD_ABSTRACT_ADDED_TO_CLASS`")
+                .contains("only `CacheResponse.semanticRead()`")
+                .contains("has an `AnnotationDefault` attribute")
+                .contains("Other abstract-method additions remain strict");
+        assertThat(pomXml)
+                .contains("scripts/japicmp-annotation-default-compatibility.groovy");
+        assertThat(compatibilityRule)
+                .contains("CacheResponse")
+                .contains("semanticRead")
+                .contains("METHOD_ABSTRACT_ADDED_TO_CLASS")
+                .contains("AnnotationDefaultAttribute.tag")
+                .contains("change.binaryCompatible = true")
+                .contains("change.sourceCompatible = true");
         assertThat(includeWorkflow)
                 .contains("authoritative root and module-scoped commands")
                 .contains("[Public API compatibility](#public-api-compatibility)")

@@ -232,7 +232,7 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 | [V16 to V17 Adoption Guide](docs/27-v16-to-v17-adoption.md) | Immutable historical strict-validation adoption guidance |
 | [Spring Boot 4 and Starter 4.x Migration](docs/28-spring-boot-4-jackson-migration.md) | Current Boot 3-to-Boot 4 migration guidance |
 | [Starter 3.x to 4.x Resilience Migration](docs/31-3x-to-4x-resilience-migration.md) | `4.0.0` resilience behavior migration and initial API report |
-| [Response Caching](docs/32-response-caching.md) | V27 explicit policy selection, eligibility, and customization-safety contract |
+| [Response Caching](docs/32-response-caching.md) | Explicit GET-friendly selection and method-specific semantic-read caching contract |
 | [2.14.1 to 3.0.0 API Report](docs/api-report-2.14.1-to-3.0.0.md) | Immutable historical cross-major API evidence |
 | [V19 3.0.0 Release Decision](docs/29-v19-release-decision.md) | Immutable historical no-go evidence superseded by the V20 release-prep reactor |
 | [Configuration Properties](docs/configuration-properties.md) | Generated property reference |

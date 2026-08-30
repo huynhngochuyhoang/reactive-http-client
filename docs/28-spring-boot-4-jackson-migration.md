@@ -13,6 +13,13 @@ idempotency behavior, diagnostics sanitization, and reactive.http property names
 remain unchanged. Review the
 [2.14.1 to 3.0.0 API Report](api-report-2.14.1-to-3.0.0.md).
 
+Applications already using explicit `GET` response caching on published
+`4.0.0` remain source and binary compatible with the `4.1.x` line.
+`CacheResponse.semanticRead()` is an additive, false-defaulted member for one
+explicitly selected non-`GET` method; client-wide cache policy does not supply
+that acknowledgement. See [Response Caching](32-response-caching.md) for the
+body-byte and variant-isolation requirements before adopting it.
+
 ## Choose the release lane
 
 Upgrade to starter `4.x` only when the application can move to Spring Boot 4,

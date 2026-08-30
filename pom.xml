@@ -34,6 +34,7 @@
         <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
         <japicmp-maven-plugin.version>0.26.0</japicmp-maven-plugin.version>
+        <japicmp-groovy.version>4.0.30</japicmp-groovy.version>
         <jmh.version>1.37</jmh.version>
         <latest.published.version>4.0.0</latest.published.version>
         <api.compatibility.baseline.version>4.0.0</api.compatibility.baseline.version>
@@ -269,6 +270,13 @@
                         <groupId>com.github.siom79.japicmp</groupId>
                         <artifactId>japicmp-maven-plugin</artifactId>
                         <version>${japicmp-maven-plugin.version}</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.apache.groovy</groupId>
+                                <artifactId>groovy-jsr223</artifactId>
+                                <version>${japicmp-groovy.version}</version>
+                            </dependency>
+                        </dependencies>
                         <configuration>
                             <oldVersion>
                                 <dependency>
@@ -290,6 +298,7 @@
                                 <accessModifier>public</accessModifier>
                                 <onlyModified>true</onlyModified>
                                 <ignoreMissingOptionalDependency>true</ignoreMissingOptionalDependency>
+                                <postAnalysisScript>${maven.multiModuleProjectDirectory}/scripts/japicmp-annotation-default-compatibility.groovy</postAnalysisScript>
                                 <includes>
                                     <include>io.github.huynhngochuyhoang.httpstarter.annotation</include>
                                     <include>io.github.huynhngochuyhoang.httpstarter.auth</include>

@@ -1,10 +1,13 @@
 # Response Caching
 
-V27 introduces an explicit local response-cache contract in four phases. Phase
-one provides bounded process-local TTL storage after policy selection, startup
-eligibility, and key isolation have succeeded. Phase two adds separately opt-in
-request coalescing, and phase three adds separately opt-in refresh on access.
-Phase four adds separately opt-in bounded metrics and terminal cache outcomes.
+Published `4.0.0` introduced an explicit local response-cache contract in four
+phases. Phase one provides bounded process-local TTL storage after policy
+selection, startup eligibility, and key isolation have succeeded. Phase two
+adds separately opt-in request coalescing, phase three adds separately opt-in
+refresh on access, and phase four adds separately opt-in bounded metrics and
+terminal cache outcomes. Existing explicit `GET` selection remains the
+cache-friendly path; `GET` is not cached automatically. The `4.1.x` line also
+permits one specific non-`GET` method to opt in as a semantic read.
 
 ## Explicit selection
 
@@ -88,6 +91,72 @@ refresh setting fails startup.
 
 Missing, zero, negative, or larger values fail startup and identify the
 concrete client, Java method, policy source, and `@ApiRef` key when applicable.
+
+### Semantic-read examples
+
+A JSON search must key the prepared body bytes and every response-changing
+variant. This example partitions by criteria, tenant scope, and the effective
+idempotency header:
+
+```yaml
+reactive:
+  http:
+    clients:
+      catalog-search:
+        base-url: https://catalog-search.example.invalid
+        cache:
+          policies:
+            catalog-search:
+              ttl-ms: 30000
+              maximum-size: 1000
+              vary-by-parameters: [criteria]
+              vary-by-headers: [Idempotency-Key, X-Tenant-Scope]
+```
+
+```java
+@POST("/catalog/search")
+@CacheResponse(value = "catalog-search", semanticRead = true)
+Mono<SearchResult> search(
+        @HeaderParam("X-Tenant-Scope") String tenantScope,
+        @Body @CacheKey("criteria") SearchCriteria criteria);
+```
+
+An RPC-style query follows the same contract. Here `@ApiRef` supplies the
+resolved `POST` verb and target, while the body, effective idempotency header,
+and principal scope define the response partition:
+
+```yaml
+reactive:
+  http:
+    clients:
+      reporting-rpc:
+        base-url: https://reporting-rpc.example.invalid
+        apis:
+          report-query:
+            method: POST
+            path: /rpc/query
+        cache:
+          policies:
+            reporting-query:
+              ttl-ms: 15000
+              maximum-size: 500
+              vary-by-parameters: [criteria]
+              vary-by-headers: [Idempotency-Key]
+              vary-by-context: [principalScope]
+```
+
+```java
+@ApiRef("report-query")
+@CacheResponse(value = "reporting-query", semanticRead = true)
+Mono<ReportResult> query(
+        @Body @CacheKey("criteria") ReportCriteria criteria);
+```
+
+These snippets show request identity only. A cache-enabled application must
+also add Caffeine and classify every applicable WebClient customization as
+described below. The complete copyable configurations, auth placeholders, and
+observability prerequisites are in the
+[effective configuration examples](examples/effective-configuration.md#semantic-read-cache-examples).
 
 ## Initial eligibility
 
@@ -662,3 +731,33 @@ bounded `Cache` cell with source, `semanticRead`, TTL, maximum size, normalized
 variants, shared-response acknowledgement, the single-flight decision, and
 bounded refresh threshold/timeout values. Policy names,
 raw values, and opaque key digests are not exported.
+
+## Compatibility and related contracts
+
+`CacheResponse.semanticRead()` defaults to `false`, so existing compiled and
+source `4.0.0` cache clients retain their explicit `GET` behavior on `4.1.x`.
+The new member is method-scoped; no client-wide property can opt every non-GET
+method into caching. See
+[Native Image and Release Compatibility](20-native-release-compatibility.md#documented-public-surface-map)
+for the compatibility-covered annotation, metadata, property, and test-helper
+surface.
+
+Review the interacting contracts before enabling a policy:
+
+- [Annotations](02-annotations.md#response-cache-selection) for selection and
+  startup grammar.
+- [Resilience4j](07-resilience4j.md) for Retry and idempotency eligibility.
+- [Outbound Auth Providers](06-auth-providers.md) for per-call authorization
+  and `401` invalidation/replay.
+- [Redirect Responses](03-error-handling.md#redirect-responses) and
+  [Timeouts](04-timeouts.md) for miss-loader composition.
+- [Observability](08-observability.md#response-cache-metrics-separately-opt-in)
+  and [Diagnostic Context Contracts](21-diagnostic-contexts.md) for bounded
+  terminal and support fields.
+- [Production Checklist](16-production-checklist.md),
+  [Operations Troubleshooting](30-operations-troubleshooting.md), and
+  [Support Bundles](26-support-bundles.md#response-cache-incidents) for rollout
+  and incident handling.
+- [Spring Boot 4 and Starter 4.x Migration](28-spring-boot-4-jackson-migration.md)
+  and [3.x to 4.x Resilience Migration](31-3x-to-4x-resilience-migration.md) for
+  the supported runtime and explicit operator baseline.
