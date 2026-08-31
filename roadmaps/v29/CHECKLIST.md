@@ -544,76 +544,147 @@ Evidence recorded on 2026-08-31 from durable baseline commit
 
 ## Priority 6 - Capacity, Expiry, and Concurrency Invariants
 
-### [ ] 6.1 Make capacity evidence deterministic
+### [x] 6.1 Make capacity evidence deterministic
 
-- [ ] Test small and large entries under entry-count pressure and, after a weight
+- [x] Test small and large entries under entry-count pressure and, after a weight
       GO, under combined size/weight pressure.
-- [ ] Assert observable admission/eviction invariants without depending on an
+- [x] Assert observable admission/eviction invariants without depending on an
       unspecified victim order.
-- [ ] Cover entry replacement, same-key reload after expiry, explicit eviction,
+- [x] Cover entry replacement, same-key reload after expiry, explicit eviction,
       policy isolation, and multiple clients sharing one registry.
-- [ ] Verify current entry/weight totals agree with the actual retained entry set
+- [x] Verify current entry/weight totals agree with the actual retained entry set
       after every transition.
 
-### [ ] 6.2 Bound metadata independently from values
+### [x] 6.2 Bound metadata independently from values
 
-- [ ] Stress high-cardinality miss-only, failed-load, rejected-admission, and
+- [x] Stress high-cardinality miss-only, failed-load, rejected-admission, and
       cancelled-load keys.
-- [ ] Prove generation/tombstone state is removed or bounded independently of
+- [x] Prove generation/tombstone state is removed or bounded independently of
       cache entry count and TTL.
-- [ ] Prove per-flight waiter collections, cancellation markers, and diagnostic
+- [x] Prove per-flight waiter collections, cancellation markers, and diagnostic
       ownership are removed at terminal transition.
-- [ ] Verify explicit eviction invalidates outstanding publication tokens without
+- [x] Verify explicit eviction invalidates outstanding publication tokens without
       unnecessarily cancelling caller-visible work.
 
-### [ ] 6.3 Stress interleavings without blocking event loops
+### [x] 6.3 Stress interleavings without blocking event loops
 
-- [ ] Cover same-key and many-key immediate completion, delayed response body,
+- [x] Cover same-key and many-key immediate completion, delayed response body,
       timeout, cancellation, refresh, eviction, and shutdown interleavings.
-- [ ] Gate races with latches/sinks/virtual time or server observations rather
+- [x] Gate races with latches/sinks/virtual time or server observations rather
       than timing-only sleeps.
-- [ ] Detect blocking cleanup, unbounded serialization/accounting, or recursive
+- [x] Detect blocking cleanup, unbounded serialization/accounting, or recursive
       traversal on event-loop threads.
-- [ ] Record bounded stress iteration counts, seeds where applicable, and failure
+- [x] Record bounded stress iteration counts, seeds where applicable, and failure
       diagnostics in target-only evidence.
+
+Evidence recorded on 2026-08-31 from durable baseline commit
+`3c1707bec36a98ff6d8c63387d2c7cc5c0bee829` plus this reviewed change:
+
+- `ResponseCacheCapacityConcurrencyInvariantTest` independently reflects the
+  Caffeine retained-entry set after every capacity, weight, replacement, expiry,
+  reload, and explicit-eviction transition. It requires reported retained bytes
+  to equal the sum of stored entry weights, every weighted entry to be accounted
+  exactly once, generation count to equal terminal retained-entry count, and both
+  configured bounds to hold without asserting which unspecified victim survives.
+- Policy-isolation evidence covers two bounds in one manager and two client
+  managers sharing one `SimpleMeterRegistry`; destroying one manager leaves the
+  other client's tagged gauge live. Same-key refresh replacement, same-key reload
+  after monotonic hard expiry, and aggregate manager totals are verified in the
+  same suite.
+- Four independent 1,024-key sweeps cover miss-only tokens, failed loads,
+  over-budget admission, and cancelled loads. Every terminal path leaves zero
+  generation/tombstone records. A 32-member single flight proves members,
+  released markers, diagnostic ownership, and the manager flight map are cleared;
+  explicit eviction makes an active publication token stale while its independent
+  caller still receives the successful value without cancellation.
+- The deterministic stress matrix completed 256 iterations with seed `701154533`
+  across ten same-key, many-key, refresh, expiry, eviction, delayed, virtual-time
+  timeout, cancellation, and shutdown scenarios. Every scenario is forced once
+  before seeded selection. Target-only provenance and failure context are written
+  to `target/release-evidence/v29/priority6/cache-concurrency-invariants.properties`.
+- A 64-publication pressure run executes loader and accounting signals on a Reactor
+  non-blocking scheduler with response values that fail on equality, hashing, or
+  rendering. This guards against blocking Reactor calls, response graph traversal,
+  serialization, and value-derived accounting on the event-loop path.
+- The focused cache/retention/workload/observability run passed 75 tests, and the
+  complete starter suite passed 1,281 tests. Both runs had no failures, errors, or
+  skips; `git diff --check` also passed. No production change was needed because
+  the Priority 5 storage and manager implementation satisfied every new invariant.
 
 ---
 
 ## Priority 7 - Single-Flight and Refresh Memory Boundaries
 
-### [ ] 7.1 Release each caller independently
+### [x] 7.1 Release each caller independently
 
-- [ ] Account for one shared load independently from the number of attached
+- [x] Account for one shared load independently from the number of attached
       callers.
-- [ ] Release a timed-out or cancelled leader's context, request arguments,
+- [x] Release a timed-out or cancelled leader's context, request arguments,
       prepared body, auth state, and diagnostics while waiters continue.
-- [ ] Keep coalesced waiter terminal records free of transport attempt evidence
+- [x] Keep coalesced waiter terminal records free of transport attempt evidence
       unless that caller actually owns the dispatch.
-- [ ] Prevent a detached/removed shared publisher from reconnecting and starting
+- [x] Prevent a detached/removed shared publisher from reconnecting and starting
       an untracked duplicate load.
 
-### [ ] 7.2 Bound hidden refresh work
+### [x] 7.2 Bound hidden refresh work
 
-- [ ] Apply the configured refresh deadline and hard-expiry cancellation to every
+- [x] Apply the configured refresh deadline and hard-expiry cancellation to every
       hidden refresh, including a source that never terminates.
-- [ ] Release frozen request/auth/body state on refresh success, failure, empty,
+- [x] Release frozen request/auth/body state on refresh success, failure, empty,
       timeout, rejection, cancellation, eviction, and close.
-- [ ] Keep one refresh per key and prevent stale callbacks from replacing a newer
+- [x] Keep one refresh per key and prevent stale callbacks from replacing a newer
       entry or recreating an evicted entry.
-- [ ] Verify a stale-serving caller completes independently while refresh remains
+- [x] Verify a stale-serving caller completes independently while refresh remains
       bounded and factory-owned.
 
-### [ ] 7.3 Preserve composition behavior
+### [x] 7.3 Preserve composition behavior
 
-- [ ] Cover auth resolution/refresh, Retry, RateLimiter, Bulkhead,
+- [x] Cover auth resolution/refresh, Retry, RateLimiter, Bulkhead,
       CircuitBreaker, redirect, logical-call timeout, and request timeout around
       miss and refresh loads.
-- [ ] Keep per-caller logical-call budgets independent from the shared load's
+- [x] Keep per-caller logical-call budgets independent from the shared load's
       lifetime while interested callers remain.
-- [ ] Verify zero-attempt admission rejection creates no transport dispatch and
+- [x] Verify zero-attempt admission rejection creates no transport dispatch and
       retains no flight/refresh state.
-- [ ] Verify shutdown terminates queued/active flights and refreshes within one
+- [x] Verify shutdown terminates queued/active flights and refreshes within one
       documented factory deadline.
+
+Evidence recorded on 2026-08-31 from durable baseline commit
+`c2006ab0000830b102efe4202026929709e9272c` plus this reviewed change:
+
+- Cache-selected invocations now copy the manager-owned work context without the
+  caller's reporting state or logical-call deadline, then replace starter-owned
+  values through `RequestContextSnapshot` and policy-selected values through
+  immutable `PreparedContext`. Cache-safe propagation context remains visible
+  to the shared transport, while the package-private manager overload leaves the
+  ordinary caller-owned path unchanged.
+- `ResponseCacheRetentionOwnershipTest` reproduces the prior retention with an
+  open shared source, cancels the original leader while one waiter remains, and
+  proves the leader argument, prepared body, auth-header state, original Reactor-
+  context container, reporting state, and waiter-free diagnostic ownership are
+  collectible without cancelling or duplicating the source. The single-flight
+  customization fixture also proves custom trace context and starter correlation
+  context still reach the real dispatch. Existing detached-publisher tests
+  continue to prove a removed publisher cannot reconnect.
+- The same retention suite now covers hidden-refresh success, failure, admission
+  rejection, empty completion, configured timeout, hard-expiry timeout, eviction,
+  and manager close. Virtual time drives both deadline paths; four non-terminating
+  sources observe cancellation, every refresh map reaches zero, and late
+  publication remains generation-checked by the existing cache contracts.
+- `SemanticReadReplayTimeoutContractTest` now applies Retry, RateLimiter,
+  CircuitBreaker, Bulkhead, and configured request timeout to both miss and hidden
+  refresh work. It retains existing auth replay, redirect, response-body/logical
+  timeout, independent caller-deadline, and terminal-diagnostic coverage, and
+  explicitly proves zero-attempt CircuitBreaker rejection creates no dispatch,
+  flight, waiter, refresh, or entry.
+- `BoundedLocalResponseCacheContractTest`,
+  `StalePooledConnectionRecoveryContractTest`, and
+  `Priority7HousekeepingTest` retain deterministic one-load, one-body-
+  subscription, refresh, eviction, close, active/queued shutdown, and one
+  aggregate factory-deadline evidence.
+- The focused retention/cache/composition run passed 67 tests and the complete
+  starter suite passed 1,283 tests, both with no failures, errors, or skips.
+  `git diff --check` also passed.
 
 ---
 

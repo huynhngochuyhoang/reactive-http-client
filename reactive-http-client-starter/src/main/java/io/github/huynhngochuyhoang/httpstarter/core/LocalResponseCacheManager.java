@@ -188,18 +188,31 @@ final class LocalResponseCacheManager implements AutoCloseable {
                       Supplier<ResponseMetadata> responseMetadata,
                       SubscriptionReportingState callerState,
                       SubscriptionReportingState proposedLoadState) {
+        return getOrLoad(selection, key, apiName, loader, responseMetadata,
+                callerState, proposedLoadState, null);
+    }
+
+    Mono<?> getOrLoad(EffectiveCachePolicy.Selection selection,
+                      CacheKeyContract.OpaqueKey key,
+                      String apiName,
+                      Function<SubscriptionReportingState, Mono<?>> loader,
+                      Supplier<ResponseMetadata> responseMetadata,
+                      SubscriptionReportingState callerState,
+                      SubscriptionReportingState proposedLoadState,
+                      ContextView detachedLoadContext) {
         return Mono.deferContextual(context -> {
+            ContextView loadContext = detachedLoadContext != null ? detachedLoadContext : context;
             LocalResponseCache cache = cache(selection, "unknown");
             if (selection.policy().isSingleFlight()) {
                 return coalescedLoad(
                         selection, cache, key, apiName, loader, responseMetadata,
-                        callerState, proposedLoadState, context);
+                        callerState, proposedLoadState, loadContext);
             }
             LocalResponseCache.Lookup lookup = cache.lookup(key);
             if (lookup.hit()) {
                 metrics.lookup(apiName, "hit");
                 return cachedHit(selection, cache, key, apiName, lookup, loader, responseMetadata,
-                        callerState, proposedLoadState, context);
+                        callerState, proposedLoadState, loadContext);
             }
             metrics.lookup(apiName, "miss");
             cacheOutcome(callerState, apiName, HttpClientCacheOutcome.MISS_LOADER);

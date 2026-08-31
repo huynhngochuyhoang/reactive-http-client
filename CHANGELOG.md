@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   response-byte measurement. The unit is decoded response representation bytes,
   not Java heap, direct memory, RSS, or container memory.
 
+### Fixed
+- **Single-flight caller-context retention.** Cache miss flights and hidden
+  refreshes now detach their Reactor-context container from the initiating
+  caller, exclude caller reporting/deadline state, and replace starter-owned and
+  explicitly selected cache variants with immutable snapshots. Context required
+  by cache-safe propagation filters remains available to shared transport work.
+
 ## [4.1.0] - 2026-08-30
 
 - **`4.1.0` published release.** This additive minor release adds

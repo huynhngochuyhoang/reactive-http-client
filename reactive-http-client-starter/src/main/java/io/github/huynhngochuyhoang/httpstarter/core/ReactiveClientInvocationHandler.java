@@ -37,6 +37,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Signal;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClientRequest;
+import reactor.util.context.Context;
 import reactor.util.context.ContextView;
 
 import java.io.*;
@@ -443,7 +444,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                                                 preparedContext, cacheSelection.policy(),
                                                                 finalLoadRequestIdentity.get(), bodyPreparation.key()),
                                                         callerState,
-                                                        new SubscriptionReportingState(keyResolved));
+                                                        new SubscriptionReportingState(keyResolved),
+                                                        detachedCacheLoadContext(context, preparedContext));
                                             }));
                             return authorizedLookup.contextWrite(preparedContext::writeContext);
                         });
@@ -498,6 +500,20 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             }
             return caller.contextWrite(context -> context.put(SUBSCRIPTION_STATE_CONTEXT_KEY, state));
         });
+    }
+
+    private static Context detachedCacheLoadContext(
+            ContextView callerContext,
+            CacheKeyContract.PreparedContext preparedContext) {
+        Context detached = Context.empty();
+        for (Map.Entry<Object, Object> entry : callerContext.stream().toList()) {
+            if (entry.getKey() != SUBSCRIPTION_STATE_CONTEXT_KEY
+                    && entry.getKey() != LOGICAL_CALL_DEADLINE_CONTEXT_KEY) {
+                detached = detached.put(entry.getKey(), entry.getValue());
+            }
+        }
+        detached = RequestContextSnapshot.capture(callerContext).writeTo(detached);
+        return preparedContext.writeContext(detached);
     }
 
     private void validateCacheAuthorizationSupportAtConstruction() {
