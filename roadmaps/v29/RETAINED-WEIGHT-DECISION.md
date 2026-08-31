@@ -3,9 +3,11 @@
 > **Decision:** GO with decoded response representation bytes as one optional,
 > deterministic, non-heap cache weight unit.
 
-Recorded on 2026-08-31 against commit
-`3a103ea6968a7dd160392498134812b23bf5c7af` and the
-`4.2.0-SNAPSHOT` response-cache implementation.
+Recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` and the
+`4.2.0-SNAPSHOT` response-cache implementation. This source-controlled decision
+and its prerequisite candidate/admission artifacts are part of the reviewed V29
+Priority 4 change layered on that baseline.
 
 ## Scope of the Decision
 

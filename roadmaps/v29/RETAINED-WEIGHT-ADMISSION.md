@@ -1,8 +1,10 @@
 # V29 Retained-Weight Admission Semantics
 
-Recorded on 2026-08-31 against commit
-`95426f31152ca6bfd1c8e569eea99b4a820bcba1` and the
-`4.2.0-SNAPSHOT` response-cache implementation.
+Recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` and the
+`4.2.0-SNAPSHOT` response-cache implementation. This source-controlled
+admission contract and its candidate evaluation are part of the reviewed V29
+Priority 4 change layered on that baseline.
 
 ## Scope
 

@@ -342,8 +342,9 @@ documentation change:
 - [x] Reject candidates that require blocking, unbounded recursion, arbitrary
       reflection, full response duplication, or event-loop reserialization.
 
-Evidence recorded on 2026-08-31 against commit
-`fd762589f038fd41ee85856dd78576d02cd1a23e`:
+Evidence recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` plus the source-controlled
+Priority 4.1 artifact in this reviewed change:
 
 - [`RETAINED-WEIGHT-CANDIDATES.md`](RETAINED-WEIGHT-CANDIDATES.md) maps the
   current decode-to-publication pipeline and evaluates all four boundaries in
@@ -375,8 +376,9 @@ Evidence recorded on 2026-08-31 against commit
 - [x] Define source/binary compatibility and no-op behavior for every existing
       `4.0.0`/`4.1.0` policy when no weight budget is selected.
 
-Evidence recorded on 2026-08-31 against commit
-`95426f31152ca6bfd1c8e569eea99b4a820bcba1`:
+Evidence recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` plus the source-controlled
+Priority 4.1 and 4.2 artifacts in this reviewed change:
 
 - [`RETAINED-WEIGHT-ADMISSION.md`](RETAINED-WEIGHT-ADMISSION.md) defines the
   candidate-independent model, measurement outcomes, caller behavior, atomic
@@ -411,13 +413,14 @@ Select exactly one outcome before continuing:
 - [x] Update generated readiness with the selected outcome without presenting a
       no-go as an unfinished release blocker.
 
-Evidence recorded on 2026-08-31 against commit
-`3a103ea6968a7dd160392498134812b23bf5c7af`:
+Evidence recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` plus the source-controlled
+Priority 4.1-4.3 artifacts in this reviewed change:
 
 - [`RETAINED-WEIGHT-DECISION.md`](RETAINED-WEIGHT-DECISION.md) records **GO**
   for decoded response representation bytes plus checked UTF-8 bytes of only
-  the header names and values retained in a cached `ResponseEntity`. The unit is explicitly not
-  Java heap, object-graph size, direct memory, RSS, container memory, compressed
+  the header names and values retained in a cached `ResponseEntity`. The unit is
+  explicitly not Java heap, object-graph size, direct memory, RSS, container memory, compressed
   wire size, or a leak diagnosis.
 - The selected body count must observe the final unary decoder input without
   copying or reserialization and becomes known only after that body stream
