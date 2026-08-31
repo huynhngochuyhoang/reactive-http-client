@@ -275,6 +275,11 @@ class SemanticReadReplayTimeoutContractTest {
                     .isInstanceOf(CallNotPermittedException.class);
             assertThat(dispatches).hasValue(0);
             assertThat(manager.snapshot().currentSize()).isZero();
+            assertThat(manager.workloadSnapshotForTesting())
+                    .extracting(LocalResponseCacheManager.WorkloadSnapshot::inFlightLoads,
+                            LocalResponseCacheManager.WorkloadSnapshot::coalescedWaiters,
+                            LocalResponseCacheManager.WorkloadSnapshot::inFlightRefreshes)
+                    .containsExactly(0, 0, 0);
             applier.reject.set(false);
             assertThat(query(client, "admission").block()).isEqualTo("dispatch-1");
             assertThat(query(client, "admission").block()).isEqualTo("dispatch-1");
@@ -298,9 +303,9 @@ class SemanticReadReplayTimeoutContractTest {
         policy.setTtlMs(200L);
         policy.setRefreshAfterMs(50L);
         policy.setRefreshTimeoutMs(500L);
-        config.getResilience().setEnabled(true);
-        config.getResilience().setRetry("semantic-retry");
-        config.getResilience().setRetryMethods(java.util.Set.of("POST"));
+        config.setRequestTimeoutMs(1_000L);
+        enableComposition(config, "POST");
+        RecordingCompositionApplier applier = new RecordingCompositionApplier();
         WebClient webClient = webClient(request -> {
             int dispatch = dispatches.incrementAndGet();
             if (dispatch == 1) {
@@ -319,12 +324,17 @@ class SemanticReadReplayTimeoutContractTest {
                     LocalResponseCacheMetrics.enabled(registry, "semantic-boundary-client"),
                     "semantic-boundary-client");
             SemanticBoundaryClient client = client(
-                    webClient, config, context, manager, new RetryOnceApplier(), null, null);
+                    webClient, config, context, manager, applier, null, null);
 
             assertThat(query(client, "refresh").block()).isEqualTo("initial");
+            assertThat(applier.applied)
+                    .containsExactly("retry", "rateLimiter", "circuitBreaker", "bulkhead");
             ticker.addAndGet(Duration.ofMillis(50).toNanos());
             assertThat(query(client, "refresh").block()).isEqualTo("initial");
             awaitValue(dispatches, 3);
+            assertThat(applier.applied.subList(4, 8))
+                    .containsExactly("retry", "rateLimiter", "circuitBreaker", "bulkhead");
+            assertThat(manager.workloadSnapshotForTesting().inFlightRefreshes()).isZero();
             assertThat(registry.find(LocalResponseCacheMetrics.PREFIX + ".refreshes")
                     .tag("outcome", "failure").counters()
                     .stream().mapToDouble(counter -> counter.count()).sum()).isEqualTo(1.0);
@@ -334,6 +344,13 @@ class SemanticReadReplayTimeoutContractTest {
             assertThat(query(client, "refresh").block()).isEqualTo("reloaded");
             assertThat(query(client, "refresh").block()).isEqualTo("reloaded");
             assertThat(dispatches).hasValue(4);
+            assertThat(applier.applied.subList(8, 12))
+                    .containsExactly("retry", "rateLimiter", "circuitBreaker", "bulkhead");
+            assertThat(manager.workloadSnapshotForTesting())
+                    .extracting(LocalResponseCacheManager.WorkloadSnapshot::inFlightLoads,
+                            LocalResponseCacheManager.WorkloadSnapshot::coalescedWaiters,
+                            LocalResponseCacheManager.WorkloadSnapshot::inFlightRefreshes)
+                    .containsExactly(0, 0, 0);
             manager.close();
         }
     }

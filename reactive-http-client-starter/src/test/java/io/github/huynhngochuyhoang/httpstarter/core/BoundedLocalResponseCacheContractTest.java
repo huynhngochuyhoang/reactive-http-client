@@ -1268,6 +1268,7 @@ class BoundedLocalResponseCacheContractTest {
                 .setVaryByParameters(List.of("principal", "tenant"));
         config.getCache().getPolicies().get("local")
                 .setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        config.getCache().getPolicies().get("local").setSingleFlight(true);
         AtomicInteger authCalls = new AtomicInteger();
         AtomicInteger downstreamFilterCalls = new AtomicInteger();
         AtomicInteger dispatches = new AtomicInteger();

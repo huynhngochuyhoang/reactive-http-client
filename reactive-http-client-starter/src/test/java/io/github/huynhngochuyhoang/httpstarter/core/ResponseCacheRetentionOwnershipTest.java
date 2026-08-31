@@ -22,6 +22,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
+import reactor.test.scheduler.VirtualTimeScheduler;
 import reactor.util.context.Context;
 
 import java.lang.ref.ReferenceQueue;
@@ -143,6 +144,34 @@ class ResponseCacheRetentionOwnershipTest {
         assertThat(active.leaderValue()).containsExactly("leader-value");
         active.leader().dispose();
         active.manager().close();
+    }
+
+    @Test
+    void detachedLeaderReleasesItsCallerStateWhileAWaiterKeepsTheLoadAlive() {
+        ReferenceQueue<Object> queue = new ReferenceQueue<>();
+        DetachedLeaderFlight active = createActiveFlightWithCancelledLeader(queue);
+
+        assertThat(active.manager().hasInFlightLoadWithMembersForTesting(1)).isTrue();
+        assertThat(active.sourceCancellations()).hasValue(0);
+        assertCollected(queue, active.leaderOwners());
+
+        active.result().tryEmitValue("waiter-value").orThrow();
+        assertThat(active.waiterValue()).containsExactly("waiter-value");
+        active.waiter().dispose();
+        active.manager().close();
+    }
+
+    @Test
+    void hiddenRefreshTerminalPathsReleaseTheirCapturedState() {
+        ReferenceQueue<Object> queue = new ReferenceQueue<>();
+        RefreshTerminalFixture fixture = exerciseRefreshTerminalPaths(queue);
+
+        assertThat(fixture.openManager().workloadSnapshotForTesting().inFlightRefreshes()).isZero();
+        assertThat(fixture.cancellations()).hasValue(4);
+        assertCollected(queue, fixture.refreshOwners());
+
+        fixture.openManager().close();
+        fixture.scheduler().dispose();
     }
 
     @Test
@@ -340,6 +369,146 @@ class ResponseCacheRetentionOwnershipTest {
 
         return new ActiveFlight(
                 manager, result, leader, leaderValue, sourceCancellations, waiterOwners);
+    }
+
+    private static DetachedLeaderFlight createActiveFlightWithCancelledLeader(ReferenceQueue<Object> queue) {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("leader", 60_000, 10, true);
+        CacheKeyContract.OpaqueKey key = key("leader");
+        Sinks.One<String> result = Sinks.one();
+        AtomicInteger sourceCancellations = new AtomicInteger();
+
+        Object argumentOwner = new Object();
+        byte[] preparedBodyOwner = "prepared-body".getBytes(StandardCharsets.UTF_8);
+        String authStateOwner = new String("Bearer detached-leader");
+        Context leaderContext = Context.of("retention.leader.context", new Object());
+        SubscriptionReportingState leaderState = new SubscriptionReportingState(
+                new RequestArgumentResolver.ResolvedArgs(
+                        Map.of("id", argumentOwner),
+                        Map.of(),
+                        Map.of(HttpHeaders.AUTHORIZATION, List.of(authStateOwner)),
+                        preparedBodyOwner));
+        List<TrackedReference> leaderOwners = List.of(
+                track("detached leader argument", argumentOwner, queue),
+                track("detached leader prepared body", preparedBodyOwner, queue),
+                track("detached leader auth state", authStateOwner, queue),
+                track("detached leader context container", leaderContext, queue),
+                track("detached leader reporting state", leaderState, queue));
+        Disposable leader = manager.getOrLoad(
+                        selection, key, "retention.leader",
+                        ignored -> result.asMono().doOnCancel(sourceCancellations::incrementAndGet),
+                        LocalResponseCacheManager.ResponseMetadata::successWithoutHeaders,
+                        leaderState, new SubscriptionReportingState(emptyResolved()), Context.empty())
+                .contextWrite(leaderContext)
+                .subscribe();
+
+        List<String> waiterValue = new ArrayList<>();
+        Disposable waiter = manager.getOrLoad(
+                        selection, key, "retention.leader",
+                        ignored -> Mono.error(new AssertionError("waiter must not load")),
+                        LocalResponseCacheManager.ResponseMetadata::successWithoutHeaders,
+                        new SubscriptionReportingState(emptyResolved()),
+                        new SubscriptionReportingState(emptyResolved()))
+                .subscribe(value -> waiterValue.add((String) value));
+        leader.dispose();
+
+        return new DetachedLeaderFlight(
+                manager, result, waiter, waiterValue, sourceCancellations, leaderOwners);
+    }
+
+    private static RefreshTerminalFixture exerciseRefreshTerminalPaths(ReferenceQueue<Object> queue) {
+        AtomicLong ticker = new AtomicLong();
+        VirtualTimeScheduler scheduler = VirtualTimeScheduler.create();
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get, scheduler);
+        List<TrackedReference> owners = new ArrayList<>();
+        AtomicInteger cancellations = new AtomicInteger();
+        EffectiveCachePolicy.Selection immediate =
+                refreshSelection("refresh-terminal", 60_000, 32, 10, 500);
+
+        owners.add(runTerminalRefresh(
+                manager, immediate, ticker, key("refresh-success"), "refresh success", queue,
+                Mono.just("replacement")));
+        owners.add(runTerminalRefresh(
+                manager, immediate, ticker, key("refresh-failure"), "refresh failure", queue,
+                Mono.error(new IllegalStateException("refresh failed"))));
+        owners.add(runTerminalRefresh(
+                manager, immediate, ticker, key("refresh-rejection"), "refresh rejection", queue,
+                Mono.error(new IllegalStateException("admission rejected"))));
+        owners.add(runTerminalRefresh(
+                manager, immediate, ticker, key("refresh-empty"), "refresh empty", queue,
+                Mono.empty()));
+
+        EffectiveCachePolicy.Selection timeout =
+                refreshSelection("refresh-timeout", 60_000, 32, 10, 50);
+        owners.add(startNeverRefresh(
+                manager, timeout, ticker, key("refresh-timeout"), "refresh timeout", queue, cancellations));
+        scheduler.advanceTimeBy(Duration.ofMillis(50));
+        assertThat(manager.workloadSnapshotForTesting().inFlightRefreshes()).isZero();
+
+        EffectiveCachePolicy.Selection hardExpiry =
+                refreshSelection("refresh-hard-expiry", 100, 32, 10, 500);
+        owners.add(startNeverRefresh(
+                manager, hardExpiry, ticker, key("refresh-hard-expiry"),
+                "refresh hard expiry", queue, cancellations));
+        scheduler.advanceTimeBy(Duration.ofMillis(90));
+        assertThat(manager.workloadSnapshotForTesting().inFlightRefreshes()).isZero();
+
+        owners.add(startNeverRefresh(
+                manager, immediate, ticker, key("refresh-eviction"),
+                "refresh eviction", queue, cancellations));
+        manager.evictAllForTesting();
+        assertThat(manager.workloadSnapshotForTesting().inFlightRefreshes()).isZero();
+
+        LocalResponseCacheManager closingManager = LocalResponseCacheManager.testing(ticker::get, scheduler);
+        owners.add(startNeverRefresh(
+                closingManager, immediate, ticker, key("refresh-close"),
+                "refresh close", queue, cancellations));
+        closingManager.close();
+        assertThat(closingManager.workloadSnapshotForTesting().inFlightRefreshes()).isZero();
+
+        return new RefreshTerminalFixture(manager, scheduler, cancellations, owners);
+    }
+
+    private static TrackedReference runTerminalRefresh(
+            LocalResponseCacheManager manager,
+            EffectiveCachePolicy.Selection selection,
+            AtomicLong ticker,
+            CacheKeyContract.OpaqueKey key,
+            String label,
+            ReferenceQueue<Object> queue,
+            Mono<?> terminal) {
+        assertThat(manager.getOrLoad(selection, key, () -> Mono.just("initial")).block())
+                .isEqualTo("initial");
+        ticker.addAndGet(Duration.ofMillis(selection.policy().getRefreshAfterMs()).toNanos());
+        Object owner = new Object();
+        TrackedReference reference = track(label, owner, queue);
+        assertThat(manager.getOrLoad(selection, key, () -> Mono.defer(() -> {
+            owner.hashCode();
+            return terminal;
+        })).block()).isEqualTo("initial");
+        assertThat(manager.workloadSnapshotForTesting().inFlightRefreshes()).isZero();
+        return reference;
+    }
+
+    private static TrackedReference startNeverRefresh(
+            LocalResponseCacheManager manager,
+            EffectiveCachePolicy.Selection selection,
+            AtomicLong ticker,
+            CacheKeyContract.OpaqueKey key,
+            String label,
+            ReferenceQueue<Object> queue,
+            AtomicInteger cancellations) {
+        assertThat(manager.getOrLoad(selection, key, () -> Mono.just("initial")).block())
+                .isEqualTo("initial");
+        ticker.addAndGet(Duration.ofMillis(selection.policy().getRefreshAfterMs()).toNanos());
+        Object owner = new Object();
+        TrackedReference reference = track(label, owner, queue);
+        assertThat(manager.getOrLoad(selection, key, () -> Mono.defer(() -> {
+            owner.hashCode();
+            return Mono.never();
+        }).doOnCancel(cancellations::incrementAndGet)).block()).isEqualTo("initial");
+        assertThat(manager.workloadSnapshotForTesting().inFlightRefreshes()).isEqualTo(1);
+        return reference;
     }
 
     private static PreparedInvocationReferences invokePreparedCachedRequest(
@@ -732,6 +901,22 @@ class ResponseCacheRetentionOwnershipTest {
             List<String> leaderValue,
             AtomicInteger sourceCancellations,
             List<TrackedReference> waiterOwners) {
+    }
+
+    private record DetachedLeaderFlight(
+            LocalResponseCacheManager manager,
+            Sinks.One<String> result,
+            Disposable waiter,
+            List<String> waiterValue,
+            AtomicInteger sourceCancellations,
+            List<TrackedReference> leaderOwners) {
+    }
+
+    private record RefreshTerminalFixture(
+            LocalResponseCacheManager openManager,
+            VirtualTimeScheduler scheduler,
+            AtomicInteger cancellations,
+            List<TrackedReference> refreshOwners) {
     }
 
     private record PreparedInvocationReferences(List<TrackedReference> transientOwners) {

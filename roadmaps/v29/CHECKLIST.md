@@ -615,39 +615,76 @@ Evidence recorded on 2026-08-31 from durable baseline commit
 
 ## Priority 7 - Single-Flight and Refresh Memory Boundaries
 
-### [ ] 7.1 Release each caller independently
+### [x] 7.1 Release each caller independently
 
-- [ ] Account for one shared load independently from the number of attached
+- [x] Account for one shared load independently from the number of attached
       callers.
-- [ ] Release a timed-out or cancelled leader's context, request arguments,
+- [x] Release a timed-out or cancelled leader's context, request arguments,
       prepared body, auth state, and diagnostics while waiters continue.
-- [ ] Keep coalesced waiter terminal records free of transport attempt evidence
+- [x] Keep coalesced waiter terminal records free of transport attempt evidence
       unless that caller actually owns the dispatch.
-- [ ] Prevent a detached/removed shared publisher from reconnecting and starting
+- [x] Prevent a detached/removed shared publisher from reconnecting and starting
       an untracked duplicate load.
 
-### [ ] 7.2 Bound hidden refresh work
+### [x] 7.2 Bound hidden refresh work
 
-- [ ] Apply the configured refresh deadline and hard-expiry cancellation to every
+- [x] Apply the configured refresh deadline and hard-expiry cancellation to every
       hidden refresh, including a source that never terminates.
-- [ ] Release frozen request/auth/body state on refresh success, failure, empty,
+- [x] Release frozen request/auth/body state on refresh success, failure, empty,
       timeout, rejection, cancellation, eviction, and close.
-- [ ] Keep one refresh per key and prevent stale callbacks from replacing a newer
+- [x] Keep one refresh per key and prevent stale callbacks from replacing a newer
       entry or recreating an evicted entry.
-- [ ] Verify a stale-serving caller completes independently while refresh remains
+- [x] Verify a stale-serving caller completes independently while refresh remains
       bounded and factory-owned.
 
-### [ ] 7.3 Preserve composition behavior
+### [x] 7.3 Preserve composition behavior
 
-- [ ] Cover auth resolution/refresh, Retry, RateLimiter, Bulkhead,
+- [x] Cover auth resolution/refresh, Retry, RateLimiter, Bulkhead,
       CircuitBreaker, redirect, logical-call timeout, and request timeout around
       miss and refresh loads.
-- [ ] Keep per-caller logical-call budgets independent from the shared load's
+- [x] Keep per-caller logical-call budgets independent from the shared load's
       lifetime while interested callers remain.
-- [ ] Verify zero-attempt admission rejection creates no transport dispatch and
+- [x] Verify zero-attempt admission rejection creates no transport dispatch and
       retains no flight/refresh state.
-- [ ] Verify shutdown terminates queued/active flights and refreshes within one
+- [x] Verify shutdown terminates queued/active flights and refreshes within one
       documented factory deadline.
+
+Evidence recorded on 2026-08-31 from durable baseline commit
+`c2006ab0000830b102efe4202026929709e9272c` plus this reviewed change:
+
+- Cache-selected invocations now copy the manager-owned work context without the
+  caller's reporting state or logical-call deadline, then replace starter-owned
+  values through `RequestContextSnapshot` and policy-selected values through
+  immutable `PreparedContext`. Cache-safe propagation context remains visible
+  to the shared transport, while the package-private manager overload leaves the
+  ordinary caller-owned path unchanged.
+- `ResponseCacheRetentionOwnershipTest` reproduces the prior retention with an
+  open shared source, cancels the original leader while one waiter remains, and
+  proves the leader argument, prepared body, auth-header state, original Reactor-
+  context container, reporting state, and waiter-free diagnostic ownership are
+  collectible without cancelling or duplicating the source. The single-flight
+  customization fixture also proves custom trace context and starter correlation
+  context still reach the real dispatch. Existing detached-publisher tests
+  continue to prove a removed publisher cannot reconnect.
+- The same retention suite now covers hidden-refresh success, failure, admission
+  rejection, empty completion, configured timeout, hard-expiry timeout, eviction,
+  and manager close. Virtual time drives both deadline paths; four non-terminating
+  sources observe cancellation, every refresh map reaches zero, and late
+  publication remains generation-checked by the existing cache contracts.
+- `SemanticReadReplayTimeoutContractTest` now applies Retry, RateLimiter,
+  CircuitBreaker, Bulkhead, and configured request timeout to both miss and hidden
+  refresh work. It retains existing auth replay, redirect, response-body/logical
+  timeout, independent caller-deadline, and terminal-diagnostic coverage, and
+  explicitly proves zero-attempt CircuitBreaker rejection creates no dispatch,
+  flight, waiter, refresh, or entry.
+- `BoundedLocalResponseCacheContractTest`,
+  `StalePooledConnectionRecoveryContractTest`, and
+  `Priority7HousekeepingTest` retain deterministic one-load, one-body-
+  subscription, refresh, eviction, close, active/queued shutdown, and one
+  aggregate factory-deadline evidence.
+- The focused retention/cache/composition run passed 67 tests and the complete
+  starter suite passed 1,283 tests, both with no failures, errors, or skips.
+  `git diff --check` also passed.
 
 ---
 
