@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Optional decoded-response byte admission.** Cache policies that set
+  `maximum-total-decoded-response-bytes` now measure the final successful unary
+  decoder input after transport decompression and atomically enforce that
+  per-policy aggregate alongside TTL and `maximum-size`. Over-budget or unknown
+  measurements are returned uncached, refresh bypass preserves the stale entry,
+  and replacement, expiry, size/weight eviction, explicit invalidation, and
+  shutdown release retained representation-byte accounting exactly once.
+  Policies that omit the setting retain the published count-only path without
+  response-byte measurement. The unit is decoded response representation bytes,
+  not Java heap, direct memory, RSS, or container memory.
+
 ## [4.1.0] - 2026-08-30
 
 - **`4.1.0` published release.** This additive minor release adds

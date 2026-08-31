@@ -89,6 +89,13 @@ policy must exist and must define:
   across one policy cache. The count is taken after transport decompression and
   includes only response-header names and values retained in a cached
   `ResponseEntity`; it is not Java heap, direct memory, RSS, or container memory.
+  The final unary decoder stream is counted without copying or reserializing the
+  value. A successful response whose count is unknown or exceeds the policy
+  limit is returned to the caller but is not stored. Admissible publication and
+  refresh replacement evict entries from the same policy as needed and keep the
+  retained representation-byte total at or below the configured limit. Policies
+  that omit this setting retain the existing TTL plus entry-count behavior and
+  do not activate response-byte measurement.
 
 Refresh remains disabled when both refresh settings are absent. Selecting it requires
 `refresh-after-ms` to be positive and strictly below `ttl-ms`, plus a
@@ -263,8 +270,9 @@ Each client factory owns one Caffeine cache for every selected policy. Caffeine
 provides concurrent maximum-size eviction and hard expiry from a monotonic
 ticker; wall-clock changes do not extend or shorten an entry. Factory shutdown
 invalidates every entry and prevents an already-running load from publishing
-after shutdown. Internal aggregate state exposes only policy count, configured
-capacity, and current size; entries and opaque keys are not inspectable.
+after shutdown. Internal aggregate state tracks policy count, configured entry capacity,
+current size, and, only for policies that select it, the bounded retained decoded-response
+byte total. Entries, opaque keys, and cached values are not inspectable.
 
 Lookup is cold and repeats for every subscription. Mandatory key, request
 variant, and configured `AuthProvider` checks run before a value can be returned.

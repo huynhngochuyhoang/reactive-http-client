@@ -13,15 +13,23 @@ interface LocalResponseCache extends AutoCloseable {
 
     void publishRefresh(RefreshToken refreshToken, Object value);
 
+    void publishRefresh(RefreshToken refreshToken, Object value, long decodedResponseBytes);
+
     void finishRefresh(RefreshToken refreshToken);
 
     void publish(LoadToken token, Object value);
+
+    void publish(LoadToken token, Object value, long decodedResponseBytes);
 
     void finish(LoadToken token);
 
     long estimatedSize();
 
     long evictionCount();
+
+    Long maximumDecodedResponseBytes();
+
+    long retainedDecodedResponseBytes();
 
     void invalidateAll();
 
@@ -54,7 +62,8 @@ interface LocalResponseCache extends AutoCloseable {
 
     enum RemovalReason {
         TTL,
-        SIZE;
+        SIZE,
+        WEIGHT;
 
         String tagValue() {
             return name().toLowerCase(java.util.Locale.ROOT);

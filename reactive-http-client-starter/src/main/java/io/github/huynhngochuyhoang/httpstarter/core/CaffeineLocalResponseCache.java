@@ -18,17 +18,29 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     private final Object lifecycleMonitor = new Object();
     private final Map<CacheKeyContract.OpaqueKey, GenerationState> generations = new HashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
-    private final Cache<CacheKeyContract.OpaqueKey, CachedEntry> cache;
+    private final Cache<CacheKeyContract.OpaqueKey, StoredEntry> cache;
     private final long ttlNanos;
     private final LongSupplier ticker;
     private final RemovalObserver removalObserver;
     private final AtomicLong evictions = new AtomicLong();
+    private final WeightState weightState;
 
     CaffeineLocalResponseCache(long ttlMs,
                                long maximumSize,
                                LongSupplier ticker,
                                RemovalObserver removalObserver) {
+        this(ttlMs, maximumSize, null, ticker, removalObserver);
+    }
+
+    CaffeineLocalResponseCache(long ttlMs,
+                               long maximumSize,
+                               Long maximumDecodedResponseBytes,
+                               LongSupplier ticker,
+                               RemovalObserver removalObserver) {
         this.ttlNanos = TimeUnit.MILLISECONDS.toNanos(ttlMs);
+        this.weightState = maximumDecodedResponseBytes != null
+                ? new WeightState(maximumDecodedResponseBytes)
+                : null;
         this.ticker = ticker;
         this.removalObserver = removalObserver;
         this.cache = Caffeine.newBuilder()
@@ -43,7 +55,13 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     @Override
     public Lookup lookup(CacheKeyContract.OpaqueKey key) {
         requireOpen();
-        CachedEntry entry = cache.getIfPresent(key);
+        if (weightState != null) {
+            synchronized (lifecycleMonitor) {
+                return lookupUnderLifecycleLock(key);
+            }
+        }
+
+        StoredEntry entry = cache.getIfPresent(key);
         if (entry != null) {
             long ageNanos = ageNanos(entry);
             if (ageNanos < ttlNanos) {
@@ -53,27 +71,31 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
             cache.cleanUp();
         }
         synchronized (lifecycleMonitor) {
-            requireOpen();
-            entry = cache.getIfPresent(key);
-            if (entry != null) {
-                long ageNanos = ageNanos(entry);
-                if (ageNanos < ttlNanos) {
-                    return hit(key, entry, ageNanos);
-                }
-                cache.cleanUp();
-            }
-            GenerationState state = generations.computeIfAbsent(key, ignored -> new GenerationState());
-            state.activeLoads++;
-            return Lookup.miss(new GenerationLoadToken(key, state, state.generation));
+            return lookupUnderLifecycleLock(key);
         }
     }
 
-    private Lookup hit(CacheKeyContract.OpaqueKey key, CachedEntry entry, long ageNanos) {
-        return Lookup.hit(entry.value, new GenerationEntryToken(key, entry), ageNanos);
+    private Lookup lookupUnderLifecycleLock(CacheKeyContract.OpaqueKey key) {
+        requireOpen();
+        StoredEntry entry = cache.getIfPresent(key);
+        if (entry != null) {
+            long ageNanos = ageNanos(entry);
+            if (ageNanos < ttlNanos) {
+                return hit(key, entry, ageNanos);
+            }
+            cache.cleanUp();
+        }
+        GenerationState state = generations.computeIfAbsent(key, ignored -> new GenerationState());
+        state.activeLoads++;
+        return Lookup.miss(new GenerationLoadToken(key, state, state.generation));
     }
 
-    private long ageNanos(CachedEntry entry) {
-        return Math.max(0, ticker.getAsLong() - entry.writtenNanos);
+    private Lookup hit(CacheKeyContract.OpaqueKey key, StoredEntry entry, long ageNanos) {
+        return Lookup.hit(entry.value(), new GenerationEntryToken(key, entry), ageNanos);
+    }
+
+    private long ageNanos(StoredEntry entry) {
+        return Math.max(0, ticker.getAsLong() - entry.writtenNanos());
     }
 
     @Override
@@ -81,7 +103,7 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
         GenerationEntryToken token = entryToken(entryToken);
         synchronized (lifecycleMonitor) {
             requireOpen();
-            CachedEntry current = cache.getIfPresent(token.key);
+            StoredEntry current = cache.getIfPresent(token.key);
             if (current != token.entry) {
                 return null;
             }
@@ -98,7 +120,7 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
             if (closed.get()) {
                 return false;
             }
-            CachedEntry current = cache.getIfPresent(token.key);
+            StoredEntry current = cache.getIfPresent(token.key);
             return current == token.entry && token.state.generation == token.observedGeneration;
         }
     }
@@ -106,24 +128,33 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     @Override
     public long hardExpiryRemainingNanos(RefreshToken refreshToken) {
         GenerationRefreshToken token = refreshToken(refreshToken);
-        long ageNanos = Math.max(0, ticker.getAsLong() - token.entry.writtenNanos);
+        long ageNanos = Math.max(0, ticker.getAsLong() - token.entry.writtenNanos());
         return Math.max(0, ttlNanos - ageNanos);
     }
 
     @Override
     public void publishRefresh(RefreshToken refreshToken, Object value) {
+        publishRefresh(refreshToken, value, 0);
+    }
+
+    @Override
+    public void publishRefresh(RefreshToken refreshToken, Object value, long decodedResponseBytes) {
         GenerationRefreshToken token = refreshToken(refreshToken);
         synchronized (lifecycleMonitor) {
             if (closed.get()) {
                 return;
             }
-            CachedEntry current = cache.getIfPresent(token.key);
+            StoredEntry current = cache.getIfPresent(token.key);
             if (closed.get()
                     || current != token.entry
                     || token.state.generation != token.observedGeneration) {
                 return;
             }
-            cache.put(token.key, new CachedEntry(value, ticker.getAsLong()));
+            StoredEntry replacement = newEntry(value, decodedResponseBytes);
+            if (!makeRoomFor(replacement.weight(), token.key, current)) {
+                return;
+            }
+            replace(token.key, current, replacement);
             token.state.generation++;
             cache.cleanUp();
         }
@@ -144,18 +175,27 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
 
     @Override
     public void publish(LoadToken loadToken, Object value) {
+        publish(loadToken, value, 0);
+    }
+
+    @Override
+    public void publish(LoadToken loadToken, Object value, long decodedResponseBytes) {
         GenerationLoadToken token = token(loadToken);
         synchronized (lifecycleMonitor) {
             if (closed.get()) {
                 return;
             }
-            CachedEntry currentValue = cache.getIfPresent(token.key);
+            StoredEntry currentValue = cache.getIfPresent(token.key);
             if (closed.get()
                     || token.state.generation != token.observedGeneration
                     || currentValue != null) {
                 return;
             }
-            cache.put(token.key, new CachedEntry(value, ticker.getAsLong()));
+            StoredEntry entry = newEntry(value, decodedResponseBytes);
+            if (!makeRoomFor(entry.weight(), token.key, null)) {
+                return;
+            }
+            replace(token.key, null, entry);
             token.state.generation++;
             cache.cleanUp();
         }
@@ -179,6 +219,12 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
         if (closed.get()) {
             return 0;
         }
+        if (weightState != null) {
+            synchronized (lifecycleMonitor) {
+                cache.cleanUp();
+                return cache.estimatedSize();
+            }
+        }
         cache.cleanUp();
         return cache.estimatedSize();
     }
@@ -186,6 +232,22 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     @Override
     public long evictionCount() {
         return evictions.get();
+    }
+
+    @Override
+    public Long maximumDecodedResponseBytes() {
+        return weightState != null ? weightState.maximumBytes : null;
+    }
+
+    @Override
+    public long retainedDecodedResponseBytes() {
+        if (weightState == null) {
+            return 0;
+        }
+        synchronized (lifecycleMonitor) {
+            cache.cleanUp();
+            return weightState.retainedBytes;
+        }
     }
 
     @Override
@@ -211,11 +273,80 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
         }
     }
 
-    private void onRemoval(CacheKeyContract.OpaqueKey key, CachedEntry value, RemovalCause cause) {
+    private StoredEntry newEntry(Object value, long decodedResponseBytes) {
+        if (weightState == null) {
+            return new CachedEntry(value, ticker.getAsLong());
+        }
+        return new WeightedCachedEntry(value, ticker.getAsLong(), decodedResponseBytes);
+    }
+
+    private boolean makeRoomFor(
+            long candidateWeight, CacheKeyContract.OpaqueKey candidateKey, StoredEntry replaced) {
+        if (weightState == null) {
+            return true;
+        }
+        cache.cleanUp();
+        if (candidateWeight < 0 || candidateWeight > weightState.maximumBytes) {
+            return false;
+        }
+        long replacedWeight = accountedWeight(replaced);
+        while (weightState.retainedBytes - replacedWeight
+                > weightState.maximumBytes - candidateWeight) {
+            Map.Entry<CacheKeyContract.OpaqueKey, StoredEntry> victim = cache.asMap().entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals(candidateKey))
+                    .filter(entry -> accountedWeight(entry.getValue()) > 0)
+                    .findFirst()
+                    .orElse(null);
+            if (victim == null) {
+                return false;
+            }
+            removeForWeight(victim.getKey(), victim.getValue());
+        }
+        return true;
+    }
+
+    private void replace(
+            CacheKeyContract.OpaqueKey key, StoredEntry replaced, StoredEntry replacement) {
+        unaccount(replaced);
+        account(replacement);
+        cache.put(key, replacement);
+    }
+
+    private void removeForWeight(CacheKeyContract.OpaqueKey key, StoredEntry entry) {
+        unaccount(entry);
+        cache.invalidate(key);
+        evictions.incrementAndGet();
+        if (removalObserver != null) {
+            removalObserver.onRemoval(this, key, RemovalReason.WEIGHT);
+        }
+    }
+
+    private long accountedWeight(StoredEntry entry) {
+        return entry instanceof WeightedCachedEntry weighted && weighted.accounted
+                ? weighted.weight
+                : 0;
+    }
+
+    private void account(StoredEntry entry) {
+        if (entry instanceof WeightedCachedEntry weighted && !weighted.accounted) {
+            weightState.retainedBytes = Math.addExact(weightState.retainedBytes, weighted.weight);
+            weighted.accounted = true;
+        }
+    }
+
+    private void unaccount(StoredEntry entry) {
+        if (entry instanceof WeightedCachedEntry weighted && weighted.accounted) {
+            weightState.retainedBytes = Math.subtractExact(weightState.retainedBytes, weighted.weight);
+            weighted.accounted = false;
+        }
+    }
+
+    private void onRemoval(CacheKeyContract.OpaqueKey key, StoredEntry value, RemovalCause cause) {
         if (key == null) {
             return;
         }
         synchronized (lifecycleMonitor) {
+            unaccount(value);
             GenerationState state = generations.get(key);
             if (state != null) {
                 state.generation++;
@@ -268,7 +399,56 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
         throw new IllegalArgumentException("Unknown local response-cache refresh token");
     }
 
-    private record CachedEntry(Object value, long writtenNanos) {
+    private interface StoredEntry {
+        Object value();
+
+        long writtenNanos();
+
+        long weight();
+    }
+
+    private record CachedEntry(Object value, long writtenNanos) implements StoredEntry {
+        @Override
+        public long weight() {
+            return 0;
+        }
+    }
+
+    private static final class WeightedCachedEntry implements StoredEntry {
+        private final Object value;
+        private final long writtenNanos;
+        private final long weight;
+        private boolean accounted;
+
+        private WeightedCachedEntry(Object value, long writtenNanos, long weight) {
+            this.value = value;
+            this.writtenNanos = writtenNanos;
+            this.weight = weight;
+        }
+
+        @Override
+        public Object value() {
+            return value;
+        }
+
+        @Override
+        public long writtenNanos() {
+            return writtenNanos;
+        }
+
+        @Override
+        public long weight() {
+            return weight;
+        }
+    }
+
+    private static final class WeightState {
+        private final long maximumBytes;
+        private long retainedBytes;
+
+        private WeightState(long maximumBytes) {
+            this.maximumBytes = maximumBytes;
+        }
     }
 
     private static final class GenerationState {
@@ -278,20 +458,20 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     }
 
     private record GenerationEntryToken(
-            CacheKeyContract.OpaqueKey key, CachedEntry entry) implements EntryToken {
+            CacheKeyContract.OpaqueKey key, StoredEntry entry) implements EntryToken {
     }
 
     private static final class GenerationRefreshToken implements RefreshToken {
         private final CacheKeyContract.OpaqueKey key;
         private final GenerationState state;
         private final long observedGeneration;
-        private final CachedEntry entry;
+        private final StoredEntry entry;
         private boolean finished;
 
         private GenerationRefreshToken(CacheKeyContract.OpaqueKey key,
                                        GenerationState state,
                                        long observedGeneration,
-                                       CachedEntry entry) {
+                                       StoredEntry entry) {
             this.key = key;
             this.state = state;
             this.observedGeneration = observedGeneration;

@@ -50,7 +50,13 @@ class LocalResponseCacheObservabilityTest {
                 .contains("reactive_http_client_cache_refreshes_total")
                 .contains("reactive_http_client_cache_evictions_total")
                 .contains("reactive_http_client_cache_entries")
-                .contains("reactive_http_client_cache_maximum_entries");
+                .contains("reactive_http_client_cache_maximum_entries")
+                .doesNotContain("cause=\"weight\"");
+
+        metrics.registerCache("weighted", 10, new SizedCache(100L));
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".evictions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted", "cause", "weight")
+                .counter().count()).isZero();
 
         metrics.lookup("catalog.get", "hit");
         metrics.lookup("catalog.get", "miss");
@@ -512,17 +518,30 @@ class LocalResponseCacheObservabilityTest {
 
     private static final class SizedCache implements LocalResponseCache {
         private final AtomicLong size = new AtomicLong();
+        private final Long maximumDecodedResponseBytes;
+
+        private SizedCache() {
+            this(null);
+        }
+
+        private SizedCache(Long maximumDecodedResponseBytes) {
+            this.maximumDecodedResponseBytes = maximumDecodedResponseBytes;
+        }
 
         @Override public Lookup lookup(CacheKeyContract.OpaqueKey key) { throw new UnsupportedOperationException(); }
         @Override public RefreshToken beginRefresh(EntryToken entryToken) { throw new UnsupportedOperationException(); }
         @Override public boolean isRefreshCurrent(RefreshToken refreshToken) { return false; }
         @Override public long hardExpiryRemainingNanos(RefreshToken refreshToken) { return 0; }
         @Override public void publishRefresh(RefreshToken refreshToken, Object value) { }
+        @Override public void publishRefresh(RefreshToken refreshToken, Object value, long bytes) { }
         @Override public void finishRefresh(RefreshToken refreshToken) { }
         @Override public void publish(LoadToken token, Object value) { }
+        @Override public void publish(LoadToken token, Object value, long bytes) { }
         @Override public void finish(LoadToken token) { }
         @Override public long estimatedSize() { return size.get(); }
         @Override public long evictionCount() { return 0; }
+        @Override public Long maximumDecodedResponseBytes() { return maximumDecodedResponseBytes; }
+        @Override public long retainedDecodedResponseBytes() { return 0; }
         @Override public void invalidateAll() { size.set(0); }
         @Override public void close() { }
     }
