@@ -544,38 +544,72 @@ Evidence recorded on 2026-08-31 from durable baseline commit
 
 ## Priority 6 - Capacity, Expiry, and Concurrency Invariants
 
-### [ ] 6.1 Make capacity evidence deterministic
+### [x] 6.1 Make capacity evidence deterministic
 
-- [ ] Test small and large entries under entry-count pressure and, after a weight
+- [x] Test small and large entries under entry-count pressure and, after a weight
       GO, under combined size/weight pressure.
-- [ ] Assert observable admission/eviction invariants without depending on an
+- [x] Assert observable admission/eviction invariants without depending on an
       unspecified victim order.
-- [ ] Cover entry replacement, same-key reload after expiry, explicit eviction,
+- [x] Cover entry replacement, same-key reload after expiry, explicit eviction,
       policy isolation, and multiple clients sharing one registry.
-- [ ] Verify current entry/weight totals agree with the actual retained entry set
+- [x] Verify current entry/weight totals agree with the actual retained entry set
       after every transition.
 
-### [ ] 6.2 Bound metadata independently from values
+### [x] 6.2 Bound metadata independently from values
 
-- [ ] Stress high-cardinality miss-only, failed-load, rejected-admission, and
+- [x] Stress high-cardinality miss-only, failed-load, rejected-admission, and
       cancelled-load keys.
-- [ ] Prove generation/tombstone state is removed or bounded independently of
+- [x] Prove generation/tombstone state is removed or bounded independently of
       cache entry count and TTL.
-- [ ] Prove per-flight waiter collections, cancellation markers, and diagnostic
+- [x] Prove per-flight waiter collections, cancellation markers, and diagnostic
       ownership are removed at terminal transition.
-- [ ] Verify explicit eviction invalidates outstanding publication tokens without
+- [x] Verify explicit eviction invalidates outstanding publication tokens without
       unnecessarily cancelling caller-visible work.
 
-### [ ] 6.3 Stress interleavings without blocking event loops
+### [x] 6.3 Stress interleavings without blocking event loops
 
-- [ ] Cover same-key and many-key immediate completion, delayed response body,
+- [x] Cover same-key and many-key immediate completion, delayed response body,
       timeout, cancellation, refresh, eviction, and shutdown interleavings.
-- [ ] Gate races with latches/sinks/virtual time or server observations rather
+- [x] Gate races with latches/sinks/virtual time or server observations rather
       than timing-only sleeps.
-- [ ] Detect blocking cleanup, unbounded serialization/accounting, or recursive
+- [x] Detect blocking cleanup, unbounded serialization/accounting, or recursive
       traversal on event-loop threads.
-- [ ] Record bounded stress iteration counts, seeds where applicable, and failure
+- [x] Record bounded stress iteration counts, seeds where applicable, and failure
       diagnostics in target-only evidence.
+
+Evidence recorded on 2026-08-31 from durable baseline commit
+`3c1707bec36a98ff6d8c63387d2c7cc5c0bee829` plus this reviewed change:
+
+- `ResponseCacheCapacityConcurrencyInvariantTest` independently reflects the
+  Caffeine retained-entry set after every capacity, weight, replacement, expiry,
+  reload, and explicit-eviction transition. It requires reported retained bytes
+  to equal the sum of stored entry weights, every weighted entry to be accounted
+  exactly once, generation count to equal terminal retained-entry count, and both
+  configured bounds to hold without asserting which unspecified victim survives.
+- Policy-isolation evidence covers two bounds in one manager and two client
+  managers sharing one `SimpleMeterRegistry`; destroying one manager leaves the
+  other client's tagged gauge live. Same-key refresh replacement, same-key reload
+  after monotonic hard expiry, and aggregate manager totals are verified in the
+  same suite.
+- Four independent 1,024-key sweeps cover miss-only tokens, failed loads,
+  over-budget admission, and cancelled loads. Every terminal path leaves zero
+  generation/tombstone records. A 32-member single flight proves members,
+  released markers, diagnostic ownership, and the manager flight map are cleared;
+  explicit eviction makes an active publication token stale while its independent
+  caller still receives the successful value without cancellation.
+- The deterministic stress matrix completed 256 iterations with seed `701154533`
+  across ten same-key, many-key, refresh, expiry, eviction, delayed, virtual-time
+  timeout, cancellation, and shutdown scenarios. Every scenario is forced once
+  before seeded selection. Target-only provenance and failure context are written
+  to `target/release-evidence/v29/priority6/cache-concurrency-invariants.properties`.
+- A 64-publication pressure run executes loader and accounting signals on a Reactor
+  non-blocking scheduler with response values that fail on equality, hashing, or
+  rendering. This guards against blocking Reactor calls, response graph traversal,
+  serialization, and value-derived accounting on the event-loop path.
+- The focused cache/retention/workload/observability run passed 75 tests, and the
+  complete starter suite passed 1,281 tests. Both runs had no failures, errors, or
+  skips; `git diff --check` also passed. No production change was needed because
+  the Priority 5 storage and manager implementation satisfied every new invariant.
 
 ---
 
