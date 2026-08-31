@@ -285,8 +285,9 @@ documentation change:
   Each row names its creation, terminal/removal transition, and shutdown owner;
   intentionally retained decoded values and representation headers are separated
   from subscription-local request/auth/response metadata.
-- `ResponseCacheRetentionOwnershipTest` adds six bounded `ReferenceQueue` and
-  weak-reference proofs. Repeated diagnostic GC attempts run for at most five
+- `ResponseCacheRetentionOwnershipTest` adds eight bounded `ReferenceQueue`,
+  weak-reference, and owner-count proofs. Repeated diagnostic GC attempts run for
+  at most five
   seconds with at most 1 MiB of bounded pressure per attempt. The tests keep the
   manager, active leader, or meter registry alive where required, avoiding a
   vacuous whole-fixture collection result.
@@ -297,19 +298,27 @@ documentation change:
   and unused load state while the leader remains active. A real cache-selected
   request releases frozen body arguments, bounded serialized bytes, prepared
   context, auth context/header, final request identity, and response metadata
-  after publication.
+  after publication. Capacity and explicit eviction release ordinary survivors
+  before manager close. An independent load remains caller-owned after close and
+  releases its closure only at caller terminal.
 - Late duplicate, detached-publisher, generation, hard-expiry, explicit-eviction,
   and shutdown publication behavior remains covered by the deterministic cache
-  race tests listed in the audit. A retained Actuator map was proved not to own
+  race tests listed in the audit. Runtime mutation of an already-created policy's
+  TTL, maximum size, or refresh bounds is rejected before lookup, and the
+  manager retains only the original policy cache. A retained Actuator map was
+  proved not to own
   its provider, bean factory, client factory, manager, cache, or decoded value.
   Factory destruction removes all owned cache meters, and a retained registry
   observes only a same-tag replacement cache.
-- No starter-owned unbounded retention defect was reproduced, so this priority
-  intentionally changes no production source. The Priority 2 RSS delta remains
-  an accounting gap; Priority 4 must not present retained weight as a leak fix.
-- The focused ownership suite passed 6 tests. The ownership, cache race,
-  observability, diagnostics, and memory workload run passed 124 tests with no
-  failures, errors, or skips. The documentation plus ownership gate passed 50
+- One retention defect was confirmed and fixed: mutable runtime bounds could
+  retain a distinct cache for each tuple under one policy name.
+  `LocalResponseCacheManager` now rejects bounds mutation after the policy cache
+  is created. Cache properties remain startup configuration. No other unbounded
+  starter root was reproduced; the Priority 2 RSS delta remains a separate
+  accounting gap.
+- The focused ownership suite passed 8 tests. The ownership, cache race,
+  observability, diagnostics, and memory workload run passed 126 tests with no
+  failures, errors, or skips. The documentation plus ownership gate passed 52
   tests with no failures, errors, or skips; final diff checks also passed.
 
 ---

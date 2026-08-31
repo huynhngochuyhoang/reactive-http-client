@@ -91,9 +91,43 @@ class ResponseCacheRetentionOwnershipTest {
         assertThat(manager.workloadSnapshotForTesting().inFlightRefreshes()).isZero();
         assertGenerationOwners(manager, 0);
         assertCollected(queue, List.of(refresh.currentValue(), refresh.cancelledRefreshOwner()));
+        assertCollected(queue, capacityValues);
 
         manager.close();
-        assertCollected(queue, capacityValues);
+    }
+
+    @Test
+    void runtimePolicyBoundsMutationIsRejectedWithoutCreatingAnotherCache() throws Exception {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("stable-bounds", 60_000, 10, false);
+
+        assertThat(load(manager, selection, key("initial"), "initial")).isEqualTo("initial");
+        selection.policy().setMaximumSize(20L);
+
+        assertThatThrownBy(() -> load(manager, selection, key("mutated"), "mutated"))
+                .hasMessageContaining("changed after its local response cache was created")
+                .hasMessageContaining("runtime mutation")
+                .hasMessageContaining("maximum-size");
+        assertThat(caches(manager)).hasSize(1);
+        assertThat(manager.snapshot()).isEqualTo(
+                new LocalResponseCacheManager.Snapshot(1, 10, 1, 0, false));
+        manager.close();
+    }
+
+    @Test
+    void independentLoadRemainsCallerOwnedAfterManagerCloseAndReleasesAtCallerTerminal() {
+        ReferenceQueue<Object> queue = new ReferenceQueue<>();
+        IndependentLoadAfterClose active = startIndependentLoadThenClose(queue);
+
+        assertThat(active.manager().workloadSnapshotForTesting().inFlightLoads()).isZero();
+        assertThat(active.manager().snapshot().closed()).isTrue();
+        assertRetained(active.loadOwner());
+
+        active.source().tryEmitEmpty().orThrow();
+        assertThat(active.result().join()).isEqualTo("late-value");
+        assertThat(active.manager().snapshot()).isEqualTo(
+                new LocalResponseCacheManager.Snapshot(0, 0, 0, 0, true));
+        assertCollected(queue, List.of(active.loadOwner()));
     }
 
     @Test
@@ -405,6 +439,25 @@ class ResponseCacheRetentionOwnershipTest {
         return new CloseReferences(references);
     }
 
+    private static IndependentLoadAfterClose startIndependentLoadThenClose(ReferenceQueue<Object> queue) {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = selection("independent-close", 60_000, 10, false);
+        Sinks.Empty<Void> source = Sinks.empty();
+        Object loadOwner = new Object();
+        TrackedReference loadOwnerReference = track("caller-owned independent load", loadOwner, queue);
+        java.util.concurrent.CompletableFuture<?> result = manager.getOrLoad(
+                        selection,
+                        key("independent-close"),
+                        () -> Mono.defer(() -> {
+                            loadOwner.hashCode();
+                            return source.asMono().thenReturn("late-value");
+                        }))
+                .toFuture();
+
+        manager.close();
+        return new IndependentLoadAfterClose(manager, source, result, loadOwnerReference);
+    }
+
     private static DiagnosticsReferences createAndCloseDiagnosticsFixture(
             ReferenceQueue<Object> queue) throws Exception {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
@@ -685,6 +738,13 @@ class ResponseCacheRetentionOwnershipTest {
     }
 
     private record CloseReferences(List<TrackedReference> owners) {
+    }
+
+    private record IndependentLoadAfterClose(
+            LocalResponseCacheManager manager,
+            Sinks.Empty<Void> source,
+            java.util.concurrent.CompletableFuture<?> result,
+            TrackedReference loadOwner) {
     }
 
     private record DiagnosticsReferences(
