@@ -233,46 +233,93 @@ Evidence recorded on 2026-08-31:
 
 ## Priority 3 - Cache Retention Ownership Audit
 
-### [ ] 3.1 Inventory every strong owner
+### [x] 3.1 Inventory every strong owner
 
-- [ ] Trace ownership from `ReactiveHttpClientFactoryBean` through cache manager,
+- [x] Trace ownership from `ReactiveHttpClientFactoryBean` through cache manager,
       per-policy caches, keys, entries, generation state, in-flight flights,
       refresh tokens, schedulers, subscriptions, meter suppliers, request
       snapshots, response metadata, auth contexts, and decoded values.
-- [ ] Record the creation, terminal transition, removal trigger, and shutdown
+- [x] Record the creation, terminal transition, removal trigger, and shutdown
       owner for each retained object class.
-- [ ] Identify static collections, registry callbacks, scheduler tasks, meter
+- [x] Identify static collections, registry callbacks, scheduler tasks, meter
       suppliers, and application-context references that can outlive a factory.
-- [ ] Distinguish intentionally retained decoded values from metadata that should
+- [x] Distinguish intentionally retained decoded values from metadata that should
       be released immediately after publication or caller termination.
 
-### [ ] 3.2 Prove terminal release paths
+### [x] 3.2 Prove terminal release paths
 
-- [ ] Add bounded reference-queue, weak-reference, heap-query, or owner-count
+- [x] Add bounded reference-queue, weak-reference, heap-query, or owner-count
       tests for success, failure, empty completion, serialization failure, and
       cancellation.
-- [ ] Cover TTL expiry, size eviction, explicit eviction, refresh replacement,
+- [x] Cover TTL expiry, size eviction, explicit eviction, refresh replacement,
       refresh failure/cancellation, and factory destruction.
-- [ ] Verify each waiter releases its context, arguments, and terminal state when
+- [x] Verify each waiter releases its context, arguments, and terminal state when
       it ends even while another caller keeps a shared load alive.
-- [ ] Verify auth contexts, prepared bodies, frozen request arguments, and
+- [x] Verify auth contexts, prepared bodies, frozen request arguments, and
       response metadata are not retained after their final required owner ends.
-- [ ] Make GC-assisted tests bounded and diagnostic-rich; avoid a single sleep or
+- [x] Make GC-assisted tests bounded and diagnostic-rich; avoid a single sleep or
       one `System.gc()` call as proof.
 
-### [ ] 3.3 Close late-publication and external-owner gaps
+### [x] 3.3 Close late-publication and external-owner gaps
 
-- [ ] Prove duplicate misses, detached shared publishers, and late completion
+- [x] Prove duplicate misses, detached shared publishers, and late completion
       callbacks cannot recreate entries or generation records after eviction or
       close.
-- [ ] Prove refresh callbacks cannot republish or retain state after hard expiry,
+- [x] Prove refresh callbacks cannot republish or retain state after hard expiry,
       explicit eviction, policy removal, or factory destruction.
-- [ ] Prove diagnostics and the Actuator endpoint inspect only existing managers
+- [x] Prove diagnostics and the Actuator endpoint inspect only existing managers
       and do not retain factories, cache values, keys, or application contexts.
-- [ ] Prove owned cache meters are removed on close and their suppliers cannot
+- [x] Prove owned cache meters are removed on close and their suppliers cannot
       retain a dead manager.
-- [ ] Record every confirmed retention defect and its regression test before
+- [x] Record every confirmed retention defect and its regression test before
       moving to the weight-design gate.
+
+Evidence recorded on 2026-08-31 from commit
+`fbaeefee89260d59d33daa4caab9401be4dadb66` plus this Priority 3 test and
+documentation change:
+
+- [`CACHE-RETENTION-OWNERSHIP.md`](CACHE-RETENTION-OWNERSHIP.md) records the
+  strong path from the Spring bean factory through the client factory, handler,
+  manager, policy caches, Caffeine entries/generation state, loads, waiters,
+  refreshes, scheduler subscriptions, metrics, diagnostics, and external roots.
+  Each row names its creation, terminal/removal transition, and shutdown owner;
+  intentionally retained decoded values and representation headers are separated
+  from subscription-local request/auth/response metadata.
+- `ResponseCacheRetentionOwnershipTest` adds eight bounded `ReferenceQueue`,
+  weak-reference, and owner-count proofs. Repeated diagnostic GC attempts run for
+  at most five
+  seconds with at most 1 MiB of bounded pressure per attempt. The tests keep the
+  manager, active leader, or meter registry alive where required, avoiding a
+  vacuous whole-fixture collection result.
+- The ownership suite covers success, failure, empty completion, simulated
+  serialization failure, cancellation, TTL expiry, capacity and explicit
+  eviction, refresh replacement/failure/cancellation, and actual factory
+  destruction. A detached waiter releases its context, arguments, caller state,
+  and unused load state while the leader remains active. A real cache-selected
+  request releases frozen body arguments, bounded serialized bytes, prepared
+  context, auth context/header, final request identity, and response metadata
+  after publication. Capacity and explicit eviction release ordinary survivors
+  before manager close. An independent load remains caller-owned after close and
+  releases its closure only at caller terminal.
+- Late duplicate, detached-publisher, generation, hard-expiry, explicit-eviction,
+  and shutdown publication behavior remains covered by the deterministic cache
+  race tests listed in the audit. Runtime mutation of an already-created policy's
+  TTL, maximum size, or refresh bounds is rejected before lookup, and the
+  manager retains only the original policy cache. A retained Actuator map was
+  proved not to own
+  its provider, bean factory, client factory, manager, cache, or decoded value.
+  Factory destruction removes all owned cache meters, and a retained registry
+  observes only a same-tag replacement cache.
+- One retention defect was confirmed and fixed: mutable runtime bounds could
+  retain a distinct cache for each tuple under one policy name.
+  `LocalResponseCacheManager` now rejects bounds mutation after the policy cache
+  is created. Cache properties remain startup configuration. No other unbounded
+  starter root was reproduced; the Priority 2 RSS delta remains a separate
+  accounting gap.
+- The focused ownership suite passed 8 tests. The ownership, cache race,
+  observability, diagnostics, and memory workload run passed 126 tests with no
+  failures, errors, or skips. The documentation plus ownership gate passed 52
+  tests with no failures, errors, or skips; final diff checks also passed.
 
 ---
 

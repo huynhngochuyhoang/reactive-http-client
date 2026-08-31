@@ -738,6 +738,15 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 throw new IllegalStateException(
                         "The local response cache for client '" + clientName + "' has been closed");
             }
+            PolicyBounds existingBounds = caches.keySet().stream()
+                    .filter(candidate -> candidate.policyName().equals(selection.policyName()))
+                    .findFirst()
+                    .orElse(null);
+            if (existingBounds != null && !existingBounds.equals(bounds)) {
+                throw new IllegalStateException("Cache policy '" + selection.policyName() + "' for client '"
+                        + clientName + "' changed after its local response cache was created; runtime mutation of "
+                        + "ttl-ms, maximum-size, refresh-after-ms, or refresh-timeout-ms is unsupported");
+            }
             return caches.computeIfAbsent(bounds, ignored -> newCache(selection.policyName(), clientName, bounds));
         }
     }
