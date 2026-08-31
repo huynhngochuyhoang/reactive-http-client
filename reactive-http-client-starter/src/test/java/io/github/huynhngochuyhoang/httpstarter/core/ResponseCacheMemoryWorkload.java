@@ -61,7 +61,15 @@ final class ResponseCacheMemoryWorkload {
     }
 
     static Evidence run(Scenario scenario) throws Exception {
-        Fixture fixture = new Fixture(scenario);
+        return run(scenario, false);
+    }
+
+    static Evidence runCharacterization(Scenario scenario) throws Exception {
+        return run(scenario, true);
+    }
+
+    private static Evidence run(Scenario scenario, boolean characterization) throws Exception {
+        Fixture fixture = new Fixture(scenario, characterization);
         try {
             fixture.warmUp();
             fixture.checkpoint("baseline-after-explicit-gc", true);
@@ -72,11 +80,13 @@ final class ResponseCacheMemoryWorkload {
                 case MAXIMUM_SIZE_PRESSURE -> maximumSizePressure(fixture);
                 case TTL_EXPIRY -> ttlExpiry(fixture);
                 case EXPLICIT_EVICTION -> explicitEviction(fixture);
+                case DUPLICATE_MISS -> duplicateMiss(fixture);
                 case SINGLE_FLIGHT -> singleFlight(fixture);
                 case REFRESH -> refresh(fixture);
                 case CANCELLATION -> cancellation(fixture);
                 case FACTORY_CLOSE -> factoryClose(fixture);
             }
+            fixture.characterizationCheckpoint("steady-after-explicit-gc");
         }
         finally {
             fixture.close();
@@ -119,6 +129,7 @@ final class ResponseCacheMemoryWorkload {
         fixture.checkpoint("after-fill");
         fixture.tickerNanos.addAndGet(Duration.ofMillis(TTL_MILLIS).toNanos());
         fixture.checkpoint("after-expiry");
+        fixture.characterizationCheckpoint("expired-after-explicit-gc");
         for (int index = 0; index < MEASURED_OPERATIONS; index++) {
             fixture.requirePayload(fixture.call(index, Operation.MEASURED).block(AWAIT_TIMEOUT));
         }
@@ -130,10 +141,28 @@ final class ResponseCacheMemoryWorkload {
         fixture.checkpoint("after-fill");
         fixture.manager.evictAllForTesting();
         fixture.checkpoint("after-eviction");
+        fixture.characterizationCheckpoint("evicted-after-explicit-gc");
         for (int index = 0; index < MEASURED_OPERATIONS; index++) {
             fixture.requirePayload(fixture.call(index, Operation.MEASURED).block(AWAIT_TIMEOUT));
         }
         fixture.checkpoint("after-reload");
+    }
+
+    private static void duplicateMiss(Fixture fixture) throws Exception {
+        ResponseGate gate = fixture.server.gateNextResponse();
+        List<CompletableFuture<byte[]>> callers = fixture.concurrentCallers(0);
+        gate.awaitDispatch();
+        fixture.await(() -> fixture.loadSubscriptions.get() == CONCURRENCY,
+                "duplicate miss subscriptions");
+        fixture.checkpoint("duplicate-loads-gated");
+
+        gate.release();
+        for (CompletableFuture<byte[]> caller : callers) {
+            fixture.requirePayload(caller.get(AWAIT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS));
+        }
+        fixture.await(() -> fixture.server.completedDispatches.get() == CONCURRENCY,
+                "duplicate miss completion");
+        fixture.checkpoint("after-duplicate-misses");
     }
 
     private static void singleFlight(Fixture fixture) throws Exception {
@@ -217,6 +246,7 @@ final class ResponseCacheMemoryWorkload {
         MAXIMUM_SIZE_PRESSURE,
         TTL_EXPIRY,
         EXPLICIT_EVICTION,
+        DUPLICATE_MISS,
         SINGLE_FLIGHT,
         REFRESH,
         CANCELLATION,
@@ -435,6 +465,7 @@ final class ResponseCacheMemoryWorkload {
 
     private static final class Fixture implements AutoCloseable {
         private final Scenario scenario;
+        private final boolean characterization;
         private final AtomicLong tickerNanos = new AtomicLong();
         private final Scheduler refreshScheduler;
         private final LoopbackServer server;
@@ -467,13 +498,15 @@ final class ResponseCacheMemoryWorkload {
         private boolean closed;
         private boolean factoryClosed;
 
-        private Fixture(Scenario scenario) throws Exception {
+        private Fixture(Scenario scenario, boolean characterization) throws Exception {
             this.scenario = Objects.requireNonNull(scenario, "scenario");
+            this.characterization = characterization;
             this.refreshScheduler = Schedulers.newSingle("v29-memory-refresh-" + scenario.id());
             this.server = new LoopbackServer();
             this.poolMetrics = new PoolMetricsRecorder();
             this.connectionProvider = ConnectionProvider.builder("v29-memory-" + scenario.id())
                     .maxConnections(1)
+                    .pendingAcquireMaxCount(CONCURRENCY)
                     .metrics(true, () -> poolMetrics)
                     .build();
             this.context = new AnnotationConfigApplicationContext();
@@ -624,6 +657,12 @@ final class ResponseCacheMemoryWorkload {
                     serversStopped.get()));
         }
 
+        private void characterizationCheckpoint(String name) {
+            if (characterization) {
+                checkpoint(name, true);
+            }
+        }
+
         private Evidence evidence() {
             long maximumSize = scenario == Scenario.MAXIMUM_SIZE_PRESSURE
                     ? PRESSURE_MAXIMUM_SIZE
@@ -670,7 +709,9 @@ final class ResponseCacheMemoryWorkload {
             server.close();
             serversStopped.incrementAndGet();
             refreshScheduler.dispose();
-            checkpoint("fixture-closed");
+            checkpoint(characterization
+                    ? "fixture-closed-after-explicit-gc"
+                    : "fixture-closed", characterization);
         }
 
         private static void attachManager(

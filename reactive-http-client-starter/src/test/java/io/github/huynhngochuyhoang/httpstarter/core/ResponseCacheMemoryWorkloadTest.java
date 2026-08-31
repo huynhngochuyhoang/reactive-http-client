@@ -135,6 +135,16 @@ class ResponseCacheMemoryWorkloadTest {
         assertThat(checkpoint(byScenario, ResponseCacheMemoryWorkload.Scenario.EXPLICIT_EVICTION,
                 "after-eviction").cache().cache().currentSize()).isZero();
 
+        ResponseCacheMemoryWorkload.Checkpoint duplicateGated = checkpoint(
+                byScenario, ResponseCacheMemoryWorkload.Scenario.DUPLICATE_MISS, "duplicate-loads-gated");
+        assertThat(duplicateGated.serverDispatches()).isEqualTo(1);
+        assertThat(duplicateGated.loadSubscriptions()).isEqualTo(ResponseCacheMemoryWorkload.CONCURRENCY);
+        assertThat(duplicateGated.cache().inFlightLoads()).isZero();
+        ResponseCacheMemoryWorkload.Checkpoint duplicateComplete = checkpoint(
+                byScenario, ResponseCacheMemoryWorkload.Scenario.DUPLICATE_MISS, "after-duplicate-misses");
+        assertThat(duplicateComplete.serverDispatches()).isEqualTo(ResponseCacheMemoryWorkload.CONCURRENCY);
+        assertThat(duplicateComplete.cache().cache().currentSize()).isEqualTo(1);
+
         ResponseCacheMemoryWorkload.Checkpoint shared = checkpoint(
                 byScenario, ResponseCacheMemoryWorkload.Scenario.SINGLE_FLIGHT, "load-gated");
         assertThat(shared.serverDispatches()).isEqualTo(1);
@@ -190,6 +200,23 @@ class ResponseCacheMemoryWorkloadTest {
 
         assertThat(ResponseCacheMemoryDomains.capture("diagnostic-explicit-gc", false, 0)
                 .explicitGcRequested()).isFalse();
+    }
+
+    @Test
+    void characterizationAddsGcStableReleaseAndCloseCheckpoints() throws Exception {
+        ResponseCacheMemoryWorkload.Evidence evidence = ResponseCacheMemoryWorkload.runCharacterization(
+                ResponseCacheMemoryWorkload.Scenario.TTL_EXPIRY);
+
+        assertThat(evidence.checkpoint("expired-after-explicit-gc").cache().cache().currentSize()).isZero();
+        assertThat(evidence.checkpoint("steady-after-explicit-gc").cache().cache().currentSize())
+                .isEqualTo(ResponseCacheMemoryWorkload.KEY_CARDINALITY);
+        ResponseCacheMemoryWorkload.Checkpoint closed =
+                evidence.checkpoint("fixture-closed-after-explicit-gc");
+        assertThat(closed.memory().explicitGcRequested()).isTrue();
+        assertThat(closed.cache().cache().currentSize()).isZero();
+        assertThat(closed.cache().inFlightLoads()).isZero();
+        assertThat(closed.cache().inFlightRefreshes()).isZero();
+        assertThat(closed.connectionPool().totalConnections()).isZero();
     }
 
     private static Recording startOptionalRecording() throws Exception {

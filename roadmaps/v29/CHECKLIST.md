@@ -114,9 +114,10 @@ Evidence recorded on 2026-08-30 from clean commit
 
 Evidence recorded on 2026-08-30:
 
-- `ResponseCacheMemoryWorkload` runs all ten scenarios against a fresh loopback
-  server, application context, connection provider, cache manager, refresh
-  scheduler, and factory owner per scenario. It fixes a 4 KiB synthetic byte-array
+- `ResponseCacheMemoryWorkload` runs the original ten scenarios against a fresh
+  loopback server, application context, connection provider, cache manager,
+  refresh scheduler, and factory owner per scenario. Priority 2.3 adds the
+  duplicate-miss scenario under the same isolation contract. It fixes a 4 KiB synthetic byte-array
   payload, 8 keys, concurrency 8, 2 warmup calls, 8 measured calls, a 1 second
   TTL, and named structural checkpoints. Capacity pressure alone lowers maximum
   size from 8 to 4.
@@ -178,19 +179,55 @@ Evidence recorded on 2026-08-31:
   profiling script, and `git diff --check` passed. Memory-growth comparison and
   ownership classification remain intentionally open in Priority 2.3.
 
-### [ ] 2.3 Classify observed growth before changing production code
+### [x] 2.3 Classify observed growth before changing production code
 
-- [ ] Compare cache-disabled control runs with cache-enabled fill and steady-state
+- [x] Compare cache-disabled control runs with cache-enabled fill and steady-state
       runs under identical transport and payload conditions.
-- [ ] Verify whether growth plateaus at `maximum-size`, falls after expiry/
+- [x] Verify whether growth plateaus at `maximum-size`, falls after expiry/
       eviction, and returns toward the control live set after factory close.
-- [ ] Repeat refresh, cancellation, duplicate miss, and shutdown races enough to
+- [x] Repeat refresh, cancellation, duplicate miss, and shutdown races enough to
       distinguish retained owners from one-time class/JIT/allocator growth.
-- [ ] Correlate any retained object class with a starter-owned reference path or
+- [x] Correlate any retained object class with a starter-owned reference path or
       explicitly classify it as application-, JVM-, or transport-owned.
-- [ ] Record one source-controlled finding before Priority 3 implementation:
+- [x] Record one source-controlled finding before Priority 3 implementation:
       confirmed leak, expected bounded retention, accounting gap, or inconclusive
       external workload.
+
+Evidence recorded on 2026-08-31:
+
+- `scripts/run-v29-memory-characterization.sh` launched 55 fresh JVMs: five
+  repetitions of the cache-disabled control and all ten cache-enabled/lifecycle
+  scenarios. Every child used the same 4 KiB payload, eight-key workload,
+  concurrency eight, one-connection epoll transport, adaptive Netty allocator,
+  `-Xms128m -Xmx128m`, `-XX:MaxDirectMemorySize=64m`, and G1. Raw sanitized
+  properties, logs, per-sample values, and aggregate means are target-only under
+  `target/release-evidence/v29/priority2/characterization/`.
+- The cache-disabled steady live-set change averaged 18.0 KiB. Eight-entry cold
+  and warm fills averaged about 225 KiB; capacity pressure completed eight loads
+  but remained at exactly four entries in every repetition. TTL expiry and
+  explicit eviction reached zero entries and reduced mean GC-stable heap by
+  37,008 and 34,557 bytes before reload. These are diagnostic observations, not
+  correctness thresholds or exact retained-size claims.
+- Duplicate miss produced eight subscriptions and eight dispatches but one
+  winning entry. Refresh, cancellation, duplicate miss, single flight, and
+  factory-close races each completed five isolated repetitions. Every final
+  checkpoint reported zero entries, loads, refreshes, and pool connections with
+  the factory/cache and pool disposed.
+- Closed cache scenarios remained about 184-223 KiB of heap and 0.90-4.26 MiB
+  of RSS above the cache-disabled mean. The bounded JFR's class-level candidates
+  were classified as application payload, Netty transport/allocator state, or
+  JVM/Reactor aggregate state; it did not prove a surviving starter reference
+  path. `roadmaps/v29/MEMORY-CHARACTERIZATION.md` records the explicit owner
+  paths, limitations, and the source-controlled finding: **expected bounded
+  retention**, with RSS retained as a separate accounting gap rather than a
+  confirmed starter leak.
+- The focused workload/cache/refresh/observability run passed 65 tests with no
+  failures, errors, or skips. `ResponseCacheMemoryWorkloadTest` separately
+  passed 3 tests, including GC-stable release/close checkpoints and the
+  duplicate-miss control. The documentation plus workload gate passed 47 tests;
+  `bash -n scripts/run-v29-memory-characterization.sh` and `git diff --check`
+  also passed. Priority 3 remains responsible for weak-reference and
+  root-path collectability proof before any production retention fix.
 
 ---
 

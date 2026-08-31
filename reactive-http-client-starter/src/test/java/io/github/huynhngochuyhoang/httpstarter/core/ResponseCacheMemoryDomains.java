@@ -191,6 +191,13 @@ final class ResponseCacheMemoryDomains {
 
     private static synchronized RepositoryState repositoryState(Path projectRoot) {
         if (cachedRepositoryState == null) {
+            String suppliedCommit = System.getProperty("v29.starter.commit");
+            String suppliedDirty = System.getProperty("v29.starter.dirty");
+            if (suppliedCommit != null && suppliedDirty != null) {
+                cachedRepositoryState = new RepositoryState(
+                        oneLine(suppliedCommit), Boolean.parseBoolean(suppliedDirty));
+                return cachedRepositoryState;
+            }
             String commit = command(projectRoot, "git", "rev-parse", "--verify", "HEAD");
             String status = command(projectRoot, "git", "status", "--porcelain", "--untracked-files=normal");
             cachedRepositoryState = new RepositoryState(
