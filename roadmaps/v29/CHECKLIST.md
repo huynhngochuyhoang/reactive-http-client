@@ -325,22 +325,41 @@ documentation change:
 
 ## Priority 4 - Retained-Weight Contract Spike
 
-### [ ] 4.1 Evaluate candidate measurement boundaries
+### [x] 4.1 Evaluate candidate measurement boundaries
 
-- [ ] Evaluate response-decode, cache-publication, starter-owned byte, and
+- [x] Evaluate response-decode, cache-publication, starter-owned byte, and
       application-supplied weigher boundaries against the same supported value
       shapes.
-- [ ] For each candidate, define what is measured, when it becomes known, its
+- [x] For each candidate, define what is measured, when it becomes known, its
       unit, deterministic cost, ownership, overflow behavior, and relationship
       to the retained decoded value.
-- [ ] Include plain values, `ResponseEntity<T>` plus retained headers, empty
+- [x] Include plain values, `ResponseEntity<T>` plus retained headers, empty
       completion, present empty values, refresh replacement, and unknown/custom
       value shapes.
-- [ ] Demonstrate why `Content-Length`, compressed wire bytes, arbitrary JSON
+- [x] Demonstrate why `Content-Length`, compressed wire bytes, arbitrary JSON
       reserialization, reflection-based graph walking, and JVM
       `Instrumentation` are accepted or rejected.
-- [ ] Reject candidates that require blocking, unbounded recursion, arbitrary
+- [x] Reject candidates that require blocking, unbounded recursion, arbitrary
       reflection, full response duplication, or event-loop reserialization.
+
+Evidence recorded on 2026-08-31 against commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e`:
+
+- [`RETAINED-WEIGHT-CANDIDATES.md`](RETAINED-WEIGHT-CANDIDATES.md) maps the
+  current decode-to-publication pipeline and evaluates all four boundaries in
+  one matrix using the same cacheable result shapes.
+- Generic publication-time object inspection and starter-owned metadata bytes
+  are rejected as response-retention units. `Content-Length`, compressed wire
+  bytes, arbitrary JSON reserialization, reflection graph walking, and JVM
+  `Instrumentation` are rejected with explicit correctness or cost reasons.
+- A bounded count of decoded representation bytes consumed by the final unary
+  codec path survives as a non-heap candidate. A post-sanitization application
+  weigher survives only as an explicitly selected application-owned estimate.
+  Neither is selected yet; admission semantics and the final go/no-go remain
+  open in 4.2 and 4.3.
+- No public property, SPI, meter, diagnostics field, or production value
+  traversal was added by this spike. `DocumentationReleaseArtifactTest` passed
+  44 tests; tracked and new-file whitespace checks passed.
 
 ### [ ] 4.2 Define admission semantics before API design
 
