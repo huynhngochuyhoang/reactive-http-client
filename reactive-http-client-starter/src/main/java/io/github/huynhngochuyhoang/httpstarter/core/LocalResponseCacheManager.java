@@ -641,6 +641,23 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
     }
 
+    WorkloadSnapshot workloadSnapshotForTesting() {
+        Snapshot cacheSnapshot = snapshot();
+        int loadCount;
+        int waiterCount;
+        synchronized (inFlightLoads) {
+            loadCount = inFlightLoads.size();
+            waiterCount = inFlightLoads.values().stream()
+                    .mapToInt(flight -> Math.max(0, flight.members.size() - 1))
+                    .sum();
+        }
+        int refreshCount;
+        synchronized (inFlightRefreshes) {
+            refreshCount = inFlightRefreshes.size();
+        }
+        return new WorkloadSnapshot(cacheSnapshot, loadCount, waiterCount, refreshCount);
+    }
+
     void evictAllForTesting() {
         if (closed.get()) {
             throw new IllegalStateException(
@@ -821,6 +838,13 @@ final class LocalResponseCacheManager implements AutoCloseable {
         Snapshot(int policyCount, long configuredCapacity, long currentSize, boolean closed) {
             this(policyCount, configuredCapacity, currentSize, 0, closed);
         }
+    }
+
+    record WorkloadSnapshot(
+            Snapshot cache,
+            int inFlightLoads,
+            int coalescedWaiters,
+            int inFlightRefreshes) {
     }
 
     record ResponseMetadata(

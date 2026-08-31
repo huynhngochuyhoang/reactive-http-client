@@ -97,49 +97,137 @@ Evidence recorded on 2026-08-30 from clean commit
 
 ## Priority 2 - Production Memory Characterization
 
-### [ ] 2.1 Build a deterministic workload
+### [x] 2.1 Build a deterministic workload
 
-- [ ] Add a loopback fixture that can run cache-disabled, cold miss, warm hit,
+- [x] Add a loopback fixture that can run cache-disabled, cold miss, warm hit,
       maximum-size pressure, TTL expiry, explicit eviction, single flight,
       refresh, cancellation, and factory-close scenarios.
-- [ ] Use fixed payload shapes, key cardinality, concurrency, warmup, operation
+- [x] Use fixed payload shapes, key cardinality, concurrency, warmup, operation
       count, and observation checkpoints so scenarios are comparable.
-- [ ] Isolate scenarios in fresh application contexts or forked JVMs where prior
+- [x] Isolate scenarios in fresh application contexts or forked JVMs where prior
       cache, allocator, or class-loading state would contaminate the result.
-- [ ] Make every hidden load, waiter, refresh, server dispatch, entry, and factory
+- [x] Make every hidden load, waiter, refresh, server dispatch, entry, and factory
       lifecycle observable through bounded structural counters; do not use sleeps
       as the only synchronization.
-- [ ] Keep request and response material synthetic and sanitized in all recorded
+- [x] Keep request and response material synthetic and sanitized in all recorded
       evidence.
 
-### [ ] 2.2 Separate memory domains
+Evidence recorded on 2026-08-30:
 
-- [ ] Capture Java heap usage, live-set evidence, direct-buffer usage, thread
+- `ResponseCacheMemoryWorkload` runs the original ten scenarios against a fresh
+  loopback server, application context, connection provider, cache manager,
+  refresh scheduler, and factory owner per scenario. Priority 2.3 adds the
+  duplicate-miss scenario under the same isolation contract. It fixes a 4 KiB synthetic byte-array
+  payload, 8 keys, concurrency 8, 2 warmup calls, 8 measured calls, a 1 second
+  TTL, and named structural checkpoints. Capacity pressure alone lowers maximum
+  size from 8 to 4.
+- Response gates and bounded latches make the shared load, seven coalesced
+  waiters, hidden refresh, cancellation, and factory-close transitions
+  deterministic. `LocalResponseCacheManager.WorkloadSnapshot` records entries,
+  evictions, active loads, waiter count, refreshes, and closed state alongside
+  caller/load/server and context/factory/server lifecycle counters. Ticker
+  advancement drives expiry and refresh; no scenario uses a sleep as its proof.
+- `mvn -B -ntp -pl reactive-http-client-starter
+  -Dtest=ResponseCacheMemoryWorkloadTest,BoundedLocalResponseCacheContractTest,SemanticReadSingleFlightRefreshContractTest,LocalResponseCacheObservabilityTest
+  test` passed 63 tests with no failures, errors, or skips. The workload also
+  passed two standalone executions. Sanitized structural output is under
+  `target/release-evidence/v29/priority2/deterministic-workload.properties` and
+  contains no request target, cache key, authorization material, or payload.
+
+### [x] 2.2 Separate memory domains
+
+- [x] Capture Java heap usage, live-set evidence, direct-buffer usage, thread
       count, connection-provider resources, cache entry count, in-flight loads,
       refreshes, and application-owned payload allocation separately.
-- [ ] Record JVM flags, heap/direct-memory limits, container limit if available,
+- [x] Record JVM flags, heap/direct-memory limits, container limit if available,
       Java version, OS, transport, allocator, starter commit, and cache policy
       with each run.
-- [ ] Treat process RSS, committed heap, used heap, direct memory, and cache
+- [x] Treat process RSS, committed heap, used heap, direct memory, and cache
       occupancy as distinct signals; do not derive one from another.
-- [ ] Use explicit GC only at named diagnostic checkpoints and never as a
+- [x] Use explicit GC only at named diagnostic checkpoints and never as a
       production behavior or correctness dependency.
-- [ ] Bound profiling output and keep heap dumps/JFR files target-only because
+- [x] Bound profiling output and keep heap dumps/JFR files target-only because
       they may contain application data.
 
-### [ ] 2.3 Classify observed growth before changing production code
+Evidence recorded on 2026-08-31:
 
-- [ ] Compare cache-disabled control runs with cache-enabled fill and steady-state
+- `ResponseCacheMemoryDomains` records used, committed, and maximum heap;
+  process RSS when `/proc/self/status` is available; JDK direct-buffer count,
+  memory, and capacity; Netty allocator direct memory; live/daemon/peak threads;
+  explicit direct-memory and container limits when available; sanitized
+  memory-relevant JVM flags; Java/OS/transport/allocator identity; and the
+  starter commit/dirty state. Unavailable values remain `-1` with an explicit
+  source instead of being inferred from another memory domain.
+- The loopback fixture now installs a supported Reactor Netty pool meter
+  registrar and records registered/total/active/idle/pending/max/disposed pool
+  state separately from server dispatches. Decoded 4 KiB application payload
+  allocations and bytes are cumulative counters independent of cache entries,
+  in-flight loads, coalesced waiters, refreshes, heap, direct memory, and RSS.
+  Each scenario also records its enabled, single-flight, refresh, TTL, and
+  maximum-size policy facts in
+  `target/release-evidence/v29/priority2/deterministic-workload.properties`.
+- Explicit GC is requested only at the structurally named
+  `baseline-after-explicit-gc` checkpoint. The sampler rejects an explicit-GC
+  request at any checkpoint without `explicit-gc` in its name, and no memory
+  value is used as a test correctness threshold.
+- `scripts/run-v29-memory-profile.sh` confines JFR/heap-dump destinations to
+  `target/release-evidence/v29/priority2/profiling/`, caps JFR at 64 MiB, and
+  warns that profiles may contain application data. The recorded focused run
+  passed 2 tests and produced a valid 973,336-byte JFR.
+- The adjacent cache workload/contract/observability run passed 64 tests, the
+  documentation plus workload run passed 46 tests, `bash -n` passed for the
+  profiling script, and `git diff --check` passed. Memory-growth comparison and
+  ownership classification remain intentionally open in Priority 2.3.
+
+### [x] 2.3 Classify observed growth before changing production code
+
+- [x] Compare cache-disabled control runs with cache-enabled fill and steady-state
       runs under identical transport and payload conditions.
-- [ ] Verify whether growth plateaus at `maximum-size`, falls after expiry/
+- [x] Verify whether growth plateaus at `maximum-size`, falls after expiry/
       eviction, and returns toward the control live set after factory close.
-- [ ] Repeat refresh, cancellation, duplicate miss, and shutdown races enough to
+- [x] Repeat refresh, cancellation, duplicate miss, and shutdown races enough to
       distinguish retained owners from one-time class/JIT/allocator growth.
-- [ ] Correlate any retained object class with a starter-owned reference path or
+- [x] Correlate any retained object class with a starter-owned reference path or
       explicitly classify it as application-, JVM-, or transport-owned.
-- [ ] Record one source-controlled finding before Priority 3 implementation:
+- [x] Record one source-controlled finding before Priority 3 implementation:
       confirmed leak, expected bounded retention, accounting gap, or inconclusive
       external workload.
+
+Evidence recorded on 2026-08-31:
+
+- `scripts/run-v29-memory-characterization.sh` launched 55 fresh JVMs: five
+  repetitions of the cache-disabled control and all ten cache-enabled/lifecycle
+  scenarios. Every child used the same 4 KiB payload, eight-key workload,
+  concurrency eight, one-connection epoll transport, adaptive Netty allocator,
+  `-Xms128m -Xmx128m`, `-XX:MaxDirectMemorySize=64m`, and G1. Raw sanitized
+  properties, logs, per-sample values, and aggregate means are target-only under
+  `target/release-evidence/v29/priority2/characterization/`.
+- The cache-disabled steady live-set change averaged 18.0 KiB. Eight-entry cold
+  and warm fills averaged about 225 KiB; capacity pressure completed eight loads
+  but remained at exactly four entries in every repetition. TTL expiry and
+  explicit eviction reached zero entries and reduced mean GC-stable heap by
+  37,008 and 34,557 bytes before reload. These are diagnostic observations, not
+  correctness thresholds or exact retained-size claims.
+- Duplicate miss produced eight subscriptions and eight dispatches but one
+  winning entry. Refresh, cancellation, duplicate miss, single flight, and
+  factory-close races each completed five isolated repetitions. Every final
+  checkpoint reported zero entries, loads, refreshes, and pool connections with
+  the factory/cache and pool disposed.
+- Closed cache scenarios remained about 184-223 KiB of heap and 0.90-4.26 MiB
+  of RSS above the cache-disabled mean. The bounded JFR's class-level candidates
+  were classified as application payload, Netty transport/allocator state, or
+  JVM/Reactor aggregate state; it did not prove a surviving starter reference
+  path. `roadmaps/v29/MEMORY-CHARACTERIZATION.md` records the explicit owner
+  paths, limitations, and the source-controlled finding: **expected bounded
+  retention**, with RSS retained as a separate accounting gap rather than a
+  confirmed starter leak.
+- The focused workload/cache/refresh/observability run passed 65 tests with no
+  failures, errors, or skips. `ResponseCacheMemoryWorkloadTest` separately
+  passed 3 tests, including GC-stable release/close checkpoints and the
+  duplicate-miss control. The documentation plus workload gate passed 47 tests;
+  `bash -n scripts/run-v29-memory-characterization.sh` and `git diff --check`
+  also passed. Priority 3 remains responsible for weak-reference and
+  root-path collectability proof before any production retention fix.
 
 ---
 
