@@ -361,19 +361,40 @@ Evidence recorded on 2026-08-31 against commit
   traversal was added by this spike. `DocumentationReleaseArtifactTest` passed
   44 tests; tracked and new-file whitespace checks passed.
 
-### [ ] 4.2 Define admission semantics before API design
+### [x] 4.2 Define admission semantics before API design
 
-- [ ] Define behavior for zero, negative, unknown, overflowing, and individually
+- [x] Define behavior for zero, negative, unknown, overflowing, and individually
       over-budget weights without assigning unknown values a silent constant.
-- [ ] Define whether over-budget successful responses bypass storage, fail the
+- [x] Define whether over-budget successful responses bypass storage, fail the
       call, or use a narrower supported-value contract; prefer successful
       uncached delivery unless evidence requires otherwise.
-- [ ] Keep mandatory TTL and `maximum-size`; define weight as an additional bound,
+- [x] Keep mandatory TTL and `maximum-size`; define weight as an additional bound,
       not a replacement or a heap/RSS estimate.
-- [ ] Define atomic accounting for first fill, duplicate misses, replacement,
+- [x] Define atomic accounting for first fill, duplicate misses, replacement,
       refresh success/failure, expiry, eviction, and close.
-- [ ] Define source/binary compatibility and no-op behavior for every existing
+- [x] Define source/binary compatibility and no-op behavior for every existing
       `4.0.0`/`4.1.0` policy when no weight budget is selected.
+
+Evidence recorded on 2026-08-31 against commit
+`95426f31152ca6bfd1c8e569eea99b4a820bcba1`:
+
+- [`RETAINED-WEIGHT-ADMISSION.md`](RETAINED-WEIGHT-ADMISSION.md) defines the
+  candidate-independent model, measurement outcomes, caller behavior, atomic
+  accounting owner, transition semantics, and compatibility boundary.
+- A positive aggregate budget is additional to mandatory TTL and
+  `maximum-size`. Zero entry weight is valid but still consumes an entry slot;
+  negative, unknown, overflowing, and individually over-budget measurements
+  bypass storage without changing a successful downstream result.
+- Only an actual generation-current retained-entry transition changes aggregate
+  weight. The stored entry owns immutable weight, removal subtracts it exactly
+  once, losing duplicates have no accounting or eviction side effects, and
+  refresh failure or bypass preserves the old weight and hard-expiry deadline.
+- Existing policies with no selected budget allocate no counter, candidate
+  weight, weighted cache, weigher lookup, callback, meter, diagnostic field, or
+  support output. No public API or production code was added in 4.2; the unit,
+  numeric bounds, storage, and final go/no-go remain deferred to 4.3.
+  `DocumentationReleaseArtifactTest` passed 44 tests; tracked and new-file
+  whitespace checks passed.
 
 ### [ ] 4.3 Record the weight-contract decision
 
