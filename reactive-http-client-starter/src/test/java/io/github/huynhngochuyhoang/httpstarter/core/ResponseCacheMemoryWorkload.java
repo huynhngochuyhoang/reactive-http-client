@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.netty.buffer.ByteBufAllocatorMetricProvider;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -15,13 +16,18 @@ import reactor.core.scheduler.Schedulers;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.server.HttpServer;
+import reactor.netty.resources.ConnectionPoolMetrics;
 import reactor.netty.resources.ConnectionProvider;
 
 import java.lang.reflect.Field;
+import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,7 +64,7 @@ final class ResponseCacheMemoryWorkload {
         Fixture fixture = new Fixture(scenario);
         try {
             fixture.warmUp();
-            fixture.checkpoint("baseline");
+            fixture.checkpoint("baseline-after-explicit-gc", true);
             switch (scenario) {
                 case CACHE_DISABLED -> cacheDisabled(fixture);
                 case COLD_MISS -> coldMiss(fixture);
@@ -229,7 +235,24 @@ final class ResponseCacheMemoryWorkload {
             int warmupOperations,
             int measuredOperations,
             long ttlMillis,
-            long maximumSize) {
+            long maximumSize,
+            boolean cacheEnabled,
+            boolean singleFlight,
+            long refreshAfterMillis,
+            long refreshTimeoutMillis) {
+    }
+
+    record PoolSnapshot(
+            int registeredPools,
+            int totalConnections,
+            int activeConnections,
+            int idleConnections,
+            int pendingAcquires,
+            int maximumConnections,
+            boolean disposed) {
+    }
+
+    record ApplicationPayloadSnapshot(long allocations, long allocatedBytes) {
     }
 
     record Checkpoint(
@@ -249,6 +272,9 @@ final class ResponseCacheMemoryWorkload {
             int cancelledDispatches,
             int activeDispatches,
             LocalResponseCacheManager.WorkloadSnapshot cache,
+            PoolSnapshot connectionPool,
+            ApplicationPayloadSnapshot applicationPayload,
+            ResponseCacheMemoryDomains.Snapshot memory,
             int contextsCreated,
             int contextsClosed,
             int factoriesCreated,
@@ -257,7 +283,11 @@ final class ResponseCacheMemoryWorkload {
             int serversStopped) {
     }
 
-    record Evidence(Scenario scenario, Definition definition, List<Checkpoint> checkpoints) {
+    record Evidence(
+            Scenario scenario,
+            Definition definition,
+            ResponseCacheMemoryDomains.Environment environment,
+            List<Checkpoint> checkpoints) {
         Evidence {
             checkpoints = List.copyOf(checkpoints);
         }
@@ -277,7 +307,7 @@ final class ResponseCacheMemoryWorkload {
 
     static String render(List<Evidence> evidence) {
         StringBuilder output = new StringBuilder();
-        output.append("format=v29-response-cache-memory-workload-v1\n");
+        output.append("format=v29-response-cache-memory-workload-v2\n");
         for (Evidence item : evidence) {
             Definition definition = item.definition();
             String prefix = "scenario." + item.scenario().id();
@@ -289,6 +319,11 @@ final class ResponseCacheMemoryWorkload {
             output.append(prefix).append(".measuredOperations=").append(definition.measuredOperations()).append('\n');
             output.append(prefix).append(".ttlMillis=").append(definition.ttlMillis()).append('\n');
             output.append(prefix).append(".maximumSize=").append(definition.maximumSize()).append('\n');
+            output.append(prefix).append(".cacheEnabled=").append(definition.cacheEnabled()).append('\n');
+            output.append(prefix).append(".singleFlight=").append(definition.singleFlight()).append('\n');
+            output.append(prefix).append(".refreshAfterMillis=").append(definition.refreshAfterMillis()).append('\n');
+            output.append(prefix).append(".refreshTimeoutMillis=").append(definition.refreshTimeoutMillis()).append('\n');
+            appendEnvironment(output, prefix, item.environment());
             output.append(prefix).append(".checkpointCount=").append(item.checkpoints().size()).append('\n');
             for (int index = 0; index < item.checkpoints().size(); index++) {
                 Checkpoint checkpoint = item.checkpoints().get(index);
@@ -313,6 +348,9 @@ final class ResponseCacheMemoryWorkload {
                 output.append(checkpointPrefix).append(".coalescedWaiters=").append(checkpoint.cache().coalescedWaiters()).append('\n');
                 output.append(checkpointPrefix).append(".inFlightRefreshes=").append(checkpoint.cache().inFlightRefreshes()).append('\n');
                 output.append(checkpointPrefix).append(".cacheClosed=").append(checkpoint.cache().cache().closed()).append('\n');
+                appendPool(output, checkpointPrefix, checkpoint.connectionPool());
+                appendApplicationPayload(output, checkpointPrefix, checkpoint.applicationPayload());
+                appendMemory(output, checkpointPrefix, checkpoint.memory());
                 output.append(checkpointPrefix).append(".contextsCreated=").append(checkpoint.contextsCreated()).append('\n');
                 output.append(checkpointPrefix).append(".contextsClosed=").append(checkpoint.contextsClosed()).append('\n');
                 output.append(checkpointPrefix).append(".factoriesCreated=").append(checkpoint.factoriesCreated()).append('\n');
@@ -322,6 +360,71 @@ final class ResponseCacheMemoryWorkload {
             }
         }
         return output.toString();
+    }
+
+    private static void appendEnvironment(
+            StringBuilder output,
+            String prefix,
+            ResponseCacheMemoryDomains.Environment environment) {
+        output.append(prefix).append(".javaVersion=").append(environment.javaVersion()).append("\n");
+        output.append(prefix).append(".javaVm=").append(environment.javaVm()).append("\n");
+        output.append(prefix).append(".jvmFlags=").append(environment.jvmFlags()).append("\n");
+        output.append(prefix).append(".maximumHeapBytes=").append(environment.maximumHeapBytes()).append("\n");
+        output.append(prefix).append(".configuredDirectMemoryLimitBytes=")
+                .append(environment.configuredDirectMemoryLimitBytes()).append("\n");
+        output.append(prefix).append(".directMemoryLimitSource=")
+                .append(environment.directMemoryLimitSource()).append("\n");
+        output.append(prefix).append(".containerMemoryLimitBytes=")
+                .append(environment.containerMemoryLimitBytes()).append("\n");
+        output.append(prefix).append(".osName=").append(environment.osName()).append("\n");
+        output.append(prefix).append(".osVersion=").append(environment.osVersion()).append("\n");
+        output.append(prefix).append(".osArchitecture=").append(environment.osArchitecture()).append("\n");
+        output.append(prefix).append(".transport=").append(environment.transport()).append("\n");
+        output.append(prefix).append(".allocator=").append(environment.allocator()).append("\n");
+        output.append(prefix).append(".starterCommit=").append(environment.starterCommit()).append("\n");
+        output.append(prefix).append(".sourceTreeDirty=").append(environment.sourceTreeDirty()).append("\n");
+    }
+
+    private static void appendPool(StringBuilder output, String prefix, PoolSnapshot pool) {
+        output.append(prefix).append(".poolRegistered=").append(pool.registeredPools()).append("\n");
+        output.append(prefix).append(".poolTotalConnections=").append(pool.totalConnections()).append("\n");
+        output.append(prefix).append(".poolActiveConnections=").append(pool.activeConnections()).append("\n");
+        output.append(prefix).append(".poolIdleConnections=").append(pool.idleConnections()).append("\n");
+        output.append(prefix).append(".poolPendingAcquires=").append(pool.pendingAcquires()).append("\n");
+        output.append(prefix).append(".poolMaximumConnections=").append(pool.maximumConnections()).append("\n");
+        output.append(prefix).append(".poolDisposed=").append(pool.disposed()).append("\n");
+    }
+
+    private static void appendApplicationPayload(
+            StringBuilder output,
+            String prefix,
+            ApplicationPayloadSnapshot payload) {
+        output.append(prefix).append(".applicationPayloadAllocations=")
+                .append(payload.allocations()).append("\n");
+        output.append(prefix).append(".applicationPayloadAllocatedBytes=")
+                .append(payload.allocatedBytes()).append("\n");
+    }
+
+    private static void appendMemory(
+            StringBuilder output,
+            String prefix,
+            ResponseCacheMemoryDomains.Snapshot memory) {
+        output.append(prefix).append(".explicitGcRequested=").append(memory.explicitGcRequested()).append("\n");
+        output.append(prefix).append(".explicitGcObserved=").append(memory.explicitGcObserved()).append("\n");
+        output.append(prefix).append(".processRssBytes=").append(memory.processRssBytes()).append("\n");
+        output.append(prefix).append(".usedHeapBytes=").append(memory.usedHeapBytes()).append("\n");
+        output.append(prefix).append(".committedHeapBytes=").append(memory.committedHeapBytes()).append("\n");
+        output.append(prefix).append(".maximumHeapBytes=").append(memory.maximumHeapBytes()).append("\n");
+        output.append(prefix).append(".directBufferCount=").append(memory.directBufferCount()).append("\n");
+        output.append(prefix).append(".directBufferMemoryUsedBytes=")
+                .append(memory.directBufferMemoryUsedBytes()).append("\n");
+        output.append(prefix).append(".directBufferTotalCapacityBytes=")
+                .append(memory.directBufferTotalCapacityBytes()).append("\n");
+        output.append(prefix).append(".nettyAllocatorDirectMemoryUsedBytes=")
+                .append(memory.nettyAllocatorDirectMemoryUsedBytes()).append("\n");
+        output.append(prefix).append(".liveThreadCount=").append(memory.liveThreadCount()).append("\n");
+        output.append(prefix).append(".daemonThreadCount=").append(memory.daemonThreadCount()).append("\n");
+        output.append(prefix).append(".peakThreadCount=").append(memory.peakThreadCount()).append("\n");
     }
 
     private enum Operation {
@@ -335,12 +438,14 @@ final class ResponseCacheMemoryWorkload {
         private final AtomicLong tickerNanos = new AtomicLong();
         private final Scheduler refreshScheduler;
         private final LoopbackServer server;
+        private final PoolMetricsRecorder poolMetrics;
         private final ConnectionProvider connectionProvider;
         private final AnnotationConfigApplicationContext context;
         private final LocalResponseCacheManager manager;
         private final ReactiveHttpClientFactoryBean<Object> factory;
         private final WebClient webClient;
         private final EffectiveCachePolicy.Selection selection;
+        private final ResponseCacheMemoryDomains.Environment environment;
         private final AtomicInteger measuredCallers = new AtomicInteger();
         private final AtomicInteger setupCallers = new AtomicInteger();
         private final AtomicInteger verificationCallers = new AtomicInteger();
@@ -350,6 +455,8 @@ final class ResponseCacheMemoryWorkload {
         private final AtomicInteger loadSuccesses = new AtomicInteger();
         private final AtomicInteger loadFailures = new AtomicInteger();
         private final AtomicInteger loadCancellations = new AtomicInteger();
+        private final AtomicLong applicationPayloadAllocations = new AtomicLong();
+        private final AtomicLong applicationPayloadAllocatedBytes = new AtomicLong();
         private final List<Checkpoint> checkpoints = new ArrayList<>();
         private final AtomicInteger contextsCreated = new AtomicInteger(1);
         private final AtomicInteger contextsClosed = new AtomicInteger();
@@ -364,7 +471,11 @@ final class ResponseCacheMemoryWorkload {
             this.scenario = Objects.requireNonNull(scenario, "scenario");
             this.refreshScheduler = Schedulers.newSingle("v29-memory-refresh-" + scenario.id());
             this.server = new LoopbackServer();
-            this.connectionProvider = ConnectionProvider.create("v29-memory-" + scenario.id(), 1);
+            this.poolMetrics = new PoolMetricsRecorder();
+            this.connectionProvider = ConnectionProvider.builder("v29-memory-" + scenario.id())
+                    .maxConnections(1)
+                    .metrics(true, () -> poolMetrics)
+                    .build();
             this.context = new AnnotationConfigApplicationContext();
             context.refresh();
             this.manager = LocalResponseCacheManager.testing(tickerNanos::get, refreshScheduler);
@@ -375,6 +486,8 @@ final class ResponseCacheMemoryWorkload {
                     .clientConnector(new ReactorClientHttpConnector(HttpClient.create(connectionProvider)))
                     .build();
             this.selection = scenario == Scenario.CACHE_DISABLED ? null : selection(scenario);
+            this.environment = ResponseCacheMemoryDomains.environment(
+                    projectRoot(), server.transport(), server.allocator());
         }
 
         private void warmUp() {
@@ -387,6 +500,8 @@ final class ResponseCacheMemoryWorkload {
             loadSuccesses.set(0);
             loadFailures.set(0);
             loadCancellations.set(0);
+            applicationPayloadAllocations.set(0);
+            applicationPayloadAllocatedBytes.set(0);
         }
 
         private void fill(Operation operation) {
@@ -424,6 +539,10 @@ final class ResponseCacheMemoryWorkload {
                         .uri("/memory/{key}", "synthetic-" + Math.floorMod(keyIndex, KEY_CARDINALITY))
                         .retrieve()
                         .bodyToMono(byte[].class)
+                        .doOnNext(payload -> {
+                            applicationPayloadAllocations.incrementAndGet();
+                            applicationPayloadAllocatedBytes.addAndGet(payload.length);
+                        })
                         .doOnSuccess(ignored -> loadSuccesses.incrementAndGet())
                         .doOnError(ignored -> loadFailures.incrementAndGet())
                         .doOnCancel(loadCancellations::incrementAndGet);
@@ -469,6 +588,10 @@ final class ResponseCacheMemoryWorkload {
         }
 
         private void checkpoint(String name) {
+            checkpoint(name, false);
+        }
+
+        private void checkpoint(String name, boolean requestExplicitGc) {
             LocalResponseCacheManager.WorkloadSnapshot cache = manager.workloadSnapshotForTesting();
             checkpoints.add(new Checkpoint(
                     name,
@@ -487,6 +610,12 @@ final class ResponseCacheMemoryWorkload {
                     server.cancelledDispatches.get(),
                     server.activeDispatches.get(),
                     cache,
+                    poolMetrics.snapshot(connectionProvider),
+                    new ApplicationPayloadSnapshot(
+                            applicationPayloadAllocations.get(),
+                            applicationPayloadAllocatedBytes.get()),
+                    ResponseCacheMemoryDomains.capture(
+                            name, requestExplicitGc, server.allocatorDirectMemoryUsedBytes()),
                     contextsCreated.get(),
                     contextsClosed.get(),
                     factoriesCreated.get(),
@@ -509,7 +638,14 @@ final class ResponseCacheMemoryWorkload {
                             WARMUP_OPERATIONS,
                             MEASURED_OPERATIONS,
                             TTL_MILLIS,
-                            maximumSize),
+                            maximumSize,
+                            scenario != Scenario.CACHE_DISABLED,
+                            scenario == Scenario.SINGLE_FLIGHT
+                                    || scenario == Scenario.CANCELLATION
+                                    || scenario == Scenario.FACTORY_CLOSE,
+                            scenario == Scenario.REFRESH ? REFRESH_AFTER_MILLIS : 0,
+                            scenario == Scenario.REFRESH ? REFRESH_TIMEOUT_MILLIS : 0),
+                    environment,
                     checkpoints);
         }
 
@@ -546,6 +682,49 @@ final class ResponseCacheMemoryWorkload {
         }
     }
 
+    private static final class PoolMetricsRecorder implements ConnectionProvider.MeterRegistrar {
+        private final Map<PoolKey, ConnectionPoolMetrics> pools = new ConcurrentHashMap<>();
+
+        @Override
+        public void registerMetrics(
+                String poolName,
+                String id,
+                SocketAddress remoteAddress,
+                ConnectionPoolMetrics metrics) {
+            pools.put(new PoolKey(poolName, id, remoteAddress), metrics);
+        }
+
+        @Override
+        public void deRegisterMetrics(String poolName, String id, SocketAddress remoteAddress) {
+            pools.remove(new PoolKey(poolName, id, remoteAddress));
+        }
+
+        private PoolSnapshot snapshot(ConnectionProvider provider) {
+            int total = 0;
+            int active = 0;
+            int idle = 0;
+            int pending = 0;
+            List<ConnectionPoolMetrics> current = List.copyOf(pools.values());
+            for (ConnectionPoolMetrics metrics : current) {
+                total += metrics.allocatedSize();
+                active += metrics.acquiredSize();
+                idle += metrics.idleSize();
+                pending += metrics.pendingAcquireSize();
+            }
+            return new PoolSnapshot(
+                    current.size(),
+                    total,
+                    active,
+                    idle,
+                    pending,
+                    provider.maxConnections(),
+                    provider.isDisposed());
+        }
+
+        private record PoolKey(String poolName, String id, SocketAddress remoteAddress) {
+        }
+    }
+
     private static EffectiveCachePolicy.Selection selection(Scenario scenario) {
         ReactiveHttpClientProperties.CachePolicyConfig policy =
                 new ReactiveHttpClientProperties.CachePolicyConfig();
@@ -564,6 +743,11 @@ final class ResponseCacheMemoryWorkload {
         }
         return new EffectiveCachePolicy.Selection(
                 true, EffectiveCachePolicy.Source.CLIENT, "memory-policy", policy);
+    }
+
+    private static Path projectRoot() {
+        Path cwd = Path.of("").toAbsolutePath().normalize();
+        return Files.exists(cwd.resolve("README.md")) ? cwd : cwd.getParent();
     }
 
     private static CacheKeyContract.OpaqueKey key(int keyIndex) {
@@ -607,6 +791,20 @@ final class ResponseCacheMemoryWorkload {
 
         private String baseUrl() {
             return "http://127.0.0.1:" + server.port();
+        }
+
+        private String transport() {
+            return server.channel().getClass().getName();
+        }
+
+        private String allocator() {
+            return server.channel().alloc().getClass().getName();
+        }
+
+        private long allocatorDirectMemoryUsedBytes() {
+            return server.channel().alloc() instanceof ByteBufAllocatorMetricProvider provider
+                    ? provider.metric().usedDirectMemory()
+                    : ResponseCacheMemoryDomains.UNAVAILABLE;
         }
 
         private ResponseGate gateNextResponse() {

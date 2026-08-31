@@ -133,20 +133,50 @@ Evidence recorded on 2026-08-30:
   `target/release-evidence/v29/priority2/deterministic-workload.properties` and
   contains no request target, cache key, authorization material, or payload.
 
-### [ ] 2.2 Separate memory domains
+### [x] 2.2 Separate memory domains
 
-- [ ] Capture Java heap usage, live-set evidence, direct-buffer usage, thread
+- [x] Capture Java heap usage, live-set evidence, direct-buffer usage, thread
       count, connection-provider resources, cache entry count, in-flight loads,
       refreshes, and application-owned payload allocation separately.
-- [ ] Record JVM flags, heap/direct-memory limits, container limit if available,
+- [x] Record JVM flags, heap/direct-memory limits, container limit if available,
       Java version, OS, transport, allocator, starter commit, and cache policy
       with each run.
-- [ ] Treat process RSS, committed heap, used heap, direct memory, and cache
+- [x] Treat process RSS, committed heap, used heap, direct memory, and cache
       occupancy as distinct signals; do not derive one from another.
-- [ ] Use explicit GC only at named diagnostic checkpoints and never as a
+- [x] Use explicit GC only at named diagnostic checkpoints and never as a
       production behavior or correctness dependency.
-- [ ] Bound profiling output and keep heap dumps/JFR files target-only because
+- [x] Bound profiling output and keep heap dumps/JFR files target-only because
       they may contain application data.
+
+Evidence recorded on 2026-08-31:
+
+- `ResponseCacheMemoryDomains` records used, committed, and maximum heap;
+  process RSS when `/proc/self/status` is available; JDK direct-buffer count,
+  memory, and capacity; Netty allocator direct memory; live/daemon/peak threads;
+  explicit direct-memory and container limits when available; sanitized
+  memory-relevant JVM flags; Java/OS/transport/allocator identity; and the
+  starter commit/dirty state. Unavailable values remain `-1` with an explicit
+  source instead of being inferred from another memory domain.
+- The loopback fixture now installs a supported Reactor Netty pool meter
+  registrar and records registered/total/active/idle/pending/max/disposed pool
+  state separately from server dispatches. Decoded 4 KiB application payload
+  allocations and bytes are cumulative counters independent of cache entries,
+  in-flight loads, coalesced waiters, refreshes, heap, direct memory, and RSS.
+  Each scenario also records its enabled, single-flight, refresh, TTL, and
+  maximum-size policy facts in
+  `target/release-evidence/v29/priority2/deterministic-workload.properties`.
+- Explicit GC is requested only at the structurally named
+  `baseline-after-explicit-gc` checkpoint. The sampler rejects an explicit-GC
+  request at any checkpoint without `explicit-gc` in its name, and no memory
+  value is used as a test correctness threshold.
+- `scripts/run-v29-memory-profile.sh` confines JFR/heap-dump destinations to
+  `target/release-evidence/v29/priority2/profiling/`, caps JFR at 64 MiB, and
+  warns that profiles may contain application data. The recorded focused run
+  passed 2 tests and produced a valid 973,336-byte JFR.
+- The adjacent cache workload/contract/observability run passed 64 tests, the
+  documentation plus workload run passed 46 tests, `bash -n` passed for the
+  profiling script, and `git diff --check` passed. Memory-growth comparison and
+  ownership classification remain intentionally open in Priority 2.3.
 
 ### [ ] 2.3 Classify observed growth before changing production code
 

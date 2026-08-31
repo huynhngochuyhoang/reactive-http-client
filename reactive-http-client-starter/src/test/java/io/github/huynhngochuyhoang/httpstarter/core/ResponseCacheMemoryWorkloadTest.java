@@ -1,5 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import jdk.jfr.Configuration;
+import jdk.jfr.Recording;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
@@ -9,12 +11,20 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ResponseCacheMemoryWorkloadTest {
 
     @Test
     void allScenariosExposeDeterministicBoundedStructuralEvidence() throws Exception {
-        List<ResponseCacheMemoryWorkload.Evidence> evidence = ResponseCacheMemoryWorkload.runAll();
+        Recording recording = startOptionalRecording();
+        List<ResponseCacheMemoryWorkload.Evidence> evidence;
+        try {
+            evidence = ResponseCacheMemoryWorkload.runAll();
+        }
+        finally {
+            finishOptionalRecording(recording);
+        }
         Map<ResponseCacheMemoryWorkload.Scenario, ResponseCacheMemoryWorkload.Evidence> byScenario =
                 new EnumMap<>(ResponseCacheMemoryWorkload.Scenario.class);
         evidence.forEach(item -> byScenario.put(item.scenario(), item));
@@ -27,6 +37,21 @@ class ResponseCacheMemoryWorkloadTest {
             assertThat(item.definition().concurrency()).isEqualTo(ResponseCacheMemoryWorkload.CONCURRENCY);
             assertThat(item.definition().warmupOperations()).isEqualTo(ResponseCacheMemoryWorkload.WARMUP_OPERATIONS);
             assertThat(item.definition().measuredOperations()).isEqualTo(ResponseCacheMemoryWorkload.MEASURED_OPERATIONS);
+            assertThat(item.definition().cacheEnabled())
+                    .isEqualTo(item.scenario() != ResponseCacheMemoryWorkload.Scenario.CACHE_DISABLED);
+            assertThat(item.environment().javaVersion()).isNotBlank();
+            assertThat(item.environment().javaVm()).isNotBlank();
+            assertThat(item.environment().jvmFlags()).doesNotContain("\n", "\r");
+            assertThat(item.environment().maximumHeapBytes()).isPositive();
+            assertThat(item.environment().configuredDirectMemoryLimitBytes()).isGreaterThanOrEqualTo(-1);
+            assertThat(item.environment().directMemoryLimitSource()).isNotBlank();
+            assertThat(item.environment().containerMemoryLimitBytes()).isGreaterThanOrEqualTo(-1);
+            assertThat(item.environment().osName()).isNotBlank();
+            assertThat(item.environment().osVersion()).isNotBlank();
+            assertThat(item.environment().osArchitecture()).isNotBlank();
+            assertThat(item.environment().transport()).startsWith("io.netty.channel.");
+            assertThat(item.environment().allocator()).contains("ByteBufAllocator");
+            assertThat(item.environment().starterCommit()).isNotBlank();
             assertThat(item.checkpoints()).hasSizeBetween(3, 5);
             assertThat(item.checkpoints()).allSatisfy(checkpoint -> {
                 assertThat(checkpoint.cache().inFlightLoads()).isBetween(0, 1);
@@ -34,7 +59,36 @@ class ResponseCacheMemoryWorkloadTest {
                         .isBetween(0, ResponseCacheMemoryWorkload.CONCURRENCY - 1);
                 assertThat(checkpoint.cache().inFlightRefreshes()).isBetween(0, 1);
                 assertThat(checkpoint.activeDispatches()).isBetween(0, 1);
+                assertThat(checkpoint.connectionPool().registeredPools()).isGreaterThanOrEqualTo(0);
+                assertThat(checkpoint.connectionPool().totalConnections()).isGreaterThanOrEqualTo(0);
+                assertThat(checkpoint.connectionPool().activeConnections()).isGreaterThanOrEqualTo(0);
+                assertThat(checkpoint.connectionPool().idleConnections()).isGreaterThanOrEqualTo(0);
+                assertThat(checkpoint.connectionPool().pendingAcquires()).isGreaterThanOrEqualTo(0);
+                assertThat(checkpoint.connectionPool().maximumConnections()).isEqualTo(1);
+                assertThat(checkpoint.applicationPayload().allocations()).isGreaterThanOrEqualTo(0);
+                assertThat(checkpoint.applicationPayload().allocatedBytes())
+                        .isEqualTo(checkpoint.applicationPayload().allocations()
+                                * ResponseCacheMemoryWorkload.PAYLOAD_BYTES);
+                assertThat(checkpoint.memory().processRssBytes()).isGreaterThanOrEqualTo(-1);
+                assertThat(checkpoint.memory().usedHeapBytes()).isGreaterThanOrEqualTo(0);
+                assertThat(checkpoint.memory().committedHeapBytes())
+                        .isGreaterThanOrEqualTo(checkpoint.memory().usedHeapBytes());
+                assertThat(checkpoint.memory().maximumHeapBytes())
+                        .isGreaterThanOrEqualTo(checkpoint.memory().committedHeapBytes());
+                assertThat(checkpoint.memory().directBufferCount()).isGreaterThanOrEqualTo(-1);
+                assertThat(checkpoint.memory().directBufferMemoryUsedBytes()).isGreaterThanOrEqualTo(-1);
+                assertThat(checkpoint.memory().directBufferTotalCapacityBytes()).isGreaterThanOrEqualTo(-1);
+                assertThat(checkpoint.memory().nettyAllocatorDirectMemoryUsedBytes()).isGreaterThanOrEqualTo(-1);
+                assertThat(checkpoint.memory().liveThreadCount()).isPositive();
+                assertThat(checkpoint.memory().daemonThreadCount()).isGreaterThanOrEqualTo(0);
+                assertThat(checkpoint.memory().peakThreadCount())
+                        .isGreaterThanOrEqualTo(checkpoint.memory().liveThreadCount());
             });
+            ResponseCacheMemoryWorkload.Checkpoint baseline = item.checkpoint("baseline-after-explicit-gc");
+            assertThat(baseline.memory().explicitGcRequested()).isTrue();
+            assertThat(item.checkpoints().stream()
+                    .filter(checkpoint -> checkpoint.memory().explicitGcRequested()))
+                    .allSatisfy(checkpoint -> assertThat(checkpoint.name()).contains("explicit-gc"));
             ResponseCacheMemoryWorkload.Checkpoint closed = item.lastCheckpoint();
             assertThat(closed.measuredCallers())
                     .isEqualTo(ResponseCacheMemoryWorkload.MEASURED_OPERATIONS);
@@ -50,6 +104,9 @@ class ResponseCacheMemoryWorkloadTest {
             assertThat(closed.cache().inFlightLoads()).isZero();
             assertThat(closed.cache().coalescedWaiters()).isZero();
             assertThat(closed.cache().inFlightRefreshes()).isZero();
+            assertThat(closed.connectionPool().disposed()).isTrue();
+            assertThat(closed.connectionPool().registeredPools()).isZero();
+            assertThat(closed.connectionPool().totalConnections()).isZero();
         });
 
         assertThat(checkpoint(byScenario, ResponseCacheMemoryWorkload.Scenario.CACHE_DISABLED,
@@ -109,11 +166,58 @@ class ResponseCacheMemoryWorkloadTest {
         Files.createDirectories(report.getParent());
         Files.writeString(report, ResponseCacheMemoryWorkload.render(evidence));
         assertThat(Files.readString(report))
-                .contains("format=v29-response-cache-memory-workload-v1")
+                .contains("format=v29-response-cache-memory-workload-v2")
+                .contains("scenario.single-flight.jvmFlags=")
+                .contains("scenario.single-flight.checkpoint.1.processRssBytes=")
+                .contains("scenario.single-flight.checkpoint.1.usedHeapBytes=")
+                .contains("scenario.single-flight.checkpoint.1.committedHeapBytes=")
+                .contains("scenario.single-flight.checkpoint.1.directBufferMemoryUsedBytes=")
+                .contains("scenario.single-flight.checkpoint.1.nettyAllocatorDirectMemoryUsedBytes=")
+                .contains("scenario.single-flight.checkpoint.1.cacheEntries=")
+                .contains("scenario.single-flight.checkpoint.1.poolTotalConnections=")
+                .contains("scenario.single-flight.checkpoint.1.applicationPayloadAllocatedBytes=")
                 .contains("scenario.single-flight.checkpoint.1.coalescedWaiters=7")
                 .doesNotContain("http://")
                 .doesNotContain("Authorization")
                 .doesNotContain("synthetic-key-");
+    }
+
+    @Test
+    void explicitGcRequiresANamedDiagnosticCheckpoint() {
+        assertThatThrownBy(() -> ResponseCacheMemoryDomains.capture("ordinary-checkpoint", true, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("explicit-gc");
+
+        assertThat(ResponseCacheMemoryDomains.capture("diagnostic-explicit-gc", false, 0)
+                .explicitGcRequested()).isFalse();
+    }
+
+    private static Recording startOptionalRecording() throws Exception {
+        String configuredPath = System.getProperty("v29.memory.jfr");
+        if (configuredPath == null) {
+            return null;
+        }
+        Path recordingPath = Path.of(configuredPath).toAbsolutePath().normalize();
+        Path target = projectRoot().resolve("target").toAbsolutePath().normalize();
+        if (!recordingPath.startsWith(target)) {
+            throw new IllegalArgumentException("V29 profiling output must remain under target");
+        }
+        Files.createDirectories(recordingPath.getParent());
+        Recording recording = new Recording(Configuration.getConfiguration("profile"));
+        recording.setMaxSize(64L * 1024 * 1024);
+        recording.setToDisk(true);
+        recording.start();
+        return recording;
+    }
+
+    private static void finishOptionalRecording(Recording recording) throws Exception {
+        if (recording == null) {
+            return;
+        }
+        try (recording) {
+            recording.stop();
+            recording.dump(Path.of(System.getProperty("v29.memory.jfr")));
+        }
     }
 
     private static ResponseCacheMemoryWorkload.Checkpoint checkpoint(
