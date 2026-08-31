@@ -26,6 +26,7 @@ reactive:
             catalog-read:
               ttl-ms: 60000
               maximum-size: 10000
+              maximum-total-decoded-response-bytes: 268435456
               single-flight: true
               refresh-after-ms: 30000
               refresh-timeout-ms: 5000
@@ -83,6 +84,11 @@ policy must exist and must define:
 
 - `ttl-ms`: `1` through `31536000000` (365 days).
 - `maximum-size`: `1` through `1000000` entries.
+- Optional `maximum-total-decoded-response-bytes`: `1` through
+  `1099511627776` (1 TiB) decoded response representation bytes retained
+  across one policy cache. The count is taken after transport decompression and
+  includes only response-header names and values retained in a cached
+  `ResponseEntity`; it is not Java heap, direct memory, RSS, or container memory.
 
 Refresh remains disabled when both refresh settings are absent. Selecting it requires
 `refresh-after-ms` to be positive and strictly below `ttl-ms`, plus a
@@ -727,8 +733,8 @@ it `INCOMPATIBLE`; classification is not a bypass mechanism.
 Proxy startup, AOT processing, effective-contract export, diagnostics, and
 `MockReactiveHttpClient` use the same `MethodMetadataCache`-backed grammar.
 Replacement metadata caches remain authoritative. Contract snapshots expose a
-bounded `Cache` cell with source, `semanticRead`, TTL, maximum size, normalized
-variants, shared-response acknowledgement, the single-flight decision, and
+bounded `Cache` cell with source, `semanticRead`, TTL, maximum size, the
+optional aggregate decoded-response-byte limit, normalized variants, shared-response acknowledgement, the single-flight decision, and
 bounded refresh threshold/timeout values. Policy names,
 raw values, and opaque key digests are not exported.
 

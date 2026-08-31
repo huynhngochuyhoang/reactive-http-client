@@ -338,6 +338,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "reactive.http.clients.[name].cache.policy",
                 "reactive.http.clients.[name].cache.policies.[policy-name].ttl-ms",
                 "reactive.http.clients.[name].cache.policies.[policy-name].maximum-size",
+                "reactive.http.clients.[name].cache.policies.[policy-name].maximum-total-decoded-response-bytes",
                 "reactive.http.clients.[name].cache.policies.[policy-name].single-flight",
                 "reactive.http.clients.[name].cache.policies.[policy-name].refresh-after-ms",
                 "reactive.http.clients.[name].cache.policies.[policy-name].refresh-timeout-ms",

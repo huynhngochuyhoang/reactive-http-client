@@ -778,6 +778,8 @@ public class ReactiveHttpClientProperties {
         private Long ttlMs;
         /** Maximum number of entries. {@code null} means missing. */
         private Long maximumSize;
+        /** Optional aggregate decoded response representation byte limit. */
+        private Long maximumTotalDecodedResponseBytes;
         /** Stable {@code @CacheKey} labels included as additional key dimensions. */
         private List<String> varyByParameters = new ArrayList<>();
         /**
@@ -806,6 +808,11 @@ public class ReactiveHttpClientProperties {
 
         public Long getMaximumSize() { return maximumSize; }
         public void setMaximumSize(Long maximumSize) { this.maximumSize = maximumSize; }
+
+        public Long getMaximumTotalDecodedResponseBytes() { return maximumTotalDecodedResponseBytes; }
+        public void setMaximumTotalDecodedResponseBytes(Long maximumTotalDecodedResponseBytes) {
+            this.maximumTotalDecodedResponseBytes = maximumTotalDecodedResponseBytes;
+        }
 
         public List<String> getVaryByParameters() { return varyByParameters; }
         public void setVaryByParameters(List<String> varyByParameters) {

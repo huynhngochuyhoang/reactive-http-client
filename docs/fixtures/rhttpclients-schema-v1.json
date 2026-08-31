@@ -22,6 +22,7 @@
       "cacheRefreshAfterMs": null,
       "cacheSingleFlight": "disabled",
       "cacheMaximumSize": 0,
+      "cacheMaximumTotalDecodedResponseBytes": null,
       "cacheEntryCount": 0,
       "cacheEvictions": 0,
       "cacheMetricsEnabled": false,

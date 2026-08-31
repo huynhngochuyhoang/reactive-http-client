@@ -83,6 +83,10 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 ReactiveHttpClientProperties.CachePolicyConfig.class.getMethod("setTtlMs", Long.class)))
                 .accepts(hints);
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                ReactiveHttpClientProperties.CachePolicyConfig.class.getMethod(
+                        "setMaximumTotalDecodedResponseBytes", Long.class)))
+                .accepts(hints);
         assertThat(ReactiveHttpClientProperties.class.getDeclaredClasses())
                 .filteredOn(type -> Modifier.isPublic(type.getModifiers()))
                 .allSatisfy(type -> assertThat(hints.reflection().getTypeHint(type))

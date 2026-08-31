@@ -196,11 +196,16 @@ endpoint use the same logical fields. Provider-backed entries include the config
 limit; collection overloads render those provider-only values as `null` in map/JSON
 and `unknown` in Markdown. Collection-only pool and strict-validation facts retain
 the same unknown semantics. Cache phase, policy count, minimum TTL and refresh
-threshold, single-flight state, aggregate maximum size, entry count, eviction
-count, and cache-metrics enablement follow the same provider/collection unknown
+threshold, single-flight state, aggregate maximum size, optional aggregate
+maximum decoded response representation bytes, entry count, eviction count, and
+cache-metrics enablement follow the same provider/collection unknown
 rules. Provider-backed cache fields also export the bounded policy-source set
 (`method` or `client`), resolved HTTP-method set, and whether at least one
-selected method carries explicit semantic-read acknowledgement. Empty lists and
+selected method carries explicit semantic-read acknowledgement. The configured
+decoded-response-byte aggregate is `null` when any selected
+policy omits the optional limit or when a finite aggregate cannot be represented;
+exact per-method policy limits remain available in effective-contract snapshots.
+Empty lists and
 `false` mean the provider proved no selected cache method; `null` means the fact
 cannot be proven through the collection or replacement-factory contract. No
 snapshot path enumerates cache entries. The fixture and JVM

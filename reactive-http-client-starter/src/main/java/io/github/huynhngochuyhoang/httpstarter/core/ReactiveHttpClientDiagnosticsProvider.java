@@ -240,7 +240,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                                       Class<?> clientInterface,
                                       ReactiveHttpClientProperties.ClientConfig clientConfig) {
         if (!registration.starterFactory()) {
-            return new CacheSummary("disabled", 0, null, null, "disabled", 0, 0L, 0L, false, null, null, null);
+            return new CacheSummary("disabled", 0, null, null, "disabled", 0, null, 0L, 0L, false, null, null, null);
         }
         List<ReactiveHttpClientProperties.CachePolicyConfig> selected = new ArrayList<>();
         Set<String> policySources = new TreeSet<>();
@@ -264,7 +264,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
             }
         }
         if (selected.isEmpty()) {
-            return new CacheSummary("disabled", 0, null, null, "disabled", 0, 0L, 0L, false, List.of(), List.of(), false);
+            return new CacheSummary("disabled", 0, null, null, "disabled", 0, null, 0L, 0L, false, List.of(), List.of(), false);
         }
         String phase = selected.stream().anyMatch(ReactiveHttpClientProperties.CachePolicyConfig::isRefreshEnabled)
                 ? "refresh-on-access"
@@ -283,6 +283,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 .filter(Objects::nonNull).mapToLong(Long::longValue).min().stream().boxed().findFirst().orElse(null);
         long maximumSize = selected.stream().map(ReactiveHttpClientProperties.CachePolicyConfig::getMaximumSize)
                 .filter(Objects::nonNull).mapToLong(Long::longValue).sum();
+        Long maximumTotalDecodedResponseBytes = aggregateMaximumTotalDecodedResponseBytes(selected);
         LocalResponseCacheManager.Snapshot runtime = existingCacheSnapshot(registration);
         boolean metricsEnabled = properties.getObservability() != null
                 && properties.getObservability().isEnabled()
@@ -295,12 +296,30 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 refreshAfterMs,
                 singleFlight,
                 maximumSize,
+                maximumTotalDecodedResponseBytes,
                 runtime != null ? runtime.currentSize() : null,
                 runtime != null ? runtime.evictions() : null,
                 metricsEnabled,
                 List.copyOf(policySources),
                 List.copyOf(httpMethods),
                 semanticReadAcknowledged);
+    }
+
+    private static Long aggregateMaximumTotalDecodedResponseBytes(
+            List<ReactiveHttpClientProperties.CachePolicyConfig> selected) {
+        long total = 0;
+        for (ReactiveHttpClientProperties.CachePolicyConfig policy : selected) {
+            Long maximum = policy.getMaximumTotalDecodedResponseBytes();
+            if (maximum == null) {
+                return null;
+            }
+            try {
+                total = Math.addExact(total, maximum);
+            } catch (ArithmeticException ignored) {
+                return null;
+            }
+        }
+        return total;
     }
 
     private LocalResponseCacheManager.Snapshot existingCacheSnapshot(ClientRegistration registration) {
@@ -886,6 +905,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
             Long refreshAfterMs,
             String singleFlight,
             long maximumSize,
+            Long maximumTotalDecodedResponseBytes,
             Long entryCount,
             Long evictions,
             boolean metricsEnabled,

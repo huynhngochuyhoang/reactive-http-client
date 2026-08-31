@@ -57,7 +57,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
             "poolMaxConnections", "poolPendingAcquireTimeoutMs", "poolMetricsEnabled",
             "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams",
             "cachePhase", "cachePolicyCount", "cacheTtlMs", "cacheRefreshAfterMs",
-            "cacheSingleFlight", "cacheMaximumSize", "cacheEntryCount", "cacheEvictions",
+            "cacheSingleFlight", "cacheMaximumSize", "cacheMaximumTotalDecodedResponseBytes",
+            "cacheEntryCount", "cacheEvictions",
             "cacheMetricsEnabled", "cachePolicySources", "cacheHttpMethods",
             "cacheSemanticReadAcknowledged", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
             "compressionEnabled", "codecMaxInMemorySizeMb",
@@ -121,6 +122,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         policy.setRefreshAfterMs(30_000L);
         policy.setRefreshTimeoutMs(5_000L);
         policy.setMaximumSize(100L);
+        policy.setMaximumTotalDecodedResponseBytes(67_108_864L);
         policy.setSingleFlight(true);
         policy.setSharedResponse(true);
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
@@ -141,6 +143,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("cacheRefreshAfterMs", 30_000L)
                 .containsEntry("cacheSingleFlight", "enabled")
                 .containsEntry("cacheMaximumSize", 100L)
+                .containsEntry("cacheMaximumTotalDecodedResponseBytes", 67_108_864L)
                 .containsEntry("cacheEntryCount", null)
                 .containsEntry("cacheEvictions", null)
                 .containsEntry("cacheMetricsEnabled", true);
@@ -273,6 +276,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
         ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
         policy.setTtlMs(1_000L);
         policy.setMaximumSize(100L);
+        policy.setMaximumTotalDecodedResponseBytes(33_554_432L);
         policy.setSharedResponse(true);
         ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
         config.getCache().getPolicies().put("selected", policy);
@@ -287,6 +291,8 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("clientName", "semantic-read-diagnostic")
                 .containsEntry("cachePhase", "local-ttl")
                 .containsEntry("cachePolicyCount", 1)
+                .containsEntry("cacheMaximumTotalDecodedResponseBytes", 33_554_432L)
+                .containsEntry("cacheMetricsEnabled", false)
                 .containsEntry("cachePolicySources", List.of("method"))
                 .containsEntry("cacheHttpMethods", List.of("POST"))
                 .containsEntry("cacheSemanticReadAcknowledged", true)
@@ -1213,6 +1219,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                       "cacheRefreshAfterMs": null,
                       "cacheSingleFlight": "disabled",
                       "cacheMaximumSize": 0,
+                      "cacheMaximumTotalDecodedResponseBytes": null,
                       "cacheEntryCount": 0,
                       "cacheEvictions": 0,
                       "cacheMetricsEnabled": false,
@@ -1312,6 +1319,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("cachePolicySources", null)
                 .containsEntry("cacheHttpMethods", null)
                 .containsEntry("cacheSemanticReadAcknowledged", null)
+                .containsEntry("cacheMaximumTotalDecodedResponseBytes", null)
                 .containsEntry("timeoutMs", 500L)
                 .containsEntry("followRedirects", true);
 

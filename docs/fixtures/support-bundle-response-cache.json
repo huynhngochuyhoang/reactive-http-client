@@ -20,6 +20,7 @@
     "cacheHttpMethods": ["POST"],
     "cacheSemanticReadAcknowledged": true,
     "cacheMaximumSize": 10000,
+    "cacheMaximumTotalDecodedResponseBytes": 268435456,
     "cacheEntryCount": 8250
   },
   "lookups": {
