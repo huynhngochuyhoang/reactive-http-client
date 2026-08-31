@@ -325,51 +325,118 @@ documentation change:
 
 ## Priority 4 - Retained-Weight Contract Spike
 
-### [ ] 4.1 Evaluate candidate measurement boundaries
+### [x] 4.1 Evaluate candidate measurement boundaries
 
-- [ ] Evaluate response-decode, cache-publication, starter-owned byte, and
+- [x] Evaluate response-decode, cache-publication, starter-owned byte, and
       application-supplied weigher boundaries against the same supported value
       shapes.
-- [ ] For each candidate, define what is measured, when it becomes known, its
+- [x] For each candidate, define what is measured, when it becomes known, its
       unit, deterministic cost, ownership, overflow behavior, and relationship
       to the retained decoded value.
-- [ ] Include plain values, `ResponseEntity<T>` plus retained headers, empty
+- [x] Include plain values, `ResponseEntity<T>` plus retained headers, empty
       completion, present empty values, refresh replacement, and unknown/custom
       value shapes.
-- [ ] Demonstrate why `Content-Length`, compressed wire bytes, arbitrary JSON
+- [x] Demonstrate why `Content-Length`, compressed wire bytes, arbitrary JSON
       reserialization, reflection-based graph walking, and JVM
       `Instrumentation` are accepted or rejected.
-- [ ] Reject candidates that require blocking, unbounded recursion, arbitrary
+- [x] Reject candidates that require blocking, unbounded recursion, arbitrary
       reflection, full response duplication, or event-loop reserialization.
 
-### [ ] 4.2 Define admission semantics before API design
+Evidence recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` plus the source-controlled
+Priority 4.1 artifact in this reviewed change:
 
-- [ ] Define behavior for zero, negative, unknown, overflowing, and individually
+- [`RETAINED-WEIGHT-CANDIDATES.md`](RETAINED-WEIGHT-CANDIDATES.md) maps the
+  current decode-to-publication pipeline and evaluates all four boundaries in
+  one matrix using the same cacheable result shapes.
+- Generic publication-time object inspection and starter-owned metadata bytes
+  are rejected as response-retention units. `Content-Length`, compressed wire
+  bytes, arbitrary JSON reserialization, reflection graph walking, and JVM
+  `Instrumentation` are rejected with explicit correctness or cost reasons.
+- A bounded count of decoded representation bytes consumed by the final unary
+  codec path survives as a non-heap candidate. A post-sanitization application
+  weigher survives only as an explicitly selected application-owned estimate.
+  Neither is selected yet; admission semantics and the final go/no-go remain
+  open in 4.2 and 4.3.
+- No public property, SPI, meter, diagnostics field, or production value
+  traversal was added by this spike. `DocumentationReleaseArtifactTest` passed
+  44 tests; tracked and new-file whitespace checks passed.
+
+### [x] 4.2 Define admission semantics before API design
+
+- [x] Define behavior for zero, negative, unknown, overflowing, and individually
       over-budget weights without assigning unknown values a silent constant.
-- [ ] Define whether over-budget successful responses bypass storage, fail the
+- [x] Define whether over-budget successful responses bypass storage, fail the
       call, or use a narrower supported-value contract; prefer successful
       uncached delivery unless evidence requires otherwise.
-- [ ] Keep mandatory TTL and `maximum-size`; define weight as an additional bound,
+- [x] Keep mandatory TTL and `maximum-size`; define weight as an additional bound,
       not a replacement or a heap/RSS estimate.
-- [ ] Define atomic accounting for first fill, duplicate misses, replacement,
+- [x] Define atomic accounting for first fill, duplicate misses, replacement,
       refresh success/failure, expiry, eviction, and close.
-- [ ] Define source/binary compatibility and no-op behavior for every existing
+- [x] Define source/binary compatibility and no-op behavior for every existing
       `4.0.0`/`4.1.0` policy when no weight budget is selected.
 
-### [ ] 4.3 Record the weight-contract decision
+Evidence recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` plus the source-controlled
+Priority 4.1 and 4.2 artifacts in this reviewed change:
 
-- [ ] Publish a source-controlled decision document containing alternatives,
+- [`RETAINED-WEIGHT-ADMISSION.md`](RETAINED-WEIGHT-ADMISSION.md) defines the
+  candidate-independent model, measurement outcomes, caller behavior, atomic
+  accounting owner, transition semantics, and compatibility boundary.
+- A positive aggregate budget is additional to mandatory TTL and
+  `maximum-size`. Zero entry weight is valid but still consumes an entry slot;
+  negative, unknown, overflowing, and individually over-budget measurements
+  bypass storage without changing a successful downstream result.
+- Only an actual generation-current retained-entry transition changes aggregate
+  weight. The stored entry owns immutable weight, removal subtracts it exactly
+  once, losing duplicates have no accounting or eviction side effects, and
+  refresh failure or bypass preserves the old weight and hard-expiry deadline.
+- Existing policies with no selected budget allocate no counter, candidate
+  weight, weighted cache, weigher lookup, callback, meter, diagnostic field, or
+  support output. No public API or production code was added in 4.2; the unit,
+  numeric bounds, storage, and final go/no-go remain deferred to 4.3.
+  `DocumentationReleaseArtifactTest` passed 44 tests; tracked and new-file
+  whitespace checks passed.
+
+### [x] 4.3 Record the weight-contract decision
+
+- [x] Publish a source-controlled decision document containing alternatives,
       measurements, supported shapes, rejected designs, migration impact, and
       remaining uncertainty.
-- [ ] Confirm no public property, SPI, meter, or diagnostics field was added
+- [x] Confirm no public property, SPI, meter, or diagnostics field was added
       before this decision.
 Select exactly one outcome before continuing:
-- [ ] **GO:** one deterministic, bounded, non-heap weight unit is defensible and
+- [x] **GO:** one deterministic, bounded, non-heap weight unit is defensible and
       Priority 5 may implement it.
 - [ ] **NO-GO:** no general unit is defensible; defer Priority 5, retain entry
       bounds, and continue only with proven lifecycle/accounting fixes.
-- [ ] Update generated readiness with the selected outcome without presenting a
+- [x] Update generated readiness with the selected outcome without presenting a
       no-go as an unfinished release blocker.
+
+Evidence recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` plus the source-controlled
+Priority 4.1-4.3 artifacts in this reviewed change:
+
+- [`RETAINED-WEIGHT-DECISION.md`](RETAINED-WEIGHT-DECISION.md) records **GO**
+  for decoded response representation bytes plus checked UTF-8 bytes of only
+  the header names and values retained in a cached `ResponseEntity`. The unit is
+  explicitly not Java heap, object-graph size, direct memory, RSS, container memory, compressed
+  wire size, or a leak diagnosis.
+- The selected body count must observe the final unary decoder input without
+  copying or reserialization and becomes known only after that body stream
+  completes. Unknown, invalid, overflowing, and individually over-budget
+  successful results follow the uncached-delivery semantics frozen in 4.2.
+- Generic value inspection, starter metadata weight, `Content-Length`, compressed
+  wire bytes, reserialization, graph walking, and `Instrumentation` remain
+  rejected. An application weigher remains deferred rather than becoming a
+  hidden default or premature SPI.
+- Generated readiness now reports an `additive-minor` lane, selected optional
+  representation-byte admission/eviction scope, `go` decision, exact unit, and
+  decision-document path. Implementation and all release evidence remain
+  pending; the release candidate remains deferred.
+- No public property, SPI, meter, diagnostics field, configuration metadata, or
+  production runtime path was added by Priority 4. The focused documentation
+  suite and whitespace checks passed.
 
 ---
 
