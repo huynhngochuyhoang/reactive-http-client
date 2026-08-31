@@ -130,7 +130,9 @@ reactive:
 ## Explicit Local Response Cache
 
 This `4.0.0+` example selects one bounded local policy explicitly.
-Single flight, access refresh, and cache telemetry are independent choices. Add
+The aggregate decoded-response-byte limit, single flight, access refresh, and
+cache telemetry are independent choices. The byte limit is additional to TTL
+and `maximum-size`; it is not a Java heap or process-memory limit. Add
 the optional runtime described in the
 [Caffeine dependency instructions](../32-response-caching.md#explicit-selection)
 before selecting the policy. With that dependency present, this example is
@@ -154,6 +156,7 @@ reactive:
             catalog-read:
               ttl-ms: 60000
               maximum-size: 10000
+              maximum-total-decoded-response-bytes: 268435456
               single-flight: true
               refresh-after-ms: 30000
               refresh-timeout-ms: 5000

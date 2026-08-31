@@ -29,6 +29,7 @@ class DeclarativeCachePolicyTest {
     @Test
     void policyDefinitionsAreInertUntilExplicitlySelected() {
         ReactiveHttpClientProperties.ClientConfig config = configWithPolicy("unused", 0L, -1L);
+        config.getCache().getPolicies().get("unused").setMaximumTotalDecodedResponseBytes(-1L);
 
         assertThatCode(() -> validate(UnselectedClient.class, "unselected-cache", config))
                 .doesNotThrowAnyException();
@@ -51,15 +52,15 @@ class DeclarativeCachePolicyTest {
                         EffectiveHttpClientContract::cache));
         assertThat(policies.get("inherited")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
-                        true, "client", false, 1_000L, 100L,
+                        true, "client", false, 1_000L, 100L, null,
                         List.of(), List.of("idempotency-key"), List.of(), List.of(), false, false, 0, 0));
         assertThat(policies.get("overridden")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
-                        true, "method", false, 2_000L, 200L,
+                        true, "method", false, 2_000L, 200L, null,
                         List.of(), List.of("idempotency-key"), List.of(), List.of(), false, false, 0, 0));
         assertThat(policies.get("excluded")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
-                        false, "method-disabled", false, 0L, 0L,
+                        false, "method-disabled", false, 0L, 0L, null,
                         List.of(), List.of(), List.of(), List.of(), false, false, 0, 0));
     }
 
@@ -67,6 +68,7 @@ class DeclarativeCachePolicyTest {
     void effectiveContractExportsNormalizedIsolationPolicy() {
         ReactiveHttpClientProperties.ClientConfig config = selectedPolicy(1_000L, 100L);
         ReactiveHttpClientProperties.CachePolicyConfig policy = config.getCache().getPolicies().get("selected");
+        policy.setMaximumTotalDecodedResponseBytes(67_108_864L);
         policy.setVaryByParameters(List.of(" tenant "));
         policy.setVaryByHeaders(List.of(" X-Tenant "));
         policy.setVaryByContext(List.of(" region ", "locale"));
@@ -81,7 +83,7 @@ class DeclarativeCachePolicyTest {
                 VariantContractClient.class, "variant-contract", config, metadataCache).get(0);
 
         assertThat(contract.cache()).isEqualTo(new EffectiveHttpClientContract.CachePolicy(
-                true, "client", false, 1_000L, 100L,
+                true, "client", false, 1_000L, 100L, 67_108_864L,
                 List.of("tenant"), List.of("x-tenant"), List.of("locale", "region"),
                 List.of("x-caller", "x-session"), true, true, 400, 250));
     }
@@ -124,6 +126,16 @@ class DeclarativeCachePolicyTest {
         assertInvalidBounds(selectedPolicy(1L, -1L), "maximum-size must be > 0");
         assertInvalidBounds(selectedPolicy(1L, EffectiveCachePolicy.MAXIMUM_SIZE + 1),
                 "maximum-size must be <= " + EffectiveCachePolicy.MAXIMUM_SIZE);
+        assertInvalidWeight(0L, "maximum-total-decoded-response-bytes must be > 0");
+        assertInvalidWeight(-1L, "maximum-total-decoded-response-bytes must be > 0");
+        assertInvalidWeight(EffectiveCachePolicy.MAXIMUM_TOTAL_DECODED_RESPONSE_BYTES + 1,
+                "maximum-total-decoded-response-bytes must be <= "
+                        + EffectiveCachePolicy.MAXIMUM_TOTAL_DECODED_RESPONSE_BYTES);
+        ReactiveHttpClientProperties.ClientConfig maximumWeight = selectedPolicy(1L, 1L);
+        maximumWeight.getCache().getPolicies().get("selected")
+                .setMaximumTotalDecodedResponseBytes(EffectiveCachePolicy.MAXIMUM_TOTAL_DECODED_RESPONSE_BYTES);
+        assertThatCode(() -> validate(EligibleClient.class, "bounded-cache", maximumWeight))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -572,6 +584,13 @@ class DeclarativeCachePolicyTest {
                 .hasMessageContaining("cachePolicy='selected'")
                 .hasMessageContaining("method=")
                 .hasMessageContaining(reason);
+    }
+
+    private void assertInvalidWeight(Long maximumTotalDecodedResponseBytes, String reason) {
+        ReactiveHttpClientProperties.ClientConfig config = selectedPolicy(1_000L, 100L);
+        config.getCache().getPolicies().get("selected")
+                .setMaximumTotalDecodedResponseBytes(maximumTotalDecodedResponseBytes);
+        assertInvalidBounds(config, reason);
     }
 
     private void assertInvalidRefresh(Long refreshAfterMs, Long refreshTimeoutMs, String reason) {

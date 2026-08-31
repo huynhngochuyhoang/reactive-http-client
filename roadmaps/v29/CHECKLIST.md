@@ -446,44 +446,99 @@ Priority 4.1-4.3 artifacts in this reviewed change:
 > **NO-GO**, mark this priority explicitly deferred with the decision-document
 > link; do not invent placeholder configuration or API.
 
-### [ ] 5.1 Add one explicit bounded policy contract
+### [x] 5.1 Add one explicit bounded policy contract
 
-- [ ] Add one clearly named per-policy aggregate weight limit using the unit
+- [x] Add one clearly named per-policy aggregate weight limit using the unit
       selected by Priority 4.
-- [ ] Reject invalid, zero/negative where unsupported, and overflowing values at
+- [x] Reject invalid, zero/negative where unsupported, and overflowing values at
       startup with client/policy/method context.
-- [ ] Keep absence of the new setting behaviorally identical to published
+- [x] Keep absence of the new setting behaviorally identical to published
       `4.1.0`, including allocation and dependency behavior.
-- [ ] Update configuration metadata, effective configuration, contract snapshots,
+- [x] Update configuration metadata, effective configuration, contract snapshots,
       diagnostics model, runtime hints, and public API filters only for types
       required by the selected design.
-- [ ] Keep cache and cache-memory observability independently opt-in.
+- [x] Keep cache and cache-memory observability independently opt-in.
 
-### [ ] 5.2 Make publication and accounting atomic
+Evidence recorded on 2026-08-31 from durable baseline commit
+`18d38b131bbd96c60136a0fa867ba5b3575e9f43` plus this reviewed change:
 
-- [ ] Require every stored entry to satisfy TTL, `maximum-size`, and the selected
+- `CachePolicyConfig.maximumTotalDecodedResponseBytes` and YAML
+  `maximum-total-decoded-response-bytes` define one nullable per-policy aggregate
+  decoded response representation-byte limit. The selected-policy range is
+  `1..1099511627776` (1 TiB); TTL and `maximum-size` remain mandatory.
+- Startup validation rejects zero, negative, and above-limit values through the
+  existing effective-policy path with concrete client, method, policy, source,
+  HTTP method, and `@ApiRef` context. Unselected policy definitions remain inert.
+- Effective contracts and approval snapshots expose the exact per-method limit.
+  Diagnostics schema V1 adds nullable
+  `cacheMaximumTotalDecodedResponseBytes`; provider snapshots report a finite
+  sum only when every selected policy has a configured representable limit.
+- Generated configuration metadata, the effective-configuration example, cache
+  and diagnostics guides, schema/support fixtures, and metadata tests use the
+  same unit and bounds. Existing runtime hints already cover `CachePolicyConfig`;
+  AOT evidence now checks the new setter. The existing
+  `ReactiveHttpClientProperties*` API filter covers the additive public methods,
+  so no new type or filter was required.
+- An absent limit remains `null`; no cache manager, body counter, weighted cache,
+  dependency, meter, or cache-memory observer was added or activated. A focused
+  contract/diagnostics/metadata/AOT/documentation run passed 231 tests, and
+  the complete starter suite passed 1,273 tests; both had no failures. JSON
+  validation and `git diff --check` also passed.
+- Response-byte measurement and retained-weight enforcement are implemented in
+  5.2 and 5.3 below; the configured limit is no longer diagnostics-only.
+
+### [x] 5.2 Make publication and accounting atomic
+
+- [x] Require every stored entry to satisfy TTL, `maximum-size`, and the selected
       weight limit.
-- [ ] Make generation validation, admission, accounting, and publication one
+- [x] Make generation validation, admission, accounting, and publication one
       race-safe transition for first fills and duplicate loads.
-- [ ] Prevent an older duplicate completion from replacing a newer value or
+- [x] Prevent an older duplicate completion from replacing a newer value or
       restarting the full TTL/weight lifetime.
-- [ ] Return an over-budget successful value to its caller without storing it when
+- [x] Return an over-budget successful value to its caller without storing it when
       that is the selected contract.
-- [ ] Prevent skipped/failed admission from leaving generation, key, meter, or
+- [x] Prevent skipped/failed admission from leaving generation, key, meter, or
       load-token state behind.
 
-### [ ] 5.3 Preserve replacement and refresh invariants
+### [x] 5.3 Preserve replacement and refresh invariants
 
-- [ ] Transfer weight exactly once on refresh replacement and ordinary
+- [x] Transfer weight exactly once on refresh replacement and ordinary
       replacement.
-- [ ] Retain the stale entry and its original accounting when refresh fails,
+- [x] Retain the stale entry and its original accounting when refresh fails,
       empties, is rejected, times out, or is cancelled.
-- [ ] Remove weight exactly once on TTL expiry, size/weight eviction, explicit
+- [x] Remove weight exactly once on TTL expiry, size/weight eviction, explicit
       eviction, policy removal, and shutdown.
-- [ ] Prove totals cannot become negative, overflow, or temporarily exceed the
+- [x] Prove totals cannot become negative, overflow, or temporarily exceed the
       documented bound beyond explicitly documented atomic transition behavior.
-- [ ] Verify `ResponseEntity<T>` accounting follows the selected body/header
+- [x] Verify `ResponseEntity<T>` accounting follows the selected body/header
       contract without retaining disallowed headers.
+
+Evidence recorded on 2026-08-31 from durable baseline commit
+`1d681dd9c5bc46bacf3888e85e2574054c59860c` plus this reviewed change:
+
+- The configured aggregate limit is passed into the policy cache and allocates a
+  `WeightState` only for selected weighted policies. The final successful unary
+  decoder input is observed after transport decompression without joining,
+  copying, retaining, or reserializing its `DataBuffer` stream. Unknown, failed,
+  cancelled, overflowing, and individually over-budget measurements bypass
+  storage while preserving the successful caller result where one exists.
+- Generation validation, pressure eviction, replacement, aggregate accounting,
+  and Caffeine publication run under the cache lifecycle monitor. Duplicate
+  losers cannot publish or account; an over-budget candidate cannot evict; and
+  refresh bypass preserves the stale entry and its original hard-expiry time.
+- Stored entries own immutable representation-byte weights. Replacement transfers
+  that weight once, while TTL, size/weight eviction, explicit invalidation, and
+  close subtract it once. Retained `ResponseEntity` header names and values are
+  counted only after the existing allowlist and sensitive-header rejection build
+  the stored entity. Runtime mutation of the aggregate limit is rejected with the
+  other immutable policy bounds.
+- `BoundedLocalResponseCacheContractTest` covers real decoded-body admission,
+  over-budget delivery without storage or generation residue, duplicate fill,
+  weight and size pressure, refresh replacement/bypass, TTL, explicit eviction,
+  close, and retained-header accounting without asserting victim order. The
+  focused cache, retention, observability, and policy run passed 92 tests with no
+  failures, errors, or skips. The complete starter suite passed 1,277 tests with
+  no failures, errors, or skips; `git diff --check` also passed.
 
 ---
 

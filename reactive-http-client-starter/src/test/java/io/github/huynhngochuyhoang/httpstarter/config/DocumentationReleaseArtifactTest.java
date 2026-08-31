@@ -270,6 +270,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(fixture.path("cache").path("cachePhase").asText()).isEqualTo("refresh-on-access");
         assertThat(fixture.path("cache").path("cachePolicyCount").isInt()).isTrue();
         assertThat(fixture.path("cache").path("cacheMaximumSize").isInt()).isTrue();
+        assertThat(fixture.path("cache").path("cacheMaximumTotalDecodedResponseBytes").isIntegralNumber())
+                .isTrue();
         assertThat(fixture.path("cache").path("cacheEntryCount").isInt()).isTrue();
         assertThat(fixture.path("cache").path("cachePolicySources").isArray()).isTrue();
         assertThat(fixture.path("cache").path("cachePolicySources").get(0).asText()).isEqualTo("method");

@@ -158,6 +158,7 @@ final class EffectiveHttpClientContractExporter {
                 decision.semanticRead(),
                 policy != null && policy.getTtlMs() != null ? policy.getTtlMs() : 0,
                 policy != null && policy.getMaximumSize() != null ? policy.getMaximumSize() : 0,
+                policy != null ? policy.getMaximumTotalDecodedResponseBytes() : null,
                 variants.parameterNames(),
                 variants.headerNames(),
                 variants.contextNames(),

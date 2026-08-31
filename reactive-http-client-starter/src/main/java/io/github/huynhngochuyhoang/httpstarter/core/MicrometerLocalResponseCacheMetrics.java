@@ -71,7 +71,10 @@ final class MicrometerLocalResponseCacheMetrics extends LocalResponseCacheMetric
                 .tags(tags)
                 .register(registry));
         for (LocalResponseCache.RemovalReason reason : LocalResponseCache.RemovalReason.values()) {
-            counter(PREFIX + ".evictions", tags.and("cause", reason.tagValue()));
+            if (reason != LocalResponseCache.RemovalReason.WEIGHT
+                    || cache.maximumDecodedResponseBytes() != null) {
+                counter(PREFIX + ".evictions", tags.and("cause", reason.tagValue()));
+            }
         }
     }
 

@@ -369,9 +369,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
             subscription = source
                     .doOnSuccess(value -> {
                         if (value != null) {
-                            cacheCandidate(policy, value, responseMetadata.get())
-                                    .ifPresent(candidate -> refresh.cache.publishRefresh(
-                                            refresh.refreshToken, candidate));
+                            ResponseMetadata metadata = responseMetadata.get();
+                            cacheCandidate(policy, value, metadata)
+                                    .ifPresent(candidate -> publishRefreshCandidate(
+                                            policy, refresh.cache, refresh.refreshToken, candidate, metadata));
                         }
                     })
                     .timeout(Duration.ofNanos(deadlineNanos), refreshScheduler)
@@ -474,8 +475,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
             return source
                     .doOnSuccess(value -> {
                         if (value != null) {
-                            cacheCandidate(policy, value, responseMetadata.get())
-                                    .ifPresent(candidate -> cache.publish(token, candidate));
+                            ResponseMetadata metadata = responseMetadata.get();
+                            cacheCandidate(policy, value, metadata)
+                                    .ifPresent(candidate -> publishLoadCandidate(
+                                            policy, cache, token, candidate, metadata));
                         }
                     })
                     .doFinally(signal -> {
@@ -641,6 +644,16 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
     }
 
+    long retainedDecodedResponseBytesForTesting() {
+        synchronized (caches) {
+            long retainedBytes = 0;
+            for (LocalResponseCache cache : caches.values()) {
+                retainedBytes = Math.addExact(retainedBytes, cache.retainedDecodedResponseBytes());
+            }
+            return retainedBytes;
+        }
+    }
+
     WorkloadSnapshot workloadSnapshotForTesting() {
         Snapshot cacheSnapshot = snapshot();
         int loadCount;
@@ -738,33 +751,104 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 throw new IllegalStateException(
                         "The local response cache for client '" + clientName + "' has been closed");
             }
-            PolicyBounds existingBounds = caches.keySet().stream()
-                    .filter(candidate -> candidate.policyName().equals(selection.policyName()))
+            Map.Entry<PolicyBounds, LocalResponseCache> existing = caches.entrySet().stream()
+                    .filter(candidate -> candidate.getKey().policyName().equals(selection.policyName()))
                     .findFirst()
                     .orElse(null);
-            if (existingBounds != null && !existingBounds.equals(bounds)) {
+            if (existing != null && (!existing.getKey().equals(bounds)
+                    || !Objects.equals(existing.getValue().maximumDecodedResponseBytes(),
+                    policy.getMaximumTotalDecodedResponseBytes()))) {
                 throw new IllegalStateException("Cache policy '" + selection.policyName() + "' for client '"
                         + clientName + "' changed after its local response cache was created; runtime mutation of "
-                        + "ttl-ms, maximum-size, refresh-after-ms, or refresh-timeout-ms is unsupported");
+                        + "ttl-ms, maximum-size, maximum-total-decoded-response-bytes, refresh-after-ms, "
+                        + "or refresh-timeout-ms is unsupported");
             }
-            return caches.computeIfAbsent(bounds, ignored -> newCache(selection.policyName(), clientName, bounds));
+            return caches.computeIfAbsent(bounds, ignored -> newCache(selection.policyName(), clientName, bounds,
+                    policy.getMaximumTotalDecodedResponseBytes()));
         }
     }
 
-    private LocalResponseCache newCache(String policyName, String clientName, PolicyBounds bounds) {
+    private LocalResponseCache newCache(
+            String policyName, String clientName, PolicyBounds bounds, Long maximumDecodedResponseBytes) {
         if (!ClassUtils.isPresent(CAFFEINE_CLASS, classLoader)) {
             throw new IllegalStateException("Reactive HTTP client '" + clientName + "' selects response-cache policy '"
                     + policyName + "', but optional dependency com.github.ben-manes.caffeine:caffeine is not available. "
                     + "Add Caffeine at runtime or disable response caching for this client.");
         }
         LocalResponseCache cache = new CaffeineLocalResponseCache(
-                bounds.ttlMs, bounds.maximumSize, ticker,
+                bounds.ttlMs, bounds.maximumSize, maximumDecodedResponseBytes, ticker,
                 (removedCache, key, reason) -> {
                     cancelRefreshForRemoval(removedCache, key);
                     metrics.eviction(policyName, reason);
                 });
         metrics.registerCache(policyName, bounds.maximumSize, cache);
         return cache;
+    }
+
+    private void publishLoadCandidate(
+            ReactiveHttpClientProperties.CachePolicyConfig policy,
+            LocalResponseCache cache,
+            LocalResponseCache.LoadToken token,
+            Object candidate,
+            ResponseMetadata responseMetadata) {
+        Long maximumBytes = policy.getMaximumTotalDecodedResponseBytes();
+        if (maximumBytes == null) {
+            cache.publish(token, candidate);
+            return;
+        }
+        Long retainedBytes = retainedResponseBytes(candidate, responseMetadata, maximumBytes);
+        if (retainedBytes != null) {
+            cache.publish(token, candidate, retainedBytes);
+        }
+    }
+
+    private void publishRefreshCandidate(
+            ReactiveHttpClientProperties.CachePolicyConfig policy,
+            LocalResponseCache cache,
+            LocalResponseCache.RefreshToken token,
+            Object candidate,
+            ResponseMetadata responseMetadata) {
+        Long maximumBytes = policy.getMaximumTotalDecodedResponseBytes();
+        if (maximumBytes == null) {
+            cache.publishRefresh(token, candidate);
+            return;
+        }
+        Long retainedBytes = retainedResponseBytes(candidate, responseMetadata, maximumBytes);
+        if (retainedBytes != null) {
+            cache.publishRefresh(token, candidate, retainedBytes);
+        }
+    }
+
+    private Long retainedResponseBytes(
+            Object candidate, ResponseMetadata responseMetadata, long maximumBytes) {
+        Long decodedBodyBytes = responseMetadata != null
+                ? responseMetadata.completedDecodedResponseBytes()
+                : null;
+        if (decodedBodyBytes == null || decodedBodyBytes < 0 || decodedBodyBytes > maximumBytes) {
+            return null;
+        }
+        long retainedBytes = decodedBodyBytes;
+        if (!(candidate instanceof ResponseEntity<?> entity)) {
+            return retainedBytes;
+        }
+        for (Map.Entry<String, java.util.List<String>> header : entity.getHeaders().headerSet()) {
+            retainedBytes = addRetainedBytes(retainedBytes, header.getKey(), maximumBytes);
+            if (retainedBytes < 0) {
+                return null;
+            }
+            for (String value : header.getValue()) {
+                retainedBytes = addRetainedBytes(retainedBytes, value, maximumBytes);
+                if (retainedBytes < 0) {
+                    return null;
+                }
+            }
+        }
+        return retainedBytes;
+    }
+
+    private long addRetainedBytes(long current, String value, long maximumBytes) {
+        int bytes = value.getBytes(StandardCharsets.UTF_8).length;
+        return current > maximumBytes - bytes ? -1 : current + bytes;
     }
 
     private java.util.Optional<Object> cacheCandidate(
@@ -859,10 +943,16 @@ final class LocalResponseCacheManager implements AutoCloseable {
     record ResponseMetadata(
             int statusCode,
             Map<String, java.util.List<String>> headers,
-            boolean requestIdentityMatches) {
+            boolean requestIdentityMatches,
+            DecodedResponseBytes decodedResponseBytes) {
 
         ResponseMetadata(int statusCode, Map<String, java.util.List<String>> headers) {
-            this(statusCode, headers, true);
+            this(statusCode, headers, true, null);
+        }
+
+        ResponseMetadata(
+                int statusCode, Map<String, java.util.List<String>> headers, boolean requestIdentityMatches) {
+            this(statusCode, headers, requestIdentityMatches, null);
         }
 
         ResponseMetadata {
@@ -880,8 +970,48 @@ final class LocalResponseCacheManager implements AutoCloseable {
             return new ResponseMetadata(200, Map.of());
         }
 
+        Long completedDecodedResponseBytes() {
+            return decodedResponseBytes != null ? decodedResponseBytes.completedBytes() : null;
+        }
+
         ResponseMetadata withRequestIdentityMatches(boolean matches) {
-            return new ResponseMetadata(statusCode, headers, matches);
+            return new ResponseMetadata(statusCode, headers, matches, decodedResponseBytes);
+        }
+    }
+
+    static final class DecodedResponseBytes {
+        private final long maximumBytes;
+        private long bytes;
+        private boolean complete;
+        private boolean unavailable;
+
+        DecodedResponseBytes(long maximumBytes) {
+            this.maximumBytes = maximumBytes;
+        }
+
+        synchronized void add(long addedBytes) {
+            if (complete || unavailable) {
+                return;
+            }
+            if (addedBytes < 0 || bytes > maximumBytes - addedBytes) {
+                unavailable = true;
+                return;
+            }
+            bytes += addedBytes;
+        }
+
+        synchronized void complete() {
+            complete = true;
+        }
+
+        synchronized void unavailable() {
+            if (!complete) {
+                unavailable = true;
+            }
+        }
+
+        synchronized Long completedBytes() {
+            return complete && !unavailable ? bytes : null;
         }
     }
 

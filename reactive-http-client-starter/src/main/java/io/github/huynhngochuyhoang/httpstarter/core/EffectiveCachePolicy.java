@@ -14,6 +14,7 @@ final class EffectiveCachePolicy {
 
     static final long MAX_TTL_MS = 365L * 24 * 60 * 60 * 1000;
     static final long MAXIMUM_SIZE = 1_000_000L;
+    static final long MAXIMUM_TOTAL_DECODED_RESPONSE_BYTES = 1L << 40;
     static final int MAX_NON_CACHEABLE_RESPONSE_HEADERS = 32;
 
     private EffectiveCachePolicy() {
@@ -47,6 +48,10 @@ final class EffectiveCachePolicy {
         }
         requireBound(context, "ttl-ms", policy.getTtlMs(), MAX_TTL_MS);
         requireBound(context, "maximum-size", policy.getMaximumSize(), MAXIMUM_SIZE);
+        if (policy.getMaximumTotalDecodedResponseBytes() != null) {
+            requireBound(context, "maximum-total-decoded-response-bytes",
+                    policy.getMaximumTotalDecodedResponseBytes(), MAXIMUM_TOTAL_DECODED_RESPONSE_BYTES);
+        }
         validateRefreshBounds(context, policy);
         normalizedNonCacheableResponseHeaders(context, policy);
 

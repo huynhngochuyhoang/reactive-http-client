@@ -157,7 +157,7 @@ does not select caching and does not enable Caffeine's library statistics.
 | `reactive.http.client.cache.load.duration` | Timer | same as `loads` | Miss-load work duration; Prometheus exports seconds. |
 | `reactive.http.client.cache.refreshes` | Counter | `client.name`, `api.name`, `outcome=success|failure|cancellation` | Terminal hidden-refresh work. |
 | `reactive.http.client.cache.refresh.duration` | Timer | same as `refreshes` | Hidden-refresh work duration; Prometheus exports seconds. |
-| `reactive.http.client.cache.evictions` | Counter | `client.name`, `cache.policy`, `cause=ttl|size` | Automatic TTL or maximum-size removal. Replacement and shutdown are not eviction causes. |
+| `reactive.http.client.cache.evictions` | Counter | `client.name`, `cache.policy`, `cause=ttl|size|weight` | Automatic TTL, maximum-size, or aggregate decoded-response-byte removal. Replacement and shutdown are not eviction causes. |
 | `reactive.http.client.cache.entries` | Gauge | `client.name`, `cache.policy` | Current estimated entries. |
 | `reactive.http.client.cache.maximum.entries` | Gauge | `client.name`, `cache.policy` | Configured maximum entries. |
 
