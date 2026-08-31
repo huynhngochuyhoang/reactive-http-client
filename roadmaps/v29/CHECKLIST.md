@@ -396,20 +396,44 @@ Evidence recorded on 2026-08-31 against commit
   `DocumentationReleaseArtifactTest` passed 44 tests; tracked and new-file
   whitespace checks passed.
 
-### [ ] 4.3 Record the weight-contract decision
+### [x] 4.3 Record the weight-contract decision
 
-- [ ] Publish a source-controlled decision document containing alternatives,
+- [x] Publish a source-controlled decision document containing alternatives,
       measurements, supported shapes, rejected designs, migration impact, and
       remaining uncertainty.
-- [ ] Confirm no public property, SPI, meter, or diagnostics field was added
+- [x] Confirm no public property, SPI, meter, or diagnostics field was added
       before this decision.
 Select exactly one outcome before continuing:
-- [ ] **GO:** one deterministic, bounded, non-heap weight unit is defensible and
+- [x] **GO:** one deterministic, bounded, non-heap weight unit is defensible and
       Priority 5 may implement it.
 - [ ] **NO-GO:** no general unit is defensible; defer Priority 5, retain entry
       bounds, and continue only with proven lifecycle/accounting fixes.
-- [ ] Update generated readiness with the selected outcome without presenting a
+- [x] Update generated readiness with the selected outcome without presenting a
       no-go as an unfinished release blocker.
+
+Evidence recorded on 2026-08-31 against commit
+`3a103ea6968a7dd160392498134812b23bf5c7af`:
+
+- [`RETAINED-WEIGHT-DECISION.md`](RETAINED-WEIGHT-DECISION.md) records **GO**
+  for decoded response representation bytes plus checked UTF-8 bytes of only
+  the header names and values retained in a cached `ResponseEntity`. The unit is explicitly not
+  Java heap, object-graph size, direct memory, RSS, container memory, compressed
+  wire size, or a leak diagnosis.
+- The selected body count must observe the final unary decoder input without
+  copying or reserialization and becomes known only after that body stream
+  completes. Unknown, invalid, overflowing, and individually over-budget
+  successful results follow the uncached-delivery semantics frozen in 4.2.
+- Generic value inspection, starter metadata weight, `Content-Length`, compressed
+  wire bytes, reserialization, graph walking, and `Instrumentation` remain
+  rejected. An application weigher remains deferred rather than becoming a
+  hidden default or premature SPI.
+- Generated readiness now reports an `additive-minor` lane, selected optional
+  representation-byte admission/eviction scope, `go` decision, exact unit, and
+  decision-document path. Implementation and all release evidence remain
+  pending; the release candidate remains deferred.
+- No public property, SPI, meter, diagnostics field, configuration metadata, or
+  production runtime path was added by Priority 4. The focused documentation
+  suite and whitespace checks passed.
 
 ---
 
