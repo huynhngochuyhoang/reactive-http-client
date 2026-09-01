@@ -498,6 +498,12 @@ class DocumentationReleaseArtifactTest {
             assertThat(api.path("callers").path("missLoader").isIntegralNumber()).isTrue();
             assertThat(api.path("callers").path("coalescedWaiter").isIntegralNumber()).isTrue();
             assertThat(api.path("callers").path("staleHit").isIntegralNumber()).isTrue();
+            assertThat(api.path("lookups").path("hits").asLong()).isEqualTo(
+                    api.path("callers").path("freshHit").asLong()
+                            + api.path("callers").path("staleHit").asLong());
+            assertThat(api.path("lookups").path("misses").asLong()).isEqualTo(
+                    api.path("callers").path("missLoader").asLong()
+                            + api.path("callers").path("coalescedWaiter").asLong());
             assertThat(api.path("coalesced").asInt())
                     .isEqualTo(api.path("callers").path("coalescedWaiter").asInt());
             assertThat(api.path("loads").path("success").isIntegralNumber()).isTrue();
@@ -586,7 +592,16 @@ class DocumentationReleaseArtifactTest {
             assertThat(event.path("capturedAt").isTextual()).isTrue();
             assertThat(event.path("type").isTextual()).isTrue();
         });
-        assertThat(fixture.path("lifecycle").path("deploymentChanges").isArray()).isTrue();
+        JsonNode deploymentChanges = lifecycle.path("deploymentChanges");
+        assertThat(deploymentChanges.isArray()).isTrue();
+        assertThat(deploymentChanges).hasSize(1);
+        JsonNode deploymentChange = deploymentChanges.get(0);
+        assertThat(deploymentChange.path("capturedAt").isTextual()).isTrue();
+        assertThat(deploymentChange.path("capturedAt").asText())
+                .isLessThan(fixture.path("window").path("startedAt").asText());
+        assertThat(deploymentChange.path("type").asText()).isEqualTo("starter-version");
+        assertThat(deploymentChange.path("beforeVersion").asText()).isEqualTo("4.1.0");
+        assertThat(deploymentChange.path("afterVersion").asText()).isEqualTo("4.2.0-SNAPSHOT");
 
         assertThat(sensitiveSupportFixtureFieldNames(fixture))
                 .as("sensitive cache-memory support fixture field names")
@@ -607,6 +622,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(supportBundles)
                 .contains("mv rhttpclients.sanitized.json support-bundle/diagnostics/rhttpclients.json")
                 .contains("mv reactive-http-client-health.sanitized.json support-bundle/health/health.json")
+                .contains("def nonnegative_integer:")
+                .contains("$detail.samples == $detail.sampleCount")
+                .contains("$detail.reason == \"NO_SAMPLES\"")
+                .contains("$detail.reason == \"ERROR_RATE_ABOVE_THRESHOLD\"")
                 .contains("If either `jq` command fails, keep the HTTP-status file");
         long staleFinalCaptureRemovalCount = supportBundles.lines()
                 .map(String::trim)
@@ -615,6 +634,12 @@ class DocumentationReleaseArtifactTest {
                                 + "support-bundle/health/health.json"))
                 .count();
         assertThat(staleFinalCaptureRemovalCount).isEqualTo(3);
+        long staleRawCaptureRemovalCount = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.equals(
+                        "rm -f rhttpclients.raw.json reactive-http-client-health.raw.json"))
+                .count();
+        assertThat(staleRawCaptureRemovalCount).isEqualTo(3);
         String kubernetesCapture = markdownSection(
                 supportBundles, "### Kubernetes-Style Capture", "## Health Details");
         for (String assignment : List.of(

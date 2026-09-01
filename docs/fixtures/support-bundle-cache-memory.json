@@ -37,7 +37,7 @@
       "apiName": "catalog.search",
       "selectedPolicy": "catalog-read",
       "lookups": {
-        "hits": 760,
+        "hits": 772,
         "misses": 65
       },
       "callers": {
@@ -218,7 +218,12 @@
     ],
     "contextRestarts": 0,
     "deploymentChanges": [
-      "starter-version"
+      {
+        "capturedAt": "2025-12-31T23:55:00Z",
+        "type": "starter-version",
+        "beforeVersion": "4.1.0",
+        "afterVersion": "4.2.0-SNAPSHOT"
+      }
     ]
   }
 }

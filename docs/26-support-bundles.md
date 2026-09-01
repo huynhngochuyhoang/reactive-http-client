@@ -209,7 +209,8 @@ the HTTP status to a bundle file. Response bodies first go to quarantined
 or generic error handler can return arbitrary sensitive content, so an HTTP error
 body is not automatically diagnostics evidence. Retain it only after the shared
 validation/sanitization step below confirms the expected endpoint shape and
-allowlists its fields. Never attach the raw files.
+allowlists its fields. Every recipe removes stale raw files before invoking
+`curl`. Never attach the raw files.
 
 ### Local JVM Capture
 
@@ -224,6 +225,7 @@ EXAMPLE_SANITIZED_CONFIG="/path/to/sanitized-reactive-http-client.yml"
 
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
 curl -sS -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt
 curl -sS -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt
 grep 'ReactiveHttpClientFactoryBean' "$EXAMPLE_APP_LOG" > support-bundle/logs/startup-summary.log || true
@@ -246,6 +248,7 @@ EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER="/path/in/container/sanitized-reactive-htt
 
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
 curl -sS -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt
 curl -sS -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
@@ -281,6 +284,7 @@ EXAMPLE_MANAGEMENT_URL="http://127.0.0.1:$EXAMPLE_LOCAL_PORT"
 EXAMPLE_CLIENT_NAME="example-client"
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
 curl -sS -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt
 curl -sS -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
@@ -322,13 +326,51 @@ jq --slurpfile schema "$EXAMPLE_RHTTPCLIENTS_SCHEMA" '
   mv rhttpclients.sanitized.json support-bundle/diagnostics/rhttpclients.json
 
 jq --arg client "$EXAMPLE_CLIENT_NAME" '
-  if ((.status | type) == "string"
-      and (.details | type) == "object"
-      and (.details[$client] | type) == "object")
+  def nonnegative_integer:
+    (type == "number") and (. >= 0) and (. == floor);
+  def unit_rate:
+    (type == "number") and (. >= 0) and (. <= 1);
+  .details[$client] as $detail
+  | if ((.status == "UP" or .status == "DOWN")
+      and ((.details | type) == "object")
+      and (($detail | type) == "object")
+      and ($detail.samples | nonnegative_integer)
+      and ($detail.errors | nonnegative_integer)
+      and ($detail.sampleCount | nonnegative_integer)
+      and ($detail.errorCount | nonnegative_integer)
+      and ($detail.poolAcquireFailureCount | nonnegative_integer)
+      and ($detail.minSamples | nonnegative_integer)
+      and ($detail.minSamples >= 1)
+      and ($detail.errorRateThreshold | unit_rate)
+      and ($detail.samples == $detail.sampleCount)
+      and ($detail.errors == $detail.errorCount)
+      and ($detail.errors <= $detail.samples)
+      and ($detail.poolAcquireFailureCount <= $detail.errors)
+      and (
+        ($detail.reason == "NO_SAMPLES"
+          and $detail.status == "INSUFFICIENT_SAMPLES"
+          and $detail.samples == 0
+          and $detail.errorRate == null)
+        or ($detail.reason == "INSUFFICIENT_SAMPLES"
+          and $detail.status == "INSUFFICIENT_SAMPLES"
+          and $detail.samples > 0
+          and $detail.samples < $detail.minSamples
+          and ($detail.errorRate | unit_rate))
+        or ($detail.reason == "ERROR_RATE_WITHIN_THRESHOLD"
+          and $detail.status == "UP"
+          and $detail.samples >= $detail.minSamples
+          and ($detail.errorRate | unit_rate)
+          and $detail.errorRate <= $detail.errorRateThreshold)
+        or ($detail.reason == "ERROR_RATE_ABOVE_THRESHOLD"
+          and $detail.status == "DOWN"
+          and $detail.samples >= $detail.minSamples
+          and ($detail.errorRate | unit_rate)
+          and $detail.errorRate > $detail.errorRateThreshold)
+      ))
   then {
     status,
     details: {
-      ($client): (.details[$client] | {
+      ($client): ($detail | {
         samples, errors, sampleCount, errorCount, poolAcquireFailureCount,
         minSamples, errorRateThreshold, errorRate, status, reason
       })
@@ -720,6 +762,12 @@ Use one configuration record and multiple checkpoints tied to the same
 memory, and explicit cache/transport availability. A post-close checkpoint uses
 an empty policy-state list and a null transport block after their meters are
 removed; it does not invent zero gauges.
+
+Every relevant deployment or configuration change records a bounded `type`,
+`capturedAt`, and safe before/after version or configuration identifiers so its
+position relative to the capture window is explicit. Use an empty
+`deploymentChanges` array when no relevant change occurred; never substitute
+free-form release notes or configuration values.
 
 The client, API, policy, configuration-source, process-instance, and phase values
 may be included only after review confirms they are non-sensitive and bounded.

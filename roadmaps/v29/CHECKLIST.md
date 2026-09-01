@@ -811,18 +811,25 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   the sanitized `support-bundle-cache-memory.json` fixture. The fixture identifies
   one bounded client/process instance, maps API-tagged caller/load/refresh work to
   selected policies, keeps policy-tagged eviction/admission facts separate,
-  represents weighted/unweighted availability with values versus `null`, and
-  records three timestamped post-GC memory/cache/H2-pool checkpoints. It contains
-  no request, cache-entry, identity, credential, tenant, or error-message material.
+  includes stale callers in lookup hits and partitions misses into loaders plus
+  coalesced waiters, represents weighted/unweighted availability with values
+  versus `null`, and records three timestamped post-GC memory/cache/H2-pool
+  checkpoints. Its lifecycle evidence timestamps the relevant starter-version
+  change with safe before/after versions. It contains no request, cache-entry,
+  identity, credential, tenant, or error-message material.
 - Recursive fixture guards reject singular, plural, and compound sensitive field
   names plus origin, authority, rootless-path, query, and absolute-URL textual
-  values. All six endpoint captures record HTTP status unconditionally, quarantine
-  bodies outside the bundle, and publish JSON only after expected-shape validation
-  and field allowlisting. Kubernetes placeholders and the `kubectl exec -- cat`
-  minimal-image path remain covered without `kubectl cp`/`tar`.
-- `DocumentationReleaseArtifactTest` passed 45 tests. The complete starter suite
-  passed 1,292 tests; both runs had no failures, errors, or skips. JSON validation,
-  local-link validation, and `git diff --check` also passed.
+  values. All six endpoint captures remove stale raw files, record HTTP status
+  unconditionally, quarantine bodies outside the bundle, and publish JSON only
+  after expected-shape validation and field allowlisting. The health filter also
+  enforces built-in counter, rate, status, and reason invariants before publishing.
+  Kubernetes placeholders and the `kubectl exec -- cat` minimal-image path remain
+  covered without `kubectl cp`/`tar`.
+- `DocumentationReleaseArtifactTest` passed 45 tests and the paired configuration
+  guard passed 18 tests. The complete starter suite passed 1,292 tests; all runs
+  had no failures, errors, or skips. The exact documented health filter accepted
+  the built-in fixture and rejected an object-valued reason without publishing it.
+  JSON validation, local-link validation, and `git diff --check` also passed.
 
 ---
 
