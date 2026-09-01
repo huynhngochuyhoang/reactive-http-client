@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -232,6 +233,73 @@ class LocalResponseCacheObservabilityTest {
                         "outcome", "bypassed_over_budget")
                 .counter().count()).isZero();
         manager.close();
+    }
+
+    @Test
+    void bypassRecordingIsAtomicWithLoadAndRefreshFreshness() throws Exception {
+        AtomicLong ticker = new AtomicLong();
+        CaffeineLocalResponseCache cache = new CaffeineLocalResponseCache(
+                1_000L, 10L, ticker::get, (ignoredCache, ignoredKey, ignoredReason) -> { });
+        AtomicInteger recordedBypasses = new AtomicInteger();
+
+        CacheKeyContract.OpaqueKey loadKey = key("atomic-load");
+        LocalResponseCache.LoadToken loadToken = cache.lookup(loadKey).loadToken();
+        CountDownLatch loadRecorderEntered = new CountDownLatch(1);
+        CompletableFuture<Void> releaseLoadRecorder = new CompletableFuture<>();
+        CompletableFuture<Boolean> loadRecorded = CompletableFuture.supplyAsync(() ->
+                cache.recordLoadBypassIfCurrent(loadToken, () -> {
+                    recordedBypasses.incrementAndGet();
+                    loadRecorderEntered.countDown();
+                    releaseLoadRecorder.join();
+                }));
+
+        assertThat(loadRecorderEntered.await(1, TimeUnit.SECONDS)).isTrue();
+        CountDownLatch competingPublicationStarted = new CountDownLatch(1);
+        CompletableFuture<Void> competingPublication = CompletableFuture.runAsync(() -> {
+            competingPublicationStarted.countDown();
+            LocalResponseCache.LoadToken winner = cache.lookup(loadKey).loadToken();
+            cache.publish(winner, "winner", 1L);
+            cache.finish(winner);
+        });
+        assertThat(competingPublicationStarted.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(competingPublication).isNotDone();
+
+        releaseLoadRecorder.complete(null);
+        assertThat(loadRecorded.get(1, TimeUnit.SECONDS)).isTrue();
+        competingPublication.get(1, TimeUnit.SECONDS);
+        assertThat(cache.recordLoadBypassIfCurrent(loadToken, recordedBypasses::incrementAndGet)).isFalse();
+        cache.finish(loadToken);
+
+        CacheKeyContract.OpaqueKey refreshKey = key("atomic-refresh");
+        LocalResponseCache.LoadToken initialLoad = cache.lookup(refreshKey).loadToken();
+        cache.publish(initialLoad, "initial", 1L);
+        cache.finish(initialLoad);
+        LocalResponseCache.RefreshToken refreshToken = cache.beginRefresh(cache.lookup(refreshKey).entryToken());
+        CountDownLatch refreshRecorderEntered = new CountDownLatch(1);
+        CompletableFuture<Void> releaseRefreshRecorder = new CompletableFuture<>();
+        CompletableFuture<Boolean> refreshRecorded = CompletableFuture.supplyAsync(() ->
+                cache.recordRefreshBypassIfCurrent(refreshToken, () -> {
+                    recordedBypasses.incrementAndGet();
+                    refreshRecorderEntered.countDown();
+                    releaseRefreshRecorder.join();
+                }));
+
+        assertThat(refreshRecorderEntered.await(1, TimeUnit.SECONDS)).isTrue();
+        CountDownLatch competingInvalidationStarted = new CountDownLatch(1);
+        CompletableFuture<Void> competingInvalidation = CompletableFuture.runAsync(() -> {
+            competingInvalidationStarted.countDown();
+            cache.invalidateAll();
+        });
+        assertThat(competingInvalidationStarted.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(competingInvalidation).isNotDone();
+
+        releaseRefreshRecorder.complete(null);
+        assertThat(refreshRecorded.get(1, TimeUnit.SECONDS)).isTrue();
+        competingInvalidation.get(1, TimeUnit.SECONDS);
+        assertThat(cache.recordRefreshBypassIfCurrent(refreshToken, recordedBypasses::incrementAndGet)).isFalse();
+        assertThat(recordedBypasses).hasValue(2);
+        cache.finishRefresh(refreshToken);
+        cache.close();
     }
 
     @Test
@@ -762,13 +830,16 @@ class LocalResponseCacheObservabilityTest {
         @Override public Lookup lookup(CacheKeyContract.OpaqueKey key) { throw new UnsupportedOperationException(); }
         @Override public RefreshToken beginRefresh(EntryToken entryToken) { throw new UnsupportedOperationException(); }
         @Override public boolean isRefreshCurrent(RefreshToken refreshToken) { return false; }
+        @Override public boolean recordRefreshBypassIfCurrent(RefreshToken token, Runnable recorder) {
+            return false;
+        }
         @Override public long hardExpiryRemainingNanos(RefreshToken refreshToken) { return 0; }
         @Override public void publishRefresh(RefreshToken refreshToken, Object value) { }
         @Override public void publishRefresh(RefreshToken refreshToken, Object value, long bytes) { }
         @Override public void finishRefresh(RefreshToken refreshToken) { }
         @Override public void publish(LoadToken token, Object value) { }
         @Override public void publish(LoadToken token, Object value, long bytes) { }
-        @Override public boolean isLoadCurrent(LoadToken token) { return true; }
+        @Override public boolean recordLoadBypassIfCurrent(LoadToken token, Runnable recorder) { return false; }
         @Override public void finish(LoadToken token) { }
         @Override public long estimatedSize() { return size.get(); }
         @Override public long evictionCount() { return 0; }

@@ -317,9 +317,13 @@ final class MicrometerLocalResponseCacheMetrics extends LocalResponseCacheMetric
             return owners.isEmpty();
         }
 
-        private synchronized double retainedDecodedResponseBytes() {
+        private double retainedDecodedResponseBytes() {
+            List<LocalResponseCache> liveCaches;
+            synchronized (this) {
+                liveCaches = List.copyOf(owners.keySet());
+            }
             long total = 0;
-            for (LocalResponseCache cache : owners.keySet()) {
+            for (LocalResponseCache cache : liveCaches) {
                 total = saturatedAdd(total, cache.retainedDecodedResponseBytes());
             }
             return total;

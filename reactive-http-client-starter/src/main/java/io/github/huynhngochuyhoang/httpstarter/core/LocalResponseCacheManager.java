@@ -832,9 +832,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
         AdmissionMeasurement measurement = retainedResponseBytes(candidate, responseMetadata, maximumBytes);
         if (measurement.bytes() == null) {
-            if (cache.isLoadCurrent(token)) {
-                metrics.admission(policyName, measurement.outcome());
-            }
+            cache.recordLoadBypassIfCurrent(
+                    token, () -> metrics.admission(policyName, measurement.outcome()));
             return;
         }
         recordAdmission(policyName, cache.publishMeasured(token, candidate, measurement.bytes()));
@@ -854,9 +853,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
         AdmissionMeasurement measurement = retainedResponseBytes(candidate, responseMetadata, maximumBytes);
         if (measurement.bytes() == null) {
-            if (cache.isRefreshCurrent(token)) {
-                metrics.admission(policyName, measurement.outcome());
-            }
+            cache.recordRefreshBypassIfCurrent(
+                    token, () -> metrics.admission(policyName, measurement.outcome()));
             return;
         }
         recordAdmission(

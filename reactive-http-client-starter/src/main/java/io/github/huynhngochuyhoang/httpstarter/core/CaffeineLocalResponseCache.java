@@ -126,6 +126,22 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     }
 
     @Override
+    public boolean recordRefreshBypassIfCurrent(RefreshToken refreshToken, Runnable recorder) {
+        GenerationRefreshToken token = refreshToken(refreshToken);
+        synchronized (lifecycleMonitor) {
+            if (closed.get()) {
+                return false;
+            }
+            StoredEntry current = cache.getIfPresent(token.key);
+            if (current != token.entry || token.state.generation != token.observedGeneration) {
+                return false;
+            }
+            recorder.run();
+            return true;
+        }
+    }
+
+    @Override
     public long hardExpiryRemainingNanos(RefreshToken refreshToken) {
         GenerationRefreshToken token = refreshToken(refreshToken);
         long ageNanos = Math.max(0, ticker.getAsLong() - token.entry.writtenNanos());
@@ -191,14 +207,18 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     }
 
     @Override
-    public boolean isLoadCurrent(LoadToken loadToken) {
+    public boolean recordLoadBypassIfCurrent(LoadToken loadToken, Runnable recorder) {
         GenerationLoadToken token = token(loadToken);
         synchronized (lifecycleMonitor) {
             if (closed.get()) {
                 return false;
             }
             StoredEntry current = cache.getIfPresent(token.key);
-            return current == null && token.state.generation == token.observedGeneration;
+            if (current != null || token.state.generation != token.observedGeneration) {
+                return false;
+            }
+            recorder.run();
+            return true;
         }
     }
 

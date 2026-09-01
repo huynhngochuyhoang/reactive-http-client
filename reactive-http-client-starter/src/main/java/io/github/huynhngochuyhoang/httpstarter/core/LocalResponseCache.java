@@ -9,6 +9,8 @@ interface LocalResponseCache extends AutoCloseable {
 
     boolean isRefreshCurrent(RefreshToken refreshToken);
 
+    boolean recordRefreshBypassIfCurrent(RefreshToken refreshToken, Runnable recorder);
+
     long hardExpiryRemainingNanos(RefreshToken refreshToken);
 
     void publishRefresh(RefreshToken refreshToken, Object value);
@@ -27,7 +29,7 @@ interface LocalResponseCache extends AutoCloseable {
 
     void publish(LoadToken token, Object value, long decodedResponseBytes);
 
-    boolean isLoadCurrent(LoadToken token);
+    boolean recordLoadBypassIfCurrent(LoadToken token, Runnable recorder);
 
     default PublicationResult publishMeasured(LoadToken token, Object value, long decodedResponseBytes) {
         publish(token, value, decodedResponseBytes);
