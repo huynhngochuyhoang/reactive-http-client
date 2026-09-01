@@ -240,7 +240,9 @@ public class ReactiveHttpClientDiagnosticsProvider {
                                       Class<?> clientInterface,
                                       ReactiveHttpClientProperties.ClientConfig clientConfig) {
         if (!registration.starterFactory()) {
-            return new CacheSummary("disabled", 0, null, null, "disabled", 0, null, 0L, 0L, false, null, null, null);
+            return new CacheSummary(
+                    "disabled", 0, null, null, "disabled", 0, null,
+                    null, 0L, 0L, false, null, null, null);
         }
         List<ReactiveHttpClientProperties.CachePolicyConfig> selected = new ArrayList<>();
         Set<String> policySources = new TreeSet<>();
@@ -264,7 +266,9 @@ public class ReactiveHttpClientDiagnosticsProvider {
             }
         }
         if (selected.isEmpty()) {
-            return new CacheSummary("disabled", 0, null, null, "disabled", 0, null, 0L, 0L, false, List.of(), List.of(), false);
+            return new CacheSummary(
+                    "disabled", 0, null, null, "disabled", 0, null,
+                    null, 0L, 0L, false, List.of(), List.of(), false);
         }
         String phase = selected.stream().anyMatch(ReactiveHttpClientProperties.CachePolicyConfig::isRefreshEnabled)
                 ? "refresh-on-access"
@@ -297,6 +301,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 singleFlight,
                 maximumSize,
                 maximumTotalDecodedResponseBytes,
+                runtime != null ? runtime.retainedDecodedResponseBytes() : null,
                 runtime != null ? runtime.currentSize() : null,
                 runtime != null ? runtime.evictions() : null,
                 metricsEnabled,
@@ -906,6 +911,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
             String singleFlight,
             long maximumSize,
             Long maximumTotalDecodedResponseBytes,
+            Long retainedDecodedResponseBytes,
             Long entryCount,
             Long evictions,
             boolean metricsEnabled,

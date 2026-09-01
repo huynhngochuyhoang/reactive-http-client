@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Policies that omit the setting retain the published count-only path without
   response-byte measurement. The unit is decoded response representation bytes,
   not Java heap, direct memory, RSS, or container memory.
+- **Bounded cache accounting telemetry and diagnostics.** Explicit cache
+  observability now adds current/maximum decoded response representation-byte
+  gauges and fixed admission outcomes only for weighted policies. Diagnostics
+  schema V1 additively reports nullable current retained bytes without creating
+  or traversing a cache. Cache-local signals remain outside downstream health,
+  and factory shutdown removes all owned meters.
 
 ### Fixed
 - **Single-flight caller-context retention.** Cache miss flights and hidden

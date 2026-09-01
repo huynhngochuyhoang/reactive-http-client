@@ -690,42 +690,80 @@ Evidence recorded on 2026-08-31 from durable baseline commit
 
 ## Priority 8 - Metrics, Diagnostics, and Health Semantics
 
-### [ ] 8.1 Keep telemetry explicit and bounded
+### [x] 8.1 Keep telemetry explicit and bounded
 
-- [ ] Register cache memory/accounting telemetry only when cache observability is
+- [x] Register cache memory/accounting telemetry only when cache observability is
       explicitly selected.
-- [ ] If weighted admission ships, expose current/maximum weight with a meter
+- [x] If weighted admission ships, expose current/maximum weight with a meter
       description that names the exact unit and an admission outcome using only
       stable low-cardinality tags.
-- [ ] Keep cache-disabled and cache-enabled/metrics-disabled clients free of the
+- [x] Keep cache-disabled and cache-enabled/metrics-disabled clients free of the
       new meters and meter suppliers.
-- [ ] Never export keys, values, request targets, headers, bodies, identities,
+- [x] Never export keys, values, request targets, headers, bodies, identities,
       credentials, tenant data, exception messages, or derived variants.
-- [ ] Remove every owned meter on factory destruction and prove destroy/recreate
+- [x] Remove every owned meter on factory destruction and prove destroy/recreate
       observes the replacement manager.
 
-### [ ] 8.2 Evolve diagnostics schema V1 additively
+### [x] 8.2 Evolve diagnostics schema V1 additively
 
-- [ ] Add only nullable configured/runtime facts that can be derived without
+- [x] Add only nullable configured/runtime facts that can be derived without
       creating a cache manager, invoking a weigher, or traversing cached values.
-- [ ] Preserve `null`/unknown for lazy, absent, uncreated, or uninspectable cache
+- [x] Preserve `null`/unknown for lazy, absent, uncreated, or uninspectable cache
       state instead of reporting false certainty.
-- [ ] Keep existing collection-backed snapshot overloads accurate when new facts
+- [x] Keep existing collection-backed snapshot overloads accurate when new facts
       are unavailable.
-- [ ] Enforce existing client, endpoint, field, rendered-byte, and sanitization
+- [x] Enforce existing client, endpoint, field, rendered-byte, and sanitization
       limits for map, JSON, and Markdown outputs.
-- [ ] Add compatibility fixtures for older schema consumers and unknown fields.
+- [x] Add compatibility fixtures for older schema consumers and unknown fields.
 
-### [ ] 8.3 Preserve downstream health semantics
+### [x] 8.3 Preserve downstream health semantics
 
-- [ ] Keep fresh/stale hits and coalesced waiters out of the ordinary downstream
+- [x] Keep fresh/stale hits and coalesced waiters out of the ordinary downstream
       request timer used by health calculations.
-- [ ] Keep miss/refresh loads that fail before transport distinguishable from
+- [x] Keep miss/refresh loads that fail before transport distinguishable from
       dispatched downstream failures.
-- [ ] Ensure local admission bypass/rejection does not dilute or inflate
+- [x] Ensure local admission bypass/rejection does not dilute or inflate
       downstream health samples.
-- [ ] Document which cache meters are occupancy signals and which are terminal
+- [x] Document which cache meters are occupancy signals and which are terminal
       event histories.
+
+Evidence recorded on 2026-09-01 from durable baseline commit
+`89527bf190aebcb23dc085817895f12fb88e9c1d` plus this reviewed change:
+
+- Weighted policies with explicitly enabled cache metrics now expose current and
+  configured decoded-response representation bytes plus one admission counter
+  with fixed `admitted`, `bypassed_unknown_size`, `bypassed_over_budget`, and
+  `bypassed_capacity` outcomes. Meter descriptions name decoded response
+  representation bytes, tags remain limited to client, policy, and outcome, and
+  stale duplicate publications do not create admission events.
+- `LocalResponseCacheObservabilityTest` proves admitted, unknown-size, and over-
+  budget transitions; current retained-byte updates; zero-initialized stable
+  outcomes; absence for cache-disabled and cache-metrics-disabled clients; no
+  request/cache material in tags; stale duplicate bypass suppression; atomic
+  load/refresh freshness-and-admission decisions; overlapping manager aggregation
+  and owner-safe close; complete meter removal; and clean manager
+  re-registration.
+- Diagnostics schema V1 now adds nullable
+  `cacheRetainedDecodedResponseBytes`. Provider snapshots read it only from an
+  already-created factory cache manager, report `null` for uncreated or mixed
+  weighted/unweighted state, report zero for an empty or closed weighted
+  manager, and never create a manager, invoke a weigher, or traverse cached
+  values. Collection-backed snapshots preserve `null` when runtime state is
+  unavailable.
+- The current schema fixture includes the additive nullable field, the immutable
+  published fixture remains unchanged, and compatibility coverage proves older
+  consumers ignore unknown additive fields. Existing map, JSON, Markdown,
+  sanitization, and rendered-byte guards continue to cover the new field.
+- `Boot4HttpClientHealthIndicatorTest` proves fresh hits, stale hits, coalesced
+  waiters, and local admission outcomes create no ordinary request samples, then
+  proves one dispatched `503` remains exactly one failed health sample and keeps
+  the client `DOWN`.
+- `docs/08-observability.md` distinguishes current occupancy/capacity gauges from
+  cumulative admission/load/refresh/eviction histories; the diagnostics,
+  support-bundle, and response-cache guides document nullable runtime-state and
+  health-isolation semantics.
+- The focused cache/accounting run passed 69 tests and the complete starter suite
+  passed 1,291 tests, both with no failures, errors, or skips.
 
 ---
 

@@ -243,6 +243,12 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("zero branch retains refresh-enabled groups")
                 .contains("### Cache eviction pressure (evictions per second)")
                 .contains("### Cache capacity pressure (dimensionless)")
+                .contains("reactive.http.client.cache.retained.decoded.response.bytes")
+                .contains("reactive.http.client.cache.maximum.decoded.response.bytes")
+                .contains("reactive.http.client.cache.admissions")
+                .contains("decoded response representation bytes")
+                .contains("current occupancy/capacity signals")
+                .contains("cumulative terminal event histories")
                 .contains("reactive_http_client_cache_entries\n  /\n  clamp_min(\n"
                         + "    reactive_http_client_cache_maximum_entries, 1")
                 .contains("per scrape target before aggregation")

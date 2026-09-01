@@ -9,17 +9,32 @@ interface LocalResponseCache extends AutoCloseable {
 
     boolean isRefreshCurrent(RefreshToken refreshToken);
 
+    boolean recordRefreshBypassIfCurrent(RefreshToken refreshToken, Runnable recorder);
+
     long hardExpiryRemainingNanos(RefreshToken refreshToken);
 
     void publishRefresh(RefreshToken refreshToken, Object value);
 
     void publishRefresh(RefreshToken refreshToken, Object value, long decodedResponseBytes);
 
+    default PublicationResult publishRefreshMeasured(
+            RefreshToken refreshToken, Object value, long decodedResponseBytes) {
+        publishRefresh(refreshToken, value, decodedResponseBytes);
+        return PublicationResult.STORED;
+    }
+
     void finishRefresh(RefreshToken refreshToken);
 
     void publish(LoadToken token, Object value);
 
     void publish(LoadToken token, Object value, long decodedResponseBytes);
+
+    boolean recordLoadBypassIfCurrent(LoadToken token, Runnable recorder);
+
+    default PublicationResult publishMeasured(LoadToken token, Object value, long decodedResponseBytes) {
+        publish(token, value, decodedResponseBytes);
+        return PublicationResult.STORED;
+    }
 
     void finish(LoadToken token);
 
@@ -68,6 +83,12 @@ interface LocalResponseCache extends AutoCloseable {
         String tagValue() {
             return name().toLowerCase(java.util.Locale.ROOT);
         }
+    }
+
+    enum PublicationResult {
+        STORED,
+        STALE,
+        CAPACITY
     }
 
     interface RemovalObserver {

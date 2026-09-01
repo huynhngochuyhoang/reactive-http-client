@@ -157,7 +157,7 @@ class ReactiveHttpClientAutoConfigurationTest {
                                     "poolMaxConcurrentStreams", "cachePhase", "cachePolicyCount",
                                     "cacheTtlMs", "cacheRefreshAfterMs", "cacheSingleFlight",
                                     "cacheMaximumSize", "cacheMaximumTotalDecodedResponseBytes",
-                                    "cacheEntryCount", "cacheEvictions",
+                                    "cacheRetainedDecodedResponseBytes", "cacheEntryCount", "cacheEvictions",
                                     "cacheMetricsEnabled", "cachePolicySources", "cacheHttpMethods",
                                     "cacheSemanticReadAcknowledged", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
                                     "compressionEnabled", "codecMaxInMemorySizeMb", "resilienceConfigured", "retry", "rateLimiter", "circuitBreaker",
