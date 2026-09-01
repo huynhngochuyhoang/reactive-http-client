@@ -90,7 +90,7 @@
     {
       "policy": "catalog-read",
       "evictions": {
-        "size": 10,
+        "size": 0,
         "ttl": 29,
         "weight": 3
       },
@@ -104,7 +104,7 @@
     {
       "policy": "profile-summary",
       "evictions": {
-        "size": 4,
+        "size": 0,
         "ttl": 8,
         "weight": null
       },
@@ -166,14 +166,14 @@
       "policyState": [
         {
           "policy": "catalog-read",
-          "entries": 192,
+          "entries": 202,
           "maximumEntries": 10000,
           "retainedDecodedResponseBytes": 180355072,
           "maximumDecodedResponseBytes": 268435456
         },
         {
           "policy": "profile-summary",
-          "entries": 38,
+          "entries": 42,
           "maximumEntries": 2500,
           "retainedDecodedResponseBytes": null,
           "maximumDecodedResponseBytes": null

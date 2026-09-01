@@ -815,12 +815,15 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   coalesced waiters, represents weighted/unweighted availability with values
   versus `null`, and records three timestamped post-GC memory/cache/H2-pool
   checkpoints. The after-load entry counts equal opening entries plus successful
-  loads minus recorded evictions for each policy. Its lifecycle evidence timestamps
+  loads minus recorded evictions for each policy. Both size-eviction counts are
+  zero because neither policy reaches its maximum entry capacity during the
+  bounded window. Its lifecycle evidence timestamps
   the relevant starter-version change with safe before/after versions. It contains
   no request, cache-entry, identity, credential, tenant, or error-message material.
 - Recursive fixture guards reject singular, plural, and compound sensitive field
   names plus origin, authority, rootless-path, query, and absolute-URL textual
-  values. All six endpoint captures remove stale raw files, cap downloads at
+  values, including request targets embedded in HTTP request lines. All six
+  endpoint captures remove stale raw files, cap downloads at
   1 MiB, record HTTP status unconditionally, quarantine bodies outside the bundle,
   verify raw byte size before parsing, and publish JSON only after expected-shape
   validation and field allowlisting. Diagnostics publication requires 2xx status,
@@ -836,9 +839,10 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   `kubectl exec -- cat` minimal-image path remain covered without
   `kubectl cp`/`tar`.
 - The operations decision table uses only observable cache evidence: stale-hit
-  callers across consecutive bounded windows, terminal refresh deltas, and
-  post-close terminal activity. It explicitly states that terminal-only counters
-  cannot prove an active refresh.
+  callers across consecutive bounded windows, coalesced-waiter and terminal-load
+  deltas, terminal refresh deltas, and post-close terminal activity. It explicitly
+  states that cumulative terminal counters cannot prove active flight or refresh
+  ownership.
 - `DocumentationReleaseArtifactTest` passed 45 tests and the paired configuration
   guard passed 18 tests. The complete starter suite passed 1,292 tests; all runs
   had no failures, errors, or skips. The exact documented diagnostics filter

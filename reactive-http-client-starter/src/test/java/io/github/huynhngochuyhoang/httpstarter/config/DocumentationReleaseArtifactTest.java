@@ -34,6 +34,9 @@ class DocumentationReleaseArtifactTest {
     private static final Pattern SUPPORT_FIXTURE_REQUEST_TARGET_VALUE = Pattern.compile(
             "(?i)^(?:\\*|https?://\\S+|(?:/|\\./|\\.\\./)\\S*"
                     + "|\\S*\\?[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?(?:&[^\\s]*)?)$");
+    private static final Pattern SUPPORT_FIXTURE_EMBEDDED_HTTP_REQUEST_LINE = Pattern.compile(
+            "(?i)(?:^|\\s)(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|TRACE|CONNECT)"
+                    + "\\s+\\S+\\s+HTTP/[0-9](?:\\.[0-9])?(?:$|\\s)");
     private static final Pattern SUPPORT_FIXTURE_QUERY_VALUE = Pattern.compile(
             "^(?:\\?[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?"
                     + "(?:&[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?)*"
@@ -385,7 +388,8 @@ class DocumentationReleaseArtifactTest {
                   "endpoint": "internal.example:443",
                   "route": "orders/42",
                   "option": "?debug",
-                  "target": "*"
+                  "target": "*",
+                  "sampleLine": "request failed: GET /orders/42?debug HTTP/1.1 after dispatch"
                 }
                 """);
         assertThat(sensitiveSupportFixtureFieldNames(unsafeTextFixture)).isEmpty();
@@ -396,7 +400,8 @@ class DocumentationReleaseArtifactTest {
                         "internal.example:443",
                         "orders/42",
                         "?debug",
-                        "*");
+                        "*",
+                        "request failed: GET /orders/42?debug HTTP/1.1 after dispatch");
     }
 
     @Test
@@ -424,7 +429,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("protocol, total/idle physical connections")
                 .contains("applicable active/pending connection or stream gauges")
                 .contains("generation records, completed load tokens")
-                .contains("flight ownership remains after every caller and load has terminated")
+                .contains("coalesced-waiter deltas rise in the same bounded window")
+                .contains("terminal-load deltas after that boundary prove late completion")
+                .contains("absent deltas do not prove retained flight ownership")
                 .contains("stale-hit callers continue across consecutive bounded windows")
                 .contains("terminal refresh totals do not advance")
                 .contains("terminal-only counters cannot prove an active refresh by themselves")
@@ -549,6 +556,7 @@ class DocumentationReleaseArtifactTest {
             assertThat(weightedPolicies).containsKey(policyName);
             assertThat(activity.path("evictions").path("ttl").isIntegralNumber()).isTrue();
             assertThat(activity.path("evictions").path("size").isIntegralNumber()).isTrue();
+            assertThat(activity.path("evictions").path("size").asLong()).isZero();
             boolean weighted = weightedPolicies.get(policyName);
             assertThat(activity.path("evictions").path("weight").isIntegralNumber())
                     .isEqualTo(weighted);
@@ -4397,6 +4405,7 @@ class DocumentationReleaseArtifactTest {
         if (node.isTextual()) {
             String value = node.asText().trim();
             if (SUPPORT_FIXTURE_REQUEST_TARGET_VALUE.matcher(value).matches()
+                    || SUPPORT_FIXTURE_EMBEDDED_HTTP_REQUEST_LINE.matcher(value).find()
                     || SUPPORT_FIXTURE_QUERY_VALUE.matcher(value).matches()
                     || SUPPORT_FIXTURE_AUTHORITY_VALUE.matcher(value).matches()
                     || (!SUPPORT_FIXTURE_ALLOWED_SLASH_VALUES.contains(value)
