@@ -344,7 +344,9 @@ bytes that compacted `tojson` does not measure.
 The two V29 decoded-response byte fields are optional only when `projectVersion`
 identifies a published `4.1.x` response. A V29 `4.2.0-SNAPSHOT` response must
 include both fields, although their values may be `null` where the diagnostics
-contract permits an unknown state. Each filter slurps the raw input and requires
+contract permits an unknown state. When both fields are numeric, retained
+decoded-response bytes cannot exceed the configured aggregate maximum. Each
+filter slurps the raw input and requires
 exactly one parsed JSON value, so empty bodies and JSON streams are rejected. The
 health filter also requires a `2xx` status or a `5xx` response whose top-level
 status is `DOWN`, rejecting authentication and other `4xx` responses while
@@ -454,6 +456,13 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
         and .endpointCount <= 10000
         and .inheritedEndpointCount <= .endpointCount
         and all(.clients[]; .inheritedEndpointCount <= .endpointCount)
+        and all(.clients[];
+          if ((.cacheMaximumTotalDecodedResponseBytes | type) == "number"
+              and (.cacheRetainedDecodedResponseBytes | type) == "number")
+          then .cacheRetainedDecodedResponseBytes
+            <= .cacheMaximumTotalDecodedResponseBytes
+          else true
+          end)
         and ([.clients[].endpointCount] | add // 0) == .endpointCount
         and ([.clients[].inheritedEndpointCount] | add // 0)
           == .inheritedEndpointCount

@@ -822,6 +822,9 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   loads minus recorded evictions for each policy. The idle `profile-summary`
   policy has zero survivors after four minutes because its 50 opening entries all
   exceed the 30-second TTL, and its eviction total records all 50 expirations.
+  The `catalog-read` policy records 14 refreshed opening entries, 186 TTL
+  expirations, 34 successful loads, three weight evictions, and 45 survivors at
+  the four-minute checkpoint, respecting its 60-second TTL.
   Both size-eviction counts are zero because neither policy reaches its maximum
   entry capacity during the bounded window. Its lifecycle evidence timestamps
   the relevant starter-version change with safe before/after versions. It contains

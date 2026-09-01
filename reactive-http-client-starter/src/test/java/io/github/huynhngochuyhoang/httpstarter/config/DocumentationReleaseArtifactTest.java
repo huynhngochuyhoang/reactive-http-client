@@ -34,7 +34,7 @@ class DocumentationReleaseArtifactTest {
             "key", "digest", "value", "payload",
             "path", "query", "uri", "requesttarget", "requestvariant");
     private static final Pattern SUPPORT_FIXTURE_REQUEST_TARGET_VALUE = Pattern.compile(
-            "(?i)^(?:\\*|https?://\\S+|(?:/|\\./|\\.\\./)\\S*"
+            "(?i)^(?:\\*|[a-z][a-z0-9+.-]*:\\S+|(?:/|\\./|\\.\\./)\\S*"
                     + "|\\S*\\?[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?(?:&[^\\s]*)?)$");
     private static final Pattern SUPPORT_FIXTURE_EMBEDDED_HTTP_REQUEST_LINE = Pattern.compile(
             "(?i)(?:^|\\s)(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|TRACE|CONNECT)"
@@ -391,6 +391,8 @@ class DocumentationReleaseArtifactTest {
                   "route": "orders/42",
                   "option": "?debug",
                   "target": "*",
+                  "remoteArchive": "ftp://internal-host/resource",
+                  "localResource": "file:///private/path",
                   "sampleLine": "request failed: GET /orders/42?debug HTTP/1.1 after dispatch"
                 }
                 """);
@@ -403,6 +405,8 @@ class DocumentationReleaseArtifactTest {
                         "orders/42",
                         "?debug",
                         "*",
+                        "ftp://internal-host/resource",
+                        "file:///private/path",
                         "request failed: GET /orders/42?debug HTTP/1.1 after dispatch");
     }
 
@@ -481,6 +485,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("two V29 decoded-response byte fields are optional only when `projectVersion` "
                         + "identifies a published `4.1.x` response")
                 .contains("A V29 `4.2.0-SNAPSHOT` response must include both fields")
+                .contains("retained decoded-response bytes cannot exceed the configured aggregate maximum")
                 .contains("$httpStatus | test(\"^2[0-9][0-9]$\")")
                 .contains("nullable_number($field)")
                 .contains("nullable_boolean($field)")
@@ -553,6 +558,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(apiActivity.isArray()).isTrue();
         assertThat(apiActivity.size()).isEqualTo(2).isLessThanOrEqualTo(64);
         Map<String, Long> successfulLoadsByPolicy = new HashMap<>();
+        Map<String, Long> successfulRefreshesByPolicy = new HashMap<>();
         Map<String, JsonNode> apiActivityByName = new HashMap<>();
         apiActivity.forEach(api -> {
             assertThat(api.path("apiName").isTextual()).isTrue();
@@ -577,6 +583,10 @@ class DocumentationReleaseArtifactTest {
             successfulLoadsByPolicy.merge(
                     api.path("selectedPolicy").asText(),
                     api.path("loads").path("success").asLong(),
+                    Long::sum);
+            successfulRefreshesByPolicy.merge(
+                    api.path("selectedPolicy").asText(),
+                    api.path("refreshes").path("success").asLong(),
                     Long::sum);
             assertThat(api.path("refreshes").path("failure").isIntegralNumber()).isTrue();
         });
@@ -690,6 +700,17 @@ class DocumentationReleaseArtifactTest {
         assertThat(entriesBeforeLoad).containsEntry("profile-summary", 50L);
         assertThat(entriesAfterLoad).containsEntry("profile-summary", 0L);
         assertThat(ttlEvictionsByPolicy).containsEntry("profile-summary", 50L);
+        long catalogElapsedMs = Duration.between(
+                Instant.parse(checkpoints.get(0).path("capturedAt").asText()),
+                Instant.parse(checkpoints.get(1).path("capturedAt").asText())).toMillis();
+        assertThat(catalogElapsedMs).isGreaterThan(policyTtlMs.get("catalog-read"));
+        assertThat(entriesBeforeLoad).containsEntry("catalog-read", 200L);
+        assertThat(successfulRefreshesByPolicy).containsEntry("catalog-read", 14L);
+        assertThat(ttlEvictionsByPolicy).containsEntry("catalog-read", 186L);
+        assertThat(entriesAfterLoad).containsEntry("catalog-read", 45L);
+        assertThat(entriesAfterLoad.get("catalog-read")).isLessThanOrEqualTo(
+                successfulLoadsByPolicy.get("catalog-read")
+                        + successfulRefreshesByPolicy.get("catalog-read"));
 
         JsonNode quietWindow = fixture.path("quietWindow");
         assertThat(quietWindow.path("trafficStopped").isBoolean()).isTrue();
@@ -809,6 +830,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("and length <= 16\n"
                         + "            and all(.[]; type == \"string\" and length <= 512)")
                 .contains("all(.clients[]; .inheritedEndpointCount <= .endpointCount)")
+                .contains(".cacheRetainedDecodedResponseBytes\n"
+                        + "            <= .cacheMaximumTotalDecodedResponseBytes")
                 .contains("def nonnegative_integer:")
                 .contains("def rate_matches($detail):")
                 .contains("$detail.errors / $detail.samples")

@@ -95,7 +95,7 @@
       "policy": "catalog-read",
       "evictions": {
         "size": 0,
-        "ttl": 29,
+        "ttl": 186,
         "weight": 3
       },
       "admissions": {
@@ -214,7 +214,7 @@
       "policyState": [
         {
           "policy": "catalog-read",
-          "entries": 202,
+          "entries": 45,
           "maximumEntries": 10000,
           "retainedDecodedResponseBytes": 180355072,
           "maximumDecodedResponseBytes": 268435456
