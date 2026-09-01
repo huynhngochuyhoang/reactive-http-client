@@ -455,12 +455,21 @@ for the complete meter and dashboard contract. Meter names, types, base units,
 tag keys, and zero-series behavior are verb-independent; the resolved HTTP method
 is intentionally not added as a cache-meter tag.
 
+Weighted policies additionally expose current and maximum decoded response
+representation-byte gauges plus one bounded admission outcome counter. These
+signals use only client, policy, and fixed outcome tags. Occupancy gauges are
+current state; lookup/load/refresh/admission/eviction counters are terminal event
+history. They are absent unless cache observability and the policy byte bound are
+both selected, and they do not change downstream health.
+
 Provider-backed diagnostics and effective-contract snapshots expose bounded cache
 policy source, resolved HTTP method, and semantic-read acknowledgement. Collection
 snapshot overloads and replacement client factories render provider-only semantic
 facts as `null`/unknown rather than inventing `false`. None of these outputs
 contain policy names, request targets, selected headers, bodies, keys, tenants, or
-identities.
+identities. Provider diagnostics also expose current retained representation
+bytes only when an existing manager can prove the aggregate; lazy/uncreated and
+partly unweighted state remains `null` without creating or traversing a cache.
 
 Response cacheability is decided from the final wire status and headers for
 both plain `Mono<T>` and `Mono<ResponseEntity<T>>` contracts. Redirect responses

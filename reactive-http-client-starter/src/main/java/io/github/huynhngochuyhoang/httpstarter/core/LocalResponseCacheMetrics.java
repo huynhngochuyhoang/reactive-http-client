@@ -38,6 +38,8 @@ abstract class LocalResponseCacheMetrics implements AutoCloseable {
 
     abstract void eviction(String policyName, LocalResponseCache.RemovalReason reason);
 
+    abstract void admission(String policyName, AdmissionOutcome outcome);
+
     @Override
     public abstract void close();
 
@@ -45,6 +47,17 @@ abstract class LocalResponseCacheMetrics implements AutoCloseable {
         SUCCESS,
         FAILURE,
         CANCELLATION;
+
+        String tagValue() {
+            return name().toLowerCase(java.util.Locale.ROOT);
+        }
+    }
+
+    enum AdmissionOutcome {
+        ADMITTED,
+        BYPASSED_UNKNOWN_SIZE,
+        BYPASSED_OVER_BUDGET,
+        BYPASSED_CAPACITY;
 
         String tagValue() {
             return name().toLowerCase(java.util.Locale.ROOT);
@@ -92,6 +105,10 @@ abstract class LocalResponseCacheMetrics implements AutoCloseable {
 
         @Override
         void eviction(String policyName, LocalResponseCache.RemovalReason reason) {
+        }
+
+        @Override
+        void admission(String policyName, AdmissionOutcome outcome) {
         }
 
         @Override

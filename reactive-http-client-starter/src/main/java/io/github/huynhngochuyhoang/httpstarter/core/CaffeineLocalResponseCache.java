@@ -139,24 +139,31 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
 
     @Override
     public void publishRefresh(RefreshToken refreshToken, Object value, long decodedResponseBytes) {
+        publishRefreshMeasured(refreshToken, value, decodedResponseBytes);
+    }
+
+    @Override
+    public PublicationResult publishRefreshMeasured(
+            RefreshToken refreshToken, Object value, long decodedResponseBytes) {
         GenerationRefreshToken token = refreshToken(refreshToken);
         synchronized (lifecycleMonitor) {
             if (closed.get()) {
-                return;
+                return PublicationResult.STALE;
             }
             StoredEntry current = cache.getIfPresent(token.key);
             if (closed.get()
                     || current != token.entry
                     || token.state.generation != token.observedGeneration) {
-                return;
+                return PublicationResult.STALE;
             }
             StoredEntry replacement = newEntry(value, decodedResponseBytes);
             if (!makeRoomFor(replacement.weight(), token.key, current)) {
-                return;
+                return PublicationResult.CAPACITY;
             }
             replace(token.key, current, replacement);
             token.state.generation++;
             cache.cleanUp();
+            return PublicationResult.STORED;
         }
     }
 
@@ -180,24 +187,31 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
 
     @Override
     public void publish(LoadToken loadToken, Object value, long decodedResponseBytes) {
+        publishMeasured(loadToken, value, decodedResponseBytes);
+    }
+
+    @Override
+    public PublicationResult publishMeasured(
+            LoadToken loadToken, Object value, long decodedResponseBytes) {
         GenerationLoadToken token = token(loadToken);
         synchronized (lifecycleMonitor) {
             if (closed.get()) {
-                return;
+                return PublicationResult.STALE;
             }
             StoredEntry currentValue = cache.getIfPresent(token.key);
             if (closed.get()
                     || token.state.generation != token.observedGeneration
                     || currentValue != null) {
-                return;
+                return PublicationResult.STALE;
             }
             StoredEntry entry = newEntry(value, decodedResponseBytes);
             if (!makeRoomFor(entry.weight(), token.key, null)) {
-                return;
+                return PublicationResult.CAPACITY;
             }
             replace(token.key, null, entry);
             token.state.generation++;
             cache.cleanUp();
+            return PublicationResult.STORED;
         }
     }
 

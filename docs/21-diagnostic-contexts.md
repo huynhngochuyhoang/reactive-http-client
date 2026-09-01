@@ -205,6 +205,11 @@ selected method carries explicit semantic-read acknowledgement. The configured
 decoded-response-byte aggregate is `null` when any selected
 policy omits the optional limit or when a finite aggregate cannot be represented;
 exact per-method policy limits remain available in effective-contract snapshots.
+`cacheRetainedDecodedResponseBytes` is a nullable runtime aggregate for already
+created weighted policy caches only. It is `null` when the client/cache manager
+has not been created or when any active policy omits the byte bound. Diagnostics
+read the cache's aggregate counter and never invoke a weigher, enumerate keys,
+or traverse cached values. An empty or closed existing manager reports zero.
 Empty lists and
 `false` mean the provider proved no selected cache method; `null` means the fact
 cannot be proven through the collection or replacement-factory contract. No

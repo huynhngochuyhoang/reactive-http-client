@@ -212,9 +212,9 @@ class ResponseCacheCapacityConcurrencyInvariantTest {
                     .isEqualTo("d");
 
             assertThat(first.snapshot()).isEqualTo(
-                    new LocalResponseCacheManager.Snapshot(2, 3, 3, 0, false));
+                    new LocalResponseCacheManager.Snapshot(2, 3, 3, 0, 11L, false));
             assertThat(second.snapshot()).isEqualTo(
-                    new LocalResponseCacheManager.Snapshot(1, 1, 1, 0, false));
+                    new LocalResponseCacheManager.Snapshot(1, 1, 1, 0, 2L, false));
             assertThat(first.retainedDecodedResponseBytesForTesting()).isEqualTo(11);
             assertThat(second.retainedDecodedResponseBytesForTesting()).isEqualTo(2);
             assertManagerTotals(first);

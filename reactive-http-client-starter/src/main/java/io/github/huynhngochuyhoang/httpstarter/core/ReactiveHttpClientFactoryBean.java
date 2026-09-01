@@ -231,7 +231,7 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
     LocalResponseCacheManager.Snapshot responseCacheSnapshot() {
         return responseCacheManager != null
                 ? responseCacheManager.snapshot()
-                : new LocalResponseCacheManager.Snapshot(0, 0, 0, 0, false);
+                : null;
     }
 
     private void disposeResources(Duration timeout) {

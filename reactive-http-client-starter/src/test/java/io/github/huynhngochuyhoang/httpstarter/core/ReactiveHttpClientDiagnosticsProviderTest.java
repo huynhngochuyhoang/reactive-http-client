@@ -32,9 +32,12 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -58,7 +61,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
             "poolProtocol", "poolCapacityBasis", "poolMaxConcurrentStreams",
             "cachePhase", "cachePolicyCount", "cacheTtlMs", "cacheRefreshAfterMs",
             "cacheSingleFlight", "cacheMaximumSize", "cacheMaximumTotalDecodedResponseBytes",
-            "cacheEntryCount", "cacheEvictions",
+            "cacheRetainedDecodedResponseBytes", "cacheEntryCount", "cacheEvictions",
             "cacheMetricsEnabled", "cachePolicySources", "cacheHttpMethods",
             "cacheSemanticReadAcknowledged", "timeoutSource", "timeoutMs", "logicalCallTimeoutMs",
             "compressionEnabled", "codecMaxInMemorySizeMb",
@@ -144,6 +147,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("cacheSingleFlight", "enabled")
                 .containsEntry("cacheMaximumSize", 100L)
                 .containsEntry("cacheMaximumTotalDecodedResponseBytes", 67_108_864L)
+                .containsEntry("cacheRetainedDecodedResponseBytes", null)
                 .containsEntry("cacheEntryCount", null)
                 .containsEntry("cacheEvictions", null)
                 .containsEntry("cacheMetricsEnabled", true);
@@ -153,6 +157,56 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .doesNotContain("tenant")
                 .doesNotContain("Authorization");
         assertThat(beanFactory.containsSingleton("diagnosticClient")).isFalse();
+    }
+
+    @Test
+    void providerSnapshotReadsRetainedBytesOnlyFromAnExistingCacheManager() throws Exception {
+        DefaultListableBeanFactory beanFactory = diagnosticClientBeanFactory();
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(60_000L);
+        policy.setMaximumSize(100L);
+        policy.setMaximumTotalDecodedResponseBytes(64L);
+        policy.setSharedResponse(true);
+        ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
+        config.getCache().setPolicy("catalog");
+        config.getCache().getPolicies().put("catalog", policy);
+        ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
+        properties.setClients(Map.of("diagnostic-client", config));
+
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = new EffectiveCachePolicy.Selection(
+                true, EffectiveCachePolicy.Source.CLIENT, "catalog", policy);
+        LocalResponseCacheManager.DecodedResponseBytes measurement =
+                new LocalResponseCacheManager.DecodedResponseBytes(64L);
+        measurement.add(7L);
+        measurement.complete();
+        LocalResponseCacheManager.ResponseMetadata metadata =
+                new LocalResponseCacheManager.ResponseMetadata(200, Map.of(), true, measurement);
+        manager.getOrLoad(
+                        selection,
+                        CacheKeyContract.OpaqueKey.from("bounded-key".getBytes(StandardCharsets.UTF_8)),
+                        () -> Mono.just("secret-value"),
+                        () -> metadata)
+                .block();
+
+        ReactiveHttpClientFactoryBean<DiagnosticClient> factory = new ReactiveHttpClientFactoryBean<>();
+        Field responseCacheManager = ReactiveHttpClientFactoryBean.class
+                .getDeclaredField("responseCacheManager");
+        responseCacheManager.setAccessible(true);
+        responseCacheManager.set(factory, manager);
+        beanFactory.registerSingleton("diagnosticClient", factory);
+        ReactiveHttpClientDiagnosticsProvider provider = new ReactiveHttpClientDiagnosticsProvider(
+                beanFactory, properties, new MethodMetadataCache());
+
+        Map<String, Object> client = firstClient(ReactiveHttpClientDiagnosticsSnapshot.toMap(provider));
+
+        assertThat(client)
+                .containsEntry("cacheMaximumTotalDecodedResponseBytes", 64L)
+                .containsEntry("cacheRetainedDecodedResponseBytes", 7L)
+                .containsEntry("cacheEntryCount", 1L);
+        assertThat(client.toString()).doesNotContain("bounded-key", "secret-value");
+        manager.close();
     }
 
     @Test
@@ -1220,6 +1274,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                       "cacheSingleFlight": "disabled",
                       "cacheMaximumSize": 0,
                       "cacheMaximumTotalDecodedResponseBytes": null,
+                      "cacheRetainedDecodedResponseBytes": null,
                       "cacheEntryCount": 0,
                       "cacheEvictions": 0,
                       "cacheMetricsEnabled": false,
@@ -1273,6 +1328,18 @@ class ReactiveHttpClientDiagnosticsProviderTest {
     }
 
     @Test
+    void schemaV1CompatibilityIgnoresUnknownAdditiveFields() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode current = mapper.readTree(Path.of("..", "docs", "fixtures",
+                "rhttpclients-schema-v1.json").toFile());
+        ObjectNode future = (ObjectNode) current.deepCopy();
+        future.put("futureRootFact", true);
+        ((ObjectNode) future.path("clients").get(0)).put("futureClientFact", "ignored");
+
+        assertCompatibleSchema(current, future, "root");
+    }
+
+    @Test
     void keepsProviderCollectionJsonAndMarkdownOnSchemaV1() throws Exception {
         ReactiveHttpClientDiagnosticsProvider provider = sensitiveDiagnosticsProvider();
         Map<String, Object> providerMap = ReactiveHttpClientDiagnosticsSnapshot.toMap(provider);
@@ -1320,6 +1387,7 @@ class ReactiveHttpClientDiagnosticsProviderTest {
                 .containsEntry("cacheHttpMethods", null)
                 .containsEntry("cacheSemanticReadAcknowledged", null)
                 .containsEntry("cacheMaximumTotalDecodedResponseBytes", null)
+                .containsEntry("cacheRetainedDecodedResponseBytes", null)
                 .containsEntry("timeoutMs", 500L)
                 .containsEntry("followRedirects", true);
 

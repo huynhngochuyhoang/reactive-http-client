@@ -144,6 +144,8 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             clientMap.put("cacheMaximumSize", cacheMaximumSize(entry.cache()));
             clientMap.put("cacheMaximumTotalDecodedResponseBytes",
                     cacheMaximumTotalDecodedResponseBytes(entry.cache()));
+            clientMap.put("cacheRetainedDecodedResponseBytes",
+                    cacheRetainedDecodedResponseBytes(entry.cache()));
             clientMap.put("cacheEntryCount", cacheEntryCount(entry.cache()));
             clientMap.put("cacheEvictions", cacheEvictions(entry.cache()));
             clientMap.put("cacheMetricsEnabled", cacheMetricsEnabled(entry.cache()));
@@ -217,6 +219,8 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             nullableField(out, 3, "cacheMaximumSize", cacheMaximumSize(entry.cache()), true);
             nullableField(out, 3, "cacheMaximumTotalDecodedResponseBytes",
                     cacheMaximumTotalDecodedResponseBytes(entry.cache()), true);
+            nullableField(out, 3, "cacheRetainedDecodedResponseBytes",
+                    cacheRetainedDecodedResponseBytes(entry.cache()), true);
             nullableField(out, 3, "cacheEntryCount", cacheEntryCount(entry.cache()), true);
             nullableField(out, 3, "cacheEvictions", cacheEvictions(entry.cache()), true);
             field(out, 3, "cacheMetricsEnabled", cacheMetricsEnabled(entry.cache()), true);
@@ -434,6 +438,10 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
                 + (cache.maximumTotalDecodedResponseBytes() != null
                         ? cache.maximumTotalDecodedResponseBytes()
                         : "disabled")
+                + ", retainedDecodedResponseBytes="
+                + (cache.retainedDecodedResponseBytes() != null
+                        ? cache.retainedDecodedResponseBytes()
+                        : "unknown")
                 + ", entries=" + (cache.entryCount() != null ? cache.entryCount() : "unknown")
                 + ", evictions=" + (cache.evictions() != null ? cache.evictions() : "unknown")
                 + ", metrics=" + cache.metricsEnabled()
@@ -473,6 +481,11 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
 
     private static Long cacheEntryCount(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
         return cache != null ? cache.entryCount() : null;
+    }
+
+    private static Long cacheRetainedDecodedResponseBytes(
+            ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        return cache != null ? cache.retainedDecodedResponseBytes() : null;
     }
 
     private static Long cacheEvictions(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {

@@ -70,6 +70,23 @@ final class MicrometerLocalResponseCacheMetrics extends LocalResponseCacheMetric
                 .strongReference(true)
                 .tags(tags)
                 .register(registry));
+        Long maximumDecodedResponseBytes = cache.maximumDecodedResponseBytes();
+        if (maximumDecodedResponseBytes != null) {
+            own(Gauge.builder(PREFIX + ".retained.decoded.response.bytes",
+                            cache, LocalResponseCache::retainedDecodedResponseBytes)
+                    .description("Current decoded response representation bytes retained by this policy cache")
+                    .strongReference(true)
+                    .tags(tags)
+                    .register(registry));
+            own(Gauge.builder(PREFIX + ".maximum.decoded.response.bytes", () -> maximumDecodedResponseBytes)
+                    .description("Configured maximum decoded response representation bytes for this policy cache")
+                    .strongReference(true)
+                    .tags(tags)
+                    .register(registry));
+            for (AdmissionOutcome outcome : AdmissionOutcome.values()) {
+                counter(PREFIX + ".admissions", tags.and("outcome", outcome.tagValue()));
+            }
+        }
         for (LocalResponseCache.RemovalReason reason : LocalResponseCache.RemovalReason.values()) {
             if (reason != LocalResponseCache.RemovalReason.WEIGHT
                     || cache.maximumDecodedResponseBytes() != null) {
@@ -113,6 +130,13 @@ final class MicrometerLocalResponseCacheMetrics extends LocalResponseCacheMetric
     @Override
     void eviction(String policyName, LocalResponseCache.RemovalReason reason) {
         increment(PREFIX + ".evictions", policyTags(policyName).and("cause", reason.tagValue()));
+    }
+
+    @Override
+    void admission(String policyName, AdmissionOutcome outcome) {
+        if (outcome != null) {
+            increment(PREFIX + ".admissions", policyTags(policyName).and("outcome", outcome.tagValue()));
+        }
     }
 
     private void work(String counterName,
