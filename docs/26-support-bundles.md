@@ -40,8 +40,10 @@ fake hostnames plus placeholders before it leaves the incident system:
 
 ```text
 support-bundle/
+  diagnostics/rhttpclients-curl-exit-status.txt
   diagnostics/rhttpclients-http-status.txt
   diagnostics/rhttpclients.json
+  health/reactive-http-client-health-curl-exit-status.txt
   health/reactive-http-client-health-http-status.txt
   health/health.json
   logs/startup-summary.log
@@ -337,10 +339,12 @@ of UTF-8 JSON before it retains allowlisted fields. Before either filter starts,
 the shell also verifies that curl reported a successful transfer, the quarantined
 raw file exists, and the file is at most 1 MiB; this bounds whitespace and other
 bytes that compacted `tojson` does not measure.
-The two V29 decoded-response byte fields are optional when sanitizing a published
-4.1 response. The health filter requires the requested client entry and emits
-only the documented structural health fields. For nonzero samples, the reported
-error rate must equal
+The two V29 decoded-response byte fields are optional only when `projectVersion`
+identifies a published `4.1.x` response. A V29 `4.2.0-SNAPSHOT` response must
+include both fields, although their values may be `null` where the diagnostics
+contract permits an unknown state. The health filter requires the requested
+client entry and emits only the documented structural health fields. For nonzero
+samples, the reported error rate must equal
 `errors / samples` within an absolute tolerance of `0.000000000001`. Its
 top-level status is derived from that selected client, not from unrelated clients
 in the aggregate health response. The sanitized projection preserves omission of
@@ -374,9 +378,13 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
     ] | index($field)) != null;
   def nullable_array($field):
     $field == "cachePolicySources" or $field == "cacheHttpMethods";
-  def optional_field($field):
-    $field == "cacheMaximumTotalDecodedResponseBytes"
-      or $field == "cacheRetainedDecodedResponseBytes";
+  def published_4_1($version):
+    ($version | type) == "string"
+      and ($version | test("^4\\.1\\.[0-9]+$"));
+  def optional_field($projectVersion; $field):
+    published_4_1($projectVersion)
+      and ($field == "cacheMaximumTotalDecodedResponseBytes"
+        or $field == "cacheRetainedDecodedResponseBytes");
   def valid_leaf($field; $shape):
     ($shape | type) as $expected
     | if $expected == "string" then
@@ -396,17 +404,18 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
         end
       else false
       end;
-  def keep_shape($shape; $field):
+  def keep_shape($shape; $field; $projectVersion):
     ($shape | type) as $expected
     | if $expected == "object" then
-        ($shape | keys | map(select((optional_field(.)) | not))) as $required
+        ($shape | keys
+          | map(select((optional_field($projectVersion; .)) | not))) as $required
         | if (type == "object"
             and (($required - keys) | length) == 0)
           then with_entries(
             select(.key as $key | $shape | has($key))
             | . as $entry
             | .value = ($entry.value
-                | keep_shape($shape[$entry.key]; $entry.key))
+                | keep_shape($shape[$entry.key]; $entry.key; $projectVersion))
           )
           else error("unexpected diagnostics object")
           end
@@ -414,7 +423,7 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
         if type == "null" and nullable_array($field) then .
         elif type != "array" then error("unexpected diagnostics array")
         elif $field == "clients" and length <= 256 then
-          [.[] | keep_shape($shape[0]; "client")]
+          [.[] | keep_shape($shape[0]; "client"; $projectVersion)]
         elif (($field == "cachePolicySources" or $field == "cacheHttpMethods")
             and length <= 16
             and all(.[]; type == "string" and length <= 512))
@@ -429,7 +438,8 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
       and (.clients | type) == "array"
       and (.clients | length) <= 256
       and ((tojson | utf8bytelength) <= 1048576))
-  then keep_shape($schema[0]; "root")
+  then .projectVersion as $projectVersion
+    | keep_shape($schema[0]; "root"; $projectVersion)
     | if (.clientCount == (.clients | length)
         and .endpointCount <= 10000
         and .inheritedEndpointCount <= .endpointCount

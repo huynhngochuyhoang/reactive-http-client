@@ -409,6 +409,8 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
         String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String reviewableBundleFixture = markdownSection(
+                supportBundles, "## Reviewable Bundle Fixture", "## Diagnostics Snapshot");
         String normalizedOperations = operations.replaceAll("\\s+", " ");
         String normalizedSupportBundles = supportBundles.replaceAll("\\s+", " ");
         Path fixturePath = root.resolve("docs/fixtures/support-bundle-cache-memory.json");
@@ -470,12 +472,17 @@ class DocumentationReleaseArtifactTest {
                 .contains("--slurpfile schema")
                 .contains("expected recursive leaf types")
                 .contains("documented nullable unknown states")
-                .contains("two V29 decoded-response byte fields are optional")
+                .contains("two V29 decoded-response byte fields are optional only when `projectVersion` "
+                        + "identifies a published `4.1.x` response")
+                .contains("A V29 `4.2.0-SNAPSHOT` response must include both fields")
                 .contains("$httpStatus | test(\"^2[0-9][0-9]$\")")
                 .contains("nullable_number($field)")
                 .contains("nullable_boolean($field)")
                 .contains("nullable_array($field)")
-                .contains("optional_field($field)")
+                .contains("published_4_1($version)")
+                .contains("optional_field($projectVersion; $field)")
+                .contains("optional_field($projectVersion; .)")
+                .contains("keep_shape($schema[0]; \"root\"; $projectVersion)")
                 .contains("valid_leaf($field; $shape)")
                 .contains("(length <= 512)")
                 .contains("($required - keys) | length")
@@ -728,6 +735,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("truncation, or connection-reset failure")
                 .contains("a raw-size check fails")
                 .contains("keep the HTTP and curl exit-status files");
+        assertThat(reviewableBundleFixture)
+                .contains("diagnostics/rhttpclients-curl-exit-status.txt")
+                .contains("health/reactive-http-client-health-curl-exit-status.txt");
         assertThat(supportBundles)
                 .doesNotContain("minSamples, errorRateThreshold, errorRate, status, reason");
         for (String exitStatusPath : List.of(

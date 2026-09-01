@@ -834,11 +834,14 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   bounded recursive leaf types, at most 16 cache policy-source/HTTP-method values,
   per-client and aggregate endpoint-count invariants, and the documented output
   limits while retaining supported nullable unknown values. The V29 byte fields
-  are optional for a published 4.1 response. The health filter enforces built-in
-  counter, status, and reason invariants, verifies every nonzero-sample rate against
-  `errors / samples` within `0.000000000001`, and derives the output status
-  from the selected client while preserving omission of `errorRate` for a
-  zero-sample detail. Query flags and asterisk-form targets are
+  are optional only when `projectVersion` identifies a published `4.1.x`
+  response and are required for the V29 `4.2.0-SNAPSHOT` shape. The canonical
+  bundle tree retains both curl exit-status artifacts beside the HTTP statuses.
+  The health filter enforces built-in counter, status, and reason invariants,
+  verifies every nonzero-sample rate against `errors / samples` within
+  `0.000000000001`, and derives the output status from the selected client while
+  preserving omission of `errorRate` for a zero-sample detail. Query flags and
+  asterisk-form targets are
   fixture-rejected alongside
   other request-target forms. Kubernetes placeholders and the
   `kubectl exec -- cat` minimal-image path remain covered without
