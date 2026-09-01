@@ -32,9 +32,13 @@ class DocumentationReleaseArtifactTest {
             "key", "digest", "value", "payload",
             "path", "query", "uri", "requesttarget", "requestvariant");
     private static final Pattern SUPPORT_FIXTURE_REQUEST_TARGET_VALUE = Pattern.compile(
-            "(?i)^(?:https?://\\S+|(?:/|\\./|\\.\\./)\\S*|\\S*\\?[A-Za-z0-9_.%~-]+=[^\\s]*)$");
+            "(?i)^(?:\\*|https?://\\S+|(?:/|\\./|\\.\\./)\\S*"
+                    + "|\\S*\\?[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?(?:&[^\\s]*)?)$");
     private static final Pattern SUPPORT_FIXTURE_QUERY_VALUE = Pattern.compile(
-            "^\\??[A-Za-z0-9_.%~-]+=[^\\s&]*(?:&[A-Za-z0-9_.%~-]+=[^\\s&]*)*$");
+            "^(?:\\?[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?"
+                    + "(?:&[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?)*"
+                    + "|[A-Za-z0-9_.%~-]+=[^\\s&]*"
+                    + "(?:&[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?)*)$");
     private static final Pattern SUPPORT_FIXTURE_AUTHORITY_VALUE = Pattern.compile(
             "^(?:[A-Za-z0-9._~-]+@)?(?:[A-Za-z0-9.-]+|\\[[0-9A-Fa-f:]+]):[0-9]{1,5}$");
     private static final Pattern SUPPORT_FIXTURE_ROOTLESS_PATH_VALUE = Pattern.compile(
@@ -379,7 +383,9 @@ class DocumentationReleaseArtifactTest {
                   "sample": "/orders/42?account=123",
                   "detail": "account=123&region=west",
                   "endpoint": "internal.example:443",
-                  "route": "orders/42"
+                  "route": "orders/42",
+                  "option": "?debug",
+                  "target": "*"
                 }
                 """);
         assertThat(sensitiveSupportFixtureFieldNames(unsafeTextFixture)).isEmpty();
@@ -388,7 +394,9 @@ class DocumentationReleaseArtifactTest {
                         "/orders/42?account=123",
                         "account=123&region=west",
                         "internal.example:443",
-                        "orders/42");
+                        "orders/42",
+                        "?debug",
+                        "*");
     }
 
     @Test
@@ -446,7 +454,13 @@ class DocumentationReleaseArtifactTest {
                 .contains("Retain it only after the shared validation/sanitization step")
                 .contains("--slurpfile schema")
                 .contains("expected recursive leaf types")
+                .contains("documented nullable unknown states")
+                .contains("two V29 decoded-response byte fields are optional")
                 .contains("$httpStatus | test(\"^2[0-9][0-9]$\")")
+                .contains("nullable_number($field)")
+                .contains("nullable_boolean($field)")
+                .contains("nullable_array($field)")
+                .contains("optional_field($field)")
                 .contains("valid_leaf($field; $shape)")
                 .contains("(length <= 512)")
                 .contains("($required - keys) | length")

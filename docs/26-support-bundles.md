@@ -298,9 +298,11 @@ printf 'docs/benchmark-report-<version>.md\n' > support-bundle/performance/bench
 Run this in the same capture workspace after any recipe above. Point
 `EXAMPLE_RHTTPCLIENTS_SCHEMA` at a reviewed copy of the source-controlled
 `docs/fixtures/rhttpclients-schema-v1.json`. The first filter requires a 2xx
-HTTP status, schema V1, every required field, the expected recursive leaf types,
-nonnegative numeric values, 512-character strings, bounded arrays/counts, and at most
-1 MiB of UTF-8 JSON before it retains allowlisted fields. The health filter
+HTTP status, schema V1, every version-applicable required field, the expected
+recursive leaf types (including documented nullable unknown states), nonnegative
+numeric values, 512-character strings, bounded arrays/counts, and at most 1 MiB
+of UTF-8 JSON before it retains allowlisted fields. The two V29 decoded-response
+byte fields are optional when sanitizing a published 4.1 response. The health filter
 requires the requested client entry and emits only the documented structural
 health fields. Its top-level status is derived from that selected client, not
 from unrelated clients in the aggregate health response:
@@ -313,26 +315,49 @@ jq --arg httpStatus "$(cat support-bundle/diagnostics/rhttpclients-http-status.t
   def nonnegative_integer:
     (type == "number") and (. >= 0) and (. <= 9223372036854775807)
       and (. == floor);
+  def nullable_number($field):
+    ([
+      "poolMaxConnections", "poolPendingAcquireTimeoutMs",
+      "poolMaxConcurrentStreams", "cachePolicyCount", "cacheTtlMs",
+      "cacheRefreshAfterMs", "cacheMaximumSize",
+      "cacheMaximumTotalDecodedResponseBytes",
+      "cacheRetainedDecodedResponseBytes", "cacheEntryCount",
+      "cacheEvictions", "logicalCallTimeoutMs", "codecMaxInMemorySizeMb"
+    ] | index($field)) != null;
+  def nullable_boolean($field):
+    ([
+      "poolMetricsEnabled", "cacheMetricsEnabled",
+      "cacheSemanticReadAcknowledged", "compressionEnabled",
+      "strictUnsafeRetryValidation", "strictBodySigningValidation"
+    ] | index($field)) != null;
+  def nullable_array($field):
+    $field == "cachePolicySources" or $field == "cacheHttpMethods";
+  def optional_field($field):
+    $field == "cacheMaximumTotalDecodedResponseBytes"
+      or $field == "cacheRetainedDecodedResponseBytes";
   def valid_leaf($field; $shape):
     ($shape | type) as $expected
     | if $expected == "string" then
         (type == "string") and (length <= 512)
       elif $expected == "number" then
         nonnegative_integer
+          or (nullable_number($field) and type == "null")
       elif $expected == "boolean" then
         type == "boolean"
+          or (nullable_boolean($field) and type == "null")
       elif $expected == "null" then
-        if ($field == "strictUnsafeRetryValidation"
-            or $field == "strictBodySigningValidation")
+        if nullable_boolean($field)
         then type == "null" or type == "boolean"
-        else type == "null" or nonnegative_integer
+        elif nullable_number($field)
+        then type == "null" or nonnegative_integer
+        else false
         end
       else false
       end;
   def keep_shape($shape; $field):
     ($shape | type) as $expected
     | if $expected == "object" then
-        ($shape | keys) as $required
+        ($shape | keys | map(select((optional_field(.)) | not))) as $required
         | if (type == "object"
             and (($required - keys) | length) == 0)
           then with_entries(
@@ -344,7 +369,8 @@ jq --arg httpStatus "$(cat support-bundle/diagnostics/rhttpclients-http-status.t
           else error("unexpected diagnostics object")
           end
       elif $expected == "array" then
-        if type != "array" then error("unexpected diagnostics array")
+        if type == "null" and nullable_array($field) then .
+        elif type != "array" then error("unexpected diagnostics array")
         elif $field == "clients" and length <= 256 then
           [.[] | keep_shape($shape[0]; "client")]
         elif (($field == "cachePolicySources" or $field == "cacheHttpMethods")

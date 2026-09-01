@@ -823,18 +823,23 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   values. All six endpoint captures remove stale raw files, record HTTP status
   unconditionally, quarantine bodies outside the bundle, and publish JSON only
   after expected-shape validation and field allowlisting. Diagnostics publication
-  requires 2xx status, required fields, bounded recursive leaf types, consistent
-  counts, and the documented output limits. The health filter enforces built-in
-  counter, rate, status, and reason invariants and derives the output status from
-  the selected client. Kubernetes placeholders and the `kubectl exec -- cat`
-  minimal-image path remain covered without `kubectl cp`/`tar`.
+  requires 2xx status, version-applicable required fields, bounded recursive leaf
+  types, consistent counts, and the documented output limits while retaining
+  supported nullable unknown values. The V29 byte fields are optional for a
+  published 4.1 response. The health filter enforces built-in counter, rate,
+  status, and reason invariants and derives the output status from the selected
+  client. Query flags and asterisk-form targets are fixture-rejected alongside
+  other request-target forms. Kubernetes placeholders and the
+  `kubectl exec -- cat` minimal-image path remain covered without
+  `kubectl cp`/`tar`.
 - `DocumentationReleaseArtifactTest` passed 45 tests and the paired configuration
   guard passed 18 tests. The complete starter suite passed 1,292 tests; all runs
   had no failures, errors, or skips. The exact documented diagnostics filter
-  accepted the schema fixture and rejected both an object-valued leaf and a 401
-  response. The health filter rejected an object-valued reason and emitted UP for
-  a selected UP client from an aggregate DOWN response. JSON validation, local-link
-  validation, and `git diff --check` also passed.
+  accepted provider-backed, summary-only, and published 4.1-shaped fixtures while
+  rejecting both an object-valued leaf and a 401 response. The health filter
+  rejected an object-valued reason and emitted UP for a selected UP client from
+  an aggregate DOWN response. JSON validation, local-link validation, and
+  `git diff --check` also passed.
 
 ---
 
