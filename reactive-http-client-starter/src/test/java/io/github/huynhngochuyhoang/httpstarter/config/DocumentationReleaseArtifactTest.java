@@ -425,7 +425,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("applicable active/pending connection or stream gauges")
                 .contains("generation records, completed load tokens")
                 .contains("flight ownership remains after every caller and load has terminated")
-                .contains("Refresh activity remains nonterminal")
+                .contains("stale-hit callers continue across consecutive bounded windows")
+                .contains("terminal refresh totals do not advance")
+                .contains("terminal-only counters cannot prove an active refresh by themselves")
                 .contains("Meter count or old gauge suppliers grow across context restart")
                 .contains("RSS and container working set are not Java heap")
                 .contains("response wire size is not the decoded object graph retained by a cache entry");
@@ -659,6 +661,7 @@ class DocumentationReleaseArtifactTest {
                 .filter(line -> line.startsWith("curl -sS "))
                 .toList();
         assertThat(captureCurlCommands).hasSize(6)
+                .allMatch(line -> line.contains("--max-filesize 1048576"))
                 .allMatch(line -> line.contains("-w '%{http_code}\\n'"))
                 .allMatch(line -> line.contains(".raw.json"))
                 .allMatch(line -> line.contains("-http-status.txt"))
@@ -666,6 +669,13 @@ class DocumentationReleaseArtifactTest {
         assertThat(supportBundles)
                 .contains("mv rhttpclients.sanitized.json support-bundle/diagnostics/rhttpclients.json")
                 .contains("mv reactive-http-client-health.sanitized.json support-bundle/health/health.json")
+                .contains("test -f rhttpclients.raw.json &&\n"
+                        + "  test \"$(wc -c < rhttpclients.raw.json)\" -le 1048576 &&\n"
+                        + "  jq --arg httpStatus")
+                .contains("test -f reactive-http-client-health.raw.json &&\n"
+                        + "  test \"$(wc -c < reactive-http-client-health.raw.json)\" -le 1048576 &&\n"
+                        + "  jq --arg client")
+                .contains("all(.clients[]; .inheritedEndpointCount <= .endpointCount)")
                 .contains("def nonnegative_integer:")
                 .contains("def rate_matches($detail):")
                 .contains("$detail.errors / $detail.samples")
@@ -673,7 +683,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("$detail.samples == $detail.sampleCount")
                 .contains("$detail.reason == \"NO_SAMPLES\"")
                 .contains("$detail.reason == \"ERROR_RATE_ABOVE_THRESHOLD\"")
-                .contains("If either `jq` command fails, keep the HTTP-status file");
+                .contains("If `curl` rejects a response at the transfer bound")
+                .contains("a raw-size check fails")
+                .contains("either `jq` command fails, keep the HTTP-status file");
         long staleFinalCaptureRemovalCount = supportBundles.lines()
                 .map(String::trim)
                 .filter(line -> line.equals(

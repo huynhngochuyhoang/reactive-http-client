@@ -820,12 +820,13 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   no request, cache-entry, identity, credential, tenant, or error-message material.
 - Recursive fixture guards reject singular, plural, and compound sensitive field
   names plus origin, authority, rootless-path, query, and absolute-URL textual
-  values. All six endpoint captures remove stale raw files, record HTTP status
-  unconditionally, quarantine bodies outside the bundle, and publish JSON only
-  after expected-shape validation and field allowlisting. Diagnostics publication
-  requires 2xx status, version-applicable required fields, bounded recursive leaf
-  types, consistent counts, and the documented output limits while retaining
-  supported nullable unknown values. The V29 byte fields are optional for a
+  values. All six endpoint captures remove stale raw files, cap downloads at
+  1 MiB, record HTTP status unconditionally, quarantine bodies outside the bundle,
+  verify raw byte size before parsing, and publish JSON only after expected-shape
+  validation and field allowlisting. Diagnostics publication requires 2xx status,
+  version-applicable required fields, bounded recursive leaf types, per-client and
+  aggregate endpoint-count invariants, and the documented output limits while
+  retaining supported nullable unknown values. The V29 byte fields are optional for a
   published 4.1 response. The health filter enforces built-in counter, status,
   and reason invariants, verifies every nonzero-sample rate against
   `errors / samples` within `0.000000000001`, and derives the output status
@@ -834,6 +835,10 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   other request-target forms. Kubernetes placeholders and the
   `kubectl exec -- cat` minimal-image path remain covered without
   `kubectl cp`/`tar`.
+- The operations decision table uses only observable cache evidence: stale-hit
+  callers across consecutive bounded windows, terminal refresh deltas, and
+  post-close terminal activity. It explicitly states that terminal-only counters
+  cannot prove an active refresh.
 - `DocumentationReleaseArtifactTest` passed 45 tests and the paired configuration
   guard passed 18 tests. The complete starter suite passed 1,292 tests; all runs
   had no failures, errors, or skips. The exact documented diagnostics filter
