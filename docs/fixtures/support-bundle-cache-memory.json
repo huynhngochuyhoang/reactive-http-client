@@ -18,6 +18,8 @@
         "name": "catalog-read",
         "source": "method",
         "ttlMs": 60000,
+        "refreshAfterMs": 30000,
+        "refreshTimeoutMs": 5000,
         "maximumEntries": 10000,
         "maximumDecodedResponseBytes": 268435456,
         "weightedAdmission": true
@@ -26,6 +28,8 @@
         "name": "profile-summary",
         "source": "client",
         "ttlMs": 30000,
+        "refreshAfterMs": null,
+        "refreshTimeoutMs": null,
         "maximumEntries": 2500,
         "maximumDecodedResponseBytes": null,
         "weightedAdmission": false
@@ -208,7 +212,7 @@
   "lifecycle": {
     "events": [
       {
-        "capturedAt": "2026-01-01T00:00:00Z",
+        "capturedAt": "2025-12-31T23:55:00Z",
         "type": "factory-start"
       },
       {

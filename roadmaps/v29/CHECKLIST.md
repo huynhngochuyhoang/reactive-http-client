@@ -811,10 +811,12 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   the sanitized `support-bundle-cache-memory.json` fixture. The fixture identifies
   one bounded client/process instance, maps API-tagged caller/load/refresh work to
   selected policies, keeps policy-tagged eviction/admission facts separate,
+  records nullable refresh-after and refresh-timeout bounds for each policy,
   includes stale callers in lookup hits and partitions misses into loaders plus
   coalesced waiters, represents weighted/unweighted availability with values
   versus `null`, and records three timestamped post-GC memory/cache/H2-pool
-  checkpoints. The after-load entry counts equal opening entries plus successful
+  checkpoints. Factory startup precedes the populated opening checkpoint. The
+  after-load entry counts equal opening entries plus successful
   loads minus recorded evictions for each policy. Both size-eviction counts are
   zero because neither policy reaches its maximum entry capacity during the
   bounded window. Its lifecycle evidence timestamps
@@ -823,7 +825,7 @@ Evidence recorded on 2026-09-01 from durable baseline commit
 - Recursive fixture guards reject singular, plural, and compound sensitive field
   names plus origin, authority, rootless-path, query, and absolute-URL textual
   values, including request targets embedded in HTTP request lines. All six
-  endpoint captures remove stale raw files, cap downloads at
+  endpoint captures remove stale raw files, set a private `umask 077`, cap downloads at
   1 MiB, record HTTP status unconditionally, quarantine bodies outside the bundle,
   verify raw byte size before parsing, and publish JSON only after expected-shape
   validation and field allowlisting. Diagnostics publication requires 2xx status,
@@ -840,9 +842,10 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   `kubectl cp`/`tar`.
 - The operations decision table uses only observable cache evidence: stale-hit
   callers across consecutive bounded windows, coalesced-waiter and terminal-load
-  deltas, terminal refresh deltas, and post-close terminal activity. It explicitly
-  states that cumulative terminal counters cannot prove active flight or refresh
-  ownership.
+  deltas during a pre-close quiet window, terminal refresh deltas, and separate
+  post-close memory/lifecycle cleanup. It explicitly states that removed meters
+  cannot provide post-close load deltas and cumulative terminal counters cannot
+  prove active flight or refresh ownership.
 - `DocumentationReleaseArtifactTest` passed 45 tests and the paired configuration
   guard passed 18 tests. The complete starter suite passed 1,292 tests; all runs
   had no failures, errors, or skips. The exact documented diagnostics filter

@@ -430,8 +430,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("applicable active/pending connection or stream gauges")
                 .contains("generation records, completed load tokens")
                 .contains("coalesced-waiter deltas rise in the same bounded window")
-                .contains("terminal-load deltas after that boundary prove late completion")
-                .contains("absent deltas do not prove retained flight ownership")
+                .contains("compare terminal-load counters across a bounded quiet window")
+                .contains("while those meters remain registered")
+                .contains("no delta narrows the observation but does not prove retained flight ownership")
+                .contains("not to read removed cache meters")
                 .contains("stale-hit callers continue across consecutive bounded windows")
                 .contains("terminal refresh totals do not advance")
                 .contains("terminal-only counters cannot prove an active refresh by themselves")
@@ -449,6 +451,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("timestamped, phase-labeled post-GC memory checkpoints")
                 .contains("HTTP/2 stream gauges")
                 .contains("factory start/close, context restart")
+                .contains("nullable refresh-after/refresh-timeout bounds")
                 .contains("Record `cacheMetricsEnabled` for the affected client")
                 .contains("disabled or unavailable integration uses `null`, not fabricated zeros")
                 .contains("For an unweighted policy")
@@ -460,6 +463,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("separately approved, encrypted, access-controlled process")
                 .contains("always write the HTTP status to a bundle file")
                 .contains("quarantined `*.raw.json` files outside the bundle")
+                .contains("sets `umask 077` before creating capture files")
+                .contains("newly created quarantined bodies use mode `0600`")
                 .contains("Retain it only after the shared validation/sanitization step")
                 .contains("--slurpfile schema")
                 .contains("expected recursive leaf types")
@@ -498,11 +503,22 @@ class DocumentationReleaseArtifactTest {
         assertThat(configuration.path("cacheMetricsEnabled").isBoolean()).isTrue();
         assertThat(configuration.path("cacheMetricsEnabled").asBoolean()).isTrue();
         Map<String, Boolean> weightedPolicies = new HashMap<>();
+        Map<String, Boolean> refreshEnabledPolicies = new HashMap<>();
         policies.forEach(policy -> {
             assertThat(policy.path("name").isTextual()).isTrue();
             assertThat(policy.path("name").asText().length()).isLessThanOrEqualTo(128);
             assertThat(policy.path("source").isTextual()).isTrue();
             assertThat(policy.path("ttlMs").isIntegralNumber()).isTrue();
+            boolean refreshEnabled = policy.path("refreshAfterMs").isIntegralNumber();
+            refreshEnabledPolicies.put(policy.path("name").asText(), refreshEnabled);
+            assertThat(policy.path("refreshAfterMs").isNull()).isEqualTo(!refreshEnabled);
+            assertThat(policy.path("refreshTimeoutMs").isIntegralNumber()).isEqualTo(refreshEnabled);
+            assertThat(policy.path("refreshTimeoutMs").isNull()).isEqualTo(!refreshEnabled);
+            if (refreshEnabled) {
+                assertThat(policy.path("refreshAfterMs").asLong()).isPositive()
+                        .isLessThan(policy.path("ttlMs").asLong());
+                assertThat(policy.path("refreshTimeoutMs").asLong()).isPositive();
+            }
             assertThat(policy.path("maximumEntries").isIntegralNumber()).isTrue();
             assertThat(policy.path("weightedAdmission").isBoolean()).isTrue();
             boolean weighted = policy.path("weightedAdmission").asBoolean();
@@ -513,6 +529,8 @@ class DocumentationReleaseArtifactTest {
                     .isEqualTo(!weighted);
         });
         assertThat(weightedPolicies).containsEntry("catalog-read", true)
+                .containsEntry("profile-summary", false);
+        assertThat(refreshEnabledPolicies).containsEntry("catalog-read", true)
                 .containsEntry("profile-summary", false);
 
         JsonNode apiActivity = fixture.path("apiActivity");
@@ -646,6 +664,10 @@ class DocumentationReleaseArtifactTest {
             assertThat(event.path("capturedAt").isTextual()).isTrue();
             assertThat(event.path("type").isTextual()).isTrue();
         });
+        assertThat(lifecycle.path("events").get(0).path("type").asText())
+                .isEqualTo("factory-start");
+        assertThat(lifecycle.path("events").get(0).path("capturedAt").asText())
+                .isLessThan(checkpoints.get(0).path("capturedAt").asText());
         JsonNode deploymentChanges = lifecycle.path("deploymentChanges");
         assertThat(deploymentChanges.isArray()).isTrue();
         assertThat(deploymentChanges).hasSize(1);
@@ -707,6 +729,11 @@ class DocumentationReleaseArtifactTest {
                         "rm -f rhttpclients.raw.json reactive-http-client-health.raw.json"))
                 .count();
         assertThat(staleRawCaptureRemovalCount).isEqualTo(3);
+        long privateCaptureUmaskCount = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.equals("umask 077"))
+                .count();
+        assertThat(privateCaptureUmaskCount).isEqualTo(3);
         String kubernetesCapture = markdownSection(
                 supportBundles, "### Kubernetes-Style Capture", "## Health Details");
         for (String assignment : List.of(

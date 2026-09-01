@@ -211,7 +211,8 @@ error handler can return arbitrary sensitive content, so an HTTP error body is
 not automatically diagnostics evidence. Retain it only after the shared
 validation/sanitization step below confirms the expected endpoint shape and
 allowlists its fields. Every recipe removes stale raw files before invoking
-`curl`. Never attach the raw files.
+`curl` and sets `umask 077` before creating capture files, so newly created
+quarantined bodies use mode `0600`. Never attach the raw files.
 
 ### Local JVM Capture
 
@@ -224,6 +225,7 @@ EXAMPLE_CLIENT_NAME="example-client"
 EXAMPLE_APP_LOG="/path/to/sanitized-application.log"
 EXAMPLE_SANITIZED_CONFIG="/path/to/sanitized-reactive-http-client.yml"
 
+umask 077
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
 rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
@@ -247,6 +249,7 @@ EXAMPLE_MANAGEMENT_URL="http://<management-host>:<management-port>"
 EXAMPLE_CLIENT_NAME="example-client"
 EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER="/path/in/container/sanitized-reactive-http-client.yml"
 
+umask 077
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
 rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
@@ -283,6 +286,7 @@ EXAMPLE_MANAGEMENT_PORT="<management-port>"
 EXAMPLE_SANITIZED_CONFIG_IN_POD="/path/in/pod/sanitized-reactive-http-client.yml"
 EXAMPLE_MANAGEMENT_URL="http://127.0.0.1:$EXAMPLE_LOCAL_PORT"
 EXAMPLE_CLIENT_NAME="example-client"
+umask 077
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
 rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
@@ -836,7 +840,8 @@ Use the source-controlled
 five-minute window around the symptom. It keeps the following domains separate:
 
 - one bounded client name and one sanitized process-instance ordinal;
-- static client cache-metrics selection plus per-policy source, TTL, entry bound, and optional
+- static client cache-metrics selection plus per-policy source, TTL, nullable
+  refresh-after/refresh-timeout bounds, entry bound, and optional
   decoded-response-byte bound;
 - API-tagged lookup, caller outcome, coalesced, stale, terminal load, and refresh
   aggregates with an explicit API-to-policy mapping;
