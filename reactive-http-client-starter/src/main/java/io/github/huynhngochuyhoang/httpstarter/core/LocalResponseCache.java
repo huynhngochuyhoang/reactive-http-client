@@ -27,6 +27,8 @@ interface LocalResponseCache extends AutoCloseable {
 
     void publish(LoadToken token, Object value, long decodedResponseBytes);
 
+    boolean isLoadCurrent(LoadToken token);
+
     default PublicationResult publishMeasured(LoadToken token, Object value, long decodedResponseBytes) {
         publish(token, value, decodedResponseBytes);
         return PublicationResult.STORED;

@@ -191,6 +191,18 @@ final class CaffeineLocalResponseCache implements LocalResponseCache {
     }
 
     @Override
+    public boolean isLoadCurrent(LoadToken loadToken) {
+        GenerationLoadToken token = token(loadToken);
+        synchronized (lifecycleMonitor) {
+            if (closed.get()) {
+                return false;
+            }
+            StoredEntry current = cache.getIfPresent(token.key);
+            return current == null && token.state.generation == token.observedGeneration;
+        }
+    }
+
+    @Override
     public PublicationResult publishMeasured(
             LoadToken loadToken, Object value, long decodedResponseBytes) {
         GenerationLoadToken token = token(loadToken);

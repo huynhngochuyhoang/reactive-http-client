@@ -65,7 +65,7 @@ class LocalResponseCacheObservabilityTest {
                 .satisfies(gauge -> {
                     assertThat(gauge.value()).isEqualTo(40.0);
                     assertThat(gauge.getId().getDescription())
-                            .isEqualTo("Current decoded response representation bytes retained by this policy cache");
+                            .isEqualTo("Current decoded response representation bytes retained by live policy caches");
                 });
         assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".maximum.decoded.response.bytes")
                 .tags("client.name", "catalog-client", "cache.policy", "weighted")
@@ -73,7 +73,7 @@ class LocalResponseCacheObservabilityTest {
                 .satisfies(gauge -> {
                     assertThat(gauge.value()).isEqualTo(100.0);
                     assertThat(gauge.getId().getDescription())
-                            .isEqualTo("Configured maximum decoded response representation bytes for this policy cache");
+                            .isEqualTo("Configured maximum decoded response representation bytes across live policy caches");
                 });
         for (LocalResponseCacheMetrics.AdmissionOutcome outcome
                 : LocalResponseCacheMetrics.AdmissionOutcome.values()) {
@@ -173,6 +173,111 @@ class LocalResponseCacheObservabilityTest {
 
         manager.close();
         assertThat(registry.getMeters()).noneMatch(LocalResponseCacheObservabilityTest::isCacheMeter);
+    }
+
+    @Test
+    void staleDuplicateBypassesDoNotCreateAdmissionEvents() throws Exception {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        LocalResponseCacheMetrics metrics = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
+        metrics.registerApi("catalog.get");
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(
+                System::nanoTime, Schedulers.parallel(), metrics, "catalog-client");
+        EffectiveCachePolicy.Selection selection = selection("weighted", false, null);
+        selection.policy().setMaximumTotalDecodedResponseBytes(5L);
+
+        Sinks.One<String> unknownLoser = Sinks.one();
+        CountDownLatch unknownSubscribed = new CountDownLatch(1);
+        CompletableFuture<?> unknownResult = manager.getOrLoad(
+                        selection,
+                        key("unknown-race"),
+                        "catalog.get",
+                        ignored -> unknownLoser.asMono().doOnSubscribe(subscription -> unknownSubscribed.countDown()),
+                        LocalResponseCacheManager.ResponseMetadata::successWithoutHeaders,
+                        state(),
+                        state())
+                .toFuture();
+        assertThat(unknownSubscribed.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(load(manager, selection, key("unknown-race"), "catalog.get", state(), state(),
+                Mono.just("unknown-winner"), measuredResponse(5, 4))).isEqualTo("unknown-winner");
+        unknownLoser.tryEmitValue("unknown-loser").orThrow();
+        assertThat(unknownResult.get(1, TimeUnit.SECONDS)).isEqualTo("unknown-loser");
+
+        Sinks.One<String> overBudgetLoser = Sinks.one();
+        CountDownLatch overBudgetSubscribed = new CountDownLatch(1);
+        CompletableFuture<?> overBudgetResult = manager.getOrLoad(
+                        selection,
+                        key("over-budget-race"),
+                        "catalog.get",
+                        ignored -> overBudgetLoser.asMono()
+                                .doOnSubscribe(subscription -> overBudgetSubscribed.countDown()),
+                        () -> measuredResponse(5, 6),
+                        state(),
+                        state())
+                .toFuture();
+        assertThat(overBudgetSubscribed.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(load(manager, selection, key("over-budget-race"), "catalog.get", state(), state(),
+                Mono.just("over-budget-winner"), measuredResponse(5, 3))).isEqualTo("over-budget-winner");
+        overBudgetLoser.tryEmitValue("over-budget-loser").orThrow();
+        assertThat(overBudgetResult.get(1, TimeUnit.SECONDS)).isEqualTo("over-budget-loser");
+
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted", "outcome", "admitted")
+                .counter().count()).isEqualTo(2.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted",
+                        "outcome", "bypassed_unknown_size")
+                .counter().count()).isZero();
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted",
+                        "outcome", "bypassed_over_budget")
+                .counter().count()).isZero();
+        manager.close();
+    }
+
+    @Test
+    void overlappingManagersShareWeightedMetersUntilTheLastOwnerCloses() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        LocalResponseCacheMetrics first = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
+        LocalResponseCacheMetrics second = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
+        SizedCache firstCache = new SizedCache(100L);
+        SizedCache secondCache = new SizedCache(200L);
+        firstCache.retainedBytes.set(30L);
+        secondCache.retainedBytes.set(80L);
+
+        first.registerCache("catalog", 10, firstCache);
+        second.registerCache("catalog", 10, secondCache);
+        first.admission("catalog", LocalResponseCacheMetrics.AdmissionOutcome.ADMITTED);
+        second.admission("catalog", LocalResponseCacheMetrics.AdmissionOutcome.BYPASSED_UNKNOWN_SIZE);
+
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".retained.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(110.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".maximum.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(300.0);
+
+        first.close();
+
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".retained.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(80.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".maximum.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(200.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog", "outcome", "admitted")
+                .counter().count()).isEqualTo(1.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog",
+                        "outcome", "bypassed_unknown_size")
+                .counter().count()).isEqualTo(1.0);
+
+        second.close();
+        assertThat(registry.find(LocalResponseCacheMetrics.PREFIX + ".retained.decoded.response.bytes")
+                .meters()).isEmpty();
+        assertThat(registry.find(LocalResponseCacheMetrics.PREFIX + ".maximum.decoded.response.bytes")
+                .meters()).isEmpty();
+        assertThat(registry.find(LocalResponseCacheMetrics.PREFIX + ".admissions").meters()).isEmpty();
     }
 
     @Test
@@ -663,6 +768,7 @@ class LocalResponseCacheObservabilityTest {
         @Override public void finishRefresh(RefreshToken refreshToken) { }
         @Override public void publish(LoadToken token, Object value) { }
         @Override public void publish(LoadToken token, Object value, long bytes) { }
+        @Override public boolean isLoadCurrent(LoadToken token) { return true; }
         @Override public void finish(LoadToken token) { }
         @Override public long estimatedSize() { return size.get(); }
         @Override public long evictionCount() { return 0; }

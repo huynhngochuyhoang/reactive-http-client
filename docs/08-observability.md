@@ -160,16 +160,18 @@ does not select caching and does not enable Caffeine's library statistics.
 | `reactive.http.client.cache.evictions` | Counter | `client.name`, `cache.policy`, `cause=ttl|size|weight` | Automatic TTL, maximum-size, or aggregate decoded-response-byte removal. Replacement and shutdown are not eviction causes. |
 | `reactive.http.client.cache.entries` | Gauge | `client.name`, `cache.policy` | Current estimated entries. |
 | `reactive.http.client.cache.maximum.entries` | Gauge | `client.name`, `cache.policy` | Configured maximum entries. |
-| `reactive.http.client.cache.retained.decoded.response.bytes` | Gauge | `client.name`, `cache.policy` | Current decoded response representation bytes retained by a policy that configures the optional aggregate byte bound. This is not heap, direct memory, RSS, or container memory. |
-| `reactive.http.client.cache.maximum.decoded.response.bytes` | Gauge | `client.name`, `cache.policy` | Configured maximum decoded response representation bytes for that policy cache. |
+| `reactive.http.client.cache.retained.decoded.response.bytes` | Gauge | `client.name`, `cache.policy` | Current decoded response representation bytes retained by live policy caches that share these tags. This is not heap, direct memory, RSS, or container memory. |
+| `reactive.http.client.cache.maximum.decoded.response.bytes` | Gauge | `client.name`, `cache.policy` | Sum of the configured maximum decoded response representation bytes across live policy caches that share these tags. |
 | `reactive.http.client.cache.admissions` | Counter | `client.name`, `cache.policy`, `outcome=admitted|bypassed_unknown_size|bypassed_over_budget|bypassed_capacity` | Terminal weighted-publication decision. Stale duplicate tokens do not create an admission event. |
 
 All result/outcome/cause values are fixed vocabularies. Selected APIs and
 policies register zero-valued series so an idle cache is distinguishable from a
 missing integration. Cache keys, values, arguments, headers, URLs, tenant values,
-and credentials are never tags. Every meter is owned by the client factory and
-removed on factory destruction; recreating the factory with identical tags binds
-gauges only to the replacement cache.
+and credentials are never tags. When factories with identical client/policy tags
+overlap, the weighted gauges aggregate their live caches and admission counters
+remain shared; closing either factory removes only its contribution. The weighted
+meters are removed when the last owner closes, and a later recreation binds only
+to the replacement cache.
 
 `entries`, `maximum.entries`, `retained.decoded.response.bytes`, and
 `maximum.decoded.response.bytes` are current occupancy/capacity signals. They

@@ -739,8 +739,9 @@ Evidence recorded on 2026-09-01 from durable baseline commit
 - `LocalResponseCacheObservabilityTest` proves admitted, unknown-size, and over-
   budget transitions; current retained-byte updates; zero-initialized stable
   outcomes; absence for cache-disabled and cache-metrics-disabled clients; no
-  request/cache material in tags; and complete meter removal followed by clean
-  manager re-registration.
+  request/cache material in tags; stale duplicate bypass suppression; overlapping
+  manager aggregation and owner-safe close; and complete meter removal followed
+  by clean manager re-registration.
 - Diagnostics schema V1 now adds nullable
   `cacheRetainedDecodedResponseBytes`. Provider snapshots read it only from an
   already-created factory cache manager, report `null` for uncreated or mixed
@@ -760,8 +761,8 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   cumulative admission/load/refresh/eviction histories; the diagnostics,
   support-bundle, and response-cache guides document nullable runtime-state and
   health-isolation semantics.
-- The focused cache/accounting run passed 66 tests and the complete starter suite
-  passed 1,288 tests, both with no failures, errors, or skips.
+- The focused cache/accounting run passed 68 tests and the complete starter suite
+  passed 1,290 tests, both with no failures, errors, or skips.
 
 ---
 
