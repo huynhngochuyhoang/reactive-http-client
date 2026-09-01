@@ -40,7 +40,9 @@ fake hostnames plus placeholders before it leaves the incident system:
 
 ```text
 support-bundle/
+  diagnostics/rhttpclients-http-status.txt
   diagnostics/rhttpclients.json
+  health/reactive-http-client-health-http-status.txt
   health/health.json
   logs/startup-summary.log
   logs/exchange-metadata.log
@@ -112,10 +114,10 @@ common terminal outcomes:
   refresh, eviction, and capacity counts plus one sanitized caller terminal
   record, without cache material or request variants.
 - [Cache-memory triage](fixtures/support-bundle-cache-memory.json) records one
-  bounded V29 snapshot window of process/container/heap/direct-memory summaries,
-  cache occupancy and activity, pool gauges, and lifecycle counts. It contains
-  only fake bounded policy names and no cache keys/values, request variants,
-  identity values, or exception messages.
+  bounded V29 window for one fake client/process instance, API-tagged caller work,
+  policy-tagged cache signals, timestamped memory/cache/pool checkpoints, and
+  lifecycle events. It contains only fake bounded client/API/policy names and no
+  cache keys/values, request variants, identity values, or exception messages.
 
 These fixtures are illustrative sanitized records, not raw logger output. They
 contain fake client and path-template metadata only. Default support output must
@@ -190,8 +192,8 @@ Each recipe captures separate evidence streams:
 
 | Stream | File | Answers |
 |---|---|---|
-| Diagnostics endpoint | `diagnostics/rhttpclients.json` | Which clients and endpoints exist, plus sanitized effective policy such as timeout source, auth mode, resilience, redirect policy, inherited endpoint counts, and strict-validation flags. |
-| Health details | `health/health.json` | Whether recent Micrometer samples crossed the configured per-client error-rate threshold. |
+| Diagnostics endpoint | `diagnostics/rhttpclients-http-status.txt` plus validated `diagnostics/rhttpclients.json` | Which status was returned and, only for the expected schema, which clients/endpoints and sanitized effective policies exist. |
+| Health details | `health/reactive-http-client-health-http-status.txt` plus sanitized `health/health.json` | Which status was returned and, only for the expected component shape, whether recent samples crossed the affected client's error-rate threshold. |
 | Startup summary | `logs/startup-summary.log` | Which sanitized client policy was applied when the proxy was created. |
 | Metadata-only exchange logs | `logs/exchange-metadata.log` | What happened for the affected calls: method, path template, status, duration, error, and subscription-attempt count. |
 | Sanitized configuration | `config/reactive-http-client.yml` | Which `reactive.http.*` settings the application intended to use, without secrets or concrete internal URLs. |
@@ -201,11 +203,13 @@ The diagnostics endpoint, health details, startup summaries, exchange logs,
 configuration snippets, and release-evidence reference answer different
 questions. Do not merge them into a single free-form log dump.
 
-The recipes deliberately use `curl -sS` without `--fail`/`-f`. An unhealthy
-health endpoint or failing diagnostics endpoint can return useful JSON with an
-HTTP error status, and the bundle must retain that body. Record the HTTP status
-separately when the incident process requires it; do not replace the saved body
-with an empty fail-fast result.
+The recipes deliberately use `curl -sS` without `--fail`/`-f` and always write
+the HTTP status to a bundle file. Response bodies first go to quarantined
+`*.raw.json` files outside the bundle. An authentication gateway, reverse proxy,
+or generic error handler can return arbitrary sensitive content, so an HTTP error
+body is not automatically diagnostics evidence. Retain it only after the shared
+validation/sanitization step below confirms the expected endpoint shape and
+allowlists its fields. Never attach the raw files.
 
 ### Local JVM Capture
 
@@ -214,12 +218,14 @@ from the same shell:
 
 ```bash
 EXAMPLE_MANAGEMENT_URL="http://<management-host>:<management-port>"
+EXAMPLE_CLIENT_NAME="example-client"
 EXAMPLE_APP_LOG="/path/to/sanitized-application.log"
 EXAMPLE_SANITIZED_CONFIG="/path/to/sanitized-reactive-http-client.yml"
 
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
-curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
-curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+curl -sS -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt
+curl -sS -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt
 grep 'ReactiveHttpClientFactoryBean' "$EXAMPLE_APP_LOG" > support-bundle/logs/startup-summary.log || true
 grep 'DefaultHttpExchangeLogger' "$EXAMPLE_APP_LOG" > support-bundle/logs/exchange-metadata.log || true
 cp "$EXAMPLE_SANITIZED_CONFIG" support-bundle/config/reactive-http-client.yml
@@ -235,11 +241,13 @@ sanitized:
 ```bash
 EXAMPLE_CONTAINER="example-app-container"
 EXAMPLE_MANAGEMENT_URL="http://<management-host>:<management-port>"
+EXAMPLE_CLIENT_NAME="example-client"
 EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER="/path/in/container/sanitized-reactive-http-client.yml"
 
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
-curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
-curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+curl -sS -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt
+curl -sS -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
 docker cp "$EXAMPLE_CONTAINER:$EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER" support-bundle/config/reactive-http-client.yml
@@ -270,14 +278,74 @@ EXAMPLE_LOCAL_PORT="18080"
 EXAMPLE_MANAGEMENT_PORT="<management-port>"
 EXAMPLE_SANITIZED_CONFIG_IN_POD="/path/in/pod/sanitized-reactive-http-client.yml"
 EXAMPLE_MANAGEMENT_URL="http://127.0.0.1:$EXAMPLE_LOCAL_PORT"
+EXAMPLE_CLIENT_NAME="example-client"
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
-curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
-curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+curl -sS -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt
+curl -sS -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
 kubectl -n "$EXAMPLE_NAMESPACE" exec "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" -- cat "$EXAMPLE_SANITIZED_CONFIG_IN_POD" > support-bundle/config/reactive-http-client.yml
 printf 'docs/benchmark-report-<version>.md\n' > support-bundle/performance/benchmark-report-link.txt
 ```
+
+### Validate and sanitize captured endpoint bodies
+
+Run this in the same capture workspace after any recipe above. Point
+`EXAMPLE_RHTTPCLIENTS_SCHEMA` at a reviewed copy of the source-controlled
+`docs/fixtures/rhttpclients-schema-v1.json`. The first filter requires schema V1
+and keeps only fields present in that fixture, recursively. The health filter
+requires the requested client entry and emits only the documented structural
+health fields:
+
+```bash
+EXAMPLE_RHTTPCLIENTS_SCHEMA="/path/to/reviewed/rhttpclients-schema-v1.json"
+
+jq --slurpfile schema "$EXAMPLE_RHTTPCLIENTS_SCHEMA" '
+  def keep_shape($shape):
+    if (($shape | type) == "object" and (type == "object")) then
+      with_entries(
+        select(.key as $key | $shape | has($key))
+        | . as $entry
+        | .value = ($entry.value | keep_shape($shape[$entry.key]))
+      )
+    elif (($shape | type) == "array" and (type == "array")
+          and (($shape | length) > 0)) then
+      [.[] | keep_shape($shape[0])]
+    else .
+    end;
+  if (.schemaVersion == 1 and (.clients | type) == "array")
+  then keep_shape($schema[0])
+  else error("unexpected rhttpclients response")
+  end
+' rhttpclients.raw.json > rhttpclients.sanitized.json &&
+  mv rhttpclients.sanitized.json support-bundle/diagnostics/rhttpclients.json
+
+jq --arg client "$EXAMPLE_CLIENT_NAME" '
+  if ((.status | type) == "string"
+      and (.details | type) == "object"
+      and (.details[$client] | type) == "object")
+  then {
+    status,
+    details: {
+      ($client): (.details[$client] | {
+        samples, errors, sampleCount, errorCount, poolAcquireFailureCount,
+        minSamples, errorRateThreshold, errorRate, status, reason
+      })
+    }
+  }
+  else error("unexpected reactive HTTP client health response")
+  end
+' reactive-http-client-health.raw.json > reactive-http-client-health.sanitized.json &&
+  mv reactive-http-client-health.sanitized.json support-bundle/health/health.json
+
+rm -f rhttpclients.raw.json rhttpclients.sanitized.json \
+  reactive-http-client-health.raw.json reactive-http-client-health.sanitized.json
+```
+
+If either `jq` command fails, keep the HTTP-status file, omit the endpoint body
+from the bundle, and delete the raw file. Do not weaken the shape check to retain
+a gateway, proxy, authentication, or generic error document.
 
 The Kubernetes recipe uses `kubectl exec ... cat` instead of `kubectl cp` so it
 does not require `tar` in the application image. If the image also lacks `cat`
@@ -285,7 +353,7 @@ or cannot read the sanitized file path, capture the already-sanitized
 configuration from the deployment source and place it at
 `support-bundle/config/reactive-http-client.yml`.
 
-Keep namespace, pod, container, file path, and management URL values as
+Keep client, namespace, pod, container, file path, and management URL values as
 placeholders in shared examples. Before attaching a bundle, inspect every file
 for concrete hosts, credentials, cookies, authorization headers, request bodies,
 response bodies, and customer data.
@@ -629,25 +697,37 @@ Use the source-controlled
 [cache-memory fixture](fixtures/support-bundle-cache-memory.json) for one fixed
 five-minute window around the symptom. It keeps the following domains separate:
 
-- process RSS and container working set;
-- Java heap used after a completed GC and committed heap;
-- direct-memory usage and live thread count;
-- per-policy configuration, entry occupancy/capacity, and, on V29, retained
-  decoded-response-byte occupancy/capacity;
-- per-policy lookup, terminal load, refresh, size/TTL/weight eviction, and
-  admission aggregates;
-- protocol plus total/idle physical connections and the applicable active/pending
-  connection gauges for HTTP/1.1 or stream gauges for HTTP/2; and
+- one bounded client name and one sanitized process-instance ordinal;
+- static client cache-metrics selection plus per-policy source, TTL, entry bound, and optional
+  decoded-response-byte bound;
+- API-tagged lookup, caller outcome, coalesced, stale, terminal load, and refresh
+  aggregates with an explicit API-to-policy mapping;
+- policy-tagged TTL/size/weight eviction and weighted-admission aggregates;
+- timestamped, phase-labeled post-GC memory checkpoints with per-policy occupancy,
+  protocol, total/idle physical connections, and the applicable HTTP/1.1
+  connection or HTTP/2 stream gauges; and
 - factory start/close, context restart, and bounded deployment-change events.
 
-Each selected policy has its own configuration, state, and activity record. The
-configuration source and policy name may be included only after review confirms
-they are non-sensitive. Keep the record to one affected client, at most 16 policy
-records, and at most 128 characters per name. Replace unsafe names with an
-ordinal placeholder. Never add cache keys or digests, cached
-values, arguments, headers, bodies, request targets, paths, query material,
-identities, credentials, tenant data, or exception messages. Aggregate counts
-and fixed structural enums are sufficient for this fixture.
+Record `cacheMetricsEnabled` for the affected client. An enabled idle API uses
+real zero-valued API series; a disabled or unavailable integration uses `null`,
+not fabricated zeros. For an unweighted policy,
+`maximumDecodedResponseBytes`, `retainedDecodedResponseBytes`, weight eviction,
+and admissions are `null`; entry gauges and TTL/size evictions remain available
+when cache metrics are enabled.
+
+Use one configuration record and multiple checkpoints tied to the same
+`processInstance`. Every checkpoint has `capturedAt`, a fixed `phase`, post-GC
+memory, and explicit cache/transport availability. A post-close checkpoint uses
+an empty policy-state list and a null transport block after their meters are
+removed; it does not invent zero gauges.
+
+The client, API, policy, configuration-source, process-instance, and phase values
+may be included only after review confirms they are non-sensitive and bounded.
+Keep at most 16 policy records, at most 64 API records, and at most 128 characters
+per name. Replace unsafe names with ordinal placeholders. Never add cache keys or
+digests, cached values, arguments, headers, bodies, request targets, paths, query
+material, identities, credentials, tenant data, or exception messages. Aggregate
+counts and fixed structural enums are sufficient for this fixture.
 
 RSS is not Java heap, and decoded-response representation bytes are not response
 wire bytes or an object-graph heap measurement. Correlate the fixture with the

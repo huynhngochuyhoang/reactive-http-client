@@ -35,6 +35,13 @@ class DocumentationReleaseArtifactTest {
             "(?i)^(?:https?://\\S+|(?:/|\\./|\\.\\./)\\S*|\\S*\\?[A-Za-z0-9_.%~-]+=[^\\s]*)$");
     private static final Pattern SUPPORT_FIXTURE_QUERY_VALUE = Pattern.compile(
             "^\\??[A-Za-z0-9_.%~-]+=[^\\s&]*(?:&[A-Za-z0-9_.%~-]+=[^\\s&]*)*$");
+    private static final Pattern SUPPORT_FIXTURE_AUTHORITY_VALUE = Pattern.compile(
+            "^(?:[A-Za-z0-9._~-]+@)?(?:[A-Za-z0-9.-]+|\\[[0-9A-Fa-f:]+]):[0-9]{1,5}$");
+    private static final Pattern SUPPORT_FIXTURE_ROOTLESS_PATH_VALUE = Pattern.compile(
+            "^[A-Za-z0-9._~!$&'()*+,;=:@%-]+"
+                    + "(?:/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]+)+$");
+    private static final Set<String> SUPPORT_FIXTURE_ALLOWED_SLASH_VALUES =
+            Set.of("HTTP/1.1", "HTTP/2");
     private static final Pattern PROJECT_VERSION_SNIPPET = Pattern.compile(
             "<groupId>io\\.github\\.huynhngochuyhoang</groupId>\\s*"
                     + "<artifactId>reactive-http-client-[^<]+</artifactId>\\s*"
@@ -370,14 +377,18 @@ class DocumentationReleaseArtifactTest {
         JsonNode unsafeTextFixture = OBJECT_MAPPER.readTree("""
                 {
                   "sample": "/orders/42?account=123",
-                  "detail": "account=123&region=west"
+                  "detail": "account=123&region=west",
+                  "endpoint": "internal.example:443",
+                  "route": "orders/42"
                 }
                 """);
         assertThat(sensitiveSupportFixtureFieldNames(unsafeTextFixture)).isEmpty();
         assertThat(sensitiveSupportFixtureTextValues(unsafeTextFixture))
                 .containsExactlyInAnyOrder(
                         "/orders/42?account=123",
-                        "account=123&region=west");
+                        "account=123&region=west",
+                        "internal.example:443",
+                        "orders/42");
     }
 
     @Test
@@ -396,8 +407,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("it does not expose V29's decoded-response-byte capacity/occupancy")
                 .contains("starter version and deployment change")
                 .contains("how many policies the client selects")
-                .contains("`maximum-size`, TTL, entry occupancy")
-                .contains("hit, miss, terminal load, coalesced-waiter, refresh, size/TTL eviction")
+                .contains("configuration source, safe bounded name, `maximum-size`, TTL, and entry occupancy")
+                .contains("`cacheMetricsEnabled` selection")
+                .contains("API-tagged hit/miss, caller outcome, coalesced-waiter, load, and refresh")
+                .contains("policy-tagged occupancy, size/TTL/weight eviction")
                 .contains("Java heap used/committed, process RSS, container working set, direct memory")
                 .contains("live thread count")
                 .contains("protocol, total/idle physical connections")
@@ -413,17 +426,27 @@ class DocumentationReleaseArtifactTest {
                 .contains("Published `4.1.0` incidents use the explicitly enumerated published fields")
                 .contains("do not include the two V29 snapshot-only decoded-response-byte diagnostics fields")
                 .contains("[cache-memory fixture](fixtures/support-bundle-cache-memory.json)")
-                .contains("process RSS and container working set")
-                .contains("Java heap used after a completed GC and committed heap")
-                .contains("direct-memory usage and live thread count")
-                .contains("Each selected policy has its own configuration, state, and activity record")
-                .contains("size/TTL/weight eviction")
-                .contains("stream gauges for HTTP/2")
+                .contains("one bounded client name and one sanitized process-instance ordinal")
+                .contains("API-tagged lookup, caller outcome, coalesced, stale, terminal load, and refresh")
+                .contains("policy-tagged TTL/size/weight eviction and weighted-admission")
+                .contains("timestamped, phase-labeled post-GC memory checkpoints")
+                .contains("HTTP/2 stream gauges")
                 .contains("factory start/close, context restart")
+                .contains("Record `cacheMetricsEnabled` for the affected client")
+                .contains("disabled or unavailable integration uses `null`, not fabricated zeros")
+                .contains("For an unweighted policy")
+                .contains("weight eviction, and admissions are `null`")
                 .contains("at most 16 policy records")
+                .contains("at most 64 API records")
                 .contains("at most 128 characters per name")
                 .contains("Heap dumps and JFR recordings can contain")
-                .contains("separately approved, encrypted, access-controlled process");
+                .contains("separately approved, encrypted, access-controlled process")
+                .contains("always write the HTTP status to a bundle file")
+                .contains("quarantined `*.raw.json` files outside the bundle")
+                .contains("Retain it only after the shared validation/sanitization step")
+                .contains("jq --slurpfile schema")
+                .contains("unexpected reactive HTTP client health response")
+                .contains("Never attach the raw files");
 
         assertThat(fixture.path("schemaVersion").asInt()).isEqualTo(1);
         assertThat(fixture.path("captureScope").asText()).isEqualTo("cache-memory");
@@ -432,45 +455,137 @@ class DocumentationReleaseArtifactTest {
         assertThat(fixture.path("window").path("endedAt").isTextual()).isTrue();
         assertThat(fixture.path("window").path("duration").asInt()).isEqualTo(300);
         assertThat(fixture.path("window").path("unit").asText()).isEqualTo("seconds");
+        assertThat(fixture.path("clientName").isTextual()).isTrue();
+        assertThat(fixture.path("clientName").asText().length()).isLessThanOrEqualTo(128);
+        assertThat(fixture.path("processInstance").isTextual()).isTrue();
+        assertThat(fixture.path("processInstance").asText().length()).isLessThanOrEqualTo(128);
 
         JsonNode configuration = fixture.path("configuration");
         JsonNode policies = configuration.path("policies");
         assertThat(policies.isArray()).isTrue();
         assertThat(policies.size()).isEqualTo(2).isLessThanOrEqualTo(16);
         assertThat(configuration.path("selectedPolicyCount").asInt()).isEqualTo(policies.size());
+        assertThat(configuration.path("cacheMetricsEnabled").isBoolean()).isTrue();
+        assertThat(configuration.path("cacheMetricsEnabled").asBoolean()).isTrue();
+        Map<String, Boolean> weightedPolicies = new HashMap<>();
         policies.forEach(policy -> {
             assertThat(policy.path("name").isTextual()).isTrue();
             assertThat(policy.path("name").asText().length()).isLessThanOrEqualTo(128);
             assertThat(policy.path("source").isTextual()).isTrue();
             assertThat(policy.path("ttlMs").isIntegralNumber()).isTrue();
             assertThat(policy.path("maximumEntries").isIntegralNumber()).isTrue();
-            assertThat(policy.path("maximumDecodedResponseBytes").isIntegralNumber()).isTrue();
-            assertThat(policy.path("state").path("entries").isIntegralNumber()).isTrue();
-            assertThat(policy.path("state").path("retainedDecodedResponseBytes").isIntegralNumber()).isTrue();
-            assertThat(policy.path("activity").path("lookups").path("hits").isIntegralNumber()).isTrue();
-            assertThat(policy.path("activity").path("loads").path("success").isIntegralNumber()).isTrue();
-            assertThat(policy.path("activity").path("refreshes").path("failure").isIntegralNumber()).isTrue();
-            assertThat(policy.path("activity").path("evictions").path("ttl").isIntegralNumber()).isTrue();
-            assertThat(policy.path("activity").path("evictions").path("size").isIntegralNumber()).isTrue();
-            assertThat(policy.path("activity").path("evictions").path("weight").isIntegralNumber()).isTrue();
-            assertThat(policy.path("activity").path("admissions").path("admitted").isIntegralNumber()).isTrue();
+            assertThat(policy.path("weightedAdmission").isBoolean()).isTrue();
+            boolean weighted = policy.path("weightedAdmission").asBoolean();
+            weightedPolicies.put(policy.path("name").asText(), weighted);
+            assertThat(policy.path("maximumDecodedResponseBytes").isIntegralNumber())
+                    .isEqualTo(weighted);
+            assertThat(policy.path("maximumDecodedResponseBytes").isNull())
+                    .isEqualTo(!weighted);
         });
-        assertThat(policies.get(1).path("activity").path("evictions").path("weight").asInt())
-                .isZero();
+        assertThat(weightedPolicies).containsEntry("catalog-read", true)
+                .containsEntry("profile-summary", false);
 
-        JsonNode memory = fixture.path("memory");
-        for (String field : List.of("processRssBytes", "containerWorkingSetBytes",
-                "javaHeapUsedAfterGcBytes", "javaHeapCommittedBytes",
-                "directMemoryUsedBytes", "liveThreadCount")) {
-            assertThat(memory.path(field).isIntegralNumber()).as(field).isTrue();
-        }
-        JsonNode transport = fixture.path("transport");
-        assertThat(transport.path("protocol").asText()).isEqualTo("HTTP/2");
-        for (String field : List.of("poolTotalConnections", "poolIdleConnections",
-                "poolActiveStreams", "poolPendingStreams", "poolMaximumConnections")) {
-            assertThat(transport.path(field).isIntegralNumber()).as(field).isTrue();
-        }
-        assertThat(fixture.path("lifecycle").path("factoryStarts").isIntegralNumber()).isTrue();
+        JsonNode apiActivity = fixture.path("apiActivity");
+        assertThat(apiActivity.isArray()).isTrue();
+        assertThat(apiActivity.size()).isEqualTo(2).isLessThanOrEqualTo(64);
+        apiActivity.forEach(api -> {
+            assertThat(api.path("apiName").isTextual()).isTrue();
+            assertThat(api.path("apiName").asText().length()).isLessThanOrEqualTo(128);
+            assertThat(weightedPolicies).containsKey(api.path("selectedPolicy").asText());
+            assertThat(api.path("lookups").path("hits").isIntegralNumber()).isTrue();
+            assertThat(api.path("lookups").path("misses").isIntegralNumber()).isTrue();
+            assertThat(api.path("callers").path("freshHit").isIntegralNumber()).isTrue();
+            assertThat(api.path("callers").path("missLoader").isIntegralNumber()).isTrue();
+            assertThat(api.path("callers").path("coalescedWaiter").isIntegralNumber()).isTrue();
+            assertThat(api.path("callers").path("staleHit").isIntegralNumber()).isTrue();
+            assertThat(api.path("coalesced").asInt())
+                    .isEqualTo(api.path("callers").path("coalescedWaiter").asInt());
+            assertThat(api.path("loads").path("success").isIntegralNumber()).isTrue();
+            assertThat(api.path("refreshes").path("failure").isIntegralNumber()).isTrue();
+        });
+        assertThat(apiActivity.get(1).path("lookups").path("hits").asInt()).isZero();
+        assertThat(apiActivity.get(1).path("coalesced").asInt()).isZero();
+
+        JsonNode policyActivity = fixture.path("policyActivity");
+        assertThat(policyActivity.isArray()).isTrue();
+        assertThat(policyActivity.size()).isEqualTo(policies.size());
+        policyActivity.forEach(activity -> {
+            String policyName = activity.path("policy").asText();
+            assertThat(weightedPolicies).containsKey(policyName);
+            assertThat(activity.path("evictions").path("ttl").isIntegralNumber()).isTrue();
+            assertThat(activity.path("evictions").path("size").isIntegralNumber()).isTrue();
+            boolean weighted = weightedPolicies.get(policyName);
+            assertThat(activity.path("evictions").path("weight").isIntegralNumber())
+                    .isEqualTo(weighted);
+            assertThat(activity.path("evictions").path("weight").isNull())
+                    .isEqualTo(!weighted);
+            assertThat(activity.path("admissions").isObject()).isEqualTo(weighted);
+            assertThat(activity.path("admissions").isNull()).isEqualTo(!weighted);
+        });
+
+        JsonNode checkpoints = fixture.path("checkpoints");
+        assertThat(checkpoints.isArray()).isTrue();
+        assertThat(checkpoints).hasSize(3);
+        assertThat(checkpoints).extracting(checkpoint -> checkpoint.path("phase").asText())
+                .containsExactly("before-load-post-gc", "after-load-post-gc", "after-close-post-gc");
+        assertThat(checkpoints.get(0).path("capturedAt").asText())
+                .isEqualTo(fixture.path("window").path("startedAt").asText());
+        assertThat(checkpoints.get(2).path("capturedAt").asText())
+                .isEqualTo(fixture.path("window").path("endedAt").asText());
+        checkpoints.forEach(checkpoint -> {
+            assertThat(checkpoint.path("capturedAt").isTextual()).isTrue();
+            assertThat(checkpoint.path("phase").isTextual()).isTrue();
+            JsonNode memory = checkpoint.path("memory");
+            for (String field : List.of("processRssBytes", "containerWorkingSetBytes",
+                    "javaHeapUsedAfterGcBytes", "javaHeapCommittedBytes",
+                    "directMemoryUsedBytes", "liveThreadCount")) {
+                assertThat(memory.path(field).isIntegralNumber()).as(field).isTrue();
+            }
+            assertThat(checkpoint.path("cacheStateAvailable").isBoolean()).isTrue();
+            assertThat(checkpoint.path("transportStateAvailable").isBoolean()).isTrue();
+            if (checkpoint.path("cacheStateAvailable").asBoolean()) {
+                JsonNode policyState = checkpoint.path("policyState");
+                assertThat(policyState.isArray()).isTrue();
+                assertThat(policyState.size()).isEqualTo(policies.size());
+                policyState.forEach(state -> {
+                    String policyName = state.path("policy").asText();
+                    boolean weighted = weightedPolicies.get(policyName);
+                    assertThat(state.path("entries").isIntegralNumber()).isTrue();
+                    assertThat(state.path("maximumEntries").isIntegralNumber()).isTrue();
+                    assertThat(state.path("retainedDecodedResponseBytes").isIntegralNumber())
+                            .isEqualTo(weighted);
+                    assertThat(state.path("retainedDecodedResponseBytes").isNull())
+                            .isEqualTo(!weighted);
+                    assertThat(state.path("maximumDecodedResponseBytes").isIntegralNumber())
+                            .isEqualTo(weighted);
+                    assertThat(state.path("maximumDecodedResponseBytes").isNull())
+                            .isEqualTo(!weighted);
+                });
+            }
+            else {
+                assertThat(checkpoint.path("policyState").isArray()).isTrue();
+                assertThat(checkpoint.path("policyState").isEmpty()).isTrue();
+            }
+            if (checkpoint.path("transportStateAvailable").asBoolean()) {
+                JsonNode transport = checkpoint.path("transport");
+                assertThat(transport.path("protocol").asText()).isEqualTo("HTTP/2");
+                for (String field : List.of("poolTotalConnections", "poolIdleConnections",
+                        "poolActiveStreams", "poolPendingStreams", "poolMaximumConnections")) {
+                    assertThat(transport.path(field).isIntegralNumber()).as(field).isTrue();
+                }
+            }
+            else {
+                assertThat(checkpoint.path("transport").isNull()).isTrue();
+            }
+        });
+
+        JsonNode lifecycle = fixture.path("lifecycle");
+        assertThat(lifecycle.path("events").isArray()).isTrue();
+        assertThat(lifecycle.path("events")).hasSize(2);
+        lifecycle.path("events").forEach(event -> {
+            assertThat(event.path("capturedAt").isTextual()).isTrue();
+            assertThat(event.path("type").isTextual()).isTrue();
+        });
         assertThat(fixture.path("lifecycle").path("deploymentChanges").isArray()).isTrue();
 
         assertThat(sensitiveSupportFixtureFieldNames(fixture))
@@ -480,14 +595,26 @@ class DocumentationReleaseArtifactTest {
                 .as("request-target or query material in cache-memory support fixture values")
                 .isEmpty();
 
-        List<String> curlCommands = supportBundles.lines()
+        List<String> captureCurlCommands = supportBundles.lines()
                 .map(String::trim)
-                .filter(line -> line.startsWith("curl "))
-                .filter(line -> line.contains(" -o support-bundle/"))
+                .filter(line -> line.startsWith("curl -sS "))
                 .toList();
-        assertThat(curlCommands).hasSize(6)
-                .allMatch(line -> line.startsWith("curl -sS "))
-                .allMatch(line -> line.contains(" -o support-bundle/"));
+        assertThat(captureCurlCommands).hasSize(6)
+                .allMatch(line -> line.contains("-w '%{http_code}\\n'"))
+                .allMatch(line -> line.contains(".raw.json"))
+                .allMatch(line -> line.contains("-http-status.txt"))
+                .noneMatch(line -> line.contains(" -o support-bundle/"));
+        assertThat(supportBundles)
+                .contains("mv rhttpclients.sanitized.json support-bundle/diagnostics/rhttpclients.json")
+                .contains("mv reactive-http-client-health.sanitized.json support-bundle/health/health.json")
+                .contains("If either `jq` command fails, keep the HTTP-status file");
+        long staleFinalCaptureRemovalCount = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.equals(
+                        "rm -f support-bundle/diagnostics/rhttpclients.json "
+                                + "support-bundle/health/health.json"))
+                .count();
+        assertThat(staleFinalCaptureRemovalCount).isEqualTo(3);
         String kubernetesCapture = markdownSection(
                 supportBundles, "### Kubernetes-Style Capture", "## Health Details");
         for (String assignment : List.of(
@@ -4182,7 +4309,10 @@ class DocumentationReleaseArtifactTest {
         if (node.isTextual()) {
             String value = node.asText().trim();
             if (SUPPORT_FIXTURE_REQUEST_TARGET_VALUE.matcher(value).matches()
-                    || SUPPORT_FIXTURE_QUERY_VALUE.matcher(value).matches()) {
+                    || SUPPORT_FIXTURE_QUERY_VALUE.matcher(value).matches()
+                    || SUPPORT_FIXTURE_AUTHORITY_VALUE.matcher(value).matches()
+                    || (!SUPPORT_FIXTURE_ALLOWED_SLASH_VALUES.contains(value)
+                            && SUPPORT_FIXTURE_ROOTLESS_PATH_VALUE.matcher(value).matches())) {
                 sensitiveValues.add(node.asText());
             }
             return;

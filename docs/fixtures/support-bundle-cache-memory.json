@@ -3,13 +3,16 @@
   "captureScope": "cache-memory",
   "signalAvailability": "4.2.0-SNAPSHOT-v29",
   "window": {
-    "startedAt": "EXAMPLE_WINDOW_START",
-    "endedAt": "EXAMPLE_WINDOW_END",
+    "startedAt": "2026-01-01T00:00:00Z",
+    "endedAt": "2026-01-01T00:05:00Z",
     "duration": 300,
     "unit": "seconds"
   },
+  "clientName": "example-client",
+  "processInstance": "instance-1",
   "configuration": {
     "selectedPolicyCount": 2,
+    "cacheMetricsEnabled": true,
     "policies": [
       {
         "name": "catalog-read",
@@ -17,98 +20,205 @@
         "ttlMs": 60000,
         "maximumEntries": 10000,
         "maximumDecodedResponseBytes": 268435456,
-        "state": {
-          "entries": 7000,
-          "retainedDecodedResponseBytes": 180355072
-        },
-        "activity": {
-          "lookups": {
-            "hits": 760,
-            "misses": 65
-          },
-          "loads": {
-            "success": 34,
-            "failure": 2,
-            "cancellation": 1
-          },
-          "refreshes": {
-            "success": 14,
-            "failure": 2,
-            "cancellation": 1
-          },
-          "evictions": {
-            "size": 10,
-            "ttl": 29,
-            "weight": 3
-          },
-          "admissions": {
-            "admitted": 34,
-            "bypassedUnknownSize": 1,
-            "bypassedOverBudget": 2,
-            "bypassedCapacity": 0
-          }
-        }
+        "weightedAdmission": true
       },
       {
         "name": "profile-summary",
         "source": "client",
         "ttlMs": 30000,
         "maximumEntries": 2500,
-        "maximumDecodedResponseBytes": 67108864,
-        "state": {
-          "entries": 1250,
-          "retainedDecodedResponseBytes": 39845888
-        },
-        "activity": {
-          "lookups": {
-            "hits": 160,
-            "misses": 15
-          },
-          "loads": {
-            "success": 8,
-            "failure": 0,
-            "cancellation": 0
-          },
-          "refreshes": {
-            "success": 4,
-            "failure": 0,
-            "cancellation": 0
-          },
-          "evictions": {
-            "size": 4,
-            "ttl": 8,
-            "weight": 0
-          },
-          "admissions": {
-            "admitted": 8,
-            "bypassedUnknownSize": 0,
-            "bypassedOverBudget": 0,
-            "bypassedCapacity": 0
-          }
-        }
+        "maximumDecodedResponseBytes": null,
+        "weightedAdmission": false
       }
     ]
   },
-  "memory": {
-    "processRssBytes": 536870912,
-    "containerWorkingSetBytes": 603979776,
-    "javaHeapUsedAfterGcBytes": 201326592,
-    "javaHeapCommittedBytes": 402653184,
-    "directMemoryUsedBytes": 67108864,
-    "liveThreadCount": 84
-  },
-  "transport": {
-    "protocol": "HTTP/2",
-    "poolTotalConnections": 12,
-    "poolIdleConnections": 4,
-    "poolActiveStreams": 28,
-    "poolPendingStreams": 2,
-    "poolMaximumConnections": 64
-  },
+  "apiActivity": [
+    {
+      "apiName": "catalog.search",
+      "selectedPolicy": "catalog-read",
+      "lookups": {
+        "hits": 760,
+        "misses": 65
+      },
+      "callers": {
+        "freshHit": 760,
+        "missLoader": 37,
+        "coalescedWaiter": 28,
+        "staleHit": 12
+      },
+      "coalesced": 28,
+      "stale": 12,
+      "loads": {
+        "success": 34,
+        "failure": 2,
+        "cancellation": 1
+      },
+      "refreshes": {
+        "success": 14,
+        "failure": 2,
+        "cancellation": 1
+      }
+    },
+    {
+      "apiName": "profile.get",
+      "selectedPolicy": "profile-summary",
+      "lookups": {
+        "hits": 0,
+        "misses": 0
+      },
+      "callers": {
+        "freshHit": 0,
+        "missLoader": 0,
+        "coalescedWaiter": 0,
+        "staleHit": 0
+      },
+      "coalesced": 0,
+      "stale": 0,
+      "loads": {
+        "success": 0,
+        "failure": 0,
+        "cancellation": 0
+      },
+      "refreshes": {
+        "success": 0,
+        "failure": 0,
+        "cancellation": 0
+      }
+    }
+  ],
+  "policyActivity": [
+    {
+      "policy": "catalog-read",
+      "evictions": {
+        "size": 10,
+        "ttl": 29,
+        "weight": 3
+      },
+      "admissions": {
+        "admitted": 34,
+        "bypassedUnknownSize": 1,
+        "bypassedOverBudget": 2,
+        "bypassedCapacity": 0
+      }
+    },
+    {
+      "policy": "profile-summary",
+      "evictions": {
+        "size": 4,
+        "ttl": 8,
+        "weight": null
+      },
+      "admissions": null
+    }
+  ],
+  "checkpoints": [
+    {
+      "capturedAt": "2026-01-01T00:00:00Z",
+      "phase": "before-load-post-gc",
+      "cacheStateAvailable": true,
+      "transportStateAvailable": true,
+      "memory": {
+        "processRssBytes": 335544320,
+        "containerWorkingSetBytes": 369098752,
+        "javaHeapUsedAfterGcBytes": 125829120,
+        "javaHeapCommittedBytes": 268435456,
+        "directMemoryUsedBytes": 33554432,
+        "liveThreadCount": 78
+      },
+      "policyState": [
+        {
+          "policy": "catalog-read",
+          "entries": 200,
+          "maximumEntries": 10000,
+          "retainedDecodedResponseBytes": 4194304,
+          "maximumDecodedResponseBytes": 268435456
+        },
+        {
+          "policy": "profile-summary",
+          "entries": 50,
+          "maximumEntries": 2500,
+          "retainedDecodedResponseBytes": null,
+          "maximumDecodedResponseBytes": null
+        }
+      ],
+      "transport": {
+        "protocol": "HTTP/2",
+        "poolTotalConnections": 4,
+        "poolIdleConnections": 3,
+        "poolActiveStreams": 1,
+        "poolPendingStreams": 0,
+        "poolMaximumConnections": 64
+      }
+    },
+    {
+      "capturedAt": "2026-01-01T00:04:00Z",
+      "phase": "after-load-post-gc",
+      "cacheStateAvailable": true,
+      "transportStateAvailable": true,
+      "memory": {
+        "processRssBytes": 536870912,
+        "containerWorkingSetBytes": 603979776,
+        "javaHeapUsedAfterGcBytes": 201326592,
+        "javaHeapCommittedBytes": 402653184,
+        "directMemoryUsedBytes": 67108864,
+        "liveThreadCount": 84
+      },
+      "policyState": [
+        {
+          "policy": "catalog-read",
+          "entries": 7000,
+          "maximumEntries": 10000,
+          "retainedDecodedResponseBytes": 180355072,
+          "maximumDecodedResponseBytes": 268435456
+        },
+        {
+          "policy": "profile-summary",
+          "entries": 1250,
+          "maximumEntries": 2500,
+          "retainedDecodedResponseBytes": null,
+          "maximumDecodedResponseBytes": null
+        }
+      ],
+      "transport": {
+        "protocol": "HTTP/2",
+        "poolTotalConnections": 12,
+        "poolIdleConnections": 4,
+        "poolActiveStreams": 28,
+        "poolPendingStreams": 2,
+        "poolMaximumConnections": 64
+      }
+    },
+    {
+      "capturedAt": "2026-01-01T00:05:00Z",
+      "phase": "after-close-post-gc",
+      "cacheStateAvailable": false,
+      "transportStateAvailable": false,
+      "memory": {
+        "processRssBytes": 352321536,
+        "containerWorkingSetBytes": 385875968,
+        "javaHeapUsedAfterGcBytes": 130023424,
+        "javaHeapCommittedBytes": 402653184,
+        "directMemoryUsedBytes": 35651584,
+        "liveThreadCount": 78
+      },
+      "policyState": [],
+      "transport": null
+    }
+  ],
   "lifecycle": {
-    "factoryStarts": 1,
-    "factoryCloses": 0,
+    "events": [
+      {
+        "capturedAt": "2026-01-01T00:00:00Z",
+        "type": "factory-start"
+      },
+      {
+        "capturedAt": "2026-01-01T00:04:30Z",
+        "type": "factory-close"
+      }
+    ],
     "contextRestarts": 0,
-    "deploymentChanges": ["starter-version"]
+    "deploymentChanges": [
+      "starter-version"
+    ]
   }
 }

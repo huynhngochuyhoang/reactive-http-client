@@ -808,17 +808,18 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   and states that RSS, Java heap, decoded representation bytes, and wire size are
   different signals.
 - `docs/26-support-bundles.md` adds a bounded V29 cache-memory capture contract and
-  the sanitized `support-bundle-cache-memory.json` fixture. The fixture records a
-  five-minute window, separate bounded configuration/state/activity for each
-  selected policy, weight evictions, protocol-aware pool gauges, and global
-  memory/lifecycle facts without request, cache-entry, identity, credential,
-  tenant, or error-message material. Heap dumps and JFR remain a separate
-  encrypted, access-controlled process.
+  the sanitized `support-bundle-cache-memory.json` fixture. The fixture identifies
+  one bounded client/process instance, maps API-tagged caller/load/refresh work to
+  selected policies, keeps policy-tagged eviction/admission facts separate,
+  represents weighted/unweighted availability with values versus `null`, and
+  records three timestamped post-GC memory/cache/H2-pool checkpoints. It contains
+  no request, cache-entry, identity, credential, tenant, or error-message material.
 - Recursive fixture guards reject singular, plural, and compound sensitive field
-  names plus arbitrary relative request-target/query textual values and exception-
-  message material. Recipe checks require all six diagnostics/health captures to preserve HTTP error bodies,
-  repeat every Kubernetes shell placeholder, and use the `kubectl exec -- cat`
-  minimal-image path without `kubectl cp`/`tar`.
+  names plus origin, authority, rootless-path, query, and absolute-URL textual
+  values. All six endpoint captures record HTTP status unconditionally, quarantine
+  bodies outside the bundle, and publish JSON only after expected-shape validation
+  and field allowlisting. Kubernetes placeholders and the `kubectl exec -- cat`
+  minimal-image path remain covered without `kubectl cp`/`tar`.
 - `DocumentationReleaseArtifactTest` passed 45 tests. The complete starter suite
   passed 1,292 tests; both runs had no failures, errors, or skips. JSON validation,
   local-link validation, and `git diff --check` also passed.

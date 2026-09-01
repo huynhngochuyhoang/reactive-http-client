@@ -345,12 +345,16 @@ and after each step:
    affected method actually selects a cache policy, how many policies the client
    selects, and whether the report began after a rollout, configuration refresh,
    traffic shift, or application change.
-2. Record each selected policy's configuration source, safe bounded policy name,
-   `maximum-size`, TTL, entry occupancy, and cache-metrics selection. Compare
-   hit, miss, terminal load, coalesced-waiter, refresh, size/TTL eviction, and,
-   on V29, weight eviction and admission activity. A defined but unselected
-   policy retains nothing.
-3. Take memory checkpoints after equivalent traffic and a completed GC cycle.
+2. Record the affected client's `cacheMetricsEnabled` selection and each policy's
+   configuration source, safe bounded name, `maximum-size`, TTL, and entry
+   occupancy. A
+   disabled integration is unavailable, while an enabled idle series is zero.
+   Keep API-tagged hit/miss, caller outcome, coalesced-waiter, load, and refresh
+   activity with its API-to-policy mapping; keep policy-tagged occupancy,
+   size/TTL/weight eviction, and admission activity separate. A defined but
+   unselected policy retains nothing.
+3. Take timestamped, phase-labeled memory/cache/pool checkpoints for the same
+   sanitized process instance after equivalent traffic and a completed GC cycle.
    Keep Java heap used/committed, process RSS, container working set, direct
    memory, live thread count, protocol, total/idle physical connections, and the
    applicable active/pending connection or stream gauges as separate series. Do
