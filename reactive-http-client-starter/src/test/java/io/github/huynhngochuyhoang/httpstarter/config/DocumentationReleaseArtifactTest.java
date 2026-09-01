@@ -667,6 +667,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("mv rhttpclients.sanitized.json support-bundle/diagnostics/rhttpclients.json")
                 .contains("mv reactive-http-client-health.sanitized.json support-bundle/health/health.json")
                 .contains("def nonnegative_integer:")
+                .contains("def rate_matches($detail):")
+                .contains("$detail.errors / $detail.samples")
+                .contains("($detail.samples == 0) or rate_matches($detail)")
                 .contains("$detail.samples == $detail.sampleCount")
                 .contains("$detail.reason == \"NO_SAMPLES\"")
                 .contains("$detail.reason == \"ERROR_RATE_ABOVE_THRESHOLD\"")
@@ -1269,6 +1272,10 @@ class DocumentationReleaseArtifactTest {
         }
         assertThat(clientHealth.path("errorRateThreshold").isNumber()).isTrue();
         assertThat(clientHealth.path("errorRate").isNumber()).isTrue();
+        double calculatedErrorRate = (double) clientHealth.path("errors").asLong()
+                / (double) clientHealth.path("samples").asLong();
+        assertThat(Math.abs(clientHealth.path("errorRate").asDouble() - calculatedErrorRate))
+                .isLessThanOrEqualTo(0.000000000001d);
         assertThat(clientHealth.path("status").isTextual()).isTrue();
         assertThat(clientHealth.path("status").asText()).isIn("UP", "DOWN", "INSUFFICIENT_SAMPLES");
         assertThat(clientHealth.path("reason").isTextual()).isTrue();

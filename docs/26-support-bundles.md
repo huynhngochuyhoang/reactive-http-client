@@ -304,8 +304,10 @@ numeric values, 512-character strings, bounded arrays/counts, and at most 1 MiB
 of UTF-8 JSON before it retains allowlisted fields. The two V29 decoded-response
 byte fields are optional when sanitizing a published 4.1 response. The health filter
 requires the requested client entry and emits only the documented structural
-health fields. Its top-level status is derived from that selected client, not
-from unrelated clients in the aggregate health response:
+health fields. For nonzero samples, the reported error rate must equal
+`errors / samples` within an absolute tolerance of `0.000000000001`. Its
+top-level status is derived from that selected client, not from unrelated clients
+in the aggregate health response:
 
 ```bash
 EXAMPLE_RHTTPCLIENTS_SCHEMA="/path/to/reviewed/rhttpclients-schema-v1.json"
@@ -408,6 +410,11 @@ jq --arg client "$EXAMPLE_CLIENT_NAME" '
     (type == "number") and (. >= 0) and (. == floor);
   def unit_rate:
     (type == "number") and (. >= 0) and (. <= 1);
+  def rate_matches($detail):
+    ($detail.errorRate | unit_rate)
+      and (($detail.errors / $detail.samples) as $calculated
+        | (($detail.errorRate - $calculated) >= -0.000000000001)
+        and (($detail.errorRate - $calculated) <= 0.000000000001));
   .details[$client] as $detail
   | if ((.status == "UP" or .status == "DOWN")
       and ((.details | type) == "object")
@@ -424,6 +431,7 @@ jq --arg client "$EXAMPLE_CLIENT_NAME" '
       and ($detail.errors == $detail.errorCount)
       and ($detail.errors <= $detail.samples)
       and ($detail.poolAcquireFailureCount <= $detail.errors)
+      and (($detail.samples == 0) or rate_matches($detail))
       and (
         ($detail.reason == "NO_SAMPLES"
           and $detail.status == "INSUFFICIENT_SAMPLES"

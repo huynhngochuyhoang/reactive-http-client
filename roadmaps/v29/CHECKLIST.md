@@ -826,9 +826,11 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   requires 2xx status, version-applicable required fields, bounded recursive leaf
   types, consistent counts, and the documented output limits while retaining
   supported nullable unknown values. The V29 byte fields are optional for a
-  published 4.1 response. The health filter enforces built-in counter, rate,
-  status, and reason invariants and derives the output status from the selected
-  client. Query flags and asterisk-form targets are fixture-rejected alongside
+  published 4.1 response. The health filter enforces built-in counter, status,
+  and reason invariants, verifies every nonzero-sample rate against
+  `errors / samples` within `0.000000000001`, and derives the output status
+  from the selected client. Query flags and asterisk-form targets are
+  fixture-rejected alongside
   other request-target forms. Kubernetes placeholders and the
   `kubectl exec -- cat` minimal-image path remain covered without
   `kubectl cp`/`tar`.
@@ -837,8 +839,9 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   had no failures, errors, or skips. The exact documented diagnostics filter
   accepted provider-backed, summary-only, and published 4.1-shaped fixtures while
   rejecting both an object-valued leaf and a 401 response. The health filter
-  rejected an object-valued reason and emitted UP for a selected UP client from
-  an aggregate DOWN response. JSON validation, local-link validation, and
+  accepted valid and zero-sample records, rejected an object-valued reason and a
+  counter/rate mismatch, and emitted UP for a selected UP client from an aggregate
+  DOWN response. JSON validation, local-link validation, and
   `git diff --check` also passed.
 
 ---
