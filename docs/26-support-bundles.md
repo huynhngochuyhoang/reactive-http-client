@@ -343,7 +343,8 @@ only the documented structural health fields. For nonzero samples, the reported
 error rate must equal
 `errors / samples` within an absolute tolerance of `0.000000000001`. Its
 top-level status is derived from that selected client, not from unrelated clients
-in the aggregate health response:
+in the aggregate health response. The sanitized projection preserves omission of
+`errorRate` when the selected client has zero samples:
 
 ```bash
 EXAMPLE_RHTTPCLIENTS_SCHEMA="/path/to/reviewed/rhttpclients-schema-v1.json"
@@ -499,10 +500,16 @@ test "$(cat support-bundle/health/reactive-http-client-health-curl-exit-status.t
   then {
     status: (if $detail.status == "DOWN" then "DOWN" else "UP" end),
     details: {
-      ($client): ($detail | {
-        samples, errors, sampleCount, errorCount, poolAcquireFailureCount,
-        minSamples, errorRateThreshold, errorRate, status, reason
-      })
+      ($client): (
+        $detail
+        | {
+            samples, errors, sampleCount, errorCount, poolAcquireFailureCount,
+            minSamples, errorRateThreshold, status, reason
+          }
+        | if $detail.samples == 0 then .
+          else . + {errorRate: $detail.errorRate}
+          end
+      )
     }
   }
   else error("unexpected reactive HTTP client health response")

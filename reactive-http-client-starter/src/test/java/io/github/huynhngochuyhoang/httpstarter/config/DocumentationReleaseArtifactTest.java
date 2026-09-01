@@ -717,6 +717,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("def rate_matches($detail):")
                 .contains("$detail.errors / $detail.samples")
                 .contains("($detail.samples == 0) or rate_matches($detail)")
+                .contains("preserves omission of\n`errorRate` when the selected client has zero samples")
+                .contains("| if $detail.samples == 0 then .\n"
+                        + "          else . + {errorRate: $detail.errorRate}")
                 .contains("$detail.samples == $detail.sampleCount")
                 .contains("$detail.reason == \"NO_SAMPLES\"")
                 .contains("$detail.reason == \"ERROR_RATE_ABOVE_THRESHOLD\"")
@@ -725,6 +728,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("truncation, or connection-reset failure")
                 .contains("a raw-size check fails")
                 .contains("keep the HTTP and curl exit-status files");
+        assertThat(supportBundles)
+                .doesNotContain("minSamples, errorRateThreshold, errorRate, status, reason");
         for (String exitStatusPath : List.of(
                 "support-bundle/diagnostics/rhttpclients-curl-exit-status.txt",
                 "support-bundle/health/reactive-http-client-health-curl-exit-status.txt")) {

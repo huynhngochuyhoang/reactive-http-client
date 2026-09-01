@@ -837,7 +837,8 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   are optional for a published 4.1 response. The health filter enforces built-in
   counter, status, and reason invariants, verifies every nonzero-sample rate against
   `errors / samples` within `0.000000000001`, and derives the output status
-  from the selected client. Query flags and asterisk-form targets are
+  from the selected client while preserving omission of `errorRate` for a
+  zero-sample detail. Query flags and asterisk-form targets are
   fixture-rejected alongside
   other request-target forms. Kubernetes placeholders and the
   `kubectl exec -- cat` minimal-image path remain covered without
