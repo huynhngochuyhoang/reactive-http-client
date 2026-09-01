@@ -192,8 +192,8 @@ Each recipe captures separate evidence streams:
 
 | Stream | File | Answers |
 |---|---|---|
-| Diagnostics endpoint | `diagnostics/rhttpclients-http-status.txt` plus validated `diagnostics/rhttpclients.json` | Which status was returned and, only for the expected schema, which clients/endpoints and sanitized effective policies exist. |
-| Health details | `health/reactive-http-client-health-http-status.txt` plus sanitized `health/health.json` | Which status was returned and, only for the expected component shape, whether recent samples crossed the affected client's error-rate threshold. |
+| Diagnostics endpoint | `diagnostics/rhttpclients-http-status.txt`, `diagnostics/rhttpclients-curl-exit-status.txt`, plus validated `diagnostics/rhttpclients.json` | Whether the transfer completed, which status was returned, and, only for the expected schema, which clients/endpoints and sanitized effective policies exist. |
+| Health details | `health/reactive-http-client-health-http-status.txt`, `health/reactive-http-client-health-curl-exit-status.txt`, plus sanitized `health/health.json` | Whether the transfer completed, which status was returned, and, only for the expected component shape, whether recent samples crossed the affected client's error-rate threshold. |
 | Startup summary | `logs/startup-summary.log` | Which sanitized client policy was applied when the proxy was created. |
 | Metadata-only exchange logs | `logs/exchange-metadata.log` | What happened for the affected calls: method, path template, status, duration, error, and subscription-attempt count. |
 | Sanitized configuration | `config/reactive-http-client.yml` | Which `reactive.http.*` settings the application intended to use, without secrets or concrete internal URLs. |
@@ -228,9 +228,18 @@ EXAMPLE_SANITIZED_CONFIG="/path/to/sanitized-reactive-http-client.yml"
 umask 077
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt support-bundle/health/reactive-http-client-health-curl-exit-status.txt
 rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
-curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt
-curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt
+if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
+  printf '0\n' > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+fi
+if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
+  printf '0\n' > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+fi
 grep 'ReactiveHttpClientFactoryBean' "$EXAMPLE_APP_LOG" > support-bundle/logs/startup-summary.log || true
 grep 'DefaultHttpExchangeLogger' "$EXAMPLE_APP_LOG" > support-bundle/logs/exchange-metadata.log || true
 cp "$EXAMPLE_SANITIZED_CONFIG" support-bundle/config/reactive-http-client.yml
@@ -252,9 +261,18 @@ EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER="/path/in/container/sanitized-reactive-htt
 umask 077
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt support-bundle/health/reactive-http-client-health-curl-exit-status.txt
 rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
-curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt
-curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt
+if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
+  printf '0\n' > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+fi
+if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
+  printf '0\n' > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+fi
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
 docker cp "$EXAMPLE_CONTAINER:$EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER" support-bundle/config/reactive-http-client.yml
@@ -289,9 +307,18 @@ EXAMPLE_CLIENT_NAME="example-client"
 umask 077
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt support-bundle/health/reactive-http-client-health-curl-exit-status.txt
 rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
-curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt
-curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt
+if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
+  printf '0\n' > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+fi
+if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
+  printf '0\n' > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+fi
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
 kubectl -n "$EXAMPLE_NAMESPACE" exec "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" -- cat "$EXAMPLE_SANITIZED_CONFIG_IN_POD" > support-bundle/config/reactive-http-client.yml
@@ -307,8 +334,9 @@ HTTP status, schema V1, every version-applicable required field, the expected
 recursive leaf types (including documented nullable unknown states), nonnegative
 numeric values, 512-character strings, bounded arrays/counts, and at most 1 MiB
 of UTF-8 JSON before it retains allowlisted fields. Before either filter starts,
-the shell also verifies that the quarantined raw file exists and is at most 1 MiB;
-this bounds whitespace and other bytes that compacted `tojson` does not measure.
+the shell also verifies that curl reported a successful transfer, the quarantined
+raw file exists, and the file is at most 1 MiB; this bounds whitespace and other
+bytes that compacted `tojson` does not measure.
 The two V29 decoded-response byte fields are optional when sanitizing a published
 4.1 response. The health filter requires the requested client entry and emits
 only the documented structural health fields. For nonzero samples, the reported
@@ -320,7 +348,8 @@ in the aggregate health response:
 ```bash
 EXAMPLE_RHTTPCLIENTS_SCHEMA="/path/to/reviewed/rhttpclients-schema-v1.json"
 
-test -f rhttpclients.raw.json &&
+test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0" &&
+  test -f rhttpclients.raw.json &&
   test "$(wc -c < rhttpclients.raw.json)" -le 1048576 &&
   jq --arg httpStatus "$(cat support-bundle/diagnostics/rhttpclients-http-status.txt)" \
   --slurpfile schema "$EXAMPLE_RHTTPCLIENTS_SCHEMA" '
@@ -386,7 +415,7 @@ test -f rhttpclients.raw.json &&
         elif $field == "clients" and length <= 256 then
           [.[] | keep_shape($shape[0]; "client")]
         elif (($field == "cachePolicySources" or $field == "cacheHttpMethods")
-            and length <= 10000
+            and length <= 16
             and all(.[]; type == "string" and length <= 512))
         then .
         else error("unexpected diagnostics array")
@@ -416,7 +445,8 @@ test -f rhttpclients.raw.json &&
 ' rhttpclients.raw.json > rhttpclients.sanitized.json &&
   mv rhttpclients.sanitized.json support-bundle/diagnostics/rhttpclients.json
 
-test -f reactive-http-client-health.raw.json &&
+test "$(cat support-bundle/health/reactive-http-client-health-curl-exit-status.txt)" = "0" &&
+  test -f reactive-http-client-health.raw.json &&
   test "$(wc -c < reactive-http-client-health.raw.json)" -le 1048576 &&
   jq --arg client "$EXAMPLE_CLIENT_NAME" '
   def nonnegative_integer:
@@ -484,10 +514,11 @@ rm -f rhttpclients.raw.json rhttpclients.sanitized.json \
   reactive-http-client-health.raw.json reactive-http-client-health.sanitized.json
 ```
 
-If `curl` rejects a response at the transfer bound, a raw-size check fails, or
-either `jq` command fails, keep the HTTP-status file, omit the endpoint body from
-the bundle, and delete the raw file. Do not weaken the shape check to retain a
-gateway, proxy, authentication, or generic error document.
+If `curl` reports any nonzero transfer status, including a transfer-bound,
+truncation, or connection-reset failure, a raw-size check fails, or either `jq`
+command fails, keep the HTTP and curl exit-status files, omit the endpoint body
+from the bundle, and delete the raw file. Do not weaken the shape check to retain
+a gateway, proxy, authentication, or generic error document.
 
 The Kubernetes recipe uses `kubectl exec ... cat` instead of `kubectl cp` so it
 does not require `tar` in the application image. If the image also lacks `cat`

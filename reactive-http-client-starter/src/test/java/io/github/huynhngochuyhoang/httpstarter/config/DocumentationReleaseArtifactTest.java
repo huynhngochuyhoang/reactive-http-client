@@ -466,6 +466,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("sets `umask 077` before creating capture files")
                 .contains("newly created quarantined bodies use mode `0600`")
                 .contains("Retain it only after the shared validation/sanitization step")
+                .contains("verifies that curl reported a successful transfer")
                 .contains("--slurpfile schema")
                 .contains("expected recursive leaf types")
                 .contains("documented nullable unknown states")
@@ -688,7 +689,7 @@ class DocumentationReleaseArtifactTest {
 
         List<String> captureCurlCommands = supportBundles.lines()
                 .map(String::trim)
-                .filter(line -> line.startsWith("curl -sS "))
+                .filter(line -> line.startsWith("if curl -sS "))
                 .toList();
         assertThat(captureCurlCommands).hasSize(6)
                 .allMatch(line -> line.contains("--max-filesize 1048576"))
@@ -699,12 +700,18 @@ class DocumentationReleaseArtifactTest {
         assertThat(supportBundles)
                 .contains("mv rhttpclients.sanitized.json support-bundle/diagnostics/rhttpclients.json")
                 .contains("mv reactive-http-client-health.sanitized.json support-bundle/health/health.json")
-                .contains("test -f rhttpclients.raw.json &&\n"
+                .contains("test \"$(cat support-bundle/diagnostics/"
+                        + "rhttpclients-curl-exit-status.txt)\" = \"0\" &&\n"
+                        + "  test -f rhttpclients.raw.json &&\n"
                         + "  test \"$(wc -c < rhttpclients.raw.json)\" -le 1048576 &&\n"
                         + "  jq --arg httpStatus")
-                .contains("test -f reactive-http-client-health.raw.json &&\n"
+                .contains("test \"$(cat support-bundle/health/"
+                        + "reactive-http-client-health-curl-exit-status.txt)\" = \"0\" &&\n"
+                        + "  test -f reactive-http-client-health.raw.json &&\n"
                         + "  test \"$(wc -c < reactive-http-client-health.raw.json)\" -le 1048576 &&\n"
                         + "  jq --arg client")
+                .contains("and length <= 16\n"
+                        + "            and all(.[]; type == \"string\" and length <= 512)")
                 .contains("all(.clients[]; .inheritedEndpointCount <= .endpointCount)")
                 .contains("def nonnegative_integer:")
                 .contains("def rate_matches($detail):")
@@ -713,9 +720,21 @@ class DocumentationReleaseArtifactTest {
                 .contains("$detail.samples == $detail.sampleCount")
                 .contains("$detail.reason == \"NO_SAMPLES\"")
                 .contains("$detail.reason == \"ERROR_RATE_ABOVE_THRESHOLD\"")
-                .contains("If `curl` rejects a response at the transfer bound")
+                .contains("If `curl` reports any nonzero transfer status")
+                .contains("including a transfer-bound,")
+                .contains("truncation, or connection-reset failure")
                 .contains("a raw-size check fails")
-                .contains("either `jq` command fails, keep the HTTP-status file");
+                .contains("keep the HTTP and curl exit-status files");
+        for (String exitStatusPath : List.of(
+                "support-bundle/diagnostics/rhttpclients-curl-exit-status.txt",
+                "support-bundle/health/reactive-http-client-health-curl-exit-status.txt")) {
+            long writeCount = supportBundles.lines()
+                    .map(String::trim)
+                    .filter(line -> line.startsWith("printf "))
+                    .filter(line -> line.endsWith("> " + exitStatusPath))
+                    .count();
+            assertThat(writeCount).as(exitStatusPath).isEqualTo(6);
+        }
         long staleFinalCaptureRemovalCount = supportBundles.lines()
                 .map(String::trim)
                 .filter(line -> line.equals(
@@ -723,6 +742,14 @@ class DocumentationReleaseArtifactTest {
                                 + "support-bundle/health/health.json"))
                 .count();
         assertThat(staleFinalCaptureRemovalCount).isEqualTo(3);
+        long staleCurlStatusRemovalCount = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.equals(
+                        "rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt "
+                                + "support-bundle/health/"
+                                + "reactive-http-client-health-curl-exit-status.txt"))
+                .count();
+        assertThat(staleCurlStatusRemovalCount).isEqualTo(3);
         long staleRawCaptureRemovalCount = supportBundles.lines()
                 .map(String::trim)
                 .filter(line -> line.equals(

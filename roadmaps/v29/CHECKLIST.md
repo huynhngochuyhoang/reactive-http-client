@@ -825,15 +825,17 @@ Evidence recorded on 2026-09-01 from durable baseline commit
 - Recursive fixture guards reject singular, plural, and compound sensitive field
   names plus origin, authority, rootless-path, query, and absolute-URL textual
   values, including request targets embedded in HTTP request lines. All six
-  endpoint captures remove stale raw files, set a private `umask 077`, cap downloads at
-  1 MiB, record HTTP status unconditionally, quarantine bodies outside the bundle,
-  verify raw byte size before parsing, and publish JSON only after expected-shape
-  validation and field allowlisting. Diagnostics publication requires 2xx status,
-  version-applicable required fields, bounded recursive leaf types, per-client and
-  aggregate endpoint-count invariants, and the documented output limits while
-  retaining supported nullable unknown values. The V29 byte fields are optional for a
-  published 4.1 response. The health filter enforces built-in counter, status,
-  and reason invariants, verifies every nonzero-sample rate against
+  endpoint captures remove stale raw files and curl-status evidence, set a private
+  `umask 077`, cap downloads at
+  1 MiB, record HTTP and curl exit status separately, quarantine bodies outside
+  the bundle, require a zero curl exit status, verify raw byte size before parsing,
+  and publish JSON only after expected-shape validation and field allowlisting.
+  Diagnostics publication requires 2xx status, version-applicable required fields,
+  bounded recursive leaf types, at most 16 cache policy-source/HTTP-method values,
+  per-client and aggregate endpoint-count invariants, and the documented output
+  limits while retaining supported nullable unknown values. The V29 byte fields
+  are optional for a published 4.1 response. The health filter enforces built-in
+  counter, status, and reason invariants, verifies every nonzero-sample rate against
   `errors / samples` within `0.000000000001`, and derives the output status
   from the selected client. Query flags and asterisk-form targets are
   fixture-rejected alongside

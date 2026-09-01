@@ -464,7 +464,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 .contains("logs/exchange-metadata.log")
                 .contains("config/reactive-http-client.yml")
                 .contains("performance/benchmark-report-link.txt")
-                .contains("Which status was returned and, only for the expected schema")
+                .contains("Whether the transfer completed, which status was returned")
                 .contains("whether recent samples crossed the affected client's error-rate threshold")
                 .contains("Which sanitized client policy was applied")
                 .contains("What happened for the affected calls")
