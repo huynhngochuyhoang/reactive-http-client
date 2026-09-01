@@ -11,6 +11,8 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -432,7 +434,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("applicable active/pending connection or stream gauges")
                 .contains("generation records, completed load tokens")
                 .contains("coalesced-waiter deltas rise in the same bounded window")
-                .contains("compare terminal-load counters across a bounded quiet window")
+                .contains("compare the recorded before/after terminal-load counter snapshots "
+                        + "across a bounded quiet window")
+                .contains("Record the cumulative success, failure, and cancellation terminal-load counters")
                 .contains("while those meters remain registered")
                 .contains("no delta narrows the observation but does not prove retained flight ownership")
                 .contains("not to read removed cache meters")
@@ -449,6 +453,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("[cache-memory fixture](fixtures/support-bundle-cache-memory.json)")
                 .contains("one bounded client name and one sanitized process-instance ordinal")
                 .contains("API-tagged lookup, caller outcome, coalesced, stale, terminal load, and refresh")
+                .contains("cumulative API terminal-load counters sampled at both boundaries")
+                .contains("traffic was stopped and the factory remained open")
                 .contains("policy-tagged TTL/size/weight eviction and weighted-admission")
                 .contains("timestamped, phase-labeled post-GC memory checkpoints")
                 .contains("HTTP/2 stream gauges")
@@ -512,11 +518,13 @@ class DocumentationReleaseArtifactTest {
         assertThat(configuration.path("cacheMetricsEnabled").asBoolean()).isTrue();
         Map<String, Boolean> weightedPolicies = new HashMap<>();
         Map<String, Boolean> refreshEnabledPolicies = new HashMap<>();
+        Map<String, Long> policyTtlMs = new HashMap<>();
         policies.forEach(policy -> {
             assertThat(policy.path("name").isTextual()).isTrue();
             assertThat(policy.path("name").asText().length()).isLessThanOrEqualTo(128);
             assertThat(policy.path("source").isTextual()).isTrue();
             assertThat(policy.path("ttlMs").isIntegralNumber()).isTrue();
+            policyTtlMs.put(policy.path("name").asText(), policy.path("ttlMs").asLong());
             boolean refreshEnabled = policy.path("refreshAfterMs").isIntegralNumber();
             refreshEnabledPolicies.put(policy.path("name").asText(), refreshEnabled);
             assertThat(policy.path("refreshAfterMs").isNull()).isEqualTo(!refreshEnabled);
@@ -545,9 +553,11 @@ class DocumentationReleaseArtifactTest {
         assertThat(apiActivity.isArray()).isTrue();
         assertThat(apiActivity.size()).isEqualTo(2).isLessThanOrEqualTo(64);
         Map<String, Long> successfulLoadsByPolicy = new HashMap<>();
+        Map<String, JsonNode> apiActivityByName = new HashMap<>();
         apiActivity.forEach(api -> {
             assertThat(api.path("apiName").isTextual()).isTrue();
             assertThat(api.path("apiName").asText().length()).isLessThanOrEqualTo(128);
+            apiActivityByName.put(api.path("apiName").asText(), api);
             assertThat(weightedPolicies).containsKey(api.path("selectedPolicy").asText());
             assertThat(api.path("lookups").path("hits").isIntegralNumber()).isTrue();
             assertThat(api.path("lookups").path("misses").isIntegralNumber()).isTrue();
@@ -572,15 +582,22 @@ class DocumentationReleaseArtifactTest {
         });
         assertThat(apiActivity.get(1).path("lookups").path("hits").asInt()).isZero();
         assertThat(apiActivity.get(1).path("coalesced").asInt()).isZero();
+        for (String outcome : List.of("success", "failure", "cancellation")) {
+            assertThat(apiActivity.get(1).path("loads").path(outcome).asLong()).isZero();
+            assertThat(apiActivity.get(1).path("refreshes").path(outcome).asLong()).isZero();
+        }
 
         JsonNode policyActivity = fixture.path("policyActivity");
         assertThat(policyActivity.isArray()).isTrue();
         assertThat(policyActivity.size()).isEqualTo(policies.size());
         Map<String, Long> evictionsByPolicy = new HashMap<>();
+        Map<String, Long> ttlEvictionsByPolicy = new HashMap<>();
         policyActivity.forEach(activity -> {
             String policyName = activity.path("policy").asText();
             assertThat(weightedPolicies).containsKey(policyName);
             assertThat(activity.path("evictions").path("ttl").isIntegralNumber()).isTrue();
+            ttlEvictionsByPolicy.put(
+                    policyName, activity.path("evictions").path("ttl").asLong());
             assertThat(activity.path("evictions").path("size").isIntegralNumber()).isTrue();
             assertThat(activity.path("evictions").path("size").asLong()).isZero();
             boolean weighted = weightedPolicies.get(policyName);
@@ -609,10 +626,12 @@ class DocumentationReleaseArtifactTest {
         assertThat(checkpoints.get(2).path("capturedAt").asText())
                 .isEqualTo(fixture.path("window").path("endedAt").asText());
         Map<String, Long> entriesBeforeLoad = new HashMap<>();
+        Map<String, Long> entriesAfterLoad = new HashMap<>();
         checkpoints.get(0).path("policyState").forEach(state ->
                 entriesBeforeLoad.put(state.path("policy").asText(), state.path("entries").asLong()));
         checkpoints.get(1).path("policyState").forEach(state -> {
             String policyName = state.path("policy").asText();
+            entriesAfterLoad.put(policyName, state.path("entries").asLong());
             assertThat(state.path("entries").asLong()).isEqualTo(
                     entriesBeforeLoad.get(policyName)
                             + successfulLoadsByPolicy.getOrDefault(policyName, 0L)
@@ -664,6 +683,66 @@ class DocumentationReleaseArtifactTest {
                 assertThat(checkpoint.path("transport").isNull()).isTrue();
             }
         });
+        long profileElapsedMs = Duration.between(
+                Instant.parse(checkpoints.get(0).path("capturedAt").asText()),
+                Instant.parse(checkpoints.get(1).path("capturedAt").asText())).toMillis();
+        assertThat(profileElapsedMs).isGreaterThan(policyTtlMs.get("profile-summary"));
+        assertThat(entriesBeforeLoad).containsEntry("profile-summary", 50L);
+        assertThat(entriesAfterLoad).containsEntry("profile-summary", 0L);
+        assertThat(ttlEvictionsByPolicy).containsEntry("profile-summary", 50L);
+
+        JsonNode quietWindow = fixture.path("quietWindow");
+        assertThat(quietWindow.path("trafficStopped").isBoolean()).isTrue();
+        assertThat(quietWindow.path("trafficStopped").asBoolean()).isTrue();
+        assertThat(quietWindow.path("factoryOpen").isBoolean()).isTrue();
+        assertThat(quietWindow.path("factoryOpen").asBoolean()).isTrue();
+        assertThat(quietWindow.path("startedAt").isTextual()).isTrue();
+        assertThat(quietWindow.path("endedAt").isTextual()).isTrue();
+        assertThat(quietWindow.path("startedAt").asText())
+                .isEqualTo(checkpoints.get(1).path("capturedAt").asText());
+        assertThat(quietWindow.path("endedAt").asText())
+                .isGreaterThan(quietWindow.path("startedAt").asText())
+                .isLessThan(fixture.path("lifecycle").path("events").get(1)
+                        .path("capturedAt").asText());
+        JsonNode counterSnapshots = quietWindow.path("counterSnapshots");
+        assertThat(counterSnapshots.isArray()).isTrue();
+        assertThat(counterSnapshots).hasSize(2);
+        assertThat(counterSnapshots).extracting(snapshot -> snapshot.path("phase").asText())
+                .containsExactly("before-quiet", "after-quiet");
+        assertThat(counterSnapshots.get(0).path("capturedAt").asText())
+                .isEqualTo(quietWindow.path("startedAt").asText());
+        assertThat(counterSnapshots.get(1).path("capturedAt").asText())
+                .isEqualTo(quietWindow.path("endedAt").asText());
+        Map<String, Long> beforeTerminalLoads = new HashMap<>();
+        Map<String, Long> afterTerminalLoads = new HashMap<>();
+        for (int snapshotIndex = 0; snapshotIndex < counterSnapshots.size(); snapshotIndex++) {
+            boolean afterSnapshot = snapshotIndex == 1;
+            JsonNode terminalLoads = counterSnapshots.get(snapshotIndex).path("terminalLoads");
+            assertThat(terminalLoads.isArray()).isTrue();
+            assertThat(terminalLoads).hasSize(apiActivityByName.size());
+            Map<String, Long> totals = afterSnapshot ? afterTerminalLoads : beforeTerminalLoads;
+            terminalLoads.forEach(loads -> {
+                assertThat(loads.path("apiName").isTextual()).isTrue();
+                String apiName = loads.path("apiName").asText();
+                assertThat(apiActivityByName).containsKey(apiName);
+                long total = 0;
+                for (String outcome : List.of("success", "failure", "cancellation")) {
+                    assertThat(loads.path(outcome).isIntegralNumber()).isTrue();
+                    assertThat(loads.path(outcome).asLong()).isNotNegative();
+                    total += loads.path(outcome).asLong();
+                    if (afterSnapshot) {
+                        assertThat(loads.path(outcome).asLong()).isEqualTo(
+                                apiActivityByName.get(apiName).path("loads").path(outcome).asLong());
+                    }
+                }
+                totals.put(apiName, total);
+            });
+            assertThat(totals).hasSize(apiActivityByName.size());
+        }
+        assertThat(afterTerminalLoads.get("catalog.search")
+                - beforeTerminalLoads.get("catalog.search")).isEqualTo(1L);
+        assertThat(afterTerminalLoads.get("profile.get")
+                - beforeTerminalLoads.get("profile.get")).isZero();
 
         JsonNode lifecycle = fixture.path("lifecycle");
         assertThat(lifecycle.path("events").isArray()).isTrue();

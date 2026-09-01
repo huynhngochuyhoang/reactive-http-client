@@ -814,12 +814,16 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   records nullable refresh-after and refresh-timeout bounds for each policy,
   includes stale callers in lookup hits and partitions misses into loaders plus
   coalesced waiters, represents weighted/unweighted availability with values
-  versus `null`, and records three timestamped post-GC memory/cache/H2-pool
-  checkpoints. Factory startup precedes the populated opening checkpoint. The
+  versus `null`, records two cumulative API terminal-load counter snapshots in a
+  bounded pre-close quiet window while traffic is stopped and the factory remains
+  open, and records three timestamped post-GC memory/cache/H2-pool checkpoints.
+  Factory startup precedes the populated opening checkpoint. The
   after-load entry counts equal opening entries plus successful
-  loads minus recorded evictions for each policy. Both size-eviction counts are
-  zero because neither policy reaches its maximum entry capacity during the
-  bounded window. Its lifecycle evidence timestamps
+  loads minus recorded evictions for each policy. The idle `profile-summary`
+  policy has zero survivors after four minutes because its 50 opening entries all
+  exceed the 30-second TTL, and its eviction total records all 50 expirations.
+  Both size-eviction counts are zero because neither policy reaches its maximum
+  entry capacity during the bounded window. Its lifecycle evidence timestamps
   the relevant starter-version change with safe before/after versions. It contains
   no request, cache-entry, identity, credential, tenant, or error-message material.
 - Recursive fixture guards reject singular, plural, and compound sensitive field

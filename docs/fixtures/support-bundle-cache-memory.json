@@ -109,12 +109,56 @@
       "policy": "profile-summary",
       "evictions": {
         "size": 0,
-        "ttl": 8,
+        "ttl": 50,
         "weight": null
       },
       "admissions": null
     }
   ],
+  "quietWindow": {
+    "startedAt": "2026-01-01T00:04:00Z",
+    "endedAt": "2026-01-01T00:04:25Z",
+    "trafficStopped": true,
+    "factoryOpen": true,
+    "counterSnapshots": [
+      {
+        "capturedAt": "2026-01-01T00:04:00Z",
+        "phase": "before-quiet",
+        "terminalLoads": [
+          {
+            "apiName": "catalog.search",
+            "success": 33,
+            "failure": 2,
+            "cancellation": 1
+          },
+          {
+            "apiName": "profile.get",
+            "success": 0,
+            "failure": 0,
+            "cancellation": 0
+          }
+        ]
+      },
+      {
+        "capturedAt": "2026-01-01T00:04:25Z",
+        "phase": "after-quiet",
+        "terminalLoads": [
+          {
+            "apiName": "catalog.search",
+            "success": 34,
+            "failure": 2,
+            "cancellation": 1
+          },
+          {
+            "apiName": "profile.get",
+            "success": 0,
+            "failure": 0,
+            "cancellation": 0
+          }
+        ]
+      }
+    ]
+  },
   "checkpoints": [
     {
       "capturedAt": "2026-01-01T00:00:00Z",
@@ -177,7 +221,7 @@
         },
         {
           "policy": "profile-summary",
-          "entries": 42,
+          "entries": 0,
           "maximumEntries": 2500,
           "retainedDecodedResponseBytes": null,
           "maximumDecodedResponseBytes": null

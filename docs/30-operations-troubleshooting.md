@@ -360,11 +360,13 @@ and after each step:
    applicable active/pending connection or stream gauges as separate series. Do
    not subtract one as if it were a component of another.
 4. Stop new traffic and first take a bounded quiet-window checkpoint while the
-   factory remains open and its counters remain registered. When the incident
-   procedure permits it, then close or replace the affected application context
-   and take another equivalent post-close checkpoint. Entry, retained-byte,
-   refresh, meter, and transport ownership should return to the lifecycle
-   baseline rather than continue growing after close.
+   factory remains open and its counters remain registered. Record the cumulative
+   success, failure, and cancellation terminal-load counters for each affected API
+   at both the start and end of that quiet window. When the incident procedure
+   permits it, then close or replace the affected application context and take
+   another equivalent post-close checkpoint. Entry, retained-byte, refresh,
+   meter, and transport ownership should return to the lifecycle baseline rather
+   than continue growing after close.
 
 Classify the shape before changing production code:
 
@@ -373,7 +375,7 @@ Classify the shape before changing production code:
 | Entries plateau at `maximum-size`; V29 retained decoded-response bytes plateau at or below their configured maximum; evictions continue | Expected bounded retained cache values under pressure. Confirm that post-GC heap and container limits leave operating headroom; capacity may still be too large for the application. |
 | Entry occupancy remains near the configured maximum while miss/load and TTL/size/weight-eviction activity remain sustained | Evidence that the working set is churning at a configured bound, not by itself a leak. Compare the exported per-policy rates and review policy/key design without collecting key material or inferring unique-key cardinality. |
 | Entries stay flat but post-GC heap associated with repeated misses or failures grows monotonically | Investigate generation records, completed load tokens, and caller-owned independent loads. Finished or rejected work must release metadata even when no entry is stored. |
-| Miss-caller deltas exceed terminal-load deltas while coalesced-waiter deltas rise in the same bounded window | Single flight is coalescing callers, or a load crossed the window boundary. Stop new traffic without closing the factory and compare terminal-load counters across a bounded quiet window while those meters remain registered. A rising terminal-load total proves pre-boundary work completed late; no delta narrows the observation but does not prove retained flight ownership. Use the separate post-close memory and lifecycle checkpoint only to verify cleanup, not to read removed cache meters. |
+| Miss-caller deltas exceed terminal-load deltas while coalesced-waiter deltas rise in the same bounded window | Single flight is coalescing callers, or a load crossed the window boundary. Stop new traffic without closing the factory and compare the recorded before/after terminal-load counter snapshots across a bounded quiet window while those meters remain registered. A rising terminal-load total proves pre-boundary work completed late; no delta narrows the observation but does not prove retained flight ownership. Use the separate post-close memory and lifecycle checkpoint only to verify cleanup, not to read removed cache meters. |
 | For a refresh-enabled API, stale-hit callers continue across consecutive bounded windows while terminal refresh totals do not advance, or refresh terminals appear after factory close | Treat the first pattern as evidence of a possibly stalled refresh and the second as late work. Investigate refresh timeout, cancellation, hard-expiry, and factory-lifecycle evidence; terminal-only counters cannot prove an active refresh by themselves. |
 | Meter count or old gauge suppliers grow across context restart | Investigate meter ownership/removal and confirm replacement gauges observe only the new manager. Do not treat cumulative counter values as retained-object occupancy. |
 | Direct memory or pool gauges grow while post-GC heap and cache occupancy remain stable | Investigate Netty buffers, active/pending connections, TLS/compression, streaming ownership, and pool disposal before attributing growth to cached decoded values. |

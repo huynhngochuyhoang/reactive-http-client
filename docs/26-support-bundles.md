@@ -912,6 +912,8 @@ five-minute window around the symptom. It keeps the following domains separate:
   decoded-response-byte bound;
 - API-tagged lookup, caller outcome, coalesced, stale, terminal load, and refresh
   aggregates with an explicit API-to-policy mapping;
+- cumulative API terminal-load counters sampled at both boundaries of a bounded
+  pre-close quiet window while traffic is stopped and meters remain registered;
 - policy-tagged TTL/size/weight eviction and weighted-admission aggregates;
 - timestamped, phase-labeled post-GC memory checkpoints with per-policy occupancy,
   protocol, total/idle physical connections, and the applicable HTTP/1.1
@@ -930,6 +932,12 @@ Use one configuration record and multiple checkpoints tied to the same
 memory, and explicit cache/transport availability. A post-close checkpoint uses
 an empty policy-state list and a null transport block after their meters are
 removed; it does not invent zero gauges.
+
+The quiet-window record has explicit start/end timestamps, confirms that traffic
+was stopped and the factory remained open, and retains cumulative terminal-load
+success, failure, and cancellation counters by bounded API name at both
+boundaries. Compare those two snapshots before using the later post-close
+checkpoint; removed meters cannot supply a post-close counter delta.
 
 Every relevant deployment or configuration change records a bounded `type`,
 `capturedAt`, and safe before/after version or configuration identifiers so its
