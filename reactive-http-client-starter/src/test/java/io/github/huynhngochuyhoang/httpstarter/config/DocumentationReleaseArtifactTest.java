@@ -699,6 +699,8 @@ class DocumentationReleaseArtifactTest {
                 .filter(line -> line.startsWith("if curl -sS "))
                 .toList();
         assertThat(captureCurlCommands).hasSize(6)
+                .allMatch(line -> line.contains("--connect-timeout 5"))
+                .allMatch(line -> line.contains("--max-time 30"))
                 .allMatch(line -> line.contains("--max-filesize 1048576"))
                 .allMatch(line -> line.contains("-w '%{http_code}\\n'"))
                 .allMatch(line -> line.contains(".raw.json"))
@@ -711,12 +713,20 @@ class DocumentationReleaseArtifactTest {
                         + "rhttpclients-curl-exit-status.txt)\" = \"0\" &&\n"
                         + "  test -f rhttpclients.raw.json &&\n"
                         + "  test \"$(wc -c < rhttpclients.raw.json)\" -le 1048576 &&\n"
-                        + "  jq --arg httpStatus")
+                        + "  jq --slurp \\\n"
+                        + "  --arg httpStatus")
                 .contains("test \"$(cat support-bundle/health/"
                         + "reactive-http-client-health-curl-exit-status.txt)\" = \"0\" &&\n"
                         + "  test -f reactive-http-client-health.raw.json &&\n"
                         + "  test \"$(wc -c < reactive-http-client-health.raw.json)\" -le 1048576 &&\n"
-                        + "  jq --arg client")
+                        + "  jq --slurp \\\n"
+                        + "  --arg httpStatus \"$(cat support-bundle/health/"
+                        + "reactive-http-client-health-http-status.txt)\" \\\n"
+                        + "  --arg client")
+                .contains("if length == 1 then .[0]\n"
+                        + "  else error(\"expected exactly one diagnostics JSON value\")")
+                .contains("else error(\"expected exactly one health JSON value\")")
+                .contains("$httpStatus | test(\"^5[0-9][0-9]$\")")
                 .contains("and length <= 16\n"
                         + "            and all(.[]; type == \"string\" and length <= 512)")
                 .contains("all(.clients[]; .inheritedEndpointCount <= .endpointCount)")
@@ -731,9 +741,12 @@ class DocumentationReleaseArtifactTest {
                 .contains("$detail.reason == \"NO_SAMPLES\"")
                 .contains("$detail.reason == \"ERROR_RATE_ABOVE_THRESHOLD\"")
                 .contains("If `curl` reports any nonzero transfer status")
-                .contains("including a transfer-bound,")
+                .contains("including a connection timeout,")
+                .contains("total-transfer timeout, transfer-bound,")
                 .contains("truncation, or connection-reset failure")
                 .contains("a raw-size check fails")
+                .contains("an input does not contain exactly one JSON value")
+                .contains("an HTTP\nstatus is ineligible")
                 .contains("keep the HTTP and curl exit-status files");
         assertThat(reviewableBundleFixture)
                 .contains("diagnostics/rhttpclients-curl-exit-status.txt")

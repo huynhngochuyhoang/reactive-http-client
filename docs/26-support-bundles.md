@@ -206,8 +206,10 @@ configuration snippets, and release-evidence reference answer different
 questions. Do not merge them into a single free-form log dump.
 
 The recipes deliberately use `curl -sS` without `--fail`/`-f` and always write
-the HTTP status to a bundle file. `--max-filesize 1048576` bounds each raw
-endpoint download at 1 MiB. Response bodies first go to quarantined `*.raw.json`
+the HTTP status to a bundle file. `--connect-timeout 5` bounds connection setup
+and `--max-time 30` bounds the complete transfer. `--max-filesize 1048576`
+bounds each raw endpoint download at 1 MiB. Response bodies first go to
+quarantined `*.raw.json`
 files outside the bundle. An authentication gateway, reverse proxy, or generic
 error handler can return arbitrary sensitive content, so an HTTP error body is
 not automatically diagnostics evidence. Retain it only after the shared
@@ -232,12 +234,12 @@ mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs su
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
 rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt support-bundle/health/reactive-http-client-health-curl-exit-status.txt
 rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
-if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
   printf '0\n' > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
 else
   printf '%s\n' "$?" > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
 fi
-if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
   printf '0\n' > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
 else
   printf '%s\n' "$?" > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
@@ -265,12 +267,12 @@ mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs su
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
 rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt support-bundle/health/reactive-http-client-health-curl-exit-status.txt
 rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
-if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
   printf '0\n' > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
 else
   printf '%s\n' "$?" > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
 fi
-if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
   printf '0\n' > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
 else
   printf '%s\n' "$?" > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
@@ -311,12 +313,12 @@ mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs su
 rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
 rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt support-bundle/health/reactive-http-client-health-curl-exit-status.txt
 rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
-if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
   printf '0\n' > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
 else
   printf '%s\n' "$?" > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
 fi
-if curl -sS --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
   printf '0\n' > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
 else
   printf '%s\n' "$?" > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
@@ -342,9 +344,13 @@ bytes that compacted `tojson` does not measure.
 The two V29 decoded-response byte fields are optional only when `projectVersion`
 identifies a published `4.1.x` response. A V29 `4.2.0-SNAPSHOT` response must
 include both fields, although their values may be `null` where the diagnostics
-contract permits an unknown state. The health filter requires the requested
-client entry and emits only the documented structural health fields. For nonzero
-samples, the reported error rate must equal
+contract permits an unknown state. Each filter slurps the raw input and requires
+exactly one parsed JSON value, so empty bodies and JSON streams are rejected. The
+health filter also requires a `2xx` status or a `5xx` response whose top-level
+status is `DOWN`, rejecting authentication and other `4xx` responses while
+retaining a structurally valid Actuator DOWN response. It requires the requested
+client entry and emits only the documented
+structural health fields. For nonzero samples, the reported error rate must equal
 `errors / samples` within an absolute tolerance of `0.000000000001`. Its
 top-level status is derived from that selected client, not from unrelated clients
 in the aggregate health response. The sanitized projection preserves omission of
@@ -356,7 +362,8 @@ EXAMPLE_RHTTPCLIENTS_SCHEMA="/path/to/reviewed/rhttpclients-schema-v1.json"
 test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0" &&
   test -f rhttpclients.raw.json &&
   test "$(wc -c < rhttpclients.raw.json)" -le 1048576 &&
-  jq --arg httpStatus "$(cat support-bundle/diagnostics/rhttpclients-http-status.txt)" \
+  jq --slurp \
+  --arg httpStatus "$(cat support-bundle/diagnostics/rhttpclients-http-status.txt)" \
   --slurpfile schema "$EXAMPLE_RHTTPCLIENTS_SCHEMA" '
   def nonnegative_integer:
     (type == "number") and (. >= 0) and (. <= 9223372036854775807)
@@ -433,7 +440,10 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
       elif valid_leaf($field; $shape) then .
       else error("unexpected diagnostics scalar")
       end;
-  if (($httpStatus | test("^2[0-9][0-9]$"))
+  if length == 1 then .[0]
+  else error("expected exactly one diagnostics JSON value")
+  end
+  | if (($httpStatus | test("^2[0-9][0-9]$"))
       and .schemaVersion == 1
       and (.clients | type) == "array"
       and (.clients | length) <= 256
@@ -459,7 +469,9 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
 test "$(cat support-bundle/health/reactive-http-client-health-curl-exit-status.txt)" = "0" &&
   test -f reactive-http-client-health.raw.json &&
   test "$(wc -c < reactive-http-client-health.raw.json)" -le 1048576 &&
-  jq --arg client "$EXAMPLE_CLIENT_NAME" '
+  jq --slurp \
+  --arg httpStatus "$(cat support-bundle/health/reactive-http-client-health-http-status.txt)" \
+  --arg client "$EXAMPLE_CLIENT_NAME" '
   def nonnegative_integer:
     (type == "number") and (. >= 0) and (. == floor);
   def unit_rate:
@@ -469,8 +481,13 @@ test "$(cat support-bundle/health/reactive-http-client-health-curl-exit-status.t
       and (($detail.errors / $detail.samples) as $calculated
         | (($detail.errorRate - $calculated) >= -0.000000000001)
         and (($detail.errorRate - $calculated) <= 0.000000000001));
-  .details[$client] as $detail
-  | if ((.status == "UP" or .status == "DOWN")
+  if length == 1 then .[0]
+  else error("expected exactly one health JSON value")
+  end
+  | .details[$client] as $detail
+  | if (((($httpStatus | test("^2[0-9][0-9]$"))
+          or (($httpStatus | test("^5[0-9][0-9]$")) and .status == "DOWN"))
+      and (.status == "UP" or .status == "DOWN"))
       and ((.details | type) == "object")
       and (($detail | type) == "object")
       and ($detail.samples | nonnegative_integer)
@@ -531,11 +548,13 @@ rm -f rhttpclients.raw.json rhttpclients.sanitized.json \
   reactive-http-client-health.raw.json reactive-http-client-health.sanitized.json
 ```
 
-If `curl` reports any nonzero transfer status, including a transfer-bound,
-truncation, or connection-reset failure, a raw-size check fails, or either `jq`
-command fails, keep the HTTP and curl exit-status files, omit the endpoint body
-from the bundle, and delete the raw file. Do not weaken the shape check to retain
-a gateway, proxy, authentication, or generic error document.
+If `curl` reports any nonzero transfer status, including a connection timeout,
+total-transfer timeout, transfer-bound, truncation, or connection-reset failure,
+a raw-size check fails, an input does not contain exactly one JSON value, an HTTP
+status is ineligible, or either `jq` command otherwise fails,
+keep the HTTP and curl exit-status files, omit the endpoint body from the bundle,
+and delete the raw file. Do not weaken the shape check to retain a gateway, proxy,
+authentication, or generic error document.
 
 The Kubernetes recipe uses `kubectl exec ... cat` instead of `kubectl cp` so it
 does not require `tar` in the application image. If the image also lacks `cat`

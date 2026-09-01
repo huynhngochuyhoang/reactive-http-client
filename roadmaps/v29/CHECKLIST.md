@@ -826,10 +826,11 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   names plus origin, authority, rootless-path, query, and absolute-URL textual
   values, including request targets embedded in HTTP request lines. All six
   endpoint captures remove stale raw files and curl-status evidence, set a private
-  `umask 077`, cap downloads at
-  1 MiB, record HTTP and curl exit status separately, quarantine bodies outside
-  the bundle, require a zero curl exit status, verify raw byte size before parsing,
-  and publish JSON only after expected-shape validation and field allowlisting.
+  `umask 077`, bound connection setup to 5 seconds and total transfer to 30
+  seconds, cap downloads at 1 MiB, record HTTP and curl exit status separately,
+  quarantine bodies outside the bundle, require a zero curl exit status, verify
+  raw byte size before parsing, require exactly one parsed JSON value, and publish
+  JSON only after expected-shape validation and field allowlisting.
   Diagnostics publication requires 2xx status, version-applicable required fields,
   bounded recursive leaf types, at most 16 cache policy-source/HTTP-method values,
   per-client and aggregate endpoint-count invariants, and the documented output
@@ -837,7 +838,9 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   are optional only when `projectVersion` identifies a published `4.1.x`
   response and are required for the V29 `4.2.0-SNAPSHOT` shape. The canonical
   bundle tree retains both curl exit-status artifacts beside the HTTP statuses.
-  The health filter enforces built-in counter, status, and reason invariants,
+  The health filter rejects `4xx` responses, permits `2xx` responses or
+  structurally valid `5xx` Actuator responses with top-level `DOWN`, and enforces
+  built-in counter, status, and reason invariants,
   verifies every nonzero-sample rate against `errors / samples` within
   `0.000000000001`, and derives the output status from the selected client while
   preserving omission of `errorRate` for a zero-sample detail. Query flags and
