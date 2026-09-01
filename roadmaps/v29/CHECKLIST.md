@@ -809,13 +809,14 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   different signals.
 - `docs/26-support-bundles.md` adds a bounded V29 cache-memory capture contract and
   the sanitized `support-bundle-cache-memory.json` fixture. The fixture records a
-  five-minute window, bounded policy identity, memory/cache/activity/pool/lifecycle
-  aggregates, and no request, cache-entry, identity, credential, tenant, or error-
-  message material. Heap dumps and JFR remain a separate encrypted,
-  access-controlled process.
-- Recursive fixture guards reject singular, plural, and compound sensitive fields,
-  including relative request-target/query and exception-message material. Recipe
-  checks require all six diagnostics/health captures to preserve HTTP error bodies,
+  five-minute window, separate bounded configuration/state/activity for each
+  selected policy, weight evictions, protocol-aware pool gauges, and global
+  memory/lifecycle facts without request, cache-entry, identity, credential,
+  tenant, or error-message material. Heap dumps and JFR remain a separate
+  encrypted, access-controlled process.
+- Recursive fixture guards reject singular, plural, and compound sensitive field
+  names plus arbitrary relative request-target/query textual values and exception-
+  message material. Recipe checks require all six diagnostics/health captures to preserve HTTP error bodies,
   repeat every Kubernetes shell placeholder, and use the `kubectl exec -- cat`
   minimal-image path without `kubectl cp`/`tar`.
 - `DocumentationReleaseArtifactTest` passed 45 tests. The complete starter suite

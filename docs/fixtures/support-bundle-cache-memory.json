@@ -9,12 +9,85 @@
     "unit": "seconds"
   },
   "configuration": {
-    "source": "method",
-    "selectedPolicies": ["catalog-read"],
-    "selectedPolicyCount": 1,
-    "ttlMs": 60000,
-    "maximumEntries": 10000,
-    "maximumDecodedResponseBytes": 268435456
+    "selectedPolicyCount": 2,
+    "policies": [
+      {
+        "name": "catalog-read",
+        "source": "method",
+        "ttlMs": 60000,
+        "maximumEntries": 10000,
+        "maximumDecodedResponseBytes": 268435456,
+        "state": {
+          "entries": 7000,
+          "retainedDecodedResponseBytes": 180355072
+        },
+        "activity": {
+          "lookups": {
+            "hits": 760,
+            "misses": 65
+          },
+          "loads": {
+            "success": 34,
+            "failure": 2,
+            "cancellation": 1
+          },
+          "refreshes": {
+            "success": 14,
+            "failure": 2,
+            "cancellation": 1
+          },
+          "evictions": {
+            "size": 10,
+            "ttl": 29,
+            "weight": 3
+          },
+          "admissions": {
+            "admitted": 34,
+            "bypassedUnknownSize": 1,
+            "bypassedOverBudget": 2,
+            "bypassedCapacity": 0
+          }
+        }
+      },
+      {
+        "name": "profile-summary",
+        "source": "client",
+        "ttlMs": 30000,
+        "maximumEntries": 2500,
+        "maximumDecodedResponseBytes": 67108864,
+        "state": {
+          "entries": 1250,
+          "retainedDecodedResponseBytes": 39845888
+        },
+        "activity": {
+          "lookups": {
+            "hits": 160,
+            "misses": 15
+          },
+          "loads": {
+            "success": 8,
+            "failure": 0,
+            "cancellation": 0
+          },
+          "refreshes": {
+            "success": 4,
+            "failure": 0,
+            "cancellation": 0
+          },
+          "evictions": {
+            "size": 4,
+            "ttl": 8,
+            "weight": 0
+          },
+          "admissions": {
+            "admitted": 8,
+            "bypassedUnknownSize": 0,
+            "bypassedOverBudget": 0,
+            "bypassedCapacity": 0
+          }
+        }
+      }
+    ]
   },
   "memory": {
     "processRssBytes": 536870912,
@@ -24,42 +97,12 @@
     "directMemoryUsedBytes": 67108864,
     "liveThreadCount": 84
   },
-  "cacheState": {
-    "entries": 8250,
-    "maximumEntries": 10000,
-    "retainedDecodedResponseBytes": 220200960,
-    "maximumDecodedResponseBytes": 268435456
-  },
-  "activity": {
-    "lookups": {
-      "hits": 920,
-      "misses": 80
-    },
-    "loads": {
-      "success": 42,
-      "failure": 2,
-      "cancellation": 1
-    },
-    "refreshes": {
-      "success": 18,
-      "failure": 2,
-      "cancellation": 1
-    },
-    "evictions": {
-      "size": 14,
-      "ttl": 37
-    },
-    "admissions": {
-      "admitted": 42,
-      "bypassedUnknownSize": 1,
-      "bypassedOverBudget": 2,
-      "bypassedCapacity": 0
-    }
-  },
   "transport": {
-    "poolActiveConnections": 12,
-    "poolIdleConnections": 20,
-    "poolPendingAcquisitions": 0,
+    "protocol": "HTTP/2",
+    "poolTotalConnections": 12,
+    "poolIdleConnections": 4,
+    "poolActiveStreams": 28,
+    "poolPendingStreams": 2,
     "poolMaximumConnections": 64
   },
   "lifecycle": {

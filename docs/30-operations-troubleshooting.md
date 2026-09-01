@@ -348,12 +348,13 @@ and after each step:
 2. Record each selected policy's configuration source, safe bounded policy name,
    `maximum-size`, TTL, entry occupancy, and cache-metrics selection. Compare
    hit, miss, terminal load, coalesced-waiter, refresh, size/TTL eviction, and,
-   on V29, admission activity. A defined but unselected policy retains nothing.
+   on V29, weight eviction and admission activity. A defined but unselected
+   policy retains nothing.
 3. Take memory checkpoints after equivalent traffic and a completed GC cycle.
    Keep Java heap used/committed, process RSS, container working set, direct
-   memory, live thread count, and active/idle/total/pending connection-pool
-   gauges as separate series. Do not subtract one as if it were a component of
-   another.
+   memory, live thread count, protocol, total/idle physical connections, and the
+   applicable active/pending connection or stream gauges as separate series. Do
+   not subtract one as if it were a component of another.
 4. Stop new traffic, close or replace the affected application context when the
    incident procedure permits it, and take another equivalent checkpoint.
    Entry, retained-byte, flight, refresh, meter, and transport ownership should
@@ -364,7 +365,7 @@ Classify the shape before changing production code:
 | Observed shape | Interpretation and next evidence |
 |---|---|
 | Entries plateau at `maximum-size`; V29 retained decoded-response bytes plateau at or below their configured maximum; evictions continue | Expected bounded retained cache values under pressure. Confirm that post-GC heap and container limits leave operating headroom; capacity may still be too large for the application. |
-| Entry occupancy grows until the configured maximum while unique misses remain high | Expected key cardinality within the entry bound, not by itself a leak. Compare TTL and size eviction rates and verify the policy/key design without collecting key material. |
+| Entry occupancy remains near the configured maximum while miss/load and TTL/size/weight-eviction activity remain sustained | Evidence that the working set is churning at a configured bound, not by itself a leak. Compare the exported per-policy rates and review policy/key design without collecting key material or inferring unique-key cardinality. |
 | Entries stay flat but post-GC heap associated with repeated misses or failures grows monotonically | Investigate generation records, completed load tokens, and caller-owned independent loads. Finished or rejected work must release metadata even when no entry is stored. |
 | Misses exceed terminal loads while callers overlap | Single flight may be coalescing waiters. Growth is suspicious only when flight ownership remains after every caller and load has terminated. |
 | Refresh activity remains nonterminal or grows after hard expiry/close | Investigate refresh timeout, cancellation, and factory lifecycle evidence. A hidden refresh is bounded work and must not become an orphan. |

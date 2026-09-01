@@ -114,7 +114,7 @@ common terminal outcomes:
 - [Cache-memory triage](fixtures/support-bundle-cache-memory.json) records one
   bounded V29 snapshot window of process/container/heap/direct-memory summaries,
   cache occupancy and activity, pool gauges, and lifecycle counts. It contains
-  only a fake bounded policy name and no cache keys/values, request variants,
+  only fake bounded policy names and no cache keys/values, request variants,
   identity values, or exception messages.
 
 These fixtures are illustrative sanitized records, not raw logger output. They
@@ -574,12 +574,14 @@ general performance evidence:
 
 - Provider-backed diagnostics fields: `cachePhase`, `cachePolicyCount`,
   `cacheTtlMs`, `cacheRefreshAfterMs`, `cacheSingleFlight`,
-  `cacheMaximumSize`, `cacheMaximumTotalDecodedResponseBytes`,
-  `cacheRetainedDecodedResponseBytes`, `cacheEntryCount`, `cacheEvictions`,
-  `cacheMetricsEnabled`,
-  `cachePolicySources`, `cacheHttpMethods`, and
-  `cacheSemanticReadAcknowledged`. The last three are bounded structural
-  policy facts; they never contain request targets or selected values.
+  `cacheMaximumSize`, `cacheEntryCount`, `cacheEvictions`,
+  `cacheMetricsEnabled`, `cachePolicySources`, `cacheHttpMethods`, and
+  `cacheSemanticReadAcknowledged`. These are the published `4.1.0` cache
+  diagnostics fields. The last three are bounded structural policy facts; they
+  never contain request targets or selected values.
+- V29 snapshot-only diagnostics fields:
+  `cacheMaximumTotalDecodedResponseBytes` and
+  `cacheRetainedDecodedResponseBytes`.
   `cacheMaximumTotalDecodedResponseBytes` is the finite sum across selected
   policies only when every selected policy configures the optional limit; `null`
   means the aggregate is unbounded or cannot be represented.
@@ -588,7 +590,8 @@ general performance evidence:
 - Lookup hit/miss rates and, when applicable, coalesced-waiter and stale-serving
   rates for the affected bounded client/API names.
 - Load and refresh success/failure/cancellation rates and durations, plus TTL
-  and size eviction rates.
+  and size eviction rates. V29 weighted policies also include weight eviction and
+  admission outcomes.
 - Current entries divided by configured maximum entries for each bounded
   client/policy pair.
 - One caller terminal record containing the resolved HTTP verb in
@@ -615,11 +618,12 @@ header/body content, concrete URLs, identity values, or credentials.
 
 ### Cache-memory capture (V29 snapshot only)
 
-Published `4.1.0` incidents use the ordinary response-cache fields above. The
-retained decoded-response-byte gauges and admission outcomes in this subsection
-exist only on the current `4.2.0-SNAPSHOT`/V29 development line until released.
-An absent V29 field in `4.1.0` is version scope, not evidence that its value is
-zero.
+Published `4.1.0` incidents use the explicitly enumerated published fields and
+ordinary lookup/load/refresh/TTL/size activity above. They do not include the
+two V29 snapshot-only decoded-response-byte diagnostics fields, weight eviction,
+or admission outcomes. Those signals exist only on the current
+`4.2.0-SNAPSHOT`/V29 development line until released; their absence in
+`4.1.0` is version scope, not evidence that their value is zero.
 
 Use the source-controlled
 [cache-memory fixture](fixtures/support-bundle-cache-memory.json) for one fixed
@@ -628,16 +632,19 @@ five-minute window around the symptom. It keeps the following domains separate:
 - process RSS and container working set;
 - Java heap used after a completed GC and committed heap;
 - direct-memory usage and live thread count;
-- cache entry occupancy/capacity and, on V29, retained decoded-response-byte
-  occupancy/capacity;
-- lookup, terminal load, refresh, size/TTL eviction, and admission aggregates;
-- active, idle, pending, and maximum connection-pool gauges; and
+- per-policy configuration, entry occupancy/capacity, and, on V29, retained
+  decoded-response-byte occupancy/capacity;
+- per-policy lookup, terminal load, refresh, size/TTL/weight eviction, and
+  admission aggregates;
+- protocol plus total/idle physical connections and the applicable active/pending
+  connection gauges for HTTP/1.1 or stream gauges for HTTP/2; and
 - factory start/close, context restart, and bounded deployment-change events.
 
-The configuration source and selected policy names may be included only after
-review confirms they are non-sensitive. Keep the record to one affected client,
-at most 16 selected names, and at most 128 characters per name. Replace unsafe
-names with an ordinal placeholder. Never add cache keys or digests, cached
+Each selected policy has its own configuration, state, and activity record. The
+configuration source and policy name may be included only after review confirms
+they are non-sensitive. Keep the record to one affected client, at most 16 policy
+records, and at most 128 characters per name. Replace unsafe names with an
+ordinal placeholder. Never add cache keys or digests, cached
 values, arguments, headers, bodies, request targets, paths, query material,
 identities, credentials, tenant data, or exception messages. Aggregate counts
 and fixed structural enums are sufficient for this fixture.
