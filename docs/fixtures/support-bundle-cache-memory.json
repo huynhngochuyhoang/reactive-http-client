@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "captureScope": "cache-memory",
+  "signalAvailability": "4.2.0-SNAPSHOT-v29",
+  "window": {
+    "startedAt": "EXAMPLE_WINDOW_START",
+    "endedAt": "EXAMPLE_WINDOW_END",
+    "duration": 300,
+    "unit": "seconds"
+  },
+  "configuration": {
+    "source": "method",
+    "selectedPolicies": ["catalog-read"],
+    "selectedPolicyCount": 1,
+    "ttlMs": 60000,
+    "maximumEntries": 10000,
+    "maximumDecodedResponseBytes": 268435456
+  },
+  "memory": {
+    "processRssBytes": 536870912,
+    "containerWorkingSetBytes": 603979776,
+    "javaHeapUsedAfterGcBytes": 201326592,
+    "javaHeapCommittedBytes": 402653184,
+    "directMemoryUsedBytes": 67108864,
+    "liveThreadCount": 84
+  },
+  "cacheState": {
+    "entries": 8250,
+    "maximumEntries": 10000,
+    "retainedDecodedResponseBytes": 220200960,
+    "maximumDecodedResponseBytes": 268435456
+  },
+  "activity": {
+    "lookups": {
+      "hits": 920,
+      "misses": 80
+    },
+    "loads": {
+      "success": 42,
+      "failure": 2,
+      "cancellation": 1
+    },
+    "refreshes": {
+      "success": 18,
+      "failure": 2,
+      "cancellation": 1
+    },
+    "evictions": {
+      "size": 14,
+      "ttl": 37
+    },
+    "admissions": {
+      "admitted": 42,
+      "bypassedUnknownSize": 1,
+      "bypassedOverBudget": 2,
+      "bypassedCapacity": 0
+    }
+  },
+  "transport": {
+    "poolActiveConnections": 12,
+    "poolIdleConnections": 20,
+    "poolPendingAcquisitions": 0,
+    "poolMaximumConnections": 64
+  },
+  "lifecycle": {
+    "factoryStarts": 1,
+    "factoryCloses": 0,
+    "contextRestarts": 0,
+    "deploymentChanges": ["starter-version"]
+  }
+}

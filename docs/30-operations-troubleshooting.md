@@ -47,6 +47,7 @@ historical evidence.
 | Upload stalls, cancellation, leaked buffers, or incomplete stream | Declared body/return shape, subscription and cancellation boundary, consumer release/forwarding path | [Streaming ownership](#streaming-ownership) |
 | OAuth2 refresh storm, token endpoint failure, or downstream 401 | Logical client name, sanitized auth mode, token endpoint status and safe headers, refresh/cooldown timing | [OAuth2 refresh](#oauth2-refresh) |
 | Unexpected stale value, miss storm, refresh failure, or cache capacity pressure | Effective cache phase/TTL/capacity, bounded hit/miss/load/refresh/eviction rates, process instance | [Response cache behavior (4.0.0+)](#response-cache-behavior-400) |
+| Pod memory grows after enabling response caching | Published/snapshot version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (V29 snapshot only)](#cache-memory-triage-v29-snapshot-only) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
 
 ## Evidence boundary
@@ -325,6 +326,65 @@ and capture the bounded
 [response-cache incident fixture](26-support-bundles.md#response-cache-incidents).
 Never collect cache keys, values, selected arguments, headers, bodies, tenant
 values, or credentials.
+
+### Cache-memory triage (V29 snapshot only)
+
+Published `4.1.0` exposes the entry-count and cache-activity signals documented
+above, but it does not expose V29's decoded-response-byte capacity/occupancy
+gauges or admission outcomes. Do not search a `4.1.0` incident for
+`cacheMaximumTotalDecodedResponseBytes`, `cacheRetainedDecodedResponseBytes`,
+`reactive.http.client.cache.retained.decoded.response.bytes`,
+`reactive.http.client.cache.maximum.decoded.response.bytes`, or
+`reactive.http.client.cache.admissions`. Those signals apply only to the current
+`4.2.0-SNAPSHOT`/V29 development line until a release publishes them.
+
+Use one fixed, bounded time window and compare the same process instance before
+and after each step:
+
+1. Confirm the starter version and deployment change first. Record whether the
+   affected method actually selects a cache policy, how many policies the client
+   selects, and whether the report began after a rollout, configuration refresh,
+   traffic shift, or application change.
+2. Record each selected policy's configuration source, safe bounded policy name,
+   `maximum-size`, TTL, entry occupancy, and cache-metrics selection. Compare
+   hit, miss, terminal load, coalesced-waiter, refresh, size/TTL eviction, and,
+   on V29, admission activity. A defined but unselected policy retains nothing.
+3. Take memory checkpoints after equivalent traffic and a completed GC cycle.
+   Keep Java heap used/committed, process RSS, container working set, direct
+   memory, live thread count, and active/idle/total/pending connection-pool
+   gauges as separate series. Do not subtract one as if it were a component of
+   another.
+4. Stop new traffic, close or replace the affected application context when the
+   incident procedure permits it, and take another equivalent checkpoint.
+   Entry, retained-byte, flight, refresh, meter, and transport ownership should
+   return to the lifecycle baseline rather than continue growing after close.
+
+Classify the shape before changing production code:
+
+| Observed shape | Interpretation and next evidence |
+|---|---|
+| Entries plateau at `maximum-size`; V29 retained decoded-response bytes plateau at or below their configured maximum; evictions continue | Expected bounded retained cache values under pressure. Confirm that post-GC heap and container limits leave operating headroom; capacity may still be too large for the application. |
+| Entry occupancy grows until the configured maximum while unique misses remain high | Expected key cardinality within the entry bound, not by itself a leak. Compare TTL and size eviction rates and verify the policy/key design without collecting key material. |
+| Entries stay flat but post-GC heap associated with repeated misses or failures grows monotonically | Investigate generation records, completed load tokens, and caller-owned independent loads. Finished or rejected work must release metadata even when no entry is stored. |
+| Misses exceed terminal loads while callers overlap | Single flight may be coalescing waiters. Growth is suspicious only when flight ownership remains after every caller and load has terminated. |
+| Refresh activity remains nonterminal or grows after hard expiry/close | Investigate refresh timeout, cancellation, and factory lifecycle evidence. A hidden refresh is bounded work and must not become an orphan. |
+| Meter count or old gauge suppliers grow across context restart | Investigate meter ownership/removal and confirm replacement gauges observe only the new manager. Do not treat cumulative counter values as retained-object occupancy. |
+| Direct memory or pool gauges grow while post-GC heap and cache occupancy remain stable | Investigate Netty buffers, active/pending connections, TLS/compression, streaming ownership, and pool disposal before attributing growth to cached decoded values. |
+| Thread count grows with stable cache and pool occupancy | Capture bounded thread-state counts and inspect scheduler, blocked customizer, auth, refresh, or application work; a cache entry does not own a thread. |
+
+RSS and container working set are not Java heap. They can include committed but
+unused heap pages, class metadata, JIT code, native libraries, thread stacks,
+allocator arenas, and Netty direct buffers. Likewise, response wire size is not
+the decoded object graph retained by a cache entry. V29's byte budget measures
+the retained decoded-response representation defined by
+[Response Caching](32-response-caching.md#explicit-selection), not heap,
+RSS, direct memory, or compressed wire bytes.
+
+Capture the bounded
+[cache-memory fixture](26-support-bundles.md#cache-memory-capture-v29-snapshot-only)
+with the ordinary response-cache bundle. Heap dumps and JFR recordings are not
+part of that reviewable fixture because they can contain application data; use
+the separately approved secure-artifact process described there.
 
 ## Failure attribution
 

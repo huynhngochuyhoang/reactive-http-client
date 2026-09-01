@@ -28,6 +28,7 @@ class DocumentationReleaseArtifactTest {
     private static final Set<String> SENSITIVE_SUPPORT_FIXTURE_FIELD_FRAGMENTS = Set.of(
             "argument", "header", "body", "bodies", "url", "identity", "identities",
             "authorization", "credential", "tenant", "cookie", "secret", "token",
+            "exception", "message",
             "key", "digest", "value", "payload",
             "path", "query", "uri", "requesttarget", "requestvariant");
     private static final Pattern PROJECT_VERSION_SNIPPET = Pattern.compile(
@@ -347,7 +348,11 @@ class DocumentationReleaseArtifactTest {
                     "entryKey": "opaque-entry",
                     "cacheDigest": "opaque-digest",
                     "responseValue": "cached-response",
-                    "payload": "cached-payload"
+                    "payload": "cached-payload",
+                    "requestHeaders": "present",
+                    "responseBodies": "present",
+                    "callerIdentity": "present",
+                    "exceptionMessage": "unsafe"
                   }
                 }
                 """);
@@ -355,7 +360,129 @@ class DocumentationReleaseArtifactTest {
         assertThat(sensitiveSupportFixtureFieldNames(unsafeFixture))
                 .containsExactlyInAnyOrder(
                         "requestPath", "queryParameters", "requestVariant", "requestTarget", "uri",
-                        "entryKey", "cacheDigest", "responseValue", "payload");
+                        "entryKey", "cacheDigest", "responseValue", "payload", "requestHeaders",
+                        "responseBodies", "callerIdentity", "exceptionMessage");
+    }
+
+    @Test
+    void v29CacheMemoryOperationsEvidenceIsVersionScopedBoundedAndSanitized() throws IOException {
+        Path root = projectRoot();
+        String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String normalizedOperations = operations.replaceAll("\\s+", " ");
+        String normalizedSupportBundles = supportBundles.replaceAll("\\s+", " ");
+        Path fixturePath = root.resolve("docs/fixtures/support-bundle-cache-memory.json");
+        JsonNode fixture = OBJECT_MAPPER.readTree(fixturePath.toFile());
+
+        assertThat(normalizedOperations)
+                .contains("Cache-memory triage (V29 snapshot only)")
+                .contains("Published `4.1.0` exposes the entry-count and cache-activity signals")
+                .contains("it does not expose V29's decoded-response-byte capacity/occupancy")
+                .contains("starter version and deployment change")
+                .contains("how many policies the client selects")
+                .contains("`maximum-size`, TTL, entry occupancy")
+                .contains("hit, miss, terminal load, coalesced-waiter, refresh, size/TTL eviction")
+                .contains("Java heap used/committed, process RSS, container working set, direct memory")
+                .contains("live thread count")
+                .contains("active/idle/total/pending connection-pool gauges")
+                .contains("generation records, completed load tokens")
+                .contains("flight ownership remains after every caller and load has terminated")
+                .contains("Refresh activity remains nonterminal")
+                .contains("Meter count or old gauge suppliers grow across context restart")
+                .contains("RSS and container working set are not Java heap")
+                .contains("response wire size is not the decoded object graph retained by a cache entry");
+        assertThat(normalizedSupportBundles)
+                .contains("Cache-memory capture (V29 snapshot only)")
+                .contains("Published `4.1.0` incidents use the ordinary response-cache fields")
+                .contains("[cache-memory fixture](fixtures/support-bundle-cache-memory.json)")
+                .contains("process RSS and container working set")
+                .contains("Java heap used after a completed GC and committed heap")
+                .contains("direct-memory usage and live thread count")
+                .contains("factory start/close, context restart")
+                .contains("at most 16 selected names")
+                .contains("at most 128 characters per name")
+                .contains("Heap dumps and JFR recordings can contain")
+                .contains("separately approved, encrypted, access-controlled process");
+
+        assertThat(fixture.path("schemaVersion").asInt()).isEqualTo(1);
+        assertThat(fixture.path("captureScope").asText()).isEqualTo("cache-memory");
+        assertThat(fixture.path("signalAvailability").asText()).isEqualTo("4.2.0-SNAPSHOT-v29");
+        assertThat(fixture.path("window").path("startedAt").isTextual()).isTrue();
+        assertThat(fixture.path("window").path("endedAt").isTextual()).isTrue();
+        assertThat(fixture.path("window").path("duration").asInt()).isEqualTo(300);
+        assertThat(fixture.path("window").path("unit").asText()).isEqualTo("seconds");
+
+        JsonNode configuration = fixture.path("configuration");
+        assertThat(configuration.path("source").asText()).isEqualTo("method");
+        JsonNode selectedPolicies = configuration.path("selectedPolicies");
+        assertThat(selectedPolicies.isArray()).isTrue();
+        assertThat(selectedPolicies.size()).isLessThanOrEqualTo(16);
+        selectedPolicies.forEach(policy -> {
+            assertThat(policy.isTextual()).isTrue();
+            assertThat(policy.asText().length()).isLessThanOrEqualTo(128);
+        });
+        assertThat(configuration.path("selectedPolicyCount").asInt()).isEqualTo(selectedPolicies.size());
+        assertThat(configuration.path("ttlMs").isIntegralNumber()).isTrue();
+        assertThat(configuration.path("maximumEntries").isIntegralNumber()).isTrue();
+        assertThat(configuration.path("maximumDecodedResponseBytes").isIntegralNumber()).isTrue();
+
+        JsonNode memory = fixture.path("memory");
+        for (String field : List.of("processRssBytes", "containerWorkingSetBytes",
+                "javaHeapUsedAfterGcBytes", "javaHeapCommittedBytes",
+                "directMemoryUsedBytes", "liveThreadCount")) {
+            assertThat(memory.path(field).isIntegralNumber()).as(field).isTrue();
+        }
+        JsonNode cacheState = fixture.path("cacheState");
+        for (String field : List.of("entries", "maximumEntries", "retainedDecodedResponseBytes",
+                "maximumDecodedResponseBytes")) {
+            assertThat(cacheState.path(field).isIntegralNumber()).as(field).isTrue();
+        }
+        assertThat(fixture.path("activity").path("loads").path("success").isIntegralNumber()).isTrue();
+        assertThat(fixture.path("activity").path("refreshes").path("failure").isIntegralNumber()).isTrue();
+        assertThat(fixture.path("activity").path("evictions").path("ttl").isIntegralNumber()).isTrue();
+        assertThat(fixture.path("activity").path("admissions").path("admitted").isIntegralNumber()).isTrue();
+        assertThat(fixture.path("transport").path("poolPendingAcquisitions").isIntegralNumber()).isTrue();
+        assertThat(fixture.path("lifecycle").path("factoryStarts").isIntegralNumber()).isTrue();
+        assertThat(fixture.path("lifecycle").path("deploymentChanges").isArray()).isTrue();
+
+        assertThat(sensitiveSupportFixtureFieldNames(fixture))
+                .as("sensitive cache-memory support fixture field names")
+                .isEmpty();
+        assertThat(Files.readString(fixturePath))
+                .doesNotContain("http://", "https://", "/customers", "customer=");
+
+        List<String> curlCommands = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.startsWith("curl "))
+                .filter(line -> line.contains(" -o support-bundle/"))
+                .toList();
+        assertThat(curlCommands).hasSize(6)
+                .allMatch(line -> line.startsWith("curl -sS "))
+                .allMatch(line -> line.contains(" -o support-bundle/"));
+        String kubernetesCapture = markdownSection(
+                supportBundles, "### Kubernetes-Style Capture", "## Health Details");
+        for (String assignment : List.of(
+                "EXAMPLE_NAMESPACE=\"example-namespace\"",
+                "EXAMPLE_POD=\"example-app-pod\"",
+                "EXAMPLE_CONTAINER=\"example-app-container\"",
+                "EXAMPLE_LOCAL_PORT=\"18080\"",
+                "EXAMPLE_MANAGEMENT_PORT=\"<management-port>\"",
+                "EXAMPLE_SANITIZED_CONFIG_IN_POD=\"/path/in/pod/sanitized-reactive-http-client.yml\"")) {
+            long assignmentCount = kubernetesCapture.lines()
+                    .map(String::trim)
+                    .filter(line -> line.equals(assignment))
+                    .count();
+            assertThat(assignmentCount).as(assignment).isEqualTo(2);
+        }
+        List<String> kubectlCommands = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.startsWith("kubectl "))
+                .toList();
+        assertThat(kubectlCommands).noneMatch(line -> line.contains(" cp "));
+        assertThat(supportBundles)
+                .contains("kubectl -n \"$EXAMPLE_NAMESPACE\" exec")
+                .contains("-- cat \"$EXAMPLE_SANITIZED_CONFIG_IN_POD\"")
+                .contains("does not require `tar` in the application image");
     }
 
     @Test

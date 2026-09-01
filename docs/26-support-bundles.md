@@ -93,7 +93,7 @@ the reviewable bundle. The example intentionally uses `.example.invalid`,
 placeholder instance names, and metadata-only logging. Replace any production
 header values with presence/absence notes before sharing.
 
-Two source-controlled incident fixtures show the structural facts expected for
+Source-controlled incident fixtures show the structural facts expected for
 common terminal outcomes:
 
 - [Request validation before subscription](fixtures/support-bundle-request-validation.json)
@@ -111,11 +111,16 @@ common terminal outcomes:
   records one bounded time window of configuration, lookup, caller, load,
   refresh, eviction, and capacity counts plus one sanitized caller terminal
   record, without cache material or request variants.
+- [Cache-memory triage](fixtures/support-bundle-cache-memory.json) records one
+  bounded V29 snapshot window of process/container/heap/direct-memory summaries,
+  cache occupancy and activity, pool gauges, and lifecycle counts. It contains
+  only a fake bounded policy name and no cache keys/values, request variants,
+  identity values, or exception messages.
 
 These fixtures are illustrative sanitized records, not raw logger output. They
 contain fake client and path-template metadata only. Default support output must
 not copy arbitrary exception messages, concrete request URLs, header values, or
-payloads into either record.
+payloads into any record.
 
 ## Diagnostics Snapshot
 
@@ -196,6 +201,12 @@ The diagnostics endpoint, health details, startup summaries, exchange logs,
 configuration snippets, and release-evidence reference answer different
 questions. Do not merge them into a single free-form log dump.
 
+The recipes deliberately use `curl -sS` without `--fail`/`-f`. An unhealthy
+health endpoint or failing diagnostics endpoint can return useful JSON with an
+HTTP error status, and the bundle must retain that body. Record the HTTP status
+separately when the incident process requires it; do not replace the saved body
+with an empty fail-fast result.
+
 ### Local JVM Capture
 
 Use this when the application process and its management endpoint are reachable
@@ -207,7 +218,7 @@ EXAMPLE_APP_LOG="/path/to/sanitized-application.log"
 EXAMPLE_SANITIZED_CONFIG="/path/to/sanitized-reactive-http-client.yml"
 
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
-curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
+curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
 curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
 grep 'ReactiveHttpClientFactoryBean' "$EXAMPLE_APP_LOG" > support-bundle/logs/startup-summary.log || true
 grep 'DefaultHttpExchangeLogger' "$EXAMPLE_APP_LOG" > support-bundle/logs/exchange-metadata.log || true
@@ -227,7 +238,7 @@ EXAMPLE_MANAGEMENT_URL="http://<management-host>:<management-port>"
 EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER="/path/in/container/sanitized-reactive-http-client.yml"
 
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
-curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
+curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
 curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
@@ -256,10 +267,11 @@ EXAMPLE_NAMESPACE="example-namespace"
 EXAMPLE_POD="example-app-pod"
 EXAMPLE_CONTAINER="example-app-container"
 EXAMPLE_LOCAL_PORT="18080"
+EXAMPLE_MANAGEMENT_PORT="<management-port>"
 EXAMPLE_SANITIZED_CONFIG_IN_POD="/path/in/pod/sanitized-reactive-http-client.yml"
 EXAMPLE_MANAGEMENT_URL="http://127.0.0.1:$EXAMPLE_LOCAL_PORT"
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
-curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
+curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
 curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
@@ -600,6 +612,46 @@ for bounded aggregate cache facts and one sanitized caller terminal record. Keep
 the capture-window start, end, and every duration unit explicit. The fixture is
 not a dump format: do not add keys, digests, values, arguments, request variants,
 header/body content, concrete URLs, identity values, or credentials.
+
+### Cache-memory capture (V29 snapshot only)
+
+Published `4.1.0` incidents use the ordinary response-cache fields above. The
+retained decoded-response-byte gauges and admission outcomes in this subsection
+exist only on the current `4.2.0-SNAPSHOT`/V29 development line until released.
+An absent V29 field in `4.1.0` is version scope, not evidence that its value is
+zero.
+
+Use the source-controlled
+[cache-memory fixture](fixtures/support-bundle-cache-memory.json) for one fixed
+five-minute window around the symptom. It keeps the following domains separate:
+
+- process RSS and container working set;
+- Java heap used after a completed GC and committed heap;
+- direct-memory usage and live thread count;
+- cache entry occupancy/capacity and, on V29, retained decoded-response-byte
+  occupancy/capacity;
+- lookup, terminal load, refresh, size/TTL eviction, and admission aggregates;
+- active, idle, pending, and maximum connection-pool gauges; and
+- factory start/close, context restart, and bounded deployment-change events.
+
+The configuration source and selected policy names may be included only after
+review confirms they are non-sensitive. Keep the record to one affected client,
+at most 16 selected names, and at most 128 characters per name. Replace unsafe
+names with an ordinal placeholder. Never add cache keys or digests, cached
+values, arguments, headers, bodies, request targets, paths, query material,
+identities, credentials, tenant data, or exception messages. Aggregate counts
+and fixed structural enums are sufficient for this fixture.
+
+RSS is not Java heap, and decoded-response representation bytes are not response
+wire bytes or an object-graph heap measurement. Correlate the fixture with the
+[cache-memory decision tree](30-operations-troubleshooting.md#cache-memory-triage-v29-snapshot-only)
+rather than adding raw application material.
+
+Heap dumps and JFR recordings can contain payloads, object values, credentials,
+identities, internal addresses, and other sensitive application data. Do not put
+them in the reviewable support bundle. Capture them only through a separately
+approved, encrypted, access-controlled process with explicit retention and
+deletion ownership.
 
 ## Performance Investigations
 

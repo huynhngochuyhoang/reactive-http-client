@@ -769,33 +769,58 @@ Evidence recorded on 2026-09-01 from durable baseline commit
 
 ## Priority 9 - Operations and Support-Bundle Evidence
 
-### [ ] 9.1 Add a cache-memory triage path
+### [x] 9.1 Add a cache-memory triage path
 
-- [ ] Start with cache selection, policy count, `maximum-size`, TTL, occupancy,
+- [x] Start with cache selection, policy count, `maximum-size`, TTL, occupancy,
       hit/miss/load/refresh/eviction activity, direct memory, connection pools,
       thread count, and deployment changes.
-- [ ] Explain how expected bounded retained values differ from monotonically
+- [x] Explain how expected bounded retained values differ from monotonically
       growing keys, generation records, flights, refreshes, meters, or transport
       resources.
-- [ ] State that RSS is not Java heap and that decoded-object retention is not
+- [x] State that RSS is not Java heap and that decoded-object retention is not
       represented by response wire size.
-- [ ] Keep published `4.1.0` instructions separate from `4.2.0-SNAPSHOT`/V29-only
+- [x] Keep published `4.1.0` instructions separate from `4.2.0-SNAPSHOT`/V29-only
       signals until release.
 
-### [ ] 9.2 Define safe capture evidence
+### [x] 9.2 Define safe capture evidence
 
-- [ ] Add a sanitized fixture with a bounded time window, Java/process/container
+- [x] Add a sanitized fixture with a bounded time window, Java/process/container
       memory summaries, direct-memory signal, cache occupancy/capacity,
       load/refresh/eviction/admission aggregates, and lifecycle events.
-- [ ] Include configuration source and selected policy names only where they are
+- [x] Include configuration source and selected policy names only where they are
       safe and bounded; include no cache keys, values, headers, bodies, targets,
       identities, credentials, tenant data, or exception messages.
-- [ ] Add recursive fixture guards for singular, plural, and compound sensitive
+- [x] Add recursive fixture guards for singular, plural, and compound sensitive
       field names plus relative request-target/query material.
-- [ ] Document that heap dumps and JFR recordings can contain sensitive
+- [x] Document that heap dumps and JFR recordings can contain sensitive
       application data and must follow a separate secure handling process.
-- [ ] Verify Docker/Kubernetes recipes preserve failure bodies, management-port
+- [x] Verify Docker/Kubernetes recipes preserve failure bodies, management-port
       placeholders, shell variables, and minimal-image compatibility.
+
+Evidence recorded on 2026-09-01 from durable baseline commit
+`d714e51d113be2538a998ce21702432b59ebbe03` plus this reviewed change:
+
+- `docs/30-operations-troubleshooting.md` adds a version-scoped cache-memory
+  decision tree covering cache selection and policy bounds, occupancy and activity,
+  post-GC heap, RSS/container working set, direct memory, threads, pool gauges,
+  deployment changes, and close/restart behavior. It distinguishes expected
+  bounded retention from growing metadata, work, meters, and transport resources,
+  and states that RSS, Java heap, decoded representation bytes, and wire size are
+  different signals.
+- `docs/26-support-bundles.md` adds a bounded V29 cache-memory capture contract and
+  the sanitized `support-bundle-cache-memory.json` fixture. The fixture records a
+  five-minute window, bounded policy identity, memory/cache/activity/pool/lifecycle
+  aggregates, and no request, cache-entry, identity, credential, tenant, or error-
+  message material. Heap dumps and JFR remain a separate encrypted,
+  access-controlled process.
+- Recursive fixture guards reject singular, plural, and compound sensitive fields,
+  including relative request-target/query and exception-message material. Recipe
+  checks require all six diagnostics/health captures to preserve HTTP error bodies,
+  repeat every Kubernetes shell placeholder, and use the `kubectl exec -- cat`
+  minimal-image path without `kubectl cp`/`tar`.
+- `DocumentationReleaseArtifactTest` passed 45 tests. The complete starter suite
+  passed 1,292 tests; both runs had no failures, errors, or skips. JSON validation,
+  local-link validation, and `git diff --check` also passed.
 
 ---
 
