@@ -814,22 +814,27 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   includes stale callers in lookup hits and partitions misses into loaders plus
   coalesced waiters, represents weighted/unweighted availability with values
   versus `null`, and records three timestamped post-GC memory/cache/H2-pool
-  checkpoints. Its lifecycle evidence timestamps the relevant starter-version
-  change with safe before/after versions. It contains no request, cache-entry,
-  identity, credential, tenant, or error-message material.
+  checkpoints. The after-load entry counts equal opening entries plus successful
+  loads minus recorded evictions for each policy. Its lifecycle evidence timestamps
+  the relevant starter-version change with safe before/after versions. It contains
+  no request, cache-entry, identity, credential, tenant, or error-message material.
 - Recursive fixture guards reject singular, plural, and compound sensitive field
   names plus origin, authority, rootless-path, query, and absolute-URL textual
   values. All six endpoint captures remove stale raw files, record HTTP status
   unconditionally, quarantine bodies outside the bundle, and publish JSON only
-  after expected-shape validation and field allowlisting. The health filter also
-  enforces built-in counter, rate, status, and reason invariants before publishing.
-  Kubernetes placeholders and the `kubectl exec -- cat` minimal-image path remain
-  covered without `kubectl cp`/`tar`.
+  after expected-shape validation and field allowlisting. Diagnostics publication
+  requires 2xx status, required fields, bounded recursive leaf types, consistent
+  counts, and the documented output limits. The health filter enforces built-in
+  counter, rate, status, and reason invariants and derives the output status from
+  the selected client. Kubernetes placeholders and the `kubectl exec -- cat`
+  minimal-image path remain covered without `kubectl cp`/`tar`.
 - `DocumentationReleaseArtifactTest` passed 45 tests and the paired configuration
   guard passed 18 tests. The complete starter suite passed 1,292 tests; all runs
-  had no failures, errors, or skips. The exact documented health filter accepted
-  the built-in fixture and rejected an object-valued reason without publishing it.
-  JSON validation, local-link validation, and `git diff --check` also passed.
+  had no failures, errors, or skips. The exact documented diagnostics filter
+  accepted the schema fixture and rejected both an object-valued leaf and a 401
+  response. The health filter rejected an object-valued reason and emitted UP for
+  a selected UP client from an aggregate DOWN response. JSON validation, local-link
+  validation, and `git diff --check` also passed.
 
 ---
 

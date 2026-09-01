@@ -297,29 +297,81 @@ printf 'docs/benchmark-report-<version>.md\n' > support-bundle/performance/bench
 
 Run this in the same capture workspace after any recipe above. Point
 `EXAMPLE_RHTTPCLIENTS_SCHEMA` at a reviewed copy of the source-controlled
-`docs/fixtures/rhttpclients-schema-v1.json`. The first filter requires schema V1
-and keeps only fields present in that fixture, recursively. The health filter
+`docs/fixtures/rhttpclients-schema-v1.json`. The first filter requires a 2xx
+HTTP status, schema V1, every required field, the expected recursive leaf types,
+nonnegative numeric values, 512-character strings, bounded arrays/counts, and at most
+1 MiB of UTF-8 JSON before it retains allowlisted fields. The health filter
 requires the requested client entry and emits only the documented structural
-health fields:
+health fields. Its top-level status is derived from that selected client, not
+from unrelated clients in the aggregate health response:
 
 ```bash
 EXAMPLE_RHTTPCLIENTS_SCHEMA="/path/to/reviewed/rhttpclients-schema-v1.json"
 
-jq --slurpfile schema "$EXAMPLE_RHTTPCLIENTS_SCHEMA" '
-  def keep_shape($shape):
-    if (($shape | type) == "object" and (type == "object")) then
-      with_entries(
-        select(.key as $key | $shape | has($key))
-        | . as $entry
-        | .value = ($entry.value | keep_shape($shape[$entry.key]))
-      )
-    elif (($shape | type) == "array" and (type == "array")
-          and (($shape | length) > 0)) then
-      [.[] | keep_shape($shape[0])]
-    else .
-    end;
-  if (.schemaVersion == 1 and (.clients | type) == "array")
-  then keep_shape($schema[0])
+jq --arg httpStatus "$(cat support-bundle/diagnostics/rhttpclients-http-status.txt)" \
+  --slurpfile schema "$EXAMPLE_RHTTPCLIENTS_SCHEMA" '
+  def nonnegative_integer:
+    (type == "number") and (. >= 0) and (. <= 9223372036854775807)
+      and (. == floor);
+  def valid_leaf($field; $shape):
+    ($shape | type) as $expected
+    | if $expected == "string" then
+        (type == "string") and (length <= 512)
+      elif $expected == "number" then
+        nonnegative_integer
+      elif $expected == "boolean" then
+        type == "boolean"
+      elif $expected == "null" then
+        if ($field == "strictUnsafeRetryValidation"
+            or $field == "strictBodySigningValidation")
+        then type == "null" or type == "boolean"
+        else type == "null" or nonnegative_integer
+        end
+      else false
+      end;
+  def keep_shape($shape; $field):
+    ($shape | type) as $expected
+    | if $expected == "object" then
+        ($shape | keys) as $required
+        | if (type == "object"
+            and (($required - keys) | length) == 0)
+          then with_entries(
+            select(.key as $key | $shape | has($key))
+            | . as $entry
+            | .value = ($entry.value
+                | keep_shape($shape[$entry.key]; $entry.key))
+          )
+          else error("unexpected diagnostics object")
+          end
+      elif $expected == "array" then
+        if type != "array" then error("unexpected diagnostics array")
+        elif $field == "clients" and length <= 256 then
+          [.[] | keep_shape($shape[0]; "client")]
+        elif (($field == "cachePolicySources" or $field == "cacheHttpMethods")
+            and length <= 10000
+            and all(.[]; type == "string" and length <= 512))
+        then .
+        else error("unexpected diagnostics array")
+        end
+      elif valid_leaf($field; $shape) then .
+      else error("unexpected diagnostics scalar")
+      end;
+  if (($httpStatus | test("^2[0-9][0-9]$"))
+      and .schemaVersion == 1
+      and (.clients | type) == "array"
+      and (.clients | length) <= 256
+      and ((tojson | utf8bytelength) <= 1048576))
+  then keep_shape($schema[0]; "root")
+    | if (.clientCount == (.clients | length)
+        and .endpointCount <= 10000
+        and .inheritedEndpointCount <= .endpointCount
+        and ([.clients[].endpointCount] | add // 0) == .endpointCount
+        and ([.clients[].inheritedEndpointCount] | add // 0)
+          == .inheritedEndpointCount
+        and ((tojson | utf8bytelength) <= 1048576))
+      then .
+      else error("inconsistent diagnostics counts")
+      end
   else error("unexpected rhttpclients response")
   end
 ' rhttpclients.raw.json > rhttpclients.sanitized.json &&
@@ -368,7 +420,7 @@ jq --arg client "$EXAMPLE_CLIENT_NAME" '
           and $detail.errorRate > $detail.errorRateThreshold)
       ))
   then {
-    status,
+    status: (if $detail.status == "DOWN" then "DOWN" else "UP" end),
     details: {
       ($client): ($detail | {
         samples, errors, sampleCount, errorCount, poolAcquireFailureCount,

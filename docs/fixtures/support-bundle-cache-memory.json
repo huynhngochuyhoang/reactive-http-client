@@ -166,14 +166,14 @@
       "policyState": [
         {
           "policy": "catalog-read",
-          "entries": 7000,
+          "entries": 192,
           "maximumEntries": 10000,
           "retainedDecodedResponseBytes": 180355072,
           "maximumDecodedResponseBytes": 268435456
         },
         {
           "policy": "profile-summary",
-          "entries": 1250,
+          "entries": 38,
           "maximumEntries": 2500,
           "retainedDecodedResponseBytes": null,
           "maximumDecodedResponseBytes": null

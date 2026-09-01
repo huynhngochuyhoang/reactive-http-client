@@ -444,7 +444,14 @@ class DocumentationReleaseArtifactTest {
                 .contains("always write the HTTP status to a bundle file")
                 .contains("quarantined `*.raw.json` files outside the bundle")
                 .contains("Retain it only after the shared validation/sanitization step")
-                .contains("jq --slurpfile schema")
+                .contains("--slurpfile schema")
+                .contains("expected recursive leaf types")
+                .contains("$httpStatus | test(\"^2[0-9][0-9]$\")")
+                .contains("valid_leaf($field; $shape)")
+                .contains("(length <= 512)")
+                .contains("($required - keys) | length")
+                .contains("tojson | utf8bytelength) <= 1048576")
+                .contains("status: (if $detail.status == \"DOWN\" then \"DOWN\" else \"UP\" end)")
                 .contains("unexpected reactive HTTP client health response")
                 .contains("Never attach the raw files");
 
@@ -488,6 +495,7 @@ class DocumentationReleaseArtifactTest {
         JsonNode apiActivity = fixture.path("apiActivity");
         assertThat(apiActivity.isArray()).isTrue();
         assertThat(apiActivity.size()).isEqualTo(2).isLessThanOrEqualTo(64);
+        Map<String, Long> successfulLoadsByPolicy = new HashMap<>();
         apiActivity.forEach(api -> {
             assertThat(api.path("apiName").isTextual()).isTrue();
             assertThat(api.path("apiName").asText().length()).isLessThanOrEqualTo(128);
@@ -507,6 +515,10 @@ class DocumentationReleaseArtifactTest {
             assertThat(api.path("coalesced").asInt())
                     .isEqualTo(api.path("callers").path("coalescedWaiter").asInt());
             assertThat(api.path("loads").path("success").isIntegralNumber()).isTrue();
+            successfulLoadsByPolicy.merge(
+                    api.path("selectedPolicy").asText(),
+                    api.path("loads").path("success").asLong(),
+                    Long::sum);
             assertThat(api.path("refreshes").path("failure").isIntegralNumber()).isTrue();
         });
         assertThat(apiActivity.get(1).path("lookups").path("hits").asInt()).isZero();
@@ -515,6 +527,7 @@ class DocumentationReleaseArtifactTest {
         JsonNode policyActivity = fixture.path("policyActivity");
         assertThat(policyActivity.isArray()).isTrue();
         assertThat(policyActivity.size()).isEqualTo(policies.size());
+        Map<String, Long> evictionsByPolicy = new HashMap<>();
         policyActivity.forEach(activity -> {
             String policyName = activity.path("policy").asText();
             assertThat(weightedPolicies).containsKey(policyName);
@@ -527,6 +540,13 @@ class DocumentationReleaseArtifactTest {
                     .isEqualTo(!weighted);
             assertThat(activity.path("admissions").isObject()).isEqualTo(weighted);
             assertThat(activity.path("admissions").isNull()).isEqualTo(!weighted);
+            evictionsByPolicy.put(
+                    policyName,
+                    activity.path("evictions").path("ttl").asLong()
+                            + activity.path("evictions").path("size").asLong()
+                            + (weighted
+                            ? activity.path("evictions").path("weight").asLong()
+                            : 0L));
         });
 
         JsonNode checkpoints = fixture.path("checkpoints");
@@ -538,6 +558,16 @@ class DocumentationReleaseArtifactTest {
                 .isEqualTo(fixture.path("window").path("startedAt").asText());
         assertThat(checkpoints.get(2).path("capturedAt").asText())
                 .isEqualTo(fixture.path("window").path("endedAt").asText());
+        Map<String, Long> entriesBeforeLoad = new HashMap<>();
+        checkpoints.get(0).path("policyState").forEach(state ->
+                entriesBeforeLoad.put(state.path("policy").asText(), state.path("entries").asLong()));
+        checkpoints.get(1).path("policyState").forEach(state -> {
+            String policyName = state.path("policy").asText();
+            assertThat(state.path("entries").asLong()).isEqualTo(
+                    entriesBeforeLoad.get(policyName)
+                            + successfulLoadsByPolicy.getOrDefault(policyName, 0L)
+                            - evictionsByPolicy.get(policyName));
+        });
         checkpoints.forEach(checkpoint -> {
             assertThat(checkpoint.path("capturedAt").isTextual()).isTrue();
             assertThat(checkpoint.path("phase").isTextual()).isTrue();
