@@ -516,7 +516,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("def utf16_length: reduce (explode[]) as $codepoint "
                         + "(0; . + (if $codepoint > 65535 then 2 else 1 end));")
                 .contains("(type == \"string\") and (utf16_length <= 512)")
-                .contains("all(.[]; type == \"string\" and utf16_length <= 512)")
+                .contains("and utf16_length <= 512 and valid_cache_policy_source")
+                .contains("and utf16_length <= 512 and valid_cache_http_method")
                 .doesNotContain("type == \"string\" and length <= 512")
                 .contains("($required - keys) | length")
                 .contains("tojson | utf8bytelength) <= 1048576")
@@ -601,6 +602,8 @@ class DocumentationReleaseArtifactTest {
                             + api.path("callers").path("coalescedWaiter").asLong());
             assertThat(api.path("coalesced").asInt())
                     .isEqualTo(api.path("callers").path("coalescedWaiter").asInt());
+            assertThat(api.path("stale").asLong())
+                    .isEqualTo(api.path("callers").path("staleHit").asLong());
             assertThat(api.path("loads").path("success").isIntegralNumber()).isTrue();
             successfulLoadsByPolicy.merge(
                     api.path("selectedPolicy").asText(),
@@ -610,7 +613,13 @@ class DocumentationReleaseArtifactTest {
                     api.path("selectedPolicy").asText(),
                     api.path("refreshes").path("success").asLong(),
                     Long::sum);
-            assertThat(api.path("refreshes").path("failure").isIntegralNumber()).isTrue();
+            long refreshTerminals = 0L;
+            for (String outcome : List.of("success", "failure", "cancellation")) {
+                assertThat(api.path("refreshes").path(outcome).isIntegralNumber()).isTrue();
+                refreshTerminals += api.path("refreshes").path(outcome).asLong();
+            }
+            assertThat(refreshTerminals)
+                    .isLessThanOrEqualTo(api.path("callers").path("staleHit").asLong());
         });
         assertThat(apiActivity.get(1).path("lookups").path("hits").asInt()).isZero();
         assertThat(apiActivity.get(1).path("coalesced").asInt()).isZero();
@@ -889,8 +898,13 @@ class DocumentationReleaseArtifactTest {
                         + "  else error(\"expected exactly one diagnostics JSON value\")")
                 .contains("else error(\"expected exactly one health JSON value\")")
                 .contains("$httpStatus | test(\"^5[0-9][0-9]$\")")
-                .contains("and length <= 16\n"
-                        + "            and all(.[]; type == \"string\" and utf16_length <= 512)")
+                .contains("def valid_cache_policy_source:\n"
+                        + "    . as $value | [\"client\", \"method\"] | index($value) != null")
+                .contains("def valid_cache_http_method:\n"
+                        + "    . as $value\n"
+                        + "      | [\"GET\", \"HEAD\", \"POST\", \"PUT\", \"PATCH\", \"DELETE\", \"OPTIONS\"]")
+                .contains("and valid_cache_policy_source")
+                .contains("and valid_cache_http_method")
                 .contains("all(.clients[]; .inheritedEndpointCount <= .endpointCount)")
                 .contains(".cacheRetainedDecodedResponseBytes\n"
                         + "            <= .cacheMaximumTotalDecodedResponseBytes")

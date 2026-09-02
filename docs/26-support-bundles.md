@@ -337,7 +337,8 @@ Run this in the same capture workspace after any recipe above. Point
 HTTP status, schema V1, every version-applicable required field, the expected
 recursive leaf types (including documented nullable unknown states), nonnegative
 numeric values, strings bounded to 512 Java UTF-16 code units, bounded
-arrays/counts, and at most 1 MiB
+arrays/counts, cache policy sources limited to `client` and `method`, cache HTTP
+methods limited to the seven declarative verbs, and at most 1 MiB
 of UTF-8 JSON before it retains allowlisted fields. Before either filter starts,
 the shell also verifies that curl reported a successful transfer, the quarantined
 raw file exists, and the file is at most 1 MiB; this bounds whitespace and other
@@ -395,6 +396,12 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
     ] | index($field)) != null;
   def nullable_array($field):
     $field == "cachePolicySources" or $field == "cacheHttpMethods";
+  def valid_cache_policy_source:
+    . as $value | ["client", "method"] | index($value) != null;
+  def valid_cache_http_method:
+    . as $value
+      | ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+      | index($value) != null;
   def published_4_1($version):
     ($version | type) == "string"
       and ($version | test("^4\\.1\\.[0-9]+$"));
@@ -441,9 +448,19 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
         elif type != "array" then error("unexpected diagnostics array")
         elif $field == "clients" and length <= 256 then
           [.[] | keep_shape($shape[0]; "client"; $projectVersion)]
-        elif (($field == "cachePolicySources" or $field == "cacheHttpMethods")
+        elif ($field == "cachePolicySources"
             and length <= 16
-            and all(.[]; type == "string" and utf16_length <= 512))
+            and all(.[];
+              type == "string"
+                and utf16_length <= 512
+                and valid_cache_policy_source))
+        then .
+        elif ($field == "cacheHttpMethods"
+            and length <= 16
+            and all(.[];
+              type == "string"
+                and utf16_length <= 512
+                and valid_cache_http_method))
         then .
         else error("unexpected diagnostics array")
         end

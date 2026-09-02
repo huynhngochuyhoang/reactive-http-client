@@ -41,17 +41,17 @@
       "apiName": "catalog.search",
       "selectedPolicy": "catalog-read",
       "lookups": {
-        "hits": 772,
+        "hits": 777,
         "misses": 65
       },
       "callers": {
         "freshHit": 760,
         "missLoader": 37,
         "coalescedWaiter": 28,
-        "staleHit": 12
+        "staleHit": 17
       },
       "coalesced": 28,
-      "stale": 12,
+      "stale": 17,
       "loads": {
         "success": 34,
         "failure": 2,
