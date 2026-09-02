@@ -32,12 +32,13 @@ class DocumentationReleaseArtifactTest {
             "authorization", "credential", "tenant", "cookie", "secret", "token",
             "exception", "message",
             "key", "digest", "value", "payload",
-            "path", "query", "uri", "requesttarget", "requestvariant");
+            "path", "query", "uri", "requesttarget", "requestvariant",
+            "userid", "accountid", "principal", "subject");
     private static final Pattern SUPPORT_FIXTURE_REQUEST_TARGET_VALUE = Pattern.compile(
             "(?i)^(?:\\*|[a-z][a-z0-9+.-]*:\\S+|(?:/|\\./|\\.\\./)\\S*"
                     + "|\\S*\\?[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?(?:&[^\\s]*)?)$");
     private static final Pattern SUPPORT_FIXTURE_EMBEDDED_HTTP_REQUEST_LINE = Pattern.compile(
-            "(?i)(?:^|\\s)(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|TRACE|CONNECT)"
+            "(?:^|\\s)[!#$%&'*+.^_`|~0-9A-Za-z-]+"
                     + "\\s+\\S+\\s+HTTP/[0-9](?:\\.[0-9])?(?:$|\\s)");
     private static final Pattern SUPPORT_FIXTURE_QUERY_VALUE = Pattern.compile(
             "^(?:\\?[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?"
@@ -372,6 +373,10 @@ class DocumentationReleaseArtifactTest {
                     "requestHeaders": "present",
                     "responseBodies": "present",
                     "callerIdentity": "present",
+                    "userId": "customer-123",
+                    "accountId": "account-456",
+                    "principal": "operator",
+                    "subject": "subject-789",
                     "exceptionMessage": "unsafe"
                   }
                 }
@@ -381,7 +386,8 @@ class DocumentationReleaseArtifactTest {
                 .containsExactlyInAnyOrder(
                         "requestPath", "queryParameters", "requestVariant", "requestTarget", "uri",
                         "entryKey", "cacheDigest", "responseValue", "payload", "requestHeaders",
-                        "responseBodies", "callerIdentity", "exceptionMessage");
+                        "responseBodies", "callerIdentity", "userId", "accountId", "principal",
+                        "subject", "exceptionMessage");
 
         JsonNode unsafeTextFixture = OBJECT_MAPPER.readTree("""
                 {
@@ -393,7 +399,8 @@ class DocumentationReleaseArtifactTest {
                   "target": "*",
                   "remoteArchive": "ftp://internal-host/resource",
                   "localResource": "file:///private/path",
-                  "sampleLine": "request failed: GET /orders/42?debug HTTP/1.1 after dispatch"
+                  "sampleLine": "request failed: GET /orders/42?debug HTTP/1.1 after dispatch",
+                  "extensionLine": "PROPFIND /customers/123?debug HTTP/1.1"
                 }
                 """);
         assertThat(sensitiveSupportFixtureFieldNames(unsafeTextFixture)).isEmpty();
@@ -407,7 +414,8 @@ class DocumentationReleaseArtifactTest {
                         "*",
                         "ftp://internal-host/resource",
                         "file:///private/path",
-                        "request failed: GET /orders/42?debug HTTP/1.1 after dispatch");
+                        "request failed: GET /orders/42?debug HTTP/1.1 after dispatch",
+                        "PROPFIND /customers/123?debug HTTP/1.1");
     }
 
     @Test

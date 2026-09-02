@@ -830,8 +830,9 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   the relevant starter-version change with safe before/after versions. It contains
   no request, cache-entry, identity, credential, tenant, or error-message material.
 - Recursive fixture guards reject singular, plural, and compound sensitive field
-  names plus origin, authority, rootless-path, query, and absolute-URL textual
-  values, including request targets embedded in HTTP request lines. All six
+  names, including common identity-bearing names, plus origin, authority,
+  rootless-path, query, and absolute-URL textual values, including request
+  targets embedded in standard or extension-method HTTP request lines. All six
   endpoint captures remove stale raw files and curl-status evidence, set a private
   `umask 077`, bound connection setup to 5 seconds and total transfer to 30
   seconds, cap downloads at 1 MiB, record HTTP and curl exit status separately,
