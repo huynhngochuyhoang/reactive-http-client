@@ -209,7 +209,7 @@
       }
     },
     {
-      "capturedAt": "2026-01-01T00:04:00Z",
+      "capturedAt": "2026-01-01T00:04:25Z",
       "phase": "after-load-post-gc",
       "cacheStateAvailable": true,
       "transportStateAvailable": true,

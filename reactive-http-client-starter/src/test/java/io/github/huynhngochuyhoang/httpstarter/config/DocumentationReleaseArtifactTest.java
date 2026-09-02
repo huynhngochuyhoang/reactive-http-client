@@ -499,6 +499,7 @@ class DocumentationReleaseArtifactTest {
                         + "identifies a published `4.1.x` response")
                 .contains("A V29 `4.2.0-SNAPSHOT` response must include both fields")
                 .contains("retained decoded-response bytes cannot exceed the configured aggregate maximum")
+                .contains("entry occupancy cannot exceed the configured maximum")
                 .contains("rejects counters outside the Java `long` range")
                 .contains("rejects a selected `DOWN` client under an aggregate `UP` status")
                 .contains("An aggregate `DOWN` with a selected `UP` client remains valid")
@@ -779,7 +780,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(quietWindow.path("factoryOpen").asBoolean()).isTrue();
         assertThat(quietWindow.path("startedAt").isTextual()).isTrue();
         assertThat(quietWindow.path("endedAt").isTextual()).isTrue();
-        assertThat(quietWindow.path("startedAt").asText())
+        assertThat(quietWindow.path("endedAt").asText())
                 .isEqualTo(checkpoints.get(1).path("capturedAt").asText());
         assertThat(quietWindow.path("endedAt").asText())
                 .isGreaterThan(quietWindow.path("startedAt").asText())
@@ -893,6 +894,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("all(.clients[]; .inheritedEndpointCount <= .endpointCount)")
                 .contains(".cacheRetainedDecodedResponseBytes\n"
                         + "            <= .cacheMaximumTotalDecodedResponseBytes")
+                .contains("then .cacheEntryCount <= .cacheMaximumSize")
                 .contains("def nonnegative_integer:\n"
                         + "    (type == \"number\") and (. >= 0) and (. <= 9223372036854775807)")
                 .contains("and (($detail.status != \"DOWN\") or .status == \"DOWN\")")

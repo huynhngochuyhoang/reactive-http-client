@@ -824,13 +824,13 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   Factory startup precedes the populated opening checkpoint. The
   after-load entry counts equal opening entries plus successful
   loads minus recorded evictions for each policy. The idle `profile-summary`
-  policy has zero survivors after four minutes because its 50 opening entries all
-  exceed the 30-second TTL, and its eviction total records all 50 expirations.
+  policy has zero survivors by the quiet-window end because its 50 opening entries
+  all exceed the 30-second TTL, and its eviction total records all 50 expirations.
   The `catalog-read` policy records 14 refreshed opening entries, 186 TTL
   expirations, 34 successful loads, three weight evictions, and 45 survivors at
-  the four-minute checkpoint, respecting its 60-second TTL. Its admission
-  history records all 48 successful load/refresh publications as admitted and
-  records zero bypasses.
+  the `00:04:25Z` quiet-window-end checkpoint, after the 34th load terminal was
+  recorded, respecting its 60-second TTL. Its admission history records all 48
+  successful load/refresh publications as admitted and records zero bypasses.
   Both size-eviction counts are zero because neither policy reaches its maximum
   entry capacity during the bounded window. Its lifecycle evidence timestamps
   the relevant starter-version change with safe before/after versions. It contains
