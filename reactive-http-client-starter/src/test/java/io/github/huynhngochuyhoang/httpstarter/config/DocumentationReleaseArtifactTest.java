@@ -455,7 +455,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("stale-hit callers continue across consecutive bounded windows")
                 .contains("terminal refresh totals do not advance")
                 .contains("terminal-only counters cannot prove an active refresh by themselves")
-                .contains("Meter count or old gauge suppliers grow across context restart")
+                .contains("Bounded in-process cache-meter registration counts do not return to zero")
+                .contains("same `MeterRegistry`, process, and context boundaries were inventoried")
                 .contains("RSS and container working set are not Java heap")
                 .contains("response wire size is not the decoded object graph retained by a cache entry");
         assertThat(normalizedSupportBundles)
@@ -467,6 +468,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("API-tagged lookup, caller outcome, coalesced, stale, terminal load, and refresh")
                 .contains("cumulative API terminal-load counters sampled at both boundaries")
                 .contains("traffic was stopped and the factory remained open")
+                .contains("bounded cache-meter registration counts by Micrometer meter type")
+                .contains("count each matching Micrometer `Meter.Id` once")
+                .contains("Do not substitute Prometheus sample counts")
+                .contains("record `available: false` with `null` counts")
                 .contains("policy-tagged TTL/size/weight eviction and weighted-admission")
                 .contains("timestamped, phase-labeled post-GC memory checkpoints")
                 .contains("HTTP/2 stream gauges")
@@ -506,7 +511,12 @@ class DocumentationReleaseArtifactTest {
                 .contains("optional_field($projectVersion; .)")
                 .contains("keep_shape($schema[0]; \"root\"; $projectVersion)")
                 .contains("valid_leaf($field; $shape)")
-                .contains("(length <= 512)")
+                .contains("strings bounded to 512 Java UTF-16 code units")
+                .contains("def utf16_length: reduce (explode[]) as $codepoint "
+                        + "(0; . + (if $codepoint > 65535 then 2 else 1 end));")
+                .contains("(type == \"string\") and (utf16_length <= 512)")
+                .contains("all(.[]; type == \"string\" and utf16_length <= 512)")
+                .doesNotContain("type == \"string\" and length <= 512")
                 .contains("($required - keys) | length")
                 .contains("tojson | utf8bytelength) <= 1048576")
                 .contains("status: (if $detail.status == \"DOWN\" then \"DOWN\" else \"UP\" end)")
@@ -680,6 +690,23 @@ class DocumentationReleaseArtifactTest {
             }
             assertThat(checkpoint.path("cacheStateAvailable").isBoolean()).isTrue();
             assertThat(checkpoint.path("transportStateAvailable").isBoolean()).isTrue();
+            JsonNode meterRegistrations = checkpoint.path("cacheMeterRegistrations");
+            assertThat(meterRegistrations.path("available").isBoolean()).isTrue();
+            assertThat(meterRegistrations.path("available").asBoolean()).isTrue();
+            assertThat(meterRegistrations.path("source").asText())
+                    .isEqualTo("in-process-meter-registry");
+            assertThat(meterRegistrations.path("contextOrdinal").asText())
+                    .isEqualTo("context-1");
+            long typedMeterTotal = 0;
+            for (String field : List.of("counter", "timer", "gauge", "other")) {
+                assertThat(meterRegistrations.path(field).isIntegralNumber()).isTrue();
+                assertThat(meterRegistrations.path(field).asLong()).isBetween(0L, 4096L);
+                typedMeterTotal += meterRegistrations.path(field).asLong();
+            }
+            assertThat(meterRegistrations.path("total").isIntegralNumber()).isTrue();
+            assertThat(meterRegistrations.path("total").asLong())
+                    .isEqualTo(typedMeterTotal)
+                    .isBetween(0L, 4096L);
             if (checkpoint.path("cacheStateAvailable").asBoolean()) {
                 JsonNode policyState = checkpoint.path("policyState");
                 assertThat(policyState.isArray()).isTrue();
@@ -715,6 +742,12 @@ class DocumentationReleaseArtifactTest {
                 assertThat(checkpoint.path("transport").isNull()).isTrue();
             }
         });
+        assertThat(checkpoints.get(0).path("cacheMeterRegistrations").path("total").asLong())
+                .isEqualTo(55L);
+        assertThat(checkpoints.get(1).path("cacheMeterRegistrations").path("total").asLong())
+                .isEqualTo(55L);
+        assertThat(checkpoints.get(2).path("cacheMeterRegistrations").path("total").asLong())
+                .isZero();
         long profileElapsedMs = Duration.between(
                 Instant.parse(checkpoints.get(0).path("capturedAt").asText()),
                 Instant.parse(checkpoints.get(1).path("capturedAt").asText())).toMillis();
@@ -798,6 +831,7 @@ class DocumentationReleaseArtifactTest {
         lifecycle.path("events").forEach(event -> {
             assertThat(event.path("capturedAt").isTextual()).isTrue();
             assertThat(event.path("type").isTextual()).isTrue();
+            assertThat(event.path("contextOrdinal").asText()).isEqualTo("context-1");
         });
         assertThat(lifecycle.path("events").get(0).path("type").asText())
                 .isEqualTo("factory-start");
@@ -855,13 +889,15 @@ class DocumentationReleaseArtifactTest {
                 .contains("else error(\"expected exactly one health JSON value\")")
                 .contains("$httpStatus | test(\"^5[0-9][0-9]$\")")
                 .contains("and length <= 16\n"
-                        + "            and all(.[]; type == \"string\" and length <= 512)")
+                        + "            and all(.[]; type == \"string\" and utf16_length <= 512)")
                 .contains("all(.clients[]; .inheritedEndpointCount <= .endpointCount)")
                 .contains(".cacheRetainedDecodedResponseBytes\n"
                         + "            <= .cacheMaximumTotalDecodedResponseBytes")
                 .contains("def nonnegative_integer:\n"
                         + "    (type == \"number\") and (. >= 0) and (. <= 9223372036854775807)")
                 .contains("and (($detail.status != \"DOWN\") or .status == \"DOWN\")")
+                .contains("and (.details.minSamples == $detail.minSamples)")
+                .contains("and (.details.errorRateThreshold == $detail.errorRateThreshold)")
                 .contains("def rate_matches($detail):")
                 .contains("$detail.errors / $detail.samples")
                 .contains("($detail.samples == 0) or rate_matches($detail)")

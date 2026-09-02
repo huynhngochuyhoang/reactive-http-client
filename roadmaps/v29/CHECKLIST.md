@@ -786,7 +786,8 @@ Evidence recorded on 2026-09-01 from durable baseline commit
 
 - [x] Add a sanitized fixture with a bounded time window, Java/process/container
       memory summaries, direct-memory signal, cache occupancy/capacity,
-      load/refresh/eviction/admission aggregates, and lifecycle events.
+      load/refresh/eviction/admission aggregates, bounded in-process cache-meter
+      registration counts, and lifecycle events.
 - [x] Include configuration source and selected policy names only where they are
       safe and bounded; include no cache keys, values, headers, bodies, targets,
       identities, credentials, tenant data, or exception messages.
@@ -817,6 +818,9 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   versus `null`, records two cumulative API terminal-load counter snapshots in a
   bounded pre-close quiet window while traffic is stopped and the factory remains
   open, and records three timestamped post-GC memory/cache/H2-pool checkpoints.
+  Each checkpoint includes cache `Meter.Id` totals grouped by Micrometer type and
+  tied to one context ordinal; the active total is 55 and the post-close total is
+  zero.
   Factory startup precedes the populated opening checkpoint. The
   after-load entry counts equal opening entries plus successful
   loads minus recorded evictions for each policy. The idle `profile-summary`

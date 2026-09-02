@@ -336,7 +336,8 @@ Run this in the same capture workspace after any recipe above. Point
 `docs/fixtures/rhttpclients-schema-v1.json`. The first filter requires a 2xx
 HTTP status, schema V1, every version-applicable required field, the expected
 recursive leaf types (including documented nullable unknown states), nonnegative
-numeric values, 512-character strings, bounded arrays/counts, and at most 1 MiB
+numeric values, strings bounded to 512 Java UTF-16 code units, bounded
+arrays/counts, and at most 1 MiB
 of UTF-8 JSON before it retains allowlisted fields. Before either filter starts,
 the shell also verifies that curl reported a successful transfer, the quarantined
 raw file exists, and the file is at most 1 MiB; this bounds whitespace and other
@@ -373,6 +374,9 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
   def nonnegative_integer:
     (type == "number") and (. >= 0) and (. <= 9223372036854775807)
       and (. == floor);
+  def utf16_length:
+    reduce (explode[]) as $codepoint
+      (0; . + (if $codepoint > 65535 then 2 else 1 end));
   def nullable_number($field):
     ([
       "poolMaxConnections", "poolPendingAcquireTimeoutMs",
@@ -400,7 +404,7 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
   def valid_leaf($field; $shape):
     ($shape | type) as $expected
     | if $expected == "string" then
-        (type == "string") and (length <= 512)
+        (type == "string") and (utf16_length <= 512)
       elif $expected == "number" then
         nonnegative_integer
           or (nullable_number($field) and type == "null")
@@ -438,7 +442,7 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
           [.[] | keep_shape($shape[0]; "client"; $projectVersion)]
         elif (($field == "cachePolicySources" or $field == "cacheHttpMethods")
             and length <= 16
-            and all(.[]; type == "string" and length <= 512))
+            and all(.[]; type == "string" and utf16_length <= 512))
         then .
         else error("unexpected diagnostics array")
         end
@@ -504,6 +508,9 @@ test "$(cat support-bundle/health/reactive-http-client-health-curl-exit-status.t
       and ((.details | type) == "object")
       and (($detail | type) == "object")
       and (($detail.status != "DOWN") or .status == "DOWN")
+      and (.details.minSamples | nonnegative_integer)
+      and (.details.minSamples >= 1)
+      and (.details.errorRateThreshold | unit_rate)
       and ($detail.samples | nonnegative_integer)
       and ($detail.errors | nonnegative_integer)
       and ($detail.sampleCount | nonnegative_integer)
@@ -512,6 +519,8 @@ test "$(cat support-bundle/health/reactive-http-client-health-curl-exit-status.t
       and ($detail.minSamples | nonnegative_integer)
       and ($detail.minSamples >= 1)
       and ($detail.errorRateThreshold | unit_rate)
+      and (.details.minSamples == $detail.minSamples)
+      and (.details.errorRateThreshold == $detail.errorRateThreshold)
       and ($detail.samples == $detail.sampleCount)
       and ($detail.errors == $detail.errorCount)
       and ($detail.errors <= $detail.samples)
@@ -928,6 +937,8 @@ five-minute window around the symptom. It keeps the following domains separate:
   aggregates with an explicit API-to-policy mapping;
 - cumulative API terminal-load counters sampled at both boundaries of a bounded
   pre-close quiet window while traffic is stopped and meters remain registered;
+- bounded cache-meter registration counts by Micrometer meter type at each
+  checkpoint, tied to the same process and context ordinal;
 - policy-tagged TTL/size/weight eviction and weighted-admission aggregates;
 - timestamped, phase-labeled post-GC memory checkpoints with per-policy occupancy,
   protocol, total/idle physical connections, and the applicable HTTP/1.1
@@ -952,6 +963,15 @@ was stopped and the factory remained open, and retains cumulative terminal-load
 success, failure, and cancellation counters by bounded API name at both
 boundaries. Compare those two snapshots before using the later post-close
 checkpoint; removed meters cannot supply a post-close counter delta.
+
+When meter ownership is under investigation, count each matching Micrometer
+`Meter.Id` once from the same in-process `MeterRegistry`, filter to the exact
+`reactive.http.client.cache.*` prefix and reviewed `client.name`, and group only
+by `Meter.Type`. Record the total plus counter, timer, gauge, and other counts at
+each checkpoint with a bounded context ordinal. Do not substitute Prometheus
+sample counts: timers and histograms expand into multiple exported series. If an
+approved in-process inventory is unavailable, record `available: false` with
+`null` counts and do not use meter ownership as a discriminator.
 
 Every relevant deployment or configuration change records a bounded `type`,
 `capturedAt`, and safe before/after version or configuration identifiers so its

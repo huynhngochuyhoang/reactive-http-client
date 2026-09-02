@@ -165,6 +165,16 @@
       "phase": "before-load-post-gc",
       "cacheStateAvailable": true,
       "transportStateAvailable": true,
+      "cacheMeterRegistrations": {
+        "available": true,
+        "source": "in-process-meter-registry",
+        "contextOrdinal": "context-1",
+        "total": 55,
+        "counter": 37,
+        "timer": 12,
+        "gauge": 6,
+        "other": 0
+      },
       "memory": {
         "processRssBytes": 335544320,
         "containerWorkingSetBytes": 369098752,
@@ -203,6 +213,16 @@
       "phase": "after-load-post-gc",
       "cacheStateAvailable": true,
       "transportStateAvailable": true,
+      "cacheMeterRegistrations": {
+        "available": true,
+        "source": "in-process-meter-registry",
+        "contextOrdinal": "context-1",
+        "total": 55,
+        "counter": 37,
+        "timer": 12,
+        "gauge": 6,
+        "other": 0
+      },
       "memory": {
         "processRssBytes": 536870912,
         "containerWorkingSetBytes": 603979776,
@@ -241,6 +261,16 @@
       "phase": "after-close-post-gc",
       "cacheStateAvailable": false,
       "transportStateAvailable": false,
+      "cacheMeterRegistrations": {
+        "available": true,
+        "source": "in-process-meter-registry",
+        "contextOrdinal": "context-1",
+        "total": 0,
+        "counter": 0,
+        "timer": 0,
+        "gauge": 0,
+        "other": 0
+      },
       "memory": {
         "processRssBytes": 352321536,
         "containerWorkingSetBytes": 385875968,
@@ -257,11 +287,13 @@
     "events": [
       {
         "capturedAt": "2025-12-31T23:55:00Z",
-        "type": "factory-start"
+        "type": "factory-start",
+        "contextOrdinal": "context-1"
       },
       {
         "capturedAt": "2026-01-01T00:04:30Z",
-        "type": "factory-close"
+        "type": "factory-close",
+        "contextOrdinal": "context-1"
       }
     ],
     "contextRestarts": 0,

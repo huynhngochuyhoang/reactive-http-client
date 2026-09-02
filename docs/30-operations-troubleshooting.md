@@ -358,7 +358,11 @@ and after each step:
    Keep Java heap used/committed, process RSS, container working set, direct
    memory, live thread count, protocol, total/idle physical connections, and the
    applicable active/pending connection or stream gauges as separate series. Do
-   not subtract one as if it were a component of another.
+   not subtract one as if it were a component of another. When an approved
+   in-process `MeterRegistry` inventory is available, also count each matching
+   cache `Meter.Id` once by meter type and tie the bounded counts to the process
+   and context ordinal; Prometheus sample counts are not meter-registration
+   counts.
 4. Stop new traffic and first take a bounded quiet-window checkpoint while the
    factory remains open and its counters remain registered. Record the cumulative
    success, failure, and cancellation terminal-load counters for each affected API
@@ -377,7 +381,7 @@ Classify the shape before changing production code:
 | Entries stay flat but post-GC heap associated with repeated misses or failures grows monotonically | Investigate generation records, completed load tokens, and caller-owned independent loads. Finished or rejected work must release metadata even when no entry is stored. |
 | Miss-caller deltas exceed terminal-load deltas while coalesced-waiter deltas rise in the same bounded window | Single flight is coalescing callers, or a load crossed the window boundary. Stop new traffic without closing the factory and compare the recorded before/after terminal-load counter snapshots across a bounded quiet window while those meters remain registered. A rising terminal-load total proves pre-boundary work completed late; no delta narrows the observation but does not prove retained flight ownership. Use the separate post-close memory and lifecycle checkpoint only to verify cleanup, not to read removed cache meters. |
 | For a refresh-enabled API, stale-hit callers continue across consecutive bounded windows while terminal refresh totals do not advance, or refresh terminals appear after factory close | Treat the first pattern as evidence of a possibly stalled refresh and the second as late work. Investigate refresh timeout, cancellation, hard-expiry, and factory-lifecycle evidence; terminal-only counters cannot prove an active refresh by themselves. |
-| Meter count or old gauge suppliers grow across context restart | Investigate meter ownership/removal and confirm replacement gauges observe only the new manager. Do not treat cumulative counter values as retained-object occupancy. |
+| Bounded in-process cache-meter registration counts do not return to zero after context close, or exceed the same active-context baseline after replacement | Investigate meter ownership/removal and confirm replacement gauges observe only the new manager. Apply this row only when the same `MeterRegistry`, process, and context boundaries were inventoried; do not infer registration ownership from Prometheus sample counts or cumulative counter values. |
 | Direct memory or pool gauges grow while post-GC heap and cache occupancy remain stable | Investigate Netty buffers, active/pending connections, TLS/compression, streaming ownership, and pool disposal before attributing growth to cached decoded values. |
 | Thread count grows with stable cache and pool occupancy | Capture bounded thread-state counts and inspect scheduler, blocked customizer, auth, refresh, or application work; a cache entry does not own a thread. |
 
