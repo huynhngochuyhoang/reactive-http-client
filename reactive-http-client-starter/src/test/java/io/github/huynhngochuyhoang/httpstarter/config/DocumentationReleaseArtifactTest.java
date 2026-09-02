@@ -11,6 +11,8 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,8 +30,28 @@ class DocumentationReleaseArtifactTest {
     private static final Set<String> SENSITIVE_SUPPORT_FIXTURE_FIELD_FRAGMENTS = Set.of(
             "argument", "header", "body", "bodies", "url", "identity", "identities",
             "authorization", "credential", "tenant", "cookie", "secret", "token",
+            "exception", "message",
             "key", "digest", "value", "payload",
-            "path", "query", "uri", "requesttarget", "requestvariant");
+            "path", "query", "uri", "requesttarget", "requestvariant",
+            "userid", "accountid", "principal", "subject");
+    private static final Pattern SUPPORT_FIXTURE_REQUEST_TARGET_VALUE = Pattern.compile(
+            "(?i)^(?:\\*|[a-z][a-z0-9+.-]*:\\S+|(?:/|\\./|\\.\\./)\\S*"
+                    + "|\\S*\\?[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?(?:&[^\\s]*)?)$");
+    private static final Pattern SUPPORT_FIXTURE_EMBEDDED_HTTP_REQUEST_LINE = Pattern.compile(
+            "(?:^|\\s)[!#$%&'*+.^_`|~0-9A-Za-z-]+"
+                    + "\\s+\\S+\\s+HTTP/[0-9](?:\\.[0-9])?(?:$|\\s)");
+    private static final Pattern SUPPORT_FIXTURE_QUERY_VALUE = Pattern.compile(
+            "^(?:\\?[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?"
+                    + "(?:&[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?)*"
+                    + "|[A-Za-z0-9_.%~-]+=[^\\s&]*"
+                    + "(?:&[A-Za-z0-9_.%~-]+(?:=[^\\s&]*)?)*)$");
+    private static final Pattern SUPPORT_FIXTURE_AUTHORITY_VALUE = Pattern.compile(
+            "^(?:[A-Za-z0-9._~-]+@)?(?:[A-Za-z0-9.-]+|\\[[0-9A-Fa-f:]+]):[0-9]{1,5}$");
+    private static final Pattern SUPPORT_FIXTURE_ROOTLESS_PATH_VALUE = Pattern.compile(
+            "^[A-Za-z0-9._~!$&'()*+,;=:@%-]+"
+                    + "(?:/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]+)+$");
+    private static final Set<String> SUPPORT_FIXTURE_ALLOWED_SLASH_VALUES =
+            Set.of("HTTP/1.1", "HTTP/2");
     private static final Pattern PROJECT_VERSION_SNIPPET = Pattern.compile(
             "<groupId>io\\.github\\.huynhngochuyhoang</groupId>\\s*"
                     + "<artifactId>reactive-http-client-[^<]+</artifactId>\\s*"
@@ -347,7 +369,15 @@ class DocumentationReleaseArtifactTest {
                     "entryKey": "opaque-entry",
                     "cacheDigest": "opaque-digest",
                     "responseValue": "cached-response",
-                    "payload": "cached-payload"
+                    "payload": "cached-payload",
+                    "requestHeaders": "present",
+                    "responseBodies": "present",
+                    "callerIdentity": "present",
+                    "userId": "customer-123",
+                    "accountId": "account-456",
+                    "principal": "operator",
+                    "subject": "subject-789",
+                    "exceptionMessage": "unsafe"
                   }
                 }
                 """);
@@ -355,7 +385,662 @@ class DocumentationReleaseArtifactTest {
         assertThat(sensitiveSupportFixtureFieldNames(unsafeFixture))
                 .containsExactlyInAnyOrder(
                         "requestPath", "queryParameters", "requestVariant", "requestTarget", "uri",
-                        "entryKey", "cacheDigest", "responseValue", "payload");
+                        "entryKey", "cacheDigest", "responseValue", "payload", "requestHeaders",
+                        "responseBodies", "callerIdentity", "userId", "accountId", "principal",
+                        "subject", "exceptionMessage");
+
+        JsonNode unsafeTextFixture = OBJECT_MAPPER.readTree("""
+                {
+                  "sample": "/orders/42?account=123",
+                  "detail": "account=123&region=west",
+                  "endpoint": "internal.example:443",
+                  "route": "orders/42",
+                  "option": "?debug",
+                  "target": "*",
+                  "remoteArchive": "ftp://internal-host/resource",
+                  "localResource": "file:///private/path",
+                  "sampleLine": "request failed: GET /orders/42?debug HTTP/1.1 after dispatch",
+                  "extensionLine": "PROPFIND /customers/123?debug HTTP/1.1"
+                }
+                """);
+        assertThat(sensitiveSupportFixtureFieldNames(unsafeTextFixture)).isEmpty();
+        assertThat(sensitiveSupportFixtureTextValues(unsafeTextFixture))
+                .containsExactlyInAnyOrder(
+                        "/orders/42?account=123",
+                        "account=123&region=west",
+                        "internal.example:443",
+                        "orders/42",
+                        "?debug",
+                        "*",
+                        "ftp://internal-host/resource",
+                        "file:///private/path",
+                        "request failed: GET /orders/42?debug HTTP/1.1 after dispatch",
+                        "PROPFIND /customers/123?debug HTTP/1.1");
+    }
+
+    @Test
+    void v29CacheMemoryOperationsEvidenceIsVersionScopedBoundedAndSanitized() throws IOException {
+        Path root = projectRoot();
+        String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"));
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"));
+        String reviewableBundleFixture = markdownSection(
+                supportBundles, "## Reviewable Bundle Fixture", "## Diagnostics Snapshot");
+        String normalizedOperations = operations.replaceAll("\\s+", " ");
+        String normalizedSupportBundles = supportBundles.replaceAll("\\s+", " ");
+        Path fixturePath = root.resolve("docs/fixtures/support-bundle-cache-memory.json");
+        JsonNode fixture = OBJECT_MAPPER.readTree(fixturePath.toFile());
+
+        assertThat(normalizedOperations)
+                .contains("Cache-memory triage (V29 snapshot only)")
+                .contains("Published `4.1.0` exposes the entry-count and cache-activity signals")
+                .contains("it does not expose V29's decoded-response-byte capacity/occupancy")
+                .contains("starter version and deployment change")
+                .contains("how many policies the client selects")
+                .contains("configuration source, safe bounded name, `maximum-size`, TTL, and entry occupancy")
+                .contains("`cacheMetricsEnabled` selection")
+                .contains("API-tagged hit/miss, caller outcome, coalesced-waiter, load, and refresh")
+                .contains("policy-tagged occupancy, size/TTL/weight eviction")
+                .contains("Java heap used/committed, process RSS, container working set, direct memory")
+                .contains("live thread count")
+                .contains("protocol, total/idle physical connections")
+                .contains("applicable active/pending connection or stream gauges")
+                .contains("generation records, completed load tokens")
+                .contains("coalesced-waiter deltas rise in the same bounded window")
+                .contains("compare the recorded before/after terminal-load counter snapshots "
+                        + "across a bounded quiet window")
+                .contains("Record the cumulative success, failure, and cancellation terminal-load counters")
+                .contains("while those meters remain registered")
+                .contains("no delta narrows the observation but does not prove retained flight ownership")
+                .contains("not to read removed cache meters")
+                .contains("stale-hit callers continue across consecutive bounded pre-close windows")
+                .contains("terminal refresh totals do not advance")
+                .contains("separately timestamped sanitized refresh DEBUG terminal")
+                .contains("correlating the refresh log timestamp with the factory-close lifecycle timestamp")
+                .contains("not from a post-close cache counter")
+                .contains("terminal-only counters cannot prove an active refresh by themselves")
+                .contains("Bounded in-process cache-meter registration counts do not return to zero")
+                .contains("same `MeterRegistry`, process, and context boundaries were inventoried")
+                .contains("RSS and container working set are not Java heap")
+                .contains("response wire size is not the decoded object graph retained by a cache entry");
+        assertThat(normalizedSupportBundles)
+                .contains("Cache-memory capture (V29 snapshot only)")
+                .contains("Published `4.1.0` incidents use the explicitly enumerated published fields")
+                .contains("do not include the two V29 snapshot-only decoded-response-byte diagnostics fields")
+                .contains("[cache-memory fixture](fixtures/support-bundle-cache-memory.json)")
+                .contains("one bounded client name and one sanitized process-instance ordinal")
+                .contains("API-tagged lookup, caller outcome, coalesced, stale, terminal load, and refresh")
+                .contains("cumulative API terminal-load counters sampled at both boundaries")
+                .contains("traffic was stopped and the factory remained open")
+                .contains("bounded cache-meter registration counts by Micrometer meter type")
+                .contains("count each matching Micrometer `Meter.Id` once")
+                .contains("Do not substitute Prometheus sample counts")
+                .contains("record `available: false` with `null` counts")
+                .contains("policy-tagged TTL/size/weight eviction and weighted-admission")
+                .contains("timestamped, phase-labeled post-GC memory checkpoints")
+                .contains("HTTP/2 stream gauges")
+                .contains("factory start/close, context restart")
+                .contains("nullable refresh-after/refresh-timeout bounds")
+                .contains("Record `cacheMetricsEnabled` for the affected client")
+                .contains("disabled or unavailable integration uses `null`, not fabricated zeros")
+                .contains("For an unweighted policy")
+                .contains("weight eviction, and admissions are `null`")
+                .contains("at most 16 policy records")
+                .contains("at most 64 API records")
+                .contains("at most 128 characters per name")
+                .contains("Heap dumps and JFR recordings can contain")
+                .contains("separately approved, encrypted, access-controlled process")
+                .contains("always write the HTTP status to a bundle file")
+                .contains("quarantined `*.raw.json` files outside the bundle")
+                .contains("sets `umask 077` before creating capture files")
+                .contains("newly created quarantined bodies use mode `0600`")
+                .contains("Retain it only after the shared validation/sanitization step")
+                .contains("verifies that curl reported a successful transfer")
+                .contains("--slurpfile schema")
+                .contains("expected recursive leaf types")
+                .contains("documented nullable unknown states")
+                .contains("two V29 decoded-response byte fields are optional only when `projectVersion` "
+                        + "identifies a published `4.1.x` response")
+                .contains("A V29 `4.2.0-SNAPSHOT` response must include both fields")
+                .contains("retained decoded-response bytes cannot exceed the configured aggregate maximum")
+                .contains("entry occupancy cannot exceed the configured maximum")
+                .contains("rejects counters outside the Java `long` range")
+                .contains("rejects a selected `DOWN` client under an aggregate `UP` status")
+                .contains("An aggregate `DOWN` with a selected `UP` client remains valid")
+                .contains("$httpStatus | test(\"^2[0-9][0-9]$\")")
+                .contains("nullable_number($field)")
+                .contains("nullable_boolean($field)")
+                .contains("nullable_array($field)")
+                .contains("published_4_1($version)")
+                .contains("optional_field($projectVersion; $field)")
+                .contains("optional_field($projectVersion; .)")
+                .contains("keep_shape($schema[0]; \"root\"; $projectVersion)")
+                .contains("valid_leaf($field; $shape)")
+                .contains("strings bounded to 512 Java UTF-16 code units")
+                .contains("def utf16_length: reduce (explode[]) as $codepoint "
+                        + "(0; . + (if $codepoint > 65535 then 2 else 1 end));")
+                .contains("(type == \"string\") and (utf16_length <= 512)")
+                .contains("and utf16_length <= 512 and valid_cache_policy_source")
+                .contains("and utf16_length <= 512 and valid_cache_http_method")
+                .doesNotContain("type == \"string\" and length <= 512")
+                .contains("($required - keys) | length")
+                .contains("tojson | utf8bytelength) <= 1048576")
+                .contains("status: (if $detail.status == \"DOWN\" then \"DOWN\" else \"UP\" end)")
+                .contains("unexpected reactive HTTP client health response")
+                .contains("Never attach the raw files");
+
+        assertThat(fixture.path("schemaVersion").asInt()).isEqualTo(1);
+        assertThat(fixture.path("captureScope").asText()).isEqualTo("cache-memory");
+        assertThat(fixture.path("signalAvailability").asText()).isEqualTo("4.2.0-SNAPSHOT-v29");
+        assertThat(fixture.path("window").path("startedAt").isTextual()).isTrue();
+        assertThat(fixture.path("window").path("endedAt").isTextual()).isTrue();
+        assertThat(fixture.path("window").path("duration").isIntegralNumber()).isTrue();
+        assertThat(fixture.path("window").path("duration").asLong()).isEqualTo(300L);
+        assertThat(fixture.path("window").path("unit").asText()).isEqualTo("seconds");
+        Duration capturedWindow = Duration.between(
+                Instant.parse(fixture.path("window").path("startedAt").asText()),
+                Instant.parse(fixture.path("window").path("endedAt").asText()));
+        assertThat(capturedWindow).isEqualTo(
+                Duration.ofSeconds(fixture.path("window").path("duration").asLong()));
+        assertThat(fixture.path("clientName").isTextual()).isTrue();
+        assertThat(fixture.path("clientName").asText().length()).isLessThanOrEqualTo(128);
+        assertThat(fixture.path("processInstance").isTextual()).isTrue();
+        assertThat(fixture.path("processInstance").asText().length()).isLessThanOrEqualTo(128);
+
+        JsonNode configuration = fixture.path("configuration");
+        JsonNode policies = configuration.path("policies");
+        assertThat(policies.isArray()).isTrue();
+        assertThat(policies.size()).isEqualTo(2).isLessThanOrEqualTo(16);
+        assertThat(configuration.path("selectedPolicyCount").asInt()).isEqualTo(policies.size());
+        assertThat(configuration.path("cacheMetricsEnabled").isBoolean()).isTrue();
+        assertThat(configuration.path("cacheMetricsEnabled").asBoolean()).isTrue();
+        Map<String, Boolean> weightedPolicies = new HashMap<>();
+        Map<String, Boolean> refreshEnabledPolicies = new HashMap<>();
+        Map<String, Long> policyTtlMs = new HashMap<>();
+        Map<String, JsonNode> policyConfigurations = new HashMap<>();
+        policies.forEach(policy -> {
+            assertThat(policy.path("name").isTextual()).isTrue();
+            assertThat(policy.path("name").asText().length()).isLessThanOrEqualTo(128);
+            assertThat(policy.path("source").isTextual()).isTrue();
+            assertThat(policy.path("source").asText()).isIn("client", "method");
+            policyConfigurations.put(policy.path("name").asText(), policy);
+            assertThat(policy.path("ttlMs").isIntegralNumber()).isTrue();
+            policyTtlMs.put(policy.path("name").asText(), policy.path("ttlMs").asLong());
+            boolean refreshEnabled = policy.path("refreshAfterMs").isIntegralNumber();
+            refreshEnabledPolicies.put(policy.path("name").asText(), refreshEnabled);
+            assertThat(policy.path("refreshAfterMs").isNull()).isEqualTo(!refreshEnabled);
+            assertThat(policy.path("refreshTimeoutMs").isIntegralNumber()).isEqualTo(refreshEnabled);
+            assertThat(policy.path("refreshTimeoutMs").isNull()).isEqualTo(!refreshEnabled);
+            if (refreshEnabled) {
+                assertThat(policy.path("refreshAfterMs").asLong()).isPositive()
+                        .isLessThan(policy.path("ttlMs").asLong());
+                assertThat(policy.path("refreshTimeoutMs").asLong()).isPositive();
+            }
+            assertThat(policy.path("maximumEntries").isIntegralNumber()).isTrue();
+            assertThat(policy.path("maximumEntries").asLong()).isPositive();
+            assertThat(policy.path("weightedAdmission").isBoolean()).isTrue();
+            boolean weighted = policy.path("weightedAdmission").asBoolean();
+            weightedPolicies.put(policy.path("name").asText(), weighted);
+            assertThat(policy.path("maximumDecodedResponseBytes").isIntegralNumber())
+                    .isEqualTo(weighted);
+            assertThat(policy.path("maximumDecodedResponseBytes").isNull())
+                    .isEqualTo(!weighted);
+            if (weighted) {
+                assertThat(policy.path("maximumDecodedResponseBytes").asLong()).isPositive();
+            }
+        });
+        assertThat(weightedPolicies).containsEntry("catalog-read", true)
+                .containsEntry("profile-summary", false);
+        assertThat(refreshEnabledPolicies).containsEntry("catalog-read", true)
+                .containsEntry("profile-summary", false);
+
+        JsonNode apiActivity = fixture.path("apiActivity");
+        assertThat(apiActivity.isArray()).isTrue();
+        assertThat(apiActivity.size()).isEqualTo(2).isLessThanOrEqualTo(64);
+        Map<String, Long> successfulLoadsByPolicy = new HashMap<>();
+        Map<String, Long> successfulRefreshesByPolicy = new HashMap<>();
+        Map<String, JsonNode> apiActivityByName = new HashMap<>();
+        apiActivity.forEach(api -> {
+            assertThat(api.path("apiName").isTextual()).isTrue();
+            assertThat(api.path("apiName").asText().length()).isLessThanOrEqualTo(128);
+            apiActivityByName.put(api.path("apiName").asText(), api);
+            assertThat(weightedPolicies).containsKey(api.path("selectedPolicy").asText());
+            for (String outcome : List.of("hits", "misses")) {
+                assertThat(api.path("lookups").path(outcome).isIntegralNumber()).isTrue();
+                assertThat(api.path("lookups").path(outcome).asLong()).isNotNegative();
+            }
+            for (String outcome : List.of("freshHit", "missLoader", "coalescedWaiter", "staleHit")) {
+                assertThat(api.path("callers").path(outcome).isIntegralNumber()).isTrue();
+                assertThat(api.path("callers").path(outcome).asLong()).isNotNegative();
+            }
+            for (String outcome : List.of("coalesced", "stale")) {
+                assertThat(api.path(outcome).isIntegralNumber()).isTrue();
+                assertThat(api.path(outcome).asLong()).isNotNegative();
+            }
+            assertThat(api.path("lookups").path("hits").asLong()).isEqualTo(
+                    api.path("callers").path("freshHit").asLong()
+                            + api.path("callers").path("staleHit").asLong());
+            assertThat(api.path("lookups").path("misses").asLong()).isEqualTo(
+                    api.path("callers").path("missLoader").asLong()
+                            + api.path("callers").path("coalescedWaiter").asLong());
+            assertThat(api.path("coalesced").asInt())
+                    .isEqualTo(api.path("callers").path("coalescedWaiter").asInt());
+            assertThat(api.path("stale").asLong())
+                    .isEqualTo(api.path("callers").path("staleHit").asLong());
+            for (String outcome : List.of("success", "failure", "cancellation")) {
+                assertThat(api.path("loads").path(outcome).isIntegralNumber()).isTrue();
+                assertThat(api.path("loads").path(outcome).asLong()).isNotNegative();
+            }
+            successfulLoadsByPolicy.merge(
+                    api.path("selectedPolicy").asText(),
+                    api.path("loads").path("success").asLong(),
+                    Long::sum);
+            successfulRefreshesByPolicy.merge(
+                    api.path("selectedPolicy").asText(),
+                    api.path("refreshes").path("success").asLong(),
+                    Long::sum);
+            long refreshTerminals = 0L;
+            for (String outcome : List.of("success", "failure", "cancellation")) {
+                assertThat(api.path("refreshes").path(outcome).isIntegralNumber()).isTrue();
+                assertThat(api.path("refreshes").path(outcome).asLong()).isNotNegative();
+                refreshTerminals += api.path("refreshes").path(outcome).asLong();
+            }
+            assertThat(refreshTerminals)
+                    .isLessThanOrEqualTo(api.path("callers").path("staleHit").asLong());
+        });
+        assertThat(apiActivity.get(1).path("lookups").path("hits").asInt()).isZero();
+        assertThat(apiActivity.get(1).path("coalesced").asInt()).isZero();
+        for (String outcome : List.of("success", "failure", "cancellation")) {
+            assertThat(apiActivity.get(1).path("loads").path(outcome).asLong()).isZero();
+            assertThat(apiActivity.get(1).path("refreshes").path(outcome).asLong()).isZero();
+        }
+
+        JsonNode policyActivity = fixture.path("policyActivity");
+        assertThat(policyActivity.isArray()).isTrue();
+        assertThat(policyActivity.size()).isEqualTo(policies.size());
+        Map<String, Long> evictionsByPolicy = new HashMap<>();
+        Map<String, Long> ttlEvictionsByPolicy = new HashMap<>();
+        policyActivity.forEach(activity -> {
+            String policyName = activity.path("policy").asText();
+            assertThat(weightedPolicies).containsKey(policyName);
+            assertThat(activity.path("evictions").path("ttl").isIntegralNumber()).isTrue();
+            ttlEvictionsByPolicy.put(
+                    policyName, activity.path("evictions").path("ttl").asLong());
+            assertThat(activity.path("evictions").path("size").isIntegralNumber()).isTrue();
+            assertThat(activity.path("evictions").path("size").asLong()).isZero();
+            boolean weighted = weightedPolicies.get(policyName);
+            assertThat(activity.path("evictions").path("weight").isIntegralNumber())
+                    .isEqualTo(weighted);
+            assertThat(activity.path("evictions").path("weight").isNull())
+                    .isEqualTo(!weighted);
+            assertThat(activity.path("admissions").isObject()).isEqualTo(weighted);
+            assertThat(activity.path("admissions").isNull()).isEqualTo(!weighted);
+            if (weighted) {
+                long admissionTotal = 0;
+                for (String outcome : List.of(
+                        "admitted", "bypassedUnknownSize", "bypassedOverBudget", "bypassedCapacity")) {
+                    assertThat(activity.path("admissions").path(outcome).isIntegralNumber()).isTrue();
+                    admissionTotal += activity.path("admissions").path(outcome).asLong();
+                }
+                assertThat(admissionTotal).isEqualTo(
+                        successfulLoadsByPolicy.getOrDefault(policyName, 0L)
+                                + successfulRefreshesByPolicy.getOrDefault(policyName, 0L));
+            }
+            evictionsByPolicy.put(
+                    policyName,
+                    activity.path("evictions").path("ttl").asLong()
+                            + activity.path("evictions").path("size").asLong()
+                            + (weighted
+                            ? activity.path("evictions").path("weight").asLong()
+                            : 0L));
+        });
+
+        JsonNode checkpoints = fixture.path("checkpoints");
+        assertThat(checkpoints.isArray()).isTrue();
+        assertThat(checkpoints).hasSize(3);
+        assertThat(checkpoints).extracting(checkpoint -> checkpoint.path("phase").asText())
+                .containsExactly("before-load-post-gc", "after-load-post-gc", "after-close-post-gc");
+        assertThat(checkpoints.get(0).path("capturedAt").asText())
+                .isEqualTo(fixture.path("window").path("startedAt").asText());
+        assertThat(checkpoints.get(2).path("capturedAt").asText())
+                .isEqualTo(fixture.path("window").path("endedAt").asText());
+        Map<String, Long> entriesBeforeLoad = new HashMap<>();
+        Map<String, Long> entriesAfterLoad = new HashMap<>();
+        checkpoints.get(0).path("policyState").forEach(state ->
+                entriesBeforeLoad.put(state.path("policy").asText(), state.path("entries").asLong()));
+        checkpoints.get(1).path("policyState").forEach(state -> {
+            String policyName = state.path("policy").asText();
+            entriesAfterLoad.put(policyName, state.path("entries").asLong());
+            assertThat(state.path("entries").asLong()).isEqualTo(
+                    entriesBeforeLoad.get(policyName)
+                            + successfulLoadsByPolicy.getOrDefault(policyName, 0L)
+                            - evictionsByPolicy.get(policyName));
+        });
+        checkpoints.forEach(checkpoint -> {
+            assertThat(checkpoint.path("capturedAt").isTextual()).isTrue();
+            assertThat(checkpoint.path("phase").isTextual()).isTrue();
+            JsonNode memory = checkpoint.path("memory");
+            for (String field : List.of("processRssBytes", "containerWorkingSetBytes",
+                    "javaHeapUsedAfterGcBytes", "javaHeapCommittedBytes",
+                    "directMemoryUsedBytes", "liveThreadCount")) {
+                assertThat(memory.path(field).isIntegralNumber()).as(field).isTrue();
+                assertThat(memory.path(field).asLong()).as(field).isNotNegative();
+            }
+            assertThat(checkpoint.path("cacheStateAvailable").isBoolean()).isTrue();
+            assertThat(checkpoint.path("transportStateAvailable").isBoolean()).isTrue();
+            JsonNode meterRegistrations = checkpoint.path("cacheMeterRegistrations");
+            assertThat(meterRegistrations.path("available").isBoolean()).isTrue();
+            assertThat(meterRegistrations.path("available").asBoolean()).isTrue();
+            assertThat(meterRegistrations.path("source").asText())
+                    .isEqualTo("in-process-meter-registry");
+            assertThat(meterRegistrations.path("contextOrdinal").asText())
+                    .isEqualTo("context-1");
+            long typedMeterTotal = 0;
+            for (String field : List.of("counter", "timer", "gauge", "other")) {
+                assertThat(meterRegistrations.path(field).isIntegralNumber()).isTrue();
+                assertThat(meterRegistrations.path(field).asLong()).isBetween(0L, 4096L);
+                typedMeterTotal += meterRegistrations.path(field).asLong();
+            }
+            assertThat(meterRegistrations.path("total").isIntegralNumber()).isTrue();
+            assertThat(meterRegistrations.path("total").asLong())
+                    .isEqualTo(typedMeterTotal)
+                    .isBetween(0L, 4096L);
+            if (checkpoint.path("cacheStateAvailable").asBoolean()) {
+                JsonNode policyState = checkpoint.path("policyState");
+                assertThat(policyState.isArray()).isTrue();
+                assertThat(policyState.size()).isEqualTo(policies.size());
+                policyState.forEach(state -> {
+                    String policyName = state.path("policy").asText();
+                    assertThat(policyConfigurations).containsKey(policyName);
+                    JsonNode policy = policyConfigurations.get(policyName);
+                    boolean weighted = weightedPolicies.get(policyName);
+                    assertThat(state.path("entries").isIntegralNumber()).isTrue();
+                    assertThat(state.path("maximumEntries").isIntegralNumber()).isTrue();
+                    assertThat(state.path("maximumEntries").asLong())
+                            .isEqualTo(policy.path("maximumEntries").asLong());
+                    assertThat(state.path("entries").asLong())
+                            .isBetween(0L, state.path("maximumEntries").asLong());
+                    assertThat(state.path("retainedDecodedResponseBytes").isIntegralNumber())
+                            .isEqualTo(weighted);
+                    assertThat(state.path("retainedDecodedResponseBytes").isNull())
+                            .isEqualTo(!weighted);
+                    assertThat(state.path("maximumDecodedResponseBytes").isIntegralNumber())
+                            .isEqualTo(weighted);
+                    assertThat(state.path("maximumDecodedResponseBytes").isNull())
+                            .isEqualTo(!weighted);
+                    if (weighted) {
+                        assertThat(state.path("maximumDecodedResponseBytes").asLong())
+                                .isEqualTo(policy.path("maximumDecodedResponseBytes").asLong());
+                        assertThat(state.path("retainedDecodedResponseBytes").asLong())
+                                .isBetween(0L, state.path("maximumDecodedResponseBytes").asLong());
+                    }
+                });
+            }
+            else {
+                assertThat(checkpoint.path("policyState").isArray()).isTrue();
+                assertThat(checkpoint.path("policyState").isEmpty()).isTrue();
+            }
+            if (checkpoint.path("transportStateAvailable").asBoolean()) {
+                JsonNode transport = checkpoint.path("transport");
+                assertThat(transport.path("protocol").asText()).isEqualTo("HTTP/2");
+                for (String field : List.of("poolTotalConnections", "poolIdleConnections",
+                        "poolActiveStreams", "poolPendingStreams", "poolMaximumConnections")) {
+                    assertThat(transport.path(field).isIntegralNumber()).as(field).isTrue();
+                }
+                assertThat(transport.path("poolIdleConnections").asLong())
+                        .isLessThanOrEqualTo(transport.path("poolTotalConnections").asLong());
+            }
+            else {
+                assertThat(checkpoint.path("transport").isNull()).isTrue();
+            }
+        });
+        assertThat(checkpoints.get(0).path("cacheMeterRegistrations").path("total").asLong())
+                .isEqualTo(55L);
+        assertThat(checkpoints.get(1).path("cacheMeterRegistrations").path("total").asLong())
+                .isEqualTo(55L);
+        assertThat(checkpoints.get(2).path("cacheMeterRegistrations").path("total").asLong())
+                .isZero();
+        long profileElapsedMs = Duration.between(
+                Instant.parse(checkpoints.get(0).path("capturedAt").asText()),
+                Instant.parse(checkpoints.get(1).path("capturedAt").asText())).toMillis();
+        assertThat(profileElapsedMs).isGreaterThan(policyTtlMs.get("profile-summary"));
+        assertThat(entriesBeforeLoad).containsEntry("profile-summary", 50L);
+        assertThat(entriesAfterLoad).containsEntry("profile-summary", 0L);
+        assertThat(ttlEvictionsByPolicy).containsEntry("profile-summary", 50L);
+        long catalogElapsedMs = Duration.between(
+                Instant.parse(checkpoints.get(0).path("capturedAt").asText()),
+                Instant.parse(checkpoints.get(1).path("capturedAt").asText())).toMillis();
+        assertThat(catalogElapsedMs).isGreaterThan(policyTtlMs.get("catalog-read"));
+        assertThat(entriesBeforeLoad).containsEntry("catalog-read", 200L);
+        assertThat(successfulRefreshesByPolicy).containsEntry("catalog-read", 14L);
+        assertThat(ttlEvictionsByPolicy).containsEntry("catalog-read", 186L);
+        assertThat(entriesAfterLoad).containsEntry("catalog-read", 45L);
+        JsonNode catalogAdmissions = policyActivity.get(0).path("admissions");
+        assertThat(catalogAdmissions.path("admitted").asLong()).isEqualTo(48L);
+        assertThat(catalogAdmissions.path("bypassedUnknownSize").asLong()).isZero();
+        assertThat(catalogAdmissions.path("bypassedOverBudget").asLong()).isZero();
+        assertThat(catalogAdmissions.path("bypassedCapacity").asLong()).isZero();
+        assertThat(entriesAfterLoad.get("catalog-read")).isLessThanOrEqualTo(
+                successfulLoadsByPolicy.get("catalog-read")
+                        + successfulRefreshesByPolicy.get("catalog-read"));
+
+        JsonNode factoryClose = fixture.path("lifecycle").path("events").path(1);
+        assertThat(factoryClose.path("type").asText()).isEqualTo("factory-close");
+        assertThat(factoryClose.path("capturedAt").isTextual()).isTrue();
+        assertThat(factoryClose.path("capturedAt").asText())
+                .isLessThan(checkpoints.get(2).path("capturedAt").asText());
+        JsonNode quietWindow = fixture.path("quietWindow");
+        assertThat(quietWindow.path("trafficStopped").isBoolean()).isTrue();
+        assertThat(quietWindow.path("trafficStopped").asBoolean()).isTrue();
+        assertThat(quietWindow.path("factoryOpen").isBoolean()).isTrue();
+        assertThat(quietWindow.path("factoryOpen").asBoolean()).isTrue();
+        assertThat(quietWindow.path("startedAt").isTextual()).isTrue();
+        assertThat(quietWindow.path("endedAt").isTextual()).isTrue();
+        assertThat(quietWindow.path("endedAt").asText())
+                .isEqualTo(checkpoints.get(1).path("capturedAt").asText());
+        assertThat(quietWindow.path("endedAt").asText())
+                .isGreaterThan(quietWindow.path("startedAt").asText())
+                .isLessThan(factoryClose.path("capturedAt").asText());
+        JsonNode counterSnapshots = quietWindow.path("counterSnapshots");
+        assertThat(counterSnapshots.isArray()).isTrue();
+        assertThat(counterSnapshots).hasSize(2);
+        assertThat(counterSnapshots).extracting(snapshot -> snapshot.path("phase").asText())
+                .containsExactly("before-quiet", "after-quiet");
+        assertThat(counterSnapshots.get(0).path("capturedAt").asText())
+                .isEqualTo(quietWindow.path("startedAt").asText());
+        assertThat(counterSnapshots.get(1).path("capturedAt").asText())
+                .isEqualTo(quietWindow.path("endedAt").asText());
+        Map<String, Long> beforeTerminalLoads = new HashMap<>();
+        Map<String, Long> afterTerminalLoads = new HashMap<>();
+        for (int snapshotIndex = 0; snapshotIndex < counterSnapshots.size(); snapshotIndex++) {
+            boolean afterSnapshot = snapshotIndex == 1;
+            JsonNode terminalLoads = counterSnapshots.get(snapshotIndex).path("terminalLoads");
+            assertThat(terminalLoads.isArray()).isTrue();
+            assertThat(terminalLoads).hasSize(apiActivityByName.size());
+            Map<String, Long> totals = afterSnapshot ? afterTerminalLoads : beforeTerminalLoads;
+            terminalLoads.forEach(loads -> {
+                assertThat(loads.path("apiName").isTextual()).isTrue();
+                String apiName = loads.path("apiName").asText();
+                assertThat(apiActivityByName).containsKey(apiName);
+                long total = 0;
+                for (String outcome : List.of("success", "failure", "cancellation")) {
+                    assertThat(loads.path(outcome).isIntegralNumber()).isTrue();
+                    assertThat(loads.path(outcome).asLong()).isNotNegative();
+                    total += loads.path(outcome).asLong();
+                    if (afterSnapshot) {
+                        assertThat(loads.path(outcome).asLong()).isEqualTo(
+                                apiActivityByName.get(apiName).path("loads").path(outcome).asLong());
+                    }
+                }
+                totals.put(apiName, total);
+            });
+            assertThat(totals).hasSize(apiActivityByName.size());
+        }
+        assertThat(afterTerminalLoads.get("catalog.search")
+                - beforeTerminalLoads.get("catalog.search")).isEqualTo(1L);
+        assertThat(afterTerminalLoads.get("profile.get")
+                - beforeTerminalLoads.get("profile.get")).isZero();
+
+        JsonNode lifecycle = fixture.path("lifecycle");
+        assertThat(lifecycle.path("events").isArray()).isTrue();
+        assertThat(lifecycle.path("events")).hasSize(2);
+        lifecycle.path("events").forEach(event -> {
+            assertThat(event.path("capturedAt").isTextual()).isTrue();
+            assertThat(event.path("type").isTextual()).isTrue();
+            assertThat(event.path("contextOrdinal").asText()).isEqualTo("context-1");
+        });
+        assertThat(lifecycle.path("events").get(0).path("type").asText())
+                .isEqualTo("factory-start");
+        assertThat(lifecycle.path("events").get(0).path("capturedAt").asText())
+                .isLessThan(checkpoints.get(0).path("capturedAt").asText());
+        JsonNode deploymentChanges = lifecycle.path("deploymentChanges");
+        assertThat(deploymentChanges.isArray()).isTrue();
+        assertThat(deploymentChanges).hasSize(1);
+        JsonNode deploymentChange = deploymentChanges.get(0);
+        assertThat(deploymentChange.path("capturedAt").isTextual()).isTrue();
+        assertThat(deploymentChange.path("capturedAt").asText())
+                .isLessThan(fixture.path("window").path("startedAt").asText());
+        assertThat(deploymentChange.path("type").asText()).isEqualTo("starter-version");
+        assertThat(deploymentChange.path("beforeVersion").asText()).isEqualTo("4.1.0");
+        assertThat(deploymentChange.path("afterVersion").asText()).isEqualTo("4.2.0-SNAPSHOT");
+
+        assertThat(sensitiveSupportFixtureFieldNames(fixture))
+                .as("sensitive cache-memory support fixture field names")
+                .isEmpty();
+        assertThat(sensitiveSupportFixtureTextValues(fixture))
+                .as("request-target or query material in cache-memory support fixture values")
+                .isEmpty();
+
+        List<String> captureCurlCommands = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.startsWith("if curl -sS "))
+                .toList();
+        assertThat(captureCurlCommands).hasSize(6)
+                .allMatch(line -> line.contains("--connect-timeout 5"))
+                .allMatch(line -> line.contains("--max-time 30"))
+                .allMatch(line -> line.contains("--max-filesize 1048576"))
+                .allMatch(line -> line.contains("-w '%{http_code}\\n'"))
+                .allMatch(line -> line.contains(".raw.json"))
+                .allMatch(line -> line.contains("-http-status.txt"))
+                .noneMatch(line -> line.contains(" -o support-bundle/"));
+        assertThat(supportBundles)
+                .contains("mv rhttpclients.sanitized.json support-bundle/diagnostics/rhttpclients.json")
+                .contains("mv reactive-http-client-health.sanitized.json support-bundle/health/health.json")
+                .contains("test \"$(cat support-bundle/diagnostics/"
+                        + "rhttpclients-curl-exit-status.txt)\" = \"0\" &&\n"
+                        + "  test -f rhttpclients.raw.json &&\n"
+                        + "  test \"$(wc -c < rhttpclients.raw.json)\" -le 1048576 &&\n"
+                        + "  jq --slurp \\\n"
+                        + "  --arg httpStatus")
+                .contains("test \"$(cat support-bundle/health/"
+                        + "reactive-http-client-health-curl-exit-status.txt)\" = \"0\" &&\n"
+                        + "  test -f reactive-http-client-health.raw.json &&\n"
+                        + "  test \"$(wc -c < reactive-http-client-health.raw.json)\" -le 1048576 &&\n"
+                        + "  jq --slurp \\\n"
+                        + "  --arg httpStatus \"$(cat support-bundle/health/"
+                        + "reactive-http-client-health-http-status.txt)\" \\\n"
+                        + "  --arg client")
+                .contains("if length == 1 then .[0]\n"
+                        + "  else error(\"expected exactly one diagnostics JSON value\")")
+                .contains("else error(\"expected exactly one health JSON value\")")
+                .contains("$httpStatus | test(\"^5[0-9][0-9]$\")")
+                .contains("def valid_cache_policy_source:\n"
+                        + "    . as $value | [\"client\", \"method\"] | index($value) != null")
+                .contains("def valid_cache_http_method:\n"
+                        + "    . as $value\n"
+                        + "      | [\"GET\", \"HEAD\", \"POST\", \"PUT\", \"PATCH\", \"DELETE\", \"OPTIONS\"]")
+                .contains("and valid_cache_policy_source")
+                .contains("and valid_cache_http_method")
+                .contains("all(.clients[]; .inheritedEndpointCount <= .endpointCount)")
+                .contains(".cacheRetainedDecodedResponseBytes\n"
+                        + "            <= .cacheMaximumTotalDecodedResponseBytes")
+                .contains("then .cacheEntryCount <= .cacheMaximumSize")
+                .contains("def nonnegative_integer:\n"
+                        + "    (type == \"number\") and (. >= 0) and (. <= 9223372036854775807)")
+                .contains("and (($detail.status != \"DOWN\") or .status == \"DOWN\")")
+                .contains("and (.details.minSamples == $detail.minSamples)")
+                .contains("and (.details.errorRateThreshold == $detail.errorRateThreshold)")
+                .contains("def rate_matches($detail):")
+                .contains("$detail.errors / $detail.samples")
+                .contains("($detail.samples == 0) or rate_matches($detail)")
+                .contains("preserves omission of\n`errorRate` when the selected client has zero samples")
+                .contains("| if $detail.samples == 0 then .\n"
+                        + "          else . + {errorRate: $detail.errorRate}")
+                .contains("$detail.samples == $detail.sampleCount")
+                .contains("$detail.reason == \"NO_SAMPLES\"")
+                .contains("$detail.reason == \"ERROR_RATE_ABOVE_THRESHOLD\"")
+                .contains("If `curl` reports any nonzero transfer status")
+                .contains("including a connection timeout,")
+                .contains("total-transfer timeout, transfer-bound,")
+                .contains("truncation, or connection-reset failure")
+                .contains("a raw-size check fails")
+                .contains("an input does not contain exactly one JSON value")
+                .contains("an HTTP\nstatus is ineligible")
+                .contains("keep the HTTP and curl exit-status files");
+        assertThat(reviewableBundleFixture)
+                .contains("diagnostics/rhttpclients-curl-exit-status.txt")
+                .contains("health/reactive-http-client-health-curl-exit-status.txt");
+        assertThat(supportBundles)
+                .doesNotContain("minSamples, errorRateThreshold, errorRate, status, reason");
+        for (String exitStatusPath : List.of(
+                "support-bundle/diagnostics/rhttpclients-curl-exit-status.txt",
+                "support-bundle/health/reactive-http-client-health-curl-exit-status.txt")) {
+            long writeCount = supportBundles.lines()
+                    .map(String::trim)
+                    .filter(line -> line.startsWith("printf "))
+                    .filter(line -> line.endsWith("> " + exitStatusPath))
+                    .count();
+            assertThat(writeCount).as(exitStatusPath).isEqualTo(6);
+        }
+        long staleFinalCaptureRemovalCount = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.equals(
+                        "rm -f support-bundle/diagnostics/rhttpclients.json "
+                                + "support-bundle/health/health.json"))
+                .count();
+        assertThat(staleFinalCaptureRemovalCount).isEqualTo(3);
+        long staleCurlStatusRemovalCount = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.equals(
+                        "rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt "
+                                + "support-bundle/health/"
+                                + "reactive-http-client-health-curl-exit-status.txt"))
+                .count();
+        assertThat(staleCurlStatusRemovalCount).isEqualTo(3);
+        long staleRawCaptureRemovalCount = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.equals(
+                        "rm -f rhttpclients.raw.json reactive-http-client-health.raw.json"))
+                .count();
+        assertThat(staleRawCaptureRemovalCount).isEqualTo(3);
+        long privateCaptureUmaskCount = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.equals("umask 077"))
+                .count();
+        assertThat(privateCaptureUmaskCount).isEqualTo(3);
+        String kubernetesCapture = markdownSection(
+                supportBundles, "### Kubernetes-Style Capture", "## Health Details");
+        for (String assignment : List.of(
+                "EXAMPLE_NAMESPACE=\"example-namespace\"",
+                "EXAMPLE_POD=\"example-app-pod\"",
+                "EXAMPLE_CONTAINER=\"example-app-container\"",
+                "EXAMPLE_LOCAL_PORT=\"18080\"",
+                "EXAMPLE_MANAGEMENT_PORT=\"<management-port>\"",
+                "EXAMPLE_SANITIZED_CONFIG_IN_POD=\"/path/in/pod/sanitized-reactive-http-client.yml\"")) {
+            long assignmentCount = kubernetesCapture.lines()
+                    .map(String::trim)
+                    .filter(line -> line.equals(assignment))
+                    .count();
+            assertThat(assignmentCount).as(assignment).isEqualTo(2);
+        }
+        List<String> kubectlCommands = supportBundles.lines()
+                .map(String::trim)
+                .filter(line -> line.startsWith("kubectl "))
+                .toList();
+        assertThat(kubectlCommands).noneMatch(line -> line.contains(" cp "));
+        assertThat(supportBundles)
+                .contains("kubectl -n \"$EXAMPLE_NAMESPACE\" exec")
+                .contains("-- cat \"$EXAMPLE_SANITIZED_CONFIG_IN_POD\"")
+                .contains("does not require `tar` in the application image");
     }
 
     @Test
@@ -917,6 +1602,10 @@ class DocumentationReleaseArtifactTest {
         }
         assertThat(clientHealth.path("errorRateThreshold").isNumber()).isTrue();
         assertThat(clientHealth.path("errorRate").isNumber()).isTrue();
+        double calculatedErrorRate = (double) clientHealth.path("errors").asLong()
+                / (double) clientHealth.path("samples").asLong();
+        assertThat(Math.abs(clientHealth.path("errorRate").asDouble() - calculatedErrorRate))
+                .isLessThanOrEqualTo(0.000000000001d);
         assertThat(clientHealth.path("status").isTextual()).isTrue();
         assertThat(clientHealth.path("status").asText()).isIn("UP", "DOWN", "INSUFFICIENT_SAMPLES");
         assertThat(clientHealth.path("reason").isTextual()).isTrue();
@@ -4012,6 +4701,36 @@ class DocumentationReleaseArtifactTest {
         }
         else if (node.isArray()) {
             node.forEach(child -> collectSensitiveSupportFixtureFieldNames(child, sensitiveNames));
+        }
+    }
+
+    private static List<String> sensitiveSupportFixtureTextValues(JsonNode node) {
+        List<String> sensitiveValues = new ArrayList<>();
+        collectSensitiveSupportFixtureTextValues(node, sensitiveValues);
+        return sensitiveValues;
+    }
+
+    private static void collectSensitiveSupportFixtureTextValues(
+            JsonNode node, List<String> sensitiveValues) {
+        if (node.isTextual()) {
+            String value = node.asText().trim();
+            if (SUPPORT_FIXTURE_REQUEST_TARGET_VALUE.matcher(value).matches()
+                    || SUPPORT_FIXTURE_EMBEDDED_HTTP_REQUEST_LINE.matcher(value).find()
+                    || SUPPORT_FIXTURE_QUERY_VALUE.matcher(value).matches()
+                    || SUPPORT_FIXTURE_AUTHORITY_VALUE.matcher(value).matches()
+                    || (!SUPPORT_FIXTURE_ALLOWED_SLASH_VALUES.contains(value)
+                            && SUPPORT_FIXTURE_ROOTLESS_PATH_VALUE.matcher(value).matches())) {
+                sensitiveValues.add(node.asText());
+            }
+            return;
+        }
+        if (node.isObject()) {
+            node.properties().forEach(
+                    property -> collectSensitiveSupportFixtureTextValues(
+                            property.getValue(), sensitiveValues));
+        }
+        else if (node.isArray()) {
+            node.forEach(child -> collectSensitiveSupportFixtureTextValues(child, sensitiveValues));
         }
     }
 

@@ -769,33 +769,116 @@ Evidence recorded on 2026-09-01 from durable baseline commit
 
 ## Priority 9 - Operations and Support-Bundle Evidence
 
-### [ ] 9.1 Add a cache-memory triage path
+### [x] 9.1 Add a cache-memory triage path
 
-- [ ] Start with cache selection, policy count, `maximum-size`, TTL, occupancy,
+- [x] Start with cache selection, policy count, `maximum-size`, TTL, occupancy,
       hit/miss/load/refresh/eviction activity, direct memory, connection pools,
       thread count, and deployment changes.
-- [ ] Explain how expected bounded retained values differ from monotonically
+- [x] Explain how expected bounded retained values differ from monotonically
       growing keys, generation records, flights, refreshes, meters, or transport
       resources.
-- [ ] State that RSS is not Java heap and that decoded-object retention is not
+- [x] State that RSS is not Java heap and that decoded-object retention is not
       represented by response wire size.
-- [ ] Keep published `4.1.0` instructions separate from `4.2.0-SNAPSHOT`/V29-only
+- [x] Keep published `4.1.0` instructions separate from `4.2.0-SNAPSHOT`/V29-only
       signals until release.
 
-### [ ] 9.2 Define safe capture evidence
+### [x] 9.2 Define safe capture evidence
 
-- [ ] Add a sanitized fixture with a bounded time window, Java/process/container
+- [x] Add a sanitized fixture with a bounded time window, Java/process/container
       memory summaries, direct-memory signal, cache occupancy/capacity,
-      load/refresh/eviction/admission aggregates, and lifecycle events.
-- [ ] Include configuration source and selected policy names only where they are
+      load/refresh/eviction/admission aggregates, bounded in-process cache-meter
+      registration counts, and lifecycle events.
+- [x] Include configuration source and selected policy names only where they are
       safe and bounded; include no cache keys, values, headers, bodies, targets,
       identities, credentials, tenant data, or exception messages.
-- [ ] Add recursive fixture guards for singular, plural, and compound sensitive
+- [x] Add recursive fixture guards for singular, plural, and compound sensitive
       field names plus relative request-target/query material.
-- [ ] Document that heap dumps and JFR recordings can contain sensitive
+- [x] Document that heap dumps and JFR recordings can contain sensitive
       application data and must follow a separate secure handling process.
-- [ ] Verify Docker/Kubernetes recipes preserve failure bodies, management-port
+- [x] Verify Docker/Kubernetes recipes preserve failure bodies, management-port
       placeholders, shell variables, and minimal-image compatibility.
+
+Evidence recorded on 2026-09-01 from durable baseline commit
+`d714e51d113be2538a998ce21702432b59ebbe03` plus this reviewed change:
+
+- `docs/30-operations-troubleshooting.md` adds a version-scoped cache-memory
+  decision tree covering cache selection and policy bounds, occupancy and activity,
+  post-GC heap, RSS/container working set, direct memory, threads, pool gauges,
+  deployment changes, and close/restart behavior. It distinguishes expected
+  bounded retention from growing metadata, work, meters, and transport resources,
+  and states that RSS, Java heap, decoded representation bytes, and wire size are
+  different signals.
+- `docs/26-support-bundles.md` adds a bounded V29 cache-memory capture contract and
+  the sanitized `support-bundle-cache-memory.json` fixture. The fixture identifies
+  one bounded client/process instance, maps API-tagged caller/load/refresh work to
+  selected policies, keeps policy-tagged eviction/admission facts separate,
+  records nullable refresh-after and refresh-timeout bounds for each policy,
+  includes stale callers in lookup hits and partitions misses into loaders plus
+  coalesced waiters, represents weighted/unweighted availability with values
+  versus `null`, records two cumulative API terminal-load counter snapshots in a
+  bounded pre-close quiet window while traffic is stopped and the factory remains
+  open, and records three timestamped post-GC memory/cache/H2-pool checkpoints.
+  Each checkpoint includes cache `Meter.Id` totals grouped by Micrometer type and
+  tied to one context ordinal; the active total is 55 and the post-close total is
+  zero.
+  Factory startup precedes the populated opening checkpoint. The
+  after-load entry counts equal opening entries plus successful
+  loads minus recorded evictions for each policy. The idle `profile-summary`
+  policy has zero survivors by the quiet-window end because its 50 opening entries
+  all exceed the 30-second TTL, and its eviction total records all 50 expirations.
+  The `catalog-read` policy records 14 refreshed opening entries, 186 TTL
+  expirations, 34 successful loads, three weight evictions, and 45 survivors at
+  the `00:04:25Z` quiet-window-end checkpoint, after the 34th load terminal was
+  recorded, respecting its 60-second TTL. Its admission history records all 48
+  successful load/refresh publications as admitted and records zero bypasses.
+  Both size-eviction counts are zero because neither policy reaches its maximum
+  entry capacity during the bounded window. Its lifecycle evidence timestamps
+  the relevant starter-version change with safe before/after versions. It contains
+  no request, cache-entry, identity, credential, tenant, or error-message material.
+- Recursive fixture guards reject singular, plural, and compound sensitive field
+  names, including common identity-bearing names, plus origin, authority,
+  rootless-path, query, and absolute-URL textual values, including request
+  targets embedded in standard or extension-method HTTP request lines. All six
+  endpoint captures remove stale raw files and curl-status evidence, set a private
+  `umask 077`, bound connection setup to 5 seconds and total transfer to 30
+  seconds, cap downloads at 1 MiB, record HTTP and curl exit status separately,
+  quarantine bodies outside the bundle, require a zero curl exit status, verify
+  raw byte size before parsing, require exactly one parsed JSON value, and publish
+  JSON only after expected-shape validation and field allowlisting.
+  Diagnostics publication requires 2xx status, version-applicable required fields,
+  bounded recursive leaf types, at most 16 cache policy-source/HTTP-method values,
+  per-client and aggregate endpoint-count invariants, and the documented output
+  limits while retaining supported nullable unknown values. The V29 byte fields
+  are optional only when `projectVersion` identifies a published `4.1.x`
+  response and are required for the V29 `4.2.0-SNAPSHOT` shape. The canonical
+  bundle tree retains both curl exit-status artifacts beside the HTTP statuses.
+  The health filter rejects `4xx` responses, permits `2xx` responses or
+  structurally valid `5xx` Actuator responses with top-level `DOWN`, and enforces
+  Java-`long` counter bounds plus built-in aggregate/detail status and reason
+  invariants,
+  verifies every nonzero-sample rate against `errors / samples` within
+  `0.000000000001`, and derives the output status from the selected client while
+  preserving omission of `errorRate` for a zero-sample detail. Query flags and
+  asterisk-form targets are
+  fixture-rejected alongside
+  other request-target forms. Kubernetes placeholders and the
+  `kubectl exec -- cat` minimal-image path remain covered without
+  `kubectl cp`/`tar`.
+- The operations decision table uses only observable cache evidence: stale-hit
+  callers across consecutive bounded windows, coalesced-waiter and terminal-load
+  deltas during a pre-close quiet window, terminal refresh deltas, and separate
+  post-close memory/lifecycle cleanup. It explicitly states that removed meters
+  cannot provide post-close load deltas and cumulative terminal counters cannot
+  prove active flight or refresh ownership.
+- `DocumentationReleaseArtifactTest` passed 45 tests and the paired configuration
+  guard passed 18 tests. The complete starter suite passed 1,292 tests; all runs
+  had no failures, errors, or skips. The exact documented diagnostics filter
+  accepted provider-backed, summary-only, and published 4.1-shaped fixtures while
+  rejecting both an object-valued leaf and a 401 response. The health filter
+  accepted valid and zero-sample records, rejected an object-valued reason and a
+  counter/rate mismatch, and emitted UP for a selected UP client from an aggregate
+  DOWN response. JSON validation, local-link validation, and
+  `git diff --check` also passed.
 
 ---
 
