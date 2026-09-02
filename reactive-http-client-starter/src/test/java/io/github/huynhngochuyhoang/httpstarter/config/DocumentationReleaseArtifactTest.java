@@ -452,8 +452,11 @@ class DocumentationReleaseArtifactTest {
                 .contains("while those meters remain registered")
                 .contains("no delta narrows the observation but does not prove retained flight ownership")
                 .contains("not to read removed cache meters")
-                .contains("stale-hit callers continue across consecutive bounded windows")
+                .contains("stale-hit callers continue across consecutive bounded pre-close windows")
                 .contains("terminal refresh totals do not advance")
+                .contains("separately timestamped sanitized refresh DEBUG terminal")
+                .contains("correlating the refresh log timestamp with the factory-close lifecycle timestamp")
+                .contains("not from a post-close cache counter")
                 .contains("terminal-only counters cannot prove an active refresh by themselves")
                 .contains("Bounded in-process cache-meter registration counts do not return to zero")
                 .contains("same `MeterRegistry`, process, and context boundaries were inventoried")
@@ -530,8 +533,14 @@ class DocumentationReleaseArtifactTest {
         assertThat(fixture.path("signalAvailability").asText()).isEqualTo("4.2.0-SNAPSHOT-v29");
         assertThat(fixture.path("window").path("startedAt").isTextual()).isTrue();
         assertThat(fixture.path("window").path("endedAt").isTextual()).isTrue();
-        assertThat(fixture.path("window").path("duration").asInt()).isEqualTo(300);
+        assertThat(fixture.path("window").path("duration").isIntegralNumber()).isTrue();
+        assertThat(fixture.path("window").path("duration").asLong()).isEqualTo(300L);
         assertThat(fixture.path("window").path("unit").asText()).isEqualTo("seconds");
+        Duration capturedWindow = Duration.between(
+                Instant.parse(fixture.path("window").path("startedAt").asText()),
+                Instant.parse(fixture.path("window").path("endedAt").asText()));
+        assertThat(capturedWindow).isEqualTo(
+                Duration.ofSeconds(fixture.path("window").path("duration").asLong()));
         assertThat(fixture.path("clientName").isTextual()).isTrue();
         assertThat(fixture.path("clientName").asText().length()).isLessThanOrEqualTo(128);
         assertThat(fixture.path("processInstance").isTextual()).isTrue();
@@ -547,10 +556,13 @@ class DocumentationReleaseArtifactTest {
         Map<String, Boolean> weightedPolicies = new HashMap<>();
         Map<String, Boolean> refreshEnabledPolicies = new HashMap<>();
         Map<String, Long> policyTtlMs = new HashMap<>();
+        Map<String, JsonNode> policyConfigurations = new HashMap<>();
         policies.forEach(policy -> {
             assertThat(policy.path("name").isTextual()).isTrue();
             assertThat(policy.path("name").asText().length()).isLessThanOrEqualTo(128);
             assertThat(policy.path("source").isTextual()).isTrue();
+            assertThat(policy.path("source").asText()).isIn("client", "method");
+            policyConfigurations.put(policy.path("name").asText(), policy);
             assertThat(policy.path("ttlMs").isIntegralNumber()).isTrue();
             policyTtlMs.put(policy.path("name").asText(), policy.path("ttlMs").asLong());
             boolean refreshEnabled = policy.path("refreshAfterMs").isIntegralNumber();
@@ -564,6 +576,7 @@ class DocumentationReleaseArtifactTest {
                 assertThat(policy.path("refreshTimeoutMs").asLong()).isPositive();
             }
             assertThat(policy.path("maximumEntries").isIntegralNumber()).isTrue();
+            assertThat(policy.path("maximumEntries").asLong()).isPositive();
             assertThat(policy.path("weightedAdmission").isBoolean()).isTrue();
             boolean weighted = policy.path("weightedAdmission").asBoolean();
             weightedPolicies.put(policy.path("name").asText(), weighted);
@@ -571,6 +584,9 @@ class DocumentationReleaseArtifactTest {
                     .isEqualTo(weighted);
             assertThat(policy.path("maximumDecodedResponseBytes").isNull())
                     .isEqualTo(!weighted);
+            if (weighted) {
+                assertThat(policy.path("maximumDecodedResponseBytes").asLong()).isPositive();
+            }
         });
         assertThat(weightedPolicies).containsEntry("catalog-read", true)
                 .containsEntry("profile-summary", false);
@@ -588,12 +604,18 @@ class DocumentationReleaseArtifactTest {
             assertThat(api.path("apiName").asText().length()).isLessThanOrEqualTo(128);
             apiActivityByName.put(api.path("apiName").asText(), api);
             assertThat(weightedPolicies).containsKey(api.path("selectedPolicy").asText());
-            assertThat(api.path("lookups").path("hits").isIntegralNumber()).isTrue();
-            assertThat(api.path("lookups").path("misses").isIntegralNumber()).isTrue();
-            assertThat(api.path("callers").path("freshHit").isIntegralNumber()).isTrue();
-            assertThat(api.path("callers").path("missLoader").isIntegralNumber()).isTrue();
-            assertThat(api.path("callers").path("coalescedWaiter").isIntegralNumber()).isTrue();
-            assertThat(api.path("callers").path("staleHit").isIntegralNumber()).isTrue();
+            for (String outcome : List.of("hits", "misses")) {
+                assertThat(api.path("lookups").path(outcome).isIntegralNumber()).isTrue();
+                assertThat(api.path("lookups").path(outcome).asLong()).isNotNegative();
+            }
+            for (String outcome : List.of("freshHit", "missLoader", "coalescedWaiter", "staleHit")) {
+                assertThat(api.path("callers").path(outcome).isIntegralNumber()).isTrue();
+                assertThat(api.path("callers").path(outcome).asLong()).isNotNegative();
+            }
+            for (String outcome : List.of("coalesced", "stale")) {
+                assertThat(api.path(outcome).isIntegralNumber()).isTrue();
+                assertThat(api.path(outcome).asLong()).isNotNegative();
+            }
             assertThat(api.path("lookups").path("hits").asLong()).isEqualTo(
                     api.path("callers").path("freshHit").asLong()
                             + api.path("callers").path("staleHit").asLong());
@@ -619,6 +641,7 @@ class DocumentationReleaseArtifactTest {
             long refreshTerminals = 0L;
             for (String outcome : List.of("success", "failure", "cancellation")) {
                 assertThat(api.path("refreshes").path(outcome).isIntegralNumber()).isTrue();
+                assertThat(api.path("refreshes").path(outcome).asLong()).isNotNegative();
                 refreshTerminals += api.path("refreshes").path(outcome).asLong();
             }
             assertThat(refreshTerminals)
@@ -700,6 +723,7 @@ class DocumentationReleaseArtifactTest {
                     "javaHeapUsedAfterGcBytes", "javaHeapCommittedBytes",
                     "directMemoryUsedBytes", "liveThreadCount")) {
                 assertThat(memory.path(field).isIntegralNumber()).as(field).isTrue();
+                assertThat(memory.path(field).asLong()).as(field).isNotNegative();
             }
             assertThat(checkpoint.path("cacheStateAvailable").isBoolean()).isTrue();
             assertThat(checkpoint.path("transportStateAvailable").isBoolean()).isTrue();
@@ -726,9 +750,15 @@ class DocumentationReleaseArtifactTest {
                 assertThat(policyState.size()).isEqualTo(policies.size());
                 policyState.forEach(state -> {
                     String policyName = state.path("policy").asText();
+                    assertThat(policyConfigurations).containsKey(policyName);
+                    JsonNode policy = policyConfigurations.get(policyName);
                     boolean weighted = weightedPolicies.get(policyName);
                     assertThat(state.path("entries").isIntegralNumber()).isTrue();
                     assertThat(state.path("maximumEntries").isIntegralNumber()).isTrue();
+                    assertThat(state.path("maximumEntries").asLong())
+                            .isEqualTo(policy.path("maximumEntries").asLong());
+                    assertThat(state.path("entries").asLong())
+                            .isBetween(0L, state.path("maximumEntries").asLong());
                     assertThat(state.path("retainedDecodedResponseBytes").isIntegralNumber())
                             .isEqualTo(weighted);
                     assertThat(state.path("retainedDecodedResponseBytes").isNull())
@@ -737,6 +767,12 @@ class DocumentationReleaseArtifactTest {
                             .isEqualTo(weighted);
                     assertThat(state.path("maximumDecodedResponseBytes").isNull())
                             .isEqualTo(!weighted);
+                    if (weighted) {
+                        assertThat(state.path("maximumDecodedResponseBytes").asLong())
+                                .isEqualTo(policy.path("maximumDecodedResponseBytes").asLong());
+                        assertThat(state.path("retainedDecodedResponseBytes").asLong())
+                                .isBetween(0L, state.path("maximumDecodedResponseBytes").asLong());
+                    }
                 });
             }
             else {
@@ -789,6 +825,9 @@ class DocumentationReleaseArtifactTest {
 
         JsonNode factoryClose = fixture.path("lifecycle").path("events").path(1);
         assertThat(factoryClose.path("type").asText()).isEqualTo("factory-close");
+        assertThat(factoryClose.path("capturedAt").isTextual()).isTrue();
+        assertThat(factoryClose.path("capturedAt").asText())
+                .isLessThan(checkpoints.get(2).path("capturedAt").asText());
         JsonNode quietWindow = fixture.path("quietWindow");
         assertThat(quietWindow.path("trafficStopped").isBoolean()).isTrue();
         assertThat(quietWindow.path("trafficStopped").asBoolean()).isTrue();
