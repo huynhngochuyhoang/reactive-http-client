@@ -604,7 +604,10 @@ class DocumentationReleaseArtifactTest {
                     .isEqualTo(api.path("callers").path("coalescedWaiter").asInt());
             assertThat(api.path("stale").asLong())
                     .isEqualTo(api.path("callers").path("staleHit").asLong());
-            assertThat(api.path("loads").path("success").isIntegralNumber()).isTrue();
+            for (String outcome : List.of("success", "failure", "cancellation")) {
+                assertThat(api.path("loads").path(outcome).isIntegralNumber()).isTrue();
+                assertThat(api.path("loads").path(outcome).asLong()).isNotNegative();
+            }
             successfulLoadsByPolicy.merge(
                     api.path("selectedPolicy").asText(),
                     api.path("loads").path("success").asLong(),
@@ -747,6 +750,8 @@ class DocumentationReleaseArtifactTest {
                         "poolActiveStreams", "poolPendingStreams", "poolMaximumConnections")) {
                     assertThat(transport.path(field).isIntegralNumber()).as(field).isTrue();
                 }
+                assertThat(transport.path("poolIdleConnections").asLong())
+                        .isLessThanOrEqualTo(transport.path("poolTotalConnections").asLong());
             }
             else {
                 assertThat(checkpoint.path("transport").isNull()).isTrue();
@@ -782,6 +787,8 @@ class DocumentationReleaseArtifactTest {
                 successfulLoadsByPolicy.get("catalog-read")
                         + successfulRefreshesByPolicy.get("catalog-read"));
 
+        JsonNode factoryClose = fixture.path("lifecycle").path("events").path(1);
+        assertThat(factoryClose.path("type").asText()).isEqualTo("factory-close");
         JsonNode quietWindow = fixture.path("quietWindow");
         assertThat(quietWindow.path("trafficStopped").isBoolean()).isTrue();
         assertThat(quietWindow.path("trafficStopped").asBoolean()).isTrue();
@@ -793,8 +800,7 @@ class DocumentationReleaseArtifactTest {
                 .isEqualTo(checkpoints.get(1).path("capturedAt").asText());
         assertThat(quietWindow.path("endedAt").asText())
                 .isGreaterThan(quietWindow.path("startedAt").asText())
-                .isLessThan(fixture.path("lifecycle").path("events").get(1)
-                        .path("capturedAt").asText());
+                .isLessThan(factoryClose.path("capturedAt").asText());
         JsonNode counterSnapshots = quietWindow.path("counterSnapshots");
         assertThat(counterSnapshots.isArray()).isTrue();
         assertThat(counterSnapshots).hasSize(2);
