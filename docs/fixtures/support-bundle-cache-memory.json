@@ -99,9 +99,9 @@
         "weight": 3
       },
       "admissions": {
-        "admitted": 34,
-        "bypassedUnknownSize": 1,
-        "bypassedOverBudget": 2,
+        "admitted": 48,
+        "bypassedUnknownSize": 0,
+        "bypassedOverBudget": 0,
         "bypassedCapacity": 0
       }
     },

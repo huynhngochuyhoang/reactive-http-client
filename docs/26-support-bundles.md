@@ -351,8 +351,11 @@ exactly one parsed JSON value, so empty bodies and JSON streams are rejected. Th
 health filter also requires a `2xx` status or a `5xx` response whose top-level
 status is `DOWN`, rejecting authentication and other `4xx` responses while
 retaining a structurally valid Actuator DOWN response. It requires the requested
-client entry and emits only the documented
-structural health fields. For nonzero samples, the reported error rate must equal
+client entry, rejects counters outside the Java `long` range, and rejects a
+selected `DOWN` client under an aggregate `UP` status. An aggregate `DOWN` with a
+selected `UP` client remains valid because another client may be unhealthy. The
+filter emits only the documented structural health fields. For nonzero samples,
+the reported error rate must equal
 `errors / samples` within an absolute tolerance of `0.000000000001`. Its
 top-level status is derived from that selected client, not from unrelated clients
 in the aggregate health response. The sanitized projection preserves omission of
@@ -482,7 +485,8 @@ test "$(cat support-bundle/health/reactive-http-client-health-curl-exit-status.t
   --arg httpStatus "$(cat support-bundle/health/reactive-http-client-health-http-status.txt)" \
   --arg client "$EXAMPLE_CLIENT_NAME" '
   def nonnegative_integer:
-    (type == "number") and (. >= 0) and (. == floor);
+    (type == "number") and (. >= 0) and (. <= 9223372036854775807)
+      and (. == floor);
   def unit_rate:
     (type == "number") and (. >= 0) and (. <= 1);
   def rate_matches($detail):
@@ -499,6 +503,7 @@ test "$(cat support-bundle/health/reactive-http-client-health-curl-exit-status.t
       and (.status == "UP" or .status == "DOWN"))
       and ((.details | type) == "object")
       and (($detail | type) == "object")
+      and (($detail.status != "DOWN") or .status == "DOWN")
       and ($detail.samples | nonnegative_integer)
       and ($detail.errors | nonnegative_integer)
       and ($detail.sampleCount | nonnegative_integer)

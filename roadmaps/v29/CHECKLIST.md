@@ -824,7 +824,9 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   exceed the 30-second TTL, and its eviction total records all 50 expirations.
   The `catalog-read` policy records 14 refreshed opening entries, 186 TTL
   expirations, 34 successful loads, three weight evictions, and 45 survivors at
-  the four-minute checkpoint, respecting its 60-second TTL.
+  the four-minute checkpoint, respecting its 60-second TTL. Its admission
+  history records all 48 successful load/refresh publications as admitted and
+  records zero bypasses.
   Both size-eviction counts are zero because neither policy reaches its maximum
   entry capacity during the bounded window. Its lifecycle evidence timestamps
   the relevant starter-version change with safe before/after versions. It contains
@@ -848,7 +850,8 @@ Evidence recorded on 2026-09-01 from durable baseline commit
   bundle tree retains both curl exit-status artifacts beside the HTTP statuses.
   The health filter rejects `4xx` responses, permits `2xx` responses or
   structurally valid `5xx` Actuator responses with top-level `DOWN`, and enforces
-  built-in counter, status, and reason invariants,
+  Java-`long` counter bounds plus built-in aggregate/detail status and reason
+  invariants,
   verifies every nonzero-sample rate against `errors / samples` within
   `0.000000000001`, and derives the output status from the selected client while
   preserving omission of `errorRate` for a zero-sample detail. Query flags and

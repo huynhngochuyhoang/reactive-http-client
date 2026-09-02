@@ -494,6 +494,9 @@ class DocumentationReleaseArtifactTest {
                         + "identifies a published `4.1.x` response")
                 .contains("A V29 `4.2.0-SNAPSHOT` response must include both fields")
                 .contains("retained decoded-response bytes cannot exceed the configured aggregate maximum")
+                .contains("rejects counters outside the Java `long` range")
+                .contains("rejects a selected `DOWN` client under an aggregate `UP` status")
+                .contains("An aggregate `DOWN` with a selected `UP` client remains valid")
                 .contains("$httpStatus | test(\"^2[0-9][0-9]$\")")
                 .contains("nullable_number($field)")
                 .contains("nullable_boolean($field)")
@@ -625,6 +628,17 @@ class DocumentationReleaseArtifactTest {
                     .isEqualTo(!weighted);
             assertThat(activity.path("admissions").isObject()).isEqualTo(weighted);
             assertThat(activity.path("admissions").isNull()).isEqualTo(!weighted);
+            if (weighted) {
+                long admissionTotal = 0;
+                for (String outcome : List.of(
+                        "admitted", "bypassedUnknownSize", "bypassedOverBudget", "bypassedCapacity")) {
+                    assertThat(activity.path("admissions").path(outcome).isIntegralNumber()).isTrue();
+                    admissionTotal += activity.path("admissions").path(outcome).asLong();
+                }
+                assertThat(admissionTotal).isEqualTo(
+                        successfulLoadsByPolicy.getOrDefault(policyName, 0L)
+                                + successfulRefreshesByPolicy.getOrDefault(policyName, 0L));
+            }
             evictionsByPolicy.put(
                     policyName,
                     activity.path("evictions").path("ttl").asLong()
@@ -716,6 +730,11 @@ class DocumentationReleaseArtifactTest {
         assertThat(successfulRefreshesByPolicy).containsEntry("catalog-read", 14L);
         assertThat(ttlEvictionsByPolicy).containsEntry("catalog-read", 186L);
         assertThat(entriesAfterLoad).containsEntry("catalog-read", 45L);
+        JsonNode catalogAdmissions = policyActivity.get(0).path("admissions");
+        assertThat(catalogAdmissions.path("admitted").asLong()).isEqualTo(48L);
+        assertThat(catalogAdmissions.path("bypassedUnknownSize").asLong()).isZero();
+        assertThat(catalogAdmissions.path("bypassedOverBudget").asLong()).isZero();
+        assertThat(catalogAdmissions.path("bypassedCapacity").asLong()).isZero();
         assertThat(entriesAfterLoad.get("catalog-read")).isLessThanOrEqualTo(
                 successfulLoadsByPolicy.get("catalog-read")
                         + successfulRefreshesByPolicy.get("catalog-read"));
@@ -840,7 +859,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("all(.clients[]; .inheritedEndpointCount <= .endpointCount)")
                 .contains(".cacheRetainedDecodedResponseBytes\n"
                         + "            <= .cacheMaximumTotalDecodedResponseBytes")
-                .contains("def nonnegative_integer:")
+                .contains("def nonnegative_integer:\n"
+                        + "    (type == \"number\") and (. >= 0) and (. <= 9223372036854775807)")
+                .contains("and (($detail.status != \"DOWN\") or .status == \"DOWN\")")
                 .contains("def rate_matches($detail):")
                 .contains("$detail.errors / $detail.samples")
                 .contains("($detail.samples == 0) or rate_matches($detail)")
