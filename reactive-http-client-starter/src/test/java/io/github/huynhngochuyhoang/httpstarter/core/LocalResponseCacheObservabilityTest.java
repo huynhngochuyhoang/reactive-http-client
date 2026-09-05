@@ -435,6 +435,35 @@ class LocalResponseCacheObservabilityTest {
     }
 
     @Test
+    void cacheObservabilityWithoutMeterRegistryStillRecordsCallerOutcomes() {
+        ReactiveHttpClientProperties.ClientConfig config = clientCacheConfig();
+        ReactiveHttpClientProperties.ObservabilityConfig observability =
+                new ReactiveHttpClientProperties.ObservabilityConfig();
+        observability.setEnabled(true);
+        observability.getCache().setEnabled(true);
+        LocalResponseCacheManager manager = LocalResponseCacheManager.createForClient(
+                CacheObservedClient.class,
+                "catalog-client",
+                new MethodMetadataCache(),
+                config,
+                getClass().getClassLoader(),
+                observability,
+                null);
+        EffectiveCachePolicy.Selection selection = selection("catalog", false, null);
+        SubscriptionReportingState miss = state();
+        SubscriptionReportingState hit = state();
+
+        assertThat(load(manager, selection, key("no-registry"), "catalog.get",
+                miss, state(), Mono.just("value"))).isEqualTo("value");
+        assertThat(load(manager, selection, key("no-registry"), "catalog.get",
+                hit, state(), Mono.just("unexpected"))).isEqualTo("value");
+
+        assertThat(miss.cacheOutcome()).isEqualTo(HttpClientCacheOutcome.MISS_LOADER);
+        assertThat(hit.cacheOutcome()).isEqualTo(HttpClientCacheOutcome.FRESH_HIT);
+        manager.close();
+    }
+
+    @Test
     void cacheObservabilityDoesNotCreateMetersWhenNoPolicyIsSelected() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ReactiveHttpClientProperties.ObservabilityConfig observability =

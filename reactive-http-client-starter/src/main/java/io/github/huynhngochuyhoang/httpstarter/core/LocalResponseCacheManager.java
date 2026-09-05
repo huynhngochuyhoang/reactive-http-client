@@ -124,7 +124,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 refreshScheduler,
                 cacheObservabilityEnabled
                         ? LocalResponseCacheMetrics.enabled(meterRegistry, clientName)
-                        : LocalResponseCacheMetrics.disabled());
+                        : LocalResponseCacheMetrics.disabled(),
+                cacheObservabilityEnabled);
     }
 
     static LocalResponseCacheManager createForClient(
@@ -135,13 +136,14 @@ final class LocalResponseCacheManager implements AutoCloseable {
             ClassLoader classLoader,
             LongSupplier ticker,
             Scheduler refreshScheduler,
-            LocalResponseCacheMetrics metrics) {
+            LocalResponseCacheMetrics metrics,
+            boolean cacheObservabilityEnabled) {
         LocalResponseCacheManager manager = new LocalResponseCacheManager(
                 classLoader,
                 Objects.requireNonNull(ticker, "ticker"),
                 Objects.requireNonNull(refreshScheduler, "refreshScheduler"),
                 Objects.requireNonNull(metrics, "metrics"),
-                metrics.enabled(),
+                cacheObservabilityEnabled,
                 clientName);
         for (Method method : clientInterface.getMethods()) {
             if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {

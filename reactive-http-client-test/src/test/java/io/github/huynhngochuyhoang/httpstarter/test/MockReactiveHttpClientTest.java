@@ -242,6 +242,10 @@ class MockReactiveHttpClientTest {
             assertThat(snapshot.closed()).isTrue();
             assertThat(snapshot.entryCount()).isZero();
             assertThat(snapshot.retainedDecodedResponseBytes()).isZero();
+            assertThat(snapshot.evictionCount()).isEqualTo(2);
+            assertThat(snapshot.evictionCounts().get("local"))
+                    .containsEntry("weight", 1L)
+                    .containsEntry("ttl", 1L);
         });
     }
 

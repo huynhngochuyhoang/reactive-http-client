@@ -51,7 +51,8 @@ public final class MockResponseCacheSupport {
                 applicationContext.getClassLoader(),
                 ticker,
                 Schedulers.parallel(),
-                metrics);
+                metrics,
+                cacheObservabilityEnabled);
         ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
                 webClient,
                 metadataCache,
@@ -96,7 +97,7 @@ public final class MockResponseCacheSupport {
             return new Snapshot(
                     cache.currentSize(),
                     cache.retainedDecodedResponseBytes(),
-                    cache.evictions(),
+                    metrics.evictionCount(),
                     workload.inFlightLoads(),
                     workload.coalescedWaiters(),
                     workload.inFlightRefreshes(),
@@ -130,6 +131,7 @@ public final class MockResponseCacheSupport {
         private final Map<String, Map<String, LongAdder>> admissions = new ConcurrentHashMap<>();
         private final Map<String, Map<String, LongAdder>> evictions = new ConcurrentHashMap<>();
         private final Map<String, Map<String, LongAdder>> refreshes = new ConcurrentHashMap<>();
+        private final LongAdder evictionCount = new LongAdder();
 
         private RecordingMetrics(boolean enabled) {
             this.enabled = enabled;
@@ -155,6 +157,7 @@ public final class MockResponseCacheSupport {
         @Override
         void eviction(String policyName, LocalResponseCache.RemovalReason reason) {
             if (enabled) {
+                evictionCount.increment();
                 increment(evictions, policyName, reason.tagValue());
             }
         }
@@ -167,6 +170,10 @@ public final class MockResponseCacheSupport {
         }
 
         @Override public void close() { }
+
+        private long evictionCount() {
+            return evictionCount.longValue();
+        }
 
         private void increment(
                 Map<String, Map<String, LongAdder>> counters, String group, String outcome) {
