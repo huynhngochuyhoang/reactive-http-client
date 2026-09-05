@@ -499,6 +499,44 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     @Test
+    void beanFactoryAotProcessorRegistersRecordHintsOnlyForSelectedCacheMemoryPolicy() throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource(
+                "aot-cache-memory-policies",
+                Map.ofEntries(
+                        Map.entry("reactive.http.clients.selected-cache-memory.cache.policy", "weighted"),
+                        Map.entry("reactive.http.clients.selected-cache-memory.cache.policies.weighted.ttl-ms", "1000"),
+                        Map.entry("reactive.http.clients.selected-cache-memory.cache.policies.weighted.maximum-size", "100"),
+                        Map.entry("reactive.http.clients.selected-cache-memory.cache.policies.weighted.maximum-total-decoded-response-bytes", "4096"),
+                        Map.entry("reactive.http.clients.selected-cache-memory.cache.policies.weighted.shared-response", "true"),
+                        Map.entry("reactive.http.clients.unselected-cache-memory.cache.policies.inert.ttl-ms", "1000"),
+                        Map.entry("reactive.http.clients.unselected-cache-memory.cache.policies.inert.maximum-size", "100"),
+                        Map.entry("reactive.http.clients.unselected-cache-memory.cache.policies.inert.maximum-total-decoded-response-bytes", "4096"))));
+        registerClientFactory(context, SelectedCacheMemoryAotClient.class);
+        registerClientFactory(context, UnselectedCacheMemoryAotClient.class);
+        BeanFactoryInitializationAotContribution contribution =
+                new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                        .processAheadOfTime(context.getDefaultListableBeanFactory());
+        DefaultGenerationContext generationContext = newGenerationContext();
+
+        contribution.applyTo(generationContext, null);
+
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                SelectedCacheMemoryVariant.class.getMethod("value")))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.resource().forResource(
+                SelectedCacheMemoryVariant.class.getName().replace('.', '/') + ".class"))
+                .accepts(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                UnselectedCacheMemoryVariant.class.getMethod("value")))
+                .rejects(generationContext.getRuntimeHints());
+        assertThat(RuntimeHintsPredicates.resource().forResource(
+                UnselectedCacheMemoryVariant.class.getName().replace('.', '/') + ".class"))
+                .rejects(generationContext.getRuntimeHints());
+        context.close();
+    }
+
+    @Test
     void beanFactoryAotProcessorGuardsRecursiveGenericParameterTraversal() throws Exception {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         RootBeanDefinition beanDefinition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
@@ -597,6 +635,15 @@ class ReactiveHttpClientAotSmokeTest {
                 new InMemoryGeneratedFiles());
     }
 
+    private static void registerClientFactory(
+            AnnotationConfigApplicationContext context, Class<?> clientInterface) {
+        RootBeanDefinition definition = new RootBeanDefinition(ReactiveHttpClientFactoryBean.class);
+        definition.getPropertyValues().add("type", clientInterface);
+        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, clientInterface);
+        definition.setLazyInit(true);
+        context.registerBeanDefinition(clientInterface.getName(), definition);
+    }
+
     interface ParentSmokeOperations {
         @GET("/parent")
         Mono<String> parentPing();
@@ -692,6 +739,24 @@ class ReactiveHttpClientAotSmokeTest {
     }
 
     record CacheContextVariant(String region, int tier) {
+    }
+
+    record SelectedCacheMemoryVariant(String value) {
+    }
+
+    record UnselectedCacheMemoryVariant(String value) {
+    }
+
+    @ReactiveHttpClient(name = "selected-cache-memory", baseUrl = "http://selected-cache-memory.test")
+    interface SelectedCacheMemoryAotClient {
+        @GET("/items")
+        Mono<String> get(@QueryParam("variant") SelectedCacheMemoryVariant variant);
+    }
+
+    @ReactiveHttpClient(name = "unselected-cache-memory", baseUrl = "http://unselected-cache-memory.test")
+    interface UnselectedCacheMemoryAotClient {
+        @GET("/items")
+        Mono<String> get(@QueryParam("variant") UnselectedCacheMemoryVariant variant);
     }
 
     static final class CacheContextRuntimeHints implements RuntimeHintsRegistrar {

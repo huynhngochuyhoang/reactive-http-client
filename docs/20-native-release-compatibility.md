@@ -764,8 +764,18 @@ Supported Boot 4 native-image path:
   client metrics.
 - A native open-circuit rejection that reaches no transport dispatch and records
   one finite logical-call duration with zero subscription attempts.
-- One cache miss, one cache hit without dispatch, and one access-driven refresh
-  through the real loopback transport, with exact aggregate dispatch counts.
+- Cache-disabled repeated dispatch, bounded cache fill/hit/expiry, and one
+  access-driven refresh through the real loopback transport.
+- Weighted cache admission with exact decoded-response byte framing,
+  over-budget successful non-publication, weight eviction, retained-byte
+  diagnostics, and bounded admission/eviction meters.
+- A pre-instantiation diagnostics snapshot that leaves the lazy client cache
+  manager and storage untouched even when Framework AOT has materialized the
+  raw `FactoryBean` for type inspection.
+- Context shutdown that terminates active and queued miss callers plus a hidden
+  refresh before the shared five-second disposal deadline, followed by a
+  bounded quiet period and same-tag factory/context recreation against the same
+  meter registry.
 - Explicit retry-only activation that produces exactly two loopback dispatches;
   merely enabling resilience does not activate unrelated operators.
 - Opt-in gzip negotiation and transparent JSON response decompression over the
@@ -805,9 +815,10 @@ must be accompanied by a successful executable smoke run.
 Limits:
 
 - The scheduled native smoke uses real Reactor Netty loopback requests, local
-  cache hit/load/refresh behavior, explicit Retry, and one Resilience4j
-  open-circuit rejection. It does not exercise custom TLS configuration,
-  RateLimiter/Bulkhead composition, or OTel exporters.
+  cache hit/load/expiry/refresh/weighted-admission behavior, shutdown/restart,
+  explicit Retry, and one Resilience4j open-circuit rejection. It does not
+  exercise custom TLS configuration, RateLimiter/Bulkhead composition, or OTel
+  exporters.
 - Optional libraries still require native support and runtime hints from their
   owners, including Resilience4j, alternate TLS providers, and OpenTelemetry
   exporters.

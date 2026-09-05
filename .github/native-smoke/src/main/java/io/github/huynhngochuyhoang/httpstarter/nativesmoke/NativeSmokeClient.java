@@ -7,6 +7,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.CacheResponse;
 import io.github.huynhngochuyhoang.httpstarter.annotation.CircuitBreaker;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.POST;
+import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.annotation.Retry;
 import reactor.core.publisher.Mono;
@@ -33,6 +34,22 @@ interface NativeSmokeOperations<T> {
     @GET("/api/cached-order")
     @CacheResponse("native-cache")
     Mono<T> getCachedOrder();
+
+    @GET("/api/expiring-order")
+    @CacheResponse("native-expiring-cache")
+    Mono<T> getExpiringOrder();
+
+    @GET("/api/weighted-order/{id}")
+    @CacheResponse("native-weighted-cache")
+    Mono<T> getWeightedOrder(@PathVar("id") String id);
+
+    @GET("/api/shutdown-load/{id}")
+    @CacheResponse("native-shutdown-cache")
+    Mono<T> getShutdownLoad(@PathVar("id") String id);
+
+    @GET("/api/shutdown-refresh")
+    @CacheResponse("native-shutdown-refresh-cache")
+    Mono<T> getShutdownRefresh();
 
     @GET("/api/retry-only")
     @Retry("native-retry")

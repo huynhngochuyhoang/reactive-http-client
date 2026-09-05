@@ -957,38 +957,72 @@ Evidence:
 
 ## Priority 11 - AOT, Native, and Shutdown Parity
 
-### [ ] 11.1 Keep AOT hints narrow
+### [x] 11.1 Keep AOT hints narrow
 
-- [ ] Register only configuration, record accessor, constructor, and SPI types
+- [x] Register only configuration, record accessor, constructor, and SPI types
       required by the selected contract.
-- [ ] Avoid broad package/type/member reflection and any runtime reflective graph
+- [x] Avoid broad package/type/member reflection and any runtime reflective graph
       traversal for weighing.
-- [ ] Preserve replacement properties/cache beans during AOT analysis without
+- [x] Preserve replacement properties/cache beans during AOT analysis without
       eagerly creating lazy managers or factories.
-- [ ] Add native-hint tests for selected and unselected cache-memory policies.
+- [x] Add native-hint tests for selected and unselected cache-memory policies.
 
 ### [ ] 11.2 Extend native execution evidence
 
-- [ ] Run cache-disabled and bounded cache fill/hit/expiry/shutdown paths in the
+- [x] Run cache-disabled and bounded cache fill/hit/expiry/shutdown paths in the
       native fixture.
-- [ ] After a weight GO, cover over-budget successful non-publication and
+- [x] After a weight GO, cover over-budget successful non-publication and
       replacement/eviction accounting; after a no-go, omit nonexistent fields and
       record the decision.
-- [ ] Prove diagnostics do not initialize lazy cache components in the native
+- [x] Prove diagnostics do not initialize lazy cache components in the native
       executable.
 - [ ] Compile and run from a clean committed tree; record GraalVM/JDK version,
       command, commit, binary SHA-256, and executable result.
 
-### [ ] 11.3 Stress shutdown and restart
+### [x] 11.3 Stress shutdown and restart
 
-- [ ] Close active/queued miss loads and hidden refreshes within the single
+- [x] Close active/queued miss loads and hidden refreshes within the single
       documented factory shutdown deadline.
-- [ ] Prevent connections, direct buffers, schedulers, meter suppliers, cache
+- [x] Prevent connections, direct buffers, schedulers, meter suppliers, cache
       entries, or late callbacks from surviving context close.
-- [ ] Recreate the application context/factory with the same client/policy/meter
+- [x] Recreate the application context/factory with the same client/policy/meter
       tags and prove new instances are observed.
-- [ ] Run shutdown stress on JVM and native paths with disposal-driven terminal
+- [x] Run shutdown stress on JVM and native paths with disposal-driven terminal
       assertions rather than ordinary request/acquire timeouts.
+
+Evidence recorded on 2026-09-05 from baseline commit
+`89213d3c9b32684991425ddd7686d89cd1bed15c` plus this reviewed change:
+
+- AOT processing now limits recursive record-accessor and class-resource hints to
+  methods with an effective selected cache policy. Existing exact configuration,
+  Caffeine constructor/factory-field, and SPI lookup hints remain unchanged;
+  no package-wide or `MemberCategory` reflection was introduced.
+- `ReactiveHttpClientAotSmokeTest` proves a selected weighted cache policy
+  receives its record accessor/resource hints while an unselected policy does
+  not. Existing coverage continues to prove primary programmatic properties and
+  replacement metadata are honored without instantiating the default properties
+  bean or lazy client factory.
+- The native fixture now proves cache-disabled repeated dispatch, bounded
+  fill/hit/expiry, weighted replacement, over-budget successful non-publication,
+  weight-eviction/admission accounting, and diagnostics that leave uncreated
+  cache storage unknown.
+- JVM and native runs close an active miss, a queued miss, and a hidden refresh
+  before the aggregate five-second factory deadline. Server-side cancellation,
+  a post-close quiet period, complete cache-meter removal, and same-tag
+  application-context recreation against one retained registry prove
+  disposal-driven ownership and replacement-manager observation.
+- `git diff --check`, the focused AOT/cache/shutdown tests, the complete
+  `mvn -q test` reactor, and
+  `mvn -q -f .github/native-smoke/pom.xml -Dreactive-http-client.version=4.2.0-SNAPSHOT spring-boot:run`
+  all passed.
+- The provisional native build used Oracle GraalVM/JDK `25.0.3`, command
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version=4.2.0-SNAPSHOT native:compile`,
+  and produced SHA-256
+  `16baea451c46972ccd7b335b8b58362369436ac4391572b05336cd64fee966a1`.
+  The image compiled successfully in 4m39s and its executable completed
+  successfully. This run is functional evidence only because the source tree was
+  dirty; the final immutable provenance checkbox remains open until the committed
+  tree is rebuilt and rerun.
 
 ---
 
