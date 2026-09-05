@@ -967,7 +967,7 @@ Evidence:
       eagerly creating lazy managers or factories.
 - [x] Add native-hint tests for selected and unselected cache-memory policies.
 
-### [ ] 11.2 Extend native execution evidence
+### [x] 11.2 Extend native execution evidence
 
 - [x] Run cache-disabled and bounded cache fill/hit/expiry/shutdown paths in the
       native fixture.
@@ -976,7 +976,7 @@ Evidence:
       record the decision.
 - [x] Prove diagnostics do not initialize lazy cache components in the native
       executable.
-- [ ] Compile and run from a clean committed tree; record GraalVM/JDK version,
+- [x] Compile and run from a clean committed tree; record GraalVM/JDK version,
       command, commit, binary SHA-256, and executable result.
 
 ### [x] 11.3 Stress shutdown and restart
@@ -1015,14 +1015,18 @@ Evidence recorded on 2026-09-05 from baseline commit
   `mvn -q test` reactor, and
   `mvn -q -f .github/native-smoke/pom.xml -Dreactive-http-client.version=4.2.0-SNAPSHOT spring-boot:run`
   all passed.
-- The provisional native build used Oracle GraalVM/JDK `25.0.3`, command
-  `mvn -B -ntp -s .mvn/maven-central-settings.xml -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version=4.2.0-SNAPSHOT native:compile`,
-  and produced SHA-256
-  `16baea451c46972ccd7b335b8b58362369436ac4391572b05336cd64fee966a1`.
-  The image compiled successfully in 4m39s and its executable completed
-  successfully. This run is functional evidence only because the source tree was
-  dirty; the final immutable provenance checkbox remains open until the committed
-  tree is rebuilt and rerun.
+- Immutable native evidence was rebuilt on 2026-09-05 from clean commit
+  `d33096fddc7a677d9c217e0e7a136ce349bbcfeb` with Oracle GraalVM/JDK
+  `25.0.3`. The exact committed reactor was first installed with
+  `mvn -q -DskipTests -Dmaven.javadoc.skip=true install`; the clean image command
+  was
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version=4.2.0-SNAPSHOT clean native:compile`.
+  Compilation passed in 4m42s, the resulting executable completed successfully,
+  and
+  `.github/native-smoke/target/reactive-http-client-native-smoke` has SHA-256
+  `50c82d713d07bc1e4a7c249d5a7ba68b7c723b33d3eb60bf42f4321fa698eef7`.
+  `git status --short` was empty immediately before the build and after
+  executable verification.
 
 ---
 
