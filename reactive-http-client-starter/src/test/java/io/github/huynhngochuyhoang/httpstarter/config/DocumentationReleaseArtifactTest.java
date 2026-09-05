@@ -2797,17 +2797,23 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("MemberCategory", "ExecutableMode.INTROSPECT");
         assertThat(clientAotProcessor)
                 .contains("clientInterface.getMethods()",
-                        "registerMethod(method, ExecutableMode.INVOKE)")
+                        "registerMethod(method, ExecutableMode.INVOKE)",
+                        "isCacheSelected(method, metadataCache, clientConfigs.get(clientInterface))")
                 .contains("typeHint.withMethod(method.getName()",
                         "TypeReference.listOf(method.getParameterTypes())")
                 .doesNotContain("MemberCategory", "ExecutableMode.INTROSPECT");
         assertThat(nativeClient).contains(
                 "extends NativeSmokeOperations<NativeOrderResponse>",
                 "@ApiRef(\"native-problem\")",
-                "@GET(\"/api/compressed-order\")");
+                "@GET(\"/api/compressed-order\")",
+                "@CacheResponse(\"native-weighted-cache\")",
+                "@CacheResponse(\"native-shutdown-refresh-cache\")");
         assertThat(nativeProperties).contains(
                 "apis.native-problem.method",
-                "compression-enabled");
+                "compression-enabled",
+                "native-weighted-cache.maximum-total-decoded-response-bytes=64",
+                "native-shutdown-cache.single-flight=true",
+                "observability.cache.enabled=true");
         assertThat(nativeApplication).contains(
                 "Content-Encoding\", \"gzip",
                 "compression negotiation header did not reach loopback server",
@@ -2815,7 +2821,11 @@ class DocumentationReleaseArtifactTest {
                 "logicalCallTimeoutMs",
                 "reactiveHttpClientDiagnosticsEndpoint",
                 "reactiveHttpClientHealthIndicator",
-                "reactive.http.client.requests");
+                "reactive.http.client.requests",
+                "diagnostics initialized the lazy native cache manager",
+                "bypassed_over_budget",
+                "native factory shutdown exceeded the shared disposal deadline",
+                "same-tag native meter did not observe the replacement cache");
         assertThat(nativePom).contains(
                 "<reactive-http-client.version>4.2.0-SNAPSHOT</reactive-http-client.version>",
                 "-J-Xmx6g",
@@ -2835,6 +2845,8 @@ class DocumentationReleaseArtifactTest {
                 "configured inherited",
                 "@ApiRef",
                 "transparent JSON response decompression",
+                "Weighted cache admission",
+                "same-tag factory/context recreation",
                 "6 GiB",
                 "-Dreactive-http-client.version=4.2.0-SNAPSHOT native:compile",
                 "native-smoke-provenance");

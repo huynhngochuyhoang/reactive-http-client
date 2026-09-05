@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.config;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
 import org.springframework.aot.hint.ExecutableMode;
@@ -18,12 +19,10 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.env.Environment;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Registers native-image JDK proxy hints for scanned {@code @ReactiveHttpClient} interfaces.
@@ -49,11 +48,13 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         MethodMetadataCache metadataCache = beanFactory.getBeanProvider(MethodMetadataCache.class)
                 .getIfAvailable(MethodMetadataCache::new);
         ReactiveHttpClientProperties properties = properties(beanFactory);
+        Map<Class<?>, ReactiveHttpClientProperties.ClientConfig> clientConfigs = new HashMap<>();
         clientInterfaces.forEach(clientInterface -> {
             ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
             if (annotation != null) {
                 ReactiveHttpClientProperties.ClientConfig clientConfig = properties.getClients()
                         .getOrDefault(annotation.name(), new ReactiveHttpClientProperties.ClientConfig());
+                clientConfigs.put(clientInterface, clientConfig);
                 metadataCache.validateDeclarativeRequestParameters(clientInterface, annotation.name());
                 metadataCache.validateDeclarativeUriTemplates(clientInterface, annotation.name());
                 metadataCache.validateDeclarativeReturnTypes(clientInterface, annotation.name());
@@ -70,11 +71,13 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             Set<Class<?>> registeredRecordTypes = new HashSet<>();
             for (var method : clientInterface.getMethods()) {
                 reflectionHints.registerMethod(method, ExecutableMode.INVOKE);
-                for (int index = 0; index < method.getParameterCount(); index++) {
-                    registerRecordAccessors(runtimeHints,
-                            ResolvableType.forMethodParameter(method, index, clientInterface),
-                            registeredRecordTypes,
-                            new HashSet<>());
+                if (isCacheSelected(method, metadataCache, clientConfigs.get(clientInterface))) {
+                    for (int index = 0; index < method.getParameterCount(); index++) {
+                        registerRecordAccessors(runtimeHints,
+                                ResolvableType.forMethodParameter(method, index, clientInterface),
+                                registeredRecordTypes,
+                                new HashSet<>());
+                    }
                 }
             }
             reflectionHints.registerType(clientInterface, typeHint -> {
@@ -115,6 +118,22 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         }
         return beanFactory.getBeanProvider(ReactiveHttpClientProperties.class)
                 .getIfAvailable(ReactiveHttpClientProperties::new);
+    }
+
+    private static boolean isCacheSelected(
+            java.lang.reflect.Method method,
+            MethodMetadataCache metadataCache,
+            ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        MethodMetadata metadata = metadataCache.get(method);
+        if (metadata.isCacheDisabled()) {
+            return false;
+        }
+        if (StringUtils.hasText(metadata.getCachePolicyName())) {
+            return true;
+        }
+        return clientConfig != null
+                && clientConfig.getCache() != null
+                && StringUtils.hasText(clientConfig.getCache().getPolicy());
     }
 
     private static void registerRecordAccessors(RuntimeHints runtimeHints,
