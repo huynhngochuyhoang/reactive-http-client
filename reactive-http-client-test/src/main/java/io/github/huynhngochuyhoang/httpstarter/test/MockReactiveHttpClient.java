@@ -116,6 +116,23 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
         return cacheControl.entryCount();
     }
 
+    /** Returns bounded cache occupancy, work, and terminal event counts. */
+    public CacheSnapshot cacheSnapshot() {
+        requireCacheControl();
+        MockResponseCacheSupport.Snapshot snapshot = cacheControl.snapshot();
+        return new CacheSnapshot(
+                snapshot.entryCount(),
+                snapshot.retainedDecodedResponseBytes(),
+                snapshot.evictionCount(),
+                snapshot.inFlightLoadCount(),
+                snapshot.coalescedWaiterCount(),
+                snapshot.inFlightRefreshCount(),
+                snapshot.admissionCounts(),
+                snapshot.evictionCounts(),
+                snapshot.refreshCounts(),
+                snapshot.closed());
+    }
+
     /** Returns the number of in-process downstream loads recorded by this mock. */
     public int loadCount() {
         return exchanges.size();
@@ -142,6 +159,32 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
         if (cacheTickerNanos == null || cacheControl == null) {
             throw new IllegalStateException(
                     "Deterministic cache time was not enabled on this mock builder");
+        }
+    }
+
+    /** Immutable test-helper view; map keys match documented policy/API and outcome tags. */
+    public record CacheSnapshot(
+            long entryCount,
+            Long retainedDecodedResponseBytes,
+            long evictionCount,
+            int inFlightLoadCount,
+            int coalescedWaiterCount,
+            int inFlightRefreshCount,
+            Map<String, Map<String, Long>> admissionCounts,
+            Map<String, Map<String, Long>> evictionCounts,
+            Map<String, Map<String, Long>> refreshCounts,
+            boolean closed) {
+
+        public CacheSnapshot {
+            admissionCounts = deepCopy(admissionCounts);
+            evictionCounts = deepCopy(evictionCounts);
+            refreshCounts = deepCopy(refreshCounts);
+        }
+
+        private static Map<String, Map<String, Long>> deepCopy(Map<String, Map<String, Long>> values) {
+            Map<String, Map<String, Long>> copied = new LinkedHashMap<>();
+            values.forEach((name, counts) -> copied.put(name, Map.copyOf(counts)));
+            return Map.copyOf(copied);
         }
     }
 
@@ -365,6 +408,23 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
 
         /** Defines one inert local-cache policy and enables deterministic cache time. */
         public Builder<T> cachePolicy(String policyName, Duration ttl, long maximumSize) {
+            return cachePolicy(policyName, ttl, maximumSize, null);
+        }
+
+        /** Defines one weighted local-cache policy and enables deterministic cache time. */
+        public Builder<T> cachePolicy(
+                String policyName,
+                Duration ttl,
+                long maximumSize,
+                long maximumTotalDecodedResponseBytes) {
+            if (maximumTotalDecodedResponseBytes < 1) {
+                throw new IllegalArgumentException("maximumTotalDecodedResponseBytes must be at least 1");
+            }
+            return cachePolicy(policyName, ttl, maximumSize, Long.valueOf(maximumTotalDecodedResponseBytes));
+        }
+
+        private Builder<T> cachePolicy(
+                String policyName, Duration ttl, long maximumSize, Long maximumTotalDecodedResponseBytes) {
             if (policyName == null || policyName.isBlank()) {
                 throw new IllegalArgumentException("policyName must not be blank");
             }
@@ -379,6 +439,7 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
                     new ReactiveHttpClientProperties.CachePolicyConfig();
             policy.setTtlMs(ttl.toMillis());
             policy.setMaximumSize(maximumSize);
+            policy.setMaximumTotalDecodedResponseBytes(maximumTotalDecodedResponseBytes);
             policy.setVaryByHeaders(List.of("Idempotency-Key"));
             clientConfig.getCache().getPolicies().put(policyName, policy);
             return withDeterministicCacheTime();

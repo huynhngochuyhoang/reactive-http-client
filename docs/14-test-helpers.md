@@ -52,7 +52,9 @@ when a test depends on transport ownership.
 single-flight, and refresh behavior while replacing only the cache clock. It does
 not select caching. Supply the same `ClientConfig` used by the application, or use
 `cachePolicy(name, ttl, maximumSize)` to define an inert policy selected by a
-method-level `@CacheResponse`.
+method-level `@CacheResponse`. The additive
+`cachePolicy(name, ttl, maximumSize, maximumTotalDecodedResponseBytes)` overload
+selects the V29 decoded-response byte bound.
 
 ```java
 try (MockReactiveHttpClient<CatalogClient> mock = MockReactiveHttpClient
@@ -68,14 +70,23 @@ try (MockReactiveHttpClient<CatalogClient> mock = MockReactiveHttpClient
     assertThat(mock.loadCount("/catalog/42")).isEqualTo(1);
     assertThat(mock.cacheEntryCount()).isEqualTo(1);
     assertThat(mock.cacheOutcomes()).containsExactly(MISS_LOADER, FRESH_HIT);
+    assertThat(mock.cacheSnapshot().entryCount()).isEqualTo(1);
 
     mock.advanceCacheTime(Duration.ofMinutes(1));
     mock.evictCacheEntries();
 }
 ```
 
+`cacheSnapshot()` reports current entries, nullable retained decoded-response
+representation bytes, aggregate and cause-tagged evictions, active load/waiter/refresh
+counts, terminal admission and refresh counts, and manager closure. Its nested maps
+use the same bounded policy/API and outcome strings as cache metrics. A null retained
+byte value means at least one selected policy is unweighted; it is not zero. This
+snapshot is neither Java heap nor process/container memory.
+
 The load count is the number of in-process `ExchangeFunction` invocations, not a
-wire-dispatch count. Explicit eviction is test-only cache control. These assertions
+wire-dispatch count. Explicit eviction is test-only cache control. `close()` owns the
+cache manager in deterministic and ordinary-time modes. These assertions
 do not prove socket cancellation, pool reuse, transport backpressure, or native
 resource cleanup.
 

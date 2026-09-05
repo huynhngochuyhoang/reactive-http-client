@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema V1 additively reports nullable current retained bytes without creating
   or traversing a cache. Cache-local signals remain outside downstream health,
   and factory shutdown removes all owned meters.
+- **Weighted-cache test and consumer parity.** `MockReactiveHttpClient` adds an
+  opt-in weighted-policy overload and an immutable cache snapshot for deterministic
+  occupancy, admission, eviction, flight, refresh, expiry, and close assertions.
+  The assembled-consumer verifier now covers an explicitly provisioned weighted
+  cache and a separate cache-disabled application whose classpath contains no
+  Caffeine dependency.
 
 ### Fixed
 - **Single-flight caller-context retention.** Cache miss flights and hidden

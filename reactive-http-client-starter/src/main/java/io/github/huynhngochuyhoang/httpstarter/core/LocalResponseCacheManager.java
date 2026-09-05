@@ -114,13 +114,35 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 && observability.isEnabled()
                 && observability.getCache() != null
                 && observability.getCache().isEnabled();
+        return createForClient(
+                clientInterface,
+                clientName,
+                metadataCache,
+                clientConfig,
+                classLoader,
+                ticker,
+                refreshScheduler,
+                cacheObservabilityEnabled
+                        ? LocalResponseCacheMetrics.enabled(meterRegistry, clientName)
+                        : LocalResponseCacheMetrics.disabled(),
+                cacheObservabilityEnabled);
+    }
+
+    static LocalResponseCacheManager createForClient(
+            Class<?> clientInterface,
+            String clientName,
+            MethodMetadataCache metadataCache,
+            ReactiveHttpClientProperties.ClientConfig clientConfig,
+            ClassLoader classLoader,
+            LongSupplier ticker,
+            Scheduler refreshScheduler,
+            LocalResponseCacheMetrics metrics,
+            boolean cacheObservabilityEnabled) {
         LocalResponseCacheManager manager = new LocalResponseCacheManager(
                 classLoader,
                 Objects.requireNonNull(ticker, "ticker"),
                 Objects.requireNonNull(refreshScheduler, "refreshScheduler"),
-                cacheObservabilityEnabled
-                        ? LocalResponseCacheMetrics.enabled(meterRegistry, clientName)
-                        : LocalResponseCacheMetrics.disabled(),
+                Objects.requireNonNull(metrics, "metrics"),
                 cacheObservabilityEnabled,
                 clientName);
         for (Method method : clientInterface.getMethods()) {

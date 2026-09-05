@@ -884,31 +884,74 @@ Evidence recorded on 2026-09-01 from durable baseline commit
 
 ## Priority 10 - Mock and Assembled-Consumer Parity
 
-### [ ] 10.1 Extend deterministic mock controls
+### [x] 10.1 Extend deterministic mock controls
 
-- [ ] Provide deterministic time and control surfaces for occupancy, TTL expiry,
+- [x] Provide deterministic time and control surfaces for occupancy, TTL expiry,
       admission, eviction, refresh, and close without exposing production cache
       internals.
-- [ ] Keep mock behavior aligned with production for duplicate misses,
+- [x] Keep mock behavior aligned with production for duplicate misses,
       single-flight membership, refresh replacement, and late publication.
-- [ ] Ensure `MockReactiveHttpClient.close()` owns and closes cache managers in
+- [x] Ensure `MockReactiveHttpClient.close()` owns and closes cache managers in
       deterministic and ordinary-time modes.
-- [ ] Keep existing `4.1.0` test-helper source/binary usage working when no new
+- [x] Keep existing `4.1.0` test-helper source/binary usage working when no new
       budget is configured.
 
-### [ ] 10.2 Revalidate assembled consumers
+### [x] 10.2 Revalidate assembled consumers
 
-- [ ] Verify a cache-disabled Boot 4 consumer requires no optional Caffeine or
+- [x] Verify a cache-disabled Boot 4 consumer requires no optional Caffeine or
       new cache-accounting dependency.
-- [ ] Verify the published `4.1.0` assembled consumer remains Central-only and
+- [x] Verify the published `4.1.0` assembled consumer remains Central-only and
       unchanged by V29 APIs.
-- [ ] If weighted admission ships, add a current-reactor consumer that declares
+- [x] If weighted admission ships, add a current-reactor consumer that declares
       required dependencies/configuration explicitly and exercises admission,
       hit, eviction/bypass, and shutdown.
-- [ ] Preserve Surefire reports, effective POMs, dependency trees, classpaths,
+- [x] Preserve Surefire reports, effective POMs, dependency trees, classpaths,
       artifact hashes, completed stage, and exit status on success and failure.
-- [ ] Reject reactor `target/classes`, stale report, and default-local-repository
+- [x] Reject reactor `target/classes`, stale report, and default-local-repository
       contamination in every consumer lane.
+
+Evidence:
+
+- `MockReactiveHttpClient` now exposes an immutable `CacheSnapshot` through its
+  `@hidden` bridge and an additive four-argument weighted `cachePolicy` overload.
+  The snapshot contains only bounded counts and nullable decoded-response
+  representation-byte occupancy; no production cache type, key, value, header,
+  body, target, identity, or credential is exposed. The published three-argument
+  builder path remains unweighted.
+- `MockReactiveHttpClientTest` deterministically covers weighted admission,
+  over-budget bypass, weight/TTL eviction, occupancy, single-flight membership,
+  refresh replacement/terminal outcome, explicit eviction, out-of-order duplicate
+  fills, late post-eviction publication, and deterministic close. The existing
+  ordinary-time close test still proves active cache work is cancelled. Together
+  with `Boot4MockReactiveHttpClientTest`, 63 tests passed with no failures, errors,
+  or skips.
+- `.github/boot4-cache-disabled-consumer` is an independent starter-only Boot 4
+  application. It starts and performs a real loopback call while asserting
+  Caffeine is absent. Its effective POM, dependency tree, classpath, fresh Surefire
+  report, and provenance are retained by `scripts/verify-current-consumer.sh`.
+- The V29-only profile in `.github/boot4-consumer/pom.xml` explicitly declares
+  Caffeine and exercises two admitted fills, a fresh hit, weight eviction, two
+  over-budget bypasses, retained-byte occupancy, and factory-owned meter removal
+  at context shutdown. The current assembled fixture passed 7 tests and the
+  cache-disabled fixture passed 1 test.
+- `scripts/verify-current-consumer.sh` passed from a fresh target-local repository
+  and recorded `completedStage=evidence-verified`, `exitStatus=0`, both effective
+  POMs/dependency trees/classpaths, two mock XML reports covering 63 tests, four
+  current-consumer reports covering 7 tests, one cache-disabled report, and
+  parent/starter/test-helper/OTel hashes under
+  `target/release-evidence/current-consumer/current-4.2.0-SNAPSHOT/`. Marker-time
+  report copies and the exit trap preserve fresh partial evidence on failure; both
+  classpaths are checked for reactor output-directory leakage, and the disabled
+  lane rejects Caffeine.
+- `scripts/verify-published-consumer.sh 4.1.0` passed 4 tests from a separate fresh
+  Maven Central repository with the V29 profile disabled. Central markers,
+  artifact hashes, effective POMs, dependency tree, classpath, reports, and
+  `completedStage=evidence-verified` / `exitStatus=0` provenance are under
+  `target/release-evidence/published-consumer/published-4.1.0/`.
+- The module-scoped strict `api-compatibility` run against published `4.1.0`
+  classified `cacheSnapshot`, `CacheSnapshot`, and the weighted builder overload
+  as additive while retaining binary and source compatibility. The focused
+  documentation guard passed 45 tests; shell syntax and `git diff --check` passed.
 
 ---
 

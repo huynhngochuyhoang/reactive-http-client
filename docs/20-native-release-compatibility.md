@@ -497,7 +497,7 @@ the POM include set or lacks an explicit support status.
 | `io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot` | Request context snapshot model | Immutable context snapshot exports | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ResilienceOperatorApplier*` | Contract snapshot resilience hook | Operator availability and instance-type hook | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.SensitiveHeaders` | Header redaction helper | Custom exchange logger redaction checks | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, deterministic cache clock/policy/outcome/eviction controls, `RecordedExchange`, `RecordedExchangeAssertions`, `RecordedMultipartPart`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, deterministic cache clock/policy/outcome/occupancy/admission/eviction/refresh controls, `RecordedExchange`, `RecordedExchangeAssertions`, `RecordedMultipartPart`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | `OpenTelemetryHttpClientObserver`, `OpenTelemetryContextWebFilter`, `OpenTelemetryContextExchangeFilter`, and `OpenTelemetryHttpClientAutoConfiguration` | Supported |
 
 The `3.0.0` migration replaces `HttpClientHealthIndicator` with its Boot 4
@@ -585,6 +585,9 @@ current minor line:
   V27 also covers `AutoCloseable`, `advanceCacheTime`, `cacheEntryCount`,
   `cacheOutcomes`, `evictCacheEntries`, both `loadCount` methods,
   `Builder.cachePolicy`, and `Builder.withDeterministicCacheTime`.
+  V29 additively covers `cacheSnapshot`, `CacheSnapshot`, and the four-argument
+  weighted `Builder.cachePolicy` overload. The published three-argument overload
+  remains count-only and reports retained decoded-response bytes as unknown.
 - `ResilienceOperatorApplier.InstanceType` is a public nested enum used by
   diagnostics and contract snapshots. Do not remove or rename enum constants in
   the current minor line; add new constants only with corresponding docs and
@@ -941,13 +944,17 @@ Jackson 3 signing bytes and final outbound metadata through
 `MockReactiveHttpClient`.
 
 The verifier installs the current reactor into a fresh target-local repository,
-runs the complete mock parity classes, then runs the assembled consumer against
-the installed jars. It rejects reactor `target/classes` leakage and records
-separate mock and real-server test reports, the consumer classpath, dependency
-tree, effective POM, artifact hashes, commit state, and provenance under
+runs the complete mock parity classes, then runs two assembled applications against
+the installed jars. The main fixture explicitly declares Caffeine and exercises
+weighted admission, hit, weight eviction, over-budget bypass, and meter/cache-manager
+shutdown. The independent cache-disabled fixture declares only the starter and Boot
+test/runtime dependencies; its classpath must contain no Caffeine artifact. It rejects
+reactor `target/classes` leakage in either application and records separate mock,
+weighted/current-consumer, and cache-disabled test reports, both consumer classpaths,
+dependency trees and effective POMs, project artifact hashes, commit state, and provenance under
 `target/release-evidence/current-consumer/current-4.2.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
 test stage. An `EXIT` trap repeats that filtered copy before preserving the original
-verifier status, including when either test stage fails.
+verifier status, including when any test stage fails.
 It also records the last completed stage and exit status when a later
 classpath/provenance check fails.
 
@@ -984,6 +991,7 @@ status, and provenance under
 Fresh Surefire XML is copied immediately after the consumer test stage. Its `EXIT`
 trap repeats that filtered copy and retains the evidence when a test, Central marker,
 classpath, or checksum check fails.
+The published lane does not activate the V29 profile or compile against V29 APIs.
 
 The release-artifact command uses its own fresh repository and additionally
 requires the starter, test-helper, and OTel source and Javadoc jars. Its
