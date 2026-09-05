@@ -199,6 +199,67 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void deterministicWeightedCacheReportsAdmissionEvictionExpiryAndClose() {
+        MockReactiveHttpClient<CacheMockClient> mock = MockReactiveHttpClient
+                .forClient(CacheMockClient.class)
+                .cachePolicy("local", java.time.Duration.ofMillis(100), 10, 8)
+                .respondTo(HttpMethod.GET, "/cache/one", exchange ->
+                        MockReactiveHttpClient.text(200, "four"))
+                .respondTo(HttpMethod.GET, "/cache/over", exchange ->
+                        MockReactiveHttpClient.text(200, "123456789"))
+                .respondTo(HttpMethod.GET, "/cache/three", exchange ->
+                        MockReactiveHttpClient.text(200, "abcde"))
+                .build();
+        try {
+            assertThat(mock.proxy().get("one").block()).isEqualTo("four");
+            assertThat(mock.proxy().get("one").block()).isEqualTo("four");
+            assertThat(mock.proxy().get("over").block()).isEqualTo("123456789");
+            assertThat(mock.proxy().get("three").block()).isEqualTo("abcde");
+
+            MockReactiveHttpClient.CacheSnapshot populated = mock.cacheSnapshot();
+            assertThat(populated.entryCount()).isEqualTo(1);
+            assertThat(populated.retainedDecodedResponseBytes()).isEqualTo(5L);
+            assertThat(populated.evictionCount()).isEqualTo(1);
+            assertThat(populated.admissionCounts().get("local"))
+                    .containsEntry("admitted", 2L)
+                    .containsEntry("bypassed_over_budget", 1L);
+            assertThat(populated.evictionCounts().get("local")).containsEntry("weight", 1L);
+            assertThat(mock.loadCount("/cache/one")).isEqualTo(1);
+            assertThat(mock.loadCount("/cache/over")).isEqualTo(1);
+
+            mock.advanceCacheTime(java.time.Duration.ofMillis(100));
+            MockReactiveHttpClient.CacheSnapshot expired = mock.cacheSnapshot();
+            assertThat(expired.entryCount()).isZero();
+            assertThat(expired.retainedDecodedResponseBytes()).isZero();
+            assertThat(expired.evictionCount()).isEqualTo(2);
+            assertThat(expired.evictionCounts().get("local")).containsEntry("ttl", 1L);
+        }
+        finally {
+            mock.close();
+        }
+
+        assertThat(mock.cacheSnapshot()).satisfies(snapshot -> {
+            assertThat(snapshot.closed()).isTrue();
+            assertThat(snapshot.entryCount()).isZero();
+            assertThat(snapshot.retainedDecodedResponseBytes()).isZero();
+        });
+    }
+
+    @Test
+    void existingUnweightedCachePolicyBuilderRemainsUnweighted() {
+        try (MockReactiveHttpClient<CacheMockClient> mock = MockReactiveHttpClient
+                .forClient(CacheMockClient.class)
+                .cachePolicy("local", java.time.Duration.ofSeconds(1), 10)
+                .respondTo(HttpMethod.GET, "/cache/legacy", exchange ->
+                        MockReactiveHttpClient.text(200, "legacy"))
+                .build()) {
+            assertThat(mock.proxy().get("legacy").block()).isEqualTo("legacy");
+            assertThat(mock.cacheSnapshot().retainedDecodedResponseBytes()).isNull();
+            assertThat(mock.cacheSnapshot().admissionCounts()).isEmpty();
+        }
+    }
+
+    @Test
     void deterministicCacheCoalescesOneLoadAndRefreshesAfterClockAdvance() throws Exception {
         ReactiveHttpClientProperties.ClientConfig config = cacheConfig(true, 50L, 10);
         AtomicInteger loads = new AtomicInteger();
@@ -223,6 +284,10 @@ class MockReactiveHttpClientTest {
             CompletableFuture<String> waiter = mock.proxy().get("shared").toFuture();
 
             assertThat(mock.loadCount("/cache/shared")).isEqualTo(1);
+            assertThat(mock.cacheSnapshot()).satisfies(snapshot -> {
+                assertThat(snapshot.inFlightLoadCount()).isEqualTo(1);
+                assertThat(snapshot.coalescedWaiterCount()).isEqualTo(1);
+            });
             firstBody.tryEmitValue(new DefaultDataBufferFactory()
                     .wrap("value-1".getBytes(StandardCharsets.UTF_8))).orThrow();
             assertThat(leader.get(1, TimeUnit.SECONDS)).isEqualTo("value-1");
@@ -236,6 +301,51 @@ class MockReactiveHttpClientTest {
             assertThat(mock.proxy().get("shared").block()).isEqualTo("value-2");
             assertThat(loads).hasValue(2);
             assertThat(mock.cacheOutcomes()).contains(HttpClientCacheOutcome.STALE_HIT);
+            assertThat(mock.cacheSnapshot()).satisfies(snapshot -> {
+                assertThat(snapshot.inFlightRefreshCount()).isZero();
+                assertThat(snapshot.refreshCounts().get("get")).containsEntry("success", 1L);
+            });
+        }
+    }
+
+    @Test
+    void deterministicDuplicateMissesAndLatePublicationPreserveTheCurrentGeneration() throws Exception {
+        ReactiveHttpClientProperties.ClientConfig config = cacheConfig(false, null, 10);
+        List<Sinks.One<DataBuffer>> responseBodies = new CopyOnWriteArrayList<>();
+
+        try (MockReactiveHttpClient<CacheMockClient> mock = MockReactiveHttpClient
+                .forClient(CacheMockClient.class)
+                .clientConfig(config)
+                .withDeterministicCacheTime()
+                .respondTo(HttpMethod.GET, "/cache/race", exchange -> pendingResponse(responseBodies))
+                .respondTo(HttpMethod.GET, "/cache/evicted", exchange -> pendingResponse(responseBodies))
+                .build()) {
+            CompletableFuture<String> older = mock.proxy().get("race").toFuture();
+            CompletableFuture<String> newer = mock.proxy().get("race").toFuture();
+            await().atMost(java.time.Duration.ofSeconds(1)).untilAsserted(() ->
+                    assertThat(responseBodies).hasSize(2));
+
+            responseBodies.get(1).tryEmitValue(buffer("newer")).orThrow();
+            assertThat(newer.get(1, TimeUnit.SECONDS)).isEqualTo("newer");
+            responseBodies.get(0).tryEmitValue(buffer("older")).orThrow();
+            assertThat(older.get(1, TimeUnit.SECONDS)).isEqualTo("older");
+            assertThat(mock.proxy().get("race").block()).isEqualTo("newer");
+            assertThat(mock.loadCount("/cache/race")).isEqualTo(2);
+
+            CompletableFuture<String> evicted = mock.proxy().get("evicted").toFuture();
+            await().atMost(java.time.Duration.ofSeconds(1)).untilAsserted(() ->
+                    assertThat(responseBodies).hasSize(3));
+            mock.evictCacheEntries();
+            responseBodies.get(2).tryEmitValue(buffer("late")).orThrow();
+            assertThat(evicted.get(1, TimeUnit.SECONDS)).isEqualTo("late");
+            assertThat(mock.cacheSnapshot().entryCount()).isZero();
+
+            CompletableFuture<String> replacement = mock.proxy().get("evicted").toFuture();
+            await().atMost(java.time.Duration.ofSeconds(1)).untilAsserted(() ->
+                    assertThat(responseBodies).hasSize(4));
+            responseBodies.get(3).tryEmitValue(buffer("replacement")).orThrow();
+            assertThat(replacement.get(1, TimeUnit.SECONDS)).isEqualTo("replacement");
+            assertThat(mock.cacheSnapshot().entryCount()).isEqualTo(1);
         }
     }
 
@@ -265,6 +375,19 @@ class MockReactiveHttpClientTest {
         finally {
             mock.close();
         }
+    }
+
+    private static ClientResponse pendingResponse(List<Sinks.One<DataBuffer>> responseBodies) {
+        Sinks.One<DataBuffer> body = Sinks.one();
+        responseBodies.add(body);
+        return ClientResponse.create(org.springframework.http.HttpStatus.OK)
+                .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                .body(body.asMono().flux())
+                .build();
+    }
+
+    private static DataBuffer buffer(String value) {
+        return new DefaultDataBufferFactory().wrap(value.getBytes(StandardCharsets.UTF_8));
     }
 
     interface ApiRefUriClient {

@@ -1788,12 +1788,18 @@ class DocumentationReleaseArtifactTest {
     void boot4AssembledConsumerFixtureStaysVersionAlignedAndDocumented() throws IOException {
         Path root = projectRoot();
         String fixturePom = Files.readString(root.resolve(".github/boot4-consumer/pom.xml"));
+        String cacheDisabledPom = Files.readString(
+                root.resolve(".github/boot4-cache-disabled-consumer/pom.xml"));
         String workflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
         String currentConsumerScript = Files.readString(root.resolve("scripts/verify-current-consumer.sh"));
         String publishedConsumerScript = Files.readString(root.resolve("scripts/verify-published-consumer.sh"));
         String testHelperDocs = Files.readString(root.resolve("docs/14-test-helpers.md"));
         String fixtureTest = Files.readString(root.resolve(
                 ".github/boot4-consumer/src/test/java/io/github/huynhngochuyhoang/httpstarter/boot4consumer/Boot4ConsumerApplicationTest.java"));
+        String weightedFixtureTest = Files.readString(root.resolve(
+                ".github/boot4-consumer/src/v29-test/java/io/github/huynhngochuyhoang/httpstarter/v29consumer/Boot4WeightedCacheConsumerTest.java"));
+        String cacheDisabledFixtureTest = Files.readString(root.resolve(
+                ".github/boot4-cache-disabled-consumer/src/test/java/io/github/huynhngochuyhoang/httpstarter/cachedisabled/Boot4CacheDisabledConsumerTest.java"));
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
 
         assertThat(fixturePom)
@@ -1804,7 +1810,16 @@ class DocumentationReleaseArtifactTest {
                 .contains("<artifactId>spring-boot-webclient</artifactId>")
                 .contains("<artifactId>spring-boot-jackson</artifactId>")
                 .contains("<groupId>tools.jackson.core</groupId>")
-                .contains("<artifactId>spring-boot-starter-actuator</artifactId>");
+                .contains("<artifactId>spring-boot-starter-actuator</artifactId>")
+                .contains("<id>v29-current-parity</id>")
+                .contains("<name>consumer.v29.parity</name>")
+                .contains("<source>src/v29-test/java</source>")
+                .contains("<groupId>com.github.ben-manes.caffeine</groupId>");
+        assertThat(cacheDisabledPom)
+                .contains("<artifactId>reactive-http-client-starter</artifactId>")
+                .contains("<artifactId>spring-boot-starter-webflux</artifactId>")
+                .doesNotContain("reactive-http-client-test")
+                .doesNotContain("com.github.ben-manes.caffeine");
         assertThat(workflow)
                 .contains("boot4-consumer:")
                 .contains("scripts/verify-current-consumer.sh")
@@ -1818,6 +1833,12 @@ class DocumentationReleaseArtifactTest {
                 .contains("copy_consumer_reports()")
                 .contains("stage=\"mock-tests\"\ncopy_mock_reports")
                 .contains("stage=\"consumer-tests\"\ncopy_consumer_reports")
+                .contains("copy_cache_disabled_reports()")
+                .contains("-Dconsumer.v29.parity=true")
+                .contains("stage=\"cache-disabled-tests\"\ncopy_cache_disabled_reports")
+                .contains("cache-disabled-dependency-tree.txt")
+                .contains("cache-disabled-classpath.txt")
+                .contains("cache-disabled consumer unexpectedly resolved optional Caffeine storage")
                 .contains("trap preserve_reports EXIT")
                 .contains("REPORT_START_MARKER=\"$EVIDENCE_DIR/report-start.marker\"")
                 .contains("\"$report\" -nt \"$REPORT_START_MARKER\"")
@@ -1849,6 +1870,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("completedStage=$stage")
                 .contains("exitStatus=$status")
                 .contains("published consumer resolved reactor output directories");
+        assertThat(publishedConsumerScript).doesNotContain("consumer.v29.parity");
         assertThat(fixtureTest)
                 .contains("extends SharedOrders<OrderResponse>")
                 .contains("@ApiRef(\"configured\")")
@@ -1863,13 +1885,26 @@ class DocumentationReleaseArtifactTest {
                 .contains("PropertyNamingStrategies.SNAKE_CASE")
                 .contains("TrackingMethodMetadataCache extends MethodMetadataCache")
                 .contains("openTelemetryHttpClientObserver");
+        assertThat(weightedFixtureTest)
+                .contains("maximum-total-decoded-response-bytes=8")
+                .contains("bypassed_over_budget")
+                .contains("cause\", \"weight")
+                .contains("noneMatch(meter -> meter.getId().getName().startsWith(CACHE_METRIC_PREFIX))");
+        assertThat(cacheDisabledFixtureTest)
+                .contains("cacheDisabledConsumerRunsWithoutCaffeine")
+                .contains("com.github.benmanes.caffeine.cache.Caffeine")
+                .contains("isFalse()")
+                .contains("context.getBean(CacheDisabledClient.class).get().block()");
         assertThat(releaseDocs)
                 .contains("### Boot 4 assembled consumer fixture")
                 .contains("scripts/verify-current-consumer.sh")
                 .contains("real inherited-generic and configured")
                 .contains("OAuth2, SigV4 raw-body signing")
                 .contains("Protocol negotiation, TLS, compression wire bytes, pool timing")
-                .contains("including when either test stage fails")
+                .contains("including when any test stage fails")
+                .contains("weighted admission, hit, weight eviction, over-budget bypass")
+                .contains("cache-disabled fixture")
+                .contains("does not activate the V29 profile")
                 .contains("no dual-generation")
                 .contains("no dual-generation helper");
         assertThat(testHelperDocs)
@@ -2414,9 +2449,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("`CacheResponse` including `semanticRead`, `CacheDisabled`, and `CacheKey`")
                 .contains("`CacheConfig`, `CachePolicyConfig`, `CacheCustomizationSafety`")
                 .contains("cache terminal callback, and `HttpClientCacheOutcome`")
-                .contains("deterministic cache clock/policy/outcome/eviction controls")
+                .contains("deterministic cache clock/policy/outcome/occupancy/admission/eviction/refresh controls")
                 .contains("V27 adds no incompatible Java API row relative to published `3.6.0`")
                 .contains("V28 adds `CacheResponse.semanticRead()`")
+                .contains("V29 additively covers `cacheSnapshot`, `CacheSnapshot`")
                 .contains("`cacheSemanticRead` getter/setter")
                 .contains("`MockResponseCacheSupport` is a\npublic, `@hidden` cross-package bridge")
                 .contains("No starter public signature exposes Caffeine")
