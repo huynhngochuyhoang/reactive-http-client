@@ -147,6 +147,8 @@ final class BenchmarkMarkdownReport {
         markdown.append("- Cache loopback rows compare cache workloads only with equivalent cache workloads; a local hit is never compared with a raw WebClient network call as abstraction-overhead evidence.\n");
         markdown.append("- Cache allocation rows isolate bounded starter-owned key, lookup, publication, waiter, eviction, and refresh work without transport I/O.\n");
         markdown.append("- Semantic POST no-network rows include bounded JSON serialization, body-key derivation, and local cache work; semantic POST loopback rows additionally perform the authenticated wire request when the scenario dispatches.\n");
+        markdown.append("- V29 no-network rows isolate unweighted, metrics-disabled weighted, admission, eviction, single-flight, refresh, and accounting work. V29 loopback rows include the corresponding request and decoded-body measurement where dispatch is required.\n");
+        markdown.append("- Trial-scoped setup is excluded from per-operation scores. Retained live-set evidence comes from the separately bounded V29 workload/JFR capture, not from JMH allocation rates.\n");
         markdown.append("- Local loopback, JVM warmup, CPU scheduling, and Netty event-loop behavior affect the numbers; use this report as trend evidence for named scenarios.\n");
         markdown.append("- Review thresholds are manual signals; this harness does not enforce hard performance gates.\n\n");
 
@@ -250,6 +252,18 @@ final class BenchmarkMarkdownReport {
     }
 
     private static Classification classification(String benchmarkName) {
+        if (benchmarkName.startsWith("cacheV29NoNetwork")) {
+            String scenario = benchmarkName.substring("cacheV29NoNetwork".length());
+            requireScenario(benchmarkName, scenario);
+            return new Classification("V29 no-network cache accounting", "Starter", scenario,
+                    false, true, sortPrefix("cache-v29-no-network", scenario));
+        }
+        if (benchmarkName.startsWith("cacheV29Loopback")) {
+            String scenario = benchmarkName.substring("cacheV29Loopback".length());
+            requireScenario(benchmarkName, scenario);
+            return new Classification("V29 cache loopback workload", "Starter", scenario,
+                    false, true, sortPrefix("cache-v29-loopback", scenario));
+        }
         if (benchmarkName.startsWith("cacheSemanticPostNoNetwork")) {
             String scenario = benchmarkName.substring("cacheSemanticPostNoNetwork".length());
             requireScenario(benchmarkName, scenario);

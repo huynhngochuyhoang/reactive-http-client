@@ -670,7 +670,7 @@ class BoundedLocalResponseCacheContractTest {
 
         LocalResponseCacheManager disabledManager = LocalResponseCacheManager.createForClient(
                 CacheClient.class, "cache-client", metadata, disabled, withoutCaffeine);
-        assertThat(disabledManager.snapshot().policyCount()).isZero();
+        assertThat(disabledManager).isNull();
 
         ReactiveHttpClientProperties.ClientConfig selected = config();
         assertThatThrownBy(() -> LocalResponseCacheManager.createForClient(

@@ -139,6 +139,7 @@ public final class BenchmarkReportComparator {
         markdown.append("- Current report: `").append(currentReport).append("`\n");
         markdown.append("- Baseline report: `").append(baselineReport).append("`\n");
         markdown.append("- Review triggers are informational by default; use `--fail-on-review` for local non-zero exit.\n\n");
+        appendScenarioCompleteness(markdown, rows);
         markdown.append("| Benchmark | Mode | Metric | Current | Baseline | Delta | Relative Delta | Status |\n");
         markdown.append("| --- | --- | --- | ---: | ---: | ---: | ---: | --- |\n");
         for (ComparisonRow row : rows) {
@@ -153,6 +154,30 @@ public final class BenchmarkReportComparator {
                     .append(" |\n");
         }
         return markdown.toString();
+    }
+
+    private static void appendScenarioCompleteness(StringBuilder markdown, List<ComparisonRow> rows) {
+        TreeSet<ResultKey> matched = new TreeSet<>(Comparator
+                .comparing(ResultKey::benchmarkName)
+                .thenComparing(BenchmarkReportComparator::modeSortKey));
+        TreeSet<ResultKey> currentOnly = new TreeSet<>(matched.comparator());
+        TreeSet<ResultKey> baselineOnly = new TreeSet<>(matched.comparator());
+        for (ComparisonRow row : rows) {
+            if ("missing baseline".equals(row.status())) {
+                currentOnly.add(row.key());
+            }
+            else if ("missing current".equals(row.status())) {
+                baselineOnly.add(row.key());
+            }
+            else {
+                matched.add(row.key());
+            }
+        }
+        markdown.append("## Scenario Completeness\n\n");
+        markdown.append("- Matched benchmark/mode rows: **").append(matched.size()).append("**.\n");
+        markdown.append("- Current-only rows: **").append(currentOnly.size()).append("**.\n");
+        markdown.append("- Baseline-only rows: **").append(baselineOnly.size()).append("**.\n");
+        markdown.append("- Deltas are calculated only for matched rows; missing rows remain explicit and are never compared.\n\n");
     }
 
     private static boolean crossesReviewTrigger(Metric current, Metric baseline, Double relativeDeltaPercent, Double absoluteDelta) {

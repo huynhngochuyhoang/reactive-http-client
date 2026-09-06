@@ -1032,26 +1032,26 @@ Evidence recorded on 2026-09-05 from baseline commit
 
 ## Priority 12 - Performance and Allocation Re-Audit
 
-### [ ] 12.1 Keep disabled paths allocation-neutral
+### [x] 12.1 Keep disabled paths allocation-neutral
 
-- [ ] Add or update JMH coverage for publisher creation and subscription when
+- [x] Add or update JMH coverage for publisher creation and subscription when
       caching is unselected, selected without memory accounting, and selected
       with metrics disabled.
-- [ ] Prove no manager, meter, weigher, value inspection, or accounting object is
+- [x] Prove no manager, meter, weigher, value inspection, or accounting object is
       created for cache-disabled clients.
-- [ ] Keep benchmark scenario discovery compatible with published `4.1.0` and
+- [x] Keep benchmark scenario discovery compatible with published `4.1.0` and
       record dependency/commit provenance.
 
-### [ ] 12.2 Measure selected paths
+### [x] 12.2 Measure selected paths
 
-- [ ] Measure hit, miss publication, rejected/bypassed admission, size/weight
+- [x] Measure hit, miss publication, rejected/bypassed admission, size/weight
       eviction, single-flight attachment, refresh replacement, and accounting in
       no-network and loopback modes.
-- [ ] Separate throughput/latency, allocation per operation, retained live-set,
+- [x] Separate throughput/latency, allocation per operation, retained live-set,
       and one-time setup costs.
-- [ ] Use JFR/heap evidence to distinguish transient measurement allocation from
+- [x] Use JFR/heap evidence to distinguish transient measurement allocation from
       retained entries and metadata.
-- [ ] Record scenario completeness and missing published-baseline scenarios
+- [x] Record scenario completeness and missing published-baseline scenarios
       instead of comparing mismatched rows.
 
 ### [ ] 12.3 Classify public performance evidence
@@ -1059,12 +1059,54 @@ Evidence recorded on 2026-09-05 from baseline commit
 - [ ] Run current and published `4.1.0` release-quality benchmarks on the same
       clean machine only if request-path behavior changes or release wording
       makes a performance claim.
-- [ ] Keep generated reports target-only unless a source-controlled promoted
+- [x] Keep generated reports target-only unless a source-controlled promoted
       report is required for a public claim.
-- [ ] Record a no-public-claim deferral when release notes make no performance,
+- [x] Record a no-public-claim deferral when release notes make no performance,
       latency, percentile, throughput, allocation, or overhead movement claim.
-- [ ] Run benchmark report-path/provenance guards and `git diff --check` before
+- [x] Run benchmark report-path/provenance guards and `git diff --check` before
       closing this priority.
+
+Implementation evidence recorded on 2026-09-06 from starting commit
+`116c8b035e7e449cec8c33eea52cbe6cca1d127a` plus this reviewed change:
+
+- Cache-disabled standard clients now receive no `LocalResponseCacheManager`;
+  focused coverage also proves that no cache meter is registered. Because the
+  manager is the owner of policy caches, weighers, measurement state, and cached
+  value inspection, those objects cannot be reached or created on this path.
+- `StarterInvocationBenchmark` covers cache-disabled publisher creation and
+  subscription. `V29WeightedCachePerformanceBenchmark` separates unweighted and
+  weighted-metrics-disabled invocation, then measures hit, miss publication,
+  over-budget bypass, size/weight eviction, single-flight attachment, refresh
+  replacement, and accounting in no-network and IPv4-loopback fixtures. JMH
+  throughput and average-time modes are separate, release runs attach `-prof gc`,
+  and all fixture construction and seeding remains trial-scoped.
+- `V29WeightedCachePerformanceBenchmarkTest` exercised every declared V29 row.
+  The complete starter and benchmark-module runs passed 1,294 and 21 tests,
+  respectively, with no failures, errors, or skips. A 46-row smoke run passed and
+  remains target-only under
+  `target/release-evidence/v29/priority12/smoke/`; its environment records
+  `116c8b035e7e449cec8c33eea52cbe6cca1d127a-dirty`, so it is not promotable
+  numerical evidence.
+- Current-harness discovery passed with every V29 scenario. The same harness
+  compiled and discovered against published starter `4.1.0` from an isolated
+  repository after excluding only V29-only sources. Central-marked POM/JAR
+  provenance is retained target-only under
+  `target/release-evidence/v29/priority12/published-baseline-provenance/`.
+- The bounded V29 workload JFR was regenerated under
+  `target/release-evidence/v29/priority2/profiling/`. Its allocation samples are
+  treated as transient evidence; post-GC occupancy, eviction, close, and
+  collectability tests remain the retained-live-set evidence. JFR and heap data
+  stay target-only because they can contain application material.
+- The comparator now reports matched, current-only, and baseline-only scenario
+  counts and calculates deltas only for exactly matched benchmark/mode rows.
+  Documentation guards cover baseline source exclusions and command provenance;
+  `git diff --check` passed. Unreleased wording makes no numerical performance,
+  latency, percentile, throughput, allocation, or overhead movement claim, so no
+  report is promoted.
+- The release-quality current and published `4.1.0` pair remains open because
+  this change removes disabled-path manager allocation. Run it from the same
+  clean committed tree and machine using the V29 commands in
+  `docs/22-benchmarks.md`; do not promote or compare the dirty smoke numbers.
 
 ---
 

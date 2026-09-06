@@ -278,8 +278,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 ? resilienceOperatorApplier
                 : new NoopResilienceOperatorApplier();
         this.jsonCodec = jsonCodec;
-        this.responseCacheManager = Objects.requireNonNull(
-                responseCacheManager, "responseCacheManager must not be null");
+        this.responseCacheManager = responseCacheManager;
         this.cacheAuthProvider = cacheAuthProvider;
         this.baseUrl = baseUrl;
         validateCacheAuthorizationSupportAtConstruction();
@@ -393,6 +392,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 : null;
         if (cacheDecision != null && cacheDecision.cacheable()) {
             EffectiveCachePolicy.Selection cacheSelection = cacheDecision.selection();
+            LocalResponseCacheManager cacheManager = Objects.requireNonNull(
+                    responseCacheManager, "A cache-selected method requires a local response cache manager");
             requireCacheAuthorizationSupport();
             Object[] invocationArguments = args != null ? args.clone() : new Object[0];
             Mono<?> cacheInvocation = Mono.deferContextual(context -> {
@@ -433,7 +434,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                                                 new AtomicReference<>(authorization.authContext()), responseMetadata,
                                                                 loadState, finalLoadRequestIdentity,
                                                                 cacheSelection.policy().getMaximumTotalDecodedResponseBytes());
-                                                return responseCacheManager.getOrLoad(
+                                                return cacheManager.getOrLoad(
                                                         cacheSelection,
                                                         preparedKey.key(),
                                                         plan.apiName(),
