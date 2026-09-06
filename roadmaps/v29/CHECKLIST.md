@@ -1270,11 +1270,11 @@ Evidence recorded on 2026-09-06 from clean commit
 
 ### [ ] 13.4 Select release scope and close V29
 
-- [ ] Select `4.2.0` only when the final scope is additive, bounded, measurable,
+- [x] Select `4.2.0` only when the final scope is additive, bounded, measurable,
       and supported by immutable evidence.
-- [ ] If only compatible retention defects are proven, choose an appropriate
+- [x] If only compatible retention defects are proven, choose an appropriate
       maintenance release path or record why the `4.2.0` feature scope is no-go.
-- [ ] Record one explicit go/no-go decision with candidate version, commit, date,
+- [x] Record one explicit go/no-go decision with candidate version, commit, date,
       evidence paths, benchmark disposition, and remaining risk.
 - [ ] On go, cut/publish only from the reviewed clean commit and run generation-
       packaging/signing checks.
@@ -1285,23 +1285,59 @@ Evidence recorded on 2026-09-06 from clean commit
       on no-go, keep unreleased coordinates private and document the blocker or
       narrowed maintenance scope.
 
+Release decision recorded on 2026-09-06:
+
+- **GO to the `4.2.0` release cut; publication is not yet claimed.** The selected
+  scope is the additive, explicitly selected decoded-response representation-byte
+  admission and eviction contract approved in Priority 4. Existing count-only
+  policies remain compatible, no exact heap/RSS/container-memory claim is made,
+  and no performance claim is attached to the release.
+- The maintenance/no-go branch was evaluated and rejected because V29 contains
+  the reviewed additive weighted-admission surface in addition to compatible
+  retention fixes. Immutable behavior evidence comes from clean commit
+  `e5e82e402d521071b8fd6480b1db39c042c07bf4`; release-cut preparation is based
+  on `6d51837a` plus this uncommitted final-version change set. The eventual tag
+  must identify the reviewed commit containing these exact changes.
+- Root, starter, test-helper, OTel, native-smoke, benchmark, and assembled-
+  consumer coordinates now resolve to final `4.2.0`. Public dependency snippets,
+  published-consumer/API baselines, and published benchmark baselines remain on
+  `4.1.0` until Central verification succeeds.
+- `mvn -B -ntp clean verify` passed 1,413 tests with no failures, errors, or
+  skips. Strict root API compatibility against published `4.1.0` passed. The
+  isolated current-consumer lane passed 63 mock, seven assembled-consumer, and
+  one cache-disabled test. `mvn -B -ntp -s .mvn/maven-central-settings.xml
+  clean -Prelease -DskipTests -Dgpg.skip=true verify`, generation packaging, the
+  46-test documentation/release-artifact suite, and `git diff --check` passed.
+- Candidate artifacts, current-consumer provenance, packaging reports, generated
+  readiness, and the immutable Priority 13.3 bundle are under
+  `target/release-evidence/v29/priority13/`. Generated readiness reports
+  `release-candidate`, selected `additive-minor` scope, candidate `4.2.0`, latest
+  published baseline `4.1.0`, and `publication` as the only candidate-state
+  pending work.
+- Remaining risk is operational rather than an unreviewed scope change: the
+  signed release preflight still requires usable GPG credentials, the final tree
+  must be committed and tagged, the workflow must publish all parent/module
+  artifacts, and fresh Central-only artifact plus assembled-consumer checks must
+  pass. Until those facts exist, the three publication/archive items above and
+  the V29 completion heading remain open.
+
 ---
 
 ## Completion Criteria
 
 V29 is complete only when:
 
-- [ ] Production memory growth has a reproducible classification with separated
+- [x] Production memory growth has a reproducible classification with separated
       heap, direct-memory, transport, cache, and application evidence.
-- [ ] Every starter-owned cache entry, key, generation record, flight, waiter,
+- [x] Every starter-owned cache entry, key, generation record, flight, waiter,
       refresh, meter, request snapshot, auth context, and callback has a proven
       terminal owner and release path.
-- [ ] Weighted admission either has one precise, bounded, non-heap unit and an
+- [x] Weighted admission either has one precise, bounded, non-heap unit and an
       explicit go decision, or is source-controlled as no-go with no placeholder
       public surface.
-- [ ] Existing policies remain compatible and no new cache-memory behavior or
+- [x] Existing policies remain compatible and no new cache-memory behavior or
       telemetry activates without explicit selection.
-- [ ] Mock, consumer, API, AOT, native, shutdown, performance, documentation, and
+- [x] Mock, consumer, API, AOT, native, shutdown, performance, documentation, and
       operations evidence agree with the selected scope.
 - [ ] Release publication and baseline movement occur only after fresh Central
       artifact and assembled-consumer verification.

@@ -210,8 +210,8 @@ created weighted policy caches only. It is `null` when the client/cache manager
 has not been created or when any active policy omits the byte bound. Diagnostics
 read the cache's aggregate counter and never invoke a weigher, enumerate keys,
 or traverse cached values. An empty or closed existing manager reports zero.
-Both decoded-response-byte fields are additive `4.2.0-SNAPSHOT`/V29 schema-v1
-fields; published `4.1.x` responses omit them. Their unit is decoded response
+Both decoded-response-byte fields are additive unpublished `4.2.0`/V29
+release-candidate schema-v1 fields; published `4.1.x` responses omit them. Their unit is decoded response
 representation bytes, while `cacheMaximumSize` continues to count entries.
 Empty lists and
 `false` mean the provider proved no selected cache method; `null` means the fact

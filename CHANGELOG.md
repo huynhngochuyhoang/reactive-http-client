@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-09-06
+
+- **`4.2.0` release candidate (pending publication).** This additive minor
+  release adds optional decoded-response representation-byte admission and
+  eviction to explicitly selected local response-cache policies. Existing
+  count-only policies remain unchanged when the new bound is omitted. The unit
+  is not exact Java heap, direct memory, process RSS, or container memory, and
+  this release makes no numerical or comparative performance claim.
+
 ### Added
 - **Optional decoded-response byte admission.** Cache policies that set
   `maximum-total-decoded-response-bytes` now measure the final successful unary
@@ -1797,7 +1806,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.1.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.6.0...v4.0.0
 [3.6.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.5.0...v3.6.0

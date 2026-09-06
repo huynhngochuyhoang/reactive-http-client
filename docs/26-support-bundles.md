@@ -344,7 +344,7 @@ the shell also verifies that curl reported a successful transfer, the quarantine
 raw file exists, and the file is at most 1 MiB; this bounds whitespace and other
 bytes that compacted `tojson` does not measure.
 The two V29 decoded-response byte fields are optional only when `projectVersion`
-identifies a published `4.1.x` response. A V29 `4.2.0-SNAPSHOT` response must
+identifies a published `4.1.x` response. A V29 `4.2.0` response must
 include both fields, although their values may be `null` where the diagnostics
 contract permits an unknown state. When both fields are numeric, retained
 decoded-response bytes cannot exceed the configured aggregate maximum. Likewise,
@@ -903,7 +903,7 @@ general performance evidence:
   `cacheSemanticReadAcknowledged`. These are the published `4.1.0` cache
   diagnostics fields. The last three are bounded structural policy facts; they
   never contain request targets or selected values.
-- V29 snapshot-only diagnostics fields:
+- V29 release-candidate diagnostics fields:
   `cacheMaximumTotalDecodedResponseBytes` and
   `cacheRetainedDecodedResponseBytes`.
   `cacheMaximumTotalDecodedResponseBytes` is the finite sum across selected
@@ -940,13 +940,13 @@ the capture-window start, end, and every duration unit explicit. The fixture is
 not a dump format: do not add keys, digests, values, arguments, request variants,
 header/body content, concrete URLs, identity values, or credentials.
 
-### Cache-memory capture (V29 snapshot only)
+### Cache-memory capture (V29 / `4.2.0` candidate)
 
 Published `4.1.0` incidents use the explicitly enumerated published fields and
 ordinary lookup/load/refresh/TTL/size activity above. They do not include the
-two V29 snapshot-only decoded-response-byte diagnostics fields, weight eviction,
+two V29 release-candidate decoded-response-byte diagnostics fields, weight eviction,
 or admission outcomes. Those signals exist only on the current
-`4.2.0-SNAPSHOT`/V29 development line until released; their absence in
+unpublished `4.2.0`/V29 release candidate until Central publishes it; their absence in
 `4.1.0` is version scope, not evidence that their value is zero.
 
 The V29 values are decoded response representation bytes; `maximum-size` is
@@ -1018,7 +1018,7 @@ counts and fixed structural enums are sufficient for this fixture.
 
 RSS is not Java heap, and decoded-response representation bytes are not response
 wire bytes or an object-graph heap measurement. Correlate the fixture with the
-[cache-memory decision tree](30-operations-troubleshooting.md#cache-memory-triage-v29-snapshot-only)
+[cache-memory decision tree](30-operations-troubleshooting.md#cache-memory-triage-v29-420-candidate)
 rather than adding raw application material.
 
 Heap dumps and JFR recordings can contain payloads, object values, credentials,
