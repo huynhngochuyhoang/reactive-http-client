@@ -47,7 +47,7 @@ historical evidence.
 | Upload stalls, cancellation, leaked buffers, or incomplete stream | Declared body/return shape, subscription and cancellation boundary, consumer release/forwarding path | [Streaming ownership](#streaming-ownership) |
 | OAuth2 refresh storm, token endpoint failure, or downstream 401 | Logical client name, sanitized auth mode, token endpoint status and safe headers, refresh/cooldown timing | [OAuth2 refresh](#oauth2-refresh) |
 | Unexpected stale value, miss storm, refresh failure, or cache capacity pressure | Effective cache phase/TTL/capacity, bounded hit/miss/load/refresh/eviction rates, process instance | [Response cache behavior (4.0.0+)](#response-cache-behavior-400) |
-| Pod memory grows after enabling response caching | Published/snapshot version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (V29 snapshot only)](#cache-memory-triage-v29-snapshot-only) |
+| Pod memory grows after enabling response caching | Published/candidate version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (V29 / `4.2.0` candidate)](#cache-memory-triage-v29-420-candidate) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
 
 ## Evidence boundary
@@ -327,7 +327,7 @@ and capture the bounded
 Never collect cache keys, values, selected arguments, headers, bodies, tenant
 values, or credentials.
 
-### Cache-memory triage (V29 snapshot only)
+### Cache-memory triage (V29 / `4.2.0` candidate)
 
 Published `4.1.0` exposes the entry-count and cache-activity signals documented
 above, but it does not expose V29's decoded-response-byte capacity/occupancy
@@ -336,7 +336,7 @@ gauges or admission outcomes. Do not search a `4.1.0` incident for
 `reactive.http.client.cache.retained.decoded.response.bytes`,
 `reactive.http.client.cache.maximum.decoded.response.bytes`, or
 `reactive.http.client.cache.admissions`. Those signals apply only to the current
-`4.2.0-SNAPSHOT`/V29 development line until a release publishes them.
+unpublished `4.2.0`/V29 release candidate until Central publishes it.
 
 Use one fixed, bounded time window and compare the same process instance before
 and after each step:
@@ -396,7 +396,7 @@ bytes. `maximum-size` remains the independent entry-count bound. See
 [Response Caching](32-response-caching.md#explicit-selection).
 
 Capture the bounded
-[cache-memory fixture](26-support-bundles.md#cache-memory-capture-v29-snapshot-only)
+[cache-memory fixture](26-support-bundles.md#cache-memory-capture-v29-420-candidate)
 with the ordinary response-cache bundle. Heap dumps and JFR recordings are not
 part of that reviewable fixture because they can contain application data; use
 the separately approved secure-artifact process described there.

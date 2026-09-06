@@ -129,7 +129,8 @@ reactive:
 
 ## Explicit Local Response Cache
 
-This weighted example targets the current (`4.2.0-SNAPSHOT`) V29 line and
+This weighted example targets the current unpublished `4.2.0` V29 release
+candidate and
 selects one bounded local policy explicitly. Published `4.1.x` consumers must
 omit `maximum-total-decoded-response-bytes`; TTL, entry-count `maximum-size`,
 single flight, refresh, and cache telemetry remain available there. The V29

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "captureScope": "cache-memory",
-  "signalAvailability": "4.2.0-SNAPSHOT-v29",
+  "signalAvailability": "4.2.0-v29-candidate",
   "window": {
     "startedAt": "2026-01-01T00:00:00Z",
     "endedAt": "2026-01-01T00:05:00Z",
@@ -302,7 +302,7 @@
         "capturedAt": "2025-12-31T23:55:00Z",
         "type": "starter-version",
         "beforeVersion": "4.1.0",
-        "afterVersion": "4.2.0-SNAPSHOT"
+        "afterVersion": "4.2.0"
       }
     ]
   }
