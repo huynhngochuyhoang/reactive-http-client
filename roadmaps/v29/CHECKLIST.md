@@ -1054,9 +1054,9 @@ Evidence recorded on 2026-09-05 from baseline commit
 - [x] Record scenario completeness and missing published-baseline scenarios
       instead of comparing mismatched rows.
 
-### [ ] 12.3 Classify public performance evidence
+### [x] 12.3 Classify public performance evidence
 
-- [ ] Run current and published `4.1.0` release-quality benchmarks on the same
+- [x] Run current and published `4.1.0` release-quality benchmarks on the same
       clean machine only if request-path behavior changes or release wording
       makes a performance claim.
 - [x] Keep generated reports target-only unless a source-controlled promoted
@@ -1112,14 +1112,14 @@ Implementation evidence recorded on 2026-09-06 from starting commit
   through the full overload, verifies the `MISS_LOADER` caller metric, and holds
   the server response until the manager observes the attached waiter.
 - The corrected focused contract, complete benchmark-module tests, current
-  scenario discovery, and a four-row targeted JMH smoke passed. That smoke is
-  intentionally dirty/target-only; rerun the 46-row current release profile from
-  the corrected clean commit and regenerate the comparison before re-closing
-  this gate. The published `4.1.0` workload is unchanged because the corrected
-  V29-only fixture is excluded by the baseline source profile, but recreate its
-  target-only report and provenance with the documented three-command sequence
-  so the final evidence pair remains present together.
-- The initial comparison recorded six matched cache-disabled rows, 40 explicit
+  scenario discovery, and a four-row targeted JMH smoke passed. Release-quality
+  evidence was then regenerated from clean commit
+  `799f5ba07ddde56dd07b48395a1742011540bd62`: the current report contains 46
+  rows and the published report contains six, with normalized GC allocation per
+  operation present on every row. Both runs used Java `25.0.3`, eight processors,
+  Spring Boot `4.0.0`, Spring Framework `7.0.1`, Reactor Netty `1.3.0`, Netty
+  `4.2.7.Final`, Jackson `3.0.2`, Micrometer `1.16.0`, and OpenTelemetry `1.55.0`.
+- The final comparison records six matched cache-disabled rows, 40 explicit
   V29-only rows, no baseline-only rows, and no informational review trigger.
   Published starter `4.1.0` resolved from the fresh isolated repository; immutable
   provenance records its Central-marked POM SHA-256
