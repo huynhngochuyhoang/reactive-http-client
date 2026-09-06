@@ -129,10 +129,13 @@ reactive:
 
 ## Explicit Local Response Cache
 
-This `4.0.0+` example selects one bounded local policy explicitly.
-The aggregate decoded-response-byte limit, single flight, access refresh, and
-cache telemetry are independent choices. The byte limit is additional to TTL
-and `maximum-size`; it is not a Java heap or process-memory limit. Add
+This weighted example targets the current (`4.2.0-SNAPSHOT`) V29 line and
+selects one bounded local policy explicitly. Published `4.1.x` consumers must
+omit `maximum-total-decoded-response-bytes`; TTL, entry-count `maximum-size`,
+single flight, refresh, and cache telemetry remain available there. The V29
+byte limit is additional to TTL and `maximum-size` and counts decoded response
+representation bytes, not exact Java heap, direct memory, process RSS, or
+container memory. Add
 the optional runtime described in the
 [Caffeine dependency instructions](../32-response-caching.md#explicit-selection)
 before selecting the policy. With that dependency present, this example is

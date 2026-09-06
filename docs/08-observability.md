@@ -147,6 +147,13 @@ method explicitly selects a cache policy, and
 `reactive.http.observability.cache.enabled=true`. The cache-observability switch
 does not select caching and does not enable Caffeine's library statistics.
 
+Published `4.1.x` exports the entry-count and cache-activity meters. V29
+(`4.2.0-SNAPSHOT`) adds the weighted gauges, `cause="weight"` eviction series,
+and admission counter only for policies that select
+`maximum-total-decoded-response-bytes`. `maximum-size` remains an entry-count
+bound. Decoded response representation bytes are not exact Java heap, direct
+memory, process RSS, or container memory.
+
 | Meter | Type | Tags | Meaning |
 |---|---|---|---|
 | `reactive.http.client.cache.lookups` | Counter | `client.name`, `api.name`, `result=hit|miss` | One cache lookup result per caller. Use only this meter for hit ratio. |

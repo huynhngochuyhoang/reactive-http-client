@@ -200,3 +200,13 @@ implicitly accepted consequence of the major version.
 - Latest published and API baseline: `4.1.0`.
 - Public README and quick-start coordinates: `4.1.0`.
 - Development continues on `4.2.0-SNAPSHOT`; no `4.2.0` release scope is selected.
+
+## Post-`4.1.0` cache compatibility
+
+The V29 weighted-cache addition does not change the resilience migration or
+activate a cache or Resilience4j operator. Published `4.1.x` retains TTL plus
+entry-count `maximum-size`. The current `4.2.0-SNAPSHOT` line optionally adds
+`maximum-total-decoded-response-bytes` to policies that select it. That unit is
+decoded response representation bytes, not exact Java heap, direct memory,
+process RSS, or container memory. See
+[Response Caching](32-response-caching.md) for admission and version scope.

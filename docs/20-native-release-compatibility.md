@@ -527,6 +527,33 @@ has an `AnnotationDefault` attribute.
 annotation use against both API forms and runs the `4.0.0`-compiled declaration
 with the current false default. Other abstract-method additions remain strict.
 
+### V29 additive surface classification
+
+The V29 public surface was added only after the retained-weight decision selected
+decoded response representation bytes. Strict root and starter-module japicmp
+comparisons against published `4.1.0` passed from independent fresh target-local
+Maven repositories. No incompatible Java API row was accepted.
+
+| Artifact | Reported `4.1.0` to `4.2.0-SNAPSHOT` row | Classification |
+|---|---|---|
+| Starter | `CachePolicyConfig.getMaximumTotalDecodedResponseBytes()` and `setMaximumTotalDecodedResponseBytes(Long)` | Additive mutable binding-model accessors. The existing implicit no-arg constructor and all prior accessors retain their contract. |
+| Starter diagnostics | `ReactiveHttpClientDiagnosticsProvider` and `ReactiveHttpClientDiagnosticsSnapshot` modified-class markers with no public member row | Implementation-only Java changes. The two decoded-response-byte additions are nullable schema-v1 map fields; public diagnostics record constructors are unchanged. |
+| Test helper | `MockReactiveHttpClient.cacheSnapshot()` and the four-argument weighted `Builder.cachePolicy(...)` overload | Additive methods; the published count-only overload remains unchanged. |
+| Test helper | `MockReactiveHttpClient.CacheSnapshot`, its canonical constructor, and record accessors | New immutable public nested helper. Its nullable retained-byte component preserves unknown for count-only policies. |
+| OpenTelemetry companion | No change | No V29 public API delta. |
+
+No annotation default, public cache SPI, replacement-bean contract, existing
+public constructor, or existing mutable-model behavior changed in V29. Existing
+application replacements for `ReactiveHttpClientProperties` and
+`MethodMetadataCache` remain authoritative at runtime and during AOT validation.
+The diagnostics additions do not change schema version or force unknown values
+to zero.
+
+The no-go path remains viable without a placeholder API: the spike and decision
+records stay under `roadmaps/v29/`, while cache engines, weighers, admission
+state, and meter ownership remain package-private implementation. The selected
+production setting and mock additions above are the complete V29 public delta.
+
 Cache engines and keying machinery remain implementation details:
 `LocalResponseCache`, `LocalResponseCacheManager`, `CaffeineLocalResponseCache`,
 `LocalResponseCacheMetrics`, `MicrometerLocalResponseCacheMetrics`,

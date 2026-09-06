@@ -9,6 +9,12 @@ terminal cache outcomes. Existing explicit `GET` selection remains the
 cache-friendly path; `GET` is not cached automatically. The `4.1.x` line also
 permits one specific non-`GET` method to opt in as a semantic read.
 
+The optional decoded-response representation-byte bound is a
+`4.2.0-SNAPSHOT`/V29 feature and is not available in published `4.1.x`.
+`maximum-size` continues to count entries. The optional byte value counts the
+decoded response representation retained by the cache; it is not exact Java
+heap, direct memory, process RSS, or container memory.
+
 ## Explicit selection
 
 Define named policies under one client. A policy definition is inert until the

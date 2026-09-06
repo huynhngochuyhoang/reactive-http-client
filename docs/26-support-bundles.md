@@ -949,6 +949,11 @@ or admission outcomes. Those signals exist only on the current
 `4.2.0-SNAPSHOT`/V29 development line until released; their absence in
 `4.1.0` is version scope, not evidence that their value is zero.
 
+The V29 values are decoded response representation bytes; `maximum-size` is
+still an entry count. Neither value is exact Java heap, direct memory, process
+RSS, or container memory. Keep those process-memory domains as separate
+checkpoint fields.
+
 Use the source-controlled
 [cache-memory fixture](fixtures/support-bundle-cache-memory.json) for one fixed
 five-minute window around the symptom. It keeps the following domains separate:
