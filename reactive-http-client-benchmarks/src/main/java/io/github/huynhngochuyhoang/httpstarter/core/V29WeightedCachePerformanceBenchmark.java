@@ -4,6 +4,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.CacheResponse;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -39,6 +40,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 @State(Scope.Benchmark)
 @BenchmarkMode({Mode.Throughput, Mode.AverageTime})
@@ -51,11 +53,13 @@ public class V29WeightedCachePerformanceBenchmark {
     private static final long VALUE_BYTES = VALUE.getBytes(StandardCharsets.UTF_8).length;
     private static final long TTL_MS = Duration.ofDays(1).toMillis();
     private static final long MAXIMUM_SIZE = 256;
+    private static final String METERED_API = "weighted.accounting";
 
     private final AtomicLong sequence = new AtomicLong();
     private final AtomicLong ticker = new AtomicLong();
     private final AtomicLong loopbackTicker = new AtomicLong();
     private final AtomicLong loopbackDispatches = new AtomicLong();
+    private final AtomicReference<Sinks.One<Void>> loopbackSingleFlightRelease = new AtomicReference<>();
 
     private GenericApplicationContext noNetworkContext;
     private LocalResponseCacheManager unweightedInvocationManager;
@@ -206,7 +210,18 @@ public class V29WeightedCachePerformanceBenchmark {
 
     @Benchmark
     public LocalResponseCacheManager.Snapshot cacheV29NoNetworkMeteredAccountingPublication() {
-        weightedCached(meteredManager, meteredSelection, nextKey("metered"), VALUE, VALUE_BYTES).block();
+        SubscriptionReportingState callerState = reportingState();
+        meteredManager.getOrLoad(
+                meteredSelection,
+                nextKey("metered"),
+                METERED_API,
+                ignored -> Mono.just(VALUE),
+                () -> responseMetadata(meteredSelection, VALUE_BYTES),
+                callerState,
+                reportingState()).block();
+        if (callerState.cacheOutcome() != HttpClientCacheOutcome.MISS_LOADER) {
+            throw new IllegalStateException("Expected a metered miss-loader caller outcome");
+        }
         return meteredManager.snapshot();
     }
 
@@ -249,12 +264,24 @@ public class V29WeightedCachePerformanceBenchmark {
     public List<String> cacheV29LoopbackSingleFlightAttachment() {
         long before = loopbackDispatches.get();
         String id = nextId("single");
+        Sinks.One<Void> release = Sinks.one();
+        if (!loopbackSingleFlightRelease.compareAndSet(null, release)) {
+            throw new IllegalStateException("A prior loopback single-flight gate is still active");
+        }
         Mono<String> call = loopbackClient.single(id);
-        CompletableFuture<String> leader = call.toFuture();
-        CompletableFuture<String> waiter = call.toFuture();
-        List<String> result = List.of(requireValue(leader.join()), requireValue(waiter.join()));
-        requireDispatchDelta(before, 1, "single-flight attachment");
-        return result;
+        try {
+            CompletableFuture<String> leader = call.toFuture();
+            CompletableFuture<String> waiter = call.toFuture();
+            awaitCoalescedWaiter(loopbackManager);
+            release.tryEmitEmpty().orThrow();
+            List<String> result = List.of(requireValue(leader.join()), requireValue(waiter.join()));
+            requireDispatchDelta(before, 1, "single-flight attachment");
+            return result;
+        }
+        finally {
+            release.tryEmitEmpty();
+            loopbackSingleFlightRelease.compareAndSet(release, null);
+        }
     }
 
     @Benchmark
@@ -323,7 +350,7 @@ public class V29WeightedCachePerformanceBenchmark {
 
         meterRegistry = new SimpleMeterRegistry();
         LocalResponseCacheMetrics metrics = LocalResponseCacheMetrics.enabled(meterRegistry, "benchmark-v29");
-        metrics.registerApi("weighted.accounting");
+        metrics.registerApi(METERED_API);
         meteredManager = LocalResponseCacheManager.testing(
                 ticker::get, refreshScheduler, metrics, "benchmark-v29");
         meteredSelection = selection("metered", MAXIMUM_SIZE, 1_024L, false, null, null);
@@ -337,9 +364,19 @@ public class V29WeightedCachePerformanceBenchmark {
                     loopbackDispatches.incrementAndGet();
                     String requestTarget = request.uri();
                     String value = requestTarget.contains("/v29/bypass/") ? "oversized" : VALUE;
-                    Mono<String> body = requestTarget.contains("/v29/single/")
-                            ? Mono.delay(Duration.ofMillis(2)).map(ignored -> value)
-                            : Mono.just(value);
+                    Mono<String> body;
+                    if (requestTarget.contains("/v29/single/")) {
+                        Sinks.One<Void> release = loopbackSingleFlightRelease.get();
+                        if (release == null) {
+                            return response.status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                                    .sendString(Mono.just("missing single-flight gate"))
+                                    .then();
+                        }
+                        body = release.asMono().thenReturn(value);
+                    }
+                    else {
+                        body = Mono.just(value);
+                    }
                     return response.header("Content-Type", MediaType.TEXT_PLAIN_VALUE)
                             .sendString(body)
                             .then();
@@ -446,6 +483,32 @@ public class V29WeightedCachePerformanceBenchmark {
             Thread.onSpinWait();
         }
         throw new IllegalStateException("Timed out waiting for benchmark refresh completion");
+    }
+
+    private static void awaitCoalescedWaiter(LocalResponseCacheManager manager) {
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        while (System.nanoTime() < deadline) {
+            if (manager.workloadSnapshotForTesting().coalescedWaiters() == 1) {
+                return;
+            }
+            Thread.onSpinWait();
+        }
+        throw new IllegalStateException("Timed out waiting for the benchmark single-flight waiter");
+    }
+
+    double meteredCallerCount(String apiName) {
+        var counter = meterRegistry.find(LocalResponseCacheMetrics.PREFIX + ".callers")
+                .tags(
+                        "client.name", "benchmark-v29",
+                        "api.name", apiName,
+                        "outcome", HttpClientCacheOutcome.MISS_LOADER.name())
+                .counter();
+        return counter != null ? counter.count() : 0.0;
+    }
+
+    private static SubscriptionReportingState reportingState() {
+        return new SubscriptionReportingState(
+                new RequestArgumentResolver.ResolvedArgs(Map.of(), Map.of(), Map.of(), null));
     }
 
     private static void close(LocalResponseCacheManager manager) {

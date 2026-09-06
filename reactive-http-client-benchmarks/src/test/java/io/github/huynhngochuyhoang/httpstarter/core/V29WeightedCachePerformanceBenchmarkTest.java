@@ -25,7 +25,11 @@ class V29WeightedCachePerformanceBenchmarkTest {
                     .containsExactly("value", "value");
             assertThat(benchmark.cacheV29NoNetworkRefreshReplacement()).isPositive();
             assertThat(benchmark.cacheV29NoNetworkAccountingSnapshot().currentSize()).isPositive();
+            double meteredCallers = benchmark.meteredCallerCount("weighted.accounting");
             assertThat(benchmark.cacheV29NoNetworkMeteredAccountingPublication().currentSize()).isPositive();
+            assertThat(benchmark.meteredCallerCount("weighted.accounting"))
+                    .isEqualTo(meteredCallers + 1.0);
+            assertThat(benchmark.meteredCallerCount("unknown")).isZero();
 
             assertThat(benchmark.cacheV29LoopbackMissPublication()).isEqualTo("value");
             assertThat(benchmark.cacheV29LoopbackBypassedAdmission()).isEqualTo("oversized");

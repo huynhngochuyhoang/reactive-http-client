@@ -1054,9 +1054,9 @@ Evidence recorded on 2026-09-05 from baseline commit
 - [x] Record scenario completeness and missing published-baseline scenarios
       instead of comparing mismatched rows.
 
-### [x] 12.3 Classify public performance evidence
+### [ ] 12.3 Classify public performance evidence
 
-- [x] Run current and published `4.1.0` release-quality benchmarks on the same
+- [ ] Run current and published `4.1.0` release-quality benchmarks on the same
       clean machine only if request-path behavior changes or release wording
       makes a performance claim.
 - [x] Keep generated reports target-only unless a source-controlled promoted
@@ -1103,17 +1103,25 @@ Implementation evidence recorded on 2026-09-06 from starting commit
   `git diff --check` passed. Unreleased wording makes no numerical performance,
   latency, percentile, throughput, allocation, or overhead movement claim, so no
   report is promoted.
-- Release-quality current and published `4.1.0` runs completed on the same
-  machine after the implementation was committed as
-  `49e1cbc55ac8eee14c78a7228d9186a043bad9f6`. The current report contains 46
-  benchmark/mode rows and the published report contains six; every row includes
-  normalized GC allocation-per-operation evidence. Environment records use the
-  same Java `25.0.3`, eight processors, Spring Boot `4.0.0`, Spring Framework
-  `7.0.1`, Reactor Netty `1.3.0`, Netty `4.2.7.Final`, Jackson `3.0.2`,
-  Micrometer `1.16.0`, and OpenTelemetry `1.55.0` stack.
-- The comparison records six matched cache-disabled rows, 40 explicit V29-only
-  rows, no baseline-only rows, and no informational review trigger. Published
-  starter `4.1.0` resolved from the fresh isolated repository; immutable
+- Initial release-quality current and published `4.1.0` runs completed on the
+  same machine at commit `49e1cbc55ac8eee14c78a7228d9186a043bad9f6` with
+  normalized GC allocation evidence for every row. Subsequent review found that
+  the metrics-enabled row used the convenience manager overload and the
+  loopback single-flight row depended on a two-millisecond response delay. The
+  fixture now passes the registered API and representative caller/load states
+  through the full overload, verifies the `MISS_LOADER` caller metric, and holds
+  the server response until the manager observes the attached waiter.
+- The corrected focused contract, complete benchmark-module tests, current
+  scenario discovery, and a four-row targeted JMH smoke passed. That smoke is
+  intentionally dirty/target-only; rerun the 46-row current release profile from
+  the corrected clean commit and regenerate the comparison before re-closing
+  this gate. The published `4.1.0` workload is unchanged because the corrected
+  V29-only fixture is excluded by the baseline source profile, but recreate its
+  target-only report and provenance with the documented three-command sequence
+  so the final evidence pair remains present together.
+- The initial comparison recorded six matched cache-disabled rows, 40 explicit
+  V29-only rows, no baseline-only rows, and no informational review trigger.
+  Published starter `4.1.0` resolved from the fresh isolated repository; immutable
   provenance records its Central-marked POM SHA-256
   `52b40488a41dc6b4981dc0f21af956d55ea1b868ad2e238ba601b0fcaf7f5cb4`
   and JAR SHA-256
