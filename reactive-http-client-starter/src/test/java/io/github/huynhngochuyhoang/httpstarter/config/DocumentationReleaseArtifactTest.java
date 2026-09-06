@@ -2047,7 +2047,7 @@ class DocumentationReleaseArtifactTest {
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         String currentBaselineProfile = benchmarkPom.substring(
                 benchmarkPom.indexOf("<id>benchmark-published-baseline</id>"),
-                benchmarkPom.indexOf("<id>benchmark-published-baseline-v28-source-exclusion</id>"));
+                benchmarkPom.indexOf("<id>benchmark-published-baseline-v29-source-exclusion</id>"));
         int currentBaselineCommandStart = benchmarkDocs.indexOf(
                 "target/published-baseline-repositories/benchmark-4.1.0 &&");
         String currentBaselineCommand = benchmarkDocs.substring(currentBaselineCommandStart,
@@ -2063,13 +2063,16 @@ class DocumentationReleaseArtifactTest {
                 .contains("benchmark.micrometer.artifact")
                 .contains("benchmark.opentelemetry.artifact")
                 .contains("META-INF/*.SF")
+                .contains("<id>benchmark-published-baseline-v29-source-exclusion</id>")
                 .contains("<id>benchmark-published-baseline-v28-source-exclusion</id>")
                 .doesNotContain("<id>boot4-spike</id>");
         assertThat(currentBaselineProfile)
+                .doesNotContain("V29WeightedCachePerformanceBenchmark.java",
+                        "V29WeightedCachePerformanceBenchmarkTest.java")
                 .doesNotContain("V28SemanticReadCachePerformanceBenchmark.java",
                         "V28SemanticReadCachePerformanceBenchmarkTest.java");
         assertThat(currentBaselineCommand)
-                .contains("-Pbenchmarks,benchmark-release,benchmark-published-baseline")
+                .contains("-Pbenchmarks,benchmark-release,benchmark-published-baseline,benchmark-published-baseline-v29-source-exclusion")
                 .doesNotContain("benchmark-published-baseline-v28-source-exclusion");
         assertThat(codecFactory)
                 .contains("ReactiveHttpClientJsonCodec")
@@ -2079,6 +2082,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("### Spring Boot 4 release baseline")
                 .contains("-Pbenchmarks,benchmark-smoke")
                 .contains("-Dbenchmark.commit=$(git rev-parse --short HEAD)")
+                .contains("benchmark-published-baseline-v29-source-exclusion")
                 .contains("benchmark-published-baseline-v28-source-exclusion")
                 .doesNotContain("-Dbenchmark.commit=$(git rev-parse --short HEAD)-dirty")
                 .doesNotContain("-Pboot4-spike,benchmarks")
@@ -4491,7 +4495,7 @@ class DocumentationReleaseArtifactTest {
                 "test ! -e " + publishedBaselineRepository("benchmark", baselineVersion)
                         + " && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local="
                         + publishedBaselineRepository("benchmark", baselineVersion)
-                        + " -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version="
+                        + " -Pbenchmarks,benchmark-release,benchmark-published-baseline,benchmark-published-baseline-v29-source-exclusion -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version="
                         + baselineVersion + " -Dbenchmark.commit=" + baselineVersion
                         + " && scripts/verify-published-baseline-provenance.sh benchmark " + baselineVersion
                         + " target/release-evidence/published-baselines/benchmark-" + baselineVersion

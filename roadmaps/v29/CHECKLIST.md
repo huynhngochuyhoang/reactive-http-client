@@ -1032,39 +1032,102 @@ Evidence recorded on 2026-09-05 from baseline commit
 
 ## Priority 12 - Performance and Allocation Re-Audit
 
-### [ ] 12.1 Keep disabled paths allocation-neutral
+### [x] 12.1 Keep disabled paths allocation-neutral
 
-- [ ] Add or update JMH coverage for publisher creation and subscription when
+- [x] Add or update JMH coverage for publisher creation and subscription when
       caching is unselected, selected without memory accounting, and selected
       with metrics disabled.
-- [ ] Prove no manager, meter, weigher, value inspection, or accounting object is
+- [x] Prove no manager, meter, weigher, value inspection, or accounting object is
       created for cache-disabled clients.
-- [ ] Keep benchmark scenario discovery compatible with published `4.1.0` and
+- [x] Keep benchmark scenario discovery compatible with published `4.1.0` and
       record dependency/commit provenance.
 
-### [ ] 12.2 Measure selected paths
+### [x] 12.2 Measure selected paths
 
-- [ ] Measure hit, miss publication, rejected/bypassed admission, size/weight
+- [x] Measure hit, miss publication, rejected/bypassed admission, size/weight
       eviction, single-flight attachment, refresh replacement, and accounting in
       no-network and loopback modes.
-- [ ] Separate throughput/latency, allocation per operation, retained live-set,
+- [x] Separate throughput/latency, allocation per operation, retained live-set,
       and one-time setup costs.
-- [ ] Use JFR/heap evidence to distinguish transient measurement allocation from
+- [x] Use JFR/heap evidence to distinguish transient measurement allocation from
       retained entries and metadata.
-- [ ] Record scenario completeness and missing published-baseline scenarios
+- [x] Record scenario completeness and missing published-baseline scenarios
       instead of comparing mismatched rows.
 
-### [ ] 12.3 Classify public performance evidence
+### [x] 12.3 Classify public performance evidence
 
-- [ ] Run current and published `4.1.0` release-quality benchmarks on the same
+- [x] Run current and published `4.1.0` release-quality benchmarks on the same
       clean machine only if request-path behavior changes or release wording
       makes a performance claim.
-- [ ] Keep generated reports target-only unless a source-controlled promoted
+- [x] Keep generated reports target-only unless a source-controlled promoted
       report is required for a public claim.
-- [ ] Record a no-public-claim deferral when release notes make no performance,
+- [x] Record a no-public-claim deferral when release notes make no performance,
       latency, percentile, throughput, allocation, or overhead movement claim.
-- [ ] Run benchmark report-path/provenance guards and `git diff --check` before
+- [x] Run benchmark report-path/provenance guards and `git diff --check` before
       closing this priority.
+
+Implementation evidence recorded on 2026-09-06 from starting commit
+`116c8b035e7e449cec8c33eea52cbe6cca1d127a` plus this reviewed change:
+
+- Cache-disabled standard clients now receive no `LocalResponseCacheManager`;
+  focused coverage also proves that no cache meter is registered. Because the
+  manager is the owner of policy caches, weighers, measurement state, and cached
+  value inspection, those objects cannot be reached or created on this path.
+- `StarterInvocationBenchmark` covers cache-disabled publisher creation and
+  subscription. `V29WeightedCachePerformanceBenchmark` separates unweighted and
+  weighted-metrics-disabled invocation, then measures hit, miss publication,
+  over-budget bypass, size/weight eviction, single-flight attachment, refresh
+  replacement, and accounting in no-network and IPv4-loopback fixtures. JMH
+  throughput and average-time modes are separate, release runs attach `-prof gc`,
+  and all fixture construction and seeding remains trial-scoped.
+- `V29WeightedCachePerformanceBenchmarkTest` exercised every declared V29 row.
+  The complete starter and benchmark-module runs passed 1,294 and 21 tests,
+  respectively, with no failures, errors, or skips. A 46-row smoke run passed and
+  remains target-only under
+  `target/release-evidence/v29/priority12/smoke/`; its environment records
+  `116c8b035e7e449cec8c33eea52cbe6cca1d127a-dirty`, so it is not promotable
+  numerical evidence.
+- Current-harness discovery passed with every V29 scenario. The same harness
+  compiled and discovered against published starter `4.1.0` from an isolated
+  repository after excluding only V29-only sources. Central-marked POM/JAR
+  provenance is retained target-only under
+  `target/release-evidence/v29/priority12/published-baseline-provenance/`.
+- The bounded V29 workload JFR was regenerated under
+  `target/release-evidence/v29/priority2/profiling/`. Its allocation samples are
+  treated as transient evidence; post-GC occupancy, eviction, close, and
+  collectability tests remain the retained-live-set evidence. JFR and heap data
+  stay target-only because they can contain application material.
+- The comparator now reports matched, current-only, and baseline-only scenario
+  counts and calculates deltas only for exactly matched benchmark/mode rows.
+  Documentation guards cover baseline source exclusions and command provenance;
+  `git diff --check` passed. Unreleased wording makes no numerical performance,
+  latency, percentile, throughput, allocation, or overhead movement claim, so no
+  report is promoted.
+- Initial release-quality current and published `4.1.0` runs completed on the
+  same machine at commit `49e1cbc55ac8eee14c78a7228d9186a043bad9f6` with
+  normalized GC allocation evidence for every row. Subsequent review found that
+  the metrics-enabled row used the convenience manager overload and the
+  loopback single-flight row depended on a two-millisecond response delay. The
+  fixture now passes the registered API and representative caller/load states
+  through the full overload, verifies the `MISS_LOADER` caller metric, and holds
+  the server response until the manager observes the attached waiter.
+- The corrected focused contract, complete benchmark-module tests, current
+  scenario discovery, and a four-row targeted JMH smoke passed. Release-quality
+  evidence was then regenerated from clean commit
+  `799f5ba07ddde56dd07b48395a1742011540bd62`: the current report contains 46
+  rows and the published report contains six, with normalized GC allocation per
+  operation present on every row. Both runs used Java `25.0.3`, eight processors,
+  Spring Boot `4.0.0`, Spring Framework `7.0.1`, Reactor Netty `1.3.0`, Netty
+  `4.2.7.Final`, Jackson `3.0.2`, Micrometer `1.16.0`, and OpenTelemetry `1.55.0`.
+- The final comparison records six matched cache-disabled rows, 40 explicit
+  V29-only rows, no baseline-only rows, and no informational review trigger.
+  Published starter `4.1.0` resolved from the fresh isolated repository; immutable
+  provenance records its Central-marked POM SHA-256
+  `52b40488a41dc6b4981dc0f21af956d55ea1b868ad2e238ba601b0fcaf7f5cb4`
+  and JAR SHA-256
+  `d2989dd7cc668df2e77dea984d36108ae3a2b85abf4e1b07ee6feeb0095bd721`.
+  Reports and the comparison remain target-only because no public numerical
+  performance claim is made.
 
 ---
 

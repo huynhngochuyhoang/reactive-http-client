@@ -479,9 +479,8 @@ class LocalResponseCacheObservabilityTest {
                 observability,
                 registry);
 
-        assertThat(manager.snapshot().policyCount()).isZero();
+        assertThat(manager).isNull();
         assertThat(registry.getMeters()).noneMatch(LocalResponseCacheObservabilityTest::isCacheMeter);
-        manager.close();
     }
 
     @Test

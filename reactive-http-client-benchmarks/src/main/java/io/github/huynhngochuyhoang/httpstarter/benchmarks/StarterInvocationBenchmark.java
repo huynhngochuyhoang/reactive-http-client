@@ -100,6 +100,13 @@ public class StarterInvocationBenchmark {
     @Benchmark
     @BenchmarkMode({Mode.Throughput, Mode.AverageTime})
     @OutputTimeUnit(TimeUnit.MICROSECONDS)
+    public BenchmarkUser cacheDisabledProxyInvocationSubscription() {
+        return starterClient.findUser("42", "summary", "benchmark").block();
+    }
+
+    @Benchmark
+    @BenchmarkMode({Mode.Throughput, Mode.AverageTime})
+    @OutputTimeUnit(TimeUnit.MICROSECONDS)
     public Mono<BenchmarkUser> cacheDisabledPostJsonProxyInvocationCreatesPublisher() {
         return starterClient.createUser(CREATE_USER);
     }

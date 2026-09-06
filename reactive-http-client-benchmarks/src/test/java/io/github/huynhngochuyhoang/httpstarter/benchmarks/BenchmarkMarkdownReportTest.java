@@ -112,6 +112,20 @@ class BenchmarkMarkdownReportTest {
     }
 
     @Test
+    void classifiesV29AccountingAndLoopbackRowsSeparately() throws Exception {
+        String report = renderReport(
+                result("io.github.huynhngochuyhoang.httpstarter.core.V29WeightedCachePerformanceBenchmark.cacheV29NoNetworkWeightEviction",
+                        "avgt", 3.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.core.V29WeightedCachePerformanceBenchmark.cacheV29LoopbackWeightEviction",
+                        "avgt", 30.0, "us/op"));
+
+        assertThat(report)
+                .contains("| cacheV29NoNetworkWeightEviction | V29 no-network cache accounting |")
+                .contains("| cacheV29LoopbackWeightEviction | V29 cache loopback workload |")
+                .contains("Retained live-set evidence comes from the separately bounded V29 workload/JFR capture");
+    }
+
+    @Test
     void rendersBoot4SameStackContextAndCompleteVersionMetadata() throws Exception {
         Properties environment = new Properties();
         environment.setProperty("stackContext", "Spring Boot 4 migration candidate");
@@ -160,7 +174,8 @@ class BenchmarkMarkdownReportTest {
     private static Stream<Class<?>> optionalCacheBenchmarks() {
         return Stream.of(
                         "io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark",
-                        "io.github.huynhngochuyhoang.httpstarter.core.V28SemanticReadCachePerformanceBenchmark")
+                        "io.github.huynhngochuyhoang.httpstarter.core.V28SemanticReadCachePerformanceBenchmark",
+                        "io.github.huynhngochuyhoang.httpstarter.core.V29WeightedCachePerformanceBenchmark")
                 .flatMap(BenchmarkMarkdownReportTest::optionalClass);
     }
 

@@ -31,6 +31,9 @@ class BenchmarkReportComparatorTest {
 
         assertThat(exitCode).isZero();
         assertThat(Files.readString(output))
+                .contains("Matched benchmark/mode rows: **2**")
+                .contains("Current-only rows: **0**")
+                .contains("Baseline-only rows: **0**")
                 .contains("| clientSideOverheadStarterGetNoBody | `avgt` | average time | 12 us/op | 10 us/op | 2 us/op | 20% | review |")
                 .contains("| clientSideOverheadStarterGetNoBody | `avgt` | p50 | 11 us/op | 10 us/op | 1 us/op | 10% | ok |")
                 .contains("| clientSideOverheadStarterGetNoBody | `thrpt` | throughput | 0.08 ops/us | 0.09 ops/us | -0.01 ops/us | -11.111% | ok |")
@@ -49,6 +52,10 @@ class BenchmarkReportComparatorTest {
 
         assertThat(exitCode).isZero();
         assertThat(Files.readString(output))
+                .contains("Matched benchmark/mode rows: **0**")
+                .contains("Current-only rows: **1**")
+                .contains("Baseline-only rows: **1**")
+                .contains("missing rows remain explicit and are never compared")
                 .contains("| clientSideOverheadStarterGetNoBody | `avgt` | row | n/a | n/a | n/a | n/a | missing current |")
                 .contains("| clientSideOverheadStarterPostJson | `avgt` | row | n/a | n/a | n/a | n/a | missing baseline |");
     }

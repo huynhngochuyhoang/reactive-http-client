@@ -110,6 +110,9 @@ final class LocalResponseCacheManager implements AutoCloseable {
             Object meterRegistry,
             LongSupplier ticker,
             Scheduler refreshScheduler) {
+        if (!hasSelectedCachePolicy(clientInterface, metadataCache, clientConfig)) {
+            return null;
+        }
         boolean cacheObservabilityEnabled = observability != null
                 && observability.isEnabled()
                 && observability.getCache() != null
@@ -126,6 +129,24 @@ final class LocalResponseCacheManager implements AutoCloseable {
                         ? LocalResponseCacheMetrics.enabled(meterRegistry, clientName)
                         : LocalResponseCacheMetrics.disabled(),
                 cacheObservabilityEnabled);
+    }
+
+    private static boolean hasSelectedCachePolicy(
+            Class<?> clientInterface,
+            MethodMetadataCache metadataCache,
+            ReactiveHttpClientProperties.ClientConfig clientConfig) {
+        for (Method method : clientInterface.getMethods()) {
+            if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
+                continue;
+            }
+            RequestPlan plan = RequestPlan.from(metadataCache.get(method), clientInterface);
+            EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.decide(
+                    plan, clientConfig, EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig));
+            if (decision.cacheable()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static LocalResponseCacheManager createForClient(

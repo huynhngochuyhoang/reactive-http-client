@@ -329,6 +329,25 @@
             </properties>
         </profile>
         <profile>
+            <id>benchmark-published-baseline-v29-source-exclusion</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/V29WeightedCachePerformanceBenchmark.java</exclude>
+                            </excludes>
+                            <testExcludes>
+                                <testExclude>**/V29WeightedCachePerformanceBenchmarkTest.java</testExclude>
+                            </testExcludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
             <id>benchmark-published-baseline-v28-source-exclusion</id>
             <build>
                 <plugins>
@@ -338,9 +357,11 @@
                         <configuration>
                             <excludes>
                                 <exclude>**/V28SemanticReadCachePerformanceBenchmark.java</exclude>
+                                <exclude>**/V29WeightedCachePerformanceBenchmark.java</exclude>
                             </excludes>
                             <testExcludes>
                                 <testExclude>**/V28SemanticReadCachePerformanceBenchmarkTest.java</testExclude>
+                                <testExclude>**/V29WeightedCachePerformanceBenchmarkTest.java</testExclude>
                             </testExcludes>
                         </configuration>
                     </plugin>
@@ -358,9 +379,11 @@
                             <excludes combine.self="override">
                                 <exclude>**/V27CachePerformanceBenchmark.java</exclude>
                                 <exclude>**/V28SemanticReadCachePerformanceBenchmark.java</exclude>
+                                <exclude>**/V29WeightedCachePerformanceBenchmark.java</exclude>
                             </excludes>
                             <testExcludes combine.self="override">
                                 <testExclude>**/V28SemanticReadCachePerformanceBenchmarkTest.java</testExclude>
+                                <testExclude>**/V29WeightedCachePerformanceBenchmarkTest.java</testExclude>
                             </testExcludes>
                         </configuration>
                     </plugin>
