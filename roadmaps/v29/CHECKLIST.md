@@ -1215,18 +1215,58 @@ Evidence recorded on 2026-09-06:
 - `git diff --check` passed. Priority 13.3 immutable release evidence and
   Priority 13.4 release selection remain intentionally open.
 
-### [ ] 13.3 Assemble immutable release evidence
+### [x] 13.3 Assemble immutable release evidence
 
-- [ ] Pass the complete reactor, package/generation guards, dependency matrix,
+- [x] Pass the complete reactor, package/generation guards, dependency matrix,
       current/published consumers, AOT, native, shutdown, documentation, API, and
       benchmark disposition from one reviewed clean commit.
-- [ ] Record commands, Java/Boot/GraalVM versions, commit, clean-tree state, test
+- [x] Record commands, Java/Boot/GraalVM versions, commit, clean-tree state, test
       totals, artifact checksums, Central markers, evidence paths, and remaining
       risk under `target/release-evidence/v29/`.
-- [ ] Confirm target-only evidence is not committed and any promoted report is
+- [x] Confirm target-only evidence is not committed and any promoted report is
       sanitized, source-controlled, and version-matched.
-- [ ] Verify generated readiness lists every unresolved command and reflects the
+- [x] Verify generated readiness lists every unresolved command and reflects the
       Priority 4 go/no-go outcome without contradictory scope/publication state.
+
+Evidence recorded on 2026-09-06 from clean commit
+`e5e82e402d521071b8fd6480b1db39c042c07bf4`:
+
+- `mvn -B -ntp clean verify` passed 1,413 tests with no failures,
+  errors, or skips. Snapshot packaging and
+  `scripts/verify-generation-packaging.sh` also passed; binary, source, and
+  Javadoc entry/parity reports are under
+  `target/release-evidence/v29/priority13/package-generation/`.
+- The Java 21 supported matrix passed Spring Boot `4.0.0` and `4.1.0` from
+  fresh repositories. Each row passed 1,413 reactor tests and three assembled-
+  consumer tests, strict API checks, optional-integration checks, dependency
+  trees, effective POMs, and Maven Central provenance. Current-consumer evidence
+  passed 63 mock, seven assembled-consumer, and one cache-disabled test;
+  published `4.1.0` consumer evidence passed four tests.
+- Fresh root and starter japicmp comparisons against published `4.1.0` passed
+  with only the reviewed additive V29 surface and no incompatible rows. The API
+  fixture guards, published-baseline fixtures, and fresh Central parent/module
+  POM/JAR/source/Javadoc bundle verification passed. Reports, hashes, and Central
+  markers are under `target/release-evidence/v29/priority13/api-root/`,
+  `api-starter/`, and `published-release-artifacts/`.
+- A focused AOT, shutdown, cache-contract, and documentation run passed 131
+  tests. Oracle GraalVM Native Image `25.0.3` compiled and ran the exact
+  `4.2.0-SNAPSHOT` native smoke; its executable SHA-256 is
+  `8fa6df5931629611a3e131aace20a7ab3edea2fa85185d1f9dbaa06e61b43f11`.
+- Benchmark packaging and smoke passed 21 tests and 203 JMH rows. This same-
+  commit smoke is wiring/coverage evidence only and supports no new public
+  performance claim; Priority 12 retains the reviewed release-quality benchmark
+  disposition.
+- Commands, toolchain versions, clean-tree state, test totals, snapshot/native/
+  benchmark/readiness checksums, evidence paths, and residual risks are frozen
+  in `target/release-evidence/v29/priority13/RELEASE-EVIDENCE.md`. `target/` is
+  ignored, no evidence file or benchmark report was promoted to source control,
+  and the captured readiness JSON records Priority 4 as `go`, the
+  `additive-minor` lane, candidate `4.2.0`, and an unpublished deferred state.
+- The generated manual list remains the conservative final-cut rerun list.
+  Release-profile verification reached signing but could not obtain GPG
+  pinentry in this environment; signing, final version/tag selection,
+  publication, post-publication Central/consumer verification, baseline movement,
+  and roadmap archival remain explicitly deferred to Priority 13.4.
 
 ### [ ] 13.4 Select release scope and close V29
 
