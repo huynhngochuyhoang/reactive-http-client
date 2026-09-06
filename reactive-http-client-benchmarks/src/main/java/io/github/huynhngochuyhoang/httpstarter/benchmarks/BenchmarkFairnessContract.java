@@ -16,7 +16,8 @@ final class BenchmarkFairnessContract {
     private static final String LOOPBACK_BENCHMARK = LoopbackClientComparisonBenchmark.class.getName();
     private static final Set<String> CACHE_BENCHMARKS = Set.of(
             "io.github.huynhngochuyhoang.httpstarter.core.V27CachePerformanceBenchmark",
-            "io.github.huynhngochuyhoang.httpstarter.core.V28SemanticReadCachePerformanceBenchmark");
+            "io.github.huynhngochuyhoang.httpstarter.core.V28SemanticReadCachePerformanceBenchmark",
+            "io.github.huynhngochuyhoang.httpstarter.core.V29WeightedCachePerformanceBenchmark");
     private static final String SEMANTIC_POST_CACHE_BENCHMARK =
             "io.github.huynhngochuyhoang.httpstarter.core.V28SemanticReadCachePerformanceBenchmark";
     private static final List<String> CLIENT_SURFACES = List.of(
@@ -74,6 +75,13 @@ final class BenchmarkFairnessContract {
                     && !SEMANTIC_POST_CACHE_BENCHMARK.equals(method.owner())) {
                 throw new IllegalStateException("Semantic POST no-network benchmark [" + method.owner() + "#"
                         + method.name() + "] must be owned by the V28 semantic-read cache fixture");
+            }
+            if ((method.name().startsWith("cacheV29NoNetwork")
+                    || method.name().startsWith("cacheV29Loopback"))
+                    && !"io.github.huynhngochuyhoang.httpstarter.core.V29WeightedCachePerformanceBenchmark"
+                    .equals(method.owner())) {
+                throw new IllegalStateException("V29 cache benchmark [" + method.owner() + "#"
+                        + method.name() + "] must be owned by the V29 weighted-cache fixture");
             }
             if (!method.name().startsWith(CLIENT_SIDE_PREFIX)) {
                 continue;

@@ -179,6 +179,10 @@ public final class ReactiveHttpClientContractSnapshot {
         }
         return cache.source() + ":semanticRead=" + cache.semanticRead()
                 + ",ttl=" + cache.ttlMs() + "ms,max=" + cache.maximumSize()
+                + ",maxTotalDecodedResponseBytes="
+                + (cache.maximumTotalDecodedResponseBytes() != null
+                        ? cache.maximumTotalDecodedResponseBytes()
+                        : "disabled")
                 + ",varyParameters=" + variantNames(cache.varyByParameters())
                 + ",varyHeaders=" + variantNames(cache.varyByHeaders())
                 + ",varyContext=" + variantNames(cache.varyByContext())

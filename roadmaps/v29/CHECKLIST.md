@@ -16,188 +16,427 @@ proven retention fixes and record weighted-admission work as explicitly deferred
 
 ## Priority 1 - Post-`4.1.0` Baseline and V29 Scope Integrity
 
-### [ ] 1.1 Align development and published lanes
+### [x] 1.1 Align development and published lanes
 
-- [ ] Keep root/module, benchmark, native-smoke, and current-consumer coordinates
+- [x] Keep root/module, benchmark, native-smoke, and current-consumer coordinates
       on `4.2.0-SNAPSHOT`.
-- [ ] Keep README, quick-start, and other public dependency snippets on published
+- [x] Keep README, quick-start, and other public dependency snippets on published
       `4.1.0`; do not advertise the snapshot to consumers.
-- [ ] Keep `latest.published.version`, strict API compatibility, published
+- [x] Keep `latest.published.version`, strict API compatibility, published
       consumer, and published benchmark baselines on `4.1.0`.
-- [ ] Keep V1-V28 as completed release records and V29 as the only active
+- [x] Keep V1-V28 as completed release records and V29 as the only active
       execution roadmap.
-- [ ] Keep `4.2.0` as a candidate direction only; generated readiness must report
+- [x] Keep `4.2.0` as a candidate direction only; generated readiness must report
       no selected release scope while the memory investigation is unresolved.
 
-### [ ] 1.2 Reprove the published `4.1.0` baseline
+### [x] 1.2 Reprove the published `4.1.0` baseline
 
-- [ ] Resolve the parent POM plus starter, test-helper, and OTel POM/JAR/source/
+- [x] Resolve the parent POM plus starter, test-helper, and OTel POM/JAR/source/
       Javadoc artifacts from a previously absent Central-only repository.
-- [ ] Require Maven Central remote markers and record SHA-256 values for all 13
+- [x] Require Maven Central remote markers and record SHA-256 values for all 13
       release artifacts.
-- [ ] Run the assembled Boot 4 consumer using only published `4.1.0` artifacts.
-- [ ] Run strict root and starter-module japicmp against separate fresh `4.1.0`
+- [x] Run the assembled Boot 4 consumer using only published `4.1.0` artifacts.
+- [x] Run strict root and starter-module japicmp against separate fresh `4.1.0`
       repositories and preserve binary and source failure behavior.
-- [ ] Run API and published-baseline fixtures for local contamination, mixed
+- [x] Run API and published-baseline fixtures for local contamination, mixed
       versions, missing attachments, mismatched POM/JAR versions, and
       self-comparison.
 
-### [ ] 1.3 Keep generated readiness honest
+### [x] 1.3 Keep generated readiness honest
 
-- [ ] Report `4.2.0-SNAPSHOT` as development and `4.1.0` as the latest
+- [x] Report `4.2.0-SNAPSHOT` as development and `4.1.0` as the latest
       published/API/consumer/benchmark baseline.
-- [ ] Report V29 as active with an unselected release lane and a deferred,
+- [x] Report V29 as active with an unselected release lane and a deferred,
       unpublished `4.2.0` candidate.
-- [ ] Keep compatibility, consumer, benchmark, AOT, native, publication, and
+- [x] Keep compatibility, consumer, benchmark, AOT, native, publication, and
       release-scope work pending until their evidence exists.
-- [ ] Update the roadmap archive consistency guard for the V29 checklist without
+- [x] Update the roadmap archive consistency guard for the V29 checklist without
       weakening V1-V28 completion checks.
-- [ ] Run `DocumentationReleaseArtifactTest`, Maven validation, and
+- [x] Run `DocumentationReleaseArtifactTest`, Maven validation, and
       `git diff --check`; record commands, totals, commit state, and evidence
       paths under this priority.
+
+Evidence recorded on 2026-08-30 from clean commit
+`fc30a7f3a423b3d1cb387519e2cbf285377ea33d` before this checklist-only update:
+
+- Root, starter, test-helper, OTel, benchmark, native-smoke, and current-consumer
+  coordinates resolve to `4.2.0-SNAPSHOT`. README and quick-start dependency
+  snippets remain on published `4.1.0`; `latest.published.version`, strict API,
+  published-consumer, and benchmark baselines also remain `4.1.0`. The roadmap
+  guard retains V1-V28 as completed records and V29 as the sole active roadmap.
+- A previously absent Central-only repository resolved the parent POM and the
+  starter, test-helper, and OTel POM/JAR/source/Javadoc artifacts. Central remote
+  markers, declared/embedded versions, and all 13 SHA-256 records passed under
+  `target/release-evidence/v29/priority1/published-baseline/`.
+- `scripts/verify-published-consumer.sh 4.1.0` passed 4 tests with no failures,
+  errors, or skips using published artifacts only. Effective POMs, dependency
+  tree, classpath, Surefire reports, clean-commit provenance, and 7 artifact
+  hashes are under `target/release-evidence/v29/priority1/published-consumer/`.
+- Strict root and starter-only `api-compatibility` builds passed against the
+  separate `v29-priority1-api-root-4.1.0` and
+  `v29-priority1-api-starter-4.1.0` repositories. Reports plus 7 root and 2
+  starter provenance hashes are under
+  `target/release-evidence/v29/priority1/api-root/` and `api-starter/`.
+  `scripts/verify-api-compatibility-fixtures.sh` proved source-only and binary
+  incompatibilities still fail strict mode.
+- `scripts/verify-published-baseline-fixtures.sh` rejected local-only artifacts,
+  mixed candidate versions, missing source/Javadoc attachments, mismatched
+  project/parent POM and embedded JAR versions, and root/module self-comparison.
+- Generated readiness records `4.2.0-SNAPSHOT` development, published/API/
+  consumer/benchmark baseline `4.1.0`, active roadmap `v29`, release lane
+  `unselected`, and an unpublished, deferred `4.2.0` candidate with no selected
+  scope. Release-scope, compatibility, consumer, benchmark, AOT, native, and
+  publication work remain pending; the generated JSON and benchmark snippet are
+  under `target/release-evidence/v29/priority1/readiness/`.
+- `mvn -B -ntp -pl reactive-http-client-starter
+  -Dtest=DocumentationReleaseArtifactTest test` passed 44 tests with no failures,
+  errors, or skips. `mvn -B -ntp -s .mvn/maven-central-settings.xml validate`
+  passed all four reactor modules, and `git diff --check` passed.
 
 ---
 
 ## Priority 2 - Production Memory Characterization
 
-### [ ] 2.1 Build a deterministic workload
+### [x] 2.1 Build a deterministic workload
 
-- [ ] Add a loopback fixture that can run cache-disabled, cold miss, warm hit,
+- [x] Add a loopback fixture that can run cache-disabled, cold miss, warm hit,
       maximum-size pressure, TTL expiry, explicit eviction, single flight,
       refresh, cancellation, and factory-close scenarios.
-- [ ] Use fixed payload shapes, key cardinality, concurrency, warmup, operation
+- [x] Use fixed payload shapes, key cardinality, concurrency, warmup, operation
       count, and observation checkpoints so scenarios are comparable.
-- [ ] Isolate scenarios in fresh application contexts or forked JVMs where prior
+- [x] Isolate scenarios in fresh application contexts or forked JVMs where prior
       cache, allocator, or class-loading state would contaminate the result.
-- [ ] Make every hidden load, waiter, refresh, server dispatch, entry, and factory
+- [x] Make every hidden load, waiter, refresh, server dispatch, entry, and factory
       lifecycle observable through bounded structural counters; do not use sleeps
       as the only synchronization.
-- [ ] Keep request and response material synthetic and sanitized in all recorded
+- [x] Keep request and response material synthetic and sanitized in all recorded
       evidence.
 
-### [ ] 2.2 Separate memory domains
+Evidence recorded on 2026-08-30:
 
-- [ ] Capture Java heap usage, live-set evidence, direct-buffer usage, thread
+- `ResponseCacheMemoryWorkload` runs the original ten scenarios against a fresh
+  loopback server, application context, connection provider, cache manager,
+  refresh scheduler, and factory owner per scenario. Priority 2.3 adds the
+  duplicate-miss scenario under the same isolation contract. It fixes a 4 KiB synthetic byte-array
+  payload, 8 keys, concurrency 8, 2 warmup calls, 8 measured calls, a 1 second
+  TTL, and named structural checkpoints. Capacity pressure alone lowers maximum
+  size from 8 to 4.
+- Response gates and bounded latches make the shared load, seven coalesced
+  waiters, hidden refresh, cancellation, and factory-close transitions
+  deterministic. `LocalResponseCacheManager.WorkloadSnapshot` records entries,
+  evictions, active loads, waiter count, refreshes, and closed state alongside
+  caller/load/server and context/factory/server lifecycle counters. Ticker
+  advancement drives expiry and refresh; no scenario uses a sleep as its proof.
+- `mvn -B -ntp -pl reactive-http-client-starter
+  -Dtest=ResponseCacheMemoryWorkloadTest,BoundedLocalResponseCacheContractTest,SemanticReadSingleFlightRefreshContractTest,LocalResponseCacheObservabilityTest
+  test` passed 63 tests with no failures, errors, or skips. The workload also
+  passed two standalone executions. Sanitized structural output is under
+  `target/release-evidence/v29/priority2/deterministic-workload.properties` and
+  contains no request target, cache key, authorization material, or payload.
+
+### [x] 2.2 Separate memory domains
+
+- [x] Capture Java heap usage, live-set evidence, direct-buffer usage, thread
       count, connection-provider resources, cache entry count, in-flight loads,
       refreshes, and application-owned payload allocation separately.
-- [ ] Record JVM flags, heap/direct-memory limits, container limit if available,
+- [x] Record JVM flags, heap/direct-memory limits, container limit if available,
       Java version, OS, transport, allocator, starter commit, and cache policy
       with each run.
-- [ ] Treat process RSS, committed heap, used heap, direct memory, and cache
+- [x] Treat process RSS, committed heap, used heap, direct memory, and cache
       occupancy as distinct signals; do not derive one from another.
-- [ ] Use explicit GC only at named diagnostic checkpoints and never as a
+- [x] Use explicit GC only at named diagnostic checkpoints and never as a
       production behavior or correctness dependency.
-- [ ] Bound profiling output and keep heap dumps/JFR files target-only because
+- [x] Bound profiling output and keep heap dumps/JFR files target-only because
       they may contain application data.
 
-### [ ] 2.3 Classify observed growth before changing production code
+Evidence recorded on 2026-08-31:
 
-- [ ] Compare cache-disabled control runs with cache-enabled fill and steady-state
+- `ResponseCacheMemoryDomains` records used, committed, and maximum heap;
+  process RSS when `/proc/self/status` is available; JDK direct-buffer count,
+  memory, and capacity; Netty allocator direct memory; live/daemon/peak threads;
+  explicit direct-memory and container limits when available; sanitized
+  memory-relevant JVM flags; Java/OS/transport/allocator identity; and the
+  starter commit/dirty state. Unavailable values remain `-1` with an explicit
+  source instead of being inferred from another memory domain.
+- The loopback fixture now installs a supported Reactor Netty pool meter
+  registrar and records registered/total/active/idle/pending/max/disposed pool
+  state separately from server dispatches. Decoded 4 KiB application payload
+  allocations and bytes are cumulative counters independent of cache entries,
+  in-flight loads, coalesced waiters, refreshes, heap, direct memory, and RSS.
+  Each scenario also records its enabled, single-flight, refresh, TTL, and
+  maximum-size policy facts in
+  `target/release-evidence/v29/priority2/deterministic-workload.properties`.
+- Explicit GC is requested only at the structurally named
+  `baseline-after-explicit-gc` checkpoint. The sampler rejects an explicit-GC
+  request at any checkpoint without `explicit-gc` in its name, and no memory
+  value is used as a test correctness threshold.
+- `scripts/run-v29-memory-profile.sh` confines JFR/heap-dump destinations to
+  `target/release-evidence/v29/priority2/profiling/`, caps JFR at 64 MiB, and
+  warns that profiles may contain application data. The recorded focused run
+  passed 2 tests and produced a valid 973,336-byte JFR.
+- The adjacent cache workload/contract/observability run passed 64 tests, the
+  documentation plus workload run passed 46 tests, `bash -n` passed for the
+  profiling script, and `git diff --check` passed. Memory-growth comparison and
+  ownership classification remain intentionally open in Priority 2.3.
+
+### [x] 2.3 Classify observed growth before changing production code
+
+- [x] Compare cache-disabled control runs with cache-enabled fill and steady-state
       runs under identical transport and payload conditions.
-- [ ] Verify whether growth plateaus at `maximum-size`, falls after expiry/
+- [x] Verify whether growth plateaus at `maximum-size`, falls after expiry/
       eviction, and returns toward the control live set after factory close.
-- [ ] Repeat refresh, cancellation, duplicate miss, and shutdown races enough to
+- [x] Repeat refresh, cancellation, duplicate miss, and shutdown races enough to
       distinguish retained owners from one-time class/JIT/allocator growth.
-- [ ] Correlate any retained object class with a starter-owned reference path or
+- [x] Correlate any retained object class with a starter-owned reference path or
       explicitly classify it as application-, JVM-, or transport-owned.
-- [ ] Record one source-controlled finding before Priority 3 implementation:
+- [x] Record one source-controlled finding before Priority 3 implementation:
       confirmed leak, expected bounded retention, accounting gap, or inconclusive
       external workload.
+
+Evidence recorded on 2026-08-31:
+
+- `scripts/run-v29-memory-characterization.sh` launched 55 fresh JVMs: five
+  repetitions of the cache-disabled control and all ten cache-enabled/lifecycle
+  scenarios. Every child used the same 4 KiB payload, eight-key workload,
+  concurrency eight, one-connection epoll transport, adaptive Netty allocator,
+  `-Xms128m -Xmx128m`, `-XX:MaxDirectMemorySize=64m`, and G1. Raw sanitized
+  properties, logs, per-sample values, and aggregate means are target-only under
+  `target/release-evidence/v29/priority2/characterization/`.
+- The cache-disabled steady live-set change averaged 18.0 KiB. Eight-entry cold
+  and warm fills averaged about 225 KiB; capacity pressure completed eight loads
+  but remained at exactly four entries in every repetition. TTL expiry and
+  explicit eviction reached zero entries and reduced mean GC-stable heap by
+  37,008 and 34,557 bytes before reload. These are diagnostic observations, not
+  correctness thresholds or exact retained-size claims.
+- Duplicate miss produced eight subscriptions and eight dispatches but one
+  winning entry. Refresh, cancellation, duplicate miss, single flight, and
+  factory-close races each completed five isolated repetitions. Every final
+  checkpoint reported zero entries, loads, refreshes, and pool connections with
+  the factory/cache and pool disposed.
+- Closed cache scenarios remained about 184-223 KiB of heap and 0.90-4.26 MiB
+  of RSS above the cache-disabled mean. The bounded JFR's class-level candidates
+  were classified as application payload, Netty transport/allocator state, or
+  JVM/Reactor aggregate state; it did not prove a surviving starter reference
+  path. `roadmaps/v29/MEMORY-CHARACTERIZATION.md` records the explicit owner
+  paths, limitations, and the source-controlled finding: **expected bounded
+  retention**, with RSS retained as a separate accounting gap rather than a
+  confirmed starter leak.
+- The focused workload/cache/refresh/observability run passed 65 tests with no
+  failures, errors, or skips. `ResponseCacheMemoryWorkloadTest` separately
+  passed 3 tests, including GC-stable release/close checkpoints and the
+  duplicate-miss control. The documentation plus workload gate passed 47 tests;
+  `bash -n scripts/run-v29-memory-characterization.sh` and `git diff --check`
+  also passed. Priority 3 remains responsible for weak-reference and
+  root-path collectability proof before any production retention fix.
 
 ---
 
 ## Priority 3 - Cache Retention Ownership Audit
 
-### [ ] 3.1 Inventory every strong owner
+### [x] 3.1 Inventory every strong owner
 
-- [ ] Trace ownership from `ReactiveHttpClientFactoryBean` through cache manager,
+- [x] Trace ownership from `ReactiveHttpClientFactoryBean` through cache manager,
       per-policy caches, keys, entries, generation state, in-flight flights,
       refresh tokens, schedulers, subscriptions, meter suppliers, request
       snapshots, response metadata, auth contexts, and decoded values.
-- [ ] Record the creation, terminal transition, removal trigger, and shutdown
+- [x] Record the creation, terminal transition, removal trigger, and shutdown
       owner for each retained object class.
-- [ ] Identify static collections, registry callbacks, scheduler tasks, meter
+- [x] Identify static collections, registry callbacks, scheduler tasks, meter
       suppliers, and application-context references that can outlive a factory.
-- [ ] Distinguish intentionally retained decoded values from metadata that should
+- [x] Distinguish intentionally retained decoded values from metadata that should
       be released immediately after publication or caller termination.
 
-### [ ] 3.2 Prove terminal release paths
+### [x] 3.2 Prove terminal release paths
 
-- [ ] Add bounded reference-queue, weak-reference, heap-query, or owner-count
+- [x] Add bounded reference-queue, weak-reference, heap-query, or owner-count
       tests for success, failure, empty completion, serialization failure, and
       cancellation.
-- [ ] Cover TTL expiry, size eviction, explicit eviction, refresh replacement,
+- [x] Cover TTL expiry, size eviction, explicit eviction, refresh replacement,
       refresh failure/cancellation, and factory destruction.
-- [ ] Verify each waiter releases its context, arguments, and terminal state when
+- [x] Verify each waiter releases its context, arguments, and terminal state when
       it ends even while another caller keeps a shared load alive.
-- [ ] Verify auth contexts, prepared bodies, frozen request arguments, and
+- [x] Verify auth contexts, prepared bodies, frozen request arguments, and
       response metadata are not retained after their final required owner ends.
-- [ ] Make GC-assisted tests bounded and diagnostic-rich; avoid a single sleep or
+- [x] Make GC-assisted tests bounded and diagnostic-rich; avoid a single sleep or
       one `System.gc()` call as proof.
 
-### [ ] 3.3 Close late-publication and external-owner gaps
+### [x] 3.3 Close late-publication and external-owner gaps
 
-- [ ] Prove duplicate misses, detached shared publishers, and late completion
+- [x] Prove duplicate misses, detached shared publishers, and late completion
       callbacks cannot recreate entries or generation records after eviction or
       close.
-- [ ] Prove refresh callbacks cannot republish or retain state after hard expiry,
+- [x] Prove refresh callbacks cannot republish or retain state after hard expiry,
       explicit eviction, policy removal, or factory destruction.
-- [ ] Prove diagnostics and the Actuator endpoint inspect only existing managers
+- [x] Prove diagnostics and the Actuator endpoint inspect only existing managers
       and do not retain factories, cache values, keys, or application contexts.
-- [ ] Prove owned cache meters are removed on close and their suppliers cannot
+- [x] Prove owned cache meters are removed on close and their suppliers cannot
       retain a dead manager.
-- [ ] Record every confirmed retention defect and its regression test before
+- [x] Record every confirmed retention defect and its regression test before
       moving to the weight-design gate.
+
+Evidence recorded on 2026-08-31 from commit
+`fbaeefee89260d59d33daa4caab9401be4dadb66` plus this Priority 3 test and
+documentation change:
+
+- [`CACHE-RETENTION-OWNERSHIP.md`](CACHE-RETENTION-OWNERSHIP.md) records the
+  strong path from the Spring bean factory through the client factory, handler,
+  manager, policy caches, Caffeine entries/generation state, loads, waiters,
+  refreshes, scheduler subscriptions, metrics, diagnostics, and external roots.
+  Each row names its creation, terminal/removal transition, and shutdown owner;
+  intentionally retained decoded values and representation headers are separated
+  from subscription-local request/auth/response metadata.
+- `ResponseCacheRetentionOwnershipTest` adds eight bounded `ReferenceQueue`,
+  weak-reference, and owner-count proofs. Repeated diagnostic GC attempts run for
+  at most five
+  seconds with at most 1 MiB of bounded pressure per attempt. The tests keep the
+  manager, active leader, or meter registry alive where required, avoiding a
+  vacuous whole-fixture collection result.
+- The ownership suite covers success, failure, empty completion, simulated
+  serialization failure, cancellation, TTL expiry, capacity and explicit
+  eviction, refresh replacement/failure/cancellation, and actual factory
+  destruction. A detached waiter releases its context, arguments, caller state,
+  and unused load state while the leader remains active. A real cache-selected
+  request releases frozen body arguments, bounded serialized bytes, prepared
+  context, auth context/header, final request identity, and response metadata
+  after publication. Capacity and explicit eviction release ordinary survivors
+  before manager close. An independent load remains caller-owned after close and
+  releases its closure only at caller terminal.
+- Late duplicate, detached-publisher, generation, hard-expiry, explicit-eviction,
+  and shutdown publication behavior remains covered by the deterministic cache
+  race tests listed in the audit. Runtime mutation of an already-created policy's
+  TTL, maximum size, or refresh bounds is rejected before lookup, and the
+  manager retains only the original policy cache. A retained Actuator map was
+  proved not to own
+  its provider, bean factory, client factory, manager, cache, or decoded value.
+  Factory destruction removes all owned cache meters, and a retained registry
+  observes only a same-tag replacement cache.
+- One retention defect was confirmed and fixed: mutable runtime bounds could
+  retain a distinct cache for each tuple under one policy name.
+  `LocalResponseCacheManager` now rejects bounds mutation after the policy cache
+  is created. Cache properties remain startup configuration. No other unbounded
+  starter root was reproduced; the Priority 2 RSS delta remains a separate
+  accounting gap.
+- The focused ownership suite passed 8 tests. The ownership, cache race,
+  observability, diagnostics, and memory workload run passed 126 tests with no
+  failures, errors, or skips. The documentation plus ownership gate passed 52
+  tests with no failures, errors, or skips; final diff checks also passed.
 
 ---
 
 ## Priority 4 - Retained-Weight Contract Spike
 
-### [ ] 4.1 Evaluate candidate measurement boundaries
+### [x] 4.1 Evaluate candidate measurement boundaries
 
-- [ ] Evaluate response-decode, cache-publication, starter-owned byte, and
+- [x] Evaluate response-decode, cache-publication, starter-owned byte, and
       application-supplied weigher boundaries against the same supported value
       shapes.
-- [ ] For each candidate, define what is measured, when it becomes known, its
+- [x] For each candidate, define what is measured, when it becomes known, its
       unit, deterministic cost, ownership, overflow behavior, and relationship
       to the retained decoded value.
-- [ ] Include plain values, `ResponseEntity<T>` plus retained headers, empty
+- [x] Include plain values, `ResponseEntity<T>` plus retained headers, empty
       completion, present empty values, refresh replacement, and unknown/custom
       value shapes.
-- [ ] Demonstrate why `Content-Length`, compressed wire bytes, arbitrary JSON
+- [x] Demonstrate why `Content-Length`, compressed wire bytes, arbitrary JSON
       reserialization, reflection-based graph walking, and JVM
       `Instrumentation` are accepted or rejected.
-- [ ] Reject candidates that require blocking, unbounded recursion, arbitrary
+- [x] Reject candidates that require blocking, unbounded recursion, arbitrary
       reflection, full response duplication, or event-loop reserialization.
 
-### [ ] 4.2 Define admission semantics before API design
+Evidence recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` plus the source-controlled
+Priority 4.1 artifact in this reviewed change:
 
-- [ ] Define behavior for zero, negative, unknown, overflowing, and individually
+- [`RETAINED-WEIGHT-CANDIDATES.md`](RETAINED-WEIGHT-CANDIDATES.md) maps the
+  current decode-to-publication pipeline and evaluates all four boundaries in
+  one matrix using the same cacheable result shapes.
+- Generic publication-time object inspection and starter-owned metadata bytes
+  are rejected as response-retention units. `Content-Length`, compressed wire
+  bytes, arbitrary JSON reserialization, reflection graph walking, and JVM
+  `Instrumentation` are rejected with explicit correctness or cost reasons.
+- A bounded count of decoded representation bytes consumed by the final unary
+  codec path survives as a non-heap candidate. A post-sanitization application
+  weigher survives only as an explicitly selected application-owned estimate.
+  Neither is selected yet; admission semantics and the final go/no-go remain
+  open in 4.2 and 4.3.
+- No public property, SPI, meter, diagnostics field, or production value
+  traversal was added by this spike. `DocumentationReleaseArtifactTest` passed
+  44 tests; tracked and new-file whitespace checks passed.
+
+### [x] 4.2 Define admission semantics before API design
+
+- [x] Define behavior for zero, negative, unknown, overflowing, and individually
       over-budget weights without assigning unknown values a silent constant.
-- [ ] Define whether over-budget successful responses bypass storage, fail the
+- [x] Define whether over-budget successful responses bypass storage, fail the
       call, or use a narrower supported-value contract; prefer successful
       uncached delivery unless evidence requires otherwise.
-- [ ] Keep mandatory TTL and `maximum-size`; define weight as an additional bound,
+- [x] Keep mandatory TTL and `maximum-size`; define weight as an additional bound,
       not a replacement or a heap/RSS estimate.
-- [ ] Define atomic accounting for first fill, duplicate misses, replacement,
+- [x] Define atomic accounting for first fill, duplicate misses, replacement,
       refresh success/failure, expiry, eviction, and close.
-- [ ] Define source/binary compatibility and no-op behavior for every existing
+- [x] Define source/binary compatibility and no-op behavior for every existing
       `4.0.0`/`4.1.0` policy when no weight budget is selected.
 
-### [ ] 4.3 Record the weight-contract decision
+Evidence recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` plus the source-controlled
+Priority 4.1 and 4.2 artifacts in this reviewed change:
 
-- [ ] Publish a source-controlled decision document containing alternatives,
+- [`RETAINED-WEIGHT-ADMISSION.md`](RETAINED-WEIGHT-ADMISSION.md) defines the
+  candidate-independent model, measurement outcomes, caller behavior, atomic
+  accounting owner, transition semantics, and compatibility boundary.
+- A positive aggregate budget is additional to mandatory TTL and
+  `maximum-size`. Zero entry weight is valid but still consumes an entry slot;
+  negative, unknown, overflowing, and individually over-budget measurements
+  bypass storage without changing a successful downstream result.
+- Only an actual generation-current retained-entry transition changes aggregate
+  weight. The stored entry owns immutable weight, removal subtracts it exactly
+  once, losing duplicates have no accounting or eviction side effects, and
+  refresh failure or bypass preserves the old weight and hard-expiry deadline.
+- Existing policies with no selected budget allocate no counter, candidate
+  weight, weighted cache, weigher lookup, callback, meter, diagnostic field, or
+  support output. No public API or production code was added in 4.2; the unit,
+  numeric bounds, storage, and final go/no-go remain deferred to 4.3.
+  `DocumentationReleaseArtifactTest` passed 44 tests; tracked and new-file
+  whitespace checks passed.
+
+### [x] 4.3 Record the weight-contract decision
+
+- [x] Publish a source-controlled decision document containing alternatives,
       measurements, supported shapes, rejected designs, migration impact, and
       remaining uncertainty.
-- [ ] Confirm no public property, SPI, meter, or diagnostics field was added
+- [x] Confirm no public property, SPI, meter, or diagnostics field was added
       before this decision.
 Select exactly one outcome before continuing:
-- [ ] **GO:** one deterministic, bounded, non-heap weight unit is defensible and
+- [x] **GO:** one deterministic, bounded, non-heap weight unit is defensible and
       Priority 5 may implement it.
 - [ ] **NO-GO:** no general unit is defensible; defer Priority 5, retain entry
       bounds, and continue only with proven lifecycle/accounting fixes.
-- [ ] Update generated readiness with the selected outcome without presenting a
+- [x] Update generated readiness with the selected outcome without presenting a
       no-go as an unfinished release blocker.
+
+Evidence recorded on 2026-08-31 from durable baseline commit
+`fd762589f038fd41ee85856dd78576d02cd1a23e` plus the source-controlled
+Priority 4.1-4.3 artifacts in this reviewed change:
+
+- [`RETAINED-WEIGHT-DECISION.md`](RETAINED-WEIGHT-DECISION.md) records **GO**
+  for decoded response representation bytes plus checked UTF-8 bytes of only
+  the header names and values retained in a cached `ResponseEntity`. The unit is
+  explicitly not Java heap, object-graph size, direct memory, RSS, container memory, compressed
+  wire size, or a leak diagnosis.
+- The selected body count must observe the final unary decoder input without
+  copying or reserialization and becomes known only after that body stream
+  completes. Unknown, invalid, overflowing, and individually over-budget
+  successful results follow the uncached-delivery semantics frozen in 4.2.
+- Generic value inspection, starter metadata weight, `Content-Length`, compressed
+  wire bytes, reserialization, graph walking, and `Instrumentation` remain
+  rejected. An application weigher remains deferred rather than becoming a
+  hidden default or premature SPI.
+- Generated readiness now reports an `additive-minor` lane, selected optional
+  representation-byte admission/eviction scope, `go` decision, exact unit, and
+  decision-document path. Implementation and all release evidence remain
+  pending; the release candidate remains deferred.
+- No public property, SPI, meter, diagnostics field, configuration metadata, or
+  production runtime path was added by Priority 4. The focused documentation
+  suite and whitespace checks passed.
 
 ---
 
@@ -207,346 +446,835 @@ Select exactly one outcome before continuing:
 > **NO-GO**, mark this priority explicitly deferred with the decision-document
 > link; do not invent placeholder configuration or API.
 
-### [ ] 5.1 Add one explicit bounded policy contract
+### [x] 5.1 Add one explicit bounded policy contract
 
-- [ ] Add one clearly named per-policy aggregate weight limit using the unit
+- [x] Add one clearly named per-policy aggregate weight limit using the unit
       selected by Priority 4.
-- [ ] Reject invalid, zero/negative where unsupported, and overflowing values at
+- [x] Reject invalid, zero/negative where unsupported, and overflowing values at
       startup with client/policy/method context.
-- [ ] Keep absence of the new setting behaviorally identical to published
+- [x] Keep absence of the new setting behaviorally identical to published
       `4.1.0`, including allocation and dependency behavior.
-- [ ] Update configuration metadata, effective configuration, contract snapshots,
+- [x] Update configuration metadata, effective configuration, contract snapshots,
       diagnostics model, runtime hints, and public API filters only for types
       required by the selected design.
-- [ ] Keep cache and cache-memory observability independently opt-in.
+- [x] Keep cache and cache-memory observability independently opt-in.
 
-### [ ] 5.2 Make publication and accounting atomic
+Evidence recorded on 2026-08-31 from durable baseline commit
+`18d38b131bbd96c60136a0fa867ba5b3575e9f43` plus this reviewed change:
 
-- [ ] Require every stored entry to satisfy TTL, `maximum-size`, and the selected
+- `CachePolicyConfig.maximumTotalDecodedResponseBytes` and YAML
+  `maximum-total-decoded-response-bytes` define one nullable per-policy aggregate
+  decoded response representation-byte limit. The selected-policy range is
+  `1..1099511627776` (1 TiB); TTL and `maximum-size` remain mandatory.
+- Startup validation rejects zero, negative, and above-limit values through the
+  existing effective-policy path with concrete client, method, policy, source,
+  HTTP method, and `@ApiRef` context. Unselected policy definitions remain inert.
+- Effective contracts and approval snapshots expose the exact per-method limit.
+  Diagnostics schema V1 adds nullable
+  `cacheMaximumTotalDecodedResponseBytes`; provider snapshots report a finite
+  sum only when every selected policy has a configured representable limit.
+- Generated configuration metadata, the effective-configuration example, cache
+  and diagnostics guides, schema/support fixtures, and metadata tests use the
+  same unit and bounds. Existing runtime hints already cover `CachePolicyConfig`;
+  AOT evidence now checks the new setter. The existing
+  `ReactiveHttpClientProperties*` API filter covers the additive public methods,
+  so no new type or filter was required.
+- An absent limit remains `null`; no cache manager, body counter, weighted cache,
+  dependency, meter, or cache-memory observer was added or activated. A focused
+  contract/diagnostics/metadata/AOT/documentation run passed 231 tests, and
+  the complete starter suite passed 1,273 tests; both had no failures. JSON
+  validation and `git diff --check` also passed.
+- Response-byte measurement and retained-weight enforcement are implemented in
+  5.2 and 5.3 below; the configured limit is no longer diagnostics-only.
+
+### [x] 5.2 Make publication and accounting atomic
+
+- [x] Require every stored entry to satisfy TTL, `maximum-size`, and the selected
       weight limit.
-- [ ] Make generation validation, admission, accounting, and publication one
+- [x] Make generation validation, admission, accounting, and publication one
       race-safe transition for first fills and duplicate loads.
-- [ ] Prevent an older duplicate completion from replacing a newer value or
+- [x] Prevent an older duplicate completion from replacing a newer value or
       restarting the full TTL/weight lifetime.
-- [ ] Return an over-budget successful value to its caller without storing it when
+- [x] Return an over-budget successful value to its caller without storing it when
       that is the selected contract.
-- [ ] Prevent skipped/failed admission from leaving generation, key, meter, or
+- [x] Prevent skipped/failed admission from leaving generation, key, meter, or
       load-token state behind.
 
-### [ ] 5.3 Preserve replacement and refresh invariants
+### [x] 5.3 Preserve replacement and refresh invariants
 
-- [ ] Transfer weight exactly once on refresh replacement and ordinary
+- [x] Transfer weight exactly once on refresh replacement and ordinary
       replacement.
-- [ ] Retain the stale entry and its original accounting when refresh fails,
+- [x] Retain the stale entry and its original accounting when refresh fails,
       empties, is rejected, times out, or is cancelled.
-- [ ] Remove weight exactly once on TTL expiry, size/weight eviction, explicit
+- [x] Remove weight exactly once on TTL expiry, size/weight eviction, explicit
       eviction, policy removal, and shutdown.
-- [ ] Prove totals cannot become negative, overflow, or temporarily exceed the
+- [x] Prove totals cannot become negative, overflow, or temporarily exceed the
       documented bound beyond explicitly documented atomic transition behavior.
-- [ ] Verify `ResponseEntity<T>` accounting follows the selected body/header
+- [x] Verify `ResponseEntity<T>` accounting follows the selected body/header
       contract without retaining disallowed headers.
+
+Evidence recorded on 2026-08-31 from durable baseline commit
+`1d681dd9c5bc46bacf3888e85e2574054c59860c` plus this reviewed change:
+
+- The configured aggregate limit is passed into the policy cache and allocates a
+  `WeightState` only for selected weighted policies. The final successful unary
+  decoder input is observed after transport decompression without joining,
+  copying, retaining, or reserializing its `DataBuffer` stream. Unknown, failed,
+  cancelled, overflowing, and individually over-budget measurements bypass
+  storage while preserving the successful caller result where one exists.
+- Generation validation, pressure eviction, replacement, aggregate accounting,
+  and Caffeine publication run under the cache lifecycle monitor. Duplicate
+  losers cannot publish or account; an over-budget candidate cannot evict; and
+  refresh bypass preserves the stale entry and its original hard-expiry time.
+- Stored entries own immutable representation-byte weights. Replacement transfers
+  that weight once, while TTL, size/weight eviction, explicit invalidation, and
+  close subtract it once. Retained `ResponseEntity` header names and values are
+  counted only after the existing allowlist and sensitive-header rejection build
+  the stored entity. Runtime mutation of the aggregate limit is rejected with the
+  other immutable policy bounds.
+- `BoundedLocalResponseCacheContractTest` covers real decoded-body admission,
+  over-budget delivery without storage or generation residue, duplicate fill,
+  weight and size pressure, refresh replacement/bypass, TTL, explicit eviction,
+  close, and retained-header accounting without asserting victim order. The
+  focused cache, retention, observability, and policy run passed 92 tests with no
+  failures, errors, or skips. The complete starter suite passed 1,277 tests with
+  no failures, errors, or skips; `git diff --check` also passed.
 
 ---
 
 ## Priority 6 - Capacity, Expiry, and Concurrency Invariants
 
-### [ ] 6.1 Make capacity evidence deterministic
+### [x] 6.1 Make capacity evidence deterministic
 
-- [ ] Test small and large entries under entry-count pressure and, after a weight
+- [x] Test small and large entries under entry-count pressure and, after a weight
       GO, under combined size/weight pressure.
-- [ ] Assert observable admission/eviction invariants without depending on an
+- [x] Assert observable admission/eviction invariants without depending on an
       unspecified victim order.
-- [ ] Cover entry replacement, same-key reload after expiry, explicit eviction,
+- [x] Cover entry replacement, same-key reload after expiry, explicit eviction,
       policy isolation, and multiple clients sharing one registry.
-- [ ] Verify current entry/weight totals agree with the actual retained entry set
+- [x] Verify current entry/weight totals agree with the actual retained entry set
       after every transition.
 
-### [ ] 6.2 Bound metadata independently from values
+### [x] 6.2 Bound metadata independently from values
 
-- [ ] Stress high-cardinality miss-only, failed-load, rejected-admission, and
+- [x] Stress high-cardinality miss-only, failed-load, rejected-admission, and
       cancelled-load keys.
-- [ ] Prove generation/tombstone state is removed or bounded independently of
+- [x] Prove generation/tombstone state is removed or bounded independently of
       cache entry count and TTL.
-- [ ] Prove per-flight waiter collections, cancellation markers, and diagnostic
+- [x] Prove per-flight waiter collections, cancellation markers, and diagnostic
       ownership are removed at terminal transition.
-- [ ] Verify explicit eviction invalidates outstanding publication tokens without
+- [x] Verify explicit eviction invalidates outstanding publication tokens without
       unnecessarily cancelling caller-visible work.
 
-### [ ] 6.3 Stress interleavings without blocking event loops
+### [x] 6.3 Stress interleavings without blocking event loops
 
-- [ ] Cover same-key and many-key immediate completion, delayed response body,
+- [x] Cover same-key and many-key immediate completion, delayed response body,
       timeout, cancellation, refresh, eviction, and shutdown interleavings.
-- [ ] Gate races with latches/sinks/virtual time or server observations rather
+- [x] Gate races with latches/sinks/virtual time or server observations rather
       than timing-only sleeps.
-- [ ] Detect blocking cleanup, unbounded serialization/accounting, or recursive
+- [x] Detect blocking cleanup, unbounded serialization/accounting, or recursive
       traversal on event-loop threads.
-- [ ] Record bounded stress iteration counts, seeds where applicable, and failure
+- [x] Record bounded stress iteration counts, seeds where applicable, and failure
       diagnostics in target-only evidence.
+
+Evidence recorded on 2026-08-31 from durable baseline commit
+`3c1707bec36a98ff6d8c63387d2c7cc5c0bee829` plus this reviewed change:
+
+- `ResponseCacheCapacityConcurrencyInvariantTest` independently reflects the
+  Caffeine retained-entry set after every capacity, weight, replacement, expiry,
+  reload, and explicit-eviction transition. It requires reported retained bytes
+  to equal the sum of stored entry weights, every weighted entry to be accounted
+  exactly once, generation count to equal terminal retained-entry count, and both
+  configured bounds to hold without asserting which unspecified victim survives.
+- Policy-isolation evidence covers two bounds in one manager and two client
+  managers sharing one `SimpleMeterRegistry`; destroying one manager leaves the
+  other client's tagged gauge live. Same-key refresh replacement, same-key reload
+  after monotonic hard expiry, and aggregate manager totals are verified in the
+  same suite.
+- Four independent 1,024-key sweeps cover miss-only tokens, failed loads,
+  over-budget admission, and cancelled loads. Every terminal path leaves zero
+  generation/tombstone records. A 32-member single flight proves members,
+  released markers, diagnostic ownership, and the manager flight map are cleared;
+  explicit eviction makes an active publication token stale while its independent
+  caller still receives the successful value without cancellation.
+- The deterministic stress matrix completed 256 iterations with seed `701154533`
+  across ten same-key, many-key, refresh, expiry, eviction, delayed, virtual-time
+  timeout, cancellation, and shutdown scenarios. Every scenario is forced once
+  before seeded selection. Target-only provenance and failure context are written
+  to `target/release-evidence/v29/priority6/cache-concurrency-invariants.properties`.
+- A 64-publication pressure run executes loader and accounting signals on a Reactor
+  non-blocking scheduler with response values that fail on equality, hashing, or
+  rendering. This guards against blocking Reactor calls, response graph traversal,
+  serialization, and value-derived accounting on the event-loop path.
+- The focused cache/retention/workload/observability run passed 75 tests, and the
+  complete starter suite passed 1,281 tests. Both runs had no failures, errors, or
+  skips; `git diff --check` also passed. No production change was needed because
+  the Priority 5 storage and manager implementation satisfied every new invariant.
 
 ---
 
 ## Priority 7 - Single-Flight and Refresh Memory Boundaries
 
-### [ ] 7.1 Release each caller independently
+### [x] 7.1 Release each caller independently
 
-- [ ] Account for one shared load independently from the number of attached
+- [x] Account for one shared load independently from the number of attached
       callers.
-- [ ] Release a timed-out or cancelled leader's context, request arguments,
+- [x] Release a timed-out or cancelled leader's context, request arguments,
       prepared body, auth state, and diagnostics while waiters continue.
-- [ ] Keep coalesced waiter terminal records free of transport attempt evidence
+- [x] Keep coalesced waiter terminal records free of transport attempt evidence
       unless that caller actually owns the dispatch.
-- [ ] Prevent a detached/removed shared publisher from reconnecting and starting
+- [x] Prevent a detached/removed shared publisher from reconnecting and starting
       an untracked duplicate load.
 
-### [ ] 7.2 Bound hidden refresh work
+### [x] 7.2 Bound hidden refresh work
 
-- [ ] Apply the configured refresh deadline and hard-expiry cancellation to every
+- [x] Apply the configured refresh deadline and hard-expiry cancellation to every
       hidden refresh, including a source that never terminates.
-- [ ] Release frozen request/auth/body state on refresh success, failure, empty,
+- [x] Release frozen request/auth/body state on refresh success, failure, empty,
       timeout, rejection, cancellation, eviction, and close.
-- [ ] Keep one refresh per key and prevent stale callbacks from replacing a newer
+- [x] Keep one refresh per key and prevent stale callbacks from replacing a newer
       entry or recreating an evicted entry.
-- [ ] Verify a stale-serving caller completes independently while refresh remains
+- [x] Verify a stale-serving caller completes independently while refresh remains
       bounded and factory-owned.
 
-### [ ] 7.3 Preserve composition behavior
+### [x] 7.3 Preserve composition behavior
 
-- [ ] Cover auth resolution/refresh, Retry, RateLimiter, Bulkhead,
+- [x] Cover auth resolution/refresh, Retry, RateLimiter, Bulkhead,
       CircuitBreaker, redirect, logical-call timeout, and request timeout around
       miss and refresh loads.
-- [ ] Keep per-caller logical-call budgets independent from the shared load's
+- [x] Keep per-caller logical-call budgets independent from the shared load's
       lifetime while interested callers remain.
-- [ ] Verify zero-attempt admission rejection creates no transport dispatch and
+- [x] Verify zero-attempt admission rejection creates no transport dispatch and
       retains no flight/refresh state.
-- [ ] Verify shutdown terminates queued/active flights and refreshes within one
+- [x] Verify shutdown terminates queued/active flights and refreshes within one
       documented factory deadline.
+
+Evidence recorded on 2026-08-31 from durable baseline commit
+`c2006ab0000830b102efe4202026929709e9272c` plus this reviewed change:
+
+- Cache-selected invocations now copy the manager-owned work context without the
+  caller's reporting state or logical-call deadline, then replace starter-owned
+  values through `RequestContextSnapshot` and policy-selected values through
+  immutable `PreparedContext`. Cache-safe propagation context remains visible
+  to the shared transport, while the package-private manager overload leaves the
+  ordinary caller-owned path unchanged.
+- `ResponseCacheRetentionOwnershipTest` reproduces the prior retention with an
+  open shared source, cancels the original leader while one waiter remains, and
+  proves the leader argument, prepared body, auth-header state, original Reactor-
+  context container, reporting state, and waiter-free diagnostic ownership are
+  collectible without cancelling or duplicating the source. The single-flight
+  customization fixture also proves custom trace context and starter correlation
+  context still reach the real dispatch. Existing detached-publisher tests
+  continue to prove a removed publisher cannot reconnect.
+- The same retention suite now covers hidden-refresh success, failure, admission
+  rejection, empty completion, configured timeout, hard-expiry timeout, eviction,
+  and manager close. Virtual time drives both deadline paths; four non-terminating
+  sources observe cancellation, every refresh map reaches zero, and late
+  publication remains generation-checked by the existing cache contracts.
+- `SemanticReadReplayTimeoutContractTest` now applies Retry, RateLimiter,
+  CircuitBreaker, Bulkhead, and configured request timeout to both miss and hidden
+  refresh work. It retains existing auth replay, redirect, response-body/logical
+  timeout, independent caller-deadline, and terminal-diagnostic coverage, and
+  explicitly proves zero-attempt CircuitBreaker rejection creates no dispatch,
+  flight, waiter, refresh, or entry.
+- `BoundedLocalResponseCacheContractTest`,
+  `StalePooledConnectionRecoveryContractTest`, and
+  `Priority7HousekeepingTest` retain deterministic one-load, one-body-
+  subscription, refresh, eviction, close, active/queued shutdown, and one
+  aggregate factory-deadline evidence.
+- The focused retention/cache/composition run passed 67 tests and the complete
+  starter suite passed 1,283 tests, both with no failures, errors, or skips.
+  `git diff --check` also passed.
 
 ---
 
 ## Priority 8 - Metrics, Diagnostics, and Health Semantics
 
-### [ ] 8.1 Keep telemetry explicit and bounded
+### [x] 8.1 Keep telemetry explicit and bounded
 
-- [ ] Register cache memory/accounting telemetry only when cache observability is
+- [x] Register cache memory/accounting telemetry only when cache observability is
       explicitly selected.
-- [ ] If weighted admission ships, expose current/maximum weight with a meter
+- [x] If weighted admission ships, expose current/maximum weight with a meter
       description that names the exact unit and an admission outcome using only
       stable low-cardinality tags.
-- [ ] Keep cache-disabled and cache-enabled/metrics-disabled clients free of the
+- [x] Keep cache-disabled and cache-enabled/metrics-disabled clients free of the
       new meters and meter suppliers.
-- [ ] Never export keys, values, request targets, headers, bodies, identities,
+- [x] Never export keys, values, request targets, headers, bodies, identities,
       credentials, tenant data, exception messages, or derived variants.
-- [ ] Remove every owned meter on factory destruction and prove destroy/recreate
+- [x] Remove every owned meter on factory destruction and prove destroy/recreate
       observes the replacement manager.
 
-### [ ] 8.2 Evolve diagnostics schema V1 additively
+### [x] 8.2 Evolve diagnostics schema V1 additively
 
-- [ ] Add only nullable configured/runtime facts that can be derived without
+- [x] Add only nullable configured/runtime facts that can be derived without
       creating a cache manager, invoking a weigher, or traversing cached values.
-- [ ] Preserve `null`/unknown for lazy, absent, uncreated, or uninspectable cache
+- [x] Preserve `null`/unknown for lazy, absent, uncreated, or uninspectable cache
       state instead of reporting false certainty.
-- [ ] Keep existing collection-backed snapshot overloads accurate when new facts
+- [x] Keep existing collection-backed snapshot overloads accurate when new facts
       are unavailable.
-- [ ] Enforce existing client, endpoint, field, rendered-byte, and sanitization
+- [x] Enforce existing client, endpoint, field, rendered-byte, and sanitization
       limits for map, JSON, and Markdown outputs.
-- [ ] Add compatibility fixtures for older schema consumers and unknown fields.
+- [x] Add compatibility fixtures for older schema consumers and unknown fields.
 
-### [ ] 8.3 Preserve downstream health semantics
+### [x] 8.3 Preserve downstream health semantics
 
-- [ ] Keep fresh/stale hits and coalesced waiters out of the ordinary downstream
+- [x] Keep fresh/stale hits and coalesced waiters out of the ordinary downstream
       request timer used by health calculations.
-- [ ] Keep miss/refresh loads that fail before transport distinguishable from
+- [x] Keep miss/refresh loads that fail before transport distinguishable from
       dispatched downstream failures.
-- [ ] Ensure local admission bypass/rejection does not dilute or inflate
+- [x] Ensure local admission bypass/rejection does not dilute or inflate
       downstream health samples.
-- [ ] Document which cache meters are occupancy signals and which are terminal
+- [x] Document which cache meters are occupancy signals and which are terminal
       event histories.
+
+Evidence recorded on 2026-09-01 from durable baseline commit
+`89527bf190aebcb23dc085817895f12fb88e9c1d` plus this reviewed change:
+
+- Weighted policies with explicitly enabled cache metrics now expose current and
+  configured decoded-response representation bytes plus one admission counter
+  with fixed `admitted`, `bypassed_unknown_size`, `bypassed_over_budget`, and
+  `bypassed_capacity` outcomes. Meter descriptions name decoded response
+  representation bytes, tags remain limited to client, policy, and outcome, and
+  stale duplicate publications do not create admission events.
+- `LocalResponseCacheObservabilityTest` proves admitted, unknown-size, and over-
+  budget transitions; current retained-byte updates; zero-initialized stable
+  outcomes; absence for cache-disabled and cache-metrics-disabled clients; no
+  request/cache material in tags; stale duplicate bypass suppression; atomic
+  load/refresh freshness-and-admission decisions; overlapping manager aggregation
+  and owner-safe close; complete meter removal; and clean manager
+  re-registration.
+- Diagnostics schema V1 now adds nullable
+  `cacheRetainedDecodedResponseBytes`. Provider snapshots read it only from an
+  already-created factory cache manager, report `null` for uncreated or mixed
+  weighted/unweighted state, report zero for an empty or closed weighted
+  manager, and never create a manager, invoke a weigher, or traverse cached
+  values. Collection-backed snapshots preserve `null` when runtime state is
+  unavailable.
+- The current schema fixture includes the additive nullable field, the immutable
+  published fixture remains unchanged, and compatibility coverage proves older
+  consumers ignore unknown additive fields. Existing map, JSON, Markdown,
+  sanitization, and rendered-byte guards continue to cover the new field.
+- `Boot4HttpClientHealthIndicatorTest` proves fresh hits, stale hits, coalesced
+  waiters, and local admission outcomes create no ordinary request samples, then
+  proves one dispatched `503` remains exactly one failed health sample and keeps
+  the client `DOWN`.
+- `docs/08-observability.md` distinguishes current occupancy/capacity gauges from
+  cumulative admission/load/refresh/eviction histories; the diagnostics,
+  support-bundle, and response-cache guides document nullable runtime-state and
+  health-isolation semantics.
+- The focused cache/accounting run passed 69 tests and the complete starter suite
+  passed 1,291 tests, both with no failures, errors, or skips.
 
 ---
 
 ## Priority 9 - Operations and Support-Bundle Evidence
 
-### [ ] 9.1 Add a cache-memory triage path
+### [x] 9.1 Add a cache-memory triage path
 
-- [ ] Start with cache selection, policy count, `maximum-size`, TTL, occupancy,
+- [x] Start with cache selection, policy count, `maximum-size`, TTL, occupancy,
       hit/miss/load/refresh/eviction activity, direct memory, connection pools,
       thread count, and deployment changes.
-- [ ] Explain how expected bounded retained values differ from monotonically
+- [x] Explain how expected bounded retained values differ from monotonically
       growing keys, generation records, flights, refreshes, meters, or transport
       resources.
-- [ ] State that RSS is not Java heap and that decoded-object retention is not
+- [x] State that RSS is not Java heap and that decoded-object retention is not
       represented by response wire size.
-- [ ] Keep published `4.1.0` instructions separate from `4.2.0-SNAPSHOT`/V29-only
+- [x] Keep published `4.1.0` instructions separate from `4.2.0-SNAPSHOT`/V29-only
       signals until release.
 
-### [ ] 9.2 Define safe capture evidence
+### [x] 9.2 Define safe capture evidence
 
-- [ ] Add a sanitized fixture with a bounded time window, Java/process/container
+- [x] Add a sanitized fixture with a bounded time window, Java/process/container
       memory summaries, direct-memory signal, cache occupancy/capacity,
-      load/refresh/eviction/admission aggregates, and lifecycle events.
-- [ ] Include configuration source and selected policy names only where they are
+      load/refresh/eviction/admission aggregates, bounded in-process cache-meter
+      registration counts, and lifecycle events.
+- [x] Include configuration source and selected policy names only where they are
       safe and bounded; include no cache keys, values, headers, bodies, targets,
       identities, credentials, tenant data, or exception messages.
-- [ ] Add recursive fixture guards for singular, plural, and compound sensitive
+- [x] Add recursive fixture guards for singular, plural, and compound sensitive
       field names plus relative request-target/query material.
-- [ ] Document that heap dumps and JFR recordings can contain sensitive
+- [x] Document that heap dumps and JFR recordings can contain sensitive
       application data and must follow a separate secure handling process.
-- [ ] Verify Docker/Kubernetes recipes preserve failure bodies, management-port
+- [x] Verify Docker/Kubernetes recipes preserve failure bodies, management-port
       placeholders, shell variables, and minimal-image compatibility.
+
+Evidence recorded on 2026-09-01 from durable baseline commit
+`d714e51d113be2538a998ce21702432b59ebbe03` plus this reviewed change:
+
+- `docs/30-operations-troubleshooting.md` adds a version-scoped cache-memory
+  decision tree covering cache selection and policy bounds, occupancy and activity,
+  post-GC heap, RSS/container working set, direct memory, threads, pool gauges,
+  deployment changes, and close/restart behavior. It distinguishes expected
+  bounded retention from growing metadata, work, meters, and transport resources,
+  and states that RSS, Java heap, decoded representation bytes, and wire size are
+  different signals.
+- `docs/26-support-bundles.md` adds a bounded V29 cache-memory capture contract and
+  the sanitized `support-bundle-cache-memory.json` fixture. The fixture identifies
+  one bounded client/process instance, maps API-tagged caller/load/refresh work to
+  selected policies, keeps policy-tagged eviction/admission facts separate,
+  records nullable refresh-after and refresh-timeout bounds for each policy,
+  includes stale callers in lookup hits and partitions misses into loaders plus
+  coalesced waiters, represents weighted/unweighted availability with values
+  versus `null`, records two cumulative API terminal-load counter snapshots in a
+  bounded pre-close quiet window while traffic is stopped and the factory remains
+  open, and records three timestamped post-GC memory/cache/H2-pool checkpoints.
+  Each checkpoint includes cache `Meter.Id` totals grouped by Micrometer type and
+  tied to one context ordinal; the active total is 55 and the post-close total is
+  zero.
+  Factory startup precedes the populated opening checkpoint. The
+  after-load entry counts equal opening entries plus successful
+  loads minus recorded evictions for each policy. The idle `profile-summary`
+  policy has zero survivors by the quiet-window end because its 50 opening entries
+  all exceed the 30-second TTL, and its eviction total records all 50 expirations.
+  The `catalog-read` policy records 14 refreshed opening entries, 186 TTL
+  expirations, 34 successful loads, three weight evictions, and 45 survivors at
+  the `00:04:25Z` quiet-window-end checkpoint, after the 34th load terminal was
+  recorded, respecting its 60-second TTL. Its admission history records all 48
+  successful load/refresh publications as admitted and records zero bypasses.
+  Both size-eviction counts are zero because neither policy reaches its maximum
+  entry capacity during the bounded window. Its lifecycle evidence timestamps
+  the relevant starter-version change with safe before/after versions. It contains
+  no request, cache-entry, identity, credential, tenant, or error-message material.
+- Recursive fixture guards reject singular, plural, and compound sensitive field
+  names, including common identity-bearing names, plus origin, authority,
+  rootless-path, query, and absolute-URL textual values, including request
+  targets embedded in standard or extension-method HTTP request lines. All six
+  endpoint captures remove stale raw files and curl-status evidence, set a private
+  `umask 077`, bound connection setup to 5 seconds and total transfer to 30
+  seconds, cap downloads at 1 MiB, record HTTP and curl exit status separately,
+  quarantine bodies outside the bundle, require a zero curl exit status, verify
+  raw byte size before parsing, require exactly one parsed JSON value, and publish
+  JSON only after expected-shape validation and field allowlisting.
+  Diagnostics publication requires 2xx status, version-applicable required fields,
+  bounded recursive leaf types, at most 16 cache policy-source/HTTP-method values,
+  per-client and aggregate endpoint-count invariants, and the documented output
+  limits while retaining supported nullable unknown values. The V29 byte fields
+  are optional only when `projectVersion` identifies a published `4.1.x`
+  response and are required for the V29 `4.2.0-SNAPSHOT` shape. The canonical
+  bundle tree retains both curl exit-status artifacts beside the HTTP statuses.
+  The health filter rejects `4xx` responses, permits `2xx` responses or
+  structurally valid `5xx` Actuator responses with top-level `DOWN`, and enforces
+  Java-`long` counter bounds plus built-in aggregate/detail status and reason
+  invariants,
+  verifies every nonzero-sample rate against `errors / samples` within
+  `0.000000000001`, and derives the output status from the selected client while
+  preserving omission of `errorRate` for a zero-sample detail. Query flags and
+  asterisk-form targets are
+  fixture-rejected alongside
+  other request-target forms. Kubernetes placeholders and the
+  `kubectl exec -- cat` minimal-image path remain covered without
+  `kubectl cp`/`tar`.
+- The operations decision table uses only observable cache evidence: stale-hit
+  callers across consecutive bounded windows, coalesced-waiter and terminal-load
+  deltas during a pre-close quiet window, terminal refresh deltas, and separate
+  post-close memory/lifecycle cleanup. It explicitly states that removed meters
+  cannot provide post-close load deltas and cumulative terminal counters cannot
+  prove active flight or refresh ownership.
+- `DocumentationReleaseArtifactTest` passed 45 tests and the paired configuration
+  guard passed 18 tests. The complete starter suite passed 1,292 tests; all runs
+  had no failures, errors, or skips. The exact documented diagnostics filter
+  accepted provider-backed, summary-only, and published 4.1-shaped fixtures while
+  rejecting both an object-valued leaf and a 401 response. The health filter
+  accepted valid and zero-sample records, rejected an object-valued reason and a
+  counter/rate mismatch, and emitted UP for a selected UP client from an aggregate
+  DOWN response. JSON validation, local-link validation, and
+  `git diff --check` also passed.
 
 ---
 
 ## Priority 10 - Mock and Assembled-Consumer Parity
 
-### [ ] 10.1 Extend deterministic mock controls
+### [x] 10.1 Extend deterministic mock controls
 
-- [ ] Provide deterministic time and control surfaces for occupancy, TTL expiry,
+- [x] Provide deterministic time and control surfaces for occupancy, TTL expiry,
       admission, eviction, refresh, and close without exposing production cache
       internals.
-- [ ] Keep mock behavior aligned with production for duplicate misses,
+- [x] Keep mock behavior aligned with production for duplicate misses,
       single-flight membership, refresh replacement, and late publication.
-- [ ] Ensure `MockReactiveHttpClient.close()` owns and closes cache managers in
+- [x] Ensure `MockReactiveHttpClient.close()` owns and closes cache managers in
       deterministic and ordinary-time modes.
-- [ ] Keep existing `4.1.0` test-helper source/binary usage working when no new
+- [x] Keep existing `4.1.0` test-helper source/binary usage working when no new
       budget is configured.
 
-### [ ] 10.2 Revalidate assembled consumers
+### [x] 10.2 Revalidate assembled consumers
 
-- [ ] Verify a cache-disabled Boot 4 consumer requires no optional Caffeine or
+- [x] Verify a cache-disabled Boot 4 consumer requires no optional Caffeine or
       new cache-accounting dependency.
-- [ ] Verify the published `4.1.0` assembled consumer remains Central-only and
+- [x] Verify the published `4.1.0` assembled consumer remains Central-only and
       unchanged by V29 APIs.
-- [ ] If weighted admission ships, add a current-reactor consumer that declares
+- [x] If weighted admission ships, add a current-reactor consumer that declares
       required dependencies/configuration explicitly and exercises admission,
       hit, eviction/bypass, and shutdown.
-- [ ] Preserve Surefire reports, effective POMs, dependency trees, classpaths,
+- [x] Preserve Surefire reports, effective POMs, dependency trees, classpaths,
       artifact hashes, completed stage, and exit status on success and failure.
-- [ ] Reject reactor `target/classes`, stale report, and default-local-repository
+- [x] Reject reactor `target/classes`, stale report, and default-local-repository
       contamination in every consumer lane.
+
+Evidence:
+
+- `MockReactiveHttpClient` now exposes an immutable `CacheSnapshot` through its
+  `@hidden` bridge and an additive four-argument weighted `cachePolicy` overload.
+  The snapshot contains only bounded counts and nullable decoded-response
+  representation-byte occupancy; no production cache type, key, value, header,
+  body, target, identity, or credential is exposed. The published three-argument
+  builder path remains unweighted.
+- `MockReactiveHttpClientTest` deterministically covers weighted admission,
+  over-budget bypass, weight/TTL eviction, occupancy, single-flight membership,
+  refresh replacement/terminal outcome, explicit eviction, out-of-order duplicate
+  fills, late post-eviction publication, and deterministic close. The existing
+  ordinary-time close test still proves active cache work is cancelled. Together
+  with `Boot4MockReactiveHttpClientTest`, 63 tests passed with no failures, errors,
+  or skips.
+- `.github/boot4-cache-disabled-consumer` is an independent starter-only Boot 4
+  application. It starts and performs a real loopback call while asserting
+  Caffeine is absent. Its effective POM, dependency tree, classpath, fresh Surefire
+  report, and provenance are retained by `scripts/verify-current-consumer.sh`.
+- The V29-only profile in `.github/boot4-consumer/pom.xml` explicitly declares
+  Caffeine and exercises two admitted fills, a fresh hit, weight eviction, two
+  over-budget bypasses, retained-byte occupancy, and factory-owned meter removal
+  at context shutdown. The current assembled fixture passed 7 tests and the
+  cache-disabled fixture passed 1 test.
+- `scripts/verify-current-consumer.sh` passed from a fresh target-local repository
+  and recorded `completedStage=evidence-verified`, `exitStatus=0`, both effective
+  POMs/dependency trees/classpaths, two mock XML reports covering 63 tests, four
+  current-consumer reports covering 7 tests, one cache-disabled report, and
+  parent/starter/test-helper/OTel hashes under
+  `target/release-evidence/current-consumer/current-4.2.0-SNAPSHOT/`. Marker-time
+  report copies and the exit trap preserve fresh partial evidence on failure; both
+  classpaths are checked for reactor output-directory leakage, and the disabled
+  lane rejects Caffeine.
+- `scripts/verify-published-consumer.sh 4.1.0` passed 4 tests from a separate fresh
+  Maven Central repository with the V29 profile disabled. Central markers,
+  artifact hashes, effective POMs, dependency tree, classpath, reports, and
+  `completedStage=evidence-verified` / `exitStatus=0` provenance are under
+  `target/release-evidence/published-consumer/published-4.1.0/`.
+- The module-scoped strict `api-compatibility` run against published `4.1.0`
+  classified `cacheSnapshot`, `CacheSnapshot`, and the weighted builder overload
+  as additive while retaining binary and source compatibility. The focused
+  documentation guard passed 45 tests; shell syntax and `git diff --check` passed.
 
 ---
 
 ## Priority 11 - AOT, Native, and Shutdown Parity
 
-### [ ] 11.1 Keep AOT hints narrow
+### [x] 11.1 Keep AOT hints narrow
 
-- [ ] Register only configuration, record accessor, constructor, and SPI types
+- [x] Register only configuration, record accessor, constructor, and SPI types
       required by the selected contract.
-- [ ] Avoid broad package/type/member reflection and any runtime reflective graph
+- [x] Avoid broad package/type/member reflection and any runtime reflective graph
       traversal for weighing.
-- [ ] Preserve replacement properties/cache beans during AOT analysis without
+- [x] Preserve replacement properties/cache beans during AOT analysis without
       eagerly creating lazy managers or factories.
-- [ ] Add native-hint tests for selected and unselected cache-memory policies.
+- [x] Add native-hint tests for selected and unselected cache-memory policies.
 
-### [ ] 11.2 Extend native execution evidence
+### [x] 11.2 Extend native execution evidence
 
-- [ ] Run cache-disabled and bounded cache fill/hit/expiry/shutdown paths in the
+- [x] Run cache-disabled and bounded cache fill/hit/expiry/shutdown paths in the
       native fixture.
-- [ ] After a weight GO, cover over-budget successful non-publication and
+- [x] After a weight GO, cover over-budget successful non-publication and
       replacement/eviction accounting; after a no-go, omit nonexistent fields and
       record the decision.
-- [ ] Prove diagnostics do not initialize lazy cache components in the native
+- [x] Prove diagnostics do not initialize lazy cache components in the native
       executable.
-- [ ] Compile and run from a clean committed tree; record GraalVM/JDK version,
+- [x] Compile and run from a clean committed tree; record GraalVM/JDK version,
       command, commit, binary SHA-256, and executable result.
 
-### [ ] 11.3 Stress shutdown and restart
+### [x] 11.3 Stress shutdown and restart
 
-- [ ] Close active/queued miss loads and hidden refreshes within the single
+- [x] Close active/queued miss loads and hidden refreshes within the single
       documented factory shutdown deadline.
-- [ ] Prevent connections, direct buffers, schedulers, meter suppliers, cache
+- [x] Prevent connections, direct buffers, schedulers, meter suppliers, cache
       entries, or late callbacks from surviving context close.
-- [ ] Recreate the application context/factory with the same client/policy/meter
+- [x] Recreate the application context/factory with the same client/policy/meter
       tags and prove new instances are observed.
-- [ ] Run shutdown stress on JVM and native paths with disposal-driven terminal
+- [x] Run shutdown stress on JVM and native paths with disposal-driven terminal
       assertions rather than ordinary request/acquire timeouts.
+
+Evidence recorded on 2026-09-05 from baseline commit
+`89213d3c9b32684991425ddd7686d89cd1bed15c` plus this reviewed change:
+
+- AOT processing now limits recursive record-accessor and class-resource hints to
+  methods with an effective selected cache policy. Existing exact configuration,
+  Caffeine constructor/factory-field, and SPI lookup hints remain unchanged;
+  no package-wide or `MemberCategory` reflection was introduced.
+- `ReactiveHttpClientAotSmokeTest` proves a selected weighted cache policy
+  receives its record accessor/resource hints while an unselected policy does
+  not. Existing coverage continues to prove primary programmatic properties and
+  replacement metadata are honored without instantiating the default properties
+  bean or lazy client factory.
+- The native fixture now proves cache-disabled repeated dispatch, bounded
+  fill/hit/expiry, weighted replacement, over-budget successful non-publication,
+  weight-eviction/admission accounting, and diagnostics that leave uncreated
+  cache storage unknown.
+- JVM and native runs close an active miss, a queued miss, and a hidden refresh
+  before the aggregate five-second factory deadline. Server-side cancellation,
+  a post-close quiet period, complete cache-meter removal, and same-tag
+  application-context recreation against one retained registry prove
+  disposal-driven ownership and replacement-manager observation.
+- `git diff --check`, the focused AOT/cache/shutdown tests, the complete
+  `mvn -q test` reactor, and
+  `mvn -q -f .github/native-smoke/pom.xml -Dreactive-http-client.version=4.2.0-SNAPSHOT spring-boot:run`
+  all passed.
+- Immutable native evidence was rebuilt on 2026-09-05 from clean commit
+  `d33096fddc7a677d9c217e0e7a136ce349bbcfeb` with Oracle GraalVM/JDK
+  `25.0.3`. The exact committed reactor was first installed with
+  `mvn -q -DskipTests -Dmaven.javadoc.skip=true install`; the clean image command
+  was
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -f .github/native-smoke/pom.xml -Pnative -Dreactive-http-client.version=4.2.0-SNAPSHOT clean native:compile`.
+  Compilation passed in 4m42s, the resulting executable completed successfully,
+  and
+  `.github/native-smoke/target/reactive-http-client-native-smoke` has SHA-256
+  `50c82d713d07bc1e4a7c249d5a7ba68b7c723b33d3eb60bf42f4321fa698eef7`.
+  `git status --short` was empty immediately before the build and after
+  executable verification.
 
 ---
 
 ## Priority 12 - Performance and Allocation Re-Audit
 
-### [ ] 12.1 Keep disabled paths allocation-neutral
+### [x] 12.1 Keep disabled paths allocation-neutral
 
-- [ ] Add or update JMH coverage for publisher creation and subscription when
+- [x] Add or update JMH coverage for publisher creation and subscription when
       caching is unselected, selected without memory accounting, and selected
       with metrics disabled.
-- [ ] Prove no manager, meter, weigher, value inspection, or accounting object is
+- [x] Prove no manager, meter, weigher, value inspection, or accounting object is
       created for cache-disabled clients.
-- [ ] Keep benchmark scenario discovery compatible with published `4.1.0` and
+- [x] Keep benchmark scenario discovery compatible with published `4.1.0` and
       record dependency/commit provenance.
 
-### [ ] 12.2 Measure selected paths
+### [x] 12.2 Measure selected paths
 
-- [ ] Measure hit, miss publication, rejected/bypassed admission, size/weight
+- [x] Measure hit, miss publication, rejected/bypassed admission, size/weight
       eviction, single-flight attachment, refresh replacement, and accounting in
       no-network and loopback modes.
-- [ ] Separate throughput/latency, allocation per operation, retained live-set,
+- [x] Separate throughput/latency, allocation per operation, retained live-set,
       and one-time setup costs.
-- [ ] Use JFR/heap evidence to distinguish transient measurement allocation from
+- [x] Use JFR/heap evidence to distinguish transient measurement allocation from
       retained entries and metadata.
-- [ ] Record scenario completeness and missing published-baseline scenarios
+- [x] Record scenario completeness and missing published-baseline scenarios
       instead of comparing mismatched rows.
 
-### [ ] 12.3 Classify public performance evidence
+### [x] 12.3 Classify public performance evidence
 
-- [ ] Run current and published `4.1.0` release-quality benchmarks on the same
+- [x] Run current and published `4.1.0` release-quality benchmarks on the same
       clean machine only if request-path behavior changes or release wording
       makes a performance claim.
-- [ ] Keep generated reports target-only unless a source-controlled promoted
+- [x] Keep generated reports target-only unless a source-controlled promoted
       report is required for a public claim.
-- [ ] Record a no-public-claim deferral when release notes make no performance,
+- [x] Record a no-public-claim deferral when release notes make no performance,
       latency, percentile, throughput, allocation, or overhead movement claim.
-- [ ] Run benchmark report-path/provenance guards and `git diff --check` before
+- [x] Run benchmark report-path/provenance guards and `git diff --check` before
       closing this priority.
+
+Implementation evidence recorded on 2026-09-06 from starting commit
+`116c8b035e7e449cec8c33eea52cbe6cca1d127a` plus this reviewed change:
+
+- Cache-disabled standard clients now receive no `LocalResponseCacheManager`;
+  focused coverage also proves that no cache meter is registered. Because the
+  manager is the owner of policy caches, weighers, measurement state, and cached
+  value inspection, those objects cannot be reached or created on this path.
+- `StarterInvocationBenchmark` covers cache-disabled publisher creation and
+  subscription. `V29WeightedCachePerformanceBenchmark` separates unweighted and
+  weighted-metrics-disabled invocation, then measures hit, miss publication,
+  over-budget bypass, size/weight eviction, single-flight attachment, refresh
+  replacement, and accounting in no-network and IPv4-loopback fixtures. JMH
+  throughput and average-time modes are separate, release runs attach `-prof gc`,
+  and all fixture construction and seeding remains trial-scoped.
+- `V29WeightedCachePerformanceBenchmarkTest` exercised every declared V29 row.
+  The complete starter and benchmark-module runs passed 1,294 and 21 tests,
+  respectively, with no failures, errors, or skips. A 46-row smoke run passed and
+  remains target-only under
+  `target/release-evidence/v29/priority12/smoke/`; its environment records
+  `116c8b035e7e449cec8c33eea52cbe6cca1d127a-dirty`, so it is not promotable
+  numerical evidence.
+- Current-harness discovery passed with every V29 scenario. The same harness
+  compiled and discovered against published starter `4.1.0` from an isolated
+  repository after excluding only V29-only sources. Central-marked POM/JAR
+  provenance is retained target-only under
+  `target/release-evidence/v29/priority12/published-baseline-provenance/`.
+- The bounded V29 workload JFR was regenerated under
+  `target/release-evidence/v29/priority2/profiling/`. Its allocation samples are
+  treated as transient evidence; post-GC occupancy, eviction, close, and
+  collectability tests remain the retained-live-set evidence. JFR and heap data
+  stay target-only because they can contain application material.
+- The comparator now reports matched, current-only, and baseline-only scenario
+  counts and calculates deltas only for exactly matched benchmark/mode rows.
+  Documentation guards cover baseline source exclusions and command provenance;
+  `git diff --check` passed. Unreleased wording makes no numerical performance,
+  latency, percentile, throughput, allocation, or overhead movement claim, so no
+  report is promoted.
+- Initial release-quality current and published `4.1.0` runs completed on the
+  same machine at commit `49e1cbc55ac8eee14c78a7228d9186a043bad9f6` with
+  normalized GC allocation evidence for every row. Subsequent review found that
+  the metrics-enabled row used the convenience manager overload and the
+  loopback single-flight row depended on a two-millisecond response delay. The
+  fixture now passes the registered API and representative caller/load states
+  through the full overload, verifies the `MISS_LOADER` caller metric, and holds
+  the server response until the manager observes the attached waiter.
+- The corrected focused contract, complete benchmark-module tests, current
+  scenario discovery, and a four-row targeted JMH smoke passed. Release-quality
+  evidence was then regenerated from clean commit
+  `799f5ba07ddde56dd07b48395a1742011540bd62`: the current report contains 46
+  rows and the published report contains six, with normalized GC allocation per
+  operation present on every row. Both runs used Java `25.0.3`, eight processors,
+  Spring Boot `4.0.0`, Spring Framework `7.0.1`, Reactor Netty `1.3.0`, Netty
+  `4.2.7.Final`, Jackson `3.0.2`, Micrometer `1.16.0`, and OpenTelemetry `1.55.0`.
+- The final comparison records six matched cache-disabled rows, 40 explicit
+  V29-only rows, no baseline-only rows, and no informational review trigger.
+  Published starter `4.1.0` resolved from the fresh isolated repository; immutable
+  provenance records its Central-marked POM SHA-256
+  `52b40488a41dc6b4981dc0f21af956d55ea1b868ad2e238ba601b0fcaf7f5cb4`
+  and JAR SHA-256
+  `d2989dd7cc668df2e77dea984d36108ae3a2b85abf4e1b07ee6feeb0095bd721`.
+  Reports and the comparison remain target-only because no public numerical
+  performance claim is made.
 
 ---
 
 ## Priority 13 - Public API, Documentation, and Release Readiness
 
-### [ ] 13.1 Freeze the supported surface
+### [x] 13.1 Freeze the supported surface
 
-- [ ] Add public configuration or SPI only after the Priority 4 go decision and
+- [x] Add public configuration or SPI only after the Priority 4 go decision and
       include every exposed nested/helper type in compatibility coverage.
-- [ ] Audit public constructors, mutable models, annotation defaults, metadata,
+- [x] Audit public constructors, mutable models, annotation defaults, metadata,
       diagnostics schema, mock helpers, and replacement-bean contracts.
-- [ ] Run strict root and starter-module japicmp against fresh published `4.1.0`
+- [x] Run strict root and starter-module japicmp against fresh published `4.1.0`
       repositories; classify every additive or incompatible row.
-- [ ] Keep a no-go path free of placeholder public APIs and remove spike-only
+- [x] Keep a no-go path free of placeholder public APIs and remove spike-only
       implementation before release review.
 
-### [ ] 13.2 Consolidate documentation
+Evidence recorded on 2026-09-06 from the working tree based on commit
+`f0a555321882318aa74264cf67e579f6358d38f9`:
 
-- [ ] Update cache, observability, operations, support-bundle, effective
+- The selected decoded-response representation-byte setting was introduced only
+  after the Priority 4 go decision. `ReactiveHttpClientProperties*` and the
+  complete public test-helper package remain in the japicmp include map; no
+  cache engine, weigher, admission state, or meter owner became a public SPI.
+- The public-surface audit in
+  `docs/20-native-release-compatibility.md#v29-additive-surface-classification`
+  freezes the mutable `CachePolicyConfig` accessors, the existing no-arg/model
+  behavior, the additive mock overload and immutable `CacheSnapshot` helper,
+  nullable diagnostics schema-v1 map fields, unchanged annotation defaults, and
+  authoritative replacement `ReactiveHttpClientProperties` /
+  `MethodMetadataCache` contracts. Spike and decision artifacts remain
+  documentation under `roadmaps/v29/`; no placeholder public API was retained.
+- Strict root japicmp passed against published `4.1.0` from the fresh
+  `v29-priority13-api-root-4.1.0` repository. It classified two starter property
+  accessors, `MockReactiveHttpClient.cacheSnapshot()`, the weighted builder
+  overload, and `MockReactiveHttpClient.CacheSnapshot` plus its record members as
+  additive. Diagnostics classes had modified-class markers but no public member
+  row; OTel had no change; there were no incompatible rows. Central provenance,
+  seven artifact hashes, and copied reports are under
+  `target/release-evidence/v29/priority13/api-root/`.
+- The independent starter-module strict comparison passed from
+  `v29-priority13-api-starter-4.1.0` with the same two additive property
+  accessors and no incompatible row. Its Central provenance, two artifact
+  hashes, and report are under
+  `target/release-evidence/v29/priority13/api-starter/`.
+- `bash scripts/verify-api-compatibility-fixtures.sh` passed the additive and
+  defaulted-annotation cases while still detecting source-only checked
+  exceptions, public constructor/nested-method/enum removals, and report-only
+  incompatible additions.
+
+### [x] 13.2 Consolidate documentation
+
+- [x] Update cache, observability, operations, support-bundle, effective
       configuration, native/release compatibility, testing, and migration guides
       from one vocabulary and one selected weight unit, if any.
-- [ ] State clearly that `maximum-size` counts entries and no configured weight
+- [x] State clearly that `maximum-size` counts entries and no configured weight
       equals exact heap, direct memory, RSS, or container memory.
-- [ ] Keep copyable examples startup-valid, dependency-complete, sanitized, and
+- [x] Keep copyable examples startup-valid, dependency-complete, sanitized, and
       version-scoped to published versus snapshot behavior.
-- [ ] Regenerate configuration reference/effective examples and run local-link,
+- [x] Regenerate configuration reference/effective examples and run local-link,
       placeholder-domain, machine-path, secret-fixture, and benchmark-wording
       guards.
 
-### [ ] 13.3 Assemble immutable release evidence
+Evidence recorded on 2026-09-06:
 
-- [ ] Pass the complete reactor, package/generation guards, dependency matrix,
+- `docs/32-response-caching.md`, `08-observability.md`,
+  `30-operations-troubleshooting.md`, `26-support-bundles.md`,
+  `21-diagnostic-contexts.md`, `examples/effective-configuration.md`,
+  `14-test-helpers.md`, `20-native-release-compatibility.md`, and
+  `31-3x-to-4x-resilience-migration.md` now use decoded response representation
+  bytes as the single V29 unit. They keep `maximum-size` as an entry-count bound
+  and explicitly separate both values from exact Java heap, direct memory,
+  process RSS, and container memory.
+- The effective weighted example retains the required Caffeine dependency and
+  customization-safety inventory, and now identifies
+  `maximum-total-decoded-response-bytes` as `4.2.0-SNAPSHOT`/V29-only while
+  published `4.1.x` remains count-only. Hosts and placeholders remain sanitized.
+- Starter metadata and the generated `docs/configuration-properties.md` were
+  refreshed together. The effective examples remain metadata-validated.
+  `DocumentationReleaseArtifactTest`, configuration metadata, and property
+  binding passed 99 tests; the OTel metadata guard passed 4 tests. These runs
+  include generated-reference equality, local-link, placeholder-domain,
+  machine-path, secret-fixture, public-surface, and benchmark-wording guards.
+  Surefire reports are copied under
+  `target/release-evidence/v29/priority13/documentation/surefire/`.
+- `git diff --check` passed. Priority 13.3 immutable release evidence and
+  Priority 13.4 release selection remain intentionally open.
+
+### [x] 13.3 Assemble immutable release evidence
+
+- [x] Pass the complete reactor, package/generation guards, dependency matrix,
       current/published consumers, AOT, native, shutdown, documentation, API, and
       benchmark disposition from one reviewed clean commit.
-- [ ] Record commands, Java/Boot/GraalVM versions, commit, clean-tree state, test
+- [x] Record commands, Java/Boot/GraalVM versions, commit, clean-tree state, test
       totals, artifact checksums, Central markers, evidence paths, and remaining
       risk under `target/release-evidence/v29/`.
-- [ ] Confirm target-only evidence is not committed and any promoted report is
+- [x] Confirm target-only evidence is not committed and any promoted report is
       sanitized, source-controlled, and version-matched.
-- [ ] Verify generated readiness lists every unresolved command and reflects the
+- [x] Verify generated readiness lists every unresolved command and reflects the
       Priority 4 go/no-go outcome without contradictory scope/publication state.
+
+Evidence recorded on 2026-09-06 from clean commit
+`e5e82e402d521071b8fd6480b1db39c042c07bf4`:
+
+- `mvn -B -ntp clean verify` passed 1,413 tests with no failures,
+  errors, or skips. Snapshot packaging and
+  `scripts/verify-generation-packaging.sh` also passed; binary, source, and
+  Javadoc entry/parity reports are under
+  `target/release-evidence/v29/priority13/package-generation/`.
+- The Java 21 supported matrix passed Spring Boot `4.0.0` and `4.1.0` from
+  fresh repositories. Each row passed 1,413 reactor tests and three assembled-
+  consumer tests, strict API checks, optional-integration checks, dependency
+  trees, effective POMs, and Maven Central provenance. Current-consumer evidence
+  passed 63 mock, seven assembled-consumer, and one cache-disabled test;
+  published `4.1.0` consumer evidence passed four tests.
+- Fresh root and starter japicmp comparisons against published `4.1.0` passed
+  with only the reviewed additive V29 surface and no incompatible rows. The API
+  fixture guards, published-baseline fixtures, and fresh Central parent/module
+  POM/JAR/source/Javadoc bundle verification passed. Reports, hashes, and Central
+  markers are under `target/release-evidence/v29/priority13/api-root/`,
+  `api-starter/`, and `published-release-artifacts/`.
+- A focused AOT, shutdown, cache-contract, and documentation run passed 131
+  tests. Oracle GraalVM Native Image `25.0.3` compiled and ran the exact
+  `4.2.0-SNAPSHOT` native smoke; its executable SHA-256 is
+  `8fa6df5931629611a3e131aace20a7ab3edea2fa85185d1f9dbaa06e61b43f11`.
+- Benchmark packaging and smoke passed 21 tests and 203 JMH rows. This same-
+  commit smoke is wiring/coverage evidence only and supports no new public
+  performance claim; Priority 12 retains the reviewed release-quality benchmark
+  disposition.
+- Commands, toolchain versions, clean-tree state, test totals, snapshot/native/
+  benchmark/readiness checksums, evidence paths, and residual risks are frozen
+  in `target/release-evidence/v29/priority13/RELEASE-EVIDENCE.md`. `target/` is
+  ignored, no evidence file or benchmark report was promoted to source control,
+  and the captured readiness JSON records Priority 4 as `go`, the
+  `additive-minor` lane, candidate `4.2.0`, and an unpublished deferred state.
+- The generated manual list remains the conservative final-cut rerun list.
+  Release-profile verification reached signing but could not obtain GPG
+  pinentry in this environment; signing, final version/tag selection,
+  publication, post-publication Central/consumer verification, baseline movement,
+  and roadmap archival remain explicitly deferred to Priority 13.4.
 
 ### [ ] 13.4 Select release scope and close V29
 
-- [ ] Select `4.2.0` only when the final scope is additive, bounded, measurable,
+- [x] Select `4.2.0` only when the final scope is additive, bounded, measurable,
       and supported by immutable evidence.
-- [ ] If only compatible retention defects are proven, choose an appropriate
+- [x] If only compatible retention defects are proven, choose an appropriate
       maintenance release path or record why the `4.2.0` feature scope is no-go.
-- [ ] Record one explicit go/no-go decision with candidate version, commit, date,
+- [x] Record one explicit go/no-go decision with candidate version, commit, date,
       evidence paths, benchmark disposition, and remaining risk.
 - [ ] On go, cut/publish only from the reviewed clean commit and run generation-
       packaging/signing checks.
@@ -557,23 +1285,59 @@ Select exactly one outcome before continuing:
       on no-go, keep unreleased coordinates private and document the blocker or
       narrowed maintenance scope.
 
+Release decision recorded on 2026-09-06:
+
+- **GO to the `4.2.0` release cut; publication is not yet claimed.** The selected
+  scope is the additive, explicitly selected decoded-response representation-byte
+  admission and eviction contract approved in Priority 4. Existing count-only
+  policies remain compatible, no exact heap/RSS/container-memory claim is made,
+  and no performance claim is attached to the release.
+- The maintenance/no-go branch was evaluated and rejected because V29 contains
+  the reviewed additive weighted-admission surface in addition to compatible
+  retention fixes. Immutable behavior evidence comes from clean commit
+  `e5e82e402d521071b8fd6480b1db39c042c07bf4`; release-cut preparation is based
+  on `6d51837a` plus this uncommitted final-version change set. The eventual tag
+  must identify the reviewed commit containing these exact changes.
+- Root, starter, test-helper, OTel, native-smoke, benchmark, and assembled-
+  consumer coordinates now resolve to final `4.2.0`. Public dependency snippets,
+  published-consumer/API baselines, and published benchmark baselines remain on
+  `4.1.0` until Central verification succeeds.
+- `mvn -B -ntp clean verify` passed 1,413 tests with no failures, errors, or
+  skips. Strict root API compatibility against published `4.1.0` passed. The
+  isolated current-consumer lane passed 63 mock, seven assembled-consumer, and
+  one cache-disabled test. `mvn -B -ntp -s .mvn/maven-central-settings.xml
+  clean -Prelease -DskipTests -Dgpg.skip=true verify`, generation packaging, the
+  46-test documentation/release-artifact suite, and `git diff --check` passed.
+- Candidate artifacts, current-consumer provenance, packaging reports, generated
+  readiness, and the immutable Priority 13.3 bundle are under
+  `target/release-evidence/v29/priority13/`. Generated readiness reports
+  `release-candidate`, selected `additive-minor` scope, candidate `4.2.0`, latest
+  published baseline `4.1.0`, and `publication` as the only candidate-state
+  pending work.
+- Remaining risk is operational rather than an unreviewed scope change: the
+  signed release preflight still requires usable GPG credentials, the final tree
+  must be committed and tagged, the workflow must publish all parent/module
+  artifacts, and fresh Central-only artifact plus assembled-consumer checks must
+  pass. Until those facts exist, the three publication/archive items above and
+  the V29 completion heading remain open.
+
 ---
 
 ## Completion Criteria
 
 V29 is complete only when:
 
-- [ ] Production memory growth has a reproducible classification with separated
+- [x] Production memory growth has a reproducible classification with separated
       heap, direct-memory, transport, cache, and application evidence.
-- [ ] Every starter-owned cache entry, key, generation record, flight, waiter,
+- [x] Every starter-owned cache entry, key, generation record, flight, waiter,
       refresh, meter, request snapshot, auth context, and callback has a proven
       terminal owner and release path.
-- [ ] Weighted admission either has one precise, bounded, non-heap unit and an
+- [x] Weighted admission either has one precise, bounded, non-heap unit and an
       explicit go decision, or is source-controlled as no-go with no placeholder
       public surface.
-- [ ] Existing policies remain compatible and no new cache-memory behavior or
+- [x] Existing policies remain compatible and no new cache-memory behavior or
       telemetry activates without explicit selection.
-- [ ] Mock, consumer, API, AOT, native, shutdown, performance, documentation, and
+- [x] Mock, consumer, API, AOT, native, shutdown, performance, documentation, and
       operations evidence agree with the selected scope.
 - [ ] Release publication and baseline movement occur only after fresh Central
       artifact and assembled-consumer verification.

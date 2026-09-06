@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-09-06
+
+- **`4.2.0` release candidate (pending publication).** This additive minor
+  release adds optional decoded-response representation-byte admission and
+  eviction to explicitly selected local response-cache policies. Existing
+  count-only policies remain unchanged when the new bound is omitted. The unit
+  is not exact Java heap, direct memory, process RSS, or container memory, and
+  this release makes no numerical or comparative performance claim.
+
+### Added
+- **Optional decoded-response byte admission.** Cache policies that set
+  `maximum-total-decoded-response-bytes` now measure the final successful unary
+  decoder input after transport decompression and atomically enforce that
+  per-policy aggregate alongside TTL and `maximum-size`. Over-budget or unknown
+  measurements are returned uncached, refresh bypass preserves the stale entry,
+  and replacement, expiry, size/weight eviction, explicit invalidation, and
+  shutdown release retained representation-byte accounting exactly once.
+  Policies that omit the setting retain the published count-only path without
+  response-byte measurement. The unit is decoded response representation bytes,
+  not Java heap, direct memory, RSS, or container memory.
+- **Bounded cache accounting telemetry and diagnostics.** Explicit cache
+  observability now adds current/maximum decoded response representation-byte
+  gauges and fixed admission outcomes only for weighted policies. Diagnostics
+  schema V1 additively reports nullable current retained bytes without creating
+  or traversing a cache. Cache-local signals remain outside downstream health,
+  and factory shutdown removes all owned meters.
+- **Weighted-cache test and consumer parity.** `MockReactiveHttpClient` adds an
+  opt-in weighted-policy overload and an immutable cache snapshot for deterministic
+  occupancy, admission, eviction, flight, refresh, expiry, and close assertions.
+  The assembled-consumer verifier now covers an explicitly provisioned weighted
+  cache and a separate cache-disabled application whose classpath contains no
+  Caffeine dependency.
+
+### Fixed
+- **Single-flight caller-context retention.** Cache miss flights and hidden
+  refreshes now detach their Reactor-context container from the initiating
+  caller, exclude caller reporting/deadline state, and replace starter-owned and
+  explicitly selected cache variants with immutable snapshots. Context required
+  by cache-safe propagation filters remains available to shared transport work.
+
 ## [4.1.0] - 2026-08-30
 
 - **`4.1.0` published release.** This additive minor release adds
@@ -1766,7 +1806,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.1.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.6.0...v4.0.0
 [3.6.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.5.0...v3.6.0

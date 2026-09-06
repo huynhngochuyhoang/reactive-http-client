@@ -9,6 +9,12 @@ terminal cache outcomes. Existing explicit `GET` selection remains the
 cache-friendly path; `GET` is not cached automatically. The `4.1.x` line also
 permits one specific non-`GET` method to opt in as a semantic read.
 
+The optional decoded-response representation-byte bound is an unpublished
+`4.2.0`/V29 release-candidate feature and is not available in published `4.1.x`.
+`maximum-size` continues to count entries. The optional byte value counts the
+decoded response representation retained by the cache; it is not exact Java
+heap, direct memory, process RSS, or container memory.
+
 ## Explicit selection
 
 Define named policies under one client. A policy definition is inert until the
@@ -26,6 +32,7 @@ reactive:
             catalog-read:
               ttl-ms: 60000
               maximum-size: 10000
+              maximum-total-decoded-response-bytes: 268435456
               single-flight: true
               refresh-after-ms: 30000
               refresh-timeout-ms: 5000
@@ -83,6 +90,18 @@ policy must exist and must define:
 
 - `ttl-ms`: `1` through `31536000000` (365 days).
 - `maximum-size`: `1` through `1000000` entries.
+- Optional `maximum-total-decoded-response-bytes`: `1` through
+  `1099511627776` (1 TiB) decoded response representation bytes retained
+  across one policy cache. The count is taken after transport decompression and
+  includes only response-header names and values retained in a cached
+  `ResponseEntity`; it is not Java heap, direct memory, RSS, or container memory.
+  The final unary decoder stream is counted without copying or reserializing the
+  value. A successful response whose count is unknown or exceeds the policy
+  limit is returned to the caller but is not stored. Admissible publication and
+  refresh replacement evict entries from the same policy as needed and keep the
+  retained representation-byte total at or below the configured limit. Policies
+  that omit this setting retain the existing TTL plus entry-count behavior and
+  do not activate response-byte measurement.
 
 Refresh remains disabled when both refresh settings are absent. Selecting it requires
 `refresh-after-ms` to be positive and strictly below `ttl-ms`, plus a
@@ -257,8 +276,9 @@ Each client factory owns one Caffeine cache for every selected policy. Caffeine
 provides concurrent maximum-size eviction and hard expiry from a monotonic
 ticker; wall-clock changes do not extend or shorten an entry. Factory shutdown
 invalidates every entry and prevents an already-running load from publishing
-after shutdown. Internal aggregate state exposes only policy count, configured
-capacity, and current size; entries and opaque keys are not inspectable.
+after shutdown. Internal aggregate state tracks policy count, configured entry capacity,
+current size, and, only for policies that select it, the bounded retained decoded-response
+byte total. Entries, opaque keys, and cached values are not inspectable.
 
 Lookup is cold and repeats for every subscription. Mandatory key, request
 variant, and configured `AuthProvider` checks run before a value can be returned.
@@ -441,12 +461,21 @@ for the complete meter and dashboard contract. Meter names, types, base units,
 tag keys, and zero-series behavior are verb-independent; the resolved HTTP method
 is intentionally not added as a cache-meter tag.
 
+Weighted policies additionally expose current and maximum decoded response
+representation-byte gauges plus one bounded admission outcome counter. These
+signals use only client, policy, and fixed outcome tags. Occupancy gauges are
+current state; lookup/load/refresh/admission/eviction counters are terminal event
+history. They are absent unless cache observability and the policy byte bound are
+both selected, and they do not change downstream health.
+
 Provider-backed diagnostics and effective-contract snapshots expose bounded cache
 policy source, resolved HTTP method, and semantic-read acknowledgement. Collection
 snapshot overloads and replacement client factories render provider-only semantic
 facts as `null`/unknown rather than inventing `false`. None of these outputs
 contain policy names, request targets, selected headers, bodies, keys, tenants, or
-identities.
+identities. Provider diagnostics also expose current retained representation
+bytes only when an existing manager can prove the aggregate; lazy/uncreated and
+partly unweighted state remains `null` without creating or traversing a cache.
 
 Response cacheability is decided from the final wire status and headers for
 both plain `Mono<T>` and `Mono<ResponseEntity<T>>` contracts. Redirect responses
@@ -727,8 +756,8 @@ it `INCOMPATIBLE`; classification is not a bypass mechanism.
 Proxy startup, AOT processing, effective-contract export, diagnostics, and
 `MockReactiveHttpClient` use the same `MethodMetadataCache`-backed grammar.
 Replacement metadata caches remain authoritative. Contract snapshots expose a
-bounded `Cache` cell with source, `semanticRead`, TTL, maximum size, normalized
-variants, shared-response acknowledgement, the single-flight decision, and
+bounded `Cache` cell with source, `semanticRead`, TTL, maximum size, the
+optional aggregate decoded-response-byte limit, normalized variants, shared-response acknowledgement, the single-flight decision, and
 bounded refresh threshold/timeout values. Policy names,
 raw values, and opaque key digests are not exported.
 

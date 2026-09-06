@@ -47,6 +47,7 @@ historical evidence.
 | Upload stalls, cancellation, leaked buffers, or incomplete stream | Declared body/return shape, subscription and cancellation boundary, consumer release/forwarding path | [Streaming ownership](#streaming-ownership) |
 | OAuth2 refresh storm, token endpoint failure, or downstream 401 | Logical client name, sanitized auth mode, token endpoint status and safe headers, refresh/cooldown timing | [OAuth2 refresh](#oauth2-refresh) |
 | Unexpected stale value, miss storm, refresh failure, or cache capacity pressure | Effective cache phase/TTL/capacity, bounded hit/miss/load/refresh/eviction rates, process instance | [Response cache behavior (4.0.0+)](#response-cache-behavior-400) |
+| Pod memory grows after enabling response caching | Published/candidate version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (V29 / `4.2.0` candidate)](#cache-memory-triage-v29-420-candidate) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
 
 ## Evidence boundary
@@ -325,6 +326,80 @@ and capture the bounded
 [response-cache incident fixture](26-support-bundles.md#response-cache-incidents).
 Never collect cache keys, values, selected arguments, headers, bodies, tenant
 values, or credentials.
+
+### Cache-memory triage (V29 / `4.2.0` candidate)
+
+Published `4.1.0` exposes the entry-count and cache-activity signals documented
+above, but it does not expose V29's decoded-response-byte capacity/occupancy
+gauges or admission outcomes. Do not search a `4.1.0` incident for
+`cacheMaximumTotalDecodedResponseBytes`, `cacheRetainedDecodedResponseBytes`,
+`reactive.http.client.cache.retained.decoded.response.bytes`,
+`reactive.http.client.cache.maximum.decoded.response.bytes`, or
+`reactive.http.client.cache.admissions`. Those signals apply only to the current
+unpublished `4.2.0`/V29 release candidate until Central publishes it.
+
+Use one fixed, bounded time window and compare the same process instance before
+and after each step:
+
+1. Confirm the starter version and deployment change first. Record whether the
+   affected method actually selects a cache policy, how many policies the client
+   selects, and whether the report began after a rollout, configuration refresh,
+   traffic shift, or application change.
+2. Record the affected client's `cacheMetricsEnabled` selection and each policy's
+   configuration source, safe bounded name, `maximum-size`, TTL, and entry
+   occupancy. A
+   disabled integration is unavailable, while an enabled idle series is zero.
+   Keep API-tagged hit/miss, caller outcome, coalesced-waiter, load, and refresh
+   activity with its API-to-policy mapping; keep policy-tagged occupancy,
+   size/TTL/weight eviction, and admission activity separate. A defined but
+   unselected policy retains nothing.
+3. Take timestamped, phase-labeled memory/cache/pool checkpoints for the same
+   sanitized process instance after equivalent traffic and a completed GC cycle.
+   Keep Java heap used/committed, process RSS, container working set, direct
+   memory, live thread count, protocol, total/idle physical connections, and the
+   applicable active/pending connection or stream gauges as separate series. Do
+   not subtract one as if it were a component of another. When an approved
+   in-process `MeterRegistry` inventory is available, also count each matching
+   cache `Meter.Id` once by meter type and tie the bounded counts to the process
+   and context ordinal; Prometheus sample counts are not meter-registration
+   counts.
+4. Stop new traffic and first take a bounded quiet-window checkpoint while the
+   factory remains open and its counters remain registered. Record the cumulative
+   success, failure, and cancellation terminal-load counters for each affected API
+   at both the start and end of that quiet window. When the incident procedure
+   permits it, then close or replace the affected application context and take
+   another equivalent post-close checkpoint. Entry, retained-byte, refresh,
+   meter, and transport ownership should return to the lifecycle baseline rather
+   than continue growing after close.
+
+Classify the shape before changing production code:
+
+| Observed shape | Interpretation and next evidence |
+|---|---|
+| Entries plateau at `maximum-size`; V29 retained decoded-response bytes plateau at or below their configured maximum; evictions continue | Expected bounded retained cache values under pressure. Confirm that post-GC heap and container limits leave operating headroom; capacity may still be too large for the application. |
+| Entry occupancy remains near the configured maximum while miss/load and TTL/size/weight-eviction activity remain sustained | Evidence that the working set is churning at a configured bound, not by itself a leak. Compare the exported per-policy rates and review policy/key design without collecting key material or inferring unique-key cardinality. |
+| Entries stay flat but post-GC heap associated with repeated misses or failures grows monotonically | Investigate generation records, completed load tokens, and caller-owned independent loads. Finished or rejected work must release metadata even when no entry is stored. |
+| Miss-caller deltas exceed terminal-load deltas while coalesced-waiter deltas rise in the same bounded window | Single flight is coalescing callers, or a load crossed the window boundary. Stop new traffic without closing the factory and compare the recorded before/after terminal-load counter snapshots across a bounded quiet window while those meters remain registered. A rising terminal-load total proves pre-boundary work completed late; no delta narrows the observation but does not prove retained flight ownership. Use the separate post-close memory and lifecycle checkpoint only to verify cleanup, not to read removed cache meters. |
+| For a refresh-enabled API, stale-hit callers continue across consecutive bounded pre-close windows while terminal refresh totals do not advance, or a separately timestamped sanitized refresh DEBUG terminal is later than the recorded factory-close lifecycle event | Treat the first pattern as evidence of a possibly stalled refresh and the second as late work. Use refresh counters only while the factory's meters remain registered; prove post-close ordering by correlating the refresh log timestamp with the factory-close lifecycle timestamp, not from a post-close cache counter. Investigate refresh timeout, cancellation, hard-expiry, and factory-lifecycle evidence; terminal-only counters cannot prove an active refresh by themselves. |
+| Bounded in-process cache-meter registration counts do not return to zero after context close, or exceed the same active-context baseline after replacement | Investigate meter ownership/removal and confirm replacement gauges observe only the new manager. Apply this row only when the same `MeterRegistry`, process, and context boundaries were inventoried; do not infer registration ownership from Prometheus sample counts or cumulative counter values. |
+| Direct memory or pool gauges grow while post-GC heap and cache occupancy remain stable | Investigate Netty buffers, active/pending connections, TLS/compression, streaming ownership, and pool disposal before attributing growth to cached decoded values. |
+| Thread count grows with stable cache and pool occupancy | Capture bounded thread-state counts and inspect scheduler, blocked customizer, auth, refresh, or application work; a cache entry does not own a thread. |
+
+RSS and container working set are not Java heap. They can include committed but
+unused heap pages, class metadata, JIT code, native libraries, thread stacks,
+allocator arenas, and Netty direct buffers.
+Likewise, response wire size is not the decoded object graph retained by a cache entry.
+V29's byte budget measures decoded response representation bytes, not exact Java
+heap, direct memory,
+process RSS, or container memory. It also does not measure compressed wire
+bytes. `maximum-size` remains the independent entry-count bound. See
+[Response Caching](32-response-caching.md#explicit-selection).
+
+Capture the bounded
+[cache-memory fixture](26-support-bundles.md#cache-memory-capture-v29-420-candidate)
+with the ordinary response-cache bundle. Heap dumps and JFR recordings are not
+part of that reviewable fixture because they can contain application data; use
+the separately approved secure-artifact process described there.
 
 ## Failure attribution
 

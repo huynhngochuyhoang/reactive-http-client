@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,7 +51,38 @@ class LocalResponseCacheObservabilityTest {
                 .contains("reactive_http_client_cache_refreshes_total")
                 .contains("reactive_http_client_cache_evictions_total")
                 .contains("reactive_http_client_cache_entries")
-                .contains("reactive_http_client_cache_maximum_entries");
+                .contains("reactive_http_client_cache_maximum_entries")
+                .doesNotContain("cause=\"weight\"");
+
+        SizedCache weightedCache = new SizedCache(100L);
+        weightedCache.retainedBytes.set(40L);
+        metrics.registerCache("weighted", 10, weightedCache);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".evictions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted", "cause", "weight")
+                .counter().count()).isZero();
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".retained.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted")
+                .gauge())
+                .satisfies(gauge -> {
+                    assertThat(gauge.value()).isEqualTo(40.0);
+                    assertThat(gauge.getId().getDescription())
+                            .isEqualTo("Current decoded response representation bytes retained by live policy caches");
+                });
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".maximum.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted")
+                .gauge())
+                .satisfies(gauge -> {
+                    assertThat(gauge.value()).isEqualTo(100.0);
+                    assertThat(gauge.getId().getDescription())
+                            .isEqualTo("Configured maximum decoded response representation bytes across live policy caches");
+                });
+        for (LocalResponseCacheMetrics.AdmissionOutcome outcome
+                : LocalResponseCacheMetrics.AdmissionOutcome.values()) {
+            assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                    .tags("client.name", "catalog-client", "cache.policy", "weighted",
+                            "outcome", outcome.tagValue())
+                    .counter().count()).isZero();
+        }
 
         metrics.lookup("catalog.get", "hit");
         metrics.lookup("catalog.get", "miss");
@@ -102,11 +134,227 @@ class LocalResponseCacheObservabilityTest {
     }
 
     @Test
+    void weightedManagerRecordsBoundedAdmissionOutcomesAndCurrentRepresentationBytes() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        LocalResponseCacheMetrics metrics = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
+        metrics.registerApi("catalog.get");
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(
+                System::nanoTime, Schedulers.parallel(), metrics, "catalog-client");
+        EffectiveCachePolicy.Selection selection = selection("weighted", false, null);
+        selection.policy().setMaximumTotalDecodedResponseBytes(5L);
+
+        assertThat(load(manager, selection, key("admitted"), "catalog.get", state(), state(),
+                Mono.just("secret-value"), measuredResponse(5, 4))).isEqualTo("secret-value");
+        assertThat(load(manager, selection, key("unknown"), "catalog.get", state(), state(),
+                Mono.just("unknown-secret"), LocalResponseCacheManager.ResponseMetadata.successWithoutHeaders()))
+                .isEqualTo("unknown-secret");
+        assertThat(load(manager, selection, key("over"), "catalog.get", state(), state(),
+                Mono.just("over-secret"), measuredResponse(5, 6)))
+                .isEqualTo("over-secret");
+
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted",
+                        "outcome", "admitted")
+                .counter().count()).isEqualTo(1.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted",
+                        "outcome", "bypassed_unknown_size")
+                .counter().count()).isEqualTo(1.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted",
+                        "outcome", "bypassed_over_budget")
+                .counter().count()).isEqualTo(1.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".retained.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted")
+                .gauge().value()).isEqualTo(4.0);
+        assertThat(manager.snapshot().retainedDecodedResponseBytes()).isEqualTo(4L);
+        assertThat(registry.getMeters())
+                .extracting(meter -> meter.getId().getTags().toString())
+                .allMatch(tags -> !tags.contains("secret"));
+
+        manager.close();
+        assertThat(registry.getMeters()).noneMatch(LocalResponseCacheObservabilityTest::isCacheMeter);
+    }
+
+    @Test
+    void staleDuplicateBypassesDoNotCreateAdmissionEvents() throws Exception {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        LocalResponseCacheMetrics metrics = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
+        metrics.registerApi("catalog.get");
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(
+                System::nanoTime, Schedulers.parallel(), metrics, "catalog-client");
+        EffectiveCachePolicy.Selection selection = selection("weighted", false, null);
+        selection.policy().setMaximumTotalDecodedResponseBytes(5L);
+
+        Sinks.One<String> unknownLoser = Sinks.one();
+        CountDownLatch unknownSubscribed = new CountDownLatch(1);
+        CompletableFuture<?> unknownResult = manager.getOrLoad(
+                        selection,
+                        key("unknown-race"),
+                        "catalog.get",
+                        ignored -> unknownLoser.asMono().doOnSubscribe(subscription -> unknownSubscribed.countDown()),
+                        LocalResponseCacheManager.ResponseMetadata::successWithoutHeaders,
+                        state(),
+                        state())
+                .toFuture();
+        assertThat(unknownSubscribed.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(load(manager, selection, key("unknown-race"), "catalog.get", state(), state(),
+                Mono.just("unknown-winner"), measuredResponse(5, 4))).isEqualTo("unknown-winner");
+        unknownLoser.tryEmitValue("unknown-loser").orThrow();
+        assertThat(unknownResult.get(1, TimeUnit.SECONDS)).isEqualTo("unknown-loser");
+
+        Sinks.One<String> overBudgetLoser = Sinks.one();
+        CountDownLatch overBudgetSubscribed = new CountDownLatch(1);
+        CompletableFuture<?> overBudgetResult = manager.getOrLoad(
+                        selection,
+                        key("over-budget-race"),
+                        "catalog.get",
+                        ignored -> overBudgetLoser.asMono()
+                                .doOnSubscribe(subscription -> overBudgetSubscribed.countDown()),
+                        () -> measuredResponse(5, 6),
+                        state(),
+                        state())
+                .toFuture();
+        assertThat(overBudgetSubscribed.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(load(manager, selection, key("over-budget-race"), "catalog.get", state(), state(),
+                Mono.just("over-budget-winner"), measuredResponse(5, 3))).isEqualTo("over-budget-winner");
+        overBudgetLoser.tryEmitValue("over-budget-loser").orThrow();
+        assertThat(overBudgetResult.get(1, TimeUnit.SECONDS)).isEqualTo("over-budget-loser");
+
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted", "outcome", "admitted")
+                .counter().count()).isEqualTo(2.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted",
+                        "outcome", "bypassed_unknown_size")
+                .counter().count()).isZero();
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "weighted",
+                        "outcome", "bypassed_over_budget")
+                .counter().count()).isZero();
+        manager.close();
+    }
+
+    @Test
+    void bypassRecordingIsAtomicWithLoadAndRefreshFreshness() throws Exception {
+        AtomicLong ticker = new AtomicLong();
+        CaffeineLocalResponseCache cache = new CaffeineLocalResponseCache(
+                1_000L, 10L, ticker::get, (ignoredCache, ignoredKey, ignoredReason) -> { });
+        AtomicInteger recordedBypasses = new AtomicInteger();
+
+        CacheKeyContract.OpaqueKey loadKey = key("atomic-load");
+        LocalResponseCache.LoadToken loadToken = cache.lookup(loadKey).loadToken();
+        CountDownLatch loadRecorderEntered = new CountDownLatch(1);
+        CompletableFuture<Void> releaseLoadRecorder = new CompletableFuture<>();
+        CompletableFuture<Boolean> loadRecorded = CompletableFuture.supplyAsync(() ->
+                cache.recordLoadBypassIfCurrent(loadToken, () -> {
+                    recordedBypasses.incrementAndGet();
+                    loadRecorderEntered.countDown();
+                    releaseLoadRecorder.join();
+                }));
+
+        assertThat(loadRecorderEntered.await(1, TimeUnit.SECONDS)).isTrue();
+        CountDownLatch competingPublicationStarted = new CountDownLatch(1);
+        CompletableFuture<Void> competingPublication = CompletableFuture.runAsync(() -> {
+            competingPublicationStarted.countDown();
+            LocalResponseCache.LoadToken winner = cache.lookup(loadKey).loadToken();
+            cache.publish(winner, "winner", 1L);
+            cache.finish(winner);
+        });
+        assertThat(competingPublicationStarted.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(competingPublication).isNotDone();
+
+        releaseLoadRecorder.complete(null);
+        assertThat(loadRecorded.get(1, TimeUnit.SECONDS)).isTrue();
+        competingPublication.get(1, TimeUnit.SECONDS);
+        assertThat(cache.recordLoadBypassIfCurrent(loadToken, recordedBypasses::incrementAndGet)).isFalse();
+        cache.finish(loadToken);
+
+        CacheKeyContract.OpaqueKey refreshKey = key("atomic-refresh");
+        LocalResponseCache.LoadToken initialLoad = cache.lookup(refreshKey).loadToken();
+        cache.publish(initialLoad, "initial", 1L);
+        cache.finish(initialLoad);
+        LocalResponseCache.RefreshToken refreshToken = cache.beginRefresh(cache.lookup(refreshKey).entryToken());
+        CountDownLatch refreshRecorderEntered = new CountDownLatch(1);
+        CompletableFuture<Void> releaseRefreshRecorder = new CompletableFuture<>();
+        CompletableFuture<Boolean> refreshRecorded = CompletableFuture.supplyAsync(() ->
+                cache.recordRefreshBypassIfCurrent(refreshToken, () -> {
+                    recordedBypasses.incrementAndGet();
+                    refreshRecorderEntered.countDown();
+                    releaseRefreshRecorder.join();
+                }));
+
+        assertThat(refreshRecorderEntered.await(1, TimeUnit.SECONDS)).isTrue();
+        CountDownLatch competingInvalidationStarted = new CountDownLatch(1);
+        CompletableFuture<Void> competingInvalidation = CompletableFuture.runAsync(() -> {
+            competingInvalidationStarted.countDown();
+            cache.invalidateAll();
+        });
+        assertThat(competingInvalidationStarted.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(competingInvalidation).isNotDone();
+
+        releaseRefreshRecorder.complete(null);
+        assertThat(refreshRecorded.get(1, TimeUnit.SECONDS)).isTrue();
+        competingInvalidation.get(1, TimeUnit.SECONDS);
+        assertThat(cache.recordRefreshBypassIfCurrent(refreshToken, recordedBypasses::incrementAndGet)).isFalse();
+        assertThat(recordedBypasses).hasValue(2);
+        cache.finishRefresh(refreshToken);
+        cache.close();
+    }
+
+    @Test
+    void overlappingManagersShareWeightedMetersUntilTheLastOwnerCloses() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        LocalResponseCacheMetrics first = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
+        LocalResponseCacheMetrics second = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
+        SizedCache firstCache = new SizedCache(100L);
+        SizedCache secondCache = new SizedCache(200L);
+        firstCache.retainedBytes.set(30L);
+        secondCache.retainedBytes.set(80L);
+
+        first.registerCache("catalog", 10, firstCache);
+        second.registerCache("catalog", 10, secondCache);
+        first.admission("catalog", LocalResponseCacheMetrics.AdmissionOutcome.ADMITTED);
+        second.admission("catalog", LocalResponseCacheMetrics.AdmissionOutcome.BYPASSED_UNKNOWN_SIZE);
+
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".retained.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(110.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".maximum.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(300.0);
+
+        first.close();
+
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".retained.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(80.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".maximum.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(200.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog", "outcome", "admitted")
+                .counter().count()).isEqualTo(1.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".admissions")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog",
+                        "outcome", "bypassed_unknown_size")
+                .counter().count()).isEqualTo(1.0);
+
+        second.close();
+        assertThat(registry.find(LocalResponseCacheMetrics.PREFIX + ".retained.decoded.response.bytes")
+                .meters()).isEmpty();
+        assertThat(registry.find(LocalResponseCacheMetrics.PREFIX + ".maximum.decoded.response.bytes")
+                .meters()).isEmpty();
+        assertThat(registry.find(LocalResponseCacheMetrics.PREFIX + ".admissions").meters()).isEmpty();
+    }
+
+    @Test
     void closeRemovesEveryOwnedMeterAndSameTagsObserveOnlyReplacementCache() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         LocalResponseCacheMetrics first = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
-        SizedCache oldCache = new SizedCache();
+        SizedCache oldCache = new SizedCache(100L);
         oldCache.size.set(3);
+        oldCache.retainedBytes.set(30L);
         first.registerApi("catalog.get");
         first.registerCache("catalog", 10, oldCache);
 
@@ -117,18 +365,29 @@ class LocalResponseCacheObservabilityTest {
         assertThat(registry.getMeters()).noneMatch(LocalResponseCacheObservabilityTest::isCacheMeter);
 
         LocalResponseCacheMetrics replacement = LocalResponseCacheMetrics.enabled(registry, "catalog-client");
-        SizedCache newCache = new SizedCache();
+        SizedCache newCache = new SizedCache(200L);
         newCache.size.set(8);
+        newCache.retainedBytes.set(80L);
         replacement.registerApi("catalog.get");
         replacement.registerCache("catalog", 10, newCache);
 
         assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".entries")
                 .tags("client.name", "catalog-client", "cache.policy", "catalog")
                 .gauge().value()).isEqualTo(8.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".retained.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(80.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".maximum.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(200.0);
         oldCache.size.set(9);
+        oldCache.retainedBytes.set(90L);
         assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".entries")
                 .tags("client.name", "catalog-client", "cache.policy", "catalog")
                 .gauge().value()).isEqualTo(8.0);
+        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".retained.decoded.response.bytes")
+                .tags("client.name", "catalog-client", "cache.policy", "catalog")
+                .gauge().value()).isEqualTo(80.0);
         replacement.close();
         assertThat(registry.getMeters()).noneMatch(LocalResponseCacheObservabilityTest::isCacheMeter);
     }
@@ -176,6 +435,35 @@ class LocalResponseCacheObservabilityTest {
     }
 
     @Test
+    void cacheObservabilityWithoutMeterRegistryStillRecordsCallerOutcomes() {
+        ReactiveHttpClientProperties.ClientConfig config = clientCacheConfig();
+        ReactiveHttpClientProperties.ObservabilityConfig observability =
+                new ReactiveHttpClientProperties.ObservabilityConfig();
+        observability.setEnabled(true);
+        observability.getCache().setEnabled(true);
+        LocalResponseCacheManager manager = LocalResponseCacheManager.createForClient(
+                CacheObservedClient.class,
+                "catalog-client",
+                new MethodMetadataCache(),
+                config,
+                getClass().getClassLoader(),
+                observability,
+                null);
+        EffectiveCachePolicy.Selection selection = selection("catalog", false, null);
+        SubscriptionReportingState miss = state();
+        SubscriptionReportingState hit = state();
+
+        assertThat(load(manager, selection, key("no-registry"), "catalog.get",
+                miss, state(), Mono.just("value"))).isEqualTo("value");
+        assertThat(load(manager, selection, key("no-registry"), "catalog.get",
+                hit, state(), Mono.just("unexpected"))).isEqualTo("value");
+
+        assertThat(miss.cacheOutcome()).isEqualTo(HttpClientCacheOutcome.MISS_LOADER);
+        assertThat(hit.cacheOutcome()).isEqualTo(HttpClientCacheOutcome.FRESH_HIT);
+        manager.close();
+    }
+
+    @Test
     void cacheObservabilityDoesNotCreateMetersWhenNoPolicyIsSelected() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ReactiveHttpClientProperties.ObservabilityConfig observability =
@@ -191,7 +479,30 @@ class LocalResponseCacheObservabilityTest {
                 observability,
                 registry);
 
-        assertThat(manager.snapshot().policyCount()).isZero();
+        assertThat(manager).isNull();
+        assertThat(registry.getMeters()).noneMatch(LocalResponseCacheObservabilityTest::isCacheMeter);
+    }
+
+    @Test
+    void weightedCacheWithCacheMetricsDisabledCreatesNoMetersOrMeterSuppliers() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ClientConfig config = clientCacheConfig();
+        config.getCache().getPolicies().get("catalog")
+                .setMaximumTotalDecodedResponseBytes(1_024L);
+        ReactiveHttpClientProperties.ObservabilityConfig observability =
+                new ReactiveHttpClientProperties.ObservabilityConfig();
+        observability.setEnabled(true);
+
+        LocalResponseCacheManager manager = LocalResponseCacheManager.createForClient(
+                CacheObservedClient.class,
+                "catalog-client",
+                new MethodMetadataCache(),
+                config,
+                getClass().getClassLoader(),
+                observability,
+                registry);
+
+        assertThat(manager.snapshot().retainedDecodedResponseBytes()).isZero();
         assertThat(registry.getMeters()).noneMatch(LocalResponseCacheObservabilityTest::isCacheMeter);
         manager.close();
     }
@@ -454,6 +765,27 @@ class LocalResponseCacheObservabilityTest {
         return call(manager, selection, key, apiName, caller, load, source).block();
     }
 
+    private static Object load(LocalResponseCacheManager manager,
+                               EffectiveCachePolicy.Selection selection,
+                               CacheKeyContract.OpaqueKey key,
+                               String apiName,
+                               SubscriptionReportingState caller,
+                               SubscriptionReportingState load,
+                               Mono<?> source,
+                               LocalResponseCacheManager.ResponseMetadata responseMetadata) {
+        return manager.getOrLoad(selection, key, apiName, ignored -> source,
+                () -> responseMetadata, caller, load).block();
+    }
+
+    private static LocalResponseCacheManager.ResponseMetadata measuredResponse(
+            long maximumBytes, long decodedBytes) {
+        LocalResponseCacheManager.DecodedResponseBytes measurement =
+                new LocalResponseCacheManager.DecodedResponseBytes(maximumBytes);
+        measurement.add(decodedBytes);
+        measurement.complete();
+        return new LocalResponseCacheManager.ResponseMetadata(200, Map.of(), true, measurement);
+    }
+
     private static Mono<?> call(LocalResponseCacheManager manager,
                                 EffectiveCachePolicy.Selection selection,
                                 CacheKeyContract.OpaqueKey key,
@@ -512,17 +844,35 @@ class LocalResponseCacheObservabilityTest {
 
     private static final class SizedCache implements LocalResponseCache {
         private final AtomicLong size = new AtomicLong();
+        private final AtomicLong retainedBytes = new AtomicLong();
+        private final Long maximumDecodedResponseBytes;
+
+        private SizedCache() {
+            this(null);
+        }
+
+        private SizedCache(Long maximumDecodedResponseBytes) {
+            this.maximumDecodedResponseBytes = maximumDecodedResponseBytes;
+        }
 
         @Override public Lookup lookup(CacheKeyContract.OpaqueKey key) { throw new UnsupportedOperationException(); }
         @Override public RefreshToken beginRefresh(EntryToken entryToken) { throw new UnsupportedOperationException(); }
         @Override public boolean isRefreshCurrent(RefreshToken refreshToken) { return false; }
+        @Override public boolean recordRefreshBypassIfCurrent(RefreshToken token, Runnable recorder) {
+            return false;
+        }
         @Override public long hardExpiryRemainingNanos(RefreshToken refreshToken) { return 0; }
         @Override public void publishRefresh(RefreshToken refreshToken, Object value) { }
+        @Override public void publishRefresh(RefreshToken refreshToken, Object value, long bytes) { }
         @Override public void finishRefresh(RefreshToken refreshToken) { }
         @Override public void publish(LoadToken token, Object value) { }
+        @Override public void publish(LoadToken token, Object value, long bytes) { }
+        @Override public boolean recordLoadBypassIfCurrent(LoadToken token, Runnable recorder) { return false; }
         @Override public void finish(LoadToken token) { }
         @Override public long estimatedSize() { return size.get(); }
         @Override public long evictionCount() { return 0; }
+        @Override public Long maximumDecodedResponseBytes() { return maximumDecodedResponseBytes; }
+        @Override public long retainedDecodedResponseBytes() { return retainedBytes.get(); }
         @Override public void invalidateAll() { size.set(0); }
         @Override public void close() { }
     }

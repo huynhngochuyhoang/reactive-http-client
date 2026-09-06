@@ -14,7 +14,7 @@
  <properties>
   <java.version>21</java.version>
   <spring-boot.version>4.0.0</spring-boot.version>
-  <reactive-http-client.version>4.2.0-SNAPSHOT</reactive-http-client.version>
+  <reactive-http-client.version>4.2.0</reactive-http-client.version>
   <resilience4j.version>2.4.0</resilience4j.version>
  </properties>
  <dependencyManagement>
@@ -98,6 +98,35 @@
         <phase>generate-test-sources</phase>
         <goals><goal>add-test-source</goal></goals>
         <configuration><sources><source>src/v28-test/java</source></sources></configuration>
+       </execution>
+      </executions>
+     </plugin>
+    </plugins>
+   </build>
+  </profile>
+  <profile>
+   <id>v29-current-parity</id>
+   <activation>
+    <property><name>consumer.v29.parity</name><value>true</value></property>
+   </activation>
+   <dependencies>
+    <dependency>
+     <groupId>com.github.ben-manes.caffeine</groupId>
+     <artifactId>caffeine</artifactId>
+    </dependency>
+   </dependencies>
+   <build>
+    <plugins>
+     <plugin>
+      <groupId>org.codehaus.mojo</groupId>
+      <artifactId>build-helper-maven-plugin</artifactId>
+      <version>3.6.1</version>
+      <executions>
+       <execution>
+        <id>add-v29-test-source</id>
+        <phase>generate-test-sources</phase>
+        <goals><goal>add-test-source</goal></goals>
+        <configuration><sources><source>src/v29-test/java</source></sources></configuration>
        </execution>
       </executions>
      </plugin>

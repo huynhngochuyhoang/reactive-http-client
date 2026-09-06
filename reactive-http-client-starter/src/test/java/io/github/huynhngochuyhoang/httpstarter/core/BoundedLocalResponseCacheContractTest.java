@@ -670,7 +670,7 @@ class BoundedLocalResponseCacheContractTest {
 
         LocalResponseCacheManager disabledManager = LocalResponseCacheManager.createForClient(
                 CacheClient.class, "cache-client", metadata, disabled, withoutCaffeine);
-        assertThat(disabledManager.snapshot().policyCount()).isZero();
+        assertThat(disabledManager).isNull();
 
         ReactiveHttpClientProperties.ClientConfig selected = config();
         assertThatThrownBy(() -> LocalResponseCacheManager.createForClient(
@@ -1268,6 +1268,7 @@ class BoundedLocalResponseCacheContractTest {
                 .setVaryByParameters(List.of("principal", "tenant"));
         config.getCache().getPolicies().get("local")
                 .setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        config.getCache().getPolicies().get("local").setSingleFlight(true);
         AtomicInteger authCalls = new AtomicInteger();
         AtomicInteger downstreamFilterCalls = new AtomicInteger();
         AtomicInteger dispatches = new AtomicInteger();
@@ -2303,6 +2304,176 @@ class BoundedLocalResponseCacheContractTest {
         assertThat(event.getFailureStage()).isNull();
     }
 
+    @Test
+    void configuredDecodedResponseByteLimitUsesTheConsumedBodyBytes() {
+        ReactiveHttpClientProperties.ClientConfig config = config();
+        ReactiveHttpClientProperties.CachePolicyConfig policy =
+                config.getCache().getPolicies().get("local");
+        policy.setMaximumTotalDecodedResponseBytes(5L);
+        policy.setVaryByParameters(List.of("principal", "tenant"));
+        policy.setVaryByHeaders(List.of("Accept-Language", "Idempotency-Key"));
+        AtomicInteger dispatches = new AtomicInteger();
+        WebClient webClient = WebClient.builder()
+                .baseUrl("http://cache.test")
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    String body = request.url().getPath().endsWith("/fit") ? "1234" : "123456";
+                    return Mono.just(ok(body));
+                })
+                .build();
+
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.refresh();
+            CacheClient client = cacheClient(
+                    webClient, config, context, manager, new NoopResilienceOperatorApplier(), null);
+
+            assertThat(client.get("fit", "principal", "tenant", "en-US").block()).isEqualTo("1234");
+            assertThat(client.get("fit", "principal", "tenant", "en-US").block()).isEqualTo("1234");
+            assertThat(client.get("over", "principal", "tenant", "en-US").block()).isEqualTo("123456");
+            assertThat(client.get("over", "principal", "tenant", "en-US").block()).isEqualTo("123456");
+
+            assertThat(dispatches).hasValue(3);
+            assertThat(manager.snapshot().currentSize()).isEqualTo(1);
+            assertThat(manager.retainedDecodedResponseBytesForTesting()).isEqualTo(4);
+        }
+        finally {
+            manager.close();
+        }
+    }
+
+    @Test
+    void weightedAdmissionEvictsWithoutExceedingTheAggregateLimit() throws Exception {
+        LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection selection = weightedSelection("weighted", 1_000, 10, 5);
+        AtomicInteger oversizedLoads = new AtomicInteger();
+
+        assertThat(weightedCached(manager, selection, key("one"), Mono.just("one"), 3).block())
+                .isEqualTo("one");
+        assertThat(weightedCached(manager, selection, key("two"), Mono.just("two"), 3).block())
+                .isEqualTo("two");
+        assertThat(manager.snapshot().currentSize()).isEqualTo(1);
+        assertThat(manager.snapshot().evictions()).isEqualTo(1);
+        assertThat(manager.retainedDecodedResponseBytesForTesting()).isEqualTo(3);
+
+        CacheKeyContract.OpaqueKey oversizedKey = key("oversized");
+        Mono<String> oversized = weightedCached(
+                manager, selection, oversizedKey,
+                Mono.fromSupplier(() -> "over-" + oversizedLoads.incrementAndGet()), 6);
+        assertThat(oversized.block()).isEqualTo("over-1");
+        assertThat(oversized.block()).isEqualTo("over-2");
+        assertThat(manager.snapshot().currentSize()).isEqualTo(1);
+        assertThat(manager.retainedDecodedResponseBytesForTesting()).isEqualTo(3);
+        CaffeineLocalResponseCache cache = (CaffeineLocalResponseCache)
+                privateMap(manager, "caches").values().iterator().next();
+        assertThat(privateMap(cache, "generations").containsKey(oversizedKey)).isFalse();
+
+        manager.evictAllForTesting();
+        assertThat(manager.snapshot().currentSize()).isZero();
+        assertThat(manager.retainedDecodedResponseBytesForTesting()).isZero();
+        manager.close();
+        assertThat(manager.retainedDecodedResponseBytesForTesting()).isZero();
+    }
+
+    @Test
+    void weightedPublicationAndRefreshTransferWeightExactlyOnce() {
+        AtomicLong ticker = new AtomicLong();
+        CaffeineLocalResponseCache cache = new CaffeineLocalResponseCache(
+                100, 10, 5L, ticker::get, null);
+        CacheKeyContract.OpaqueKey key = key("weighted-race");
+        LocalResponseCache.Lookup first = cache.lookup(key);
+        LocalResponseCache.Lookup second = cache.lookup(key);
+
+        cache.publish(second.loadToken(), "winner", 3);
+        cache.publish(first.loadToken(), "late", 4);
+        cache.finish(second.loadToken());
+        cache.finish(first.loadToken());
+        assertThat(cache.lookup(key).value()).isEqualTo("winner");
+        assertThat(cache.retainedDecodedResponseBytes()).isEqualTo(3);
+
+        LocalResponseCache.Lookup stale = cache.lookup(key);
+        LocalResponseCache.RefreshToken rejectedRefresh = cache.beginRefresh(stale.entryToken());
+        cache.publishRefresh(rejectedRefresh, "oversized", 6);
+        cache.finishRefresh(rejectedRefresh);
+        assertThat(cache.lookup(key).value()).isEqualTo("winner");
+        assertThat(cache.retainedDecodedResponseBytes()).isEqualTo(3);
+
+        LocalResponseCache.Lookup replacementSource = cache.lookup(key);
+        LocalResponseCache.RefreshToken acceptedRefresh = cache.beginRefresh(replacementSource.entryToken());
+        cache.publishRefresh(acceptedRefresh, "replacement", 2);
+        cache.finishRefresh(acceptedRefresh);
+        assertThat(cache.lookup(key).value()).isEqualTo("replacement");
+        assertThat(cache.retainedDecodedResponseBytes()).isEqualTo(2);
+
+        ticker.addAndGet(Duration.ofMillis(100).toNanos());
+        LocalResponseCache.Lookup expired = cache.lookup(key);
+        assertThat(expired.hit()).isFalse();
+        assertThat(cache.retainedDecodedResponseBytes()).isZero();
+        cache.finish(expired.loadToken());
+
+        LocalResponseCache.Lookup refill = cache.lookup(key);
+        cache.publish(refill.loadToken(), "refill", 4);
+        cache.finish(refill.loadToken());
+        assertThat(cache.retainedDecodedResponseBytes()).isEqualTo(4);
+        cache.close();
+        assertThat(cache.retainedDecodedResponseBytes()).isZero();
+
+        CaffeineLocalResponseCache sizeBounded = new CaffeineLocalResponseCache(
+                1_000, 1, 5L, System::nanoTime, null);
+        LocalResponseCache.Lookup sizeFirst = sizeBounded.lookup(key("size-first"));
+        sizeBounded.publish(sizeFirst.loadToken(), "first", 2);
+        sizeBounded.finish(sizeFirst.loadToken());
+        LocalResponseCache.Lookup sizeSecond = sizeBounded.lookup(key("size-second"));
+        sizeBounded.publish(sizeSecond.loadToken(), "second", 3);
+        sizeBounded.finish(sizeSecond.loadToken());
+        assertThat(sizeBounded.estimatedSize()).isEqualTo(1);
+        assertThat(sizeBounded.retainedDecodedResponseBytes()).isEqualTo(3);
+        sizeBounded.close();
+        assertThat(sizeBounded.retainedDecodedResponseBytes()).isZero();
+    }
+
+    @Test
+    void retainedResponseEntityHeadersParticipateInAdmission() {
+        ResponseEntity<String> response = ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, "x")
+                .body("v");
+        long retainedBytes = "v".getBytes(StandardCharsets.UTF_8).length
+                + HttpHeaders.CONTENT_TYPE.getBytes(StandardCharsets.UTF_8).length
+                + "x".getBytes(StandardCharsets.UTF_8).length;
+
+        LocalResponseCacheManager rejectedManager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection rejected = weightedSelection(
+                "headers-rejected", 1_000, 10, retainedBytes - 1);
+        AtomicInteger rejectedLoads = new AtomicInteger();
+        Mono<ResponseEntity<String>> rejectedCall = weightedCached(
+                rejectedManager, rejected, key("headers"),
+                Mono.fromSupplier(() -> {
+                    rejectedLoads.incrementAndGet();
+                    return response;
+                }), 1);
+        assertThat(rejectedCall.block()).isEqualTo(response);
+        assertThat(rejectedCall.block()).isEqualTo(response);
+        assertThat(rejectedLoads).hasValue(2);
+        assertThat(rejectedManager.retainedDecodedResponseBytesForTesting()).isZero();
+        rejectedManager.close();
+
+        LocalResponseCacheManager admittedManager = LocalResponseCacheManager.testing(System::nanoTime);
+        EffectiveCachePolicy.Selection admitted = weightedSelection(
+                "headers-admitted", 1_000, 10, retainedBytes);
+        AtomicInteger admittedLoads = new AtomicInteger();
+        Mono<ResponseEntity<String>> admittedCall = weightedCached(
+                admittedManager, admitted, key("headers"),
+                Mono.fromSupplier(() -> {
+                    admittedLoads.incrementAndGet();
+                    return response;
+                }), 1);
+        assertThat(admittedCall.block()).isEqualTo(response);
+        assertThat(admittedCall.block()).isEqualTo(response);
+        assertThat(admittedLoads).hasValue(1);
+        assertThat(admittedManager.retainedDecodedResponseBytesForTesting()).isEqualTo(retainedBytes);
+        admittedManager.close();
+    }
+
     private static String load(LocalResponseCacheManager manager,
                                EffectiveCachePolicy.Selection selection,
                                CacheKeyContract.OpaqueKey key,
@@ -2317,6 +2488,23 @@ class BoundedLocalResponseCacheContractTest {
                                       CacheKeyContract.OpaqueKey key,
                                       Supplier<Mono<T>> loader) {
         return (Mono<T>) manager.getOrLoad(selection, key, () -> loader.get());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> Mono<T> weightedCached(
+            LocalResponseCacheManager manager,
+            EffectiveCachePolicy.Selection selection,
+            CacheKeyContract.OpaqueKey key,
+            Mono<T> loader,
+            long decodedResponseBytes) {
+        return (Mono<T>) manager.getOrLoad(selection, key, () -> loader, () -> {
+            LocalResponseCacheManager.DecodedResponseBytes measurement =
+                    new LocalResponseCacheManager.DecodedResponseBytes(decodedResponseBytes);
+            measurement.add(decodedResponseBytes);
+            measurement.complete();
+            return new LocalResponseCacheManager.ResponseMetadata(
+                    200, Map.of(), true, measurement);
+        });
     }
 
     private static CacheKeyContract.OpaqueKey key(String value) {
@@ -2347,6 +2535,15 @@ class BoundedLocalResponseCacheContractTest {
         policy.setTtlMs(ttlMs);
         policy.setMaximumSize(maximumSize);
         policy.setSingleFlight(singleFlight);
+        return new EffectiveCachePolicy.Selection(true, EffectiveCachePolicy.Source.CLIENT, name, policy);
+    }
+
+    private static EffectiveCachePolicy.Selection weightedSelection(
+            String name, long ttlMs, long maximumSize, long maximumDecodedResponseBytes) {
+        ReactiveHttpClientProperties.CachePolicyConfig policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(ttlMs);
+        policy.setMaximumSize(maximumSize);
+        policy.setMaximumTotalDecodedResponseBytes(maximumDecodedResponseBytes);
         return new EffectiveCachePolicy.Selection(true, EffectiveCachePolicy.Source.CLIENT, name, policy);
     }
 

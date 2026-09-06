@@ -1,0 +1,309 @@
+{
+  "schemaVersion": 1,
+  "captureScope": "cache-memory",
+  "signalAvailability": "4.2.0-v29-candidate",
+  "window": {
+    "startedAt": "2026-01-01T00:00:00Z",
+    "endedAt": "2026-01-01T00:05:00Z",
+    "duration": 300,
+    "unit": "seconds"
+  },
+  "clientName": "example-client",
+  "processInstance": "instance-1",
+  "configuration": {
+    "selectedPolicyCount": 2,
+    "cacheMetricsEnabled": true,
+    "policies": [
+      {
+        "name": "catalog-read",
+        "source": "method",
+        "ttlMs": 60000,
+        "refreshAfterMs": 30000,
+        "refreshTimeoutMs": 5000,
+        "maximumEntries": 10000,
+        "maximumDecodedResponseBytes": 268435456,
+        "weightedAdmission": true
+      },
+      {
+        "name": "profile-summary",
+        "source": "client",
+        "ttlMs": 30000,
+        "refreshAfterMs": null,
+        "refreshTimeoutMs": null,
+        "maximumEntries": 2500,
+        "maximumDecodedResponseBytes": null,
+        "weightedAdmission": false
+      }
+    ]
+  },
+  "apiActivity": [
+    {
+      "apiName": "catalog.search",
+      "selectedPolicy": "catalog-read",
+      "lookups": {
+        "hits": 777,
+        "misses": 65
+      },
+      "callers": {
+        "freshHit": 760,
+        "missLoader": 37,
+        "coalescedWaiter": 28,
+        "staleHit": 17
+      },
+      "coalesced": 28,
+      "stale": 17,
+      "loads": {
+        "success": 34,
+        "failure": 2,
+        "cancellation": 1
+      },
+      "refreshes": {
+        "success": 14,
+        "failure": 2,
+        "cancellation": 1
+      }
+    },
+    {
+      "apiName": "profile.get",
+      "selectedPolicy": "profile-summary",
+      "lookups": {
+        "hits": 0,
+        "misses": 0
+      },
+      "callers": {
+        "freshHit": 0,
+        "missLoader": 0,
+        "coalescedWaiter": 0,
+        "staleHit": 0
+      },
+      "coalesced": 0,
+      "stale": 0,
+      "loads": {
+        "success": 0,
+        "failure": 0,
+        "cancellation": 0
+      },
+      "refreshes": {
+        "success": 0,
+        "failure": 0,
+        "cancellation": 0
+      }
+    }
+  ],
+  "policyActivity": [
+    {
+      "policy": "catalog-read",
+      "evictions": {
+        "size": 0,
+        "ttl": 186,
+        "weight": 3
+      },
+      "admissions": {
+        "admitted": 48,
+        "bypassedUnknownSize": 0,
+        "bypassedOverBudget": 0,
+        "bypassedCapacity": 0
+      }
+    },
+    {
+      "policy": "profile-summary",
+      "evictions": {
+        "size": 0,
+        "ttl": 50,
+        "weight": null
+      },
+      "admissions": null
+    }
+  ],
+  "quietWindow": {
+    "startedAt": "2026-01-01T00:04:00Z",
+    "endedAt": "2026-01-01T00:04:25Z",
+    "trafficStopped": true,
+    "factoryOpen": true,
+    "counterSnapshots": [
+      {
+        "capturedAt": "2026-01-01T00:04:00Z",
+        "phase": "before-quiet",
+        "terminalLoads": [
+          {
+            "apiName": "catalog.search",
+            "success": 33,
+            "failure": 2,
+            "cancellation": 1
+          },
+          {
+            "apiName": "profile.get",
+            "success": 0,
+            "failure": 0,
+            "cancellation": 0
+          }
+        ]
+      },
+      {
+        "capturedAt": "2026-01-01T00:04:25Z",
+        "phase": "after-quiet",
+        "terminalLoads": [
+          {
+            "apiName": "catalog.search",
+            "success": 34,
+            "failure": 2,
+            "cancellation": 1
+          },
+          {
+            "apiName": "profile.get",
+            "success": 0,
+            "failure": 0,
+            "cancellation": 0
+          }
+        ]
+      }
+    ]
+  },
+  "checkpoints": [
+    {
+      "capturedAt": "2026-01-01T00:00:00Z",
+      "phase": "before-load-post-gc",
+      "cacheStateAvailable": true,
+      "transportStateAvailable": true,
+      "cacheMeterRegistrations": {
+        "available": true,
+        "source": "in-process-meter-registry",
+        "contextOrdinal": "context-1",
+        "total": 55,
+        "counter": 37,
+        "timer": 12,
+        "gauge": 6,
+        "other": 0
+      },
+      "memory": {
+        "processRssBytes": 335544320,
+        "containerWorkingSetBytes": 369098752,
+        "javaHeapUsedAfterGcBytes": 125829120,
+        "javaHeapCommittedBytes": 268435456,
+        "directMemoryUsedBytes": 33554432,
+        "liveThreadCount": 78
+      },
+      "policyState": [
+        {
+          "policy": "catalog-read",
+          "entries": 200,
+          "maximumEntries": 10000,
+          "retainedDecodedResponseBytes": 4194304,
+          "maximumDecodedResponseBytes": 268435456
+        },
+        {
+          "policy": "profile-summary",
+          "entries": 50,
+          "maximumEntries": 2500,
+          "retainedDecodedResponseBytes": null,
+          "maximumDecodedResponseBytes": null
+        }
+      ],
+      "transport": {
+        "protocol": "HTTP/2",
+        "poolTotalConnections": 4,
+        "poolIdleConnections": 3,
+        "poolActiveStreams": 1,
+        "poolPendingStreams": 0,
+        "poolMaximumConnections": 64
+      }
+    },
+    {
+      "capturedAt": "2026-01-01T00:04:25Z",
+      "phase": "after-load-post-gc",
+      "cacheStateAvailable": true,
+      "transportStateAvailable": true,
+      "cacheMeterRegistrations": {
+        "available": true,
+        "source": "in-process-meter-registry",
+        "contextOrdinal": "context-1",
+        "total": 55,
+        "counter": 37,
+        "timer": 12,
+        "gauge": 6,
+        "other": 0
+      },
+      "memory": {
+        "processRssBytes": 536870912,
+        "containerWorkingSetBytes": 603979776,
+        "javaHeapUsedAfterGcBytes": 201326592,
+        "javaHeapCommittedBytes": 402653184,
+        "directMemoryUsedBytes": 67108864,
+        "liveThreadCount": 84
+      },
+      "policyState": [
+        {
+          "policy": "catalog-read",
+          "entries": 45,
+          "maximumEntries": 10000,
+          "retainedDecodedResponseBytes": 180355072,
+          "maximumDecodedResponseBytes": 268435456
+        },
+        {
+          "policy": "profile-summary",
+          "entries": 0,
+          "maximumEntries": 2500,
+          "retainedDecodedResponseBytes": null,
+          "maximumDecodedResponseBytes": null
+        }
+      ],
+      "transport": {
+        "protocol": "HTTP/2",
+        "poolTotalConnections": 12,
+        "poolIdleConnections": 4,
+        "poolActiveStreams": 28,
+        "poolPendingStreams": 2,
+        "poolMaximumConnections": 64
+      }
+    },
+    {
+      "capturedAt": "2026-01-01T00:05:00Z",
+      "phase": "after-close-post-gc",
+      "cacheStateAvailable": false,
+      "transportStateAvailable": false,
+      "cacheMeterRegistrations": {
+        "available": true,
+        "source": "in-process-meter-registry",
+        "contextOrdinal": "context-1",
+        "total": 0,
+        "counter": 0,
+        "timer": 0,
+        "gauge": 0,
+        "other": 0
+      },
+      "memory": {
+        "processRssBytes": 352321536,
+        "containerWorkingSetBytes": 385875968,
+        "javaHeapUsedAfterGcBytes": 130023424,
+        "javaHeapCommittedBytes": 402653184,
+        "directMemoryUsedBytes": 35651584,
+        "liveThreadCount": 78
+      },
+      "policyState": [],
+      "transport": null
+    }
+  ],
+  "lifecycle": {
+    "events": [
+      {
+        "capturedAt": "2025-12-31T23:55:00Z",
+        "type": "factory-start",
+        "contextOrdinal": "context-1"
+      },
+      {
+        "capturedAt": "2026-01-01T00:04:30Z",
+        "type": "factory-close",
+        "contextOrdinal": "context-1"
+      }
+    ],
+    "contextRestarts": 0,
+    "deploymentChanges": [
+      {
+        "capturedAt": "2025-12-31T23:55:00Z",
+        "type": "starter-version",
+        "beforeVersion": "4.1.0",
+        "afterVersion": "4.2.0"
+      }
+    ]
+  }
+}

@@ -196,11 +196,24 @@ endpoint use the same logical fields. Provider-backed entries include the config
 limit; collection overloads render those provider-only values as `null` in map/JSON
 and `unknown` in Markdown. Collection-only pool and strict-validation facts retain
 the same unknown semantics. Cache phase, policy count, minimum TTL and refresh
-threshold, single-flight state, aggregate maximum size, entry count, eviction
-count, and cache-metrics enablement follow the same provider/collection unknown
+threshold, single-flight state, aggregate maximum size, optional aggregate
+maximum decoded response representation bytes, entry count, eviction count, and
+cache-metrics enablement follow the same provider/collection unknown
 rules. Provider-backed cache fields also export the bounded policy-source set
 (`method` or `client`), resolved HTTP-method set, and whether at least one
-selected method carries explicit semantic-read acknowledgement. Empty lists and
+selected method carries explicit semantic-read acknowledgement. The configured
+decoded-response-byte aggregate is `null` when any selected
+policy omits the optional limit or when a finite aggregate cannot be represented;
+exact per-method policy limits remain available in effective-contract snapshots.
+`cacheRetainedDecodedResponseBytes` is a nullable runtime aggregate for already
+created weighted policy caches only. It is `null` when the client/cache manager
+has not been created or when any active policy omits the byte bound. Diagnostics
+read the cache's aggregate counter and never invoke a weigher, enumerate keys,
+or traverse cached values. An empty or closed existing manager reports zero.
+Both decoded-response-byte fields are additive unpublished `4.2.0`/V29
+release-candidate schema-v1 fields; published `4.1.x` responses omit them. Their unit is decoded response
+representation bytes, while `cacheMaximumSize` continues to count entries.
+Empty lists and
 `false` mean the provider proved no selected cache method; `null` means the fact
 cannot be proven through the collection or replacement-factory contract. No
 snapshot path enumerates cache entries. The fixture and JVM

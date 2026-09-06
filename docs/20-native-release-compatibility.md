@@ -1,7 +1,7 @@
 # Native Image and Release Compatibility
 
-Sections without a version label describe the current `4.2.0-SNAPSHOT`
-development line. Sections labeled V18, V19, V20, or V27 preserve release-era
+Sections without a version label describe the current `4.2.0` release
+candidate. Sections labeled V18, V19, V20, or V27 preserve release-era
 evidence and are not current commands. Use the command in the first applicable
 current section; historical sections remain for provenance only.
 
@@ -160,12 +160,13 @@ root and
 starter-module comparisons against `4.0.0`; the V27 report-only major lane is
 historical evidence and is not a post-release compatibility command.
 
-### Post-`4.1.0` development lane
+### Post-`4.1.0` release lane
 
 After Maven Central verification, public consumer, strict API, assembled
 consumer, and benchmark baselines moved to published `4.1.0`. Reactor-only
-coordinates use `4.2.0-SNAPSHOT`; V29 is an active draft and no `4.2.0`
-release scope is selected. Normal CI runs strict root and starter-module
+coordinates use the unpublished `4.2.0` release candidate. V29 selects the
+additive decoded-response-representation-byte cache admission scope. Normal CI
+runs strict root and starter-module
 comparisons against `4.1.0`.
 
 ### Publishable module staging
@@ -370,7 +371,7 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `4.2.0-SNAPSHOT` development line compares
+from the current reactor version. The `4.2.0` release candidate compares
 strictly against published `4.1.0`:
 
 ```bash
@@ -497,7 +498,7 @@ the POM include set or lacks an explicit support status.
 | `io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot` | Request context snapshot model | Immutable context snapshot exports | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.ResilienceOperatorApplier*` | Contract snapshot resilience hook | Operator availability and instance-type hook | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.core.SensitiveHeaders` | Header redaction helper | Custom exchange logger redaction checks | Supported |
-| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, deterministic cache clock/policy/outcome/eviction controls, `RecordedExchange`, `RecordedExchangeAssertions`, `RecordedMultipartPart`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
+| `io.github.huynhngochuyhoang.httpstarter.test` | Test helper package | `MockReactiveHttpClient`, deterministic cache clock/policy/outcome/occupancy/admission/eviction/refresh controls, `RecordedExchange`, `RecordedExchangeAssertions`, `RecordedMultipartPart`, `ErrorCategoryAssertions`, `MockHttpServer`, and `MockHttpServerExtension` | Supported |
 | `io.github.huynhngochuyhoang.httpstarter.otel` | OpenTelemetry companion public package | `OpenTelemetryHttpClientObserver`, `OpenTelemetryContextWebFilter`, `OpenTelemetryContextExchangeFilter`, and `OpenTelemetryHttpClientAutoConfiguration` | Supported |
 
 The `3.0.0` migration replaces `HttpClientHealthIndicator` with its Boot 4
@@ -526,6 +527,33 @@ has an `AnnotationDefault` attribute.
 `scripts/verify-api-compatibility-fixtures.sh` separately compiles the published
 annotation use against both API forms and runs the `4.0.0`-compiled declaration
 with the current false default. Other abstract-method additions remain strict.
+
+### V29 additive surface classification
+
+The V29 public surface was added only after the retained-weight decision selected
+decoded response representation bytes. Strict root and starter-module japicmp
+comparisons against published `4.1.0` passed from independent fresh target-local
+Maven repositories. No incompatible Java API row was accepted.
+
+| Artifact | Reported `4.1.0` to `4.2.0` row | Classification |
+|---|---|---|
+| Starter | `CachePolicyConfig.getMaximumTotalDecodedResponseBytes()` and `setMaximumTotalDecodedResponseBytes(Long)` | Additive mutable binding-model accessors. The existing implicit no-arg constructor and all prior accessors retain their contract. |
+| Starter diagnostics | `ReactiveHttpClientDiagnosticsProvider` and `ReactiveHttpClientDiagnosticsSnapshot` modified-class markers with no public member row | Implementation-only Java changes. The two decoded-response-byte additions are nullable schema-v1 map fields; public diagnostics record constructors are unchanged. |
+| Test helper | `MockReactiveHttpClient.cacheSnapshot()` and the four-argument weighted `Builder.cachePolicy(...)` overload | Additive methods; the published count-only overload remains unchanged. |
+| Test helper | `MockReactiveHttpClient.CacheSnapshot`, its canonical constructor, and record accessors | New immutable public nested helper. Its nullable retained-byte component preserves unknown for count-only policies. |
+| OpenTelemetry companion | No change | No V29 public API delta. |
+
+No annotation default, public cache SPI, replacement-bean contract, existing
+public constructor, or existing mutable-model behavior changed in V29. Existing
+application replacements for `ReactiveHttpClientProperties` and
+`MethodMetadataCache` remain authoritative at runtime and during AOT validation.
+The diagnostics additions do not change schema version or force unknown values
+to zero.
+
+The no-go path remains viable without a placeholder API: the spike and decision
+records stay under `roadmaps/v29/`, while cache engines, weighers, admission
+state, and meter ownership remain package-private implementation. The selected
+production setting and mock additions above are the complete V29 public delta.
 
 Cache engines and keying machinery remain implementation details:
 `LocalResponseCache`, `LocalResponseCacheManager`, `CaffeineLocalResponseCache`,
@@ -585,6 +613,9 @@ current minor line:
   V27 also covers `AutoCloseable`, `advanceCacheTime`, `cacheEntryCount`,
   `cacheOutcomes`, `evictCacheEntries`, both `loadCount` methods,
   `Builder.cachePolicy`, and `Builder.withDeterministicCacheTime`.
+  V29 additively covers `cacheSnapshot`, `CacheSnapshot`, and the four-argument
+  weighted `Builder.cachePolicy` overload. The published three-argument overload
+  remains count-only and reports retained decoded-response bytes as unknown.
 - `ResilienceOperatorApplier.InstanceType` is a public nested enum used by
   diagnostics and contract snapshots. Do not remove or rename enum constants in
   the current minor line; add new constants only with corresponding docs and
@@ -761,8 +792,18 @@ Supported Boot 4 native-image path:
   client metrics.
 - A native open-circuit rejection that reaches no transport dispatch and records
   one finite logical-call duration with zero subscription attempts.
-- One cache miss, one cache hit without dispatch, and one access-driven refresh
-  through the real loopback transport, with exact aggregate dispatch counts.
+- Cache-disabled repeated dispatch, bounded cache fill/hit/expiry, and one
+  access-driven refresh through the real loopback transport.
+- Weighted cache admission with exact decoded-response byte framing,
+  over-budget successful non-publication, weight eviction, retained-byte
+  diagnostics, and bounded admission/eviction meters.
+- A pre-instantiation diagnostics snapshot that leaves the lazy client cache
+  manager and storage untouched even when Framework AOT has materialized the
+  raw `FactoryBean` for type inspection.
+- Context shutdown that terminates active and queued miss callers plus a hidden
+  refresh before the shared five-second disposal deadline, followed by a
+  bounded quiet period and same-tag factory/context recreation against the same
+  meter registry.
 - Explicit retry-only activation that produces exactly two loopback dispatches;
   merely enabling resilience does not activate unrelated operators.
 - Opt-in gzip negotiation and transparent JSON response decompression over the
@@ -785,7 +826,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=4.2.0-SNAPSHOT native:compile
+  -Dreactive-http-client.version=4.2.0 native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
@@ -802,9 +843,10 @@ must be accompanied by a successful executable smoke run.
 Limits:
 
 - The scheduled native smoke uses real Reactor Netty loopback requests, local
-  cache hit/load/refresh behavior, explicit Retry, and one Resilience4j
-  open-circuit rejection. It does not exercise custom TLS configuration,
-  RateLimiter/Bulkhead composition, or OTel exporters.
+  cache hit/load/expiry/refresh/weighted-admission behavior, shutdown/restart,
+  explicit Retry, and one Resilience4j open-circuit rejection. It does not
+  exercise custom TLS configuration, RateLimiter/Bulkhead composition, or OTel
+  exporters.
 - Optional libraries still require native support and runtime hints from their
   owners, including Resilience4j, alternate TLS providers, and OpenTelemetry
   exporters.
@@ -846,10 +888,10 @@ latest published consumer version and reports benchmark promotion and Maven
 Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
-For the active V29 draft, candidate status remains `deferred`, `published=false`,
-and no final release scope is selected. Pending work includes scope selection,
-compatibility, consumers, benchmarks, AOT, native evidence, and publication; the
-snapshot suffix remains until a later release cut.
+For the selected V29 release candidate, candidate status is
+`pending-publication`, `published=false`, and the Priority 4 weight decision is
+`go`. Pending work is limited to publication. A final reactor coordinate does not
+claim that the artifact is publicly resolvable.
 
 The root `latest.published.version` property owns public consumer snippets;
 `api.compatibility.baseline.version` remains an independent compatibility policy.
@@ -941,13 +983,17 @@ Jackson 3 signing bytes and final outbound metadata through
 `MockReactiveHttpClient`.
 
 The verifier installs the current reactor into a fresh target-local repository,
-runs the complete mock parity classes, then runs the assembled consumer against
-the installed jars. It rejects reactor `target/classes` leakage and records
-separate mock and real-server test reports, the consumer classpath, dependency
-tree, effective POM, artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-4.2.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
+runs the complete mock parity classes, then runs two assembled applications against
+the installed jars. The main fixture explicitly declares Caffeine and exercises
+weighted admission, hit, weight eviction, over-budget bypass, and meter/cache-manager
+shutdown. The independent cache-disabled fixture declares only the starter and Boot
+test/runtime dependencies; its classpath must contain no Caffeine artifact. It rejects
+reactor `target/classes` leakage in either application and records separate mock,
+weighted/current-consumer, and cache-disabled test reports, both consumer classpaths,
+dependency trees and effective POMs, project artifact hashes, commit state, and provenance under
+`target/release-evidence/current-consumer/current-4.2.0/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
 test stage. An `EXIT` trap repeats that filtered copy before preserving the original
-verifier status, including when either test stage fails.
+verifier status, including when any test stage fails.
 It also records the last completed stage and exit status when a later
 classpath/provenance check fails.
 
@@ -984,6 +1030,7 @@ status, and provenance under
 Fresh Surefire XML is copied immediately after the consumer test stage. Its `EXIT`
 trap repeats that filtered copy and retains the evidence when a test, Central marker,
 classpath, or checksum check fails.
+The published lane does not activate the V29 profile or compile against V29 APIs.
 
 The release-artifact command uses its own fresh repository and additionally
 requires the starter, test-helper, and OTel source and Javadoc jars. Its

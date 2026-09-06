@@ -338,6 +338,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 "reactive.http.clients.[name].cache.policy",
                 "reactive.http.clients.[name].cache.policies.[policy-name].ttl-ms",
                 "reactive.http.clients.[name].cache.policies.[policy-name].maximum-size",
+                "reactive.http.clients.[name].cache.policies.[policy-name].maximum-total-decoded-response-bytes",
                 "reactive.http.clients.[name].cache.policies.[policy-name].single-flight",
                 "reactive.http.clients.[name].cache.policies.[policy-name].refresh-after-ms",
                 "reactive.http.clients.[name].cache.policies.[policy-name].refresh-timeout-ms",
@@ -450,7 +451,7 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 .contains("EXAMPLE_NAMESPACE=\"example-namespace\"")
                 .contains("EXAMPLE_MANAGEMENT_PORT=\"<management-port>\"")
                 .contains("$EXAMPLE_LOCAL_PORT:$EXAMPLE_MANAGEMENT_PORT")
-                .contains("curl -sS \"$EXAMPLE_MANAGEMENT_URL/actuator/health\"")
+                .contains("$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient")
                 .contains("docker logs \"$EXAMPLE_CONTAINER\" --since 30m")
                 .contains("kubectl -n \"$EXAMPLE_NAMESPACE\" logs \"$EXAMPLE_POD\"")
                 .contains("kubectl -n \"$EXAMPLE_NAMESPACE\" exec \"$EXAMPLE_POD\"")
@@ -463,8 +464,8 @@ class ReactiveHttpClientConfigurationMetadataTest {
                 .contains("logs/exchange-metadata.log")
                 .contains("config/reactive-http-client.yml")
                 .contains("performance/benchmark-report-link.txt")
-                .contains("Which clients and endpoints exist")
-                .contains("Whether recent Micrometer samples crossed")
+                .contains("Whether the transfer completed, which status was returned")
+                .contains("whether recent samples crossed the affected client's error-rate threshold")
                 .contains("Which sanitized client policy was applied")
                 .contains("What happened for the affected calls")
                 .contains("Which `reactive.http.*` settings")

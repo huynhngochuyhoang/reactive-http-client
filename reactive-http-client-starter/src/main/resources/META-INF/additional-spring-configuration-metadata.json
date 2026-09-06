@@ -431,6 +431,12 @@
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
     },
     {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].maximum-total-decoded-response-bytes",
+      "type": "java.lang.Long",
+      "description": "Optional per-policy aggregate limit in decoded response representation bytes. Must be between 1 and 1099511627776 (1 TiB). `maximum-size` continues to count entries. This value is not exact Java heap, direct memory, process RSS, or container memory.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
+    },
+    {
       "name": "reactive.http.clients.[name].cache.policies.[policy-name].vary-by-parameters",
       "type": "java.util.List<java.lang.String>",
       "description": "Stable @CacheKey labels used as additional response partition dimensions. Path and query parameters are included automatically.",

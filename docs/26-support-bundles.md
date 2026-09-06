@@ -40,7 +40,11 @@ fake hostnames plus placeholders before it leaves the incident system:
 
 ```text
 support-bundle/
+  diagnostics/rhttpclients-curl-exit-status.txt
+  diagnostics/rhttpclients-http-status.txt
   diagnostics/rhttpclients.json
+  health/reactive-http-client-health-curl-exit-status.txt
+  health/reactive-http-client-health-http-status.txt
   health/health.json
   logs/startup-summary.log
   logs/exchange-metadata.log
@@ -93,7 +97,7 @@ the reviewable bundle. The example intentionally uses `.example.invalid`,
 placeholder instance names, and metadata-only logging. Replace any production
 header values with presence/absence notes before sharing.
 
-Two source-controlled incident fixtures show the structural facts expected for
+Source-controlled incident fixtures show the structural facts expected for
 common terminal outcomes:
 
 - [Request validation before subscription](fixtures/support-bundle-request-validation.json)
@@ -111,11 +115,16 @@ common terminal outcomes:
   records one bounded time window of configuration, lookup, caller, load,
   refresh, eviction, and capacity counts plus one sanitized caller terminal
   record, without cache material or request variants.
+- [Cache-memory triage](fixtures/support-bundle-cache-memory.json) records one
+  bounded V29 window for one fake client/process instance, API-tagged caller work,
+  policy-tagged cache signals, timestamped memory/cache/pool checkpoints, and
+  lifecycle events. It contains only fake bounded client/API/policy names and no
+  cache keys/values, request variants, identity values, or exception messages.
 
 These fixtures are illustrative sanitized records, not raw logger output. They
 contain fake client and path-template metadata only. Default support output must
 not copy arbitrary exception messages, concrete request URLs, header values, or
-payloads into either record.
+payloads into any record.
 
 ## Diagnostics Snapshot
 
@@ -185,8 +194,8 @@ Each recipe captures separate evidence streams:
 
 | Stream | File | Answers |
 |---|---|---|
-| Diagnostics endpoint | `diagnostics/rhttpclients.json` | Which clients and endpoints exist, plus sanitized effective policy such as timeout source, auth mode, resilience, redirect policy, inherited endpoint counts, and strict-validation flags. |
-| Health details | `health/health.json` | Whether recent Micrometer samples crossed the configured per-client error-rate threshold. |
+| Diagnostics endpoint | `diagnostics/rhttpclients-http-status.txt`, `diagnostics/rhttpclients-curl-exit-status.txt`, plus validated `diagnostics/rhttpclients.json` | Whether the transfer completed, which status was returned, and, only for the expected schema, which clients/endpoints and sanitized effective policies exist. |
+| Health details | `health/reactive-http-client-health-http-status.txt`, `health/reactive-http-client-health-curl-exit-status.txt`, plus sanitized `health/health.json` | Whether the transfer completed, which status was returned, and, only for the expected component shape, whether recent samples crossed the affected client's error-rate threshold. |
 | Startup summary | `logs/startup-summary.log` | Which sanitized client policy was applied when the proxy was created. |
 | Metadata-only exchange logs | `logs/exchange-metadata.log` | What happened for the affected calls: method, path template, status, duration, error, and subscription-attempt count. |
 | Sanitized configuration | `config/reactive-http-client.yml` | Which `reactive.http.*` settings the application intended to use, without secrets or concrete internal URLs. |
@@ -196,6 +205,19 @@ The diagnostics endpoint, health details, startup summaries, exchange logs,
 configuration snippets, and release-evidence reference answer different
 questions. Do not merge them into a single free-form log dump.
 
+The recipes deliberately use `curl -sS` without `--fail`/`-f` and always write
+the HTTP status to a bundle file. `--connect-timeout 5` bounds connection setup
+and `--max-time 30` bounds the complete transfer. `--max-filesize 1048576`
+bounds each raw endpoint download at 1 MiB. Response bodies first go to
+quarantined `*.raw.json`
+files outside the bundle. An authentication gateway, reverse proxy, or generic
+error handler can return arbitrary sensitive content, so an HTTP error body is
+not automatically diagnostics evidence. Retain it only after the shared
+validation/sanitization step below confirms the expected endpoint shape and
+allowlists its fields. Every recipe removes stale raw files before invoking
+`curl` and sets `umask 077` before creating capture files, so newly created
+quarantined bodies use mode `0600`. Never attach the raw files.
+
 ### Local JVM Capture
 
 Use this when the application process and its management endpoint are reachable
@@ -203,12 +225,25 @@ from the same shell:
 
 ```bash
 EXAMPLE_MANAGEMENT_URL="http://<management-host>:<management-port>"
+EXAMPLE_CLIENT_NAME="example-client"
 EXAMPLE_APP_LOG="/path/to/sanitized-application.log"
 EXAMPLE_SANITIZED_CONFIG="/path/to/sanitized-reactive-http-client.yml"
 
+umask 077
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
-curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
-curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
+  printf '0\n' > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+fi
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
+  printf '0\n' > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+fi
 grep 'ReactiveHttpClientFactoryBean' "$EXAMPLE_APP_LOG" > support-bundle/logs/startup-summary.log || true
 grep 'DefaultHttpExchangeLogger' "$EXAMPLE_APP_LOG" > support-bundle/logs/exchange-metadata.log || true
 cp "$EXAMPLE_SANITIZED_CONFIG" support-bundle/config/reactive-http-client.yml
@@ -224,11 +259,24 @@ sanitized:
 ```bash
 EXAMPLE_CONTAINER="example-app-container"
 EXAMPLE_MANAGEMENT_URL="http://<management-host>:<management-port>"
+EXAMPLE_CLIENT_NAME="example-client"
 EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER="/path/in/container/sanitized-reactive-http-client.yml"
 
+umask 077
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
-curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
-curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
+  printf '0\n' > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+fi
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
+  printf '0\n' > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+fi
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 docker logs "$EXAMPLE_CONTAINER" --since 30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
 docker cp "$EXAMPLE_CONTAINER:$EXAMPLE_SANITIZED_CONFIG_IN_CONTAINER" support-bundle/config/reactive-http-client.yml
@@ -256,16 +304,304 @@ EXAMPLE_NAMESPACE="example-namespace"
 EXAMPLE_POD="example-app-pod"
 EXAMPLE_CONTAINER="example-app-container"
 EXAMPLE_LOCAL_PORT="18080"
+EXAMPLE_MANAGEMENT_PORT="<management-port>"
 EXAMPLE_SANITIZED_CONFIG_IN_POD="/path/in/pod/sanitized-reactive-http-client.yml"
 EXAMPLE_MANAGEMENT_URL="http://127.0.0.1:$EXAMPLE_LOCAL_PORT"
+EXAMPLE_CLIENT_NAME="example-client"
+umask 077
 mkdir -p support-bundle/diagnostics support-bundle/health support-bundle/logs support-bundle/config support-bundle/performance
-curl -fsS "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" -o support-bundle/diagnostics/rhttpclients.json
-curl -sS "$EXAMPLE_MANAGEMENT_URL/actuator/health" -o support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients.json support-bundle/health/health.json
+rm -f support-bundle/diagnostics/rhttpclients-curl-exit-status.txt support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+rm -f rhttpclients.raw.json reactive-http-client-health.raw.json
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o rhttpclients.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/rhttpclients" > support-bundle/diagnostics/rhttpclients-http-status.txt; then
+  printf '0\n' > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/diagnostics/rhttpclients-curl-exit-status.txt
+fi
+if curl -sS --connect-timeout 5 --max-time 30 --max-filesize 1048576 -w '%{http_code}\n' -o reactive-http-client-health.raw.json "$EXAMPLE_MANAGEMENT_URL/actuator/health/reactiveHttpClient" > support-bundle/health/reactive-http-client-health-http-status.txt; then
+  printf '0\n' > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+else
+  printf '%s\n' "$?" > support-bundle/health/reactive-http-client-health-curl-exit-status.txt
+fi
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'ReactiveHttpClientFactoryBean' > support-bundle/logs/startup-summary.log || true
 kubectl -n "$EXAMPLE_NAMESPACE" logs "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" --since=30m | grep 'DefaultHttpExchangeLogger' > support-bundle/logs/exchange-metadata.log || true
 kubectl -n "$EXAMPLE_NAMESPACE" exec "$EXAMPLE_POD" -c "$EXAMPLE_CONTAINER" -- cat "$EXAMPLE_SANITIZED_CONFIG_IN_POD" > support-bundle/config/reactive-http-client.yml
 printf 'docs/benchmark-report-<version>.md\n' > support-bundle/performance/benchmark-report-link.txt
 ```
+
+### Validate and sanitize captured endpoint bodies
+
+Run this in the same capture workspace after any recipe above. Point
+`EXAMPLE_RHTTPCLIENTS_SCHEMA` at a reviewed copy of the source-controlled
+`docs/fixtures/rhttpclients-schema-v1.json`. The first filter requires a 2xx
+HTTP status, schema V1, every version-applicable required field, the expected
+recursive leaf types (including documented nullable unknown states), nonnegative
+numeric values, strings bounded to 512 Java UTF-16 code units, bounded
+arrays/counts, cache policy sources limited to `client` and `method`, cache HTTP
+methods limited to the seven declarative verbs, and at most 1 MiB
+of UTF-8 JSON before it retains allowlisted fields. Before either filter starts,
+the shell also verifies that curl reported a successful transfer, the quarantined
+raw file exists, and the file is at most 1 MiB; this bounds whitespace and other
+bytes that compacted `tojson` does not measure.
+The two V29 decoded-response byte fields are optional only when `projectVersion`
+identifies a published `4.1.x` response. A V29 `4.2.0` response must
+include both fields, although their values may be `null` where the diagnostics
+contract permits an unknown state. When both fields are numeric, retained
+decoded-response bytes cannot exceed the configured aggregate maximum. Likewise,
+when entry count and maximum size are numeric, entry occupancy cannot exceed the
+configured maximum. Each filter slurps the raw input and requires
+exactly one parsed JSON value, so empty bodies and JSON streams are rejected. The
+health filter also requires a `2xx` status or a `5xx` response whose top-level
+status is `DOWN`, rejecting authentication and other `4xx` responses while
+retaining a structurally valid Actuator DOWN response. It requires the requested
+client entry, rejects counters outside the Java `long` range, and rejects a
+selected `DOWN` client under an aggregate `UP` status. An aggregate `DOWN` with a
+selected `UP` client remains valid because another client may be unhealthy. The
+filter emits only the documented structural health fields. For nonzero samples,
+the reported error rate must equal
+`errors / samples` within an absolute tolerance of `0.000000000001`. Its
+top-level status is derived from that selected client, not from unrelated clients
+in the aggregate health response. The sanitized projection preserves omission of
+`errorRate` when the selected client has zero samples:
+
+```bash
+EXAMPLE_RHTTPCLIENTS_SCHEMA="/path/to/reviewed/rhttpclients-schema-v1.json"
+
+test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0" &&
+  test -f rhttpclients.raw.json &&
+  test "$(wc -c < rhttpclients.raw.json)" -le 1048576 &&
+  jq --slurp \
+  --arg httpStatus "$(cat support-bundle/diagnostics/rhttpclients-http-status.txt)" \
+  --slurpfile schema "$EXAMPLE_RHTTPCLIENTS_SCHEMA" '
+  def nonnegative_integer:
+    (type == "number") and (. >= 0) and (. <= 9223372036854775807)
+      and (. == floor);
+  def utf16_length:
+    reduce (explode[]) as $codepoint
+      (0; . + (if $codepoint > 65535 then 2 else 1 end));
+  def nullable_number($field):
+    ([
+      "poolMaxConnections", "poolPendingAcquireTimeoutMs",
+      "poolMaxConcurrentStreams", "cachePolicyCount", "cacheTtlMs",
+      "cacheRefreshAfterMs", "cacheMaximumSize",
+      "cacheMaximumTotalDecodedResponseBytes",
+      "cacheRetainedDecodedResponseBytes", "cacheEntryCount",
+      "cacheEvictions", "logicalCallTimeoutMs", "codecMaxInMemorySizeMb"
+    ] | index($field)) != null;
+  def nullable_boolean($field):
+    ([
+      "poolMetricsEnabled", "cacheMetricsEnabled",
+      "cacheSemanticReadAcknowledged", "compressionEnabled",
+      "strictUnsafeRetryValidation", "strictBodySigningValidation"
+    ] | index($field)) != null;
+  def nullable_array($field):
+    $field == "cachePolicySources" or $field == "cacheHttpMethods";
+  def valid_cache_policy_source:
+    . as $value | ["client", "method"] | index($value) != null;
+  def valid_cache_http_method:
+    . as $value
+      | ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+      | index($value) != null;
+  def published_4_1($version):
+    ($version | type) == "string"
+      and ($version | test("^4\\.1\\.[0-9]+$"));
+  def optional_field($projectVersion; $field):
+    published_4_1($projectVersion)
+      and ($field == "cacheMaximumTotalDecodedResponseBytes"
+        or $field == "cacheRetainedDecodedResponseBytes");
+  def valid_leaf($field; $shape):
+    ($shape | type) as $expected
+    | if $expected == "string" then
+        (type == "string") and (utf16_length <= 512)
+      elif $expected == "number" then
+        nonnegative_integer
+          or (nullable_number($field) and type == "null")
+      elif $expected == "boolean" then
+        type == "boolean"
+          or (nullable_boolean($field) and type == "null")
+      elif $expected == "null" then
+        if nullable_boolean($field)
+        then type == "null" or type == "boolean"
+        elif nullable_number($field)
+        then type == "null" or nonnegative_integer
+        else false
+        end
+      else false
+      end;
+  def keep_shape($shape; $field; $projectVersion):
+    ($shape | type) as $expected
+    | if $expected == "object" then
+        ($shape | keys
+          | map(select((optional_field($projectVersion; .)) | not))) as $required
+        | if (type == "object"
+            and (($required - keys) | length) == 0)
+          then with_entries(
+            select(.key as $key | $shape | has($key))
+            | . as $entry
+            | .value = ($entry.value
+                | keep_shape($shape[$entry.key]; $entry.key; $projectVersion))
+          )
+          else error("unexpected diagnostics object")
+          end
+      elif $expected == "array" then
+        if type == "null" and nullable_array($field) then .
+        elif type != "array" then error("unexpected diagnostics array")
+        elif $field == "clients" and length <= 256 then
+          [.[] | keep_shape($shape[0]; "client"; $projectVersion)]
+        elif ($field == "cachePolicySources"
+            and length <= 16
+            and all(.[];
+              type == "string"
+                and utf16_length <= 512
+                and valid_cache_policy_source))
+        then .
+        elif ($field == "cacheHttpMethods"
+            and length <= 16
+            and all(.[];
+              type == "string"
+                and utf16_length <= 512
+                and valid_cache_http_method))
+        then .
+        else error("unexpected diagnostics array")
+        end
+      elif valid_leaf($field; $shape) then .
+      else error("unexpected diagnostics scalar")
+      end;
+  if length == 1 then .[0]
+  else error("expected exactly one diagnostics JSON value")
+  end
+  | if (($httpStatus | test("^2[0-9][0-9]$"))
+      and .schemaVersion == 1
+      and (.clients | type) == "array"
+      and (.clients | length) <= 256
+      and ((tojson | utf8bytelength) <= 1048576))
+  then .projectVersion as $projectVersion
+    | keep_shape($schema[0]; "root"; $projectVersion)
+    | if (.clientCount == (.clients | length)
+        and .endpointCount <= 10000
+        and .inheritedEndpointCount <= .endpointCount
+        and all(.clients[]; .inheritedEndpointCount <= .endpointCount)
+        and all(.clients[];
+          if ((.cacheMaximumTotalDecodedResponseBytes | type) == "number"
+              and (.cacheRetainedDecodedResponseBytes | type) == "number")
+          then .cacheRetainedDecodedResponseBytes
+            <= .cacheMaximumTotalDecodedResponseBytes
+          else true
+          end)
+        and all(.clients[];
+          if ((.cacheMaximumSize | type) == "number"
+              and (.cacheEntryCount | type) == "number")
+          then .cacheEntryCount <= .cacheMaximumSize
+          else true
+          end)
+        and ([.clients[].endpointCount] | add // 0) == .endpointCount
+        and ([.clients[].inheritedEndpointCount] | add // 0)
+          == .inheritedEndpointCount
+        and ((tojson | utf8bytelength) <= 1048576))
+      then .
+      else error("inconsistent diagnostics counts")
+      end
+  else error("unexpected rhttpclients response")
+  end
+' rhttpclients.raw.json > rhttpclients.sanitized.json &&
+  mv rhttpclients.sanitized.json support-bundle/diagnostics/rhttpclients.json
+
+test "$(cat support-bundle/health/reactive-http-client-health-curl-exit-status.txt)" = "0" &&
+  test -f reactive-http-client-health.raw.json &&
+  test "$(wc -c < reactive-http-client-health.raw.json)" -le 1048576 &&
+  jq --slurp \
+  --arg httpStatus "$(cat support-bundle/health/reactive-http-client-health-http-status.txt)" \
+  --arg client "$EXAMPLE_CLIENT_NAME" '
+  def nonnegative_integer:
+    (type == "number") and (. >= 0) and (. <= 9223372036854775807)
+      and (. == floor);
+  def unit_rate:
+    (type == "number") and (. >= 0) and (. <= 1);
+  def rate_matches($detail):
+    ($detail.errorRate | unit_rate)
+      and (($detail.errors / $detail.samples) as $calculated
+        | (($detail.errorRate - $calculated) >= -0.000000000001)
+        and (($detail.errorRate - $calculated) <= 0.000000000001));
+  if length == 1 then .[0]
+  else error("expected exactly one health JSON value")
+  end
+  | .details[$client] as $detail
+  | if (((($httpStatus | test("^2[0-9][0-9]$"))
+          or (($httpStatus | test("^5[0-9][0-9]$")) and .status == "DOWN"))
+      and (.status == "UP" or .status == "DOWN"))
+      and ((.details | type) == "object")
+      and (($detail | type) == "object")
+      and (($detail.status != "DOWN") or .status == "DOWN")
+      and (.details.minSamples | nonnegative_integer)
+      and (.details.minSamples >= 1)
+      and (.details.errorRateThreshold | unit_rate)
+      and ($detail.samples | nonnegative_integer)
+      and ($detail.errors | nonnegative_integer)
+      and ($detail.sampleCount | nonnegative_integer)
+      and ($detail.errorCount | nonnegative_integer)
+      and ($detail.poolAcquireFailureCount | nonnegative_integer)
+      and ($detail.minSamples | nonnegative_integer)
+      and ($detail.minSamples >= 1)
+      and ($detail.errorRateThreshold | unit_rate)
+      and (.details.minSamples == $detail.minSamples)
+      and (.details.errorRateThreshold == $detail.errorRateThreshold)
+      and ($detail.samples == $detail.sampleCount)
+      and ($detail.errors == $detail.errorCount)
+      and ($detail.errors <= $detail.samples)
+      and ($detail.poolAcquireFailureCount <= $detail.errors)
+      and (($detail.samples == 0) or rate_matches($detail))
+      and (
+        ($detail.reason == "NO_SAMPLES"
+          and $detail.status == "INSUFFICIENT_SAMPLES"
+          and $detail.samples == 0
+          and $detail.errorRate == null)
+        or ($detail.reason == "INSUFFICIENT_SAMPLES"
+          and $detail.status == "INSUFFICIENT_SAMPLES"
+          and $detail.samples > 0
+          and $detail.samples < $detail.minSamples
+          and ($detail.errorRate | unit_rate))
+        or ($detail.reason == "ERROR_RATE_WITHIN_THRESHOLD"
+          and $detail.status == "UP"
+          and $detail.samples >= $detail.minSamples
+          and ($detail.errorRate | unit_rate)
+          and $detail.errorRate <= $detail.errorRateThreshold)
+        or ($detail.reason == "ERROR_RATE_ABOVE_THRESHOLD"
+          and $detail.status == "DOWN"
+          and $detail.samples >= $detail.minSamples
+          and ($detail.errorRate | unit_rate)
+          and $detail.errorRate > $detail.errorRateThreshold)
+      ))
+  then {
+    status: (if $detail.status == "DOWN" then "DOWN" else "UP" end),
+    details: {
+      ($client): (
+        $detail
+        | {
+            samples, errors, sampleCount, errorCount, poolAcquireFailureCount,
+            minSamples, errorRateThreshold, status, reason
+          }
+        | if $detail.samples == 0 then .
+          else . + {errorRate: $detail.errorRate}
+          end
+      )
+    }
+  }
+  else error("unexpected reactive HTTP client health response")
+  end
+' reactive-http-client-health.raw.json > reactive-http-client-health.sanitized.json &&
+  mv reactive-http-client-health.sanitized.json support-bundle/health/health.json
+
+rm -f rhttpclients.raw.json rhttpclients.sanitized.json \
+  reactive-http-client-health.raw.json reactive-http-client-health.sanitized.json
+```
+
+If `curl` reports any nonzero transfer status, including a connection timeout,
+total-transfer timeout, transfer-bound, truncation, or connection-reset failure,
+a raw-size check fails, an input does not contain exactly one JSON value, an HTTP
+status is ineligible, or either `jq` command otherwise fails,
+keep the HTTP and curl exit-status files, omit the endpoint body from the bundle,
+and delete the raw file. Do not weaken the shape check to retain a gateway, proxy,
+authentication, or generic error document.
 
 The Kubernetes recipe uses `kubectl exec ... cat` instead of `kubectl cp` so it
 does not require `tar` in the application image. If the image also lacks `cat`
@@ -273,7 +609,7 @@ or cannot read the sanitized file path, capture the already-sanitized
 configuration from the deployment source and place it at
 `support-bundle/config/reactive-http-client.yml`.
 
-Keep namespace, pod, container, file path, and management URL values as
+Keep client, namespace, pod, container, file path, and management URL values as
 placeholders in shared examples. Before attaching a bundle, inspect every file
 for concrete hosts, credentials, cookies, authorization headers, request bodies,
 response bodies, and customer data.
@@ -564,12 +900,22 @@ general performance evidence:
   `cacheTtlMs`, `cacheRefreshAfterMs`, `cacheSingleFlight`,
   `cacheMaximumSize`, `cacheEntryCount`, `cacheEvictions`,
   `cacheMetricsEnabled`, `cachePolicySources`, `cacheHttpMethods`, and
-  `cacheSemanticReadAcknowledged`. The last three are bounded structural
-  policy facts; they never contain request targets or selected values.
+  `cacheSemanticReadAcknowledged`. These are the published `4.1.0` cache
+  diagnostics fields. The last three are bounded structural policy facts; they
+  never contain request targets or selected values.
+- V29 release-candidate diagnostics fields:
+  `cacheMaximumTotalDecodedResponseBytes` and
+  `cacheRetainedDecodedResponseBytes`.
+  `cacheMaximumTotalDecodedResponseBytes` is the finite sum across selected
+  policies only when every selected policy configures the optional limit; `null`
+  means the aggregate is unbounded or cannot be represented.
+  `cacheRetainedDecodedResponseBytes` is available only from an already-created
+  manager whose active policy caches all use that bound; otherwise it is `null`.
 - Lookup hit/miss rates and, when applicable, coalesced-waiter and stale-serving
   rates for the affected bounded client/API names.
 - Load and refresh success/failure/cancellation rates and durations, plus TTL
-  and size eviction rates.
+  and size eviction rates. V29 weighted policies also include weight eviction and
+  admission outcomes.
 - Current entries divided by configured maximum entries for each bounded
   client/policy pair.
 - One caller terminal record containing the resolved HTTP verb in
@@ -593,6 +939,93 @@ for bounded aggregate cache facts and one sanitized caller terminal record. Keep
 the capture-window start, end, and every duration unit explicit. The fixture is
 not a dump format: do not add keys, digests, values, arguments, request variants,
 header/body content, concrete URLs, identity values, or credentials.
+
+### Cache-memory capture (V29 / `4.2.0` candidate)
+
+Published `4.1.0` incidents use the explicitly enumerated published fields and
+ordinary lookup/load/refresh/TTL/size activity above. They do not include the
+two V29 release-candidate decoded-response-byte diagnostics fields, weight eviction,
+or admission outcomes. Those signals exist only on the current
+unpublished `4.2.0`/V29 release candidate until Central publishes it; their absence in
+`4.1.0` is version scope, not evidence that their value is zero.
+
+The V29 values are decoded response representation bytes; `maximum-size` is
+still an entry count. Neither value is exact Java heap, direct memory, process
+RSS, or container memory. Keep those process-memory domains as separate
+checkpoint fields.
+
+Use the source-controlled
+[cache-memory fixture](fixtures/support-bundle-cache-memory.json) for one fixed
+five-minute window around the symptom. It keeps the following domains separate:
+
+- one bounded client name and one sanitized process-instance ordinal;
+- static client cache-metrics selection plus per-policy source, TTL, nullable
+  refresh-after/refresh-timeout bounds, entry bound, and optional
+  decoded-response-byte bound;
+- API-tagged lookup, caller outcome, coalesced, stale, terminal load, and refresh
+  aggregates with an explicit API-to-policy mapping;
+- cumulative API terminal-load counters sampled at both boundaries of a bounded
+  pre-close quiet window while traffic is stopped and meters remain registered;
+- bounded cache-meter registration counts by Micrometer meter type at each
+  checkpoint, tied to the same process and context ordinal;
+- policy-tagged TTL/size/weight eviction and weighted-admission aggregates;
+- timestamped, phase-labeled post-GC memory checkpoints with per-policy occupancy,
+  protocol, total/idle physical connections, and the applicable HTTP/1.1
+  connection or HTTP/2 stream gauges; and
+- factory start/close, context restart, and bounded deployment-change events.
+
+Record `cacheMetricsEnabled` for the affected client. An enabled idle API uses
+real zero-valued API series; a disabled or unavailable integration uses `null`,
+not fabricated zeros. For an unweighted policy,
+`maximumDecodedResponseBytes`, `retainedDecodedResponseBytes`, weight eviction,
+and admissions are `null`; entry gauges and TTL/size evictions remain available
+when cache metrics are enabled.
+
+Use one configuration record and multiple checkpoints tied to the same
+`processInstance`. Every checkpoint has `capturedAt`, a fixed `phase`, post-GC
+memory, and explicit cache/transport availability. A post-close checkpoint uses
+an empty policy-state list and a null transport block after their meters are
+removed; it does not invent zero gauges.
+
+The quiet-window record has explicit start/end timestamps, confirms that traffic
+was stopped and the factory remained open, and retains cumulative terminal-load
+success, failure, and cancellation counters by bounded API name at both
+boundaries. Compare those two snapshots before using the later post-close
+checkpoint; removed meters cannot supply a post-close counter delta.
+
+When meter ownership is under investigation, count each matching Micrometer
+`Meter.Id` once from the same in-process `MeterRegistry`, filter to the exact
+`reactive.http.client.cache.*` prefix and reviewed `client.name`, and group only
+by `Meter.Type`. Record the total plus counter, timer, gauge, and other counts at
+each checkpoint with a bounded context ordinal. Do not substitute Prometheus
+sample counts: timers and histograms expand into multiple exported series. If an
+approved in-process inventory is unavailable, record `available: false` with
+`null` counts and do not use meter ownership as a discriminator.
+
+Every relevant deployment or configuration change records a bounded `type`,
+`capturedAt`, and safe before/after version or configuration identifiers so its
+position relative to the capture window is explicit. Use an empty
+`deploymentChanges` array when no relevant change occurred; never substitute
+free-form release notes or configuration values.
+
+The client, API, policy, configuration-source, process-instance, and phase values
+may be included only after review confirms they are non-sensitive and bounded.
+Keep at most 16 policy records, at most 64 API records, and at most 128 characters
+per name. Replace unsafe names with ordinal placeholders. Never add cache keys or
+digests, cached values, arguments, headers, bodies, request targets, paths, query
+material, identities, credentials, tenant data, or exception messages. Aggregate
+counts and fixed structural enums are sufficient for this fixture.
+
+RSS is not Java heap, and decoded-response representation bytes are not response
+wire bytes or an object-graph heap measurement. Correlate the fixture with the
+[cache-memory decision tree](30-operations-troubleshooting.md#cache-memory-triage-v29-420-candidate)
+rather than adding raw application material.
+
+Heap dumps and JFR recordings can contain payloads, object values, credentials,
+identities, internal addresses, and other sensitive application data. Do not put
+them in the reviewable support bundle. Capture them only through a separately
+approved, encrypted, access-controlled process with explicit retention and
+deletion ownership.
 
 ## Performance Investigations
 

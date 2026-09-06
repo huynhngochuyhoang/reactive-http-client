@@ -31,7 +31,10 @@ class ReactiveHttpClientPropertiesTest {
         assertFalse(config.isHttp2Enabled());
         assertFalse(config.isLogExchange());
         assertFalse(config.isExchangeLoggingEnabled());
-        assertFalse(new ReactiveHttpClientProperties.CachePolicyConfig().isSingleFlight());
+        ReactiveHttpClientProperties.CachePolicyConfig cachePolicy =
+                new ReactiveHttpClientProperties.CachePolicyConfig();
+        assertFalse(cachePolicy.isSingleFlight());
+        assertNull(cachePolicy.getMaximumTotalDecodedResponseBytes());
         assertEquals(ReactiveHttpClientProperties.LogPreset.METADATA_ONLY, config.getLogPreset());
         assertNull(config.getAuthProvider());
         assertNull(config.getAuth());
@@ -295,6 +298,8 @@ class ReactiveHttpClientPropertiesTest {
         Map<String, Object> yaml = new LinkedHashMap<>();
         yaml.put("reactive.http.clients.users.cache.policies.local.ttl-ms", 1_000);
         yaml.put("reactive.http.clients.users.cache.policies.local.maximum-size", 100);
+        yaml.put("reactive.http.clients.users.cache.policies.local.maximum-total-decoded-response-bytes",
+                67_108_864L);
         yaml.put("reactive.http.clients.users.cache.policies.local.single-flight", true);
         yaml.put("reactive.http.clients.users.cache.policies.local.refresh-after-ms", 500);
         yaml.put("reactive.http.clients.users.cache.policies.local.refresh-timeout-ms", 250);
@@ -305,6 +310,7 @@ class ReactiveHttpClientPropertiesTest {
                 .getClients().get("users").getCache().getPolicies().get("local");
 
         assertTrue(policy.isSingleFlight());
+        assertEquals(67_108_864L, policy.getMaximumTotalDecodedResponseBytes());
         assertEquals(500L, policy.getRefreshAfterMs());
         assertEquals(250L, policy.getRefreshTimeoutMs());
         assertEquals(List.of("X-Session", "X-Caller"), policy.getNonCacheableResponseHeaders());

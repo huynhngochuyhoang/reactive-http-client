@@ -37,6 +37,7 @@ record EffectiveHttpClientContract(
                        boolean semanticRead,
                        long ttlMs,
                        long maximumSize,
+                       Long maximumTotalDecodedResponseBytes,
                        List<String> varyByParameters,
                        List<String> varyByHeaders,
                        List<String> varyByContext,

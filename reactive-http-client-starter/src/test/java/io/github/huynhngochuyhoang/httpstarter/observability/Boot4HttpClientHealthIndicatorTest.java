@@ -48,11 +48,60 @@ class Boot4HttpClientHealthIndicatorTest {
                         io.micrometer.core.instrument.Tag.of("client.name", "catalog"),
                         io.micrometer.core.instrument.Tag.of("cache.policy", "local")),
                 new java.util.concurrent.atomic.AtomicInteger(100));
+        registry.counter("reactive.http.client.cache.admissions",
+                "client.name", "catalog", "cache.policy", "local",
+                "outcome", "bypassed_over_budget")
+                .increment(100);
+        registry.gauge("reactive.http.client.cache.retained.decoded.response.bytes",
+                java.util.List.of(
+                        io.micrometer.core.instrument.Tag.of("client.name", "catalog"),
+                        io.micrometer.core.instrument.Tag.of("cache.policy", "local")),
+                new java.util.concurrent.atomic.AtomicLong(1_024));
 
         Health health = indicator(registry, defaults()).health();
 
         assertThat(health.getStatus()).isEqualTo(Status.UP);
         assertThat(health.getDetails()).doesNotContainKey("catalog");
+    }
+
+    @Test
+    void cacheServedCallersAndAdmissionOutcomesDoNotDiluteDispatchedHealthSamples() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReactiveHttpClientProperties.ObservabilityConfig config = defaults();
+        config.getHealth().setMinSamples(1);
+        MicrometerHttpClientObserver observer = new MicrometerHttpClientObserver(registry, config);
+        Boot4HttpClientHealthIndicator indicator = indicator(registry, config);
+
+        for (HttpClientCacheOutcome outcome : java.util.List.of(
+                HttpClientCacheOutcome.FRESH_HIT,
+                HttpClientCacheOutcome.STALE_HIT,
+                HttpClientCacheOutcome.COALESCED_WAITER)) {
+            observer.recordCacheServed(new HttpClientObserverEvent(
+                    "catalog", "get", "GET", "/catalog", 200, 1L,
+                    null, null, null, null, 0,
+                    HttpClientObserverEvent.UNKNOWN_SIZE,
+                    HttpClientObserverEvent.UNKNOWN_SIZE,
+                    null, null, null, Map.of(), outcome));
+        }
+        registry.counter("reactive.http.client.cache.admissions",
+                "client.name", "catalog", "cache.policy", "local",
+                "outcome", "bypassed_unknown_size").increment(3);
+
+        assertThat(registry.find(config.getMetricName()).timers()).isEmpty();
+        assertThat(indicator.health().getDetails()).doesNotContainKey("catalog");
+
+        observer.record(new HttpClientObserverEvent(
+                "catalog", "get", "GET", "/catalog", 503, 1L,
+                new IllegalStateException("downstream failed"), ErrorCategory.SERVER_ERROR,
+                null, null, 1,
+                HttpClientObserverEvent.UNKNOWN_SIZE,
+                HttpClientObserverEvent.UNKNOWN_SIZE));
+
+        Health health = indicator.health();
+        assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(clientDetails(health, "catalog"))
+                .containsEntry("sampleCount", 1L)
+                .containsEntry("errorCount", 1L);
     }
 
     @Test

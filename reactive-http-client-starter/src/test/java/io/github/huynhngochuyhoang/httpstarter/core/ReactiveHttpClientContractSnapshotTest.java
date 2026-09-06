@@ -140,6 +140,7 @@ class ReactiveHttpClientContractSnapshotTest {
                 new ReactiveHttpClientProperties.CachePolicyConfig();
         policy.setTtlMs(5_000L);
         policy.setMaximumSize(25L);
+        policy.setMaximumTotalDecodedResponseBytes(67_108_864L);
         policy.setVaryByParameters(java.util.List.of(" tenant "));
         policy.setVaryByHeaders(java.util.List.of(" X-Tenant "));
         policy.setVaryByContext(java.util.List.of(" region ", "locale"));
@@ -157,7 +158,7 @@ class ReactiveHttpClientContractSnapshotTest {
                 .render();
 
         assertThat(snapshot).contains(
-                "client:semanticRead=false,ttl=5000ms,max=25,varyParameters=[\"tenant\"],varyHeaders=[\"x-tenant\"],"
+                "client:semanticRead=false,ttl=5000ms,max=25,maxTotalDecodedResponseBytes=67108864,varyParameters=[\"tenant\"],varyHeaders=[\"x-tenant\"],"
                         + "varyContext=[\"locale\",\"region\"],nonCacheableResponseHeaders=[\"x-session\"],sharedResponse=true,singleFlight=true,refreshAfter=2000ms,refreshTimeout=750ms");
     }
 
