@@ -1133,29 +1133,87 @@ Implementation evidence recorded on 2026-09-06 from starting commit
 
 ## Priority 13 - Public API, Documentation, and Release Readiness
 
-### [ ] 13.1 Freeze the supported surface
+### [x] 13.1 Freeze the supported surface
 
-- [ ] Add public configuration or SPI only after the Priority 4 go decision and
+- [x] Add public configuration or SPI only after the Priority 4 go decision and
       include every exposed nested/helper type in compatibility coverage.
-- [ ] Audit public constructors, mutable models, annotation defaults, metadata,
+- [x] Audit public constructors, mutable models, annotation defaults, metadata,
       diagnostics schema, mock helpers, and replacement-bean contracts.
-- [ ] Run strict root and starter-module japicmp against fresh published `4.1.0`
+- [x] Run strict root and starter-module japicmp against fresh published `4.1.0`
       repositories; classify every additive or incompatible row.
-- [ ] Keep a no-go path free of placeholder public APIs and remove spike-only
+- [x] Keep a no-go path free of placeholder public APIs and remove spike-only
       implementation before release review.
 
-### [ ] 13.2 Consolidate documentation
+Evidence recorded on 2026-09-06 from the working tree based on commit
+`f0a555321882318aa74264cf67e579f6358d38f9`:
 
-- [ ] Update cache, observability, operations, support-bundle, effective
+- The selected decoded-response representation-byte setting was introduced only
+  after the Priority 4 go decision. `ReactiveHttpClientProperties*` and the
+  complete public test-helper package remain in the japicmp include map; no
+  cache engine, weigher, admission state, or meter owner became a public SPI.
+- The public-surface audit in
+  `docs/20-native-release-compatibility.md#v29-additive-surface-classification`
+  freezes the mutable `CachePolicyConfig` accessors, the existing no-arg/model
+  behavior, the additive mock overload and immutable `CacheSnapshot` helper,
+  nullable diagnostics schema-v1 map fields, unchanged annotation defaults, and
+  authoritative replacement `ReactiveHttpClientProperties` /
+  `MethodMetadataCache` contracts. Spike and decision artifacts remain
+  documentation under `roadmaps/v29/`; no placeholder public API was retained.
+- Strict root japicmp passed against published `4.1.0` from the fresh
+  `v29-priority13-api-root-4.1.0` repository. It classified two starter property
+  accessors, `MockReactiveHttpClient.cacheSnapshot()`, the weighted builder
+  overload, and `MockReactiveHttpClient.CacheSnapshot` plus its record members as
+  additive. Diagnostics classes had modified-class markers but no public member
+  row; OTel had no change; there were no incompatible rows. Central provenance,
+  seven artifact hashes, and copied reports are under
+  `target/release-evidence/v29/priority13/api-root/`.
+- The independent starter-module strict comparison passed from
+  `v29-priority13-api-starter-4.1.0` with the same two additive property
+  accessors and no incompatible row. Its Central provenance, two artifact
+  hashes, and report are under
+  `target/release-evidence/v29/priority13/api-starter/`.
+- `bash scripts/verify-api-compatibility-fixtures.sh` passed the additive and
+  defaulted-annotation cases while still detecting source-only checked
+  exceptions, public constructor/nested-method/enum removals, and report-only
+  incompatible additions.
+
+### [x] 13.2 Consolidate documentation
+
+- [x] Update cache, observability, operations, support-bundle, effective
       configuration, native/release compatibility, testing, and migration guides
       from one vocabulary and one selected weight unit, if any.
-- [ ] State clearly that `maximum-size` counts entries and no configured weight
+- [x] State clearly that `maximum-size` counts entries and no configured weight
       equals exact heap, direct memory, RSS, or container memory.
-- [ ] Keep copyable examples startup-valid, dependency-complete, sanitized, and
+- [x] Keep copyable examples startup-valid, dependency-complete, sanitized, and
       version-scoped to published versus snapshot behavior.
-- [ ] Regenerate configuration reference/effective examples and run local-link,
+- [x] Regenerate configuration reference/effective examples and run local-link,
       placeholder-domain, machine-path, secret-fixture, and benchmark-wording
       guards.
+
+Evidence recorded on 2026-09-06:
+
+- `docs/32-response-caching.md`, `08-observability.md`,
+  `30-operations-troubleshooting.md`, `26-support-bundles.md`,
+  `21-diagnostic-contexts.md`, `examples/effective-configuration.md`,
+  `14-test-helpers.md`, `20-native-release-compatibility.md`, and
+  `31-3x-to-4x-resilience-migration.md` now use decoded response representation
+  bytes as the single V29 unit. They keep `maximum-size` as an entry-count bound
+  and explicitly separate both values from exact Java heap, direct memory,
+  process RSS, and container memory.
+- The effective weighted example retains the required Caffeine dependency and
+  customization-safety inventory, and now identifies
+  `maximum-total-decoded-response-bytes` as `4.2.0-SNAPSHOT`/V29-only while
+  published `4.1.x` remains count-only. Hosts and placeholders remain sanitized.
+- Starter metadata and the generated `docs/configuration-properties.md` were
+  refreshed together. The effective examples remain metadata-validated.
+  `DocumentationReleaseArtifactTest`, configuration metadata, and property
+  binding passed 99 tests; the OTel metadata guard passed 4 tests. These runs
+  include generated-reference equality, local-link, placeholder-domain,
+  machine-path, secret-fixture, public-surface, and benchmark-wording guards.
+  Surefire reports are copied under
+  `target/release-evidence/v29/priority13/documentation/surefire/`.
+- `git diff --check` passed. Priority 13.3 immutable release evidence and
+  Priority 13.4 release selection remain intentionally open.
 
 ### [ ] 13.3 Assemble immutable release evidence
 

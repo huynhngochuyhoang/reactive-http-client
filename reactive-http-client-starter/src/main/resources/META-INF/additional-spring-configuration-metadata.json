@@ -433,7 +433,7 @@
     {
       "name": "reactive.http.clients.[name].cache.policies.[policy-name].maximum-total-decoded-response-bytes",
       "type": "java.lang.Long",
-      "description": "Optional per-policy aggregate decoded response representation byte limit. Must be between 1 and 1099511627776 (1 TiB). This is additional to ttl-ms and maximum-size and is not a Java heap, direct-memory, RSS, or container-memory limit.",
+      "description": "Optional per-policy aggregate limit in decoded response representation bytes. Must be between 1 and 1099511627776 (1 TiB). `maximum-size` continues to count entries. This value is not exact Java heap, direct memory, process RSS, or container memory.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
     },
     {

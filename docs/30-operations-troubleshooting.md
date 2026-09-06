@@ -387,11 +387,13 @@ Classify the shape before changing production code:
 
 RSS and container working set are not Java heap. They can include committed but
 unused heap pages, class metadata, JIT code, native libraries, thread stacks,
-allocator arenas, and Netty direct buffers. Likewise, response wire size is not
-the decoded object graph retained by a cache entry. V29's byte budget measures
-the retained decoded-response representation defined by
-[Response Caching](32-response-caching.md#explicit-selection), not heap,
-RSS, direct memory, or compressed wire bytes.
+allocator arenas, and Netty direct buffers.
+Likewise, response wire size is not the decoded object graph retained by a cache entry.
+V29's byte budget measures decoded response representation bytes, not exact Java
+heap, direct memory,
+process RSS, or container memory. It also does not measure compressed wire
+bytes. `maximum-size` remains the independent entry-count bound. See
+[Response Caching](32-response-caching.md#explicit-selection).
 
 Capture the bounded
 [cache-memory fixture](26-support-bundles.md#cache-memory-capture-v29-snapshot-only)

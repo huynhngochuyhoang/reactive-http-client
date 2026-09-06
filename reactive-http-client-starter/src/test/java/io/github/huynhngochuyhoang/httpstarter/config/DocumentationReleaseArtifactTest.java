@@ -2391,6 +2391,74 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v29PublicSurfaceAndDocumentationUseOneWeightedCacheContract() throws IOException {
+        Path root = projectRoot();
+        String caching = Files.readString(root.resolve("docs/32-response-caching.md"))
+                .replaceAll("\\s+", " ");
+        String observability = Files.readString(root.resolve("docs/08-observability.md"))
+                .replaceAll("\\s+", " ");
+        String operations = Files.readString(root.resolve("docs/30-operations-troubleshooting.md"))
+                .replaceAll("\\s+", " ");
+        String supportBundles = Files.readString(root.resolve("docs/26-support-bundles.md"))
+                .replaceAll("\\s+", " ");
+        String examples = Files.readString(root.resolve("docs/examples/effective-configuration.md"))
+                .replaceAll("\\s+", " ");
+        String releaseCompatibility = Files.readString(
+                root.resolve("docs/20-native-release-compatibility.md")).replaceAll("\\s+", " ");
+        String diagnostics = Files.readString(root.resolve("docs/21-diagnostic-contexts.md"))
+                .replaceAll("\\s+", " ");
+        String testHelpers = Files.readString(root.resolve("docs/14-test-helpers.md"))
+                .replaceAll("\\s+", " ");
+        String migration = Files.readString(root.resolve(
+                "docs/31-3x-to-4x-resilience-migration.md")).replaceAll("\\s+", " ");
+        String configurationReference = Files.readString(
+                root.resolve("docs/configuration-properties.md")).replaceAll("\\s+", " ");
+
+        assertThat(caching)
+                .contains("The optional decoded-response representation-byte bound is a "
+                        + "`4.2.0-SNAPSHOT`/V29 feature")
+                .contains("`maximum-size` continues to count entries")
+                .contains("not exact Java heap, direct memory, process RSS, or container memory");
+        assertThat(observability)
+                .contains("V29 (`4.2.0-SNAPSHOT`) adds the weighted gauges")
+                .contains("`maximum-size` remains an entry-count bound");
+        assertThat(operations)
+                .contains("V29's byte budget measures decoded response representation bytes")
+                .contains("not exact Java heap, direct memory, process RSS, or container memory");
+        assertThat(supportBundles)
+                .contains("The V29 values are decoded response representation bytes")
+                .contains("`maximum-size` is still an entry count");
+        assertThat(examples)
+                .contains("This weighted example targets the current (`4.2.0-SNAPSHOT`) V29 line")
+                .contains("Published `4.1.x` consumers must omit")
+                .contains("not exact Java heap, direct memory, process RSS, or container memory");
+        assertThat(releaseCompatibility)
+                .contains("### V29 additive surface classification")
+                .contains("No incompatible Java API row was accepted")
+                .contains("`CachePolicyConfig.getMaximumTotalDecodedResponseBytes()`")
+                .contains("`MockReactiveHttpClient.CacheSnapshot`")
+                .contains("No annotation default, public cache SPI, replacement-bean contract")
+                .contains("nullable schema-v1 map fields");
+        assertThat(diagnostics)
+                .contains("Both decoded-response-byte fields are additive "
+                        + "`4.2.0-SNAPSHOT`/V29 schema-v1 fields")
+                .contains("published `4.1.x` responses omit them")
+                .contains("`cacheMaximumSize` continues to count entries");
+        assertThat(testHelpers)
+                .contains("The weighted overload and retained-byte snapshot field are "
+                        + "`4.2.0-SNAPSHOT`/V29 APIs")
+                .contains("`maximumSize` still counts entries");
+        assertThat(migration)
+                .contains("## Post-`4.1.0` cache compatibility")
+                .contains("does not change the resilience migration")
+                .contains("not exact Java heap, direct memory, process RSS, or container memory");
+        assertThat(configurationReference)
+                .contains("Optional per-policy aggregate limit in decoded response representation bytes")
+                .contains("`maximum-size` continues to count entries")
+                .contains("not exact Java heap, direct memory, process RSS, or container memory");
+    }
+
+    @Test
     void documentedPublicSurfaceMapMatchesApiCompatibilityIncludes() throws IOException {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

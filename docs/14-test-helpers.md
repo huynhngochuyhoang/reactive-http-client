@@ -56,6 +56,12 @@ method-level `@CacheResponse`. The additive
 `cachePolicy(name, ttl, maximumSize, maximumTotalDecodedResponseBytes)` overload
 selects the V29 decoded-response byte bound.
 
+The weighted overload and retained-byte snapshot field are
+`4.2.0-SNAPSHOT`/V29 APIs; published `4.1.x` test helpers expose the count-only
+cache contract. `maximumSize` still counts entries. The optional fourth
+argument counts decoded response representation bytes and is not exact Java
+heap, direct memory, process RSS, or container memory.
+
 ```java
 try (MockReactiveHttpClient<CatalogClient> mock = MockReactiveHttpClient
         .forClient(CatalogClient.class)
