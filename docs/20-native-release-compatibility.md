@@ -173,8 +173,10 @@ against `4.1.0`.
 
 After Maven Central verification, public consumer, strict API, assembled
 consumer, and benchmark baselines moved to published `4.2.0`. Reactor-only
-coordinates use `4.3.0-SNAPSHOT`. No V30 execution roadmap or release scope is
-active. Normal CI compares the root and starter-module public APIs strictly
+coordinates use `4.3.0-SNAPSHOT`. [V30](../roadmaps/v30/ROADMAP.md) is the active
+execution roadmap with an [adopted checklist](../roadmaps/v30/CHECKLIST.md);
+its final release scope remains unselected.
+Normal CI compares the root and starter-module public APIs strictly
 against `4.2.0`.
 
 ### Publishable module staging
