@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "captureScope": "cache-memory",
-  "signalAvailability": "4.2.0-v29-candidate",
+  "signalAvailability": "4.2.0-published",
   "window": {
     "startedAt": "2026-01-01T00:00:00Z",
     "endedAt": "2026-01-01T00:05:00Z",

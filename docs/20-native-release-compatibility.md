@@ -1,7 +1,7 @@
 # Native Image and Release Compatibility
 
-Sections without a version label describe the current `4.2.0` release
-candidate. Sections labeled V18, V19, V20, or V27 preserve release-era
+Sections without a version label describe the current `4.3.0-SNAPSHOT`
+development line. Sections labeled V18, V19, V20, V27, or V29 preserve release-era
 evidence and are not current commands. Use the command in the first applicable
 current section; historical sections remain for provenance only.
 
@@ -164,10 +164,18 @@ historical evidence and is not a post-release compatibility command.
 
 After Maven Central verification, public consumer, strict API, assembled
 consumer, and benchmark baselines moved to published `4.1.0`. Reactor-only
-coordinates use the unpublished `4.2.0` release candidate. V29 selects the
+coordinates used the unpublished `4.2.0` release candidate. V29 selected the
 additive decoded-response-representation-byte cache admission scope. Normal CI
-runs strict root and starter-module
-comparisons against `4.1.0`.
+runs in that release record used strict root and starter-module comparisons
+against `4.1.0`.
+
+### Post-`4.2.0` development lane
+
+After Maven Central verification, public consumer, strict API, assembled
+consumer, and benchmark baselines moved to published `4.2.0`. Reactor-only
+coordinates use `4.3.0-SNAPSHOT`. No V30 execution roadmap or release scope is
+active. Normal CI compares the root and starter-module public APIs strictly
+against `4.2.0`.
 
 ### Publishable module staging
 
@@ -371,21 +379,21 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `4.2.0` release candidate compares
-strictly against published `4.1.0`:
+from the current reactor version. The `4.3.0-SNAPSHOT` development line compares
+strictly against published `4.2.0`:
 
 ```bash
-test ! -e target/published-baseline-repositories/api-root-4.1.0 && \
+test ! -e target/published-baseline-repositories/api-root-4.2.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/api-root-4.1.0 \
+  -Dmaven.repo.local=target/published-baseline-repositories/api-root-4.2.0 \
   -Papi-compatibility -DskipTests verify && \
-scripts/verify-published-baseline-provenance.sh api-root 4.1.0 \
-  target/release-evidence/published-baselines/api-root-4.1.0 \
+scripts/verify-published-baseline-provenance.sh api-root 4.2.0 \
+  target/release-evidence/published-baselines/api-root-4.2.0 \
   reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
 bash scripts/verify-api-compatibility-fixtures.sh
 ```
 
-For release evidence, resolve the three `4.1.0` jars into a fresh target-local
+For release evidence, resolve the three `4.2.0` jars into a fresh target-local
 Maven repository and pass that repository through `-Dmaven.repo.local` to the
 japicmp build. The frozen `scripts/verify-major-api-delta.sh` remains historical
 evidence for the reviewed `2.14.1` to `3.0.0` migration and is no longer part of
@@ -407,12 +415,12 @@ For module-scoped compatibility checks, the inherited baseline guard must still
 run before japicmp:
 
 ```bash
-test ! -e target/published-baseline-repositories/api-starter-4.1.0 && \
+test ! -e target/published-baseline-repositories/api-starter-4.2.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/api-starter-4.1.0 \
+  -Dmaven.repo.local=target/published-baseline-repositories/api-starter-4.2.0 \
   -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify && \
-scripts/verify-published-baseline-provenance.sh api-starter 4.1.0 \
-  target/release-evidence/published-baselines/api-starter-4.1.0 \
+scripts/verify-published-baseline-provenance.sh api-starter 4.2.0 \
+  target/release-evidence/published-baselines/api-starter-4.2.0 \
   reactive-http-client-starter
 ```
 
@@ -826,7 +834,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=4.2.0 native:compile
+  -Dreactive-http-client.version=4.3.0-SNAPSHOT native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
@@ -888,10 +896,9 @@ latest published consumer version and reports benchmark promotion and Maven
 Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
-For the selected V29 release candidate, candidate status is
-`pending-publication`, `published=false`, and the Priority 4 weight decision is
-`go`. Pending work is limited to publication. A final reactor coordinate does not
-claim that the artifact is publicly resolvable.
+V29 is published and archived at `4.2.0`. During the post-release
+`4.3.0-SNAPSHOT` cycle, candidate status is `deferred`, `published=false`, and
+release scope remains unselected until a later roadmap explicitly activates it.
 
 The root `latest.published.version` property owns public consumer snippets;
 `api.compatibility.baseline.version` remains an independent compatibility policy.
@@ -991,7 +998,7 @@ test/runtime dependencies; its classpath must contain no Caffeine artifact. It r
 reactor `target/classes` leakage in either application and records separate mock,
 weighted/current-consumer, and cache-disabled test reports, both consumer classpaths,
 dependency trees and effective POMs, project artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-4.2.0/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
+`target/release-evidence/current-consumer/current-4.3.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
 test stage. An `EXIT` trap repeats that filtered copy before preserving the original
 verifier status, including when any test stage fails.
 It also records the last completed stage and exit status when a later
@@ -1014,28 +1021,30 @@ evidence lanes. From a clean checkout, resolve the latest published parent,
 starter, test helper, and OTel companion exclusively through Maven Central:
 
 ```bash
-scripts/verify-published-release-artifacts.sh 4.1.0
-scripts/verify-published-consumer.sh 4.1.0
+scripts/verify-published-release-artifacts.sh 4.2.0
+scripts/verify-published-consumer.sh 4.2.0
 ```
 
 The consumer command refuses an existing
-`target/published-baseline-repositories/consumer-4.1.0` directory instead of reusing it.
-It runs the same Boot 4 application fixture against published `4.1.0`, verifies
+`target/published-baseline-repositories/consumer-4.2.0` directory instead of reusing it.
+It runs the same Boot 4 application fixture against published `4.2.0`, verifies
 the Maven Central `_remote.repositories` marker for the parent and every project artifact,
 rejects reactor `target/classes` entries, and writes target-only dependency
 trees, classpaths, consumer/module effective POMs, published parent/module POM
 and jar SHA-256 values, test reports, fixture commit state, completed stage, exit
 status, and provenance under
-`target/release-evidence/published-consumer/published-4.1.0/`.
+`target/release-evidence/published-consumer/published-4.2.0/`.
 Fresh Surefire XML is copied immediately after the consumer test stage. Its `EXIT`
 trap repeats that filtered copy and retains the evidence when a test, Central marker,
 classpath, or checksum check fails.
-The published lane does not activate the V29 profile or compile against V29 APIs.
+The published consumer compatibility subset does not activate the current-only V29 parity source profile;
+the separately verified published artifacts still
+contain the V29 APIs shipped in `4.2.0`.
 
 The release-artifact command uses its own fresh repository and additionally
 requires the starter, test-helper, and OTel source and Javadoc jars. Its
 target-only Central markers, checksums, and provenance are written under
-`target/release-evidence/published-baselines/release-artifacts-4.1.0/`.
+`target/release-evidence/published-baselines/release-artifacts-4.2.0/`.
 
 The manually dispatched `Published Consumer Smoke` workflow runs both commands
 and uploads only their published-release evidence directories. The normal

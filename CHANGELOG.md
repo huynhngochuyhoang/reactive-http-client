@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.2.0] - 2026-09-06
 
-- **`4.2.0` release candidate (pending publication).** This additive minor
+- **`4.2.0` published release.** This additive minor
   release adds optional decoded-response representation-byte admission and
   eviction to explicitly selected local response-cache policies. Existing
   count-only policies remain unchanged when the new bound is omitted. The unit

@@ -7,7 +7,7 @@ logs, or application metrics.
 
 ## Current release scope
 
-Current consumer instructions apply to published starter `4.1.0` on Spring Boot
+Current consumer instructions apply to published starter `4.2.0` on Spring Boot
 4. The repository may contain a newer snapshot while the next release is being
 prepared. Use the published coordinates from the [Quick Start](01-quick-start.md)
 for applications and reserve snapshot commands for the explicitly labeled
@@ -47,7 +47,7 @@ historical evidence.
 | Upload stalls, cancellation, leaked buffers, or incomplete stream | Declared body/return shape, subscription and cancellation boundary, consumer release/forwarding path | [Streaming ownership](#streaming-ownership) |
 | OAuth2 refresh storm, token endpoint failure, or downstream 401 | Logical client name, sanitized auth mode, token endpoint status and safe headers, refresh/cooldown timing | [OAuth2 refresh](#oauth2-refresh) |
 | Unexpected stale value, miss storm, refresh failure, or cache capacity pressure | Effective cache phase/TTL/capacity, bounded hit/miss/load/refresh/eviction rates, process instance | [Response cache behavior (4.0.0+)](#response-cache-behavior-400) |
-| Pod memory grows after enabling response caching | Published/candidate version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (V29 / `4.2.0` candidate)](#cache-memory-triage-v29-420-candidate) |
+| Pod memory grows after enabling response caching | Published/development version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (`4.2.0`+)](#cache-memory-triage-420) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
 
 ## Evidence boundary
@@ -327,16 +327,16 @@ and capture the bounded
 Never collect cache keys, values, selected arguments, headers, bodies, tenant
 values, or credentials.
 
-### Cache-memory triage (V29 / `4.2.0` candidate)
+### Cache-memory triage (`4.2.0`+)
 
-Published `4.1.0` exposes the entry-count and cache-activity signals documented
-above, but it does not expose V29's decoded-response-byte capacity/occupancy
-gauges or admission outcomes. Do not search a `4.1.0` incident for
+Published `4.1.x` exposes the entry-count and cache-activity signals documented
+above, but it does not expose the decoded-response-byte capacity/occupancy
+gauges or admission outcomes. Do not search a `4.1.x` incident for
 `cacheMaximumTotalDecodedResponseBytes`, `cacheRetainedDecodedResponseBytes`,
 `reactive.http.client.cache.retained.decoded.response.bytes`,
 `reactive.http.client.cache.maximum.decoded.response.bytes`, or
-`reactive.http.client.cache.admissions`. Those signals apply only to the current
-unpublished `4.2.0`/V29 release candidate until Central publishes it.
+`reactive.http.client.cache.admissions`. Those signals are available starting
+with published `4.2.0`.
 
 Use one fixed, bounded time window and compare the same process instance before
 and after each step:
@@ -396,7 +396,7 @@ bytes. `maximum-size` remains the independent entry-count bound. See
 [Response Caching](32-response-caching.md#explicit-selection).
 
 Capture the bounded
-[cache-memory fixture](26-support-bundles.md#cache-memory-capture-v29-420-candidate)
+[cache-memory fixture](26-support-bundles.md#cache-memory-capture-420)
 with the ordinary response-cache bundle. Heap dumps and JFR recordings are not
 part of that reviewable fixture because they can contain application data; use
 the separately approved secure-artifact process described there.

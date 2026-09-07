@@ -1268,7 +1268,7 @@ Evidence recorded on 2026-09-06 from clean commit
   publication, post-publication Central/consumer verification, baseline movement,
   and roadmap archival remain explicitly deferred to Priority 13.4.
 
-### [ ] 13.4 Select release scope and close V29
+### [x] 13.4 Select release scope and close V29
 
 - [x] Select `4.2.0` only when the final scope is additive, bounded, measurable,
       and supported by immutable evidence.
@@ -1276,12 +1276,12 @@ Evidence recorded on 2026-09-06 from clean commit
       maintenance release path or record why the `4.2.0` feature scope is no-go.
 - [x] Record one explicit go/no-go decision with candidate version, commit, date,
       evidence paths, benchmark disposition, and remaining risk.
-- [ ] On go, cut/publish only from the reviewed clean commit and run generation-
+- [x] On go, cut/publish only from the reviewed clean commit and run generation-
       packaging/signing checks.
-- [ ] Verify parent/module POM/JAR/source/Javadoc artifacts and an assembled
+- [x] Verify parent/module POM/JAR/source/Javadoc artifacts and an assembled
       consumer from fresh Maven Central repositories before moving public/API/
       consumer/benchmark baselines.
-- [ ] Archive V29 and start the next snapshot only after post-publication evidence;
+- [x] Archive V29 and start the next snapshot only after post-publication evidence;
       on no-go, keep unreleased coordinates private and document the blocker or
       narrowed maintenance scope.
 
@@ -1321,6 +1321,35 @@ Release decision recorded on 2026-09-06:
   pass. Until those facts exist, the three publication/archive items above and
   the V29 completion heading remain open.
 
+Post-publication evidence recorded on 2026-09-07:
+
+- Tag `v4.2.0` points at clean release commit
+  `0d959dbfa52573c5147cec8bf4680a0a467d5660`. The publish workflow supplied the
+  signed release boundary that was unavailable in the local candidate
+  environment.
+- `scripts/verify-published-release-artifacts.sh 4.2.0` resolved the parent POM
+  plus every starter, test-helper, and OTel POM, binary, source, and Javadoc
+  artifact from a previously absent Maven Central-only repository. All 13
+  artifacts passed Central-marker, declared/embedded-version, and SHA-256
+  provenance checks under
+  `target/release-evidence/published-baselines/release-artifacts-4.2.0/`.
+- `scripts/verify-published-consumer.sh 4.2.0` passed four assembled-consumer
+  tests using only published artifacts. Its effective POMs, dependency tree,
+  classpath, Surefire reports, artifact hashes, clean-tag fixture provenance,
+  `completedStage=evidence-verified`, and `exitStatus=0` are under
+  `target/release-evidence/published-consumer/published-4.2.0/`.
+- Public README/quick-start coordinates and published/API/consumer/benchmark
+  baselines now use `4.2.0`. Reactor modules, benchmark harness, native fixture,
+  and current assembled-consumer fixtures move to `4.3.0-SNAPSHOT`; current
+  published-baseline commands no longer activate the historical V29 source
+  exclusion, so the `4.2.0` baseline includes its weighted-cache rows.
+- V29 is archived as completed and released as `4.2.0`. Generated readiness now
+  treats `4.2.0` as the published baseline and leaves the `4.3.0` scope
+  unselected with no active V30 execution roadmap.
+- After the baseline transition, `DocumentationReleaseArtifactTest` passed 46
+  tests and `mvn -B -ntp test` passed all 1,413 reactor tests with no failures,
+  errors, or skips. `git diff --check` also passed.
+
 ---
 
 ## Completion Criteria
@@ -1339,5 +1368,5 @@ V29 is complete only when:
       telemetry activates without explicit selection.
 - [x] Mock, consumer, API, AOT, native, shutdown, performance, documentation, and
       operations evidence agree with the selected scope.
-- [ ] Release publication and baseline movement occur only after fresh Central
+- [x] Release publication and baseline movement occur only after fresh Central
       artifact and assembled-consumer verification.
