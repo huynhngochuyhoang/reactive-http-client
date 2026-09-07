@@ -79,15 +79,15 @@ class DocumentationReleaseArtifactTest {
         }
 
         List<Integer> expectedVersions = new ArrayList<>();
-        for (int version = 1; version <= 29; version++) {
+        for (int version = 1; version <= 30; version++) {
             expectedVersions.add(version);
         }
-        assertThat(versions).as("contiguous V1-V29 roadmap directories").isEqualTo(expectedVersions);
+        assertThat(versions).as("contiguous V1-V30 roadmap directories").isEqualTo(expectedVersions);
         assertThat(index)
                 .contains("acceptance boxes preserve the proposal")
                 .contains("V2 predates the separate execution-checklist convention")
-                .contains("V1-V29 are completed release records. No V30 execution roadmap")
-                .contains("is active.");
+                .contains("V1-V29 are completed release records. V30 is the only active")
+                .contains("execution roadmap; its checklist is adopted and final release scope is unselected.");
 
         for (int version : versions) {
             Path directory = archive.resolve("v" + version);
@@ -107,7 +107,11 @@ class DocumentationReleaseArtifactTest {
                     .filter(line -> line.startsWith("> **Status:**"))
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("Missing V" + version + " roadmap status"));
-            if (version == 19) {
+            if (version == 30) {
+                assertThat(roadmapStatus).isEqualTo("> **Status:** active");
+                assertThat(indexRow).endsWith(" | Active |");
+            }
+            else if (version == 19) {
                 assertThat(roadmapStatus).containsIgnoringCase("no-go");
                 assertThat(indexRow).containsIgnoringCase("no-go");
             }
@@ -3412,7 +3416,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(readiness.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
         assertThat(readiness.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
-        assertThat(readiness.path("activeRoadmap").asText()).isEqualTo("none");
+        assertThat(readiness.path("activeRoadmap").asText()).isEqualTo("v30");
         assertThat(readiness.path("releaseLane").asText()).isEqualTo("unselected");
         assertThat(readiness.path("releaseCandidate").path("version").asText()).isEqualTo("4.3.0");
         assertThat(readiness.path("releaseCandidate").path("status").asText()).isEqualTo("deferred");
@@ -4285,7 +4289,7 @@ class DocumentationReleaseArtifactTest {
         readiness.put("projectVersion", projectVersion);
         readiness.put("apiCompatibilityBaselineVersion", baselineVersion);
         readiness.put("apiCompatibilityBaselineMatchesProjectVersion", projectVersion.equals(baselineVersion));
-        readiness.put("activeRoadmap", "none");
+        readiness.put("activeRoadmap", "v30");
         readiness.put("releaseLane", "unselected");
         readiness.put("releaseCandidate", majorReleaseCandidate(projectVersion, versionContract));
         readiness.put("generatedTestEvidence", readinessStatus("pass",

@@ -8,8 +8,8 @@ branch after a go decision, or an item explicitly labeled deferred/superseded,
 is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
-`CHECKLIST.md`. V1-V29 are completed release records. No V30 execution roadmap
-is active.
+`CHECKLIST.md`. V1-V29 are completed release records. V30 is the only active
+execution roadmap; its checklist is adopted and final release scope is unselected.
 
 Deferred design work that is not part of an active execution roadmap is kept
 under [`proposals/`](proposals/). These proposals do not add release gates until
@@ -46,3 +46,4 @@ they are deliberately adopted by a future roadmap.
 | V27 | [Roadmap](v27/ROADMAP.md) | [Checklist](v27/CHECKLIST.md) | Completed and released as `4.0.0` |
 | V28 | [Roadmap](v28/ROADMAP.md) | [Checklist](v28/CHECKLIST.md) | Completed and released as `4.1.0` |
 | V29 | [Roadmap](v29/ROADMAP.md) | [Checklist](v29/CHECKLIST.md) | Completed and released as `4.2.0` |
+| V30 | [Roadmap](v30/ROADMAP.md) | [Checklist](v30/CHECKLIST.md) | Active |

@@ -1,0 +1,619 @@
+# Reactive HTTP Client - Roadmap V30 Execution Checklist
+
+Companion to [`ROADMAP.md`](ROADMAP.md). Execute priorities in order unless a
+confirmed correctness or release blocker requires reordering. Check an item only
+after implementation and verification evidence is recorded under its priority.
+Adopting this checklist starts V30 execution planning; it does not complete a
+priority or select the final release scope.
+
+Keep generated evidence under `target/release-evidence/v30/priority<N>/`.
+Record commands, actual test totals, Java/Boot versions, commit, dirty/clean
+state, fixture settings, and report paths. Native and release-quality benchmark
+evidence additionally require exact source provenance and artifact hashes.
+Do not reuse a pre-fix binary or a report from an unreachable intermediate
+commit as completion evidence. Preserve partial reports when a command fails.
+
+## Execution Gates
+
+- Priority 2 characterizes active owners before production changes. V29's
+  stored-byte bound is not a concurrency bound or proof of a process-memory leak.
+- Priority 3 freezes the contract. Keep preparatory representations internal
+  until Priorities 4-6 enforce every selected dimension. Do not expose a
+  bindable/public setting, generated metadata, or copyable configuration that
+  silently passes through an unenforced limit.
+- Priority 6 closes the integrated enforcement gate before composition, public
+  telemetry, or operations evidence is treated as complete.
+- Priority 9 supplies the exported signals used by Priority 11. Internal test
+  counters are not substitutes for an operator-visible signal.
+- Priority 12.3 provides manual release-benchmark commands and remains open
+  until the resulting reports have been reviewed.
+- Public baselines stay on `4.2.0`; reactor fixtures stay on `4.3.0-SNAPSHOT`
+  until Priority 13 selects a final cut. Publication and baseline movement are
+  separate from implementation and require fresh Central verification.
+
+## Required Invariants
+
+| Owner | Scope and reservation | Saturation and release |
+|---|---|---|
+| Foreground caller | One selected factory/policy; before freezing, serialization, or pre-lookup auth; includes hits and waiters | Reject before preparation at capacity; release the caller's reservation exactly once at its terminal boundary |
+| Foreground load | One independent miss or shared source, including all its retries/replays | Join an existing flight without another slot; reject a new load at capacity; release at source terminal, independently of its first caller |
+| Hidden refresh | One admitted current-entry refresh, counted separately from foreground loads | Return a still-valid stale hit and skip at capacity; no queue or TTL extension; release at refresh terminal |
+
+Limits apply per selected client factory and policy, not per API, process, or
+cluster. APIs sharing a policy share its capacity. The caller limit also bounds
+attached waiters; a separate per-key waiter setting is outside this scope.
+Absent limits preserve `4.2.0` behavior. Count limits do not estimate retained
+heap or impose an implicit foreground timeout.
+
+---
+
+## Priority 1 - Post-`4.2.0` Baseline and V30 Scope Integrity
+
+### [ ] 1.1 Align the development and published lanes
+
+- [ ] Verify root/modules, benchmarks, native-smoke, and current-consumer
+      coordinates are `4.3.0-SNAPSHOT`.
+- [ ] Keep public dependency snippets, `latest.published.version`, strict API,
+      published consumer, and benchmark baselines at `4.2.0`.
+- [ ] Verify current published-baseline benchmark commands include V29 weighted
+      rows; preserve version-specific exclusions only for historical runs.
+- [ ] Preserve V1-V29 release records and make V30 the sole active execution
+      roadmap with an adopted checklist and an unselected final release scope.
+
+### [ ] 1.2 Reprove the published baseline
+
+- [ ] Resolve the parent POM and starter/test-helper/OTel POM, binary, source,
+      and Javadoc artifacts from a previously absent Central-only repository;
+      record all 13 hashes and remote markers.
+- [ ] Run an assembled consumer against published `4.2.0` only; preserve its
+      effective POM, classpath, dependency tree, actual totals, and provenance.
+- [ ] Run strict root and starter-module source/binary comparisons against
+      independent fresh `4.2.0` repositories.
+- [ ] Run published-baseline/API fixture guards for same-version comparison,
+      contamination, missing attachments, and inconsistent project versions.
+
+### [ ] 1.3 Verify roadmap and readiness state
+
+- [ ] Generate readiness with active roadmap `v30`, development
+      `4.3.0-SNAPSHOT`, published/API baseline `4.2.0`, and an unselected lane.
+- [ ] Keep the candidate deferred and unpublished; selecting an execution
+      checklist must not imply completed work, a final release, or publication.
+- [ ] Retain exact active-status checks for V30 and all V1-V29 completion
+      checks in the roadmap archive contract.
+- [ ] Run Maven validation, `DocumentationReleaseArtifactTest`, and
+      `git diff --check`; record evidence for this priority.
+
+---
+
+## Priority 2 - Active-Work Characterization
+
+### [ ] 2.1 Build deterministic burst workloads
+
+- [ ] Cover cache-disabled calls, distinct blocked misses, independent duplicate
+      misses, one flight with many callers, slow pre-lookup auth, and many
+      simultaneously stale keys.
+- [ ] Fix payloads, key cardinality, caller count, operation count, policy
+      bounds, and observation checkpoints; keep inputs synthetic and bounded.
+- [ ] Gate preparation, subscriber attachment, server dispatch, and source
+      terminal signals explicitly; a delay alone must not prove overlap.
+- [ ] Exercise `GET` and body-bearing semantic `POST`, count-only and weighted
+      policies, and isolated contexts where prior state would bias evidence.
+
+### [ ] 2.2 Separate live work from stored responses and memory
+
+- [ ] Record preparing/active callers, independent loads, shared flights,
+      attached members/waiters, refreshes, and generation owners with precise
+      units; do not equate flights with every foreground load.
+- [ ] Record stored entries/bytes and protocol-aware pool state separately from
+      active work, Java heap, direct memory, threads, and process RSS.
+- [ ] Compare explicit Bulkhead and pool-acquisition limits with their absent
+      configurations to identify which stages they actually protect.
+- [ ] Capture admitted, saturated, traffic-stopped, source-terminal, and
+      post-close checkpoints; unavailable measurements remain unknown.
+
+### [ ] 2.3 Record the capacity finding
+
+- [ ] Classify each observation as capacity exposure, expected caller-owned
+      retention, confirmed defect, or inconclusive; attach owner-path evidence.
+- [ ] Identify work that survives its first caller and work that remains
+      application-owned after close; a nonzero RSS is not a leak finding.
+- [ ] Record the limits of cancellation for non-cooperative application hooks
+      and distinguish subscription counts from arbitrary external task counts.
+- [ ] Keep raw JFR/heap evidence private and target-only; use bounded structural
+      checks and reference paths rather than absolute GC/RSS pass thresholds.
+
+---
+
+## Priority 3 - Effective Work-Limit and Admission Contract
+
+### [ ] 3.1 Freeze configuration and ownership semantics
+
+- [ ] Define the smallest optional per-policy contract for positive caller and
+      foreground-load limits, plus a positive refresh limit when refresh is
+      enabled; freeze names, numeric ranges, and overflow handling.
+- [ ] Define absence, partial selections, invalid zero/negative values, and a
+      refresh limit without refresh selection; no value silently enables work.
+- [ ] Define capacity sharing across APIs and isolation across policies,
+      factories, and pods; document possible hot-key saturation without promising
+      tenant fairness or another waiter quota.
+- [ ] Freeze startup immutability/mutation behavior so changing bounds cannot
+      create another live limiter or reset occupied capacity.
+- [ ] Record when each reservation begins and ends, including synchronous
+      callback execution still unwinding after timeout/cancellation; do not
+      claim that arbitrary application work stopped from a terminal signal alone.
+
+### [ ] 3.2 Resolve one effective selection
+
+- [ ] Preserve client/method policy precedence, `@CacheDisabled`, concrete
+      inherited methods, `@ApiRef`, and replacement metadata caches.
+- [ ] Use one normalized decision across validation, runtime, contracts,
+      diagnostics, mocks, and AOT without instantiating lazy optional beans.
+- [ ] Prove omitted limits and inert policy definitions preserve the existing
+      path without new work owners, timers, or optional dependencies.
+- [ ] Keep contract representations/tests internal until complete runtime
+      enforcement exists; basic effective-policy export must accompany eventual
+      public configuration, not lag behind it.
+
+### [ ] 3.3 Define saturation and local errors
+
+- [ ] Specify fixed caller-capacity/load-capacity rejection reasons and a
+      distinct refresh-capacity skip; no fallback uncached dispatch or queue.
+- [ ] Define the error's public shape, cache outcome, category, and failure-stage
+      behavior without conflating local admission with pool, transport,
+      Resilience4j rejection, or response-byte storage bypass.
+- [ ] Specify zero attempt/dispatch evidence and one terminal callback per
+      rejected caller; bound text and exclude keys, values, targets, and identity.
+- [ ] Place local foreground rejection outside starter loader Retry; document
+      that application-side resubscription creates a new admission attempt.
+
+---
+
+## Priority 4 - Admission Before Request Preparation
+
+### [ ] 4.1 Reserve each caller before materialization
+
+- [ ] Acquire inside each cold subscription before argument freezing, selected
+      body serialization, context snapshots, or pre-lookup authorization.
+- [ ] Reject N+1 while N calls are deliberately held in preparation and prove
+      no serializer, auth provider, customizer, flight, or transport invocation
+      occurs for the rejected call.
+- [ ] Cover repeated subscriptions to one publisher and concurrent different
+      APIs sharing a policy; maintain separate capacity for another policy.
+- [ ] Keep rejection reporting bounded and avoid retaining a full prepared
+      request solely to report a local admission error.
+
+### [ ] 4.2 Preserve hit authorization and request identity
+
+- [ ] Count fresh/stale hits and waiting callers in the caller allowance;
+      saturation must not bypass authorization to inspect or return a hit.
+- [ ] Run admitted calls through finalized-request probes and the existing
+      frozen key/body/context contract; no new snapshot can alter wire identity.
+- [ ] Cover auth failure/empty auth on a warm hit and header/URI mutations from
+      classified customizations on `GET` and semantic `POST`.
+- [ ] Preserve one logical-call budget from subscription through preparation,
+      auth, lookup, waiting, and load; do not layer an unattributed timeout.
+
+### [ ] 4.3 Release preparation ownership on every terminal path
+
+- [ ] Cover success, empty completion, synchronous throw, serialization failure,
+      auth error, timeout, and cancellation before source attachment.
+- [ ] Order release for immediate terminal resubscription; a delayed cleanup
+      callback cannot release another subscription's reservation.
+- [ ] Verify no later dispatch or publication follows preparation cancellation,
+      including when an application callback returns after cancellation.
+- [ ] Prove capacity reuse and released argument/context/auth ownership with
+      the manager still open; close must not mask a release defect.
+
+---
+
+## Priority 5 - Foreground Load and Single-Flight Capacity
+
+### [ ] 5.1 Bound every foreground source
+
+- [ ] Reserve before loader assembly for independent misses and new shared
+      flights; count one source across retry/backoff, redirects, auth replay,
+      decoding, and cache publication.
+- [ ] Return one local error for a new miss at load capacity without invoking
+      the loader or creating a deferred fallback request.
+- [ ] Keep hits independent of load capacity after caller admission; same-key
+      independent misses each require their own load slot.
+- [ ] Test successful storage, unknown/over-budget byte bypass, empty/error
+      outcomes, and cancellation releasing their source slot exactly once.
+
+### [ ] 5.2 Make lookup, join, and reservation consistent
+
+- [ ] Join a current flight at load saturation when caller capacity is available;
+      the waiter does not acquire another load reservation.
+- [ ] Recheck a stale miss decision after concurrent cache publication before
+      installing another flight or rejecting for load saturation.
+- [ ] Make last-member cancellation, flight removal, and delayed attachment
+      unable to reconnect an abandoned untracked source.
+- [ ] Clean every rejected provisional token/member/generation and verify active
+      load counts never exceed the policy maximum under many-key contention.
+
+### [ ] 5.3 Separate caller and source terminal ownership
+
+- [ ] Let the first caller timeout/cancel while a waiter remains; release its
+      caller state while the shared source retains exactly one load slot.
+- [ ] Release one cancelled waiter independently and cancel the shared source
+      when no interested caller remains, including before source attachment.
+- [ ] Prevent transport evidence and later retry hooks from being written into
+      an already-terminal caller or a coalesced waiter's local terminal record.
+- [ ] Test immediate completion/error and immediate resubscription without
+      stale release callbacks or duplicate source starts.
+
+---
+
+## Priority 6 - Refresh Capacity and Foreground Isolation
+
+### [ ] 6.1 Admit only current-entry refresh work
+
+- [ ] Acquire separate refresh capacity before hidden preparation/loader
+      assembly and combine it with generation checks and duplicate suppression.
+- [ ] Start at most one refresh for the current entry and no more than the
+      configured refresh maximum across all APIs sharing the policy.
+- [ ] Release provisional state when expiry, eviction, close, or another refresh
+      wins before source subscription attaches.
+- [ ] Retain the earlier of refresh timeout and hard expiry; work limits do not
+      activate a scheduler, recurring refresh, or a new implicit timeout.
+
+### [ ] 6.2 Skip saturated refresh without extending freshness
+
+- [ ] Return the authorized still-valid stale value when refresh capacity is
+      full; do not queue a trigger or retain its context for later execution.
+- [ ] Leave stored value, byte weight, publication age, and hard-expiry deadline
+      unchanged; a skip is not a terminal refresh load.
+- [ ] Allow a later access to attempt refresh after capacity is released; test
+      failure, empty completion, hard expiry, and cancellation paths.
+- [ ] Prove foreground slots remain available at refresh saturation while
+      documenting contention in separately shared pools/auth/resilience services.
+
+### [ ] 6.3 Complete the public enforcement gate
+
+- [ ] Prove caller/load/refresh limits together under stale-hit, expired-miss,
+      single-flight, independent-load, and shutdown transitions.
+- [ ] Expose validated properties and basic effective-policy output only once
+      every selected bound is enforced; update generated metadata concurrently.
+- [ ] Reject unsupported partial or mutated selections consistently in startup,
+      invocation, mock, diagnostic-contract, and AOT validation paths.
+- [ ] Verify existing policies without work limits retain published behavior;
+      no work limit enables refresh, caching, or metrics implicitly.
+- [ ] Record focused integration evidence before proceeding to public telemetry
+      and operations claims.
+
+---
+
+## Priority 7 - Resilience, Auth, Redirect, and Deadline Composition
+
+### [ ] 7.1 Preserve resilience selection and attempt counts
+
+- [ ] Preserve explicit operator selection/order and unsafe retry/body-repeatability
+      rules; cache work limits cannot imply an operator or replay permission.
+- [ ] Verify local reservation rejection does not subscribe to the business
+      loader's Retry, CircuitBreaker, Bulkhead, or RateLimiter pipeline.
+- [ ] Verify open-circuit and other real guard rejections release admitted cache
+      reservations without inventing transport evidence.
+- [ ] Retain one source reservation through retry delays and hidden dispatches;
+      distinguish loader terminal work from downstream request counts.
+
+### [ ] 7.2 Preserve auth, redirect, and key isolation
+
+- [ ] Cover warm-hit auth rejection, `401` invalidation, refreshed identity, and
+      pre-resolved auth consumption across outer retries.
+- [ ] Keep auth-visible bytes isolated from serialized body identity; request
+      changes after retry/redirect must obey publication revalidation.
+- [ ] Exercise body-preserving redirect and semantic `POST` without duplicate
+      subscriptions introduced by admission bookkeeping.
+- [ ] Assert the final observer/lifecycle/log error, URL, status, headers, stage,
+      and dispatch evidence; do not rely on only downstream exception assertions.
+
+### [ ] 7.3 Preserve independent deadlines
+
+- [ ] Test early waiter timeout, first-caller timeout with a live later waiter,
+      timeout during Retry backoff, and timeout after response headers/body start.
+- [ ] Keep logical deadlines per caller and request timeouts inside the source;
+      a first-caller deadline cannot terminate a source still owned by others.
+- [ ] Verify timeout/cancellation releases only its owner's capacity and records
+      the correct timeout or cancellation terminal event exactly once.
+- [ ] Prove capacity remains occupied by deliberately hung admitted work until
+      its actual terminal boundary; document required application timeout choices.
+
+---
+
+## Priority 8 - Cancellation, Eviction, and Shutdown Ownership
+
+### [ ] 8.1 Stress ownership invariants
+
+- [ ] Assert nonnegative current counts at or below each configured maximum at
+      synchronized checkpoints under both same-key and many-key contention.
+- [ ] Cover every terminal type, synchronous assembly exceptions, cancellation
+      before attachment, immediate retries, and simultaneous terminal signals.
+- [ ] Count acquisitions, releases, and terminal callbacks rather than retaining
+      only the last observed record; reconcile counts with active owners.
+- [ ] Prove rejected/skipped work retains no flight, waiter, key token, task, or
+      loader closure and cannot repopulate a cache after invalidation.
+
+### [ ] 8.2 Prove collection independently of storage cleanup
+
+- [ ] Use bounded reference-queue/weak-reference evidence for caller context,
+      arguments, prepared bytes, auth state, callbacks, and source state.
+- [ ] Verify detached callers become collectible while another caller keeps
+      a flight alive, and rejected callers become collectible while saturated
+      admitted work remains active.
+- [ ] Verify explicit eviction releases ordinary entries before manager close;
+      a still-running independent load retains its own slot until terminal.
+- [ ] Keep diagnostic GC a test aid only; do not infer heap ownership from RSS
+      or add runtime GC, weak-cache, or heap-walking behavior.
+
+### [ ] 8.3 Preserve factory lifecycle boundaries
+
+- [ ] Atomically stop new reservations during close; no race can create a new
+      live cache, limiter, flight, or refresh afterward.
+- [ ] Terminate registered shared/refresh work within the established shutdown
+      bound; test with normal request deadlines beyond the observation window.
+- [ ] Preserve independent caller-owned loads after manager close until their
+      own terminal boundary, while invalidating all late publication rights.
+- [ ] Verify late releases from a closed manager cannot affect a recreated
+      factory's capacity, entries, diagnostics, or metric registrations.
+- [ ] Record before-close and post-close owner evidence with explicit absent
+      meter semantics after deregistration.
+
+---
+
+## Priority 9 - Live Metrics and Terminal Diagnostics
+
+### [ ] 9.1 Freeze and implement bounded work telemetry
+
+- [ ] Define current/maximum caller, foreground-load, and refresh count meters
+      for policies selecting limits under existing explicit cache observability.
+- [ ] Define fixed local-rejection and refresh-skip reasons; preserve existing
+      meter names/tag sets and terminal caller/load/refresh meanings.
+- [ ] Specify scopes and overlapping counts so operators cannot add callers,
+      flights, and loads as disjoint work or confuse loads with wire dispatch.
+- [ ] Test cache disabled, limits absent, cache metrics disabled, master
+      observability disabled, missing MeterRegistry, and enabled zero series.
+- [ ] Keep skips out of refresh terminal totals and rejection out of downstream
+      request timers/health; do not export keys, request variants, or identities.
+
+### [ ] 9.2 Preserve terminal observer and tracing parity
+
+- [ ] Deliver one structural local-rejection event through enabled observer,
+      lifecycle, exchange-log, and OTel surfaces, including compatibility APIs.
+- [ ] Preserve zero attempts/dispatch and cleared response evidence for local
+      rejection without losing configuration-enabled cache outcomes when no
+      MeterRegistry bean exists.
+- [ ] Keep shared-source evidence separate from waiter outcomes and hidden
+      refresh diagnostics; do not create a detached refresh span.
+- [ ] Verify downstream health excludes all cache-served and local-rejection
+      outcomes without diluting real downstream failures.
+
+### [ ] 9.3 Extend diagnostics schema V1 additively
+
+- [ ] Export normalized work-limit selections and bounded runtime counts with
+      distinct absent, unknown, mixed-policy, and closed interpretations.
+- [ ] Preserve summary-only/replacement-factory nulls and inspect only already
+      created cache owners; do not initialize lazy components to prove a limit.
+- [ ] Define per-policy facts or explicitly labeled aggregates without exposing
+      prohibited key, tenant, request, or response material.
+- [ ] Validate counts against their configured bounds when known, list limits,
+      UTF-16 text bounds, and rendered UTF-8 byte bounds on map/JSON/Markdown paths.
+
+### [ ] 9.4 Verify metric ownership across live factories
+
+- [ ] Coordinate owners sharing a registry and identical tags; define consistent
+      aggregation of current counts, maxima, and cumulative history.
+- [ ] Prove gauge suppliers survive GC and closing one owner leaves the other
+      live owners' meters accurate and registered.
+- [ ] Remove meters at the last owner; reject late registration/increments from
+      closed owners and test context restart with the registry kept alive.
+- [ ] Record tests for unweighted and weighted policies and differing limits
+      during overlapping factory replacement.
+
+---
+
+## Priority 10 - Mock, Consumer, AOT, and Native Parity
+
+### [ ] 10.1 Extend deterministic mock ownership controls
+
+- [ ] Provide bounded admission/release snapshots and gates through supported
+      test-helper APIs without exporting cache keys or production internals.
+- [ ] Cover real-time and deterministic-time mocks, published constructors,
+      custom auth/appliers, and cleanup after failed builder validation.
+- [ ] Preserve cumulative terminal/rejection/skip evidence after close while
+      distinguishing unavailable live state from active work still externally owned.
+- [ ] Verify unselected cache/work features do not require optional runtime
+      infrastructure or create a cache manager.
+
+### [ ] 10.2 Exercise assembled consumer parity
+
+- [ ] Add consumer coverage for selected `GET` and semantic `POST`, count-only
+      and weighted storage, caller/load saturation, single flight, and refresh.
+- [ ] Retain a cache-disabled assembled consumer with no Caffeine on its classpath.
+- [ ] Verify existing `4.2.0` consumer/test-helper usage with no work limits;
+      keep current reactor evidence separate from the published baseline.
+- [ ] Preserve fresh per-stage Surefire/provenance artifacts on verifier failure
+      without copying stale reports from an unstarted later stage.
+
+### [ ] 10.3 Verify AOT and application overrides
+
+- [ ] Validate effective work policies with configured properties and replacement
+      metadata beans, including primary and factory-method registrations.
+- [ ] Keep foreign factory definitions outside starter-only grammar and retain
+      unknown lazy diagnostics without instantiation.
+- [ ] Add only required hints; do not traverse arbitrary request object graphs
+      or introduce record/generic recursion for capacity accounting.
+- [ ] Exercise valid/invalid and selected/unselected policies through startup,
+      AOT, and generated effective-contract tests.
+
+### [ ] 10.4 Record native and shutdown evidence
+
+- [ ] Extend smoke with gated caller/load saturation, refresh skip, released-slot
+      reuse, independent caller deadlines, and factory close.
+- [ ] Count every server request, including rejected/unmatched routes, and
+      synchronize no-dispatch assertions against delayed event-loop work.
+- [ ] Compile and run from one clean reachable commit after all fixture fixes;
+      record Java/Boot/GraalVM versions, commands, binary SHA-256, and output.
+- [ ] Preserve the existing shutdown observation bound and do not let normal
+      request/acquire expiry satisfy disposal assertions.
+- [ ] Leave native completion open whenever the binary predates the tested
+      fixture or runtime revision.
+
+---
+
+## Priority 11 - Operations and Support-Bundle Evidence
+
+### [ ] 11.1 Publish practical saturation and recovery guidance
+
+- [ ] Explain entry, decoded-byte, caller, load, refresh, pool, and resilience
+      limits with their scopes; selected limits require explicit endpoint-owner
+      sizing and do not guarantee heap/RSS or cluster capacity.
+- [ ] Document caller rejection even on warm hits, load rejection with no
+      fallback dispatch, refresh skip, and ordinary admission after hard expiry.
+- [ ] Document logical/request deadlines and caller resubscription choices;
+      the starter does not queue or automatically retry local overload.
+- [ ] Build recipes from Priority 9 exports, preserving instance/target labels,
+      zero-versus-absent series, and separate foreground/refresh saturation.
+
+### [ ] 11.2 Add a coherent sanitized support fixture
+
+- [ ] Capture bounded client/process identifiers, API-to-policy mapping, selected
+      limits, metrics selection, and one timestamped capture window.
+- [ ] Include live caller/load/refresh samples and terminal/rejection/skip deltas
+      at matching pre-close boundaries; state overlapping units explicitly.
+- [ ] Reconcile successes, failures, cancellations, rejected work, skipped
+      refreshes, and active owners without equating window totals to instantaneous
+      occupancy or omitted counters to zero.
+- [ ] Tie entry/byte occupancy, TTL/refresh timing, connection/stream gauges,
+      factory start/close, and meter ownership to consistent checkpoints.
+- [ ] Include one structural affected-caller terminal record without keys,
+      payloads, headers, targets, identity, or arbitrary exception messages.
+
+### [ ] 11.3 Preserve capture and schema safeguards
+
+- [ ] Version-scope new fields while accepting valid published `4.2.0` captures;
+      preserve documented unknown/null facts and optional-field boundaries.
+- [ ] Keep downloads private, byte/time bounded, and quarantined; require
+      successful transfer, acceptable HTTP status, and exactly one JSON document
+      before publishing sanitized endpoint evidence.
+- [ ] Validate leaf types, numeric/string/list bounds, fixed reasons, and
+      configured/current-count relationships before retaining values.
+- [ ] Add negative fixture cases for sensitive field names, embedded request
+      lines/targets, arbitrary URI schemes, identities, and contradictory timing
+      or accounting; avoid text-coercion assertions for numeric fields.
+- [ ] Run documentation, metadata, local-link, placeholder, and fixture guards
+      against the actual copyable examples and capture path.
+
+---
+
+## Priority 12 - Performance and Allocation Evidence
+
+### [ ] 12.1 Extend production-representative benchmarks
+
+- [ ] Include cache-disabled invocation, existing policies without limits,
+      selected-limit hits/misses, and weighted publication.
+- [ ] Add caller/load rejection, same-key join, refresh start/skip, release/reuse,
+      and contended admission rows with bounded workload dimensions.
+- [ ] Exercise production API names, caller/load reporting states, and metrics
+      selection in metered rows rather than convenience defaults.
+- [ ] Gate subscribers and server responses so a supposed waiter cannot become
+      a hit unnoticed; assert workload identity and terminal ownership counts.
+- [ ] Keep published `4.2.0` rows comparable; label genuinely new rows as lacking
+      a baseline instead of silently dropping required results.
+
+### [ ] 12.2 Separate allocation from retained ownership
+
+- [ ] Inspect disabled/unselected paths for new state or work caused by the
+      optional feature; record any justified overhead explicitly.
+- [ ] Measure transient reservation/rejection allocation separately from retained
+      request/source graphs and cache entry occupancy.
+- [ ] Prove repeated saturation does not accumulate rejected owners or pending
+      tasks, and that admission uses no blocking waits or unbounded scans.
+- [ ] Record bounded JFR/retention evidence and explain measurement limits;
+      no byte/count estimate is promoted as exact process-memory sizing.
+
+### [ ] 12.3 Prepare and review manual release benchmarks
+
+- [ ] Pass benchmark packaging, harness tests, and smoke/discovery coverage before
+      providing release-run commands.
+- [ ] Supply exact clean-commit commands for current, fresh published `4.2.0`,
+      and comparison/report generation, with required profiles, output paths,
+      machine/toolchain metadata, and expected scenario counts.
+- [ ] Hand release-quality execution to the user when requested and leave this
+      item open until both runs and comparison artifacts are available.
+- [ ] Review row coverage, gates, commit cleanliness, hashes, units, allocation,
+      and comparability; a benchmark-path correction invalidates earlier numbers.
+- [ ] Record either supported versioned performance evidence or an explicit
+      no-public-performance-claim disposition; smoke alone cannot complete it.
+
+---
+
+## Priority 13 - Public API, Documentation, and Release Go/No-Go
+
+### [ ] 13.1 Freeze the supported surface and guidance
+
+- [ ] Freeze additive properties, local-admission error/outcome, mock helpers,
+      effective contracts, diagnostics, and metric schemas after enforcement.
+- [ ] Update metadata/reference generation, caching, observability, timeouts,
+      resilience, test-helper, native, operations, support, and migration guides
+      with one vocabulary and copyable startup-valid examples.
+- [ ] Preserve published `4.2.0` defaults and existing source/binary contracts;
+      any incompatible change requires explicit deferral or a revised release lane.
+- [ ] Remove placeholder/unenforced public settings and keep the new capacity
+      behavior explicitly selected and distinguishable from storage admission.
+
+### [ ] 13.2 Assemble immutable release evidence
+
+- [ ] Pass the complete reactor, package/generation guards, supported dependency
+      matrix, strict root/module API checks, current/published consumers,
+      AOT/native, shutdown, and documentation contracts from a reviewed clean commit.
+- [ ] Preserve source- and binary-incompatibility failures and isolated report
+      provenance for each supported matrix row; keep evidence after failures.
+- [ ] Include Priority 12's reviewed benchmark disposition and rerun smoke on the
+      final source; do not relabel stale/manual evidence as current.
+- [ ] Record commands, actual totals, toolchains, clean-tree state, hashes,
+      Central markers, reachable commits, remaining risks, and evidence paths.
+- [ ] Verify generated readiness names unresolved release steps without claiming
+      publication; target-only evidence remains uncommitted unless a sanitized
+      version-matched report is deliberately promoted.
+
+### [ ] 13.3 Select release scope and candidate version
+
+- [ ] Record one explicit go/no-go decision with date, reviewed commit, scope,
+      benchmark disposition, and remaining risk.
+- [ ] Select `4.3.0` only for the enforced additive opt-in work-bound contract;
+      otherwise document a compatible patch scope or a no-go with deferred items.
+- [ ] On go, prepare version-matched final artifacts and rerun release packaging,
+      generation, signing, and readiness checks before publication.
+- [ ] Keep public/API/consumer/benchmark baselines on `4.2.0` until the new
+      published artifacts have passed Central verification.
+
+### [ ] 13.4 Publish, verify, and archive V30
+
+- [ ] Publish only from the reviewed clean final commit/tag with successful
+      signing and package evidence.
+- [ ] Resolve all parent/module POM/JAR/source/Javadoc artifacts from fresh
+      Central-only repositories and verify hashes, remote markers, and versions.
+- [ ] Run a published assembled consumer before moving public snippets and
+      API/consumer/benchmark baselines to the verified release.
+- [ ] Archive V30, update exact roadmap/readiness status, and select the next
+      snapshot only after publication evidence; on no-go, record the disposition
+      without marking an unpublished version released.
+
+---
+
+## Completion Criteria
+
+- [ ] Active-work characterization explains the protected owners without claiming
+      that stored bytes or process RSS prove a complete memory bound.
+- [ ] Selected caller/load/refresh limits are enforced before their owned work;
+      APIs share policy capacity and omitted limits preserve published behavior.
+- [ ] Saturation causes one local foreground error or a non-queued refresh skip,
+      with no hidden dispatch, stale owner, or TTL extension.
+- [ ] Cancellation, deadlines, retries, auth, redirects, eviction, and shutdown
+      preserve one release per owner and independent caller/source lifetimes.
+- [ ] Metrics, terminal diagnostics, health, and support evidence are bounded,
+      truthful, explicitly selected, and free of request/response/key/identity data.
+- [ ] Mock, consumer, source/binary API, AOT/native, lifecycle, performance, and
+      documentation evidence covers the final reviewed source.
+- [ ] A go/no-go decision is recorded and the selected publication/archive path
+      is complete; a no-go leaves no misleading public configuration behind.
