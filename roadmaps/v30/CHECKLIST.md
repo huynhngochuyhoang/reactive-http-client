@@ -49,39 +49,93 @@ heap or impose an implicit foreground timeout.
 
 ## Priority 1 - Post-`4.2.0` Baseline and V30 Scope Integrity
 
-### [ ] 1.1 Align the development and published lanes
+### [x] 1.1 Align the development and published lanes
 
-- [ ] Verify root/modules, benchmarks, native-smoke, and current-consumer
+- [x] Verify root/modules, benchmarks, native-smoke, and current-consumer
       coordinates are `4.3.0-SNAPSHOT`.
-- [ ] Keep public dependency snippets, `latest.published.version`, strict API,
+- [x] Keep public dependency snippets, `latest.published.version`, strict API,
       published consumer, and benchmark baselines at `4.2.0`.
-- [ ] Verify current published-baseline benchmark commands include V29 weighted
+- [x] Verify current published-baseline benchmark commands include V29 weighted
       rows; preserve version-specific exclusions only for historical runs.
-- [ ] Preserve V1-V29 release records and make V30 the sole active execution
+- [x] Preserve V1-V29 release records and make V30 the sole active execution
       roadmap with an adopted checklist and an unselected final release scope.
 
-### [ ] 1.2 Reprove the published baseline
+### [x] 1.2 Reprove the published baseline
 
-- [ ] Resolve the parent POM and starter/test-helper/OTel POM, binary, source,
+- [x] Resolve the parent POM and starter/test-helper/OTel POM, binary, source,
       and Javadoc artifacts from a previously absent Central-only repository;
       record all 13 hashes and remote markers.
-- [ ] Run an assembled consumer against published `4.2.0` only; preserve its
+- [x] Run an assembled consumer against published `4.2.0` only; preserve its
       effective POM, classpath, dependency tree, actual totals, and provenance.
-- [ ] Run strict root and starter-module source/binary comparisons against
+- [x] Run strict root and starter-module source/binary comparisons against
       independent fresh `4.2.0` repositories.
-- [ ] Run published-baseline/API fixture guards for same-version comparison,
+- [x] Run published-baseline/API fixture guards for same-version comparison,
       contamination, missing attachments, and inconsistent project versions.
 
-### [ ] 1.3 Verify roadmap and readiness state
+### [x] 1.3 Verify roadmap and readiness state
 
-- [ ] Generate readiness with active roadmap `v30`, development
+- [x] Generate readiness with active roadmap `v30`, development
       `4.3.0-SNAPSHOT`, published/API baseline `4.2.0`, and an unselected lane.
-- [ ] Keep the candidate deferred and unpublished; selecting an execution
+- [x] Keep the candidate deferred and unpublished; selecting an execution
       checklist must not imply completed work, a final release, or publication.
-- [ ] Retain exact active-status checks for V30 and all V1-V29 completion
+- [x] Retain exact active-status checks for V30 and all V1-V29 completion
       checks in the roadmap archive contract.
-- [ ] Run Maven validation, `DocumentationReleaseArtifactTest`, and
+- [x] Run Maven validation, `DocumentationReleaseArtifactTest`, and
       `git diff --check`; record evidence for this priority.
+
+Evidence executed on 2026-09-07 and reviewed on 2026-09-08 from clean commit
+`c5ddccffb60e61a33d8b6c7c3d7dff5275a25c09`, before this checklist-only update:
+
+- Root/module and benchmark versions and both native/current-consumer starter
+  coordinates remain `4.3.0-SNAPSHOT`. Public dependency snippets and
+  published/API/consumer/benchmark baselines remain `4.2.0`. The existing
+  version, benchmark-profile, and archive guards passed without changes:
+  current baseline commands include V29 weighted rows, historical exclusions
+  remain explicitly selected profiles, and V1-V29 release records are unchanged.
+  This is a baseline/profile check, not new performance evidence.
+- `scripts/verify-published-release-artifacts.sh 4.2.0` resolved all 13 release
+  artifacts from a previously absent Central-only repository. Declared POM and
+  embedded JAR versions, source/Javadoc attachments, SHA-256 values, and remote
+  markers passed. Evidence is under
+  `target/release-evidence/v30/priority1/published-baseline/`.
+- `scripts/verify-published-consumer.sh 4.2.0` passed 4 tests with zero failures,
+  errors, or skips using only published artifacts. Its effective POMs,
+  dependency tree, classpath, Surefire XML, 7 artifact hashes, and clean-source
+  provenance are under `target/release-evidence/v30/priority1/published-consumer/`.
+  No reactor output directories were present on the consumer classpath.
+- Strict root and starter-only `-Papi-compatibility -DskipTests verify` builds
+  passed with both source and binary incompatibility failures enabled. They
+  used independent, previously absent Central-only repositories named
+  `v30-priority1-api-root-4.2.0` and `v30-priority1-api-starter-4.2.0` under
+  `target/published-baseline-repositories/`. Reports contain no public API
+  delta; 7 root and 2 starter baseline hashes and remote markers are under
+  `target/release-evidence/v30/priority1/api-root/` and `api-starter/`.
+- `bash scripts/verify-published-baseline-fixtures.sh` passed local
+  contamination, mixed-version, missing-attachment, inconsistent project/parent
+  POM and embedded JAR version, and root/module self-comparison rejection
+  checks. `bash scripts/verify-api-compatibility-fixtures.sh` accepted additive
+  and defaulted-annotation changes and rejected source-only checked exceptions,
+  removed constructors, nested public methods, and enum constants. Fixture
+  reports are retained under this priority's `baseline-fixtures/` and
+  `api-fixtures/` directories.
+- Generated readiness remains development `4.3.0-SNAPSHOT`, published/API
+  baseline `4.2.0`, active roadmap `v30`, and release lane `unselected`. The
+  `4.3.0` candidate is deferred and unpublished with no selected final scope;
+  release-quality compatibility, consumer, benchmark, AOT, native, and
+  publication gates remain pending. The generated JSON and benchmark evidence
+  snippet are under `target/release-evidence/v30/priority1/readiness/`.
+- `mvn -B -ntp -s .mvn/maven-central-settings.xml validate` passed all four
+  reactor modules. The same Maven/settings invocation with
+  `-pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed 46 tests with zero failures, errors, or skips. `git diff --check`
+  passed. Toolchain: Maven `3.9.9`, GraalVM JDK `25.0.3`, Java `21` compilation
+  target, and Spring Boot `4.0.0`.
+- Exact commands, stage exit statuses, logs, toolchain, clean-source provenance,
+  and reports are under `target/release-evidence/v30/priority1/`. Earlier local
+  artifact/consumer evidence and repositories were preserved separately under
+  `target/v30-priority1-previous-state/`, not reused as fresh-run evidence.
+  The completed runner survived the interruption; all saved artifact hashes
+  were rechecked successfully during the 2026-09-08 review.
 
 ---
 
