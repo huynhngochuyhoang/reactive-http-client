@@ -147,8 +147,8 @@ method explicitly selects a cache policy, and
 `reactive.http.observability.cache.enabled=true`. The cache-observability switch
 does not select caching and does not enable Caffeine's library statistics.
 
-Published `4.1.x` exports the entry-count and cache-activity meters. The
-unpublished V29 `4.2.0` release candidate adds the weighted gauges,
+Published `4.1.x` exports the entry-count and cache-activity meters. Published
+`4.2.0` adds the weighted gauges,
 `cause="weight"` eviction series,
 and admission counter only for policies that select
 `maximum-total-decoded-response-bytes`. `maximum-size` remains an entry-count

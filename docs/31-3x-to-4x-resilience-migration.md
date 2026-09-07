@@ -197,15 +197,15 @@ implicitly accepted consequence of the major version.
 ## Release state
 
 - Released major: `4.0.0` from tag `v4.0.0`.
-- Latest published and API baseline: `4.1.0`.
-- Public README and quick-start coordinates: `4.1.0`.
-- Current release candidate: `4.2.0`; Maven Central publication is pending.
+- Latest published and API baseline: `4.2.0`.
+- Public README and quick-start coordinates: `4.2.0`.
+- Current development line: `4.3.0-SNAPSHOT`; no release scope is selected.
 
 ## Post-`4.1.0` cache compatibility
 
 The V29 weighted-cache addition does not change the resilience migration or
 activate a cache or Resilience4j operator. Published `4.1.x` retains TTL plus
-entry-count `maximum-size`. The `4.2.0` release candidate optionally adds
+entry-count `maximum-size`. Published `4.2.0` optionally adds
 `maximum-total-decoded-response-bytes` to policies that select it. That unit is
 decoded response representation bytes, not exact Java heap, direct memory,
 process RSS, or container memory. See

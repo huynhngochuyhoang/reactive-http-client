@@ -1,6 +1,6 @@
 # Reactive HTTP Client - Roadmap V29
 
-> **Status:** active
+> **Status:** completed and released as `4.2.0`
 > **Theme:** response-cache retention budgets and production memory evidence
 > **Candidate release direction:** `4.2.0`, subject to an additive and measurable contract
 > **Starting development line:** `4.2.0-SNAPSHOT`

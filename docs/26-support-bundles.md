@@ -10,7 +10,7 @@ secrets, or customer data by default.
 Start triage in [Operations Troubleshooting](30-operations-troubleshooting.md),
 then return here for the bounded artifacts requested by that decision path.
 
-The commands and endpoint names on this page target published starter `4.1.0`
+The commands and endpoint names on this page target published starter `4.2.0`
 on Boot 4. Boot 3.5 applications remain on `2.14.1`; use the
 [4.x migration guide](28-spring-boot-4-jackson-migration.md) before applying the
 Boot 4 health type or native-image instructions.
@@ -343,8 +343,8 @@ of UTF-8 JSON before it retains allowlisted fields. Before either filter starts,
 the shell also verifies that curl reported a successful transfer, the quarantined
 raw file exists, and the file is at most 1 MiB; this bounds whitespace and other
 bytes that compacted `tojson` does not measure.
-The two V29 decoded-response byte fields are optional only when `projectVersion`
-identifies a published `4.1.x` response. A V29 `4.2.0` response must
+The two decoded-response byte fields are optional only when `projectVersion`
+identifies a published `4.1.x` response. A `4.2.0` or later response must
 include both fields, although their values may be `null` where the diagnostics
 contract permits an unknown state. When both fields are numeric, retained
 decoded-response bytes cannot exceed the configured aggregate maximum. Likewise,
@@ -900,10 +900,10 @@ general performance evidence:
   `cacheTtlMs`, `cacheRefreshAfterMs`, `cacheSingleFlight`,
   `cacheMaximumSize`, `cacheEntryCount`, `cacheEvictions`,
   `cacheMetricsEnabled`, `cachePolicySources`, `cacheHttpMethods`, and
-  `cacheSemanticReadAcknowledged`. These are the published `4.1.0` cache
-  diagnostics fields. The last three are bounded structural policy facts; they
-  never contain request targets or selected values.
-- V29 release-candidate diagnostics fields:
+  `cacheSemanticReadAcknowledged`. These are the cache diagnostics fields
+  available since published `4.1.0`. The last three are bounded structural
+  policy facts; they never contain request targets or selected values.
+- Decoded-response-byte diagnostics fields published in `4.2.0`:
   `cacheMaximumTotalDecodedResponseBytes` and
   `cacheRetainedDecodedResponseBytes`.
   `cacheMaximumTotalDecodedResponseBytes` is the finite sum across selected
@@ -940,14 +940,13 @@ the capture-window start, end, and every duration unit explicit. The fixture is
 not a dump format: do not add keys, digests, values, arguments, request variants,
 header/body content, concrete URLs, identity values, or credentials.
 
-### Cache-memory capture (V29 / `4.2.0` candidate)
+### Cache-memory capture (`4.2.0`+)
 
-Published `4.1.0` incidents use the explicitly enumerated published fields and
-ordinary lookup/load/refresh/TTL/size activity above. They do not include the
-two V29 release-candidate decoded-response-byte diagnostics fields, weight eviction,
-or admission outcomes. Those signals exist only on the current
-unpublished `4.2.0`/V29 release candidate until Central publishes it; their absence in
-`4.1.0` is version scope, not evidence that their value is zero.
+Published `4.1.x` incidents use the entry-count and ordinary
+lookup/load/refresh/TTL/size signals above. They do not include the two
+decoded-response-byte diagnostics fields, weight eviction, or admission
+outcomes. Those signals are available starting with published `4.2.0`; their
+absence in `4.1.x` is version scope, not evidence that their value is zero.
 
 The V29 values are decoded response representation bytes; `maximum-size` is
 still an entry count. Neither value is exact Java heap, direct memory, process
@@ -1018,7 +1017,7 @@ counts and fixed structural enums are sufficient for this fixture.
 
 RSS is not Java heap, and decoded-response representation bytes are not response
 wire bytes or an object-graph heap measurement. Correlate the fixture with the
-[cache-memory decision tree](30-operations-troubleshooting.md#cache-memory-triage-v29-420-candidate)
+[cache-memory decision tree](30-operations-troubleshooting.md#cache-memory-triage-420)
 rather than adding raw application material.
 
 Heap dumps and JFR recordings can contain payloads, object values, credentials,
