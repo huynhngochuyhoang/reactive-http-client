@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import org.reactivestreams.Subscription;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
@@ -87,6 +88,13 @@ final class CacheCallerAdmission {
         } finally {
             reservation.exit();
         }
+    }
+
+    static ExchangeFilterFunction preparingFilter(ExchangeFilterFunction filter) {
+        return (request, next) -> Mono.deferContextual(context -> subscribePreparation(
+                // Capture the caller guard for next.exchange calls from asynchronous filter continuations.
+                preparing(context, () -> filter.filter(request, updatedRequest -> subscribePreparation(
+                        preparing(context, () -> next.exchange(updatedRequest)))))));
     }
 
     static <T> Mono<T> subscribePreparation(Mono<T> source) {

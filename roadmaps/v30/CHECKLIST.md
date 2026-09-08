@@ -366,7 +366,7 @@ Priority 4 evidence (2026-09-08):
   Ordinary construction remains unselected; public binding, the public
   rejection type/category/outcomes, and effective exports remain gated on
   complete caller/load/refresh enforcement in Priorities 5-6 and 6.3.
-- `CacheCallerAdmissionContractTest` passes 31 cases: N+1 rejection while
+- `CacheCallerAdmissionContractTest` passes 41 cases: N+1 rejection while
   auth or serializers are gated; no rejected argument/context reads, auth,
   customizations, flight, or transport work; repeated cold subscriptions;
   shared cross-API capacity, different policy/manager isolation, and 64
@@ -394,7 +394,14 @@ Priority 4 evidence (2026-09-08):
   capacity, immediate retries do not leak it, and rejection cannot release
   another admitted caller's reservation. The reporting leak was reproduced
   before the fix in `target/release-evidence/v30/priority4/reporting-cleanup/reproduced.log`.
-- Final related regression: 399 tests (336 starter, 63 mock helper), zero
+- Eight asynchronous filter/auth/exchange-frame cases cover cancellation and
+  timeout: terminated continuations cannot call `next.exchange`, while an
+  already-entered exchange construction/subscription frame retains capacity
+  until exit. Two handler cases prove the final identity probe cannot run
+  after termination, create a flight, publish, or affect a replacement caller.
+  Six initial reproductions failed before guarding the continuation boundary;
+  log: `target/release-evidence/v30/priority4/async-continuations/reproduced.log`.
+- Final related regression: 409 tests (346 starter, 63 mock helper), zero
   failures/errors/skips, using `mvn -B -ntp -pl reactive-http-client-test -am`
   with `-Dsurefire.failIfNoSpecifiedTests=false test` and these `-Dtest` names:
   `CacheCallerAdmissionContractTest`, `CacheWorkLimitContractTest`,
@@ -404,27 +411,28 @@ Priority 4 evidence (2026-09-08):
   `SemanticReadLocalCacheContractTest`, `SemanticReadSingleFlightRefreshContractTest`,
   `MockReactiveHttpClientTest`, `Boot4MockReactiveHttpClientTest`,
   `DocumentationReleaseArtifactTest`, and `ReactiveHttpClientAotSmokeTest`.
-  Log: `target/release-evidence/v30/priority4/reporting-cleanup/regression.log`;
+  Log: `target/release-evidence/v30/priority4/async-continuations/regression.log`;
   matching Surefire XML/text:
-  `target/release-evidence/v30/priority4/reporting-cleanup/regression/`.
+  `target/release-evidence/v30/priority4/async-continuations/regression/`.
   These reruns validate the lookup subscription guard, deadline ordering,
-  and reporting-setup cleanup together, superseding the earlier final-run
+  reporting-setup cleanup, and asynchronous continuation guard together,
+  superseding the earlier final-run
   evidence rather than reusing its reports.
 - Five additional isolated runs of
   `mvn -B -ntp -pl reactive-http-client-starter -Dtest=CacheCallerAdmissionContractTest test`
-  passed all 31 cases each (155 executions), zero failures/errors/skips.
+  passed all 41 cases each (205 executions), zero failures/errors/skips.
   Logs/reports are under
-  `target/release-evidence/v30/priority4/reporting-cleanup/stress-1` through `stress-5`
+  `target/release-evidence/v30/priority4/async-continuations/stress-1` through `stress-5`
   (logs use the `.log` suffix). Reactor `mvn -B -ntp validate` and
   `git diff --check` passed; the validate log is
-  `target/release-evidence/v30/priority4/reporting-cleanup/validate.log`.
-- Source base: reachable commit `47dfb98768e3f1b0959a7be41cf8299c2a8468e0`
-  plus the working-tree reporting cleanup, two regression cases, and this
-  evidence update. Maven
+  `target/release-evidence/v30/priority4/async-continuations/validate.log`.
+- Source base: reachable commit `3c31ea6610dfa68ce37835edde52d5473518759b`
+  plus the working-tree continuation guard, ten regression cases, and the
+  contract/evidence update. Maven
   `3.9.9`, GraalVM JDK `25.0.3`, Java `21` target, Boot `4.0.0`,
   reactor `4.3.0-SNAPSHOT`, published/API baseline `4.2.0`.
   Source copies/hashes and the working-tree patch are under
-  `target/release-evidence/v30/priority4/reporting-cleanup/source/`.
+  `target/release-evidence/v30/priority4/async-continuations/source/`.
   No public configuration, dependency, historical roadmap, native-build,
   or benchmark evidence is changed or claimed by this priority.
 

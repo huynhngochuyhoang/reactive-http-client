@@ -3,6 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.auth.OutboundAuthFilter;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
@@ -18,6 +19,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.reactivestreams.Subscription;
 import org.springframework.context.support.GenericApplicationContext;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.*;
@@ -42,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.*;
@@ -226,6 +229,151 @@ class CacheCallerAdmissionContractTest {
             assertThat(f.call(false, "replacement").block(WAIT)).isEqualTo("response");
             assertThat(f.active()).isZero();
             assertThat(f.dispatches).hasValue(1);
+        }
+    }
+
+    enum AsyncContinuation { FILTER, AUTH, EXCHANGE, EXCHANGE_SUBSCRIBE }
+
+    @ParameterizedTest
+    @EnumSource(AsyncContinuation.class)
+    void asynchronousFilterContinuationRespectsCancellation(AsyncContinuation continuation) throws Exception {
+        assertAsyncContinuationStopped(continuation, false);
+    }
+
+    @ParameterizedTest
+    @EnumSource(AsyncContinuation.class)
+    void asynchronousFilterContinuationRespectsTimeout(AsyncContinuation continuation) throws Exception {
+        assertAsyncContinuationStopped(continuation, true);
+    }
+
+    private void assertAsyncContinuationStopped(AsyncContinuation continuation, boolean timeout) throws Exception {
+        boolean enteredExchange = continuation == AsyncContinuation.EXCHANGE
+                || continuation == AsyncContinuation.EXCHANGE_SUBSCRIBE;
+        CacheCallerAdmission admission = new CacheCallerAdmission(Map.of("work", 1));
+        var reservation = admission.acquire("work");
+        AtomicInteger exchanges = new AtomicInteger();
+        Sinks.One<AuthContext> ready = Sinks.one();
+        try (Gate gate = new Gate()) {
+            ExecutorService worker = Executors.newSingleThreadExecutor();
+            try {
+                ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("http://cache.example.invalid"))
+                        .attribute(AuthRequest.AUTH_CONTEXT_VALIDATOR_ATTRIBUTE,
+                                (Consumer<AuthContext>) ignored -> gate.run()).build();
+                ExchangeFilterFunction filter = continuation == AsyncContinuation.AUTH
+                        ? new OutboundAuthFilter("admission", ignored -> ready.asMono())
+                        : (req, next) -> ready.asMono().flatMap(ignored -> {
+                            if (continuation == AsyncContinuation.FILTER) { gate.run(); }
+                            return next.exchange(req);
+                        });
+                Mono<ClientResponse> call = Mono.defer(() -> {
+                    Mono<ClientResponse> source = CacheCallerAdmission.preparingFilter(filter)
+                            .filter(request, req -> {
+                                exchanges.incrementAndGet();
+                                if (continuation == AsyncContinuation.EXCHANGE) { gate.run(); }
+                                return Mono.defer(() -> {
+                                    if (continuation == AsyncContinuation.EXCHANGE_SUBSCRIBE) { gate.run(); }
+                                    return Mono.just(Fixture.ok());
+                                });
+                            });
+                    if (timeout) { source = source.timeout(Duration.ofMinutes(1)); }
+                    return source.doOnSuccess(ignored -> reservation.complete())
+                            .doOnError(ignored -> reservation.complete()).doOnCancel(reservation::complete)
+                            .contextWrite(context -> context.put(CacheCallerAdmission.CONTEXT_KEY, reservation));
+                });
+                AtomicReference<Future<?>> emission = new AtomicReference<>();
+                Runnable emit = () -> emission.set(worker.submit(() -> ready.tryEmitValue(AuthContext.empty()).orThrow()));
+                if (timeout) {
+                    StepVerifier.withVirtualTime(() -> call).then(emit)
+                            .then(() -> assertThatCode(gate::awaitEntered).doesNotThrowAnyException())
+                            .thenAwait(Duration.ofMinutes(2)).expectError(TimeoutException.class).verify(WAIT);
+                } else {
+                    var pending = call.toFuture();
+                    emit.run();
+                    gate.awaitEntered();
+                    assertThat(pending.cancel(true)).isTrue();
+                }
+                if (enteredExchange) {
+                    assertThat(admission.active("work")).isEqualTo(1);
+                    assertThatThrownBy(() -> admission.acquire("work"))
+                            .isInstanceOf(CacheCallerAdmission.Rejected.class);
+                    gate.close();
+                    emission.get().get(10, TimeUnit.SECONDS);
+                    assertThat(exchanges).hasValue(1);
+                } else {
+                    assertThat(admission.active("work")).isZero();
+                    var replacement = admission.acquire("work");
+                    gate.close();
+                    emission.get().get(10, TimeUnit.SECONDS);
+                    assertThat(exchanges).as("terminated continuation cannot call next.exchange").hasValue(0);
+                    assertThat(admission.active("work")).isEqualTo(1);
+                    replacement.complete();
+                }
+                assertThat(admission.active("work")).isZero();
+            } finally {
+                gate.close();
+                worker.shutdownNow();
+                assertThat(worker.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void asynchronousLastFilterCannotProbeAfterCallerTermination(boolean timeout) throws Exception {
+        try (Gate gate = new Gate()) {
+            Sinks.One<AuthContext> ready = Sinks.one();
+            AtomicReference<AtomicReference<?>> probeIdentity = new AtomicReference<>();
+            ExchangeFilterFunction lastFilter = (request, next) -> {
+                AtomicReference<?> identity = (AtomicReference<?>) request.attributes().get(
+                        ReactiveClientInvocationHandler.class.getName() + ".cacheFinalRequestIdentity");
+                if (!probeIdentity.compareAndSet(null, identity)) { return next.exchange(request); }
+                return ready.asMono().flatMap(ignored -> { gate.run(); return next.exchange(request); });
+            };
+            try (Fixture f = new Fixture(Map.of("work", 1), false, lastFilter)) {
+                ExecutorService worker = Executors.newSingleThreadExecutor();
+                try {
+                    AtomicReference<Future<?>> emission = new AtomicReference<>();
+                    Runnable emit = () -> emission.set(worker.submit(() -> ready.tryEmitValue(AuthContext.empty()).orThrow()));
+                    if (timeout) {
+                        f.config.setLogicalCallTimeoutMs(60_000);
+                        StepVerifier.withVirtualTime(() -> f.call(false, "blocked")).then(emit)
+                                .then(() -> assertThatCode(gate::awaitEntered).doesNotThrowAnyException())
+                                .thenAwait(Duration.ofMinutes(2))
+                                .expectError(LogicalCallTimeoutException.class).verify(WAIT);
+                    } else {
+                        var pending = f.call(false, "blocked").toFuture();
+                        emit.run();
+                        gate.awaitEntered();
+                        assertThat(pending.cancel(true)).isTrue();
+                    }
+                    assertThat(f.active()).isZero();
+                    Sinks.One<AuthContext> auth = Sinks.one();
+                    f.auth = auth::asMono;
+                    f.config.setLogicalCallTimeoutMs(0);
+                    var replacement = f.call(false, "replacement").toFuture();
+                    assertThat(f.active()).isEqualTo(1);
+                    int probes = f.probes.get();
+                    gate.close();
+                    emission.get().get(10, TimeUnit.SECONDS);
+                    assertThat(probeIdentity.get()).hasNullValue();
+                    assertThat(f.probes).hasValue(probes);
+                    assertThat(f.dispatches).hasValue(0);
+                    assertThat(f.manager.snapshot().currentSize()).isZero();
+                    assertThat(f.manager.workloadSnapshotForTesting().inFlightLoads()).isZero();
+                    assertThat(f.active()).isEqualTo(1);
+                    assertThat(f.events).hasSize(1);
+                    assertThat(f.lifecycle).hasSize(1);
+                    assertThat(f.logger.records).hasSize(1);
+                    auth.tryEmitValue(AuthContext.empty()).orThrow();
+                    assertThat(replacement.get(10, TimeUnit.SECONDS)).isEqualTo("response");
+                    assertThat(f.active()).isZero();
+                    assertThat(f.dispatches).hasValue(1);
+                } finally {
+                    gate.close();
+                    worker.shutdownNow();
+                    assertThat(worker.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+                }
+            }
         }
     }
 
@@ -635,6 +783,10 @@ class CacheCallerAdmissionContractTest {
         }
 
         Fixture(Map<String, Integer> callerMaximums, boolean realWire) {
+            this(callerMaximums, realWire, null);
+        }
+
+        Fixture(Map<String, Integer> callerMaximums, boolean realWire, ExchangeFilterFunction lastFilter) {
             context.registerBean("observer", HttpClientObserver.class, () -> events::add);
             context.registerBean("logger", RecordingLogger.class, () -> logger);
             context.registerBean("hook", ReactiveHttpClientLifecycleHook.class, () -> new ReactiveHttpClientLifecycleHook() {
@@ -702,6 +854,7 @@ class CacheCallerAdmissionContractTest {
             builder.filter(new OutboundAuthFilter("admission", provider));
             requestCustomizer.customize(builder);
             builder.filter(ReactiveClientInvocationHandler.finalRequestObservationFilter());
+            if (lastFilter != null) { builder.filter(lastFilter); }
             ExchangeFunction exchange = realWire ? ExchangeFunctions.create(
                     new ReactorClientHttpConnector(HttpClient.create().disableRetry(true))) : request -> response.get();
             builder.exchangeFunction(request -> {

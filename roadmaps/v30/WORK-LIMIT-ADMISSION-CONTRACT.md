@@ -131,6 +131,12 @@ synchronously subscribing its returned publisher holds the slot until that
 observable frame exits. Synchronous subscription terminals are delivered after
 the frame unwinds, so immediate resubscription cannot race delayed cleanup.
 Cancelled preparation cannot continue into a later probe/lookup/dispatch.
+Filter continuations retain the original caller guard at `next.exchange`:
+a late asynchronous mapper cannot advance after caller termination. If the
+continuation already entered exchange construction or subscription, its slot
+remains occupied until that synchronous frame exits. The guard does not keep
+an arbitrary application mapper's slot occupied while it runs outside those
+boundaries; it prevents that mapper from reentering terminated starter work.
 Application-created asynchronous work outside these frames remains application
 owned, as in the reservation contract below.
 

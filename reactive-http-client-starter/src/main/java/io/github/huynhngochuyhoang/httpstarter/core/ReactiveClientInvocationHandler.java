@@ -269,9 +269,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         this.cacheIdentityWebClient = webClient.mutate()
                 .filters(filters -> {
                     if (callerAdmission != null) {
-                        filters.replaceAll(filter -> (request, next) -> Mono.deferContextual(context ->
-                                CacheCallerAdmission.subscribePreparation(CacheCallerAdmission.preparing(
-                                        context, () -> filter.filter(request, next)))));
+                        filters.replaceAll(CacheCallerAdmission::preparingFilter);
                     }
                 })
                 .filter(cacheRequestIdentityFilter())
