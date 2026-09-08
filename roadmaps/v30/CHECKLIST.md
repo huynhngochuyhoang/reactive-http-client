@@ -323,39 +323,118 @@ Priority 3 evidence (2026-09-08):
 
 ## Priority 4 - Admission Before Request Preparation
 
-### [ ] 4.1 Reserve each caller before materialization
+### [x] 4.1 Reserve each caller before materialization
 
-- [ ] Acquire inside each cold subscription before argument freezing, selected
+- [x] Acquire inside each cold subscription before argument freezing, selected
       body serialization, context snapshots, or pre-lookup authorization.
-- [ ] Reject N+1 while N calls are deliberately held in preparation and prove
+- [x] Reject N+1 while N calls are deliberately held in preparation and prove
       no serializer, auth provider, customizer, flight, or transport invocation
       occurs for the rejected call.
-- [ ] Cover repeated subscriptions to one publisher and concurrent different
+- [x] Cover repeated subscriptions to one publisher and concurrent different
       APIs sharing a policy; maintain separate capacity for another policy.
-- [ ] Keep rejection reporting bounded and avoid retaining a full prepared
+- [x] Keep rejection reporting bounded and avoid retaining a full prepared
       request solely to report a local admission error.
 
-### [ ] 4.2 Preserve hit authorization and request identity
+### [x] 4.2 Preserve hit authorization and request identity
 
-- [ ] Count fresh/stale hits and waiting callers in the caller allowance;
+- [x] Count fresh/stale hits and waiting callers in the caller allowance;
       saturation must not bypass authorization to inspect or return a hit.
-- [ ] Run admitted calls through finalized-request probes and the existing
+- [x] Run admitted calls through finalized-request probes and the existing
       frozen key/body/context contract; no new snapshot can alter wire identity.
-- [ ] Cover auth failure/empty auth on a warm hit and header/URI mutations from
+- [x] Cover auth failure/empty auth on a warm hit and header/URI mutations from
       classified customizations on `GET` and semantic `POST`.
-- [ ] Preserve one logical-call budget from subscription through preparation,
+- [x] Preserve one logical-call budget from subscription through preparation,
       auth, lookup, waiting, and load; do not layer an unattributed timeout.
 
-### [ ] 4.3 Release preparation ownership on every terminal path
+### [x] 4.3 Release preparation ownership on every terminal path
 
-- [ ] Cover success, empty completion, synchronous throw, serialization failure,
+- [x] Cover success, empty completion, synchronous throw, serialization failure,
       auth error, timeout, and cancellation before source attachment.
-- [ ] Order release for immediate terminal resubscription; a delayed cleanup
+- [x] Order release for immediate terminal resubscription; a delayed cleanup
       callback cannot release another subscription's reservation.
-- [ ] Verify no later dispatch or publication follows preparation cancellation,
+- [x] Verify no later dispatch or publication follows preparation cancellation,
       including when an application callback returns after cancellation.
-- [ ] Prove capacity reuse and released argument/context/auth ownership with
+- [x] Prove capacity reuse and released argument/context/auth ownership with
       the manager still open; close must not mask a release defect.
+
+Priority 4 evidence (2026-09-08):
+
+- [Internal caller enforcement](WORK-LIMIT-ADMISSION-CONTRACT.md#priority-4-internal-enforcement)
+  is implemented by package-private `CacheCallerAdmission`, owned by the
+  cache manager and consumed before the handler's cold preparation pipeline.
+  Only the package-private fixture overload can select caller limits today.
+  Ordinary construction remains unselected; public binding, the public
+  rejection type/category/outcomes, and effective exports remain gated on
+  complete caller/load/refresh enforcement in Priorities 5-6 and 6.3.
+- `CacheCallerAdmissionContractTest` passes 41 cases: N+1 rejection while
+  auth or serializers are gated; no rejected argument/context reads, auth,
+  customizations, flight, or transport work; repeated cold subscriptions;
+  shared cross-API capacity, different policy/manager isolation, and 64
+  competing acquisitions. Rejected terminal records contain no prepared
+  body, inbound/request/response headers, URL, status, or attempt evidence.
+- Real loopback GET/semantic POST cases use explicitly SAFE Boot/per-client
+  customizers. They verify exact JSON bytes, frozen context despite caller
+  mutation, final header/URI partitioning, warm-hit auth errors, and existing
+  empty-auth behavior. Hits/stale hits/waiters reserve caller capacity;
+  detached refresh work has no caller reservation.
+- Gated freeze, codec, auth, default-request, filter, and synchronous returned
+  publisher subscription frames retain capacity through cancellation until
+  exit, with no late dispatch/publication. Success, empty/error terminals,
+  immediate repeat/retry, cancellation before attachment, waiter timeout,
+  and response-body timeout reuse capacity without delayed cleanup races.
+  Timeout checks advance virtual time only after explicit phase entry; the
+  production logical-call deadline is armed before entering preparation.
+  Weak references to arguments, context, and auth state clear after success
+  and cancellation while the cache manager stays open. Nested unbounded
+  callers do not inherit another logical call's reservation.
+- Six lookup-subscription cases cover cancellation and timeout inside fresh-hit,
+  expired-miss, and flight-start frames; capacity remains reserved until the
+  synchronous frame exits. Two reporting-setup cases cover non-Map inbound
+  context on GET/semantic POST: errors before source subscription release
+  capacity, immediate retries do not leak it, and rejection cannot release
+  another admitted caller's reservation. The reporting leak was reproduced
+  before the fix in `target/release-evidence/v30/priority4/reporting-cleanup/reproduced.log`.
+- Eight asynchronous filter/auth/exchange-frame cases cover cancellation and
+  timeout: terminated continuations cannot call `next.exchange`, while an
+  already-entered exchange construction/subscription frame retains capacity
+  until exit. Two handler cases prove the final identity probe cannot run
+  after termination, create a flight, publish, or affect a replacement caller.
+  Six initial reproductions failed before guarding the continuation boundary;
+  log: `target/release-evidence/v30/priority4/async-continuations/reproduced.log`.
+- Final related regression: 409 tests (346 starter, 63 mock helper), zero
+  failures/errors/skips, using `mvn -B -ntp -pl reactive-http-client-test -am`
+  with `-Dsurefire.failIfNoSpecifiedTests=false test` and these `-Dtest` names:
+  `CacheCallerAdmissionContractTest`, `CacheWorkLimitContractTest`,
+  `ResponseCacheActiveWorkTest`, `ResponseCacheRetentionOwnershipTest`,
+  `BoundedLocalResponseCacheContractTest`, `CacheKeyContractTest`,
+  `LogicalCallTimeoutBudgetContractTest`, `LocalResponseCacheObservabilityTest`,
+  `SemanticReadLocalCacheContractTest`, `SemanticReadSingleFlightRefreshContractTest`,
+  `MockReactiveHttpClientTest`, `Boot4MockReactiveHttpClientTest`,
+  `DocumentationReleaseArtifactTest`, and `ReactiveHttpClientAotSmokeTest`.
+  Log: `target/release-evidence/v30/priority4/async-continuations/regression.log`;
+  matching Surefire XML/text:
+  `target/release-evidence/v30/priority4/async-continuations/regression/`.
+  These reruns validate the lookup subscription guard, deadline ordering,
+  reporting-setup cleanup, and asynchronous continuation guard together,
+  superseding the earlier final-run
+  evidence rather than reusing its reports.
+- Five additional isolated runs of
+  `mvn -B -ntp -pl reactive-http-client-starter -Dtest=CacheCallerAdmissionContractTest test`
+  passed all 41 cases each (205 executions), zero failures/errors/skips.
+  Logs/reports are under
+  `target/release-evidence/v30/priority4/async-continuations/stress-1` through `stress-5`
+  (logs use the `.log` suffix). Reactor `mvn -B -ntp validate` and
+  `git diff --check` passed; the validate log is
+  `target/release-evidence/v30/priority4/async-continuations/validate.log`.
+- Source base: reachable commit `3c31ea6610dfa68ce37835edde52d5473518759b`
+  plus the working-tree continuation guard, ten regression cases, and the
+  contract/evidence update. Maven
+  `3.9.9`, GraalVM JDK `25.0.3`, Java `21` target, Boot `4.0.0`,
+  reactor `4.3.0-SNAPSHOT`, published/API baseline `4.2.0`.
+  Source copies/hashes and the working-tree patch are under
+  `target/release-evidence/v30/priority4/async-continuations/source/`.
+  No public configuration, dependency, historical roadmap, native-build,
+  or benchmark evidence is changed or claimed by this priority.
 
 ---
 
