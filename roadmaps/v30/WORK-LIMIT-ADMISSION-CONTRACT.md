@@ -101,6 +101,55 @@ Detailed live-work metrics and schema-safe diagnostics aggregation remain
 Priority 9. Configuration cannot advertise a bound before all selected
 dimensions are enforced.
 
+## Priority 4 Internal Enforcement
+
+Priority 4 adds the package-private `CacheCallerAdmission` implementation to
+the handler/cache-manager path. Its only selection entry is a package-private
+test fixture overload; ordinary construction supplies no gate. No bindable
+property, public admission exception/category/outcome, metadata, or dashboard
+setting is exposed. Load/refresh limits, shared production normalization, and
+public selection/effective output remain gated by Priorities 5-6 and 6.3.
+The internal caller-only maximum map is frozen per manager; it is not a second
+application configuration source.
+
+Each cold cache subscription reserves before argument/context freezing,
+selected or auth-required serialization, finalized-request probes, auth, or
+lookup. The existing request snapshots and probe chain remain authoritative.
+All APIs selecting the same policy name share capacity; another name or manager
+does not. Fresh/stale hits and waiters reserve too. A saturated caller gets a
+fixed, stackless internal error without preparing arguments or retaining inbound
+headers in its terminal records. Enabled observer, lifecycle, and exchange-log
+surfaces report one zero-attempt/no-dispatch terminal; downstream-only observers
+are excluded via the existing cache-served delivery path. The future public
+reason/category/cache-outcome additions above are not claimed by this internal
+gate.
+
+Reservations hold only capacity state, never arguments, context, credentials,
+or key material. Terminal release is eager and exactly once; cancellation while
+freezing, serializing, building a probe, invoking a filter/provider, or
+synchronously subscribing its returned publisher holds the slot until that
+observable frame exits. Synchronous subscription terminals are delivered after
+the frame unwinds, so immediate resubscription cannot race delayed cleanup.
+Cancelled preparation cannot continue into a later probe/lookup/dispatch.
+Application-created asynchronous work outside these frames remains application
+owned, as in the reservation contract below.
+
+The one existing logical-call deadline is armed before subscribing preparation,
+including synchronous callbacks; it is not layered with a second timeout.
+Detached shared-load/refresh context excludes the caller reservation, as it
+already excludes caller reporting state and the caller deadline. A waiter
+timeout releases only its caller slot. Manager close rejects new callers but
+does not reset occupied slots while external work is still unwinding.
+
+`CacheCallerAdmissionContractTest` exercises these boundaries with gated
+callbacks, virtual-time timeout advancement after phase entry, repeated cold
+subscriptions, cross-API/name/manager checks, 64 competing acquisitions,
+immediate terminal resubscription, and weak-reference release with the manager
+still open. Real loopback GET and semantic POST checks use explicitly SAFE
+Boot/per-client customization beans and verify frozen context, finalized
+header/URI identity, exact POST bytes, warm-hit auth failure, and the existing
+empty-auth behavior.
+
 ## Scope and Immutability
 
 One factory owns one work-capacity state per selected **policy name**. Every API

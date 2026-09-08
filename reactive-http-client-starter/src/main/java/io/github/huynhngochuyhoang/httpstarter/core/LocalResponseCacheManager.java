@@ -53,6 +53,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
     private final LocalResponseCacheMetrics metrics;
     private final boolean observabilityEnabled;
     private final String clientName;
+    private final CacheCallerAdmission callerAdmission;
     private final Map<PolicyBounds, LocalResponseCache> caches = new LinkedHashMap<>();
     private final Map<FlightKey, InFlightLoad> inFlightLoads = new HashMap<>();
     private final Map<FlightKey, InFlightRefresh> inFlightRefreshes = new HashMap<>();
@@ -65,12 +66,23 @@ final class LocalResponseCacheManager implements AutoCloseable {
                                       LocalResponseCacheMetrics metrics,
                                       boolean observabilityEnabled,
                                       String clientName) {
+        this(classLoader, ticker, refreshScheduler, metrics, observabilityEnabled, clientName, null);
+    }
+
+    private LocalResponseCacheManager(ClassLoader classLoader,
+                                      LongSupplier ticker,
+                                      Scheduler refreshScheduler,
+                                      LocalResponseCacheMetrics metrics,
+                                      boolean observabilityEnabled,
+                                      String clientName,
+                                      CacheCallerAdmission callerAdmission) {
         this.classLoader = classLoader;
         this.ticker = ticker;
         this.refreshScheduler = refreshScheduler;
         this.metrics = metrics;
         this.observabilityEnabled = observabilityEnabled;
         this.clientName = clientName;
+        this.callerAdmission = callerAdmission;
     }
 
     static LocalResponseCacheManager lazy(ClassLoader classLoader) {
@@ -191,6 +203,18 @@ final class LocalResponseCacheManager implements AutoCloseable {
         return new LocalResponseCacheManager(
                 LocalResponseCacheManager.class.getClassLoader(), ticker, refreshScheduler,
                 LocalResponseCacheMetrics.disabled(), false, "unknown");
+    }
+
+    static LocalResponseCacheManager testing(LongSupplier ticker, Scheduler refreshScheduler,
+                                             Map<String, Integer> callerMaximums) {
+        return new LocalResponseCacheManager(
+                LocalResponseCacheManager.class.getClassLoader(), ticker, refreshScheduler,
+                LocalResponseCacheMetrics.disabled(), false, "unknown",
+                new CacheCallerAdmission(callerMaximums));
+    }
+
+    CacheCallerAdmission callerAdmission() {
+        return callerAdmission;
     }
 
     static LocalResponseCacheManager testing(LongSupplier ticker,
@@ -768,6 +792,9 @@ final class LocalResponseCacheManager implements AutoCloseable {
 
     @Override
     public void close() {
+        if (callerAdmission != null) {
+            callerAdmission.close();
+        }
         if (!closed.compareAndSet(false, true)) {
             return;
         }

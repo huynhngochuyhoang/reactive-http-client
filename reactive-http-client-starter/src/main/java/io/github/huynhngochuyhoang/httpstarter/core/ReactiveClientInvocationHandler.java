@@ -116,6 +116,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final ResilienceOperatorApplier resilienceOperatorApplier;
     private final ReactiveHttpClientJsonCodec jsonCodec;
     private final LocalResponseCacheManager responseCacheManager;
+    private final CacheCallerAdmission callerAdmission;
     private final AuthProvider cacheAuthProvider;
     private final String baseUrl;
 
@@ -264,7 +265,15 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             AuthProvider cacheAuthProvider,
             String baseUrl) {
         this.webClient = webClient;
+        this.callerAdmission = responseCacheManager != null ? responseCacheManager.callerAdmission() : null;
         this.cacheIdentityWebClient = webClient.mutate()
+                .filters(filters -> {
+                    if (callerAdmission != null) {
+                        filters.replaceAll(filter -> (request, next) -> Mono.deferContextual(context ->
+                                CacheCallerAdmission.subscribePreparation(CacheCallerAdmission.preparing(
+                                        context, () -> filter.filter(request, next)))));
+                    }
+                })
                 .filter(cacheRequestIdentityFilter())
                 .build();
         this.metadataCache = metadataCache;
@@ -396,7 +405,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     responseCacheManager, "A cache-selected method requires a local response cache manager");
             requireCacheAuthorizationSupport();
             Object[] invocationArguments = args != null ? args.clone() : new Object[0];
-            Mono<?> cacheInvocation = Mono.deferContextual(context -> {
+            Mono<?> cacheInvocation = Mono.deferContextual(context -> CacheCallerAdmission.preparing(context, () -> {
                 Object[] frozenArguments = CacheKeyContract.freezeArguments(
                         plan, invocationArguments, cacheSelection.policy());
                 RequestArgumentResolver.ResolvedArgs frozenResolved = applyDefaultHeaders(
@@ -408,13 +417,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 SubscriptionReportingState callerState = subscriptionState(context);
                 callerState.prepareInitialResolved(keyResolved);
                 return prepareCacheSelectedBody(plan, keyResolved, cacheSelection.policy())
-                        .flatMap(bodyPreparation -> {
+                        .flatMap(bodyPreparation -> CacheCallerAdmission.preparing(context, () -> {
                             AtomicReference<LocalResponseCacheManager.ResponseMetadata> responseMetadata =
                                     new AtomicReference<>();
                             Mono<?> authorizedLookup = prepareCacheLoadBody(keyResolved, bodyPreparation)
                                     .flatMap(preparedRequestBody -> authorizeCacheLookup(
                                                     plan, effectiveApi, keyResolved, preparedRequestBody)
-                                            .flatMap(authorization -> {
+                                            .flatMap(authorization -> CacheCallerAdmission.preparing(context, () -> {
                                                 CacheKeyContract.PreparedKey preparedKey = CacheKeyContract.derive(
                                                         concreteClient,
                                                         clientName,
@@ -447,12 +456,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                                         callerState,
                                                         new SubscriptionReportingState(keyResolved),
                                                         detachedCacheLoadContext(context, preparedContext));
-                                            }));
+                                            })));
                             return authorizedLookup.contextWrite(preparedContext::writeContext);
-                        });
-            });
+                        }));
+            }));
             return cacheCaller(
-                    cacheInvocation, proxy, method, meta, plan, effectiveApi, clientConfig.getLogicalCallTimeoutMs());
+                    cacheInvocation, proxy, method, meta, plan, effectiveApi, clientConfig.getLogicalCallTimeoutMs(),
+                    cacheSelection.policyName());
         }
 
         RequestArgumentResolver.ResolvedArgs resolved = applyDefaultHeaders(
@@ -471,19 +481,40 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                        MethodMetadata meta,
                                        RequestPlan plan,
                                        EffectiveApi effectiveApi,
-                                       long logicalCallTimeoutMs) {
+                                       long logicalCallTimeoutMs,
+                                       String policyName) {
         return Mono.defer(() -> {
             SubscriptionReportingState state = new SubscriptionReportingState(
                     new RequestArgumentResolver.ResolvedArgs(Map.of(), Map.of(), Map.of(), null));
-            Mono<?> caller = applyLogicalCallTimeoutMono(cacheInvocation, logicalCallTimeoutMs);
             HttpExchangeLogger exchangeLogger = resolveExchangeLogger(proxy, method, meta);
             HttpClientObserver observer = getObserver();
             List<ReactiveHttpClientLifecycleHook> lifecycleHooks = getLifecycleHooks();
+            CacheCallerAdmission.Reservation reservation = null;
+            Mono<?> source = cacheInvocation;
+            if (callerAdmission != null) {
+                try {
+                    reservation = callerAdmission.acquire(policyName);
+                } catch (RuntimeException error) {
+                    state.markCacheServed();
+                    source = Mono.error(error);
+                }
+            }
+            Mono<?> caller = applyLogicalCallTimeoutMono(source, logicalCallTimeoutMs);
+            if (reservation != null) {
+                CacheCallerAdmission.Reservation acquired = reservation;
+                caller = caller
+                        .doOnSuccess(ignored -> acquired.complete())
+                        .doOnError(ignored -> acquired.complete())
+                        .doOnCancel(acquired::complete)
+                        .contextWrite(context -> context.put(CacheCallerAdmission.CONTEXT_KEY, acquired));
+            }
+            boolean localRejection = source != cacheInvocation;
             if (exchangeLogger != null || observer != null || !lifecycleHooks.isEmpty()) {
                 Mono<?> reportedCaller = caller;
                 caller = Mono.deferContextual(context -> {
                     Map<String, List<String>> inboundHeaders = context.hasKey(
                             InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
+                            && !localRejection
                             ? context.get(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY)
                             : Map.of();
                     return reportedCaller
@@ -499,7 +530,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                     exchangeLogger, observer, plan, effectiveApi, state, inboundHeaders));
                 });
             }
-            return caller.contextWrite(context -> context.put(SUBSCRIPTION_STATE_CONTEXT_KEY, state));
+            return caller.contextWrite(context -> context.delete(CacheCallerAdmission.CONTEXT_KEY)
+                    .put(SUBSCRIPTION_STATE_CONTEXT_KEY, state));
         });
     }
 
@@ -509,7 +541,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         Context detached = Context.empty();
         for (Map.Entry<Object, Object> entry : callerContext.stream().toList()) {
             if (entry.getKey() != SUBSCRIPTION_STATE_CONTEXT_KEY
-                    && entry.getKey() != LOGICAL_CALL_DEADLINE_CONTEXT_KEY) {
+                    && entry.getKey() != LOGICAL_CALL_DEADLINE_CONTEXT_KEY
+                    && entry.getKey() != CacheCallerAdmission.CONTEXT_KEY) {
                 detached = detached.put(entry.getKey(), entry.getValue());
             }
         }
@@ -1257,7 +1290,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                 ? Mono.just(Signal.error(new LogicalCallTimeoutException(timeoutMs, null)))
                                 : Mono.never();
                     });
-            return Mono.firstWithSignal(sourceSignal, deadlineSignal).dematerialize();
+            // Arm the deadline before entering potentially synchronous request preparation.
+            return Mono.firstWithSignal(deadlineSignal, sourceSignal).dematerialize();
         });
     }
 
@@ -1742,7 +1776,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         if (!shouldProvideJsonRawBody(contentTypeHeader) || jsonCodec == null) {
             return Mono.just(new SerializedRequestBody(body, body, null, null));
         }
-        return Mono.fromCallable(() -> {
+        return preparationCallable(() -> {
                     byte[] json = jsonCodec.write(body);
                     return new SerializedRequestBody(body, json, json, null);
                 })
@@ -1769,7 +1803,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return Mono.error(new IllegalStateException(
                     "Cache pre-lookup auth requires the resolved base URL for client '" + clientName + "'"));
         }
-        return Mono.defer(() -> {
+        return Mono.deferContextual(context -> CacheCallerAdmission.preparing(context, () -> {
             WebClient.RequestBodySpec request = cacheIdentityWebClient
                     .method(HttpMethod.valueOf(effectiveApi.httpMethod()))
                     .uri(uriBuilder -> DeclarativeRequestUri.build(
@@ -1820,7 +1854,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                         }
                         return Mono.just(new CacheAuthorization(authContext, identity));
                     })));
-        });
+        }));
     }
 
     private static ExchangeFilterFunction cacheRequestIdentityFilter() {
@@ -1961,7 +1995,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return Mono.just(cacheBodyPreparation(body, bytes, canonicalContentType, authContextValidator));
         }
         if (body instanceof String text) {
-            return Mono.fromCallable(() -> cacheBodyPreparation(
+            return preparationCallable(() -> cacheBodyPreparation(
                             body, CacheKeyContract.selectedStringBodyBytes(
                                     text, effectiveContentType != null && effectiveContentType.getCharset() != null
                                             ? effectiveContentType.getCharset()
@@ -1980,13 +2014,19 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return Mono.error(new RequestSerializationException(clientName, new IllegalStateException(
                     "Cache-selected JSON request bodies require a ReactiveHttpClientJsonCodec bean")));
         }
-        return Mono.fromCallable(() -> cacheBodyPreparation(body, jsonCodec.writeBounded(
+        return preparationCallable(() -> cacheBodyPreparation(body, jsonCodec.writeBounded(
                         body, CacheKeyContract.maximumSerializedBodyBytes()),
                         canonicalContentType, authContextValidator))
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorMap(error -> error instanceof RequestSerializationException
                         ? error
                         : new RequestSerializationException(clientName, error));
+    }
+
+    private <T> Mono<T> preparationCallable(java.util.concurrent.Callable<T> callback) {
+        return callerAdmission == null ? Mono.fromCallable(callback)
+                : Mono.deferContextual(context -> Mono.fromCallable(() ->
+                        CacheCallerAdmission.call(context, callback)));
     }
 
     private static CacheBodyPreparation cacheBodyPreparation(
