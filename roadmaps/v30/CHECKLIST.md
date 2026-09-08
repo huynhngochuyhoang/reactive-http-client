@@ -141,40 +141,89 @@ Evidence executed on 2026-09-07 and reviewed on 2026-09-08 from clean commit
 
 ## Priority 2 - Active-Work Characterization
 
-### [ ] 2.1 Build deterministic burst workloads
+### [x] 2.1 Build deterministic burst workloads
 
-- [ ] Cover cache-disabled calls, distinct blocked misses, independent duplicate
+- [x] Cover cache-disabled calls, distinct blocked misses, independent duplicate
       misses, one flight with many callers, slow pre-lookup auth, and many
       simultaneously stale keys.
-- [ ] Fix payloads, key cardinality, caller count, operation count, policy
+- [x] Fix payloads, key cardinality, caller count, operation count, policy
       bounds, and observation checkpoints; keep inputs synthetic and bounded.
-- [ ] Gate preparation, subscriber attachment, server dispatch, and source
+- [x] Gate preparation, subscriber attachment, server dispatch, and source
       terminal signals explicitly; a delay alone must not prove overlap.
-- [ ] Exercise `GET` and body-bearing semantic `POST`, count-only and weighted
+- [x] Exercise `GET` and body-bearing semantic `POST`, count-only and weighted
       policies, and isolated contexts where prior state would bias evidence.
 
-### [ ] 2.2 Separate live work from stored responses and memory
+### [x] 2.2 Separate live work from stored responses and memory
 
-- [ ] Record preparing/active callers, independent loads, shared flights,
+- [x] Record preparing/active callers, independent loads, shared flights,
       attached members/waiters, refreshes, and generation owners with precise
       units; do not equate flights with every foreground load.
-- [ ] Record stored entries/bytes and protocol-aware pool state separately from
+- [x] Record stored entries/bytes and protocol-aware pool state separately from
       active work, Java heap, direct memory, threads, and process RSS.
-- [ ] Compare explicit Bulkhead and pool-acquisition limits with their absent
+- [x] Compare explicit Bulkhead and pool-acquisition limits with their absent
       configurations to identify which stages they actually protect.
-- [ ] Capture admitted, saturated, traffic-stopped, source-terminal, and
+- [x] Capture admitted, saturated, traffic-stopped, source-terminal, and
       post-close checkpoints; unavailable measurements remain unknown.
 
-### [ ] 2.3 Record the capacity finding
+### [x] 2.3 Record the capacity finding
 
-- [ ] Classify each observation as capacity exposure, expected caller-owned
+- [x] Classify each observation as capacity exposure, expected caller-owned
       retention, confirmed defect, or inconclusive; attach owner-path evidence.
-- [ ] Identify work that survives its first caller and work that remains
+- [x] Identify work that survives its first caller and work that remains
       application-owned after close; a nonzero RSS is not a leak finding.
-- [ ] Record the limits of cancellation for non-cooperative application hooks
+- [x] Record the limits of cancellation for non-cooperative application hooks
       and distinguish subscription counts from arbitrary external task counts.
-- [ ] Keep raw JFR/heap evidence private and target-only; use bounded structural
+- [x] Keep raw JFR/heap evidence private and target-only; use bounded structural
       checks and reference paths rather than absolute GC/RSS pass thresholds.
+
+Priority 2 evidence (2026-09-08):
+
+- [Active-work characterization](ACTIVE-WORK-CHARACTERIZATION.md) records the
+  fixed workload, counter units, owner paths, observations, and limits.
+  `ResponseCacheActiveWorkTest` adds 35 gated cases using real invocation,
+  auth, codec, Resilience4j, cache, and loopback HTTP/1.1 paths. The source
+  base is reachable commit `0b969f089709be67fcf0a1f35d6ad4b16ea60ce1`, with
+  test/report additions in the working tree; this is not clean-commit native
+  or isolated published-binary evidence. Starter production sources are
+  unchanged from `v4.2.0`; no production or V1-V29 files are changed.
+- Twelve held distinct misses retain twelve foreground tokens before any
+  entry is stored; independent duplicate misses retain twelve tokens but no
+  shared flight. Twelve same-key shared callers retain one flight and eleven
+  waiters. Eight stale keys retain eight refreshes after their callers finish.
+  Bulkhead permits and constrained pool capacity act after all twelve
+  pre-lookup auth subscriptions (and POST serializations). These are capacity
+  exposures, not evidence of a newly introduced leak.
+- The first shared caller can cancel while eleven members keep the source
+  alive. Independent loads retain external caller ownership after manager
+  close with transport deliberately left open; their eventual terminals
+  release tokens without publication. A non-cooperative serializer remains
+  executing after caller cancellation until its application gate is released.
+  Stored generation bookkeeping, live owners, pool state, and memory domains
+  are reported separately. HTTP/2 streams and unavailable memory limits remain
+  unknown; there are no GC/RSS pass thresholds or public live-work meters.
+- Five final runs of `mvn -B -ntp -pl reactive-http-client-starter
+  -Dtest=ResponseCacheActiveWorkTest test` passed 35 cases each
+  (175 total, zero failures/errors/skips). Their per-run JSON, Surefire XML,
+  text reports, and Maven logs are preserved under
+  `target/release-evidence/v30/priority2/final-stress/run-1/` through `run-5/`.
+- The final related regression ran `ResponseCacheActiveWorkTest`,
+  `ResponseCacheMemoryWorkloadTest`, `ResponseCacheRetentionOwnershipTest`,
+  `SemanticReadSingleFlightRefreshContractTest`,
+  `BoundedLocalResponseCacheContractTest`, and `DocumentationReleaseArtifactTest`
+  with the same Maven invocation and a comma-separated `-Dtest` selection:
+  149 tests passed, zero failures/errors/skips. Reports and the exact Maven
+  log are preserved under `target/release-evidence/v30/priority2/final-regression/`.
+- After the checklist/report update, `DocumentationReleaseArtifactTest` passed
+  all 46 tests again. Reactor `mvn -B -ntp validate` passed all four modules;
+  tracked and new-file whitespace checks passed. Final logs are
+  `target/release-evidence/v30/priority2/documentation-final.log` and
+  `target/release-evidence/v30/priority2/validate-final.log`.
+- Toolchain: Maven `3.9.9`, GraalVM JDK `25.0.3`, Java `21` compilation target,
+  Spring Boot `4.0.0`, Reactor Netty `1.3.0`, and Linux `amd64` with epoll.
+  Source copies and hashes are retained under
+  `target/release-evidence/v30/priority2/source/`. No JFR or heap dump was
+  generated; any follow-up raw capture stays private and target-only.
+  Priority 3's explicit admission contract and later release gates remain open.
 
 ---
 
