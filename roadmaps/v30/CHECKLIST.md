@@ -440,39 +440,102 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 5 - Foreground Load and Single-Flight Capacity
 
-### [ ] 5.1 Bound every foreground source
+### [x] 5.1 Bound every foreground source
 
-- [ ] Reserve before loader assembly for independent misses and new shared
+- [x] Reserve before loader assembly for independent misses and new shared
       flights; count one source across retry/backoff, redirects, auth replay,
       decoding, and cache publication.
-- [ ] Return one local error for a new miss at load capacity without invoking
+- [x] Return one local error for a new miss at load capacity without invoking
       the loader or creating a deferred fallback request.
-- [ ] Keep hits independent of load capacity after caller admission; same-key
+- [x] Keep hits independent of load capacity after caller admission; same-key
       independent misses each require their own load slot.
-- [ ] Test successful storage, unknown/over-budget byte bypass, empty/error
+- [x] Test successful storage, unknown/over-budget byte bypass, empty/error
       outcomes, and cancellation releasing their source slot exactly once.
 
-### [ ] 5.2 Make lookup, join, and reservation consistent
+### [x] 5.2 Make lookup, join, and reservation consistent
 
-- [ ] Join a current flight at load saturation when caller capacity is available;
+- [x] Join a current flight at load saturation when caller capacity is available;
       the waiter does not acquire another load reservation.
-- [ ] Recheck a stale miss decision after concurrent cache publication before
+- [x] Recheck a stale miss decision after concurrent cache publication before
       installing another flight or rejecting for load saturation.
-- [ ] Make last-member cancellation, flight removal, and delayed attachment
+- [x] Make last-member cancellation, flight removal, and delayed attachment
       unable to reconnect an abandoned untracked source.
-- [ ] Clean every rejected provisional token/member/generation and verify active
+- [x] Clean every rejected provisional token/member/generation and verify active
       load counts never exceed the policy maximum under many-key contention.
 
-### [ ] 5.3 Separate caller and source terminal ownership
+### [x] 5.3 Separate caller and source terminal ownership
 
-- [ ] Let the first caller timeout/cancel while a waiter remains; release its
+- [x] Let the first caller timeout/cancel while a waiter remains; release its
       caller state while the shared source retains exactly one load slot.
-- [ ] Release one cancelled waiter independently and cancel the shared source
+- [x] Release one cancelled waiter independently and cancel the shared source
       when no interested caller remains, including before source attachment.
-- [ ] Prevent transport evidence and later retry hooks from being written into
+- [x] Prevent transport evidence and later retry hooks from being written into
       an already-terminal caller or a coalesced waiter's local terminal record.
-- [ ] Test immediate completion/error and immediate resubscription without
+- [x] Test immediate completion/error and immediate resubscription without
       stale release callbacks or duplicate source starts.
+
+### Implementation and Verification (2026-09-08)
+
+- Internal `CacheLoadAdmission` reserves one foreground source per policy name
+  before loader assembly; `CacheWorkAdmission` shares the existing frame-aware
+  reservation implementation with the independent caller gate. Selection is
+  package-private fixture input only. Public properties, exceptions/outcomes,
+  normalization, and effective output remain gated by Priority 6.3.
+- Lookup/recheck, flight joining, load reservation, and bounded publication use
+  the flight registry's coordination boundary. Rejected provisional tokens are
+  finished without loader assembly. Hits and existing-flight joins remain
+  available at load saturation; independent misses each reserve a slot.
+- Source ownership covers assembly, subscription, retry construction/backoff,
+  auth replay, redirect dispatches, decoding, metadata, and publication. Terminal
+  cleanup precedes delivery; cancellation retains occupied capacity until an
+  entered source/cancellation frame exits. Independent external loads can
+  survive manager close and retain their slot until their own terminal signal.
+- Flight members attach cancellation before source startup. Detached publishers
+  cannot restart a removed source; late waiters cannot inherit a departed
+  diagnostic owner's transport facts. Later source retries do not emit hooks
+  for the terminated caller. The cancelled-lookup fixture now proves a miss
+  cannot attach a source, rather than requiring a subscribe-then-cancel cycle.
+- `CacheLoadAdmissionContractTest`: 29 cases, including both independent and
+  shared modes, all terminal/byte-bypass outcomes, four blocked frame types,
+  delayed attachment, publication-before-saturation recheck, 64-key contention,
+  policy/factory isolation, immediate repeat/retry, close ownership, and stale-hit
+  refresh isolation at foreground saturation.
+  `CacheCallerAdmissionContractTest`: 44 cases, including three added
+  handler retry/deadline/source-frame cases. `BoundedLocalResponseCacheContractTest`:
+  51 cases, including bounded and legacy redirect and 401/retry paths.
+- Red evidence: five initial capacity cases failed before enforcement
+  (`target/release-evidence/v30/priority5/reproduced.log`); the retry-hook frame
+  reproduced premature release before its guard
+  (`target/release-evidence/v30/priority5/retry-frame-reproduced.log`).
+- Final related regression passed 493 tests (430 starter, 63 mock helper), zero
+  failures/errors/skips. Command: `mvn -B -ntp -pl reactive-http-client-test -am`
+  with `-Dsurefire.failIfNoSpecifiedTests=false test` and `-Dtest=`:
+  `CacheLoadAdmissionContractTest,CacheCallerAdmissionContractTest,CacheWorkLimitContractTest,ResponseCacheActiveWorkTest,ResponseCacheRetentionOwnershipTest,BoundedLocalResponseCacheContractTest,CacheKeyContractTest,LogicalCallTimeoutBudgetContractTest,LocalResponseCacheObservabilityTest,SemanticReadLocalCacheContractTest,SemanticReadSingleFlightRefreshContractTest,MockReactiveHttpClientTest,Boot4MockReactiveHttpClientTest,DocumentationReleaseArtifactTest,ReactiveHttpClientAotSmokeTest,SubscriptionReportingStateTest,SubscriptionLocalReportingStateTest,ExchangeLogSubscriptionAttemptCountTest,ResilienceOperatorCompositionContractTest,DiagnosticContextContractTest,OutboundAuthFilterTest`.
+  Log: `target/release-evidence/v30/priority5/final-regression.log`;
+  matching XML/text reports: `target/release-evidence/v30/priority5/final-regression/`.
+- Five isolated runs of `mvn -B -ntp -pl reactive-http-client-starter`
+  `-Dtest=CacheLoadAdmissionContractTest,CacheCallerAdmissionContractTest test`
+  passed 73 cases each (365 executions), zero failures/errors/skips.
+  Logs and exact XML/text reports: `target/release-evidence/v30/priority5/final-stress-1`
+  through `final-stress-5` (logs append `.log`). These final runs include the
+  stale-hit cases and supersede the earlier pre-final reports.
+- Complete starter/mock verification: `mvn -B -ntp -pl reactive-http-client-test -am test`
+  passed 1,515 tests (1,450 starter, 65 mock helper), zero failures/errors/skips.
+  Log: `target/release-evidence/v30/priority5/final-complete-tests.log`;
+  XML/text reports: `target/release-evidence/v30/priority5/final-complete-tests/`.
+  All four reactor modules passed `mvn -B -ntp validate`
+  (`target/release-evidence/v30/priority5/validate.log`).
+- Source base: reachable commit `4e4b7149d8c819404915fb51e8bfe63b2866cc0c`
+  plus this working-tree implementation/tests/contract update. Maven `3.9.9`,
+  GraalVM JDK `25.0.3`, Java `21` target, Boot `4.0.0`,
+  reactor `4.3.0-SNAPSHOT`, published/API baseline `4.2.0`.
+  Source copies/hashes, the reachable base, and the complete working-tree patch
+  (including new files) are preserved under
+  `target/release-evidence/v30/priority5/source/`. Final documentation verification
+  is recorded in `target/release-evidence/v30/priority5/documentation.log`;
+  `git diff --check` output is preserved in `priority5/diff-check.log`.
+  No native, benchmark, public API, dependency, or historical-roadmap evidence
+  is changed or claimed by this priority.
 
 ---
 

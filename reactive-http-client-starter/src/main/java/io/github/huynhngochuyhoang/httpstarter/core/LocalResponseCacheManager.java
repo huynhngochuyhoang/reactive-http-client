@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.ClassUtils;
 import reactor.core.Disposable;
+import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
@@ -54,6 +55,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
     private final boolean observabilityEnabled;
     private final String clientName;
     private final CacheCallerAdmission callerAdmission;
+    private final CacheLoadAdmission loadAdmission;
     private final Map<PolicyBounds, LocalResponseCache> caches = new LinkedHashMap<>();
     private final Map<FlightKey, InFlightLoad> inFlightLoads = new HashMap<>();
     private final Map<FlightKey, InFlightRefresh> inFlightRefreshes = new HashMap<>();
@@ -76,6 +78,18 @@ final class LocalResponseCacheManager implements AutoCloseable {
                                       boolean observabilityEnabled,
                                       String clientName,
                                       CacheCallerAdmission callerAdmission) {
+        this(classLoader, ticker, refreshScheduler, metrics, observabilityEnabled, clientName,
+                callerAdmission, null);
+    }
+
+    private LocalResponseCacheManager(ClassLoader classLoader,
+                                      LongSupplier ticker,
+                                      Scheduler refreshScheduler,
+                                      LocalResponseCacheMetrics metrics,
+                                      boolean observabilityEnabled,
+                                      String clientName,
+                                      CacheCallerAdmission callerAdmission,
+                                      CacheLoadAdmission loadAdmission) {
         this.classLoader = classLoader;
         this.ticker = ticker;
         this.refreshScheduler = refreshScheduler;
@@ -83,6 +97,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
         this.observabilityEnabled = observabilityEnabled;
         this.clientName = clientName;
         this.callerAdmission = callerAdmission;
+        this.loadAdmission = loadAdmission;
     }
 
     static LocalResponseCacheManager lazy(ClassLoader classLoader) {
@@ -217,6 +232,19 @@ final class LocalResponseCacheManager implements AutoCloseable {
         return callerAdmission;
     }
 
+    static LocalResponseCacheManager testing(LongSupplier ticker, Scheduler scheduler,
+                                             Map<String, Integer> callerMaximums,
+                                             Map<String, Integer> loadMaximums) {
+        return new LocalResponseCacheManager(
+                LocalResponseCacheManager.class.getClassLoader(), ticker, scheduler,
+                LocalResponseCacheMetrics.disabled(), false, "unknown",
+                new CacheCallerAdmission(callerMaximums), new CacheLoadAdmission(loadMaximums));
+    }
+
+    int activeLoadsForTesting(String policyName) {
+        return loadAdmission == null ? 0 : loadAdmission.active(policyName);
+    }
+
     static LocalResponseCacheManager testing(LongSupplier ticker,
                                              Scheduler refreshScheduler,
                                              LocalResponseCacheMetrics metrics,
@@ -275,7 +303,27 @@ final class LocalResponseCacheManager implements AutoCloseable {
                         selection, cache, key, apiName, loader, responseMetadata,
                         callerState, proposedLoadState, loadContext);
             }
-            LocalResponseCache.Lookup lookup = cache.lookup(key);
+            LocalResponseCache.Lookup lookup;
+            CacheWorkAdmission.Reservation reservation = null;
+            if (loadAdmission == null) {
+                lookup = cache.lookup(key);
+            } else {
+                synchronized (inFlightLoads) {
+                    lookup = cache.lookup(key);
+                    if (!lookup.hit()) {
+                        try {
+                            reservation = acquireLoad(selection.policyName());
+                        } catch (RuntimeException error) {
+                            cache.finish(lookup.loadToken());
+                            metrics.lookup(apiName, "miss");
+                            if (callerState != null) {
+                                callerState.markCacheServed();
+                            }
+                            return Mono.error(error);
+                        }
+                    }
+                }
+            }
             if (lookup.hit()) {
                 metrics.lookup(apiName, "hit");
                 return cachedHit(selection, cache, key, apiName, lookup, loader, responseMetadata,
@@ -285,7 +333,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
             cacheOutcome(callerState, apiName, HttpClientCacheOutcome.MISS_LOADER);
             followLoad(callerState, proposedLoadState);
             return load(selection.policyName(), selection.policy(), cache, lookup.loadToken(), apiName,
-                    () -> loader.apply(proposedLoadState), responseMetadata);
+                    () -> loader.apply(proposedLoadState), responseMetadata, reservation);
         });
     }
 
@@ -319,7 +367,18 @@ final class LocalResponseCacheManager implements AutoCloseable {
                     flight = existing;
                 }
                 else {
-                    flight = new InFlightLoad(flightKey, cache, token, proposedLoadState);
+                    CacheWorkAdmission.Reservation reservation;
+                    try {
+                        reservation = acquireLoad(selection.policyName());
+                    } catch (RuntimeException error) {
+                        cache.finish(token);
+                        metrics.lookup(apiName, "miss");
+                        if (callerState != null) {
+                            callerState.markCacheServed();
+                        }
+                        return Mono.error(error);
+                    }
+                    flight = new InFlightLoad(flightKey, cache, token, proposedLoadState, reservation);
                     inFlightLoads.put(flightKey, flight);
                     created = true;
                 }
@@ -340,10 +399,14 @@ final class LocalResponseCacheManager implements AutoCloseable {
             cacheOutcome(callerState, apiName, HttpClientCacheOutcome.COALESCED_WAITER);
             metrics.coalesced(apiName);
         }
-        if (created) {
-            startFlight(selection.policyName(), selection.policy(), flight, apiName, loader, responseMetadata, context);
-        }
-        return flight.publisher(member);
+        InFlightLoad selectedFlight = flight;
+        boolean start = created;
+        return flight.publisher(member, () -> {
+            if (start) {
+                startFlight(selection.policyName(), selection.policy(), selectedFlight,
+                        apiName, loader, responseMetadata, context);
+            }
+        });
     }
 
     private Mono<?> cachedHit(EffectiveCachePolicy.Selection selection,
@@ -539,13 +602,38 @@ final class LocalResponseCacheManager implements AutoCloseable {
         cancelRefresh(new FlightKey(cache, key));
     }
 
+    private CacheWorkAdmission.Reservation acquireLoad(String policyName) {
+        return loadAdmission == null ? null : loadAdmission.acquire(policyName);
+    }
+
     private Mono<?> load(String policyName,
                          ReactiveHttpClientProperties.CachePolicyConfig policy,
                          LocalResponseCache cache,
                          LocalResponseCache.LoadToken token,
                          String apiName,
                          Supplier<Mono<?>> loader,
-                         Supplier<ResponseMetadata> responseMetadata) {
+                         Supplier<ResponseMetadata> responseMetadata,
+                         CacheWorkAdmission.Reservation reservation) {
+        if (reservation != null) {
+            long startedAtNanos = System.nanoTime();
+            Mono<?> source = Mono.deferContextual(context -> CacheWorkAdmission.preparing(context, () ->
+                    loader.get().flatMap(value -> CacheWorkAdmission.preparing(context, () -> {
+                        ResponseMetadata metadata = responseMetadata.get();
+                        Optional<Object> candidate = cacheCandidate(policy, value, metadata);
+                        return CacheWorkAdmission.preparing(context, () -> {
+                            // Serialize publication with lookup/join/reservation decisions.
+                            synchronized (inFlightLoads) {
+                                candidate.ifPresent(selected -> publishLoadCandidate(
+                                        policyName, policy, cache, token, selected, metadata));
+                            }
+                            return Mono.just(value);
+                        });
+                    }))));
+            return CacheWorkAdmission.own(source, reservation, signal -> {
+                cache.finish(token);
+                metrics.load(apiName, workOutcome(signal), System.nanoTime() - startedAtNanos);
+            });
+        }
         return Mono.defer(() -> {
             long startedAtNanos = System.nanoTime();
             Mono<?> source;
@@ -584,6 +672,12 @@ final class LocalResponseCacheManager implements AutoCloseable {
         synchronized (inFlightLoads) {
             if (flight.terminal) {
                 flight.cache.finish(flight.loadToken);
+                if (flight.reservation != null) {
+                    flight.reservation.complete();
+                }
+                return;
+            }
+            if (flight.sourceStarted) {
                 return;
             }
             flight.sourceStarted = true;
@@ -596,30 +690,32 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 flight.loadToken,
                 apiName,
                 () -> loader.apply(flight.loadState),
-                responseMetadata).takeUntilOther(shutdown.asMono());
-        Disposable subscription;
+                responseMetadata, flight.reservation).takeUntilOther(shutdown.asMono());
+        BaseSubscriber<Object> subscription = new BaseSubscriber<>() {
+            @Override public Context currentContext() { return Context.of(context); }
+            @Override protected void hookOnNext(Object value) { completeFlightValue(flight, value); }
+            @Override protected void hookOnError(Throwable error) { completeFlightError(flight, error); }
+            @Override protected void hookOnComplete() { completeFlightEmpty(flight); }
+        };
+        synchronized (inFlightLoads) {
+            if (flight.terminal) {
+                flight.cache.finish(flight.loadToken);
+                if (flight.reservation != null) {
+                    flight.reservation.complete();
+                }
+                return;
+            }
+            flight.sourceSubscription = subscription;
+        }
         try {
-            subscription = source.subscribe(
-                    value -> completeFlightValue(flight, value),
-                    error -> completeFlightError(flight, error),
-                    () -> completeFlightEmpty(flight),
-                    Context.of(context));
+            source.subscribe(subscription);
         }
         catch (Throwable error) {
             flight.cache.finish(flight.loadToken);
-            completeFlightError(flight, error);
-            return;
-        }
-
-        boolean dispose;
-        synchronized (inFlightLoads) {
-            dispose = flight.terminal;
-            if (!dispose) {
-                flight.sourceSubscription = subscription;
+            if (flight.reservation != null) {
+                flight.reservation.complete();
             }
-        }
-        if (dispose) {
-            subscription.dispose();
+            completeFlightError(flight, error);
         }
     }
 
@@ -676,6 +772,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
             sourceToCancel.dispose();
         }
         if (abandoned) {
+            flight.cache.finish(flight.loadToken);
+            if (flight.reservation != null) {
+                flight.reservation.complete();
+            }
             flight.result.tryEmitEmpty();
         }
     }
@@ -795,6 +895,9 @@ final class LocalResponseCacheManager implements AutoCloseable {
         if (callerAdmission != null) {
             callerAdmission.close();
         }
+        if (loadAdmission != null) {
+            loadAdmission.close();
+        }
         if (!closed.compareAndSet(false, true)) {
             return;
         }
@@ -818,6 +921,9 @@ final class LocalResponseCacheManager implements AutoCloseable {
         for (InFlightLoad flight : flights) {
             if (!flight.sourceStarted) {
                 flight.cache.finish(flight.loadToken);
+                if (flight.reservation != null) {
+                    flight.reservation.complete();
+                }
             }
             if (flight.sourceSubscription != null) {
                 flight.sourceSubscription.dispose();
@@ -1223,26 +1329,31 @@ final class LocalResponseCacheManager implements AutoCloseable {
         private final LocalResponseCache.LoadToken loadToken;
         private final SubscriptionReportingState loadState;
         private final Sinks.One<Object> result = Sinks.one();
+        private final CacheWorkAdmission.Reservation reservation;
         private final Set<FlightMember> members = new LinkedHashSet<>();
         private FlightMember diagnosticOwner;
         private Disposable sourceSubscription;
         private boolean sourceStarted;
         private boolean terminal;
+        private boolean diagnosticOwnerAssigned;
 
         private InFlightLoad(FlightKey key,
                              LocalResponseCache cache,
                              LocalResponseCache.LoadToken loadToken,
-                             SubscriptionReportingState loadState) {
+                             SubscriptionReportingState loadState,
+                             CacheWorkAdmission.Reservation reservation) {
             this.key = key;
             this.cache = cache;
             this.loadToken = loadToken;
             this.loadState = loadState;
+            this.reservation = reservation;
         }
 
         private FlightMember reserve(SubscriptionReportingState callerState) {
             FlightMember member = new FlightMember(callerState);
             members.add(member);
-            if (diagnosticOwner == null) {
+            if (!diagnosticOwnerAssigned) {
+                diagnosticOwnerAssigned = true;
                 assignDiagnosticOwner(member);
             }
             return member;
@@ -1266,8 +1377,31 @@ final class LocalResponseCacheManager implements AutoCloseable {
             }
         }
 
-        private Mono<?> publisher(FlightMember member) {
-            return result.asMono().doFinally(ignored -> releaseFlightMember(this, member));
+        private Mono<?> publisher(FlightMember member, Runnable start) {
+            return Mono.create(sink -> {
+                BaseSubscriber<Object> subscriber = new BaseSubscriber<>() {
+                    @Override public Context currentContext() { return Context.of(sink.contextView()); }
+                    @Override protected void hookOnNext(Object value) {
+                        releaseFlightMember(InFlightLoad.this, member);
+                        sink.success(value);
+                    }
+                    @Override protected void hookOnComplete() {
+                        releaseFlightMember(InFlightLoad.this, member);
+                        sink.success();
+                    }
+                    @Override protected void hookOnError(Throwable error) {
+                        releaseFlightMember(InFlightLoad.this, member);
+                        sink.error(error);
+                    }
+                };
+                sink.onCancel(() -> {
+                    releaseFlightMember(this, member);
+                    subscriber.dispose();
+                });
+                result.asMono().subscribe(subscriber);
+                // A cancelled first member may still have an interested reserved waiter.
+                start.run();
+            });
         }
     }
 

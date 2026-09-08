@@ -788,19 +788,22 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         Mono<SerializedRequestBody> serializedBodyMono = preparedSerializedRequestBody != null
                 ? Mono.just(preparedSerializedRequestBody)
                 : serializeRequestBodyForAuth(resolved.body(), contentTypeHeader).cache();
-        return Mono.deferContextual(context -> {
+        return Mono.deferContextual(context -> CacheWorkAdmission.preparing(context, () -> {
             SubscriptionReportingState state = subscriptionState(context);
             RequestArgumentResolver.ResolvedArgs preparedResolved = applyIdempotencyKey(
                     plan, resolved, context, state.generatedIdempotencyKey());
             Attempt attempt = state.beginAttempt(preparedResolved);
-            notifyLifecycleAttempt(
-                    lifecycleHooks, plan, effectiveApi, preparedResolved, null, null, null,
-                    attempt.number(), state.cacheOutcome());
+            if (!state.cacheLoadCallerDetached()) {
+                notifyLifecycleAttempt(
+                        lifecycleHooks, plan, effectiveApi, preparedResolved, null, null, null,
+                        attempt.number(), state.cacheOutcome());
+            }
             if (exchangeLogger == null && state.markFirstAttemptStarted()) {
                 logRequest(effectiveApi.httpMethod(), effectiveApi.pathTemplate(), state.elapsedMillis());
             }
 
-            return serializedBodyMono.map(serializedRequestBody -> buildRequestHeadersSpec(
+            return serializedBodyMono.flatMap(serializedRequestBody -> CacheWorkAdmission.preparing(
+                    context, () -> Mono.just(buildRequestHeadersSpec(
                     plan,
                     effectiveApi,
                     preparedResolved,
@@ -814,10 +817,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     attempt,
                     requestBodyOwnership,
                     preResolvedAuthContext,
-                    cacheFinalRequestIdentity))
+                    cacheFinalRequestIdentity))))
                     .doOnError(ignored -> state.clearActiveAttempt(attempt))
                     .doOnCancel(() -> state.clearActiveAttempt(attempt));
-        });
+        }));
     }
 
     private Mono<WebClient.RequestHeadersSpec<?>> statelessRequestHeadersSpec(

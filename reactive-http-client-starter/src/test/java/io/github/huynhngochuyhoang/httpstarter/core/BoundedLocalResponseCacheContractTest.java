@@ -15,6 +15,8 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.http.HttpHeaders;
@@ -308,9 +310,9 @@ class BoundedLocalResponseCacheContractTest {
             reserve.setAccessible(true);
             Object member = reserve.invoke(flight, new Object[]{null});
             java.lang.reflect.Method publisher = flight.getClass()
-                    .getDeclaredMethod("publisher", member.getClass());
+                    .getDeclaredMethod("publisher", member.getClass(), Runnable.class);
             publisher.setAccessible(true);
-            delayedMember = (Mono<?>) publisher.invoke(flight, member);
+            delayedMember = (Mono<?>) publisher.invoke(flight, member, (Runnable) () -> { });
         }
 
         current.dispose();
@@ -1146,8 +1148,10 @@ class BoundedLocalResponseCacheContractTest {
         }
     }
 
-    @Test
-    void redirectDispatchesRemainInsideOneCoalescedLeader() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void redirectDispatchesRemainInsideOneCoalescedLeader(boolean bounded) throws Exception {
+        LocalResponseCacheManager manager = loadBoundedManager(bounded);
         AtomicInteger initialDispatches = new AtomicInteger();
         AtomicInteger redirectedDispatches = new AtomicInteger();
         CountDownLatch redirectedRequest = new CountDownLatch(1);
@@ -1155,6 +1159,7 @@ class BoundedLocalResponseCacheContractTest {
         DisposableServer server = HttpServer.create()
                 .port(0)
                 .handle((request, response) -> {
+                    assertThat(manager.activeLoadsForTesting("local")).isEqualTo(bounded ? 1 : 0);
                     if (request.uri().startsWith("/catalog/")) {
                         initialDispatches.incrementAndGet();
                         return response.status(HttpStatus.TEMPORARY_REDIRECT.value())
@@ -1167,7 +1172,7 @@ class BoundedLocalResponseCacheContractTest {
                             .sendString(responseBody.asMono());
                 })
                 .bindNow();
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+        try (manager; AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.refresh();
             ReactiveHttpClientProperties.ClientConfig config = singleFlightConfig(0);
             config.setFollowRedirects(true);
@@ -1179,7 +1184,7 @@ class BoundedLocalResponseCacheContractTest {
                     webClient,
                     config,
                     context,
-                    LocalResponseCacheManager.testing(System::nanoTime),
+                    manager,
                     new NoopResilienceOperatorApplier(),
                     null);
 
@@ -1190,9 +1195,11 @@ class BoundedLocalResponseCacheContractTest {
             assertThat(initialDispatches).hasValue(1);
             assertThat(redirectedDispatches).hasValue(1);
 
+            assertThat(manager.activeLoadsForTesting("local")).isEqualTo(bounded ? 1 : 0);
             responseBody.tryEmitValue("redirected").orThrow();
             assertThat(leader.get(1, TimeUnit.SECONDS)).isEqualTo("redirected");
             assertThat(waiter.get(1, TimeUnit.SECONDS)).isEqualTo("redirected");
+            assertThat(manager.activeLoadsForTesting("local")).isZero();
             assertThat(initialDispatches).hasValue(1);
             assertThat(redirectedDispatches).hasValue(1);
         }
@@ -1408,8 +1415,10 @@ class BoundedLocalResponseCacheContractTest {
         }
     }
 
-    @Test
-    void singleFlightKeepsAuthReplayAndRetryInsideOneLeaderLoad() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void singleFlightKeepsAuthReplayAndRetryInsideOneLeaderLoad(boolean bounded) throws Exception {
+        LocalResponseCacheManager manager = loadBoundedManager(bounded);
         ReactiveHttpClientProperties.ClientConfig config = config();
         config.setAuthProvider("cache-auth");
         config.getCache().getPolicies().get("local").setSingleFlight(true);
@@ -1445,6 +1454,7 @@ class BoundedLocalResponseCacheContractTest {
                 .filter(new OutboundAuthFilter("cache-client", authProvider))
                 .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
                 .exchangeFunction(request -> {
+                    assertThat(manager.activeLoadsForTesting("local")).isEqualTo(bounded ? 1 : 0);
                     String authorization = request.headers().getFirst(HttpHeaders.AUTHORIZATION);
                     if ("Bearer stale".equals(authorization)) {
                         staleDispatches.incrementAndGet();
@@ -1460,7 +1470,7 @@ class BoundedLocalResponseCacheContractTest {
                 })
                 .build();
 
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+        try (manager; AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
             context.getBeanFactory().registerSingleton("cacheObserver",
                     (io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver) observed::add);
             context.refresh();
@@ -1469,7 +1479,7 @@ class BoundedLocalResponseCacheContractTest {
                     webClient,
                     config,
                     context,
-                    LocalResponseCacheManager.testing(System::nanoTime),
+                    manager,
                     retryApplier,
                     authProvider);
 
@@ -1485,6 +1495,7 @@ class BoundedLocalResponseCacheContractTest {
             assertThat(invalidations).hasValue(1);
             assertThat(staleDispatches).hasValue(1);
             assertThat(freshDispatches).hasValue(2);
+            assertThat(manager.activeLoadsForTesting("local")).isEqualTo(bounded ? 1 : 0);
 
             finalResponse.tryEmitValue(ClientResponse.create(HttpStatus.OK)
                     .header(HttpHeaders.CONTENT_TYPE, "text/plain")
@@ -1492,6 +1503,7 @@ class BoundedLocalResponseCacheContractTest {
                     .build()).orThrow();
             assertThat(leader.get(1, TimeUnit.SECONDS)).isEqualTo("authorized");
             assertThat(waiter.get(1, TimeUnit.SECONDS)).isEqualTo("authorized");
+            assertThat(manager.activeLoadsForTesting("local")).isZero();
 
             assertThat(observed).hasSize(3);
             assertThat(observed).extracting(HttpClientObserverEvent::getAttemptCount)
@@ -2509,6 +2521,13 @@ class BoundedLocalResponseCacheContractTest {
 
     private static CacheKeyContract.OpaqueKey key(String value) {
         return CacheKeyContract.OpaqueKey.from(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static LocalResponseCacheManager loadBoundedManager(boolean bounded) {
+        return bounded
+                ? LocalResponseCacheManager.testing(System::nanoTime, Schedulers.parallel(),
+                        Map.of("local", 8), Map.of("local", 1))
+                : LocalResponseCacheManager.testing(System::nanoTime);
     }
 
     @SuppressWarnings("unchecked")
