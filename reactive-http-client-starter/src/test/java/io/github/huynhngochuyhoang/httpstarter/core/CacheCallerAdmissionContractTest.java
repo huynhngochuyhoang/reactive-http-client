@@ -388,6 +388,36 @@ class CacheCallerAdmissionContractTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void reportingSetupFailureReleasesAdmissionBeforeSourceSubscription(boolean post) throws Exception {
+        try (Fixture f = new Fixture(1)) {
+            Mono<String> invalid = f.call(post, "invalid-context").contextWrite(context -> context
+                    .put(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY, "not-a-map"));
+            StepVerifier.create(invalid).expectError(ClassCastException.class).verify(WAIT);
+            assertThat(f.active()).isZero();
+            StepVerifier.create(invalid.retry(2)).expectError(ClassCastException.class).verify(WAIT);
+            assertThat(f.active()).isZero();
+            assertThat(f.serializations).hasValue(0);
+            assertThat(f.authCalls).hasValue(0);
+            assertThat(f.defaults).hasValue(0);
+            assertThat(f.probes).hasValue(0);
+            assertThat(f.dispatches).hasValue(0);
+            assertThat(f.manager.workloadSnapshotForTesting().inFlightLoads()).isZero();
+            assertThat(f.manager.snapshot().currentSize()).isZero();
+
+            Sinks.One<AuthContext> auth = Sinks.one();
+            f.auth = auth::asMono;
+            var valid = f.call(post, "replacement").toFuture();
+            assertThat(f.active()).isEqualTo(1);
+            StepVerifier.create(invalid).expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
+            assertThat(f.active()).isEqualTo(1);
+            auth.tryEmitValue(AuthContext.empty()).orThrow();
+            assertThat(valid.get(10, TimeUnit.SECONDS)).isEqualTo("response");
+            assertThat(f.active()).isZero();
+        }
+    }
+
     @Test
     void cancelledBeforeSourceAttachmentDoesNotPrepareOrLeakCapacity() {
         try (Fixture f = new Fixture(1)) {

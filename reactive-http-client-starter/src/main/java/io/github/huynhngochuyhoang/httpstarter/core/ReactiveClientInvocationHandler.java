@@ -530,6 +530,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                     exchangeLogger, observer, plan, effectiveApi, state, inboundHeaders));
                 });
             }
+            if (reservation != null) {
+                CacheCallerAdmission.Reservation acquired = reservation;
+                // Reporting setup can fail before the inner caller subscribes and installs its cleanup.
+                caller = caller.doOnError(ignored -> acquired.complete());
+            }
             return caller.contextWrite(context -> context.delete(CacheCallerAdmission.CONTEXT_KEY)
                     .put(SUBSCRIPTION_STATE_CONTEXT_KEY, state));
         });

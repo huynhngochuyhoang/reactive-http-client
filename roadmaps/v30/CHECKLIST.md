@@ -366,7 +366,7 @@ Priority 4 evidence (2026-09-08):
   Ordinary construction remains unselected; public binding, the public
   rejection type/category/outcomes, and effective exports remain gated on
   complete caller/load/refresh enforcement in Priorities 5-6 and 6.3.
-- `CacheCallerAdmissionContractTest` passes 23 cases: N+1 rejection while
+- `CacheCallerAdmissionContractTest` passes 31 cases: N+1 rejection while
   auth or serializers are gated; no rejected argument/context reads, auth,
   customizations, flight, or transport work; repeated cold subscriptions;
   shared cross-API capacity, different policy/manager isolation, and 64
@@ -387,7 +387,14 @@ Priority 4 evidence (2026-09-08):
   Weak references to arguments, context, and auth state clear after success
   and cancellation while the cache manager stays open. Nested unbounded
   callers do not inherit another logical call's reservation.
-- Final related regression: 391 tests (328 starter, 63 mock helper), zero
+- Six lookup-subscription cases cover cancellation and timeout inside fresh-hit,
+  expired-miss, and flight-start frames; capacity remains reserved until the
+  synchronous frame exits. Two reporting-setup cases cover non-Map inbound
+  context on GET/semantic POST: errors before source subscription release
+  capacity, immediate retries do not leak it, and rejection cannot release
+  another admitted caller's reservation. The reporting leak was reproduced
+  before the fix in `target/release-evidence/v30/priority4/reporting-cleanup/reproduced.log`.
+- Final related regression: 399 tests (336 starter, 63 mock helper), zero
   failures/errors/skips, using `mvn -B -ntp -pl reactive-http-client-test -am`
   with `-Dsurefire.failIfNoSpecifiedTests=false test` and these `-Dtest` names:
   `CacheCallerAdmissionContractTest`, `CacheWorkLimitContractTest`,
@@ -397,19 +404,27 @@ Priority 4 evidence (2026-09-08):
   `SemanticReadLocalCacheContractTest`, `SemanticReadSingleFlightRefreshContractTest`,
   `MockReactiveHttpClientTest`, `Boot4MockReactiveHttpClientTest`,
   `DocumentationReleaseArtifactTest`, and `ReactiveHttpClientAotSmokeTest`.
-  Log: `target/release-evidence/v30/priority4/verified-regression.log`;
-  matching Surefire XML/text: `target/release-evidence/v30/priority4/verified/`.
+  Log: `target/release-evidence/v30/priority4/reporting-cleanup/regression.log`;
+  matching Surefire XML/text:
+  `target/release-evidence/v30/priority4/reporting-cleanup/regression/`.
+  These reruns validate the lookup subscription guard, deadline ordering,
+  and reporting-setup cleanup together, superseding the earlier final-run
+  evidence rather than reusing its reports.
 - Five additional isolated runs of
   `mvn -B -ntp -pl reactive-http-client-starter -Dtest=CacheCallerAdmissionContractTest test`
-  passed all 23 cases each (115 executions). Logs/reports are under
-  `target/release-evidence/v30/priority4/stress-1` through `stress-5`
+  passed all 31 cases each (155 executions), zero failures/errors/skips.
+  Logs/reports are under
+  `target/release-evidence/v30/priority4/reporting-cleanup/stress-1` through `stress-5`
   (logs use the `.log` suffix). Reactor `mvn -B -ntp validate` and
-  tracked/new-file whitespace checks passed.
-- Source base: reachable commit `35800c783dc61ff23dd207cbbd855660f5d49214`
-  plus the current working-tree implementation/tests/documents. Maven
+  `git diff --check` passed; the validate log is
+  `target/release-evidence/v30/priority4/reporting-cleanup/validate.log`.
+- Source base: reachable commit `47dfb98768e3f1b0959a7be41cf8299c2a8468e0`
+  plus the working-tree reporting cleanup, two regression cases, and this
+  evidence update. Maven
   `3.9.9`, GraalVM JDK `25.0.3`, Java `21` target, Boot `4.0.0`,
   reactor `4.3.0-SNAPSHOT`, published/API baseline `4.2.0`.
-  Source copies/hashes are under `target/release-evidence/v30/priority4/source/`.
+  Source copies/hashes and the working-tree patch are under
+  `target/release-evidence/v30/priority4/reporting-cleanup/source/`.
   No public configuration, dependency, historical roadmap, native-build,
   or benchmark evidence is changed or claimed by this priority.
 
