@@ -27,6 +27,7 @@ final class SubscriptionReportingState {
     private final AtomicReference<HttpClientCacheOutcome> cacheOutcome = new AtomicReference<>();
     private final AtomicBoolean cacheServed = new AtomicBoolean();
     private final AtomicBoolean hiddenCacheRefresh = new AtomicBoolean();
+    private final AtomicBoolean cacheLoadCallerDetached = new AtomicBoolean();
 
     SubscriptionReportingState(RequestArgumentResolver.ResolvedArgs initialResolved) {
         this.initialResolved = new AtomicReference<>(initialResolved);
@@ -66,6 +67,7 @@ final class SubscriptionReportingState {
         if (source == null || source == this) {
             return;
         }
+        source.cacheLoadCallerDetached.set(true);
         if (terminalSnapshot.get() != null) {
             followedAttemptState.compareAndSet(source, null);
             return;
@@ -130,6 +132,10 @@ final class SubscriptionReportingState {
 
     boolean hiddenCacheRefresh() {
         return hiddenCacheRefresh.get();
+    }
+
+    boolean cacheLoadCallerDetached() {
+        return cacheLoadCallerDetached.get();
     }
 
     boolean markFirstAttemptStarted() {

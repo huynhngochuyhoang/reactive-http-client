@@ -52,6 +52,117 @@ import static org.assertj.core.api.Assertions.*;
 class CacheCallerAdmissionContractTest {
     private static final Duration WAIT = Duration.ofSeconds(10);
 
+    @Test
+    void cancelledRetryConstructionKeepsItsSourceSlotUntilTheHookUnwinds() throws Exception {
+        ResilienceOperatorApplier retry = new NoopResilienceOperatorApplier() {
+            @Override public <T> Mono<T> applyRetry(Mono<T> source, String name) { return source.retry(1); }
+            @Override public boolean canRetryMoreThanOnce(String name) { return true; }
+        };
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try (Fixture f = new Fixture(Map.of("work", 4), false, null, Map.of("work", 1), retry);
+             Gate gate = new Gate()) {
+            Sinks.One<ClientResponse> first = Sinks.one();
+            f.response = first::asMono;
+            f.retryHookGate = gate;
+            var caller = f.call(false, "retry-frame").toFuture();
+            var retrying = executor.submit(() -> first.tryEmitValue(
+                    ClientResponse.create(HttpStatus.SERVICE_UNAVAILABLE).body("retry").build()).orThrow());
+            gate.awaitEntered();
+            caller.cancel(true);
+            assertThat(f.active()).isZero();
+            assertThat(f.manager.activeLoadsForTesting("work")).isEqualTo(1);
+            StepVerifier.create(f.call(false, "replacement"))
+                    .expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+            gate.close();
+            retrying.get(10, TimeUnit.SECONDS);
+            assertThat(f.manager.activeLoadsForTesting("work")).isZero();
+            assertThat(f.dispatches).hasValue(1);
+            assertThat(f.manager.snapshot().currentSize()).isZero();
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void foregroundCapacityKeepsCallerAndSourceOwnershipSeparateAcrossRetry(boolean timeout) throws Exception {
+        var clock = reactor.test.scheduler.VirtualTimeScheduler.getOrSet();
+        AtomicInteger retryAssemblies = new AtomicInteger();
+        ResilienceOperatorApplier retry = new NoopResilienceOperatorApplier() {
+            @Override public <T> Mono<T> applyRetry(Mono<T> source, String name) {
+                retryAssemblies.incrementAndGet();
+                return source.retryWhen(reactor.util.retry.Retry.fixedDelay(1, Duration.ofMillis(100)));
+            }
+            @Override public boolean canRetryMoreThanOnce(String name) { return true; }
+        };
+        try (Fixture f = new Fixture(Map.of("work", 4), false, null, Map.of("work", 1), retry)) {
+            Sinks.One<ClientResponse> initial = Sinks.one();
+            Sinks.One<ClientResponse> retried = Sinks.one();
+            AtomicInteger sourceSubscriptions = new AtomicInteger();
+            AtomicInteger cancellations = new AtomicInteger();
+            f.response = () -> (sourceSubscriptions.getAndIncrement() == 0 ? initial.asMono() : retried.asMono())
+                    .doOnCancel(cancellations::incrementAndGet);
+            f.config.setLogicalCallTimeoutMs(timeout ? 1_000 : 0);
+            var first = f.call(false, "shared-load").toFuture();
+            f.config.setLogicalCallTimeoutMs(10_000);
+            var waiter = f.call(false, "shared-load").toFuture();
+            var cancelledWaiter = f.call(false, "shared-load").toFuture();
+            assertThat(f.active()).isEqualTo(3);
+            assertThat(f.manager.activeLoadsForTesting("work")).isEqualTo(1);
+            cancelledWaiter.cancel(true);
+            assertThat(f.active()).isEqualTo(2);
+            assertThat(cancellations).hasValue(0);
+            int retryCount = retryAssemblies.get();
+            StepVerifier.create(f.call(false, "saturated").retry(2))
+                    .expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+            assertThat(retryAssemblies).hasValue(retryCount);
+            assertThat(f.dispatches).hasValue(1);
+            assertThat(f.events.stream().filter(e -> e.getError() instanceof CacheLoadAdmission.Rejected))
+                    .hasSize(3).allSatisfy(e -> {
+                        assertThat(e.getAttemptCount()).isZero();
+                        assertThat(e.getRequestUrl()).isNull();
+                        assertThat(e.getStatusCode()).isNull();
+                        assertThat(e.getFailureStage()).isNull();
+                    });
+            if (timeout) {
+                clock.advanceTimeBy(Duration.ofSeconds(1));
+                assertThatThrownBy(first::join).hasCauseInstanceOf(LogicalCallTimeoutException.class);
+            } else {
+                first.cancel(true);
+            }
+            assertThat(f.active()).isEqualTo(1);
+            assertThat(f.manager.activeLoadsForTesting("work")).isEqualTo(1);
+            int terminalCount = f.events.size();
+            int hookCount = f.attempts.size();
+            initial.tryEmitValue(ClientResponse.create(HttpStatus.SERVICE_UNAVAILABLE).body("retry").build()).orThrow();
+            assertThat(f.dispatches).hasValue(1);
+            assertThat(f.manager.activeLoadsForTesting("work")).isEqualTo(1);
+            clock.advanceTimeBy(Duration.ofMillis(100));
+            assertThat(f.dispatches).hasValue(2);
+            assertThat(f.attempts).hasSize(hookCount);
+            assertThat(f.events).hasSize(terminalCount);
+            retried.tryEmitValue(Fixture.ok()).orThrow();
+            assertThat(waiter.get(10, TimeUnit.SECONDS)).isEqualTo("response");
+            assertThat(f.active()).isZero();
+            assertThat(f.manager.activeLoadsForTesting("work")).isZero();
+            assertThat(f.events).hasSize(terminalCount + 1);
+            assertThat(f.lifecycle).hasSize(terminalCount + 1);
+            assertThat(f.logger.records).hasSize(terminalCount + 1);
+            var last = f.events.getLast();
+            assertThat(last.getAttemptCount()).isZero();
+            assertThat(last.getRequestUrl()).isNull();
+            assertThat(last.getStatusCode()).isNull();
+            assertThat(f.lifecycle.getLast().attemptNumber()).isZero();
+            assertThat(f.logger.records.getLast().subscriptionAttemptCount()).isZero();
+            assertThat(f.logger.records.getLast().responseHeaders()).isEmpty();
+            assertThat(f.call(false, "shared-load").block(WAIT)).isEqualTo("response");
+            assertThat(f.dispatches).hasValue(2);
+        } finally {
+            reactor.test.scheduler.VirtualTimeScheduler.reset();
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void rejectsBeforeAnyPreparationAndSharesCapacityAcrossApis(boolean post) throws Exception {
@@ -451,7 +562,8 @@ class CacheCallerAdmissionContractTest {
                 await(() -> f.active() == 0, "lookup subscription frame exited");
                 assertThat(f.manager.workloadSnapshotForTesting().inFlightLoads()).isZero();
                 assertThat(f.manager.snapshot().currentSize()).isEqualTo(phase == LookupPhase.MISS ? 0 : 1);
-                if (phase != LookupPhase.HIT) { assertThat(sourceCancellations).hasValue(1); }
+                // A miss cancelled during lookup cannot attach a source; an entered exchange still unwinds.
+                assertThat(sourceCancellations).hasValue(phase == LookupPhase.FLIGHT_START ? 1 : 0);
                 f.config.setLogicalCallTimeoutMs(0);
                 f.response = () -> Mono.just(Fixture.ok());
                 assertThat(f.call(false, "replacement").block(WAIT)).isEqualTo("response");
@@ -671,6 +783,7 @@ class CacheCallerAdmissionContractTest {
             List<WeakReference<?>> references = terminalReferences(f, success);
             f.events.clear();
             f.lifecycle.clear();
+            f.attempts.clear();
             f.logger.records.clear();
             for (int attempt = 0; attempt < 40 && references.stream().anyMatch(ref -> ref.get() != null); attempt++) {
                 System.gc();
@@ -762,6 +875,7 @@ class CacheCallerAdmissionContractTest {
         final AtomicInteger dispatches = new AtomicInteger();
         final List<HttpClientObserverEvent> events = new CopyOnWriteArrayList<>();
         final List<ReactiveHttpClientLifecycleContext> lifecycle = new CopyOnWriteArrayList<>();
+        final List<ReactiveHttpClientLifecycleContext> attempts = new CopyOnWriteArrayList<>();
         final RecordingLogger logger = new RecordingLogger();
         final List<Wire> wire = new CopyOnWriteArrayList<>();
         final ReactiveHttpClientProperties.ClientConfig config = new ReactiveHttpClientProperties.ClientConfig();
@@ -775,6 +889,7 @@ class CacheCallerAdmissionContractTest {
         volatile Gate filterSubscribeGate;
         volatile Gate defaultGate;
         volatile boolean serializationFailure;
+        volatile Gate retryHookGate;
 
         Fixture(int capacity) { this(capacity, false); }
 
@@ -787,9 +902,19 @@ class CacheCallerAdmissionContractTest {
         }
 
         Fixture(Map<String, Integer> callerMaximums, boolean realWire, ExchangeFilterFunction lastFilter) {
+            this(callerMaximums, realWire, lastFilter, null, null);
+        }
+
+        Fixture(Map<String, Integer> callerMaximums, boolean realWire, ExchangeFilterFunction lastFilter,
+                Map<String, Integer> loadMaximums, ResilienceOperatorApplier applier) {
             context.registerBean("observer", HttpClientObserver.class, () -> events::add);
             context.registerBean("logger", RecordingLogger.class, () -> logger);
             context.registerBean("hook", ReactiveHttpClientLifecycleHook.class, () -> new ReactiveHttpClientLifecycleHook() {
+                @Override public void onStart(ReactiveHttpClientLifecycleContext c) { attempts.add(c); }
+                @Override public void onRetryAttempt(ReactiveHttpClientLifecycleContext c) {
+                    attempts.add(c);
+                    if (retryHookGate != null) { retryHookGate.run(); }
+                }
                 @Override public void onSuccess(ReactiveHttpClientLifecycleContext c) { lifecycle.add(c); }
                 @Override public void onError(ReactiveHttpClientLifecycleContext c) { lifecycle.add(c); }
                 @Override public void onCancel(ReactiveHttpClientLifecycleContext c) { lifecycle.add(c); }
@@ -819,6 +944,10 @@ class CacheCallerAdmissionContractTest {
                 config.getCache().getPolicies().put(name, policy);
             }
             config.getCache().getPolicies().get("work").setVaryByParameters(List.of("body"));
+            if (applier != null) {
+                config.getResilience().setEnabled(true);
+                config.getResilience().setRetry("selected");
+            }
             MethodMetadataCache metadata = new MethodMetadataCache();
             AuthProvider provider = request -> {
                 authCalls.incrementAndGet();
@@ -861,12 +990,14 @@ class CacheCallerAdmissionContractTest {
                 dispatches.incrementAndGet();
                 return exchange.exchange(request);
             });
-            manager = LocalResponseCacheManager.testing(() -> {
+            java.util.function.LongSupplier clock = () -> {
                 Gate gate = lookupGate.getAndSet(null);
                 if (gate != null) { gate.run(); }
                 return ticker.get();
-            }, Schedulers.parallel(),
-                    callerMaximums);
+            };
+            manager = loadMaximums == null
+                    ? LocalResponseCacheManager.testing(clock, Schedulers.parallel(), callerMaximums)
+                    : LocalResponseCacheManager.testing(clock, Schedulers.parallel(), callerMaximums, loadMaximums);
             ReactiveHttpClientJsonCodec codec = new ReactiveHttpClientJsonCodec() {
                 @Override public byte[] write(Object value) throws Exception {
                     return TestJsonCodecs.jsonCodec().write(value);
@@ -883,7 +1014,8 @@ class CacheCallerAdmissionContractTest {
             };
             var handler = new ReactiveClientInvocationHandler(builder.build(), metadata, new RequestArgumentResolver(),
                     new DefaultErrorDecoder(), config, "admission", Client.class, context,
-                    new NoopResilienceOperatorApplier(), codec, new ReactiveHttpClientProperties.ObservabilityConfig(),
+                    applier != null ? applier : new NoopResilienceOperatorApplier(), codec,
+                    new ReactiveHttpClientProperties.ObservabilityConfig(),
                     manager, provider, base);
             client = (Client) Proxy.newProxyInstance(Client.class.getClassLoader(), new Class<?>[]{Client.class}, handler);
         }

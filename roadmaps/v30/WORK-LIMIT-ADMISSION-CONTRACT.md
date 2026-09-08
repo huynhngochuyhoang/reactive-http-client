@@ -156,6 +156,51 @@ Boot/per-client customization beans and verify frozen context, finalized
 header/URI identity, exact POST bytes, warm-hit auth failure, and the existing
 empty-auth behavior.
 
+## Priority 5 Internal Foreground Enforcement
+
+The internal manager fixture can now select separate caller and load maximum
+maps. `CacheLoadAdmission` uses the same frame-aware `CacheWorkAdmission`
+reservation implementation as `CacheCallerAdmission`, but owns independent
+per-policy counts and a fixed internal foreground-capacity error. There is
+still no bindable work group or new public exception/outcome. Production
+normalization and public selection remain Priority 6.3; refresh capacity
+remains unimplemented.
+
+An independent miss or newly registered flight reserves before invoking its
+loader. Current lookup, flight selection, reservation, and bounded publication
+are coordinated so a published hit is rechecked before rejecting for capacity.
+A same-key waiter reserves membership, not another source slot. A rejected
+miss finishes its provisional generation token and never assembles or subscribes
+the loader, including the loader's Retry pipeline.
+
+The load reservation is not tied to the first caller. It remains held across
+retry/backoff, hidden auth/redirect dispatches, decoding, response metadata,
+and cache publication, including successful byte-admission bypass. Empty,
+error, and successful terminals release before notifying callers. Cancellation
+waits for already-entered source construction, subscription, retry-hook,
+publication, and synchronous cancellation frames to unwind. As with the caller
+guard, arbitrary external work that ignores cancellation is not an observable
+starter-owned frame.
+
+Flight-member cancellation is attached before source startup, and the source
+subscriber is registered before subscription. A reserved waiter can keep an
+assembling source alive after the initiating caller leaves; an abandoned flight
+cannot reconnect when a delayed member attaches. Terminal membership cleanup
+is eager and exactly once. Diagnostic ownership is assigned only once, never
+transferred to a late waiter. Detaching the original caller freezes its facts
+and suppresses subsequent source retry hooks for that caller; coalesced waiter
+terminal records remain transport-free.
+
+Manager close rejects new load reservations and cancels shared work. It does
+not reset occupied counts while synchronous frames unwind or while an
+externally owned independent load continues. Such an independent load releases
+at its own terminal boundary and cannot publish after close. Existing policies
+without selected work limits allocate no load gate/reservation; independent
+lookup keeps its existing path.
+
+The checklist records gated tests and repeated runs for these boundaries.
+Internal active-load counts are test evidence, not a new exported gauge.
+
 ## Scope and Immutability
 
 One factory owns one work-capacity state per selected **policy name**. Every API
