@@ -49,122 +49,275 @@ heap or impose an implicit foreground timeout.
 
 ## Priority 1 - Post-`4.2.0` Baseline and V30 Scope Integrity
 
-### [ ] 1.1 Align the development and published lanes
+### [x] 1.1 Align the development and published lanes
 
-- [ ] Verify root/modules, benchmarks, native-smoke, and current-consumer
+- [x] Verify root/modules, benchmarks, native-smoke, and current-consumer
       coordinates are `4.3.0-SNAPSHOT`.
-- [ ] Keep public dependency snippets, `latest.published.version`, strict API,
+- [x] Keep public dependency snippets, `latest.published.version`, strict API,
       published consumer, and benchmark baselines at `4.2.0`.
-- [ ] Verify current published-baseline benchmark commands include V29 weighted
+- [x] Verify current published-baseline benchmark commands include V29 weighted
       rows; preserve version-specific exclusions only for historical runs.
-- [ ] Preserve V1-V29 release records and make V30 the sole active execution
+- [x] Preserve V1-V29 release records and make V30 the sole active execution
       roadmap with an adopted checklist and an unselected final release scope.
 
-### [ ] 1.2 Reprove the published baseline
+### [x] 1.2 Reprove the published baseline
 
-- [ ] Resolve the parent POM and starter/test-helper/OTel POM, binary, source,
+- [x] Resolve the parent POM and starter/test-helper/OTel POM, binary, source,
       and Javadoc artifacts from a previously absent Central-only repository;
       record all 13 hashes and remote markers.
-- [ ] Run an assembled consumer against published `4.2.0` only; preserve its
+- [x] Run an assembled consumer against published `4.2.0` only; preserve its
       effective POM, classpath, dependency tree, actual totals, and provenance.
-- [ ] Run strict root and starter-module source/binary comparisons against
+- [x] Run strict root and starter-module source/binary comparisons against
       independent fresh `4.2.0` repositories.
-- [ ] Run published-baseline/API fixture guards for same-version comparison,
+- [x] Run published-baseline/API fixture guards for same-version comparison,
       contamination, missing attachments, and inconsistent project versions.
 
-### [ ] 1.3 Verify roadmap and readiness state
+### [x] 1.3 Verify roadmap and readiness state
 
-- [ ] Generate readiness with active roadmap `v30`, development
+- [x] Generate readiness with active roadmap `v30`, development
       `4.3.0-SNAPSHOT`, published/API baseline `4.2.0`, and an unselected lane.
-- [ ] Keep the candidate deferred and unpublished; selecting an execution
+- [x] Keep the candidate deferred and unpublished; selecting an execution
       checklist must not imply completed work, a final release, or publication.
-- [ ] Retain exact active-status checks for V30 and all V1-V29 completion
+- [x] Retain exact active-status checks for V30 and all V1-V29 completion
       checks in the roadmap archive contract.
-- [ ] Run Maven validation, `DocumentationReleaseArtifactTest`, and
+- [x] Run Maven validation, `DocumentationReleaseArtifactTest`, and
       `git diff --check`; record evidence for this priority.
+
+Evidence executed on 2026-09-07 and reviewed on 2026-09-08 from clean commit
+`c5ddccffb60e61a33d8b6c7c3d7dff5275a25c09`, before this checklist-only update:
+
+- Root/module and benchmark versions and both native/current-consumer starter
+  coordinates remain `4.3.0-SNAPSHOT`. Public dependency snippets and
+  published/API/consumer/benchmark baselines remain `4.2.0`. The existing
+  version, benchmark-profile, and archive guards passed without changes:
+  current baseline commands include V29 weighted rows, historical exclusions
+  remain explicitly selected profiles, and V1-V29 release records are unchanged.
+  This is a baseline/profile check, not new performance evidence.
+- `scripts/verify-published-release-artifacts.sh 4.2.0` resolved all 13 release
+  artifacts from a previously absent Central-only repository. Declared POM and
+  embedded JAR versions, source/Javadoc attachments, SHA-256 values, and remote
+  markers passed. Evidence is under
+  `target/release-evidence/v30/priority1/published-baseline/`.
+- `scripts/verify-published-consumer.sh 4.2.0` passed 4 tests with zero failures,
+  errors, or skips using only published artifacts. Its effective POMs,
+  dependency tree, classpath, Surefire XML, 7 artifact hashes, and clean-source
+  provenance are under `target/release-evidence/v30/priority1/published-consumer/`.
+  No reactor output directories were present on the consumer classpath.
+- Strict root and starter-only `-Papi-compatibility -DskipTests verify` builds
+  passed with both source and binary incompatibility failures enabled. They
+  used independent, previously absent Central-only repositories named
+  `v30-priority1-api-root-4.2.0` and `v30-priority1-api-starter-4.2.0` under
+  `target/published-baseline-repositories/`. Reports contain no public API
+  delta; 7 root and 2 starter baseline hashes and remote markers are under
+  `target/release-evidence/v30/priority1/api-root/` and `api-starter/`.
+- `bash scripts/verify-published-baseline-fixtures.sh` passed local
+  contamination, mixed-version, missing-attachment, inconsistent project/parent
+  POM and embedded JAR version, and root/module self-comparison rejection
+  checks. `bash scripts/verify-api-compatibility-fixtures.sh` accepted additive
+  and defaulted-annotation changes and rejected source-only checked exceptions,
+  removed constructors, nested public methods, and enum constants. Fixture
+  reports are retained under this priority's `baseline-fixtures/` and
+  `api-fixtures/` directories.
+- Generated readiness remains development `4.3.0-SNAPSHOT`, published/API
+  baseline `4.2.0`, active roadmap `v30`, and release lane `unselected`. The
+  `4.3.0` candidate is deferred and unpublished with no selected final scope;
+  release-quality compatibility, consumer, benchmark, AOT, native, and
+  publication gates remain pending. The generated JSON and benchmark evidence
+  snippet are under `target/release-evidence/v30/priority1/readiness/`.
+- `mvn -B -ntp -s .mvn/maven-central-settings.xml validate` passed all four
+  reactor modules. The same Maven/settings invocation with
+  `-pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed 46 tests with zero failures, errors, or skips. `git diff --check`
+  passed. Toolchain: Maven `3.9.9`, GraalVM JDK `25.0.3`, Java `21` compilation
+  target, and Spring Boot `4.0.0`.
+- Exact commands, stage exit statuses, logs, toolchain, clean-source provenance,
+  and reports are under `target/release-evidence/v30/priority1/`. Earlier local
+  artifact/consumer evidence and repositories were preserved separately under
+  `target/v30-priority1-previous-state/`, not reused as fresh-run evidence.
+  The completed runner survived the interruption; all saved artifact hashes
+  were rechecked successfully during the 2026-09-08 review.
 
 ---
 
 ## Priority 2 - Active-Work Characterization
 
-### [ ] 2.1 Build deterministic burst workloads
+### [x] 2.1 Build deterministic burst workloads
 
-- [ ] Cover cache-disabled calls, distinct blocked misses, independent duplicate
+- [x] Cover cache-disabled calls, distinct blocked misses, independent duplicate
       misses, one flight with many callers, slow pre-lookup auth, and many
       simultaneously stale keys.
-- [ ] Fix payloads, key cardinality, caller count, operation count, policy
+- [x] Fix payloads, key cardinality, caller count, operation count, policy
       bounds, and observation checkpoints; keep inputs synthetic and bounded.
-- [ ] Gate preparation, subscriber attachment, server dispatch, and source
+- [x] Gate preparation, subscriber attachment, server dispatch, and source
       terminal signals explicitly; a delay alone must not prove overlap.
-- [ ] Exercise `GET` and body-bearing semantic `POST`, count-only and weighted
+- [x] Exercise `GET` and body-bearing semantic `POST`, count-only and weighted
       policies, and isolated contexts where prior state would bias evidence.
 
-### [ ] 2.2 Separate live work from stored responses and memory
+### [x] 2.2 Separate live work from stored responses and memory
 
-- [ ] Record preparing/active callers, independent loads, shared flights,
+- [x] Record preparing/active callers, independent loads, shared flights,
       attached members/waiters, refreshes, and generation owners with precise
       units; do not equate flights with every foreground load.
-- [ ] Record stored entries/bytes and protocol-aware pool state separately from
+- [x] Record stored entries/bytes and protocol-aware pool state separately from
       active work, Java heap, direct memory, threads, and process RSS.
-- [ ] Compare explicit Bulkhead and pool-acquisition limits with their absent
+- [x] Compare explicit Bulkhead and pool-acquisition limits with their absent
       configurations to identify which stages they actually protect.
-- [ ] Capture admitted, saturated, traffic-stopped, source-terminal, and
+- [x] Capture admitted, saturated, traffic-stopped, source-terminal, and
       post-close checkpoints; unavailable measurements remain unknown.
 
-### [ ] 2.3 Record the capacity finding
+### [x] 2.3 Record the capacity finding
 
-- [ ] Classify each observation as capacity exposure, expected caller-owned
+- [x] Classify each observation as capacity exposure, expected caller-owned
       retention, confirmed defect, or inconclusive; attach owner-path evidence.
-- [ ] Identify work that survives its first caller and work that remains
+- [x] Identify work that survives its first caller and work that remains
       application-owned after close; a nonzero RSS is not a leak finding.
-- [ ] Record the limits of cancellation for non-cooperative application hooks
+- [x] Record the limits of cancellation for non-cooperative application hooks
       and distinguish subscription counts from arbitrary external task counts.
-- [ ] Keep raw JFR/heap evidence private and target-only; use bounded structural
+- [x] Keep raw JFR/heap evidence private and target-only; use bounded structural
       checks and reference paths rather than absolute GC/RSS pass thresholds.
+
+Priority 2 evidence (2026-09-08):
+
+- [Active-work characterization](ACTIVE-WORK-CHARACTERIZATION.md) records the
+  fixed workload, counter units, owner paths, observations, and limits.
+  `ResponseCacheActiveWorkTest` adds 35 gated cases using real invocation,
+  auth, codec, Resilience4j, cache, and loopback HTTP/1.1 paths. The source
+  base is reachable commit `0b969f089709be67fcf0a1f35d6ad4b16ea60ce1`, with
+  test/report additions in the working tree; this is not clean-commit native
+  or isolated published-binary evidence. Starter production sources are
+  unchanged from `v4.2.0`; no production or V1-V29 files are changed.
+- Twelve held distinct misses retain twelve foreground tokens before any
+  entry is stored; independent duplicate misses retain twelve tokens but no
+  shared flight. Twelve same-key shared callers retain one flight and eleven
+  waiters. Eight stale keys retain eight refreshes after their callers finish.
+  Bulkhead permits and constrained pool capacity act after all twelve
+  pre-lookup auth subscriptions (and POST serializations). These are capacity
+  exposures, not evidence of a newly introduced leak.
+- The first shared caller can cancel while eleven members keep the source
+  alive. Independent loads retain external caller ownership after manager
+  close with transport deliberately left open; their eventual terminals
+  release tokens without publication. A non-cooperative serializer remains
+  executing after caller cancellation until its application gate is released.
+  Stored generation bookkeeping, live owners, pool state, and memory domains
+  are reported separately. HTTP/2 streams and unavailable memory limits remain
+  unknown; there are no GC/RSS pass thresholds or public live-work meters.
+- Five final runs of `mvn -B -ntp -pl reactive-http-client-starter
+  -Dtest=ResponseCacheActiveWorkTest test` passed 35 cases each
+  (175 total, zero failures/errors/skips). Their per-run JSON, Surefire XML,
+  text reports, and Maven logs are preserved under
+  `target/release-evidence/v30/priority2/final-stress/run-1/` through `run-5/`.
+- The final related regression ran `ResponseCacheActiveWorkTest`,
+  `ResponseCacheMemoryWorkloadTest`, `ResponseCacheRetentionOwnershipTest`,
+  `SemanticReadSingleFlightRefreshContractTest`,
+  `BoundedLocalResponseCacheContractTest`, and `DocumentationReleaseArtifactTest`
+  with the same Maven invocation and a comma-separated `-Dtest` selection:
+  149 tests passed, zero failures/errors/skips. Reports and the exact Maven
+  log are preserved under `target/release-evidence/v30/priority2/final-regression/`.
+- After the checklist/report update, `DocumentationReleaseArtifactTest` passed
+  all 46 tests again. Reactor `mvn -B -ntp validate` passed all four modules;
+  tracked and new-file whitespace checks passed. Final logs are
+  `target/release-evidence/v30/priority2/documentation-final.log` and
+  `target/release-evidence/v30/priority2/validate-final.log`.
+- Toolchain: Maven `3.9.9`, GraalVM JDK `25.0.3`, Java `21` compilation target,
+  Spring Boot `4.0.0`, Reactor Netty `1.3.0`, and Linux `amd64` with epoll.
+  Source copies and hashes are retained under
+  `target/release-evidence/v30/priority2/source/`. No JFR or heap dump was
+  generated; any follow-up raw capture stays private and target-only.
+  Priority 3's explicit admission contract and later release gates remain open.
 
 ---
 
 ## Priority 3 - Effective Work-Limit and Admission Contract
 
-### [ ] 3.1 Freeze configuration and ownership semantics
+### [x] 3.1 Freeze configuration and ownership semantics
 
-- [ ] Define the smallest optional per-policy contract for positive caller and
+- [x] Define the smallest optional per-policy contract for positive caller and
       foreground-load limits, plus a positive refresh limit when refresh is
       enabled; freeze names, numeric ranges, and overflow handling.
-- [ ] Define absence, partial selections, invalid zero/negative values, and a
+- [x] Define absence, partial selections, invalid zero/negative values, and a
       refresh limit without refresh selection; no value silently enables work.
-- [ ] Define capacity sharing across APIs and isolation across policies,
+- [x] Define capacity sharing across APIs and isolation across policies,
       factories, and pods; document possible hot-key saturation without promising
       tenant fairness or another waiter quota.
-- [ ] Freeze startup immutability/mutation behavior so changing bounds cannot
+- [x] Freeze startup immutability/mutation behavior so changing bounds cannot
       create another live limiter or reset occupied capacity.
-- [ ] Record when each reservation begins and ends, including synchronous
+- [x] Record when each reservation begins and ends, including synchronous
       callback execution still unwinding after timeout/cancellation; do not
       claim that arbitrary application work stopped from a terminal signal alone.
 
-### [ ] 3.2 Resolve one effective selection
+### [x] 3.2 Resolve one effective selection
 
-- [ ] Preserve client/method policy precedence, `@CacheDisabled`, concrete
+- [x] Preserve client/method policy precedence, `@CacheDisabled`, concrete
       inherited methods, `@ApiRef`, and replacement metadata caches.
-- [ ] Use one normalized decision across validation, runtime, contracts,
+- [x] Use one normalized decision across validation, runtime, contracts,
       diagnostics, mocks, and AOT without instantiating lazy optional beans.
-- [ ] Prove omitted limits and inert policy definitions preserve the existing
+- [x] Prove omitted limits and inert policy definitions preserve the existing
       path without new work owners, timers, or optional dependencies.
-- [ ] Keep contract representations/tests internal until complete runtime
+- [x] Keep contract representations/tests internal until complete runtime
       enforcement exists; basic effective-policy export must accompany eventual
       public configuration, not lag behind it.
 
-### [ ] 3.3 Define saturation and local errors
+### [x] 3.3 Define saturation and local errors
 
-- [ ] Specify fixed caller-capacity/load-capacity rejection reasons and a
+- [x] Specify fixed caller-capacity/load-capacity rejection reasons and a
       distinct refresh-capacity skip; no fallback uncached dispatch or queue.
-- [ ] Define the error's public shape, cache outcome, category, and failure-stage
+- [x] Define the error's public shape, cache outcome, category, and failure-stage
       behavior without conflating local admission with pool, transport,
       Resilience4j rejection, or response-byte storage bypass.
-- [ ] Specify zero attempt/dispatch evidence and one terminal callback per
+- [x] Specify zero attempt/dispatch evidence and one terminal callback per
       rejected caller; bound text and exclude keys, values, targets, and identity.
-- [ ] Place local foreground rejection outside starter loader Retry; document
+- [x] Place local foreground rejection outside starter loader Retry; document
       that application-side resubscription creates a new admission attempt.
+
+Priority 3 evidence (2026-09-08):
+
+- [Work-limit and admission contract](WORK-LIMIT-ADMISSION-CONTRACT.md)
+  freezes the future work.maximum-concurrent-callers/loads/refreshes names,
+  integer range 1-1,000,000, all-or-none selection rules, named-policy/factory
+  ownership, startup mutation rejection, callback-unwind release boundaries,
+  saturation decisions, and structural local errors. This is the internal
+  contract gate, not public configuration or production enforcement.
+- The test-only `CacheWorkLimitContract` consumes the existing
+  `EffectiveCachePolicy.Decision` through the supplied metadata cache; it
+  contains no production counters, timers, optional bean lookup, or admission
+  implementation. `CacheWorkLimitContractTest` passes 45 cases covering
+  normalization/binding overflow, inert/absent selections, refresh conditions,
+  concrete inheritance, method/client precedence, `@CacheDisabled`, `@ApiRef`,
+  immutable selection/mutation, policy/factory isolation, decision tables,
+  and fixed zero-attempt/dispatch rejection facts.
+- Existing-path checks exercise the handler/cache manager with work omitted,
+  exact per-method exporter parity, no manager/Caffeine inspection for an
+  unselected policy, and replacement metadata in AOT and provider snapshots
+  without instantiating lazy RetryRegistry/AuthProviderFactory definitions.
+  The contract maps runtime, mocks, diagnostics, and AOT to that same
+  normalized decision when enforcement lands; no bounded-work export or
+  native admission behavior is claimed today.
+- Related regression passed 327 tests (264 starter, 63 mock helper), zero
+  failures/errors/skips, using `mvn -B -ntp -pl reactive-http-client-test -am`
+  with `-Dsurefire.failIfNoSpecifiedTests=false test` and a comma-separated
+  `-Dtest` selection of `CacheWorkLimitContractTest`,
+  `DeclarativeCachePolicyTest`, `ResponseCacheActiveWorkTest`,
+  `ResponseCacheRetentionOwnershipTest`, `ReactiveHttpClientAotSmokeTest`,
+  `ReactiveHttpClientDiagnosticsProviderTest`, `EffectiveHttpClientContractExporterTest`,
+  `DocumentationReleaseArtifactTest`, `MockReactiveHttpClientTest`, and
+  `Boot4MockReactiveHttpClientTest`. The exact log is
+  `target/release-evidence/v30/priority3/regression.log`; per-module Surefire
+  reports are retained under `target/release-evidence/v30/priority3/regression/`.
+- Final contract/documentation verification passed 91 tests (45 contract,
+  46 documentation), zero failures/errors/skips, using the starter module
+  with `-Dtest=CacheWorkLimitContractTest,DocumentationReleaseArtifactTest`.
+  Reactor `mvn -B -ntp validate` passed all four modules; tracked and
+  new-file whitespace checks passed. Logs are
+  `target/release-evidence/v30/priority3/final-contract-docs.log` and
+  `target/release-evidence/v30/priority3/validate.log`.
+- Source base: reachable commit `44502219b071a73a37cc0ff7301eafb3d3a68caf`,
+  with test-only specification and V30 document additions in the working tree.
+  Maven `3.9.9`, GraalVM JDK `25.0.3`, Java `21` compilation target, Boot
+  `4.0.0`. Production sources, public properties/types/enums, metadata,
+  dependencies, and historical V1-V29 evidence are unchanged.
+  Source copies/hashes are under `target/release-evidence/v30/priority3/source/`.
+  Priorities 4-6 must enforce the contract and complete 6.3 before public
+  binding/basic effective output; later terminal-delivery/native gates remain open.
 
 ---
 
