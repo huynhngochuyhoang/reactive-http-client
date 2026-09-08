@@ -40,6 +40,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -250,6 +251,67 @@ class CacheCallerAdmissionContractTest {
             await(() -> f.active() == 0, "timed-out auth frame exit");
             assertThat(f.dispatches).hasValue(0);
             assertThat(f.manager.snapshot().currentSize()).isZero();
+        }
+    }
+
+    enum LookupPhase { HIT, MISS, FLIGHT_START }
+
+    @ParameterizedTest
+    @EnumSource(LookupPhase.class)
+    void cancellationHoldsAdmissionThroughLookupSubscription(LookupPhase phase) throws Exception {
+        assertLookupSubscriptionOwnership(phase, false);
+    }
+
+    @ParameterizedTest
+    @EnumSource(LookupPhase.class)
+    void timeoutHoldsAdmissionThroughLookupSubscription(LookupPhase phase) throws Exception {
+        assertLookupSubscriptionOwnership(phase, true);
+    }
+
+    private void assertLookupSubscriptionOwnership(LookupPhase phase, boolean timeout) throws Exception {
+        try (Fixture f = new Fixture(1); Gate gate = new Gate()) {
+            assertThat(f.call(false, "warm").block(WAIT)).isEqualTo("response");
+            if (phase == LookupPhase.MISS) { f.ticker.set(Duration.ofMinutes(2).toNanos()); }
+            AtomicInteger sourceCancellations = new AtomicInteger();
+            f.response = () -> {
+                if (phase == LookupPhase.FLIGHT_START) { gate.run(); }
+                return Mono.<ClientResponse>never().doOnCancel(sourceCancellations::incrementAndGet);
+            };
+            if (phase != LookupPhase.FLIGHT_START) { f.lookupGate.set(gate); }
+            String key = phase == LookupPhase.FLIGHT_START ? "miss" : "warm";
+            var worker = Schedulers.newSingle("admission-blocked-lookup");
+            try {
+                if (timeout) {
+                    f.config.setLogicalCallTimeoutMs(60_000);
+                    StepVerifier.withVirtualTime(() -> f.call(false, key).subscribeOn(worker))
+                            .then(() -> assertThatCode(gate::awaitEntered).doesNotThrowAnyException())
+                            .thenAwait(Duration.ofMinutes(2))
+                            .expectError(LogicalCallTimeoutException.class).verify(WAIT);
+                } else {
+                    var call = f.call(false, key).subscribeOn(worker).toFuture();
+                    gate.awaitEntered();
+                    assertThat(call.cancel(true)).isTrue();
+                }
+                assertThat(f.active()).as("lookup subscription frame still owns admission").isEqualTo(1);
+                int authCalls = f.authCalls.get();
+                int dispatches = f.dispatches.get();
+                StepVerifier.create(f.call(false, "replacement"))
+                        .expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
+                assertThat(f.authCalls).hasValue(authCalls);
+                assertThat(f.dispatches).hasValue(dispatches);
+                gate.close();
+                await(() -> f.active() == 0, "lookup subscription frame exited");
+                assertThat(f.manager.workloadSnapshotForTesting().inFlightLoads()).isZero();
+                assertThat(f.manager.snapshot().currentSize()).isEqualTo(phase == LookupPhase.MISS ? 0 : 1);
+                if (phase != LookupPhase.HIT) { assertThat(sourceCancellations).hasValue(1); }
+                f.config.setLogicalCallTimeoutMs(0);
+                f.response = () -> Mono.just(Fixture.ok());
+                assertThat(f.call(false, "replacement").block(WAIT)).isEqualTo("response");
+                assertThat(f.active()).isZero();
+            } finally {
+                gate.close();
+                worker.dispose();
+            }
         }
     }
 
@@ -514,6 +576,7 @@ class CacheCallerAdmissionContractTest {
         static final Context CONTEXT = Context.of("tenant", List.of("a"));
         final GenericApplicationContext context = new GenericApplicationContext();
         final AtomicLong ticker = new AtomicLong();
+        final AtomicReference<Gate> lookupGate = new AtomicReference<>();
         final AtomicInteger serializations = new AtomicInteger();
         final AtomicInteger authCalls = new AtomicInteger();
         final AtomicInteger probes = new AtomicInteger();
@@ -615,7 +678,11 @@ class CacheCallerAdmissionContractTest {
                 dispatches.incrementAndGet();
                 return exchange.exchange(request);
             });
-            manager = LocalResponseCacheManager.testing(ticker::get, Schedulers.parallel(),
+            manager = LocalResponseCacheManager.testing(() -> {
+                Gate gate = lookupGate.getAndSet(null);
+                if (gate != null) { gate.run(); }
+                return ticker.get();
+            }, Schedulers.parallel(),
                     callerMaximums);
             ReactiveHttpClientJsonCodec codec = new ReactiveHttpClientJsonCodec() {
                 @Override public byte[] write(Object value) throws Exception {

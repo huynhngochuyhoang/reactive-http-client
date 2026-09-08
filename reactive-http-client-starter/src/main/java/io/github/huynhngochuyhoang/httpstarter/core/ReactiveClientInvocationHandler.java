@@ -443,7 +443,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                                                 new AtomicReference<>(authorization.authContext()), responseMetadata,
                                                                 loadState, finalLoadRequestIdentity,
                                                                 cacheSelection.policy().getMaximumTotalDecodedResponseBytes());
-                                                return cacheManager.getOrLoad(
+                                                return CacheCallerAdmission.subscribePreparation(cacheManager.getOrLoad(
                                                         cacheSelection,
                                                         preparedKey.key(),
                                                         plan.apiName(),
@@ -455,7 +455,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                                                 finalLoadRequestIdentity.get(), bodyPreparation.key()),
                                                         callerState,
                                                         new SubscriptionReportingState(keyResolved),
-                                                        detachedCacheLoadContext(context, preparedContext));
+                                                        detachedCacheLoadContext(context, preparedContext)));
                                             })));
                             return authorizedLookup.contextWrite(preparedContext::writeContext);
                         }));
