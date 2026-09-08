@@ -75,14 +75,16 @@ leaks. The completed V29
 
 ### Three separate ownership bounds
 
-The intended optional policy contract has three dimensions. Public property
-names and numeric ranges must be frozen in Priority 3 before implementation.
+The optional policy contract has three dimensions. Priority 3 freezes their
+names, numeric ranges, selection rules, and terminal semantics in the internal
+[work-limit and admission contract](WORK-LIMIT-ADMISSION-CONTRACT.md).
+Public binding remains gated on complete enforcement in Priorities 4-6.
 
 | Dimension | Counted owner | Reservation lifetime |
 |---|---|---|
-| Foreground callers | Every subscribed cache-selected call, including preparation, auth, fresh/stale hits, miss leaders, and coalesced waiters | Before argument freezing, serialization, and pre-lookup auth until that caller terminates |
-| Foreground loads | Every independent miss or shared miss load, including a shared load whose first caller has detached | Before loader assembly/subscription until source termination or cancellation |
-| Hidden refreshes | Every admitted refresh, including preparation and transport work | Before hidden loader assembly until success, failure, timeout, cancellation, or invalidation terminates it |
+| Foreground callers | Every subscribed cache-selected call, including preparation, auth, fresh/stale hits, miss leaders, and coalesced waiters | Before argument freezing, serialization, and pre-lookup auth until caller terminal and executing preparation callbacks have exited |
+| Foreground loads | Every independent miss or shared miss load, including a shared load whose first caller has detached | Before loader assembly/subscription until source terminal/cancellation and owned processing has unwound |
+| Hidden refreshes | Every admitted refresh, including preparation and transport work | Before hidden loader assembly until terminal success/failure/timeout/cancellation/invalidation and owned processing has unwound |
 
 Limits belong to one selected client factory and named policy. APIs selecting
 that policy share capacity. Different factories and pods have separate capacity;
