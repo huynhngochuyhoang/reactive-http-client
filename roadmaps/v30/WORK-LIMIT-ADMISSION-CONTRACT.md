@@ -248,6 +248,46 @@ prove slots are not reusable before their entered callbacks exit. Concurrent
 starter-owned versus replacement-client AOT/contract paths are included.
 The checklist records actual runs, report totals, and source provenance.
 
+## Priority 7 Composition Evidence
+
+`CacheWorkCompositionContractTest` selects the public policy work properties
+through the production manager and invocation handler. It uses real
+Resilience4j registries/operators, virtual-time caller deadlines and Retry,
+gated single-flight responses, and loopback HTTP for response-read timeouts
+and `307`/`308` POST redirects. No production behavior changes were needed.
+
+| Boundary | Verified observations |
+|---|---|
+| Local rejection | No loader operator assembly/subscription or business guard/circuit activity; no dispatch evidence |
+| Real CircuitBreaker/RateLimiter/Bulkhead rejection | Admitted caller/source slots return to zero; one error per terminal surface; zero attempts/dispatch |
+| Retry backoff and hidden replay | One source slot across attempts/dispatches; no implicit Retry or unsafe replay permission |
+| Auth and identity | Warm hits still authorize; refreshed auth is not reused stale on outer Retry; auth cannot mutate wire bytes; changed identity/target bypasses publication |
+| Redirect | Two actual POST bodies for one admitted source, a joined waiter, and a subsequent cached hit; no extra dispatch from admission |
+| Independent deadlines | Either caller can expire without stealing the surviving source slot; waiter terminals contain no source evidence |
+| Response consumption | Logical timeout/cancellation preserve known response state; native response timeout ends the source and both callers |
+| Hidden refresh | Real auth/operators run with a separate refresh slot and deadline; no extra caller terminal for hidden work |
+| Storage byte bypass | A successful uncached response releases caller/load capacity and remains successful load work |
+
+The final diagnostic assertions compare error identity, attempts, status, URL,
+failure stage and response-header sentinels across observer, lifecycle and log
+surfaces where those fields exist. A classified response-body timeout precedes
+the terminal pre-dispatch auth failure, proving prior failure evidence resets.
+Lifecycle/log prepared arguments are not final dispatch evidence; generated
+idempotency headers are intentionally preserved. Transparent connector
+redirects still report the WebClient request URL, not a hop-by-hop wire history.
+
+Foreground limits do not impose deadlines. Deliberately nonterminating work
+with request/logical timeouts disabled keeps its slot until explicit cancellation.
+Applications need an end-to-end logical-call budget plus appropriate native
+phase timeouts; separate refresh capacity does not isolate shared transport,
+auth or resilience resources. See the work-limit composition section in
+[response caching](../../docs/32-response-caching.md).
+
+Exact test totals, commands, source revision and copied artifacts are recorded
+in [Priority 7 of the checklist](CHECKLIST.md).
+Public rejection types/live work telemetry remain Priority 9, and this is JVM
+contract evidence, not native-image or performance evidence.
+
 ## Scope and Immutability
 
 One factory owns one work-capacity state per selected **policy name**. Every API
@@ -381,8 +421,8 @@ path with limits omitted. Related existing mock, AOT, diagnostics, retention,
 and active-work suites protect those paths.
 
 The original model remains a test fixture, not a second production resolver.
-Priorities 4-6 now cover bounded preparation, foreground and refresh sources,
-with focused shutdown/race evidence. Broader feature composition, collection
-stress, live telemetry, assembled-consumer/native execution, and performance
-evidence remain subsequent priorities. No native executable, published-binary,
-GC, or latency evidence is claimed by Priority 6.
+Priorities 4-7 now cover bounded preparation, foreground and refresh sources,
+and feature composition with focused shutdown/race evidence. Collection stress,
+live telemetry, assembled-consumer/native execution, and performance evidence
+remain subsequent priorities. No native executable, published-binary, GC, or
+latency evidence is claimed by these implementation steps.

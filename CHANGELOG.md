@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   effective-contract output, and AOT binding hints ship together; configuration
   changes require factory recreation. Live admission telemetry and native
   executable evidence remain later V30 gates.
+- **Cache work-limit composition evidence.** Gated and virtual-time contracts
+  exercise real Resilience4j admission, per-caller deadlines, hidden auth replay,
+  body-preserving redirects, refresh timeouts, and publication identity checks
+  with selected limits. Local rejection stays outside the business operators;
+  source capacity remains owned through retries and independent caller departure.
+  This adds regression coverage and operations guidance, not another operator,
+  timeout default, replay permission, or public telemetry surface.
 
 ## [4.2.0] - 2026-09-06
 

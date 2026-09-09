@@ -474,6 +474,48 @@ includes the normalized bounds. Dedicated rejection types/outcomes, live work
 gauges and skip counters remain V30 Priority 9; do not infer them from the
 existing refresh terminal counters.
 
+### Composition and deadlines with work limits
+
+Work limits leave the explicitly selected operator order unchanged: Bulkhead,
+CircuitBreaker, RateLimiter, Retry, then the request attempt on subscription.
+A rejected caller never prepares or authorizes a request. A foreground load
+rejection happens after per-caller preparation/auth/lookup, but before the
+business loader's operators subscribe; it consumes no business guard permit,
+Retry attempt, or circuit sample. Auth/token-service work has its own transport
+and resilience configuration. A real guard rejection after local admission
+releases the caller and load reservations with zero business attempts/dispatch.
+
+One load reservation spans Retry backoff, the subsequent attempts, and hidden
+auth/redirect dispatches. Cache capacity grants no retry permission, unsafe-method
+acknowledgement, or body repeatability. A semantic-read POST still needs the
+existing explicit retry/idempotency contract. A `401` replay consumes refreshed
+auth, and a later outer Retry resolves current credentials rather than reusing
+the initial pre-lookup credential. Auth-visible prepared bytes remain isolated
+from outbound bytes. Changed finalized WebClient request identity prevents
+publication under the old lookup key. Transparent connector redirects retain
+the original WebClient URL in terminal diagnostics; this is not a redirect-hop
+audit or a count of wire requests.
+
+Every caller, including a hit or waiter, retains its own logical-call budget.
+An early waiter timeout releases that caller only. The first caller's timeout
+also leaves a shared source and its load slot alive while another caller remains;
+waiters do not inherit the source's URL, response headers, status, or attempt
+count. The last detachment cancels shared work. Native `request-timeout-ms`
+remains inside the source and a response read timeout terminates all its callers.
+Hidden refresh uses the same auth/operator pipeline with its own refresh slot
+and the earlier of refresh timeout and hard expiry, not a stale caller's deadline.
+
+Set a finite `logical-call-timeout-ms` for the complete foreground preparation,
+auth, resilience admission wait, Retry delays, and response consumption budget. Configure
+the native request/transport timeouts for the phases described in
+[Timeouts](04-timeouts.md); a response-read timeout alone is not an end-to-end
+deadline. Without applicable timeouts or cancellation, a hung admitted source
+continues occupying capacity indefinitely. Limits reject excess work; they do
+not age out live ownership. A successful response that bypasses byte storage
+still releases work capacity normally. Prepared request arguments may remain in
+lifecycle/exchange-log records when dispatch facts are absent; do not interpret
+those headers (for example, an idempotency key) as proof of a wire request.
+
 ## Phase-four observability
 
 Cache telemetry is independent from cache selection and defaults off. Enable it

@@ -632,38 +632,92 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 7 - Resilience, Auth, Redirect, and Deadline Composition
 
-### [ ] 7.1 Preserve resilience selection and attempt counts
+### [x] 7.1 Preserve resilience selection and attempt counts
 
-- [ ] Preserve explicit operator selection/order and unsafe retry/body-repeatability
+- [x] Preserve explicit operator selection/order and unsafe retry/body-repeatability
       rules; cache work limits cannot imply an operator or replay permission.
-- [ ] Verify local reservation rejection does not subscribe to the business
+- [x] Verify local reservation rejection does not subscribe to the business
       loader's Retry, CircuitBreaker, Bulkhead, or RateLimiter pipeline.
-- [ ] Verify open-circuit and other real guard rejections release admitted cache
+- [x] Verify open-circuit and other real guard rejections release admitted cache
       reservations without inventing transport evidence.
-- [ ] Retain one source reservation through retry delays and hidden dispatches;
+- [x] Retain one source reservation through retry delays and hidden dispatches;
       distinguish loader terminal work from downstream request counts.
 
-### [ ] 7.2 Preserve auth, redirect, and key isolation
+### [x] 7.2 Preserve auth, redirect, and key isolation
 
-- [ ] Cover warm-hit auth rejection, `401` invalidation, refreshed identity, and
+- [x] Cover warm-hit auth rejection, `401` invalidation, refreshed identity, and
       pre-resolved auth consumption across outer retries.
-- [ ] Keep auth-visible bytes isolated from serialized body identity; request
+- [x] Keep auth-visible bytes isolated from serialized body identity; request
       changes after retry/redirect must obey publication revalidation.
-- [ ] Exercise body-preserving redirect and semantic `POST` without duplicate
+- [x] Exercise body-preserving redirect and semantic `POST` without duplicate
       subscriptions introduced by admission bookkeeping.
-- [ ] Assert the final observer/lifecycle/log error, URL, status, headers, stage,
+- [x] Assert the final observer/lifecycle/log error, URL, status, headers, stage,
       and dispatch evidence; do not rely on only downstream exception assertions.
 
-### [ ] 7.3 Preserve independent deadlines
+### [x] 7.3 Preserve independent deadlines
 
-- [ ] Test early waiter timeout, first-caller timeout with a live later waiter,
+- [x] Test early waiter timeout, first-caller timeout with a live later waiter,
       timeout during Retry backoff, and timeout after response headers/body start.
-- [ ] Keep logical deadlines per caller and request timeouts inside the source;
+- [x] Keep logical deadlines per caller and request timeouts inside the source;
       a first-caller deadline cannot terminate a source still owned by others.
-- [ ] Verify timeout/cancellation releases only its owner's capacity and records
+- [x] Verify timeout/cancellation releases only its owner's capacity and records
       the correct timeout or cancellation terminal event exactly once.
-- [ ] Prove capacity remains occupied by deliberately hung admitted work until
+- [x] Prove capacity remains occupied by deliberately hung admitted work until
       its actual terminal boundary; document required application timeout choices.
+
+### Implementation and evidence
+
+- Completed on 2026-09-09 against reachable base
+  `28babfcc65209116a32c25c5673080077a6a4c9a` plus this working tree.
+  `CacheWorkCompositionContractTest` adds **23 cases** through public policy
+  selection and the production manager/invocation handler. Existing runtime
+  behavior satisfied the composition contract; no production code, dependency,
+  default, version, public exception, or metric schema changed.
+- Real Resilience4j operators prove local caller/load rejection causes no
+  business operator assembly/subscription, permit use, or circuit sample.
+  CircuitBreaker, RateLimiter and Bulkhead rejection release admitted slots
+  with zero attempts/dispatch. Explicit selection, unsafe retry validation and
+  streaming-body rejection remain intact. Retry delays retain a single source
+  reservation; loader terminal counters remain distinct from wire dispatches.
+- Warm hits still authorize. A `401` invalidation, changed credentials and an
+  outer Retry use current auth without reusing the original pre-resolved
+  credential. Auth-visible byte mutations cannot alter sent bodies. Changed
+  auth identity or finalized target bypasses publication under the old key.
+  Gated loopback `307`/`308` POSTs deliver exactly two wire bodies for one load
+  and a waiter, followed by a cached hit without another dispatch.
+- Virtual time covers either caller timing out while the other retains the
+  source, timeout during Retry backoff, response-body timeout/cancellation,
+  refresh Retry/deadline behavior and deliberately hung work without deadlines.
+  Real loopback response-read timeout terminates the shared source and both
+  callers. Successful byte-storage bypass releases capacity normally.
+  Observer/lifecycle/log lists assert exact terminal counts and matching error,
+  URL, status, stage and response evidence where available. A known classified
+  body timeout and response-header sentinel precede a terminal pre-dispatch
+  auth failure. Shared notifications are identified by outcome, not callback
+  order. Prepared idempotency headers are not mistaken for dispatch evidence.
+- Final complete starter/mock run: **1,569 tests**, **1,503** starter plus
+  **66** helper, zero failures/errors/skips:
+  `mvn -B -ntp -pl reactive-http-client-test -am -l target/release-evidence/v30/priority7/complete-tests.log test`.
+  Copied XML is under `priority7/complete-tests/`; parsed totals are in
+  `priority7/complete-tests-summary.txt`.
+- Focused regression: **155 tests**, zero failures/errors/skips:
+  `mvn -B -ntp -pl reactive-http-client-starter -Dtest=CacheWorkCompositionContractTest,CacheWorkPolicyEnforcementTest,CacheCallerAdmissionContractTest,CacheLoadAdmissionContractTest,CacheRefreshAdmissionContractTest,ResilienceOperatorCompositionContractTest,SemanticReadReplayTimeoutContractTest,RetryRedirectAuthReplayCompositionContractTest -l target/release-evidence/v30/priority7/regression.log test`.
+  The corresponding reports are copied under `priority7/regression/`.
+- Five sequential stress runs: **116 cases each, 580 executions**, zero
+  failures/errors/skips:
+  `mvn -B -ntp -pl reactive-http-client-starter -Dtest=CacheWorkCompositionContractTest,CacheCallerAdmissionContractTest,CacheLoadAdmissionContractTest,CacheRefreshAdmissionContractTest -l target/release-evidence/v30/priority7/stress-N/maven.log test`
+  for `N=1..5`. Per-run XML/logs and `priority7/stress-summary.txt` are retained.
+- Reactor `mvn -B -ntp validate` passes. Final documentation/metadata checks,
+  diff checks, source copies, base revision, complete working-tree patch and
+  SHA-256 manifests are under `target/release-evidence/v30/priority7/`.
+  Environment: Maven `3.9.9`, GraalVM JDK `25.0.3`, Java `21` target,
+  Boot `4.0.0`, reactor `4.3.0-SNAPSHOT`, published/API baseline `4.2.0`.
+- [Response-cache guidance](../../docs/32-response-caching.md) and the
+  [work-limit contract](WORK-LIMIT-ADMISSION-CONTRACT.md) document independent
+  deadline/slot ownership, shared-resource contention and required application
+  timeout choices. Priority 8 ownership/collection stress and Priority 9 public
+  rejection/live telemetry remain open. No native-image, assembled-consumer,
+  API-comparison, benchmark or release-performance evidence is claimed here.
 
 ---
 
