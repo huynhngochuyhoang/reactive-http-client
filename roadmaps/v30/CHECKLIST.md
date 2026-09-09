@@ -723,41 +723,127 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 8 - Cancellation, Eviction, and Shutdown Ownership
 
-### [ ] 8.1 Stress ownership invariants
+### [x] 8.1 Stress ownership invariants
 
-- [ ] Assert nonnegative current counts at or below each configured maximum at
+- [x] Assert nonnegative current counts at or below each configured maximum at
       synchronized checkpoints under both same-key and many-key contention.
-- [ ] Cover every terminal type, synchronous assembly exceptions, cancellation
+- [x] Cover every terminal type, synchronous assembly exceptions, cancellation
       before attachment, immediate retries, and simultaneous terminal signals.
-- [ ] Count acquisitions, releases, and terminal callbacks rather than retaining
+- [x] Count acquisitions, releases, and terminal callbacks rather than retaining
       only the last observed record; reconcile counts with active owners.
-- [ ] Prove rejected/skipped work retains no flight, waiter, key token, task, or
+- [x] Prove rejected/skipped work retains no flight, waiter, key token, task, or
       loader closure and cannot repopulate a cache after invalidation.
 
-### [ ] 8.2 Prove collection independently of storage cleanup
+### [x] 8.2 Prove collection independently of storage cleanup
 
-- [ ] Use bounded reference-queue/weak-reference evidence for caller context,
+- [x] Use bounded reference-queue/weak-reference evidence for caller context,
       arguments, prepared bytes, auth state, callbacks, and source state.
-- [ ] Verify detached callers become collectible while another caller keeps
+- [x] Verify detached callers become collectible while another caller keeps
       a flight alive, and rejected callers become collectible while saturated
       admitted work remains active.
-- [ ] Verify explicit eviction releases ordinary entries before manager close;
+- [x] Verify explicit eviction releases ordinary entries before manager close;
       a still-running independent load retains its own slot until terminal.
-- [ ] Keep diagnostic GC a test aid only; do not infer heap ownership from RSS
+- [x] Keep diagnostic GC a test aid only; do not infer heap ownership from RSS
       or add runtime GC, weak-cache, or heap-walking behavior.
 
-### [ ] 8.3 Preserve factory lifecycle boundaries
+### [x] 8.3 Preserve factory lifecycle boundaries
 
-- [ ] Atomically stop new reservations during close; no race can create a new
+- [x] Atomically stop new reservations during close; no race can create a new
       live cache, limiter, flight, or refresh afterward.
-- [ ] Terminate registered shared/refresh work within the established shutdown
+- [x] Terminate registered shared/refresh work within the established shutdown
       bound; test with normal request deadlines beyond the observation window.
-- [ ] Preserve independent caller-owned loads after manager close until their
+- [x] Preserve independent caller-owned loads after manager close until their
       own terminal boundary, while invalidating all late publication rights.
-- [ ] Verify late releases from a closed manager cannot affect a recreated
+- [x] Verify late releases from a closed manager cannot affect a recreated
       factory's capacity, entries, diagnostics, or metric registrations.
-- [ ] Record before-close and post-close owner evidence with explicit absent
+- [x] Record before-close and post-close owner evidence with explicit absent
       meter semantics after deregistration.
+
+### Implementation and evidence
+
+- Completed on 2026-09-09 against reachable base
+  `f37b510ce8f49eb84ec1e65cdc767bc9b46b52b3` plus this working tree.
+  `CacheWorkOwnershipContractTest` adds **22 cases**. Each run includes
+  **80** synchronized contention/terminal-race waves, **40** first-cache/close
+  waves, and **40** refresh/eviction waves, plus collection, pre-attachment
+  cancellation, immediate retry, and factory-replacement checks.
+- Contention exposed stranded source reservations when cancellation entered
+  its callback frame but success won `doFinally`. `CacheWorkAdmission.own`
+  now brackets upstream cancellation directly with `try/finally`, retaining
+  capacity through cleanup and releasing exactly once for either terminal
+  winner. `LocalResponseCacheManager.close` shares the limiter-installation
+  lock with work configuration; application cancellation stays outside that
+  lifecycle lock. Earlier failing evidence is retained in `priority8/` as
+  `reproduction.log` and `cancellation-race-before.log`, not final passing runs.
+- Caller acquisitions/releases reconcile with current counts and every caller
+  terminal is counted. Foreground source callbacks/load totals and hidden
+  refresh totals reconcile independently. Same-key and many-key saturation
+  stay within selected maxima; immediate assembly retries reuse released
+  capacity. Invalidated concurrent loads and refreshes cannot restore entries.
+  The existing caller/load/refresh suites cover empty/error/success, deadlines,
+  blocked synchronous frames, delayed member attachment, and skipped refresh.
+- Bounded reference-queue/weak-reference checks prove caller-only arguments,
+  prepared-byte/auth/context/state/callback references detach while another
+  source remains active. Rejected load/caller and skipped-refresh closures
+  collect without stopping saturated work; generation counts and scheduler
+  queues contain only admitted work. Shared source-owned state remains live
+  until its terminal. Existing real-proxy preparation/retention tests also run;
+  the new manager-level tests do not claim every first-caller object is
+  collectible while a shared source still legitimately needs it.
+- Explicit eviction releases ordinary cached values **before manager close**;
+  running independent loads retain slots until their own terminal and cannot
+  publish through invalidated tokens. Factory destruction terminates registered
+  shared/refresh work within a five-second observation window without advancing
+  virtual time toward one-hour foreground or 30-second refresh deadlines.
+  Independent caller-owned loads remain active after manager close. Late old
+  releases cannot change replacement capacity, entries, snapshots or meter
+  registrations. The [work-limit contract](WORK-LIMIT-ADMISSION-CONTRACT.md)
+  records before/after checkpoints with explicit absent-meter semantics.
+- Complete starter/mock regression: **1,591 tests**, **1,525** starter plus
+  **66** helper, zero failures/errors/skips:
+  `mvn -B -ntp -pl reactive-http-client-test -am -l target/release-evidence/v30/priority8/complete-tests.log test`.
+  Copied XML is under `priority8/complete-tests/`; structured XML totals are in
+  `priority8/complete-tests-summary.txt`.
+- Focused regression: **158 tests**, zero failures/errors/skips:
+  `mvn -B -ntp -pl reactive-http-client-starter -Dtest=CacheWorkOwnershipContractTest,CacheCallerAdmissionContractTest,CacheLoadAdmissionContractTest,CacheRefreshAdmissionContractTest,CacheWorkCompositionContractTest,ResponseCacheRetentionOwnershipTest,CacheWorkPolicyEnforcementTest -l target/release-evidence/v30/priority8/regression.log test`.
+  Exact XML and parsed totals are under `priority8/regression/` and
+  `priority8/regression-summary.txt`.
+- Five sequential stress runs of those same seven suites: **158 cases each,
+  790 executions**, zero failures/errors/skips. Replace the focused command's
+  log path with `target/release-evidence/v30/priority8/stress-N/maven.log` for
+  `N=1..5`. Per-run XML/logs and `priority8/stress-summary.txt` are retained.
+- Reactor `mvn -B -ntp validate` passes. Final documentation/metadata checks,
+  source copies, base revision, working-tree patch, diff checks and SHA-256
+  manifests are retained under `target/release-evidence/v30/priority8/`.
+  Environment: Maven `3.9.9`, GraalVM JDK `25.0.3`, Java `21` target,
+  Boot `4.0.0`, reactor `4.3.0-SNAPSHOT`, published/API baseline `4.2.0`.
+- [Response-cache guidance](../../docs/32-response-caching.md) distinguishes
+  eviction from cancellation and manager-owned work from independent callers.
+  Diagnostic GC remains test-only; no runtime GC, weak-cache, heap traversal,
+  RSS reclamation, or arbitrary application-thread interruption is introduced.
+  Priority 9 public rejection/live telemetry and subsequent consumer/native,
+  API and performance evidence remain open; none is claimed by this JVM audit.
+
+### Valued-Mono terminal follow-up
+
+- Revalidated on 2026-09-09 against reachable base
+  `a1b841418d36bde4f79596c211ad1521ea91617f` plus this working tree. The original
+  Priority 8 totals above describe the preceding revision, not this follow-up.
+- `CacheWorkAdmission.own` retains `onNext` without finishing ownership until
+  `onComplete`; error/cancellation clears the pending value. Two gated cases
+  fail before the fix and pass afterward: no early success/release between
+  value and completion, and no slot reuse while upstream cancellation blocks.
+  The ownership suite now contains **24 cases**. Cleanup remains once-only,
+  and an old reservation cannot release a replacement's slot.
+- Final starter/mock regression: **1,593 tests** (**1,527** starter plus **66**
+  helper), zero failures/errors/skips:
+  `mvn -B -ntp -pl reactive-http-client-test -am -l target/release-evidence/v30/priority8/valued-terminal/complete-tests.log test`.
+- Five repeated runs of the seven focused suites listed above: **160 cases
+  each, 800 executions**, zero failures/errors/skips. Logs use
+  `target/release-evidence/v30/priority8/valued-terminal/stress-N/maven.log`
+  for `N=1..5`. Copied XML, parsed totals, reproduction logs, final
+  documentation/metadata checks, source patch and hashes are preserved under
+  `target/release-evidence/v30/priority8/valued-terminal/`.
 
 ---
 

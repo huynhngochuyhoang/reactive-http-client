@@ -3,9 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 import org.reactivestreams.Subscription;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import reactor.core.CoreSubscriber;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.MonoSink;
-import reactor.core.publisher.SignalType;
+import reactor.core.publisher.*;
 import reactor.util.context.Context;
 import reactor.util.context.ContextView;
 
@@ -127,7 +125,6 @@ class CacheWorkAdmission {
 
     static <T> Mono<T> own(Mono<T> source, Reservation reservation, Consumer<SignalType> cleanup) {
         AtomicBoolean finished = new AtomicBoolean();
-        AtomicBoolean cancelling = new AtomicBoolean();
         Consumer<SignalType> finish = signal -> {
             if (finished.compareAndSet(false, true)) {
                 try {
@@ -137,20 +134,52 @@ class CacheWorkAdmission {
                 }
             }
         };
-        return subscribePreparation(source)
-                .doOnSuccess(ignored -> finish.accept(SignalType.ON_COMPLETE))
-                .doOnError(ignored -> finish.accept(SignalType.ON_ERROR))
-                .doOnCancel(() -> {
-                    // Cancellation may itself execute synchronous application cleanup.
-                    cancelling.set(reservation.enter());
+        return Mono.<T>create(sink -> {
+            BaseSubscriber<T> subscriber = new BaseSubscriber<>() {
+                private T pendingValue;
+
+                @Override public Context currentContext() { return Context.of(sink.contextView()); }
+                @Override protected synchronized void hookOnNext(T value) {
+                    if (!isDisposed()) {
+                        pendingValue = value;
+                    } else {
+                        Operators.onDiscard(value, currentContext());
+                    }
+                }
+                @Override protected void hookOnComplete() {
+                    T value = takeValue();
+                    finish.accept(SignalType.ON_COMPLETE);
+                    sink.success(value);
+                }
+                @Override protected void hookOnError(Throwable error) {
+                    takeValue();
+                    finish.accept(SignalType.ON_ERROR);
+                    sink.error(error);
+                }
+                @Override protected void hookOnCancel() {
+                    Operators.onDiscard(takeValue(), currentContext());
+                }
+
+                private synchronized T takeValue() {
+                    T value = pendingValue;
+                    pendingValue = null;
+                    return value;
+                }
+            };
+            sink.onCancel(() -> {
+                // The cancel frame must unwind even if success/error wins the terminal race.
+                boolean entered = reservation.enter();
+                try {
                     finish.accept(SignalType.CANCEL);
-                })
-                .doFinally(signal -> {
-                    if (signal == SignalType.CANCEL && cancelling.compareAndSet(true, false)) {
+                    subscriber.dispose();
+                } finally {
+                    if (entered) {
                         reservation.exit();
                     }
-                })
-                .contextWrite(context -> context.put(CONTEXT_KEY, reservation));
+                }
+            });
+            subscribePreparation(source).subscribe(subscriber);
+        }).contextWrite(context -> context.put(CONTEXT_KEY, reservation));
     }
 
     // Hold synchronous subscription frames, but deliver their terminal only after the frame exits.

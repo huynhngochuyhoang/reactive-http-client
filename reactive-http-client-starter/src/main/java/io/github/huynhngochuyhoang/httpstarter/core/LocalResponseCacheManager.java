@@ -965,17 +965,20 @@ final class LocalResponseCacheManager implements AutoCloseable {
 
     @Override
     public void close() {
-        if (callerAdmission != null) {
-            callerAdmission.close();
-        }
-        if (loadAdmission != null) {
-            loadAdmission.close();
-        }
-        if (refreshAdmission != null) {
-            refreshAdmission.close();
-        }
-        if (!closed.compareAndSet(false, true)) {
-            return;
+        // Serialize limiter installation with shutdown, not with application cancellation callbacks.
+        synchronized (this) {
+            if (callerAdmission != null) {
+                callerAdmission.close();
+            }
+            if (loadAdmission != null) {
+                loadAdmission.close();
+            }
+            if (refreshAdmission != null) {
+                refreshAdmission.close();
+            }
+            if (!closed.compareAndSet(false, true)) {
+                return;
+            }
         }
         metrics.close();
         List<InFlightLoad> flights;

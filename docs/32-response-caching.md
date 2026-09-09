@@ -516,6 +516,35 @@ still releases work capacity normally. Prepared request arguments may remain in
 lifecycle/exchange-log records when dispatch facts are absent; do not interpret
 those headers (for example, an idempotency key) as proof of a wire request.
 
+### Cancellation, eviction, and factory ownership
+
+On the V30 development line, a reservation remains occupied while an entered
+synchronous preparation or cancellation callback unwinds, even if a terminal
+signal has already been delivered. Racing success/error and cancellation release
+each reservation once. Cancellation must not make capacity reusable while its
+cleanup is still running. Application callbacks must cooperate with cancellation;
+the starter cannot forcibly interrupt arbitrary blocking application code.
+
+Explicit eviction clears stored values and invalidates outstanding publication
+tokens. It cancels registered refreshes, but does not end an interested foreground
+load or release its slot. Such a load may return its result to callers without
+storing it. Eviction is not a way to reclaim capacity from active callers.
+
+Factory close stops new reservations and cache creation, clears entries, and
+cancels registered flights and refreshes. Independent loads remain caller-owned:
+closing the cache manager invalidates their publication rights but does not claim
+they have terminated. They retain their slots until completion, error, timeout,
+or caller cancellation; separately owned transport disposal may also terminate
+them. A replacement factory has independent reservations and storage, so a late
+release from the old manager cannot free a new manager's slot or fill its cache.
+
+Capture cache meters before close. At the last metric owner, close removes them;
+an absent post-close series is not a zero-valued terminal counter or proof that
+all external callers stopped. In overlapping factories, remaining metric owners
+retain their registrations. Work-limit live gauges remain a later V30 gate.
+Reference-queue/weak-reference GC checks are test evidence only, not runtime GC
+behavior or an assertion that allocator/RSS usage must fall immediately.
+
 ## Phase-four observability
 
 Cache telemetry is independent from cache selection and defaults off. Enable it

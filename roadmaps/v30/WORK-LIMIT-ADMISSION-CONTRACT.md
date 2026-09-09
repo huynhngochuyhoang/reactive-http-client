@@ -412,6 +412,56 @@ independent loads and shared sources retain their own configured retry behavior.
 
 ## Verification and Remaining Gates
 
+### Priority 8 Ownership Evidence
+
+`CacheWorkOwnershipContractTest` exercises selected limits at synchronized
+checkpoints: same-key/many-key contention, independent/shared loads, racing
+success/error/cancellation, immediate assembly retries, cancellation before
+attachment, first-cache creation versus close, and refresh completion versus
+eviction. Acquired/released caller counts reconcile with live reservations;
+source terminal callbacks and load/refresh histories are counted independently.
+Generation owners and scheduled tasks are inspected only by tests.
+
+Two runtime corrections accompany this evidence. The source reservation guard
+brackets actual upstream cancellation with `try/finally`, independent of which
+terminal wins; a `doOnCancel`/`doFinally(CANCEL)` pair could strand a callback
+count when success won. Manager close now shares the work-configuration lock
+for limiter installation/closure, without holding that lock over application
+cancellation callbacks.
+
+Bounded reference queues verify detached/rejected caller arguments, prepared
+bytes, auth state, context, callbacks and loader closures are collectible while
+another source remains active. A source's own state remains reachable until its
+terminal. Explicit eviction releases cached values before close while a running
+independent load retains its slot and loses publication rights. These checks
+complement the existing real-proxy preparation and retention tests; they do not
+infer ownership from RSS or introduce production GC.
+
+Factory destruction terminates registered flights/refreshes without advancing
+the test clock toward their ordinary deadlines (one-hour foreground timeout,
+30-second refresh timeout). Independent caller-owned loads can survive manager
+close and release only at their own terminal. Recreating a factory with the same
+registry/tags leaves the new capacity, entries, snapshot and meter registrations
+unaffected by old late releases. After the last metric owner closes, meters are
+absent, not zero-valued history. Arbitrary blocking application cleanup must
+still cooperate; it is not forcibly interrupted by the cache manager.
+
+The replacement fixture records these synchronized checkpoints (caller/load/
+refresh counts are test-only owner observations, not proposed public meters):
+
+| Owner checkpoint | Callers | Loads | Refreshes | Entries | Cache meters |
+|---|---:|---:|---:|---:|---|
+| Shared factory before close | 2 | 1 | 1 | 1 | Present |
+| Shared factory after close | 0 | 0 | 0 | 0 | Absent at last owner |
+| Independent factory before close | 1 | 1 | 1 | 1 | Present |
+| Independent manager after close, caller still active | 1 | 1 | 0 | 0 | Absent at last owner |
+| Independent old owner after caller terminal | 0 | 0 | 0 | 0 | No late re-registration |
+| Replacement during old late release | 1 | 1 | 0 | 1 | New owner's registrations unchanged |
+
+Exact final commands, totals and source provenance are in the
+[execution checklist](CHECKLIST.md). This is JVM ownership evidence, not native
+image, benchmark, public work telemetry or an assembled-consumer claim.
+
 [CacheWorkLimitContractTest](../../reactive-http-client-starter/src/test/java/io/github/huynhngochuyhoang/httpstarter/core/CacheWorkLimitContractTest.java)
 covers input ranges/binding overflow, absence/inert definitions, refresh
 conditions, concrete inheritance, method exclusion/override, API refs,
@@ -421,8 +471,8 @@ path with limits omitted. Related existing mock, AOT, diagnostics, retention,
 and active-work suites protect those paths.
 
 The original model remains a test fixture, not a second production resolver.
-Priorities 4-7 now cover bounded preparation, foreground and refresh sources,
-and feature composition with focused shutdown/race evidence. Collection stress,
-live telemetry, assembled-consumer/native execution, and performance evidence
-remain subsequent priorities. No native executable, published-binary, GC, or
+Priorities 4-8 cover bounded preparation, foreground and refresh sources,
+feature composition, shutdown/races, and bounded diagnostic-GC collection tests.
+Live telemetry, assembled-consumer/native execution, and performance evidence
+remain subsequent priorities. No native executable, published-binary, or
 latency evidence is claimed by these implementation steps.
