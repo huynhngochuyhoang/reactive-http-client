@@ -142,6 +142,8 @@ class CacheWorkAdmission {
                 @Override protected synchronized void hookOnNext(T value) {
                     if (!isDisposed()) {
                         pendingValue = value;
+                    } else {
+                        Operators.onDiscard(value, currentContext());
                     }
                 }
                 @Override protected void hookOnComplete() {

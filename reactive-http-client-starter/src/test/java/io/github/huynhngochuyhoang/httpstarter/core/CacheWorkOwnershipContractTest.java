@@ -37,8 +37,9 @@ class CacheWorkOwnershipContractTest {
     private static final String API = "ownership.read";
 
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void valuedSourceKeepsItsReservationUntilCompletionOrCancellationCleanup(boolean cancel) throws Exception {
+    @CsvSource({"false,false", "true,false", "true,true"})
+    void valuedSourceKeepsItsReservationUntilCompletionOrCancellationCleanup(
+            boolean cancel, boolean cancelBeforeValue) throws Exception {
         var admission = new CacheWorkAdmission(Map.of(POLICY, 1), IllegalStateException::new);
         var reservation = admission.acquire(POLICY);
         List<SignalType> terminals = new CopyOnWriteArrayList<>();
@@ -70,9 +71,10 @@ class CacheWorkOwnershipContractTest {
                     });
                 }
                 @Override public void onNext(Object value) {
-                    actual.onNext(value);
+                    if (!cancelBeforeValue) { actual.onNext(value); }
                     valueDelivered.countDown();
                     await(allowComplete);
+                    if (cancelBeforeValue) { actual.onNext(value); }
                 }
                 @Override public void onError(Throwable error) { actual.onError(error); }
                 @Override public void onComplete() { actual.onComplete(); }
