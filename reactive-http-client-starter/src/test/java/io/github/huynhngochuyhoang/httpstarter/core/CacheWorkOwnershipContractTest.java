@@ -47,6 +47,8 @@ class CacheWorkOwnershipContractTest {
         CountDownLatch cancellationEntered = new CountDownLatch(1);
         CountDownLatch allowCancellation = new CountDownLatch(1);
         AtomicInteger cancellations = new AtomicInteger();
+        AtomicInteger resource = new AtomicInteger(1);
+        List<AtomicInteger> discarded = new CopyOnWriteArrayList<>();
         String hook = "cache-work-valued-terminal";
         // Gate the ownership subscriber's immediate upstream, after preparation has attached.
         Hooks.onEachOperator(hook, Operators.<Object, Object>lift((ignored, actual) -> {
@@ -78,12 +80,17 @@ class CacheWorkOwnershipContractTest {
         }));
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
-            Sinks.One<String> source = Sinks.one();
-            var result = CacheWorkAdmission.own(source.asMono(), reservation, terminals::add).toFuture();
-            var emission = executor.submit(() -> source.tryEmitValue("value").orThrow());
+            Sinks.One<AtomicInteger> source = Sinks.one();
+            var result = CacheWorkAdmission.own(source.asMono(), reservation, terminals::add)
+                    .doOnDiscard(AtomicInteger.class, value -> {
+                        discarded.add(value);
+                        value.decrementAndGet();
+                    }).toFuture();
+            var emission = executor.submit(() -> source.tryEmitValue(resource).orThrow());
             await(valueDelivered);
             assertThat(terminals).isEmpty();
             assertThat(result).isNotDone();
+            assertThat(discarded).isEmpty();
             assertThat(admission.active(POLICY)).isEqualTo(1);
             assertThatThrownBy(() -> admission.acquire(POLICY)).isInstanceOf(IllegalStateException.class);
             if (cancel) {
@@ -97,7 +104,15 @@ class CacheWorkOwnershipContractTest {
             }
             allowComplete.countDown();
             emission.get(5, TimeUnit.SECONDS);
-            if (!cancel) { assertThat(result.get(5, TimeUnit.SECONDS)).isEqualTo("value"); }
+            if (cancel) {
+                result.cancel(true);
+                assertThat(discarded).containsExactly(resource);
+                assertThat(resource).hasValue(0);
+            } else {
+                assertThat(result.get(5, TimeUnit.SECONDS)).isSameAs(resource);
+                assertThat(discarded).isEmpty();
+                assertThat(resource).hasValue(1);
+            }
             assertThat(terminals).containsExactly(cancel ? SignalType.CANCEL : SignalType.ON_COMPLETE);
             assertThat(cancellations).hasValue(cancel ? 1 : 0);
             assertThat(admission.active(POLICY)).isZero();

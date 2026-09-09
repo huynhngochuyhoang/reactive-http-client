@@ -3,10 +3,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 import org.reactivestreams.Subscription;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import reactor.core.CoreSubscriber;
-import reactor.core.publisher.BaseSubscriber;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.MonoSink;
-import reactor.core.publisher.SignalType;
+import reactor.core.publisher.*;
 import reactor.util.context.Context;
 import reactor.util.context.ContextView;
 
@@ -157,7 +154,9 @@ class CacheWorkAdmission {
                     finish.accept(SignalType.ON_ERROR);
                     sink.error(error);
                 }
-                @Override protected void hookOnCancel() { takeValue(); }
+                @Override protected void hookOnCancel() {
+                    Operators.onDiscard(takeValue(), currentContext());
+                }
 
                 private synchronized T takeValue() {
                     T value = pendingValue;
