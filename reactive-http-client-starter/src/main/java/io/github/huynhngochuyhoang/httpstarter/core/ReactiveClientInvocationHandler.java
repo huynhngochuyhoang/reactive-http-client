@@ -105,6 +105,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
     private final Class<?> clientInterface;
     private final Map<Method, RequestPlan> requestPlanCache = new ConcurrentHashMap<>();
     private final Map<Method, EffectiveCachePolicy.Decision> cacheDecisionCache = new ConcurrentHashMap<>();
+    private final CacheWorkPolicy.Snapshot workSelection;
+    private final Runnable workValidation;
     private final ApplicationContext applicationContext;
     private final Map<Class<? extends HttpExchangeLogger>, HttpExchangeLogger> loggerCache = new ConcurrentHashMap<>();
     private final AtomicBoolean loggerCacheLimitWarningLogged = new AtomicBoolean(false);
@@ -265,6 +267,13 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             AuthProvider cacheAuthProvider,
             String baseUrl) {
         this.webClient = webClient;
+        this.workSelection = CacheWorkPolicy.freeze(clientInterface, clientName, metadataCache, clientConfig);
+        this.workValidation = CacheWorkPolicy.validator(workSelection, clientInterface, metadataCache, clientConfig);
+        if (responseCacheManager != null) {
+            responseCacheManager.configureWork(workSelection);
+        } else if (!workSelection.policies().isEmpty()) {
+            throw new IllegalStateException("Cache work limits require a factory-owned cache manager");
+        }
         this.callerAdmission = responseCacheManager != null ? responseCacheManager.callerAdmission() : null;
         this.cacheIdentityWebClient = webClient.mutate()
                 .filters(filters -> {
@@ -288,6 +297,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         this.responseCacheManager = responseCacheManager;
         this.cacheAuthProvider = cacheAuthProvider;
         this.baseUrl = baseUrl;
+        if (responseCacheManager != null) {
+            responseCacheManager.validateWorkWith(workValidation);
+        }
         validateCacheAuthorizationSupportAtConstruction();
         this.observerProvider = applicationContext.getBeanProvider(HttpClientObserver.class);
         this.lifecycleHookProvider = applicationContext.getBeanProvider(ReactiveHttpClientLifecycleHook.class);
@@ -384,6 +396,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
             return InvocationHandler.invokeDefault(proxy, method, args != null ? args : new Object[0]);
         }
 
+        requireUnchangedWorkSelection();
         MethodMetadata meta = metadataCache.get(method);
         RequestPlan plan = requestPlan(method, meta);
         EffectiveApi effectiveApi = resolveEffectiveApi(plan);
@@ -482,6 +495,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                                        long logicalCallTimeoutMs,
                                        String policyName) {
         return Mono.defer(() -> {
+            requireUnchangedWorkSelection();
             SubscriptionReportingState state = new SubscriptionReportingState(
                     new RequestArgumentResolver.ResolvedArgs(Map.of(), Map.of(), Map.of(), null));
             HttpExchangeLogger exchangeLogger = resolveExchangeLogger(proxy, method, meta);
@@ -731,6 +745,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         return requestPlanCache.computeIfAbsent(method, ignored -> RequestPlan.from(meta, clientInterface));
     }
 
+    private void requireUnchangedWorkSelection() {
+        workValidation.run();
+    }
+
     private EffectiveCachePolicy.Decision cacheDecision(Method method,
                                                         Class<?> concreteClient,
                                                         RequestPlan plan,
@@ -741,6 +759,10 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
         }
         EffectiveCachePolicy.Decision validated = EffectiveCachePolicy.validateDecision(
                 concreteClient, clientName, plan, clientConfig, effectiveHttpMethod);
+        if (validated.cacheable() && CacheWorkPolicy.normalize(validated.selection().policy()) != null
+                && !workSelection.methods().containsKey(method)) {
+            throw new IllegalStateException("Cache work limits require the concrete client interface at construction");
+        }
         EffectiveCachePolicy.Decision existing = cacheDecisionCache.putIfAbsent(method, validated);
         return existing != null ? existing : validated;
     }

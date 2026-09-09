@@ -541,40 +541,92 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 6 - Refresh Capacity and Foreground Isolation
 
-### [ ] 6.1 Admit only current-entry refresh work
+### [x] 6.1 Admit only current-entry refresh work
 
-- [ ] Acquire separate refresh capacity before hidden preparation/loader
+- [x] Acquire separate refresh capacity before hidden preparation/loader
       assembly and combine it with generation checks and duplicate suppression.
-- [ ] Start at most one refresh for the current entry and no more than the
+- [x] Start at most one refresh for the current entry and no more than the
       configured refresh maximum across all APIs sharing the policy.
-- [ ] Release provisional state when expiry, eviction, close, or another refresh
+- [x] Release provisional state when expiry, eviction, close, or another refresh
       wins before source subscription attaches.
-- [ ] Retain the earlier of refresh timeout and hard expiry; work limits do not
+- [x] Retain the earlier of refresh timeout and hard expiry; work limits do not
       activate a scheduler, recurring refresh, or a new implicit timeout.
 
-### [ ] 6.2 Skip saturated refresh without extending freshness
+### [x] 6.2 Skip saturated refresh without extending freshness
 
-- [ ] Return the authorized still-valid stale value when refresh capacity is
+- [x] Return the authorized still-valid stale value when refresh capacity is
       full; do not queue a trigger or retain its context for later execution.
-- [ ] Leave stored value, byte weight, publication age, and hard-expiry deadline
+- [x] Leave stored value, byte weight, publication age, and hard-expiry deadline
       unchanged; a skip is not a terminal refresh load.
-- [ ] Allow a later access to attempt refresh after capacity is released; test
+- [x] Allow a later access to attempt refresh after capacity is released; test
       failure, empty completion, hard expiry, and cancellation paths.
-- [ ] Prove foreground slots remain available at refresh saturation while
+- [x] Prove foreground slots remain available at refresh saturation while
       documenting contention in separately shared pools/auth/resilience services.
 
-### [ ] 6.3 Complete the public enforcement gate
+### [x] 6.3 Complete the public enforcement gate
 
-- [ ] Prove caller/load/refresh limits together under stale-hit, expired-miss,
+- [x] Prove caller/load/refresh limits together under stale-hit, expired-miss,
       single-flight, independent-load, and shutdown transitions.
-- [ ] Expose validated properties and basic effective-policy output only once
+- [x] Expose validated properties and basic effective-policy output only once
       every selected bound is enforced; update generated metadata concurrently.
-- [ ] Reject unsupported partial or mutated selections consistently in startup,
+- [x] Reject unsupported partial or mutated selections consistently in startup,
       invocation, mock, diagnostic-contract, and AOT validation paths.
-- [ ] Verify existing policies without work limits retain published behavior;
+- [x] Verify existing policies without work limits retain published behavior;
       no work limit enables refresh, caching, or metrics implicitly.
-- [ ] Record focused integration evidence before proceeding to public telemetry
+- [x] Record focused integration evidence before proceeding to public telemetry
       and operations claims.
+
+### Implementation and evidence
+
+- Implemented on 2026-09-09 against reachable base
+  `89e78168b83eb74eb9ed03e68c00cc4dde742ec0` plus this working tree.
+  Refresh uses separate frame-aware reservations, current-entry validation and
+  duplicate suppression before hidden assembly. Its subscriber is registered
+  before attachment; eviction/close/timeout prevents late source subscription
+  while entered callbacks keep capacity until unwind.
+- Saturation returns the authorized stale value without retaining a trigger,
+  changing byte weight/publication age/hard TTL, or recording a terminal
+  refresh load. Later accesses can retry. Existing refresh timeout/hard-expiry
+  behavior remains; no new foreground timeout, queue, recurring refresh, or
+  automatic observability is introduced.
+- Completed the public gate with `CacheWorkConfig` nullable Long properties,
+  one production `CacheWorkPolicy` normalization/immutable selection, startup
+  and cold-subscription mutation checks, and basic effective-contract output.
+  Caller/load limits are a required pair; a refresh limit is required iff the
+  already-selected policy refreshes. Configuration metadata, generated reference
+  and AOT binding hints ship together. Replacement factories remain outside
+  starter work grammar. Existing work-omitted behavior remains covered.
+- `CacheRefreshAdmissionContractTest` has **20** cases: independent/shared
+  saturation, zero skipped assembly/terminal metrics, unchanged stored weight
+  and TTL, all source terminal types, expiry/timeout, gated preparation and
+  cancellation, plus 64-key contention and separate policy/factory capacity.
+  `CacheWorkPolicyEnforcementTest` has **10** cases covering all three public
+  limits together, expired misses, waiter detachment, immutable selections,
+  bind/export/snapshot parity, invalid startup/diagnostics/AOT input and
+  replacement-factory behavior. The mock helper test exercises both ordinary
+  and deterministic-time construction, local rejection and mutation.
+- Initial saturation reproduction failed both cases because refresh assembly
+  exceeded the proposed bound; retained in
+  `target/release-evidence/v30/priority6/reproduced.log`.
+  The final complete starter/mock run passed **1,546 tests**
+  (**1,480** starter, **66** helper), zero failures/errors/skips:
+  `mvn -B -ntp -pl reactive-http-client-test -am -l target/release-evidence/v30/priority6/final-complete-tests.log test`.
+  Reports are copied under `priority6/final-complete-tests/`; exact totals are
+  in `priority6/final-complete-tests-summary.txt`.
+- Five sequential stress runs passed **103 cases each, 515 executions**
+  with zero failures/errors/skips:
+  `mvn -B -ntp -pl reactive-http-client-starter -Dtest=CacheRefreshAdmissionContractTest,CacheWorkPolicyEnforcementTest,CacheLoadAdmissionContractTest,CacheCallerAdmissionContractTest -l target/release-evidence/v30/priority6/stress-N.log test`,
+  for `N=1..5`. Per-run reports and `stress-summary.txt` are preserved.
+- Root reactor `mvn -B -ntp validate` passes; the final documentation/metadata
+  rerun and diff check are recorded under `priority6/documentation.log`,
+  `priority6/validate.log`, and `priority6/diff-check.log`.
+  Source copies, the reachable base, full working-tree patch and SHA-256
+  manifests are preserved in `target/release-evidence/v30/priority6/source/`.
+  Environment: Maven `3.9.9`, GraalVM JDK `25.0.3`, Java `21` target,
+  Boot `4.0.0`, reactor `4.3.0-SNAPSHOT`, published/API baseline `4.2.0`.
+- Public rejection types/outcomes and live work telemetry remain Priority 9.
+  No assembled-consumer, native executable, API-comparison, benchmark, or
+  release-performance evidence is claimed here; later V30 gates stay open.
 
 ---
 

@@ -53,6 +53,11 @@ final class EffectiveCachePolicy {
                     policy.getMaximumTotalDecodedResponseBytes(), MAXIMUM_TOTAL_DECODED_RESPONSE_BYTES);
         }
         validateRefreshBounds(context, policy);
+        try {
+            CacheWorkPolicy.normalize(policy);
+        } catch (IllegalArgumentException error) {
+            throw invalid(context, error.getMessage());
+        }
         normalizedNonCacheableResponseHeaders(context, policy);
 
         if (decision.eligibility() == Eligibility.INVALID) {

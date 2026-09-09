@@ -71,6 +71,7 @@ public class ReactiveHttpClientRuntimeHints implements RuntimeHintsRegistrar {
             ReactiveHttpClientProperties.ApiConfig.class,
             ReactiveHttpClientProperties.CacheConfig.class,
             ReactiveHttpClientProperties.CachePolicyConfig.class,
+            ReactiveHttpClientProperties.CacheWorkConfig.class,
             ReactiveHttpClientProperties.CacheCustomizationSafety.class,
             ReactiveHttpClientProperties.ResilienceConfig.class,
             ReactiveHttpClientProperties.ObservabilityConfig.class,

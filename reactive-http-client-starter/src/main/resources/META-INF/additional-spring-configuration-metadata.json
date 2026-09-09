@@ -58,6 +58,12 @@
       "sourceMethod": "getPolicies()"
     },
     {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].work",
+      "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheWorkConfig",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig",
+      "sourceMethod": "getWork()"
+    },
+    {
       "name": "reactive.http.clients.[name].auth",
       "type": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$AuthConfig",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$ClientConfig",
@@ -435,6 +441,24 @@
       "type": "java.lang.Long",
       "description": "Optional per-policy aggregate limit in decoded response representation bytes. Must be between 1 and 1099511627776 (1 TiB). `maximum-size` continues to count entries. This value is not exact Java heap, direct memory, process RSS, or container memory.",
       "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].work.maximum-concurrent-callers",
+      "type": "java.lang.Long",
+      "description": "Optional foreground caller reservations per named policy and factory, including preparation, hits and waiters. Integer 1..1000000; requires maximum-concurrent-loads and, only for refresh-enabled policies, maximum-concurrent-refreshes. Saturation rejects immediately; no queue or implicit timeout.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheWorkConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].work.maximum-concurrent-loads",
+      "type": "java.lang.Long",
+      "description": "Optional foreground source reservations per named policy and factory. Integer 1..1000000; one reservation per independent miss or shared flight, including retries and publication. Requires the complete work selection. Hits and joining waiters need no load reservation.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheWorkConfig"
+    },
+    {
+      "name": "reactive.http.clients.[name].cache.policies.[policy-name].work.maximum-concurrent-refreshes",
+      "type": "java.lang.Long",
+      "description": "Separate hidden refresh reservations per named policy and factory. Integer 1..1000000; required with work limits only when refresh is already configured, forbidden otherwise. Saturation skips without queueing or extending hard TTL. Does not enable refresh, caching or metrics.",
+      "sourceType": "io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CacheWorkConfig"
     },
     {
       "name": "reactive.http.clients.[name].cache.policies.[policy-name].vary-by-parameters",

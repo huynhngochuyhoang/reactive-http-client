@@ -4,6 +4,9 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientBeanFactoryInitializationAotProcessor;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.core.CacheWorkPolicy.Limits;
+import io.github.huynhngochuyhoang.httpstarter.core.CacheWorkPolicy.Selection;
+import io.github.huynhngochuyhoang.httpstarter.core.CacheWorkPolicy.Snapshot;
 import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -358,8 +361,10 @@ class CacheWorkLimitContractTest {
     }
 
     private static Input bind(Map<String, ?> properties) {
-        return new Binder(new MapConfigurationPropertySource(properties))
-                .bind("work", Bindable.of(Input.class)).orElse(null);
+        var bound = new Binder(new MapConfigurationPropertySource(properties))
+                .bind("work", Bindable.of(ReactiveHttpClientProperties.CacheWorkConfig.class)).orElse(null);
+        return bound == null ? null : new Input(bound.getMaximumConcurrentCallers(),
+                bound.getMaximumConcurrentLoads(), bound.getMaximumConcurrentRefreshes());
     }
 
     private static Selection selection(Snapshot snapshot, String method) {

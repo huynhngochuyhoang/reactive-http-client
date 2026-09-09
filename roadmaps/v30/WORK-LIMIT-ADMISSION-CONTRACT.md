@@ -1,9 +1,10 @@
 # V30 Work-Limit and Admission Contract
 
 > **Decision:** proceed with three optional per-policy ownership counts.
-> **Delivery boundary:** internal executable specification only; no public
-> configuration, admission exception, enum, meter, or runtime enforcement ships
-> with Priority 3.
+> **Current delivery boundary:** Priority 6 exposes the complete optional
+> caller/load/refresh configuration with enforcement, basic contract output,
+> and AOT binding hints. Public rejection types/outcomes and live work telemetry
+> remain Priority 9; native executable evidence remains Priority 11.
 
 Recorded on 2026-09-08 against reachable baseline
 `44502219b071a73a37cc0ff7301eafb3d3a68caf` and the current
@@ -13,10 +14,12 @@ The [checklist](CHECKLIST.md) records executed checks and remaining gates.
 
 ## Configuration Decision
 
-The future group is
+The snapshot-only group is
 `reactive.http.clients.<client>.cache.policies.<policy>.work`.
-Names and validation below are frozen for implementation, **not copyable
-configuration supported by this revision**.
+It is available on `4.3.0-SNAPSHOT`, not published `4.2.0`. See the
+[configuration fragment](../../docs/32-response-caching.md#v30-snapshot-optional-work-limits).
+The Priority 4 and 5 sections below describe their earlier internal-only
+delivery boundaries; Priority 6 completes the public enforcement gate.
 
 | Property within work | Unit | Selection |
 |---|---|---|
@@ -63,17 +66,18 @@ Use the existing `EffectiveCachePolicy.Decision` and the application's
 5. Normalize work only for that selected policy. No work input can make an
    unresolved verb, invalid cache body, or otherwise ineligible method valid.
 
-The test-only [model](../../reactive-http-client-starter/src/test/java/io/github/huynhngochuyhoang/httpstarter/core/CacheWorkLimitContract.java)
-consumes that decision and produces immutable method selections and a named-policy
-limits map. It interns limits within one named policy, not across policies or
-factories. Its separate input map is a specification fixture, not a second
-runtime configuration source.
+The production `CacheWorkPolicy` consumes that decision and freezes immutable
+method selections and a named-policy limits map. It interns limits within one
+named policy, not across policies or factories. The original
+[model](../../reactive-http-client-starter/src/test/java/io/github/huynhngochuyhoang/httpstarter/core/CacheWorkLimitContract.java)
+now delegates normalization and selection to this resolver; its separate input
+map only builds properties for specification tests.
 
 | Consumer | Existing integration point and required implementation |
 |---|---|
 | Binding/startup | CachePolicyConfig and MethodMetadataCache validation; attach the normalized work selection to the same effective cache decision |
 | Runtime/public handler construction | ReactiveClientInvocationHandler and LocalResponseCacheManager consume the factory-owned frozen selection; no request-time independent defaulting |
-| Effective contracts | EffectiveHttpClientContractExporter renders the same selected source and bounds when public configuration becomes available |
+| Effective contracts | EffectiveHttpClientContractExporter renders the same selected source and normalized bounds for starter-owned clients |
 | Diagnostics | ReactiveHttpClientDiagnosticsProvider reads frozen limits of an existing factory; before creation it validates configuration without acquiring owners or instantiating lazy optional components |
 | Mock helper | MockReactiveHttpClient already uses the metadata/cache manager/handler paths; reuse those paths, including non-deterministic mocks |
 | AOT | ReactiveHttpClientBeanFactoryInitializationAotProcessor invokes the configured metadata cache's validation; use the selected properties bean, never create live reservations or optional infrastructure |
@@ -89,14 +93,11 @@ already flow through production exports or AOT/native images. Production wiring
 is required alongside enforcement in Priorities 4-6; integrated mock/native
 evidence remains in its later checklist gates.
 
-As enforcement lands, replace the test-only normalization with the shared
-production resolver and retain these cases; do not keep two independent
-implementations of selection and validation.
-
-When public binding is introduced, basic per-method effective output must ship
-in the same change: work selected, policy source, and the three normalized
-maximums, with refresh maximum absent when refresh is disabled. Disabled/legacy
-methods must remain unselected rather than displaying invented zero bounds.
+Priority 6 replaces test-only normalization with the shared production resolver
+and retains those cases. Public binding and basic per-method effective output
+ship together: selected source and three normalized maximums, with refresh
+maximum absent when refresh is disabled. Disabled/legacy methods remain
+unselected rather than displaying invented zero bounds.
 Detailed live-work metrics and schema-safe diagnostics aggregation remain
 Priority 9. Configuration cannot advertise a bound before all selected
 dimensions are enforced.
@@ -200,6 +201,52 @@ lookup keeps its existing path.
 
 The checklist records gated tests and repeated runs for these boundaries.
 Internal active-load counts are test evidence, not a new exported gauge.
+
+## Priority 6 Refresh and Public Enforcement
+
+Recorded on 2026-09-09 against reachable base
+`89e78168b83eb74eb9ed03e68c00cc4dde742ec0` plus the Priority 6 working tree.
+`LocalResponseCacheManager` reserves refresh capacity separately from caller
+and foreground-load counts. Current-entry generation validation, duplicate
+suppression, and capacity selection precede loader assembly. A capacity skip
+finishes its provisional generation token without retaining a trigger,
+changing storage/weight/freshness, or recording a terminal refresh load.
+
+The refresh subscriber is registered before its source subscribes. Assembly,
+subscription, response processing/publication, and cancellation use the same
+frame-aware reservation machinery as foreground work. Eviction, close, expiry
+or timeout can terminate the guard during assembly without allowing a returned
+publisher to dispatch afterward. Capacity remains held until entered frames
+unwind. Terminal outcome recording and cleanup are once-only. The existing
+refresh timeout is armed before assembly and is capped by remaining hard TTL;
+there is no recurring scheduler, new timeout property, queue, or deferred trigger.
+
+`CacheWorkConfig` binds nullable Long leaves before range checking; only complete
+selections normalize to bounded counts. `EffectiveCachePolicy` validates them
+alongside the existing selected cache grammar. Normalized startup selections
+initialize all three owner maps before the handler is exposed. The legacy
+public constructor lacking a concrete client interface rejects work-selected
+methods rather than accepting an unenforceable selection. Factory creation,
+both mock clock modes, and direct concrete-interface handler creation share the
+same manager path.
+
+Handler invocation and cold subscription check the frozen selection before
+admission. Live cache snapshots also reject changed selections; they cannot
+report newly configured limits as though existing owners used them. Contract
+export and AOT validate without creating caches or lazy optional infrastructure.
+Foreign replacement factories remain outside starter-only work validation.
+Metadata, generated property reference, native binding hints, and basic Markdown
+contract rendering are updated together. Legacy policies allocate no admission
+objects, emit no work bounds, and retain their existing terminal behavior.
+
+Tests cover public binding, partial/range/refresh validation, immutable mappings,
+stale-hit skips, byte-weight preservation, unchanged expiry, hidden deadlines,
+foreground availability during refresh saturation, and separately owned
+policies/factories. Gated assembly/subscription/publication/cancellation cases
+prove slots are not reusable before their entered callbacks exit. Concurrent
+64-key triggers respect a three-refresh bound. Both mock time modes and
+starter-owned versus replacement-client AOT/contract paths are included.
+The checklist records actual runs, report totals, and source provenance.
 
 ## Scope and Immutability
 
@@ -333,8 +380,9 @@ terminal facts, replacement-metadata AOT/diagnostics, and the existing runtime
 path with limits omitted. Related existing mock, AOT, diagnostics, retention,
 and active-work suites protect those paths.
 
-The model uses no Spring bean, production owner, timer, dependency, or public
-export. Reservation races, one-terminal delivery, live counters, bounded
-preparation/load/refresh enforcement, shutdown, native compilation, and overhead
-remain the explicitly named subsequent priorities. No native, published-binary,
-GC, or latency evidence is claimed by this contract decision.
+The original model remains a test fixture, not a second production resolver.
+Priorities 4-6 now cover bounded preparation, foreground and refresh sources,
+with focused shutdown/race evidence. Broader feature composition, collection
+stress, live telemetry, assembled-consumer/native execution, and performance
+evidence remain subsequent priorities. No native executable, published-binary,
+GC, or latency evidence is claimed by Priority 6.
