@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This adds regression coverage and operations guidance, not another operator,
   timeout default, replay permission, or public telemetry surface.
 
+### Fixed
+- **Cache work reservation cleanup under terminal races.** Cancellation now
+  brackets upstream cleanup directly, so a simultaneous success or error cannot
+  strand a foreground-load or refresh slot. Work-limit installation and the
+  start of manager shutdown share a lifecycle lock. Contention, eviction,
+  collection, and factory-replacement tests preserve independent caller-owned
+  loads and prevent invalidated work from repopulating storage.
+
 ## [4.2.0] - 2026-09-06
 
 - **`4.2.0` published release.** This additive minor
