@@ -9,9 +9,9 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import reactor.core.publisher.BaseSubscriber;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
+import org.reactivestreams.Subscription;
+import reactor.core.CoreSubscriber;
+import reactor.core.publisher.*;
 import reactor.test.scheduler.VirtualTimeScheduler;
 import reactor.util.context.Context;
 
@@ -35,6 +35,90 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CacheWorkOwnershipContractTest {
     private static final String POLICY = "ownership";
     private static final String API = "ownership.read";
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void valuedSourceKeepsItsReservationUntilCompletionOrCancellationCleanup(boolean cancel) throws Exception {
+        var admission = new CacheWorkAdmission(Map.of(POLICY, 1), IllegalStateException::new);
+        var reservation = admission.acquire(POLICY);
+        List<SignalType> terminals = new CopyOnWriteArrayList<>();
+        CountDownLatch valueDelivered = new CountDownLatch(1);
+        CountDownLatch allowComplete = new CountDownLatch(1);
+        CountDownLatch cancellationEntered = new CountDownLatch(1);
+        CountDownLatch allowCancellation = new CountDownLatch(1);
+        AtomicInteger cancellations = new AtomicInteger();
+        String hook = "cache-work-valued-terminal";
+        // Gate the ownership subscriber's immediate upstream, after preparation has attached.
+        Hooks.onEachOperator(hook, Operators.<Object, Object>lift((ignored, actual) -> {
+            if (!(actual instanceof BaseSubscriber<?>)
+                    || actual.getClass().getEnclosingClass() != CacheWorkAdmission.class) {
+                return actual;
+            }
+            return new CoreSubscriber<>() {
+                @Override public Context currentContext() { return actual.currentContext(); }
+                @Override public void onSubscribe(Subscription subscription) {
+                    actual.onSubscribe(new Subscription() {
+                        @Override public void request(long n) { subscription.request(n); }
+                        @Override public void cancel() {
+                            cancellations.incrementAndGet();
+                            cancellationEntered.countDown();
+                            await(allowCancellation);
+                            subscription.cancel();
+                        }
+                    });
+                }
+                @Override public void onNext(Object value) {
+                    actual.onNext(value);
+                    valueDelivered.countDown();
+                    await(allowComplete);
+                }
+                @Override public void onError(Throwable error) { actual.onError(error); }
+                @Override public void onComplete() { actual.onComplete(); }
+            };
+        }));
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Sinks.One<String> source = Sinks.one();
+            var result = CacheWorkAdmission.own(source.asMono(), reservation, terminals::add).toFuture();
+            var emission = executor.submit(() -> source.tryEmitValue("value").orThrow());
+            await(valueDelivered);
+            assertThat(terminals).isEmpty();
+            assertThat(result).isNotDone();
+            assertThat(admission.active(POLICY)).isEqualTo(1);
+            assertThatThrownBy(() -> admission.acquire(POLICY)).isInstanceOf(IllegalStateException.class);
+            if (cancel) {
+                var cancellation = executor.submit(() -> result.cancel(true));
+                await(cancellationEntered);
+                assertThat(terminals).containsExactly(SignalType.CANCEL);
+                assertThat(admission.active(POLICY)).isEqualTo(1);
+                assertThatThrownBy(() -> admission.acquire(POLICY)).isInstanceOf(IllegalStateException.class);
+                allowCancellation.countDown();
+                assertThat(cancellation.get(5, TimeUnit.SECONDS)).isTrue();
+            }
+            allowComplete.countDown();
+            emission.get(5, TimeUnit.SECONDS);
+            if (!cancel) { assertThat(result.get(5, TimeUnit.SECONDS)).isEqualTo("value"); }
+            assertThat(terminals).containsExactly(cancel ? SignalType.CANCEL : SignalType.ON_COMPLETE);
+            assertThat(cancellations).hasValue(cancel ? 1 : 0);
+            assertThat(admission.active(POLICY)).isZero();
+            var replacement = admission.acquire(POLICY);
+            reservation.complete();
+            assertThat(admission.active(POLICY)).isEqualTo(1);
+            replacement.complete();
+            assertThat(admission.active(POLICY)).isZero();
+        } finally {
+            allowCancellation.countDown();
+            allowComplete.countDown();
+            executor.shutdown();
+            try {
+                assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+            } finally {
+                Hooks.resetOnEachOperator(hook);
+                reservation.complete();
+                admission.close();
+            }
+        }
+    }
 
     @ParameterizedTest
     @CsvSource({"false,false,false", "false,true,false", "true,false,false", "true,true,false",

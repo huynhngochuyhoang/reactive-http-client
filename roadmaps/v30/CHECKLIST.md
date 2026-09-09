@@ -824,6 +824,27 @@ Priority 4 evidence (2026-09-08):
   Priority 9 public rejection/live telemetry and subsequent consumer/native,
   API and performance evidence remain open; none is claimed by this JVM audit.
 
+### Valued-Mono terminal follow-up
+
+- Revalidated on 2026-09-09 against reachable base
+  `a1b841418d36bde4f79596c211ad1521ea91617f` plus this working tree. The original
+  Priority 8 totals above describe the preceding revision, not this follow-up.
+- `CacheWorkAdmission.own` retains `onNext` without finishing ownership until
+  `onComplete`; error/cancellation clears the pending value. Two gated cases
+  fail before the fix and pass afterward: no early success/release between
+  value and completion, and no slot reuse while upstream cancellation blocks.
+  The ownership suite now contains **24 cases**. Cleanup remains once-only,
+  and an old reservation cannot release a replacement's slot.
+- Final starter/mock regression: **1,593 tests** (**1,527** starter plus **66**
+  helper), zero failures/errors/skips:
+  `mvn -B -ntp -pl reactive-http-client-test -am -l target/release-evidence/v30/priority8/valued-terminal/complete-tests.log test`.
+- Five repeated runs of the seven focused suites listed above: **160 cases
+  each, 800 executions**, zero failures/errors/skips. Logs use
+  `target/release-evidence/v30/priority8/valued-terminal/stress-N/maven.log`
+  for `N=1..5`. Copied XML, parsed totals, reproduction logs, final
+  documentation/metadata checks, source patch and hashes are preserved under
+  `target/release-evidence/v30/priority8/valued-terminal/`.
+
 ---
 
 ## Priority 9 - Live Metrics and Terminal Diagnostics

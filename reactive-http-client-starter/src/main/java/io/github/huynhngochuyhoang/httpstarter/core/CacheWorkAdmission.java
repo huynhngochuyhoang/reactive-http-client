@@ -139,18 +139,30 @@ class CacheWorkAdmission {
         };
         return Mono.<T>create(sink -> {
             BaseSubscriber<T> subscriber = new BaseSubscriber<>() {
+                private T pendingValue;
+
                 @Override public Context currentContext() { return Context.of(sink.contextView()); }
-                @Override protected void hookOnNext(T value) {
+                @Override protected synchronized void hookOnNext(T value) {
+                    if (!isDisposed()) {
+                        pendingValue = value;
+                    }
+                }
+                @Override protected void hookOnComplete() {
+                    T value = takeValue();
                     finish.accept(SignalType.ON_COMPLETE);
                     sink.success(value);
                 }
-                @Override protected void hookOnComplete() {
-                    finish.accept(SignalType.ON_COMPLETE);
-                    sink.success();
-                }
                 @Override protected void hookOnError(Throwable error) {
+                    takeValue();
                     finish.accept(SignalType.ON_ERROR);
                     sink.error(error);
+                }
+                @Override protected void hookOnCancel() { takeValue(); }
+
+                private synchronized T takeValue() {
+                    T value = pendingValue;
+                    pendingValue = null;
+                    return value;
                 }
             };
             sink.onCancel(() -> {
