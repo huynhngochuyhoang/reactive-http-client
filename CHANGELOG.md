@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Optional per-policy cache work limits.** The V30 development line enforces
+  explicit caller and foreground-load limits, plus a separate refresh limit
+  when refresh is selected. Saturated foreground work fails before preparation
+  or loader assembly; saturated refresh returns the authorized stale value
+  without queueing or extending TTL. Reservations survive retries and entered
+  synchronous callbacks until their owner terminates. Properties, basic
+  effective-contract output, and AOT binding hints ship together; configuration
+  changes require factory recreation. Live admission telemetry and native
+  executable evidence remain later V30 gates.
+
 ## [4.2.0] - 2026-09-06
 
 - **`4.2.0` published release.** This additive minor

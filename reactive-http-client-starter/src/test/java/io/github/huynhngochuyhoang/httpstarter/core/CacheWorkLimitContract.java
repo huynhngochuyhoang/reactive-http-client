@@ -1,89 +1,48 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.core.CacheWorkPolicy.Limits;
+import io.github.huynhngochuyhoang.httpstarter.core.CacheWorkPolicy.Snapshot;
 
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** V30 executable specification only. Not packaged, bound to application properties, or enforcing work. */
+/** Decision-table fixtures; selection and normalization delegate to the production contract. */
 final class CacheWorkLimitContract {
-    static final long MAXIMUM = 1_000_000;
+    static final long MAXIMUM = CacheWorkPolicy.MAXIMUM;
 
     record Input(Long maximumConcurrentCallers, Long maximumConcurrentLoads, Long maximumConcurrentRefreshes) {
-        boolean absent() {
-            return maximumConcurrentCallers == null && maximumConcurrentLoads == null
-                    && maximumConcurrentRefreshes == null;
-        }
-    }
-
-    record Limits(int maximumConcurrentCallers, int maximumConcurrentLoads, Integer maximumConcurrentRefreshes) { }
-
-    record Selection(EffectiveCachePolicy.Eligibility eligibility, EffectiveCachePolicy.Source source,
-                     String policyName, boolean refreshEnabled, Limits work) { }
-
-    record Snapshot(Map<Method, Selection> methods, Map<String, Limits> policies) {
-        Snapshot {
-            methods = Map.copyOf(methods);
-            policies = Map.copyOf(policies);
-        }
-
-        void requireUnchanged(Snapshot candidate) {
-            if (!equals(candidate)) {
-                throw new IllegalStateException("Cache work selection changed after startup; recreate the client factory");
-            }
-        }
     }
 
     static Snapshot freeze(Class<?> client, String name, MethodMetadataCache metadata,
                            ReactiveHttpClientProperties.ClientConfig config, Map<String, Input> inputs) {
-        Map<Method, Selection> methods = new LinkedHashMap<>();
-        Map<String, Limits> policies = new LinkedHashMap<>();
-        for (Method method : client.getMethods()) {
+        config.getCache().getPolicies().forEach((policyName, policy) ->
+                policy.setWork(properties(inputs.get(policyName))));
+        for (var method : client.getMethods()) {
             if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
                 continue;
             }
             RequestPlan plan = RequestPlan.from(metadata.get(method), client);
-            EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.validateDecision(
+            EffectiveCachePolicy.validateDecision(
                     client, name, plan, config, EffectiveCachePolicy.effectiveHttpMethod(plan, config));
-            var selection = decision.selection();
-            Limits limits = decision.cacheable()
-                    ? normalize(inputs.get(selection.policyName()), selection.policy().isRefreshEnabled()) : null;
-            if (limits != null) {
-                Limits existing = policies.putIfAbsent(selection.policyName(), limits);
-                if (existing != null) {
-                    if (!existing.equals(limits)) {
-                        throw new IllegalStateException("Cache work selection changed during startup");
-                    }
-                    limits = existing;
-                }
-            }
-            methods.put(method, new Selection(decision.eligibility(), selection.source(), selection.policyName(),
-                    decision.cacheable() && selection.policy().isRefreshEnabled(), limits));
         }
-        return new Snapshot(methods, policies);
+        return CacheWorkPolicy.freeze(client, name, metadata, config);
     }
 
     static Limits normalize(Input input, boolean refreshEnabled) {
-        if (input == null || input.absent()) {
-            return null;
-        }
-        int callers = positive("maximum-concurrent-callers", input.maximumConcurrentCallers());
-        int loads = positive("maximum-concurrent-loads", input.maximumConcurrentLoads());
-        if (!refreshEnabled && input.maximumConcurrentRefreshes() != null) {
-            throw new IllegalArgumentException("maximum-concurrent-refreshes requires selected refresh");
-        }
-        Integer refreshes = refreshEnabled
-                ? positive("maximum-concurrent-refreshes", input.maximumConcurrentRefreshes()) : null;
-        return new Limits(callers, loads, refreshes);
+        return CacheWorkPolicy.normalize(properties(input), refreshEnabled);
     }
 
-    private static int positive(String property, Long value) {
-        if (value == null || value < 1 || value > MAXIMUM) {
-            throw new IllegalArgumentException(property + " must be an integer in [1, " + MAXIMUM + "]");
+    private static ReactiveHttpClientProperties.CacheWorkConfig properties(Input input) {
+        if (input == null) {
+            return null;
         }
-        return Math.toIntExact(value);
+        var result = new ReactiveHttpClientProperties.CacheWorkConfig();
+        result.setMaximumConcurrentCallers(input.maximumConcurrentCallers());
+        result.setMaximumConcurrentLoads(input.maximumConcurrentLoads());
+        result.setMaximumConcurrentRefreshes(input.maximumConcurrentRefreshes());
+        return result;
     }
 
     enum Lookup { FRESH, STALE, MISS }

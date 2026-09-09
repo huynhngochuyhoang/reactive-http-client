@@ -54,8 +54,11 @@ final class LocalResponseCacheManager implements AutoCloseable {
     private final LocalResponseCacheMetrics metrics;
     private final boolean observabilityEnabled;
     private final String clientName;
-    private final CacheCallerAdmission callerAdmission;
-    private final CacheLoadAdmission loadAdmission;
+    private CacheCallerAdmission callerAdmission;
+    private CacheLoadAdmission loadAdmission;
+    private CacheWorkAdmission refreshAdmission;
+    private CacheWorkPolicy.Snapshot workSelection;
+    private Runnable workValidation = () -> { };
     private final Map<PolicyBounds, LocalResponseCache> caches = new LinkedHashMap<>();
     private final Map<FlightKey, InFlightLoad> inFlightLoads = new HashMap<>();
     private final Map<FlightKey, InFlightRefresh> inFlightRefreshes = new HashMap<>();
@@ -90,6 +93,14 @@ final class LocalResponseCacheManager implements AutoCloseable {
                                       String clientName,
                                       CacheCallerAdmission callerAdmission,
                                       CacheLoadAdmission loadAdmission) {
+        this(classLoader, ticker, refreshScheduler, metrics, observabilityEnabled, clientName,
+                callerAdmission, loadAdmission, null);
+    }
+
+    private LocalResponseCacheManager(ClassLoader classLoader, LongSupplier ticker, Scheduler refreshScheduler,
+                                      LocalResponseCacheMetrics metrics, boolean observabilityEnabled,
+                                      String clientName, CacheCallerAdmission callerAdmission,
+                                      CacheLoadAdmission loadAdmission, CacheWorkAdmission refreshAdmission) {
         this.classLoader = classLoader;
         this.ticker = ticker;
         this.refreshScheduler = refreshScheduler;
@@ -98,6 +109,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
         this.clientName = clientName;
         this.callerAdmission = callerAdmission;
         this.loadAdmission = loadAdmission;
+        this.refreshAdmission = refreshAdmission;
     }
 
     static LocalResponseCacheManager lazy(ClassLoader classLoader) {
@@ -193,6 +205,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 Objects.requireNonNull(metrics, "metrics"),
                 cacheObservabilityEnabled,
                 clientName);
+        manager.configureWork(CacheWorkPolicy.freeze(clientInterface, clientName, metadataCache, clientConfig));
+        manager.validateWorkWith(CacheWorkPolicy.validator(manager.workSelection, clientInterface, metadataCache, clientConfig));
         for (Method method : clientInterface.getMethods()) {
             if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
                 continue;
@@ -232,6 +246,31 @@ final class LocalResponseCacheManager implements AutoCloseable {
         return callerAdmission;
     }
 
+    synchronized void configureWork(CacheWorkPolicy.Snapshot selection) {
+        if (workSelection != null) {
+            if (!workSelection.policies().isEmpty() || !selection.policies().isEmpty()) {
+                workSelection.requireUnchanged(selection);
+            }
+            return;
+        }
+        if (closed.get()) {
+            throw new IllegalStateException("Response cache is closed");
+        }
+        workSelection = selection;
+        if (!selection.policies().isEmpty()) {
+            callerAdmission = new CacheCallerAdmission(
+                    selection.maximums(CacheWorkPolicy.Limits::maximumConcurrentCallers));
+            loadAdmission = new CacheLoadAdmission(
+                    selection.maximums(CacheWorkPolicy.Limits::maximumConcurrentLoads));
+            Map<String, Integer> refreshes = selection.maximums(CacheWorkPolicy.Limits::maximumConcurrentRefreshes);
+            refreshAdmission = refreshes.isEmpty() ? null : new CacheWorkAdmission(refreshes, RefreshCapacity::new);
+        }
+    }
+
+    void validateWorkWith(Runnable validation) {
+        workValidation = validation;
+    }
+
     static LocalResponseCacheManager testing(LongSupplier ticker, Scheduler scheduler,
                                              Map<String, Integer> callerMaximums,
                                              Map<String, Integer> loadMaximums) {
@@ -243,6 +282,22 @@ final class LocalResponseCacheManager implements AutoCloseable {
 
     int activeLoadsForTesting(String policyName) {
         return loadAdmission == null ? 0 : loadAdmission.active(policyName);
+    }
+
+    static LocalResponseCacheManager testing(LongSupplier ticker, Scheduler scheduler,
+                                             Map<String, Integer> callers, Map<String, Integer> loads,
+                                             Map<String, Integer> refreshes) {
+        return new LocalResponseCacheManager(LocalResponseCacheManager.class.getClassLoader(), ticker, scheduler,
+                LocalResponseCacheMetrics.disabled(), false, "unknown", new CacheCallerAdmission(callers),
+                new CacheLoadAdmission(loads), new CacheWorkAdmission(refreshes, RefreshCapacity::new));
+    }
+
+    int activeRefreshesForTesting(String policyName) {
+        return refreshAdmission == null ? 0 : refreshAdmission.active(policyName);
+    }
+
+    private static final class RefreshCapacity extends RuntimeException {
+        private RefreshCapacity() { super(null, null, false, false); }
     }
 
     static LocalResponseCacheManager testing(LongSupplier ticker,
@@ -459,6 +514,13 @@ final class LocalResponseCacheManager implements AutoCloseable {
         boolean rejected;
         synchronized (inFlightRefreshes) {
             rejected = closed.get() || inFlightRefreshes.containsKey(refreshKey);
+            if (!rejected && refreshAdmission != null) {
+                try {
+                    refresh.reservation = refreshAdmission.acquire(policyName);
+                } catch (RefreshCapacity | IllegalStateException ignored) {
+                    rejected = true;
+                }
+            }
             if (!rejected) {
                 inFlightRefreshes.put(refreshKey, refresh);
             }
@@ -492,60 +554,65 @@ final class LocalResponseCacheManager implements AutoCloseable {
         if (refresh.loadState != null) {
             refresh.loadState.markHiddenCacheRefresh();
         }
-        Mono<Object> source;
-        try {
-            source = (Mono<Object>) loader.apply(refresh.loadState);
-        }
-        catch (Throwable ignored) {
-            recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.FAILURE);
-            finishRefresh(refresh);
-            return;
-        }
-        boolean cancelled;
-        synchronized (inFlightRefreshes) {
-            cancelled = refresh.terminal;
-        }
-        if (cancelled) {
-            recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.CANCELLATION);
-            return;
-        }
-
-        Disposable subscription;
-        try {
-            subscription = source
-                    .doOnSuccess(value -> {
-                        if (value != null) {
-                            ResponseMetadata metadata = responseMetadata.get();
-                            cacheCandidate(policy, value, metadata)
-                                    .ifPresent(candidate -> publishRefreshCandidate(
-                                            policyName, policy, refresh.cache,
-                                            refresh.refreshToken, candidate, metadata));
-                        }
-                    })
-                    .timeout(Duration.ofNanos(deadlineNanos), refreshScheduler)
-                    .takeUntilOther(shutdown.asMono())
-                    .doFinally(signal -> {
-                        LocalResponseCacheMetrics.WorkOutcome outcome = workOutcome(signal);
-                        recordRefreshOnce(refresh, outcome);
-                        finishRefresh(refresh);
-                    })
-                    .subscribe(ignored -> { }, ignored -> { }, () -> { }, Context.of(context));
-        }
-        catch (Throwable ignored) {
-            recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.FAILURE);
-            finishRefresh(refresh);
-            return;
-        }
-
-        boolean dispose;
-        synchronized (inFlightRefreshes) {
-            dispose = refresh.terminal;
-            if (!dispose) {
-                refresh.sourceSubscription = subscription;
+        Mono<Object> source = Mono.deferContextual(owner -> CacheWorkAdmission.preparing(owner, () -> {
+            if (!refresh.cache.isRefreshCurrent(refresh.refreshToken)) {
+                cancelRefresh(refresh.key);
+                return Mono.empty();
             }
+            return ((Mono<Object>) loader.apply(refresh.loadState))
+                    .flatMap(value -> CacheWorkAdmission.preparing(owner, () -> {
+                        ResponseMetadata metadata = responseMetadata.get();
+                        Optional<Object> candidate = cacheCandidate(policy, value, metadata);
+                        return CacheWorkAdmission.preparing(owner, () -> {
+                            candidate.ifPresent(selected -> publishRefreshCandidate(
+                                    policyName, policy, refresh.cache, refresh.refreshToken, selected, metadata));
+                            return Mono.just(value);
+                        });
+                    }));
+        }));
+        source = CacheWorkAdmission.subscribePreparation(source)
+                .timeout(Duration.ofNanos(deadlineNanos), refreshScheduler)
+                .takeUntilOther(shutdown.asMono())
+                .doOnError(ignored -> {
+                    // A deadline must terminate the guard even while synchronous preparation unwinds.
+                    recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.FAILURE);
+                    if (refresh.reservation != null) {
+                        refresh.reservation.complete();
+                    }
+                });
+        if (refresh.reservation != null) {
+            source = CacheWorkAdmission.own(source, refresh.reservation, signal -> {
+                recordRefreshOnce(refresh, workOutcome(signal));
+                finishRefresh(refresh);
+            });
+        } else {
+            source = source.doFinally(signal -> {
+                recordRefreshOnce(refresh, workOutcome(signal));
+                finishRefresh(refresh);
+            });
         }
-        if (dispose) {
-            subscription.dispose();
+        BaseSubscriber<Object> subscription = new BaseSubscriber<>() {
+            @Override public Context currentContext() { return Context.of(context); }
+            @Override protected void hookOnError(Throwable ignored) { }
+        };
+        synchronized (inFlightRefreshes) {
+            if (refresh.terminal) {
+                recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.CANCELLATION);
+                if (refresh.reservation != null) {
+                    refresh.reservation.complete();
+                }
+                return;
+            }
+            refresh.sourceSubscription = subscription;
+        }
+        try {
+            source.subscribe(subscription);
+        } catch (Throwable ignored) {
+            recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.FAILURE);
+            finishRefresh(refresh);
+            if (refresh.reservation != null) {
+                refresh.reservation.complete();
+            }
         }
     }
 
@@ -593,6 +660,9 @@ final class LocalResponseCacheManager implements AutoCloseable {
         recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.CANCELLATION);
         if (refresh.sourceSubscription != null) {
             refresh.sourceSubscription.dispose();
+        }
+        if (refresh.reservation != null) {
+            refresh.reservation.complete();
         }
         refresh.cache.finishRefresh(refresh.refreshToken);
     }
@@ -811,6 +881,9 @@ final class LocalResponseCacheManager implements AutoCloseable {
     }
 
     Snapshot snapshot() {
+        if (!closed.get()) {
+            workValidation.run();
+        }
         synchronized (caches) {
             long capacity = 0;
             long size = 0;
@@ -898,6 +971,9 @@ final class LocalResponseCacheManager implements AutoCloseable {
         if (loadAdmission != null) {
             loadAdmission.close();
         }
+        if (refreshAdmission != null) {
+            refreshAdmission.close();
+        }
         if (!closed.compareAndSet(false, true)) {
             return;
         }
@@ -931,8 +1007,12 @@ final class LocalResponseCacheManager implements AutoCloseable {
             flight.result.tryEmitEmpty();
         }
         for (InFlightRefresh refresh : refreshes) {
+            recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.CANCELLATION);
             if (refresh.sourceSubscription != null) {
                 refresh.sourceSubscription.dispose();
+            }
+            if (refresh.reservation != null) {
+                refresh.reservation.complete();
             }
             refresh.cache.finishRefresh(refresh.refreshToken);
         }
@@ -950,6 +1030,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
         if (policy == null || policy.getTtlMs() == null || policy.getMaximumSize() == null) {
             throw new IllegalStateException("Cache policy '" + selection.policyName() + "' for client '"
                     + clientName + "' has not passed startup validation");
+        }
+        if (workSelection != null && !Objects.equals(workSelection.policies().get(selection.policyName()),
+                CacheWorkPolicy.normalize(policy))) {
+            throw new IllegalStateException("Cache work selection changed after startup; recreate the client factory");
         }
         PolicyBounds bounds = new PolicyBounds(
                 selection.policyName(), policy.getTtlMs(), policy.getMaximumSize(),
@@ -1309,6 +1393,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
         private Disposable sourceSubscription;
         private boolean terminal;
         private boolean outcomeRecorded;
+        private CacheWorkAdmission.Reservation reservation;
 
         private InFlightRefresh(FlightKey key,
                                 LocalResponseCache cache,

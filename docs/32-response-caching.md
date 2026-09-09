@@ -424,6 +424,56 @@ DTOs; callers that mutate a cached object must copy it on their side. A cached
 `ResponseEntity` is rebuilt only to retain the bounded safe header subset; its
 body retains the decoded object identity.
 
+## V30 snapshot: optional work limits
+
+The following policy fragment is supported by the `4.3.0-SNAPSHOT` development
+line, not published `4.2.0`. Add it only to an already selected, eligible policy;
+the dependency, key-isolation, and customization-safety requirements above still
+apply.
+
+```yaml
+work:
+  maximum-concurrent-callers: 64
+  maximum-concurrent-loads: 16
+  maximum-concurrent-refreshes: 4
+```
+
+Every selected limit is an integer in `[1, 1000000]`. Caller and load limits are
+required together. Include the refresh limit only when `refresh-after-ms` and
+`refresh-timeout-ms` are already configured; it is required in that case and
+forbidden otherwise. An absent work group, or three null leaves, selects no
+limit. Unused policy definitions remain inert. Nothing here enables caching,
+single flight, refresh, resilience, metrics, a queue, or a foreground timeout.
+
+Counts are independent per policy name and client factory, shared by all APIs
+selecting that name. Callers reserve before argument/context preparation,
+serialization, auth and lookup, including hits and coalesced waiters. A new
+independent miss or shared source requires one load reservation through retries,
+decode and publication; an existing flight's waiters do not reserve more load
+capacity. An admitted source can outlive its initiating caller.
+
+Refresh reserves separately before hidden preparation. A saturated trigger
+returns the authorized, still-valid stale value, retaining no queued trigger
+and leaving value, weight, age and hard expiry unchanged. It is not a terminal
+refresh load. Later access may try again. Refresh retains the earlier of its
+existing timeout and hard expiry. Refresh saturation does not consume
+foreground capacity, although configured shared connection pools, auth services,
+and resilience operators can still contend.
+
+Cancellation/timeout cannot release a reservation while an entered synchronous
+starter callback is still unwinding. Independent caller-owned loads may outlive
+factory close, but cannot publish afterward; their capacity ends at their own
+terminal boundary. Arbitrary application tasks outside those callbacks remain
+application-owned. Limits bound simultaneous ownership, not memory bytes or
+unbounded work duration.
+
+Limits and selected-policy mappings are frozen at construction. Detected
+mutation fails subsequent invocation/subscription or live snapshot inspection;
+recreate the factory to change the selection. Basic per-method contract output
+includes the normalized bounds. Dedicated rejection types/outcomes, live work
+gauges and skip counters remain V30 Priority 9; do not infer them from the
+existing refresh terminal counters.
+
 ## Phase-four observability
 
 Cache telemetry is independent from cache selection and defaults off. Enable it
