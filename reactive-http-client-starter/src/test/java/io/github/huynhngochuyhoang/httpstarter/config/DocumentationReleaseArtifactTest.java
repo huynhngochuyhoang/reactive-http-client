@@ -2133,6 +2133,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("<id>benchmark-published-baseline-v28-source-exclusion</id>")
                 .doesNotContain("<id>boot4-spike</id>");
         assertThat(currentBaselineProfile)
+                .contains("<exclude>**/V30CacheWork*Benchmark.java</exclude>")
+                .contains("<testExclude>**/V30CacheWorkPerformanceBenchmarkTest.java</testExclude>")
                 .doesNotContain("V29WeightedCachePerformanceBenchmark.java",
                         "V29WeightedCachePerformanceBenchmarkTest.java")
                 .doesNotContain("V28SemanticReadCachePerformanceBenchmark.java",
@@ -2141,6 +2143,12 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Pbenchmarks,benchmark-release,benchmark-published-baseline")
                 .doesNotContain("benchmark-published-baseline-v29-source-exclusion",
                         "benchmark-published-baseline-v28-source-exclusion");
+        for (String legacy : List.of("v27", "v28", "v29")) {
+            int start = benchmarkPom.indexOf("<id>benchmark-published-baseline-" + legacy + "-source-exclusion</id>");
+            assertThat(benchmarkPom.substring(start, benchmarkPom.indexOf("</profile>", start)))
+                    .contains("<exclude>**/V30CacheWork*Benchmark.java</exclude>")
+                    .contains("<testExclude>**/V30CacheWorkPerformanceBenchmarkTest.java</testExclude>");
+        }
         assertThat(codecFactory)
                 .contains("ReactiveHttpClientJsonCodec")
                 .contains("tools.jackson.databind.ObjectMapper")

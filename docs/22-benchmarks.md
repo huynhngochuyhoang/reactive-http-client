@@ -165,7 +165,8 @@ than the selected baseline. Select another empty
 target-local path when retaining earlier evidence. The command uses the current
 benchmark harness and current managed Spring Boot BOM. Because published
 `4.2.0` contains V29, the current baseline command includes the weighted-cache
-rows; historical source-exclusion profiles remain only for older baselines. Its report is written under
+rows. The published-baseline profile excludes only the new V30 work-limit
+fixtures; historical source-exclusion profiles remain for older baselines. Its report is written under
 `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-<version>/`
 so it does not overwrite the current-workspace release report.
 For an exact historical release environment, check out the release tag and run
@@ -319,6 +320,99 @@ The comparison report records matched, current-only, and baseline-only scenario
 counts. Deltas are emitted only for exactly matching benchmark/mode rows. Keep
 all generated reports under `target/` unless release wording makes a public
 performance claim and a sanitized report is intentionally promoted.
+
+### V30 active-work performance and allocation audit
+
+V30 measures work-limit overhead separately from retained cache entries.
+The eight shared methods are the two GET cache-disabled invocation rows, the
+two V29 unweighted invocation rows, the two weighted metrics-disabled invocation
+rows, weighted hit, and metered accounting publication. These remain identical
+harness paths against published **4.2.0**. They produce **16 benchmark/mode rows**.
+
+The eleven new proxy methods each run with cache telemetry off/on. They cover
+publisher creation, hit, miss, weighted publication, caller rejection on a warm
+key, load rejection, same-key join, release/reuse, refresh start, refresh capacity
+skip, and a real loopback single-flight join. A separate four-thread row measures
+only the saturated production admission primitive with one fixed owner, not a
+logical request or a metered pipeline. Combined, the candidate has **20 methods,
+62 benchmark/mode/parameter rows**: **16 matched** and **46 current-only**.
+Metrics parameters remain distinct in JSON, Markdown and comparison keys.
+
+Proxy rows use the real invocation handler, API name, caller/source reporting
+states and configured metrics, with two caller slots, one foreground slot and,
+where applicable, one refresh slot. Cache occupancy is capped at 32 entries.
+No-network rows substitute only the WebClient exchange function; they do not
+measure sockets, transport allocation, or downstream latency. The loopback row
+uses HTTP/1.1 and a server response gate released only after two flight members
+attach. Every completion checks dispatch deltas, live slots, flight membership
+and capacity. Refresh rows use a synthetic ticker, explicitly gated source, and
+the production refresh scheduler.
+
+An operation in the rejection/join/reuse/refresh rows is a **whole scenario
+cycle**, including seed/hold/cancel/release/assertion work, not one rejected
+call or refresh in isolation. Miss/publication rows use bounded entry churn;
+they include steady-state eviction after the cache fills. The contended primitive
+row isolates saturated rejection cost and includes monitor contention but no
+request preparation. None is interchangeable with a raw WebClient request.
+
+For wiring checks (not release measurements):
+
+```bash
+mvn -B -ntp -Pbenchmarks,benchmark-discovery -pl reactive-http-client-benchmarks -am verify \
+  -Dtest=V30CacheWorkPerformanceBenchmarkTest,V29WeightedCachePerformanceBenchmarkTest,V28SemanticReadCachePerformanceBenchmarkTest,BenchmarkMarkdownReportTest,BenchmarkReportComparatorTest \
+  -Dsurefire.failIfNoSpecifiedTests=false
+python3 scripts/verify-v30-benchmark-results.py --self-test
+```
+
+After committing the final harness, run these **three manual commands in order**
+from the same idle Linux machine, toolchain, JVM settings, power mode and clean
+commit. Do not change the checkout or run other profiling/stress workloads
+between measurements. The scripts use the existing release profile: two forks,
+five warmup and measurement iterations per mode, and the GC profiler. V29/V30
+methods use their one-second iteration annotations; the two cache-disabled
+methods retain JMH's default iteration duration. Compare like-for-like durations
+in the result JSON.
+
+```bash
+bash scripts/run-v30-benchmarks.sh current
+```
+
+```bash
+bash scripts/run-v30-benchmarks.sh baseline
+```
+
+```bash
+bash scripts/run-v30-benchmarks.sh compare
+```
+
+The wrapper records the exact harness commit, before/after cleanliness,
+timestamps, OS/CPU/memory, Maven/JVM details, shaded-jar hash and JMH environment
+sidecar. It refuses occupied output directories and requires a fresh
+Central-only repository at
+`target/published-baseline-repositories/benchmark-v30-release-4.2.0`.
+It cleans only the benchmark module; a reactor-root clean would destroy
+`target/release-evidence/`. Baseline compilation excludes the V30 fixtures,
+not the V29 shared rows. The published artifact version and harness commit are
+recorded separately. Central provenance must pass before comparison.
+
+Results go to `target/release-evidence/v30/priority12/current/` and
+`baseline/`, with `benchmark-comparison.md` and `release-sha256.txt`
+beside them. Run logs are in each directory's `run.log`; failed stages retain
+exit status and partial artifacts. Preserve failed evidence before choosing a
+fresh rerun. Verification rejects missing/duplicate modes or metrics parameters,
+incorrect threads/units, missing GC allocation, or non-release iteration/fork
+settings. Comparison must contain exactly 16 matched, 46 current-only, zero
+baseline-only rows. Recheck environment parity and measurement uncertainty
+manually; matching row counts alone do not establish comparable results.
+
+JMH `gc.alloc.rate.norm` is transient bytes per scenario operation, not
+retained bytes or heap/RSS. The separate bounded JFR/weak-reference audit in
+[V30 performance evidence](../roadmaps/v30/PERFORMANCE-ALLOCATION-AUDIT.md)
+checks rejected contexts, active source ownership, cleanup and scheduler queues.
+Samples and forced-GC tests are not exhaustive allocation accounting or a
+production-GC guarantee. A benchmark-path change invalidates earlier numbers.
+Priority 12.3 stays open until clean current/baseline runs and the comparison
+are reviewed; smoke or a dirty-tree JFR capture alone cannot close it.
 
 Release-quality runs write JMH JSON under:
 

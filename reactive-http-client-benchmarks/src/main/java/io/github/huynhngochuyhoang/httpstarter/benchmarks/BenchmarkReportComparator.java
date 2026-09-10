@@ -117,7 +117,10 @@ public final class BenchmarkReportComparator {
             metrics.add(new Metric("allocation per operation",
                     number(node.path("secondaryMetrics").path("gc.alloc.rate.norm").path("score")),
                     "B/op", true, ALLOCATION_REVIEW_PERCENT));
-            results.put(new ResultKey(benchmarkName, mode), new BenchmarkResult(metrics));
+            ResultKey key = new ResultKey(benchmarkName + BenchmarkMarkdownReport.parameterSuffix(node), mode);
+            if (results.putIfAbsent(key, new BenchmarkResult(metrics)) != null) {
+                throw new IllegalArgumentException("Duplicate benchmark/mode/parameter row: " + key);
+            }
         }
         return results;
     }

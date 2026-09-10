@@ -1197,35 +1197,36 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 12 - Performance and Allocation Evidence
 
-### [ ] 12.1 Extend production-representative benchmarks
+### [x] 12.1 Extend production-representative benchmarks
 
-- [ ] Include cache-disabled invocation, existing policies without limits,
+- [x] Include cache-disabled invocation, existing policies without limits,
       selected-limit hits/misses, and weighted publication.
-- [ ] Add caller/load rejection, same-key join, refresh start/skip, release/reuse,
+- [x] Add caller/load rejection, same-key join, refresh start/skip, release/reuse,
       and contended admission rows with bounded workload dimensions.
-- [ ] Exercise production API names, caller/load reporting states, and metrics
+- [x] Exercise production API names, caller/load reporting states, and metrics
       selection in metered rows rather than convenience defaults.
-- [ ] Gate subscribers and server responses so a supposed waiter cannot become
+- [x] Gate subscribers and server responses so a supposed waiter cannot become
       a hit unnoticed; assert workload identity and terminal ownership counts.
-- [ ] Keep published `4.2.0` rows comparable; label genuinely new rows as lacking
+- [x] Keep published `4.2.0` rows comparable; label genuinely new rows as lacking
       a baseline instead of silently dropping required results.
 
-### [ ] 12.2 Separate allocation from retained ownership
+### [x] 12.2 Separate allocation from retained ownership
 
-- [ ] Inspect disabled/unselected paths for new state or work caused by the
+- [x] Inspect disabled/unselected paths for new state or work caused by the
       optional feature; record any justified overhead explicitly.
-- [ ] Measure transient reservation/rejection allocation separately from retained
+- [x] Measure transient reservation/rejection allocation separately from retained
       request/source graphs and cache entry occupancy.
-- [ ] Prove repeated saturation does not accumulate rejected owners or pending
-      tasks, and that admission uses no blocking waits or unbounded scans.
-- [ ] Record bounded JFR/retention evidence and explain measurement limits;
+- [x] Prove repeated saturation does not accumulate rejected owners or pending
+      tasks, and that admission uses no capacity waits or unbounded scans.
+      Synchronized counter access can contend; this is not a lock-free claim.
+- [x] Record bounded JFR/retention evidence and explain measurement limits;
       no byte/count estimate is promoted as exact process-memory sizing.
 
 ### [ ] 12.3 Prepare and review manual release benchmarks
 
-- [ ] Pass benchmark packaging, harness tests, and smoke/discovery coverage before
+- [x] Pass benchmark packaging, harness tests, and smoke/discovery coverage before
       providing release-run commands.
-- [ ] Supply exact clean-commit commands for current, fresh published `4.2.0`,
+- [x] Supply exact clean-commit commands for current, fresh published `4.2.0`,
       and comparison/report generation, with required profiles, output paths,
       machine/toolchain metadata, and expected scenario counts.
 - [ ] Hand release-quality execution to the user when requested and leave this
@@ -1234,6 +1235,53 @@ Priority 4 evidence (2026-09-08):
       and comparability; a benchmark-path correction invalidates earlier numbers.
 - [ ] Record either supported versioned performance evidence or an explicit
       no-public-performance-claim disposition; smoke alone cannot complete it.
+
+### Implementation and bounded evidence
+
+- Implemented on 2026-09-11 against reachable base
+  `131a72481ea8ae4393a91ccae12e8695388d5a20` plus this working tree.
+  [Performance/allocation audit](PERFORMANCE-ALLOCATION-AUDIT.md) records scope,
+  fixture dimensions, disabled-path costs and ownership limits. No production
+  behavior or public API changes are made in this priority.
+- `V30CacheWorkPerformanceBenchmark` adds eleven real-proxy methods with
+  telemetry off/on; `V30CacheWorkAdmissionBenchmark` isolates four-thread
+  saturated acquisition. Eight unchanged shared methods retain the 4.2.0
+  comparison. Average-time and throughput coverage is **62 current rows**:
+  **16 matched / 46 current-only / zero baseline-only**. Parameter-aware
+  report keys prevent metrics-off/on rows from overwriting each other.
+- Current packaging/discovery and harness/report tests pass **27 cases**;
+  fresh published 4.2.0 packaging/discovery passes **23 cases**, excluding only
+  the V30 test class. The current and published smoke runs contain **62** and
+  **16** rows, and their comparison preserves the exact expected coverage.
+  Fresh Central-only artifact provenance passes. Logs, JSON, Markdown,
+  environment sidecars, copied test XML and shaded jars are retained under
+  `target/release-evidence/v30/priority12/`.
+- Documentation/configuration-metadata checks pass **101 cases** with zero
+  failures/errors/skips; reactor validation and diff checks pass. Command
+  records, the working-tree patch/source copies and SHA-256 inventory accompany
+  the reports rather than attributing these dirty-tree runs to a clean commit.
+- Seven short GC-profiler rows separate transient B/op from average time.
+  A bounded JFR run passes the four new harness cases; its allocation samples
+  are not exact object/retained-memory measurements. Repeated proxy saturation
+  makes **2,000 rejected calls per telemetry mode** while two callers retain
+  one source, and sampled rejected context objects collect before release.
+  The separately rerun ownership suite passes **25 cases**, including
+  reference-queue and bounded scheduler/task checks. Admission uses fixed
+  policy counters, not a capacity queue or an active-owner scan; immutable
+  selection validation still costs an interface-method traversal on invocation.
+- Exact release commands are in
+  [the benchmark guide](../../docs/22-benchmarks.md#v30-active-work-performance-and-allocation-audit):
+  `bash scripts/run-v30-benchmarks.sh current`, then `baseline`, then `compare`.
+  The wrapper requires one clean commit, fresh output/baseline directories,
+  successful runs, exact mode/parameter coverage, two forks, five warmups/
+  measurements, allocation metrics and Central provenance. It preserves root
+  evidence across module cleanup. Coverage-verifier self-tests pass three
+  cases, and the dirty-tree guard rejects this uncommitted checkout.
+- **12.3 remains open.** These are harness, smoke and bounded allocation/
+  ownership checks, not release-quality measurements. Commit the reviewed
+  harness before manual execution; review returned artifacts and explicitly
+  decide performance claims afterward. Native and final-release gates remain
+  independent, and no historical promoted report is modified.
 
 ---
 
