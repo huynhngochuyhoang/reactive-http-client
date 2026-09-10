@@ -1115,46 +1115,83 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 11 - Operations and Support-Bundle Evidence
 
-### [ ] 11.1 Publish practical saturation and recovery guidance
+### [x] 11.1 Publish practical saturation and recovery guidance
 
-- [ ] Explain entry, decoded-byte, caller, load, refresh, pool, and resilience
+- [x] Explain entry, decoded-byte, caller, load, refresh, pool, and resilience
       limits with their scopes; selected limits require explicit endpoint-owner
       sizing and do not guarantee heap/RSS or cluster capacity.
-- [ ] Document caller rejection even on warm hits, load rejection with no
+- [x] Document caller rejection even on warm hits, load rejection with no
       fallback dispatch, refresh skip, and ordinary admission after hard expiry.
-- [ ] Document logical/request deadlines and caller resubscription choices;
+- [x] Document logical/request deadlines and caller resubscription choices;
       the starter does not queue or automatically retry local overload.
-- [ ] Build recipes from Priority 9 exports, preserving instance/target labels,
+- [x] Build recipes from Priority 9 exports, preserving instance/target labels,
       zero-versus-absent series, and separate foreground/refresh saturation.
 
-### [ ] 11.2 Add a coherent sanitized support fixture
+### [x] 11.2 Add a coherent sanitized support fixture
 
-- [ ] Capture bounded client/process identifiers, API-to-policy mapping, selected
+- [x] Capture bounded client/process identifiers, API-to-policy mapping, selected
       limits, metrics selection, and one timestamped capture window.
-- [ ] Include live caller/load/refresh samples and terminal/rejection/skip deltas
+- [x] Include live caller/load/refresh samples and terminal/rejection/skip deltas
       at matching pre-close boundaries; state overlapping units explicitly.
-- [ ] Reconcile successes, failures, cancellations, rejected work, skipped
+- [x] Reconcile successes, failures, cancellations, rejected work, skipped
       refreshes, and active owners without equating window totals to instantaneous
       occupancy or omitted counters to zero.
-- [ ] Tie entry/byte occupancy, TTL/refresh timing, connection/stream gauges,
+- [x] Tie entry/byte occupancy, TTL/refresh timing, connection/stream gauges,
       factory start/close, and meter ownership to consistent checkpoints.
-- [ ] Include one structural affected-caller terminal record without keys,
+- [x] Include one structural affected-caller terminal record without keys,
       payloads, headers, targets, identity, or arbitrary exception messages.
 
-### [ ] 11.3 Preserve capture and schema safeguards
+### [x] 11.3 Preserve capture and schema safeguards
 
-- [ ] Version-scope new fields while accepting valid published `4.2.0` captures;
+- [x] Version-scope new fields while accepting valid published `4.2.0` captures;
       preserve documented unknown/null facts and optional-field boundaries.
-- [ ] Keep downloads private, byte/time bounded, and quarantined; require
+- [x] Keep downloads private, byte/time bounded, and quarantined; require
       successful transfer, acceptable HTTP status, and exactly one JSON document
       before publishing sanitized endpoint evidence.
-- [ ] Validate leaf types, numeric/string/list bounds, fixed reasons, and
+- [x] Validate leaf types, numeric/string/list bounds, fixed reasons, and
       configured/current-count relationships before retaining values.
-- [ ] Add negative fixture cases for sensitive field names, embedded request
+- [x] Add negative fixture cases for sensitive field names, embedded request
       lines/targets, arbitrary URI schemes, identities, and contradictory timing
       or accounting; avoid text-coercion assertions for numeric fields.
-- [ ] Run documentation, metadata, local-link, placeholder, and fixture guards
+- [x] Run documentation, metadata, local-link, placeholder, and fixture guards
       against the actual copyable examples and capture path.
+
+---
+
+### Priority 11 evidence (2026-09-10)
+
+- Reviewed against reachable base
+  `ed0867f3ccddbd0c3e538fb6edcd04aa36d76f5c` plus this working tree.
+  This priority changes documentation, fixtures and verification only; it
+  neither changes production behavior nor completes the pending native gate.
+- [Operations](../../docs/30-operations-troubleshooting.md#cache-work-saturation-v30-430-candidate)
+  distinguishes entry/byte/caller/load/refresh/pool/operator scopes, warm-hit
+  rejection, no fallback/queue/local retry, deadlines, explicit caller recovery,
+  hard expiry and close. [Recipes](../../docs/08-observability.md#cache-work-saturation-recipes-v30)
+  retain target labels and keep foreground/refresh counts and zero/absence separate.
+- [The fixture](../../docs/fixtures/support-bundle-cache-work.json) contains one
+  mapped API/policy and five coherent checkpoints. Its eight-to-ten-second
+  quiet window records both sides of terminal counter changes before close.
+  Three foreground sources end in success/failure/cancellation; six stale
+  callers cover three refresh sources and three skips. One successful load
+  plus one refresh replacement adds two admissions but only one entry.
+  Work registrations disappear only at the later last-owner close; post-close
+  counters are unavailable, not fabricated zeros.
+- `python3 scripts/verify-cache-work-support.py`: **8 unittest methods pass**,
+  including **15 negative fixture mutations** and offline execution of the
+  actual copyable Bash/jq sanitizer. Published 4.1/4.2 omissions, current work
+  groups, summary-only nulls, lazy/open/closed/mixed state, counter/type/bound
+  violations, failed/truncated/oversized transfers, HTTP errors, empty/multiple
+  JSON inputs and structural health invariants are covered. CI runs this guard.
+- Focused Maven verification: **112 tests**, zero failures/errors/skips
+  (**48 documentation, 35 properties, 18 starter metadata, 7 work diagnostics,
+  4 OTel metadata**). This includes local-link and placeholder guards and
+  negative sensitive-field/request-target/identity fixture cases:
+  `mvn -B -ntp -pl reactive-http-client-starter,reactive-http-client-otel -am -Dtest=DocumentationReleaseArtifactTest,ReactiveHttpClientPropertiesTest,ReactiveHttpClientConfigurationMetadataTest,OpenTelemetryConfigurationMetadataTest,CacheWorkDiagnosticsContractTest -Dsurefire.failIfNoSpecifiedTests=false test`.
+- Logs, copied XML, tool versions, base revision, working-tree patch and SHA-256
+  inventory are retained under `target/release-evidence/v30/priority11/`.
+  `git diff --check` passes. These are focused operations checks, not a claim
+  of a fresh full-reactor, native, or release-candidate run.
 
 ---
 

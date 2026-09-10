@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Cache-work operations evidence.** V30 saturation/recovery recipes preserve
+  target labels and foreground/refresh separation. A timestamped support fixture
+  reconciles live owners, counters, storage and shutdown; tested capture filters
+  preserve published 4.2.0 compatibility and unknown work facts.
 - **Cache work-limit mock and consumer parity.** The V30 helper adds immutable
   `cacheWorkSnapshot()` and ordinary-clock `withCacheObservability()` controls,
   retaining cumulative test evidence after close without changing the published
