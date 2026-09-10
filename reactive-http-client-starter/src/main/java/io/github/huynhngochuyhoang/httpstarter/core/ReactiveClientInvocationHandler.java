@@ -507,7 +507,7 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 try {
                     reservation = callerAdmission.acquire(policyName);
                 } catch (RuntimeException error) {
-                    state.markCacheServed();
+                    responseCacheManager.recordWorkRejection(policyName, plan.apiName(), state, error);
                     source = Mono.error(error);
                 }
             }
@@ -2364,7 +2364,8 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                     terminal.responseHeaders(),
                     terminal.responseBody(),
                     terminal.error(),
-                    inboundHeaders,
+                    terminal.error() instanceof io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException
+                            ? Map.of() : inboundHeaders,
                     terminal.attemptCount(),
                     terminal.cacheOutcome());
         }

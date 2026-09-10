@@ -1,53 +1,39 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import io.micrometer.core.instrument.*;
 import io.micrometer.core.instrument.Timer;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
-/** Micrometer implementation loaded only when cache metrics are explicitly enabled. */
+/** Registry/tag scoped leases keep overlapping factories' meters alive until the last owner closes. */
 final class MicrometerLocalResponseCacheMetrics extends LocalResponseCacheMetrics {
-
-    private static final Object SHARED_WEIGHTED_MONITOR = new Object();
-    private static final Map<MeterRegistry, Map<PolicyKey, SharedWeightedMeters>> SHARED_WEIGHTED_METERS =
-            new WeakHashMap<>();
+    private static final Object OWNERSHIP = new Object();
+    private static final Map<MeterRegistry, Map<MeterKey, SharedMeter>> SHARED = new WeakHashMap<>();
 
     private final MeterRegistry registry;
     private final String clientName;
-    private final AtomicBoolean closed = new AtomicBoolean();
-    private final Object weightedOwnershipMonitor = new Object();
-    private final Set<Meter.Id> ownedMeters = ConcurrentHashMap.newKeySet();
-    private final ConcurrentHashMap<MeterKey, Counter> counters = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<MeterKey, Timer> timers = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, SharedWeightedMeters> weightedMeters = new ConcurrentHashMap<>();
-    private final List<WeightedMeterHandle> weightedMeterHandles = new ArrayList<>();
+    private final Map<MeterKey, SharedMeter> leases = new HashMap<>();
+    private boolean closed;
 
     private MicrometerLocalResponseCacheMetrics(MeterRegistry registry, String clientName) {
         this.registry = registry;
-        this.clientName = clientName != null ? clientName : "UNKNOWN";
+        this.clientName = normalize(clientName);
     }
 
     static LocalResponseCacheMetrics create(Object registry, String clientName) {
-        if (!(registry instanceof MeterRegistry meterRegistry)) {
-            return LocalResponseCacheMetrics.disabled();
-        }
-        return new MicrometerLocalResponseCacheMetrics(meterRegistry, clientName);
+        return registry instanceof MeterRegistry meters
+                ? new MicrometerLocalResponseCacheMetrics(meters, clientName) : disabled();
     }
 
-    @Override
-    boolean enabled() {
-        return !closed.get();
-    }
+    @Override synchronized boolean enabled() { return !closed; }
 
-    @Override
-    void registerApi(String apiName) {
-        if (!enabled()) {
-            return;
-        }
+    @Override synchronized void registerApi(String apiName) {
+        if (closed) { return; }
         counter(PREFIX + ".lookups", callerTags(apiName).and("result", "hit"));
         counter(PREFIX + ".lookups", callerTags(apiName).and("result", "miss"));
         counter(PREFIX + ".coalesced", callerTags(apiName));
@@ -64,313 +50,188 @@ final class MicrometerLocalResponseCacheMetrics extends LocalResponseCacheMetric
         }
     }
 
-    @Override
-    void registerCache(String policyName, long maximumSize, LocalResponseCache cache) {
-        if (!enabled()) {
-            return;
-        }
+    @Override synchronized void registerCache(String policyName, long maximumSize, LocalResponseCache cache) {
+        if (closed) { return; }
         Tags tags = policyTags(policyName);
-        own(Gauge.builder(PREFIX + ".entries", cache, LocalResponseCache::estimatedSize)
-                .strongReference(true)
-                .tags(tags)
-                .register(registry));
-        own(Gauge.builder(PREFIX + ".maximum.entries", () -> maximumSize)
-                .strongReference(true)
-                .tags(tags)
-                .register(registry));
-        Long maximumDecodedResponseBytes = cache.maximumDecodedResponseBytes();
-        if (maximumDecodedResponseBytes != null) {
-            WeightedMeterHandle handle = acquireWeightedMeters(
-                    registry, clientName, policyName, cache, maximumDecodedResponseBytes);
-            boolean release;
-            synchronized (weightedOwnershipMonitor) {
-                release = closed.get();
-                if (!release) {
-                    weightedMeterHandles.add(handle);
-                    weightedMeters.put(normalize(policyName), handle.meters());
-                }
-            }
-            if (release) {
-                releaseWeightedMeters(registry, handle);
+        gauge(PREFIX + ".entries", tags, cache::estimatedSize, null);
+        gauge(PREFIX + ".maximum.entries", tags, () -> maximumSize, null);
+        Long bytes = cache.maximumDecodedResponseBytes();
+        if (bytes != null) {
+            gauge(PREFIX + ".retained.decoded.response.bytes", tags, cache::retainedDecodedResponseBytes,
+                    "Current decoded response representation bytes retained by live policy caches");
+            gauge(PREFIX + ".maximum.decoded.response.bytes", tags, () -> bytes,
+                    "Configured maximum decoded response representation bytes across live policy caches");
+            for (AdmissionOutcome outcome : AdmissionOutcome.values()) {
+                counter(PREFIX + ".admissions", tags.and("outcome", outcome.tagValue()));
             }
         }
         for (LocalResponseCache.RemovalReason reason : LocalResponseCache.RemovalReason.values()) {
-            if (reason != LocalResponseCache.RemovalReason.WEIGHT
-                    || cache.maximumDecodedResponseBytes() != null) {
+            if (reason != LocalResponseCache.RemovalReason.WEIGHT || bytes != null) {
                 counter(PREFIX + ".evictions", tags.and("cause", reason.tagValue()));
             }
         }
     }
 
-    @Override
-    void lookup(String apiName, String result) {
-        increment(PREFIX + ".lookups", callerTags(apiName).and("result", result));
-    }
-
-    @Override
-    void coalesced(String apiName) {
-        increment(PREFIX + ".coalesced", callerTags(apiName));
-    }
-
-    @Override
-    void stale(String apiName) {
-        increment(PREFIX + ".stale", callerTags(apiName));
-    }
-
-    @Override
-    void caller(String apiName, HttpClientCacheOutcome outcome) {
-        if (outcome != null) {
-            increment(PREFIX + ".callers", callerTags(apiName).and("outcome", outcome.name()));
+    @Override synchronized void registerWork(String policyName, CacheWorkPolicy.Limits limits,
+                                             CacheWorkAdmission callers, CacheWorkAdmission loads,
+                                             CacheWorkAdmission refreshes) {
+        if (closed) { return; }
+        workGauges(policyName, "callers", limits.maximumConcurrentCallers(), callers);
+        workGauges(policyName, "loads", limits.maximumConcurrentLoads(), loads);
+        for (CacheWorkRejectedException.Reason reason : CacheWorkRejectedException.Reason.values()) {
+            counter(PREFIX + ".work.rejections", policyTags(policyName).and("reason", reasonTag(reason)));
         }
-    }
-
-    @Override
-    void load(String apiName, WorkOutcome outcome, long durationNanos) {
-        work(PREFIX + ".loads", PREFIX + ".load.duration", apiName, outcome, durationNanos);
-    }
-
-    @Override
-    void refresh(String apiName, WorkOutcome outcome, long durationNanos) {
-        work(PREFIX + ".refreshes", PREFIX + ".refresh.duration", apiName, outcome, durationNanos);
-    }
-
-    @Override
-    void eviction(String policyName, LocalResponseCache.RemovalReason reason) {
-        increment(PREFIX + ".evictions", policyTags(policyName).and("cause", reason.tagValue()));
-    }
-
-    @Override
-    void admission(String policyName, AdmissionOutcome outcome) {
-        if (enabled() && outcome != null) {
-            SharedWeightedMeters shared = weightedMeters.get(normalize(policyName));
-            if (shared != null) {
-                shared.admission(outcome);
+        if (limits.maximumConcurrentRefreshes() != null) {
+            workGauges(policyName, "refreshes", limits.maximumConcurrentRefreshes(), refreshes);
+            for (RefreshSkipReason reason : RefreshSkipReason.values()) {
+                counter(PREFIX + ".refresh.skips", policyTags(policyName).and("reason", reason.tagValue()));
             }
         }
     }
 
-    private void work(String counterName,
-                      String timerName,
-                      String apiName,
-                      WorkOutcome outcome,
-                      long durationNanos) {
-        if (!enabled()) {
-            return;
+    private void workGauges(String policyName, String dimension, int maximum, CacheWorkAdmission admission) {
+        Tags tags = policyTags(policyName);
+        gauge(PREFIX + ".work.active." + dimension, tags, () -> admission.active(policyName),
+                "Current reserved " + dimension + " across live limited policy owners; overlapping work units");
+        gauge(PREFIX + ".work.maximum." + dimension, tags, () -> maximum,
+                "Configured " + dimension + " capacity across live limited policy owners");
+    }
+
+    @Override synchronized void rejection(String policyName, CacheWorkRejectedException.Reason reason) {
+        incrementRegistered(PREFIX + ".work.rejections", policyTags(policyName).and("reason", reasonTag(reason)));
+    }
+
+    @Override synchronized void refreshSkipped(String policyName, RefreshSkipReason reason) {
+        incrementRegistered(PREFIX + ".refresh.skips", policyTags(policyName).and("reason", reason.tagValue()));
+    }
+
+    @Override synchronized void lookup(String apiName, String result) {
+        increment(PREFIX + ".lookups", callerTags(apiName).and("result", result));
+    }
+
+    @Override synchronized void coalesced(String apiName) { increment(PREFIX + ".coalesced", callerTags(apiName)); }
+    @Override synchronized void stale(String apiName) { increment(PREFIX + ".stale", callerTags(apiName)); }
+
+    @Override synchronized void caller(String apiName, HttpClientCacheOutcome outcome) {
+        if (outcome != null) { increment(PREFIX + ".callers", callerTags(apiName).and("outcome", outcome.name())); }
+    }
+
+    @Override synchronized void load(String apiName, WorkOutcome outcome, long durationNanos) {
+        work(".loads", ".load.duration", apiName, outcome, durationNanos);
+    }
+
+    @Override synchronized void refresh(String apiName, WorkOutcome outcome, long durationNanos) {
+        work(".refreshes", ".refresh.duration", apiName, outcome, durationNanos);
+    }
+
+    @Override synchronized void eviction(String policyName, LocalResponseCache.RemovalReason reason) {
+        increment(PREFIX + ".evictions", policyTags(policyName).and("cause", reason.tagValue()));
+    }
+
+    @Override synchronized void admission(String policyName, AdmissionOutcome outcome) {
+        if (outcome != null) {
+            incrementRegistered(PREFIX + ".admissions", policyTags(policyName).and("outcome", outcome.tagValue()));
         }
+    }
+
+    private void work(String counterName, String timerName, String apiName, WorkOutcome outcome, long durationNanos) {
+        if (closed) { return; }
         Tags tags = callerTags(apiName).and("outcome", outcome.tagValue());
-        increment(counterName, tags);
-        timer(timerName, tags).record(Math.max(0L, durationNanos), TimeUnit.NANOSECONDS);
+        counter(PREFIX + counterName, tags).increment();
+        timer(PREFIX + timerName, tags).record(Math.max(0L, durationNanos), TimeUnit.NANOSECONDS);
     }
 
     private void increment(String name, Tags tags) {
-        if (enabled()) {
-            counter(name, tags).increment();
+        if (!closed) { counter(name, tags).increment(); }
+    }
+
+    private void incrementRegistered(String name, Tags tags) {
+        if (!closed) {
+            SharedMeter lease = leases.get(new MeterKey(name, tags));
+            if (lease != null) { ((Counter) lease.meter).increment(); }
         }
     }
 
     private Counter counter(String name, Tags tags) {
-        MeterKey key = new MeterKey(name, tags);
-        return counters.computeIfAbsent(key, ignored -> own(Counter.builder(name).tags(tags).register(registry)));
+        return (Counter) acquire(new MeterKey(name, tags),
+                () -> Counter.builder(name).tags(tags).register(registry)).meter;
     }
 
     private Timer timer(String name, Tags tags) {
+        return (Timer) acquire(new MeterKey(name, tags),
+                () -> Timer.builder(name).tags(tags).register(registry)).meter;
+    }
+
+    private void gauge(String name, Tags tags, DoubleSupplier supplier, String description) {
         MeterKey key = new MeterKey(name, tags);
-        return timers.computeIfAbsent(key, ignored -> own(Timer.builder(name).tags(tags).register(registry)));
-    }
-
-    private Tags callerTags(String apiName) {
-        return Tags.of(
-                "client.name", clientName,
-                "api.name", apiName != null ? apiName : "UNKNOWN");
-    }
-
-    private Tags policyTags(String policyName) {
-        return Tags.of(
-                "client.name", clientName,
-                "cache.policy", normalize(policyName));
-    }
-
-    private static String normalize(String policyName) {
-        return policyName != null ? policyName : "UNKNOWN";
-    }
-
-    private <T extends Meter> T own(T meter) {
-        if (closed.get()) {
-            registry.remove(meter);
-            return meter;
-        }
-        ownedMeters.add(meter.getId());
-        if (closed.get() && ownedMeters.remove(meter.getId())) {
-            registry.remove(meter);
-        }
-        return meter;
-    }
-
-    @Override
-    public void close() {
-        if (!closed.compareAndSet(false, true)) {
-            return;
-        }
-        synchronized (weightedOwnershipMonitor) {
-            weightedMeterHandles.forEach(handle -> releaseWeightedMeters(registry, handle));
-            weightedMeterHandles.clear();
-            weightedMeters.clear();
-        }
-        ownedMeters.forEach(registry::remove);
-        ownedMeters.clear();
-        counters.clear();
-        timers.clear();
-    }
-
-    private static WeightedMeterHandle acquireWeightedMeters(
-            MeterRegistry registry,
-            String clientName,
-            String policyName,
-            LocalResponseCache cache,
-            long maximumDecodedResponseBytes) {
-        PolicyKey key = new PolicyKey(clientName, normalize(policyName));
-        synchronized (SHARED_WEIGHTED_MONITOR) {
-            Map<PolicyKey, SharedWeightedMeters> byPolicy =
-                    SHARED_WEIGHTED_METERS.computeIfAbsent(registry, ignored -> new java.util.HashMap<>());
-            SharedWeightedMeters meters = byPolicy.computeIfAbsent(
-                    key, ignored -> SharedWeightedMeters.register(registry, key));
-            meters.add(cache, maximumDecodedResponseBytes);
-            return new WeightedMeterHandle(key, meters, cache);
+        if (leases.containsKey(key)) { return; }
+        synchronized (OWNERSHIP) {
+            Map<MeterKey, SharedMeter> meters = SHARED.computeIfAbsent(registry, ignored -> new HashMap<>());
+            SharedMeter shared = meters.get(key);
+            if (shared == null) {
+                shared = new SharedMeter();
+                shared.meter = Gauge.builder(name, shared, SharedMeter::value)
+                        .strongReference(true).description(description).tags(tags).register(registry);
+                meters.put(key, shared);
+            }
+            shared.add(this, supplier);
+            leases.put(key, shared);
         }
     }
 
-    private static void releaseWeightedMeters(MeterRegistry registry, WeightedMeterHandle handle) {
-        synchronized (SHARED_WEIGHTED_MONITOR) {
-            if (!handle.meters().remove(handle.cache()) || !handle.meters().isEmpty()) {
-                return;
-            }
-            Map<PolicyKey, SharedWeightedMeters> byPolicy = SHARED_WEIGHTED_METERS.get(registry);
-            if (byPolicy == null || !byPolicy.remove(handle.key(), handle.meters())) {
-                return;
-            }
-            handle.meters().removeFrom(registry);
-            if (byPolicy.isEmpty()) {
-                SHARED_WEIGHTED_METERS.remove(registry);
-            }
+    private SharedMeter acquire(MeterKey key, Supplier<Meter> registration) {
+        SharedMeter existing = leases.get(key);
+        if (existing != null) { return existing; }
+        synchronized (OWNERSHIP) {
+            Map<MeterKey, SharedMeter> meters = SHARED.computeIfAbsent(registry, ignored -> new HashMap<>());
+            SharedMeter shared = meters.computeIfAbsent(key, ignored -> {
+                SharedMeter created = new SharedMeter();
+                created.meter = registration.get();
+                return created;
+            });
+            shared.add(this, null);
+            leases.put(key, shared);
+            return shared;
         }
     }
 
-    private record PolicyKey(String clientName, String policyName) {
+    @Override public synchronized void close() {
+        if (closed) { return; }
+        closed = true;
+        synchronized (OWNERSHIP) {
+            Map<MeterKey, SharedMeter> meters = SHARED.get(registry);
+            leases.forEach((key, shared) -> {
+                if (shared.remove(this)) {
+                    registry.remove(shared.meter);
+                    if (meters != null) { meters.remove(key, shared); }
+                }
+            });
+            if (meters != null && meters.isEmpty()) { SHARED.remove(registry); }
+            leases.clear();
+        }
     }
 
-    private record WeightedMeterHandle(
-            PolicyKey key, SharedWeightedMeters meters, LocalResponseCache cache) {
-    }
+    private Tags callerTags(String apiName) { return Tags.of("client.name", clientName, "api.name", normalize(apiName)); }
+    private Tags policyTags(String policyName) { return Tags.of("client.name", clientName, "cache.policy", normalize(policyName)); }
+    private static String normalize(String name) { return name != null ? name : "UNKNOWN"; }
+    private static String reasonTag(CacheWorkRejectedException.Reason reason) { return reason.name().toLowerCase(Locale.ROOT); }
 
-    private static final class SharedWeightedMeters {
-        private final Map<LocalResponseCache, WeightedOwner> owners = new IdentityHashMap<>();
-        private final Map<AdmissionOutcome, Counter> admissionCounters = new EnumMap<>(AdmissionOutcome.class);
-        private final Set<Meter.Id> meterIds = ConcurrentHashMap.newKeySet();
+    private record MeterKey(String name, Tags tags) { }
 
-        private static SharedWeightedMeters register(MeterRegistry registry, PolicyKey key) {
-            SharedWeightedMeters meters = new SharedWeightedMeters();
-            Tags tags = Tags.of("client.name", key.clientName(), "cache.policy", key.policyName());
-            meters.own(Gauge.builder(PREFIX + ".retained.decoded.response.bytes",
-                            meters, SharedWeightedMeters::retainedDecodedResponseBytes)
-                    .description("Current decoded response representation bytes retained by live policy caches")
-                    .strongReference(true)
-                    .tags(tags)
-                    .register(registry));
-            meters.own(Gauge.builder(PREFIX + ".maximum.decoded.response.bytes",
-                            meters, SharedWeightedMeters::maximumDecodedResponseBytes)
-                    .description("Configured maximum decoded response representation bytes across live policy caches")
-                    .strongReference(true)
-                    .tags(tags)
-                    .register(registry));
-            for (AdmissionOutcome outcome : AdmissionOutcome.values()) {
-                Counter counter = Counter.builder(PREFIX + ".admissions")
-                        .tags(tags.and("outcome", outcome.tagValue()))
-                        .register(registry);
-                meters.admissionCounters.put(outcome, counter);
-                meters.own(counter);
-            }
-            return meters;
-        }
+    private static final class SharedMeter {
+        private Meter meter;
+        private final Map<Object, DoubleSupplier> owners = new IdentityHashMap<>();
 
-        private synchronized void add(LocalResponseCache cache, long maximumBytes) {
-            WeightedOwner owner = owners.get(cache);
-            if (owner == null) {
-                owners.put(cache, new WeightedOwner(maximumBytes));
-            }
-            else {
-                owner.registrations++;
-            }
-        }
+        synchronized void add(Object owner, DoubleSupplier supplier) { owners.put(owner, supplier); }
+        synchronized boolean remove(Object owner) { owners.remove(owner); return owners.isEmpty(); }
 
-        private synchronized boolean remove(LocalResponseCache cache) {
-            WeightedOwner owner = owners.get(cache);
-            if (owner == null) {
-                return false;
-            }
-            if (--owner.registrations == 0) {
-                owners.remove(cache);
-            }
-            return true;
-        }
-
-        private synchronized boolean isEmpty() {
-            return owners.isEmpty();
-        }
-
-        private double retainedDecodedResponseBytes() {
-            List<LocalResponseCache> liveCaches;
-            synchronized (this) {
-                liveCaches = List.copyOf(owners.keySet());
-            }
-            long total = 0;
-            for (LocalResponseCache cache : liveCaches) {
-                total = saturatedAdd(total, cache.retainedDecodedResponseBytes());
-            }
+        double value() {
+            List<DoubleSupplier> suppliers;
+            synchronized (this) { suppliers = new ArrayList<>(owners.values()); }
+            // Never hold registry ownership locks while sampling cache/admission lifecycle locks.
+            double total = 0;
+            for (DoubleSupplier supplier : suppliers) { total += supplier.getAsDouble(); }
             return total;
         }
-
-        private synchronized double maximumDecodedResponseBytes() {
-            long total = 0;
-            for (WeightedOwner owner : owners.values()) {
-                total = saturatedAdd(total, owner.maximumBytes);
-            }
-            return total;
-        }
-
-        private synchronized void admission(AdmissionOutcome outcome) {
-            Counter counter = admissionCounters.get(outcome);
-            if (counter != null) {
-                counter.increment();
-            }
-        }
-
-        private void own(Meter meter) {
-            meterIds.add(meter.getId());
-        }
-
-        private synchronized void removeFrom(MeterRegistry registry) {
-            meterIds.forEach(registry::remove);
-            meterIds.clear();
-            admissionCounters.clear();
-        }
-
-        private static long saturatedAdd(long current, long added) {
-            if (added <= 0) {
-                return current;
-            }
-            return current > Long.MAX_VALUE - added ? Long.MAX_VALUE : current + added;
-        }
-    }
-
-    private static final class WeightedOwner {
-        private final long maximumBytes;
-        private int registrations = 1;
-
-        private WeightedOwner(long maximumBytes) {
-            this.maximumBytes = maximumBytes;
-        }
-    }
-
-    private record MeterKey(String name, Tags tags) {
     }
 }

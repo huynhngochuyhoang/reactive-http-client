@@ -3,8 +3,9 @@
 > **Decision:** proceed with three optional per-policy ownership counts.
 > **Current delivery boundary:** Priority 6 exposes the complete optional
 > caller/load/refresh configuration with enforcement, basic contract output,
-> and AOT binding hints. Public rejection types/outcomes and live work telemetry
-> remain Priority 9; native executable evidence remains Priority 11.
+> and AOT binding hints. Priority 9 additionally delivers public rejection
+> types/outcomes, live work telemetry, and schema-V1 aggregates; native
+> executable evidence remains Priority 11.
 
 Recorded on 2026-09-08 against reachable baseline
 `44502219b071a73a37cc0ff7301eafb3d3a68caf` and the current
@@ -98,8 +99,8 @@ and retains those cases. Public binding and basic per-method effective output
 ship together: selected source and three normalized maximums, with refresh
 maximum absent when refresh is disabled. Disabled/legacy methods remain
 unselected rather than displaying invented zero bounds.
-Detailed live-work metrics and schema-safe diagnostics aggregation remain
-Priority 9. Configuration cannot advertise a bound before all selected
+Detailed live-work metrics and schema-safe diagnostics aggregation are delivered
+by Priority 9. Configuration cannot advertise a bound before all selected
 dimensions are enforced.
 
 ## Priority 4 Internal Enforcement
@@ -372,7 +373,7 @@ though both can still contend for configured auth/resilience/transport resources
 
 ## Local Error and Terminal Contract
 
-The future public type is
+The public type delivered by Priority 9 is
 `io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException`,
 a final RuntimeException with a required nested `Reason` enum and
 `getReason()`. Only two reasons exist:
@@ -387,7 +388,7 @@ identity, header, body, key, or occupancy object. A stack trace may identify cod
 but built-in output retains only structural metadata. Both classify as the
 additive `ErrorCategory.CACHE_ADMISSION_ERROR`, not UNKNOWN, RATE_LIMITED,
 RESILIENCE_ERROR, or a transport/pool error. Failure stage is null. The exception
-and enum additions are reserved here, **not public types in this revision**.
+and enum additions are delivered with Priority 9.
 
 Each subscribed rejected caller gets one error terminal, zero subscription
 attempts, requestDispatched=false, no URL/status/headers, no request/response body,

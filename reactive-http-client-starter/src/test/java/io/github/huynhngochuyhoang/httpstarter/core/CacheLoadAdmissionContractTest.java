@@ -47,12 +47,12 @@ class CacheLoadAdmissionContractTest {
                         assemblies.incrementAndGet();
                         return Mono.just("unexpected");
                     }))
-                    .expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+                    .expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             assertThat(call(manager, policy, "warm", () -> Mono.error(new AssertionError("hit loaded")))
                     .block(WAIT)).isEqualTo("warm");
             var waiter = singleFlight ? cold.toFuture() : null;
             if (!singleFlight) {
-                StepVerifier.create(cold).expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+                StepVerifier.create(cold).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             }
             assertThat(assemblies).hasValue(1);
             assertThat(manager.activeLoadsForTesting("work")).isEqualTo(1);
@@ -106,7 +106,7 @@ class CacheLoadAdmissionContractTest {
             assertThat(manager.activeLoadsForTesting("work")).isEqualTo(1);
             assertThat(cancellations).hasValue(0);
             StepVerifier.create(call(manager, policy, "other", () -> Mono.just("unexpected")))
-                    .expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+                    .expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             waiter.cancel(true);
             assertThat(cancellations).hasValue(1);
             assertThat(manager.activeLoadsForTesting("work")).isZero();
@@ -236,7 +236,7 @@ class CacheLoadAdmissionContractTest {
                 if (frame != Frame.CANCELLATION) { subscriber.cancel(); }
                 assertThat(manager.activeLoadsForTesting("work")).isEqualTo(1);
                 StepVerifier.create(call(manager, policy, "replacement", () -> Mono.just("unexpected")))
-                        .expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+                        .expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
                 gate.close();
                 blocked.get(10, TimeUnit.SECONDS);
                 assertThat(manager.activeLoadsForTesting("work")).isZero();
@@ -330,7 +330,7 @@ class CacheLoadAdmissionContractTest {
             for (var contender : contenders) {
                 var future = contender.get(10, TimeUnit.SECONDS);
                 if (future.isDone()) {
-                    assertThatThrownBy(future::join).hasCauseInstanceOf(CacheLoadAdmission.Rejected.class);
+                    assertThatThrownBy(future::join).hasCauseInstanceOf(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class);
                 } else {
                     admitted.add(future);
                 }

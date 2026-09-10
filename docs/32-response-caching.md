@@ -470,9 +470,16 @@ unbounded work duration.
 Limits and selected-policy mappings are frozen at construction. Detected
 mutation fails subsequent invocation/subscription or live snapshot inspection;
 recreate the factory to change the selection. Basic per-method contract output
-includes the normalized bounds. Dedicated rejection types/outcomes, live work
-gauges and skip counters remain V30 Priority 9; do not infer them from the
-existing refresh terminal counters.
+includes the normalized bounds. V30 Priority 9 adds the public
+`CacheWorkRejectedException` reasons `CALLER_CAPACITY` / `LOAD_CAPACITY`,
+`CALLER_REJECTED` / `LOAD_REJECTED` cache outcomes, and
+`CACHE_ADMISSION_ERROR`. Enabled terminal surfaces report zero attempts and
+no dispatch or request/response evidence; these calls do not enter downstream
+request timers or health samples. [Work telemetry](08-observability.md#live-cache-work-v30-430-candidate)
+is separately selected under cache observability and never inferred from refresh
+terminal counters. [Diagnostics](21-diagnostic-contexts.md#v30-work-count-additions-430-candidate)
+add limited-policy-only maxima/current counts, preserving unknown lazy state
+without requiring metrics or instantiating an owner.
 
 ### Composition and deadlines with work limits
 

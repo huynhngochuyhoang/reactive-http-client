@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -264,6 +265,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
                     selection.maximums(CacheWorkPolicy.Limits::maximumConcurrentLoads));
             Map<String, Integer> refreshes = selection.maximums(CacheWorkPolicy.Limits::maximumConcurrentRefreshes);
             refreshAdmission = refreshes.isEmpty() ? null : new CacheWorkAdmission(refreshes, RefreshCapacity::new);
+            selection.policies().forEach((name, limits) -> metrics.registerWork(
+                    name, limits, callerAdmission, loadAdmission, refreshAdmission));
         }
     }
 
@@ -371,9 +374,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
                         } catch (RuntimeException error) {
                             cache.finish(lookup.loadToken());
                             metrics.lookup(apiName, "miss");
-                            if (callerState != null) {
-                                callerState.markCacheServed();
-                            }
+                            recordWorkRejection(selection.policyName(), apiName, callerState, error);
                             return Mono.error(error);
                         }
                     }
@@ -428,9 +429,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
                     } catch (RuntimeException error) {
                         cache.finish(token);
                         metrics.lookup(apiName, "miss");
-                        if (callerState != null) {
-                            callerState.markCacheServed();
-                        }
+                        recordWorkRejection(selection.policyName(), apiName, callerState, error);
                         return Mono.error(error);
                     }
                     flight = new InFlightLoad(flightKey, cache, token, proposedLoadState, reservation);
@@ -503,21 +502,30 @@ final class LocalResponseCacheManager implements AutoCloseable {
             token = cache.beginRefresh(lookup.entryToken());
         }
         catch (IllegalStateException ignored) {
+            metrics.refreshSkipped(policyName, LocalResponseCacheMetrics.RefreshSkipReason.ENTRY_UNAVAILABLE);
             return;
         }
         if (token == null) {
+            metrics.refreshSkipped(policyName, LocalResponseCacheMetrics.RefreshSkipReason.ENTRY_UNAVAILABLE);
             return;
         }
 
         FlightKey refreshKey = new FlightKey(cache, key);
         InFlightRefresh refresh = new InFlightRefresh(refreshKey, cache, token, refreshState, apiName);
         boolean rejected;
+        LocalResponseCacheMetrics.RefreshSkipReason skip = LocalResponseCacheMetrics.RefreshSkipReason.ENTRY_UNAVAILABLE;
         synchronized (inFlightRefreshes) {
             rejected = closed.get() || inFlightRefreshes.containsKey(refreshKey);
+            if (!closed.get() && rejected) {
+                skip = LocalResponseCacheMetrics.RefreshSkipReason.ALREADY_REFRESHING;
+            }
             if (!rejected && refreshAdmission != null) {
                 try {
                     refresh.reservation = refreshAdmission.acquire(policyName);
-                } catch (RefreshCapacity | IllegalStateException ignored) {
+                } catch (RefreshCapacity ignored) {
+                    skip = LocalResponseCacheMetrics.RefreshSkipReason.CAPACITY;
+                    rejected = true;
+                } catch (IllegalStateException ignored) {
                     rejected = true;
                 }
             }
@@ -527,6 +535,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
         if (rejected) {
             cache.finishRefresh(token);
+            metrics.refreshSkipped(policyName, skip);
             return;
         }
         if (!cache.isRefreshCurrent(token)) {
@@ -850,6 +859,22 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
     }
 
+    void recordWorkRejection(String policyName, String apiName, SubscriptionReportingState state,
+                             RuntimeException error) {
+        if (state != null) {
+            state.markCacheServed();
+        }
+        if (error instanceof CacheWorkRejectedException rejected) {
+            if (state != null) {
+                state.prepareInitialResolved(new RequestArgumentResolver.ResolvedArgs(
+                        Map.of(), Map.of(), Map.of(), null));
+            }
+            metrics.rejection(policyName, rejected.getReason());
+            cacheOutcome(state, apiName, rejected.getReason() == CacheWorkRejectedException.Reason.CALLER_CAPACITY
+                    ? HttpClientCacheOutcome.CALLER_REJECTED : HttpClientCacheOutcome.LOAD_REJECTED);
+        }
+    }
+
     private void cacheOutcome(SubscriptionReportingState state,
                               String apiName,
                               HttpClientCacheOutcome outcome) {
@@ -908,6 +933,21 @@ final class LocalResponseCacheManager implements AutoCloseable {
                     retainedBytesKnown ? retainedDecodedResponseBytes : null,
                     closed.get());
         }
+    }
+
+    synchronized CacheWorkSnapshot workSnapshot() {
+        if (!closed.get()) { workValidation.run(); }
+        if (workSelection == null) { return null; }
+        CacheWorkSnapshot configured = CacheWorkSnapshot.configured(workSelection);
+        long callers = 0, loads = 0, refreshes = 0;
+        for (String policy : workSelection.policies().keySet()) {
+            callers = Math.addExact(callers, callerAdmission.active(policy));
+            loads = Math.addExact(loads, loadAdmission.active(policy));
+            if (refreshAdmission != null) {
+                refreshes = Math.addExact(refreshes, refreshAdmission.active(policy));
+            }
+        }
+        return configured.live(closed.get(), callers, loads, refreshes);
     }
 
     boolean hasInFlightLoadWithMembersForTesting(int memberCount) {

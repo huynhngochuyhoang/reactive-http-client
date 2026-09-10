@@ -181,6 +181,56 @@ remain shared; closing either factory removes only its contribution. The weighte
 meters are removed when the last owner closes, and a later recreation binds only
 to the replacement cache.
 
+### Live cache work (V30 4.3.0 candidate)
+
+These additive meters are not available in published 4.2.0. They require both
+`reactive.http.observability.enabled=true` and
+`reactive.http.observability.cache.enabled=true`, a MeterRegistry, and a selected
+policy with work limits. Selecting limits alone enables no telemetry.
+
+| Meter | Type | Tags | Meaning |
+|---|---|---|---|
+| `reactive.http.client.cache.work.active.callers` | Gauge | `client.name`, `cache.policy` | Current caller reservations, including preparation, hits, miss leaders, and waiters. |
+| `reactive.http.client.cache.work.maximum.callers` | Gauge | `client.name`, `cache.policy` | Sum of selected caller maxima across live owners. |
+| `reactive.http.client.cache.work.active.loads` | Gauge | `client.name`, `cache.policy` | Current foreground source reservations, including retries and terminal cleanup. |
+| `reactive.http.client.cache.work.maximum.loads` | Gauge | `client.name`, `cache.policy` | Sum of selected foreground-load maxima across live owners. |
+| `reactive.http.client.cache.work.active.refreshes` | Gauge | `client.name`, `cache.policy` | Current hidden refresh source reservations; only for policies selecting refresh. |
+| `reactive.http.client.cache.work.maximum.refreshes` | Gauge | `client.name`, `cache.policy` | Sum of selected refresh maxima across live owners. |
+| `reactive.http.client.cache.work.rejections` | Counter | `client.name`, `cache.policy`, `reason=caller_capacity|load_capacity` | Local rejected callers. A load rejection also follows a lookup miss, but starts no loader. |
+| `reactive.http.client.cache.refresh.skips` | Counter | `client.name`, `cache.policy`, `reason=capacity|already_refreshing|entry_unavailable` | A stale access could not start refresh: no free slot, same-key refresh already present, or entry became unavailable. |
+
+Current counts and maxima are overlapping units, not disjoint work to sum:
+a miss caller can also own a foreground source; several callers can share one
+source. A source can perform zero, one, or multiple wire dispatches. A refresh
+is independent of foreground capacity. Reservations remain active through
+entered synchronous cleanup, even after a downstream terminal signal.
+Skipped refreshes never increment terminal `refreshes` or duration; their
+caller stays `STALE_HIT`. Rejected callers increment `callers` with the new
+`CALLER_REJECTED` / `LOAD_REJECTED` outcomes when cache observability is selected,
+but neither is a lookup hit or a started load.
+
+V30 coordinates **all** cache meters across overlapping factories with identical
+tags, preserving the existing names/tag keys. Gauges sum only live owners'
+contributions; counters and timers retain shared history until the last owner
+of that meter closes. Closing one owner subtracts its gauges, does not subtract
+its history, and cannot remove another owner's meters. The last close removes
+the meter; a later owner starts fresh history. Suppliers remain strongly retained
+until deregistration. Closed owners cannot register or increment meters. Work
+gauges disappear at close even when independently caller-owned cleanup remains
+active; inspect the closed owner's diagnostics to distinguish that state from zero.
+Scrape-target labels still separate processes; none of these counts bounds
+cluster work, heap, direct memory, or RSS.
+
+`CacheWorkRejectedException` has only `CALLER_CAPACITY` and `LOAD_CAPACITY`
+reasons and fixed messages. It classifies as `CACHE_ADMISSION_ERROR`, with no
+transport failure stage. Enabled observer, lifecycle, exchange-log, and OTel
+records describe one error, zero attempts, no dispatch, no status or request/
+response material. Cache outcomes depend on configuration, not registry
+availability. Cache-served and locally rejected callers are excluded from the
+ordinary request timer and downstream health, including compatibility observer
+calls. Shared waiters have no source evidence; hidden refresh creates no detached
+caller span.
+
 `entries`, `maximum.entries`, `retained.decoded.response.bytes`, and
 `maximum.decoded.response.bytes` are current occupancy/capacity signals. They
 have no terminal history. `lookups`, `callers`, `loads`, `refreshes`,

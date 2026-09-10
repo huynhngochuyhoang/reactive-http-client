@@ -234,6 +234,10 @@ public class ReactiveHttpClientFactoryBean<T> implements FactoryBean<T>, Applica
                 : null;
     }
 
+    CacheWorkSnapshot responseCacheWorkSnapshot() {
+        return responseCacheManager != null ? responseCacheManager.workSnapshot() : null;
+    }
+
     private void disposeResources(Duration timeout) {
         List<Connection> connections;
         synchronized (ownedConnectionLifecycleMonitor) {

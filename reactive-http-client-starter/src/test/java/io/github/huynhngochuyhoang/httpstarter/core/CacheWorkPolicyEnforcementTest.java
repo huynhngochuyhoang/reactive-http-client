@@ -71,13 +71,13 @@ class CacheWorkPolicyEnforcementTest {
                 assertThat(manager.activeLoadsForTesting("work")).isEqualTo(1);
                 if (single) {
                     var waiter = client.get("busy").toFuture();
-                    StepVerifier.create(client.get("a")).expectError(CacheCallerAdmission.Rejected.class).verify();
+                    StepVerifier.create(client.get("a")).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify();
                     first.cancel(true);
                     assertThat(manager.activeLoadsForTesting("work")).isEqualTo(1);
                     assertThat(client.get("a").block()).isEqualTo("initial");
                     waiter.cancel(true);
                 } else {
-                    StepVerifier.create(client.get("busy")).expectError(CacheLoadAdmission.Rejected.class).verify();
+                    StepVerifier.create(client.get("busy")).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify();
                     first.cancel(true);
                 }
                 assertThat(manager.activeLoadsForTesting("work")).isZero();

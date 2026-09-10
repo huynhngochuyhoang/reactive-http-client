@@ -152,6 +152,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             clientMap.put("cachePolicySources", cachePolicySources(entry.cache()));
             clientMap.put("cacheHttpMethods", cacheHttpMethods(entry.cache()));
             clientMap.put("cacheSemanticReadAcknowledged", cacheSemanticReadAcknowledged(entry.cache()));
+            clientMap.putAll(workFields(entry.cache()));
             clientMap.put("timeoutSource", client.timeout().source());
             clientMap.put("timeoutMs", client.timeout().timeoutMs());
             clientMap.put("logicalCallTimeoutMs", entry.logicalCallTimeoutMs());
@@ -228,6 +229,15 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             stringListField(out, 3, "cacheHttpMethods", cacheHttpMethods(entry.cache()), true);
             field(out, 3, "cacheSemanticReadAcknowledged",
                     cacheSemanticReadAcknowledged(entry.cache()), true);
+            workFields(entry.cache()).forEach((name, value) -> {
+                if (value == null) {
+                    nullableField(out, 3, name, null, true);
+                } else if (value instanceof Number number) {
+                    nullableField(out, 3, name, number.longValue(), true);
+                } else {
+                    field(out, 3, name, (String) value, true);
+                }
+            });
             field(out, 3, "timeoutSource", client.timeout().source(), true);
             field(out, 3, "timeoutMs", client.timeout().timeoutMs(), true);
             nullableField(out, 3, "logicalCallTimeoutMs", entry.logicalCallTimeoutMs(), true);
@@ -314,6 +324,7 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             boundedText("cacheSingleFlight", entry.cache().singleFlight());
             boundedTextList("cachePolicySources", entry.cache().policySources());
             boundedTextList("cacheHttpMethods", entry.cache().httpMethods());
+            validateWork(entry.cache().work());
         }
         if (summary.endpointCount() < 0 || summary.inheritedEndpointCount() < 0
                 || summary.inheritedEndpointCount() > summary.endpointCount()) {
@@ -328,6 +339,51 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
             throw new IllegalArgumentException("Diagnostics snapshot field " + field
                     + " exceeds the " + MAX_TEXT_LENGTH + " character limit");
         }
+    }
+
+    private static void validateWork(CacheWorkSnapshot work) {
+        if (work == null) { return; }
+        boundedText("cacheWorkSelection", work.selection());
+        boundedText("cacheWorkState", work.state());
+        if (!Set.of("absent", "selected", "mixed").contains(work.selection())
+                || !Set.of("absent", "uninitialized", "open", "closed").contains(work.state())
+                || work.limitedPolicyCount() < 0 || work.limitedPolicyCount() > 16) {
+            throw new IllegalArgumentException("Invalid cache work selection");
+        }
+        workCount(work.maximumCallers(), work.activeCallers(), work.limitedPolicyCount());
+        workCount(work.maximumLoads(), work.activeLoads(), work.limitedPolicyCount());
+        workCount(work.maximumRefreshes(), work.activeRefreshes(), work.limitedPolicyCount());
+        boolean absent = work.limitedPolicyCount() == 0;
+        boolean unavailable = absent || work.state().equals("uninitialized");
+        if (absent != work.selection().equals("absent") || absent != work.state().equals("absent")
+                || absent != (work.maximumCallers() == null) || absent != (work.maximumLoads() == null)
+                || unavailable != (work.activeCallers() == null)
+                || unavailable != (work.activeLoads() == null)
+                || (unavailable || work.maximumRefreshes() == null) != (work.activeRefreshes() == null)) {
+            throw new IllegalArgumentException("Inconsistent cache work state");
+        }
+    }
+
+    private static void workCount(Long maximum, Long active, int policies) {
+        if (maximum != null && (maximum < 1 || maximum > policies * CacheWorkPolicy.MAXIMUM)
+                || active != null && (maximum == null || active < 0 || active > maximum)) {
+            throw new IllegalArgumentException("Cache work count exceeds its configured bound");
+        }
+    }
+
+    private static Map<String, Object> workFields(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {
+        CacheWorkSnapshot work = cache != null ? cache.work() : null;
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("cacheWorkSelection", work != null ? work.selection() : null);
+        fields.put("cacheWorkState", work != null ? work.state() : null);
+        fields.put("cacheWorkLimitedPolicyCount", work != null ? work.limitedPolicyCount() : null);
+        fields.put("cacheWorkMaximumConcurrentCallers", work != null ? work.maximumCallers() : null);
+        fields.put("cacheWorkMaximumConcurrentLoads", work != null ? work.maximumLoads() : null);
+        fields.put("cacheWorkMaximumConcurrentRefreshes", work != null ? work.maximumRefreshes() : null);
+        fields.put("cacheWorkActiveCallers", work != null ? work.activeCallers() : null);
+        fields.put("cacheWorkActiveLoads", work != null ? work.activeLoads() : null);
+        fields.put("cacheWorkActiveRefreshes", work != null ? work.activeRefreshes() : null);
+        return fields;
     }
 
     private static void boundedTextList(String field, List<String> values) {
@@ -447,7 +503,8 @@ public final class ReactiveHttpClientDiagnosticsSnapshot {
                 + ", metrics=" + cache.metricsEnabled()
                 + ", policySources=" + cache.policySources()
                 + ", httpMethods=" + cache.httpMethods()
-                + ", semanticReadAcknowledged=" + cache.semanticReadAcknowledged();
+                + ", semanticReadAcknowledged=" + cache.semanticReadAcknowledged()
+                + ", limitedPolicyWork=" + workFields(cache);
     }
 
     private static String cachePhase(ReactiveHttpClientDiagnosticsProvider.CacheSummary cache) {

@@ -24,6 +24,20 @@ abstract class LocalResponseCacheMetrics implements AutoCloseable {
 
     abstract void registerCache(String policyName, long maximumSize, LocalResponseCache cache);
 
+    void registerWork(String policyName, CacheWorkPolicy.Limits limits,
+                      CacheWorkAdmission callers, CacheWorkAdmission loads, CacheWorkAdmission refreshes) { }
+
+    void rejection(String policyName,
+                   io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.Reason reason) { }
+
+    void refreshSkipped(String policyName, RefreshSkipReason reason) { }
+
+    enum RefreshSkipReason {
+        CAPACITY, ALREADY_REFRESHING, ENTRY_UNAVAILABLE;
+
+        String tagValue() { return name().toLowerCase(java.util.Locale.ROOT); }
+    }
+
     abstract void lookup(String apiName, String result);
 
     abstract void coalesced(String apiName);

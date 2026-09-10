@@ -82,15 +82,15 @@ class CacheWorkCompositionContractTest {
             var active = f.call(false, "busy").toFuture();
             f.counts(1, 1, 0);
             var before = operators.history();
-            StepVerifier.create(f.call(false, "other")).expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+            StepVerifier.create(f.call(false, "other")).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             assertThat(operators.history()).isEqualTo(before);
-            f.diagnostics.terminal(1, CacheLoadAdmission.Rejected.class, 0, null, null, null, Map.of());
+            f.diagnostics.terminal(1, io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class, 0, null, null, null, Map.of());
             assertThat(f.call(false, "warm").block(WAIT)).isEqualTo("warm");
             CompletableFuture<String> waiter = single ? f.call(false, "busy").toFuture() : null;
             if (single) {
                 f.counts(2, 1, 0);
-                StepVerifier.create(f.call(false, "warm")).expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
-                f.diagnostics.terminal(3, CacheCallerAdmission.Rejected.class, 0, null, null, null, Map.of());
+                StepVerifier.create(f.call(false, "warm")).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
+                f.diagnostics.terminal(3, io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class, 0, null, null, null, Map.of());
             }
             assertThat(operators.history()).isEqualTo(before);
             assertThat(dispatches).hasValue(2);
@@ -200,7 +200,7 @@ class CacheWorkCompositionContractTest {
             assertThat(dispatches).hasValue(1);
             assertThat(operators.bulkhead.getMetrics().getAvailableConcurrentCalls()).isZero();
             var before = operators.history();
-            StepVerifier.create(f.call(true, "other")).expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+            StepVerifier.create(f.call(true, "other")).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             assertThat(operators.history()).isEqualTo(before);
             clock.advanceTimeBy(Duration.ofSeconds(timeout ? 1 : 2));
             if (timeout) {
@@ -252,7 +252,7 @@ class CacheWorkCompositionContractTest {
             f.counts(1, 1, 0);
             f.diagnostics.terminal(0, LogicalCallTimeoutException.class, leaderExpires ? 1 : 0,
                     null, leaderExpires ? url(false, "shared") : null, null, Map.of());
-            StepVerifier.create(f.call(false, "other")).expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+            StepVerifier.create(f.call(false, "other")).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             result.tryEmitValue(ok("survived")).orThrow();
             assertThat(survivor).isDone();
             assertThat(survivor.join()).isEqualTo("survived");
@@ -418,7 +418,7 @@ class CacheWorkCompositionContractTest {
             clock.advanceTimeBy(Duration.ofDays(30));
             assertThat(hung).isNotDone();
             f.counts(1, 1, 0);
-            StepVerifier.create(f.call(false, "other")).expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+            StepVerifier.create(f.call(false, "other")).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             hung.cancel(true);
             f.counts(0, 0, 0);
             f.diagnostics.terminal(1, CancellationException.class, 1, null, url(false, "hung"), null, Map.of());
@@ -491,7 +491,7 @@ class CacheWorkCompositionContractTest {
             var waiter = f.call(true, "identity").toFuture();
             // Different finalized identities must not join the existing flight.
             assertThat(waiter).isDone();
-            assertThatThrownBy(waiter::join).hasCauseInstanceOf(CacheLoadAdmission.Rejected.class);
+            assertThatThrownBy(waiter::join).hasCauseInstanceOf(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class);
             f.counts(1, 1, 0);
             clock.advanceTimeBy(Duration.ofSeconds(2));
             assertThat(leader).isDone();
@@ -574,7 +574,13 @@ class CacheWorkCompositionContractTest {
             assertThat(arrived.await(10, TimeUnit.SECONDS)).isTrue();
             var waiter = f.call(true, "redirect").toFuture();
             f.counts(2, 1, 0);
-            StepVerifier.create(f.call(true, "other")).expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+            // Admission includes asynchronous preparation; wait for actual flight attachment before releasing the wire.
+            long joinDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (!f.manager.hasInFlightLoadWithMembersForTesting(2) && System.nanoTime() < joinDeadline) {
+                Thread.sleep(1);
+            }
+            assertThat(f.manager.hasInFlightLoadWithMembersForTesting(2)).isTrue();
+            StepVerifier.create(f.call(true, "other")).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             assertThat(writes).hasValue(2);
             assertThat(bodies).containsExactly("body", "body");
             assertThat(targets).containsExactly("/post/redirect", "/final");
