@@ -111,7 +111,10 @@ public class MicrometerHttpClientObserver implements HttpClientObserver {
 
     @Override
     public void record(HttpClientObserverEvent event) {
-        if (!config.isEnabled()) {
+        if (!config.isEnabled()
+                || event.getCacheOutcome() != null && event.getCacheOutcome() != HttpClientCacheOutcome.MISS_LOADER
+                || io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategories.from(event.getError())
+                == io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory.CACHE_ADMISSION_ERROR) {
             return;
         }
         try {

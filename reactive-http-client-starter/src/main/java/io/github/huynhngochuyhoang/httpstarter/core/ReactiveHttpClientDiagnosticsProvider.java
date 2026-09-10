@@ -245,6 +245,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                     null, 0L, 0L, false, null, null, null);
         }
         List<ReactiveHttpClientProperties.CachePolicyConfig> selected = new ArrayList<>();
+        Set<String> selectedNames = new HashSet<>();
         Set<String> policySources = new TreeSet<>();
         Set<String> httpMethods = new TreeSet<>();
         boolean semanticReadAcknowledged = false;
@@ -257,7 +258,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
             EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.decide(plan, clientConfig, httpMethod);
             EffectiveCachePolicy.Selection selection = decision.selection();
             if (decision.cacheable()) {
-                if (selected.stream().noneMatch(policy -> policy == selection.policy())) {
+                if (selectedNames.add(selection.policyName())) {
                     selected.add(selection.policy());
                 }
                 policySources.add(selection.source().value());
@@ -289,6 +290,7 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 .filter(Objects::nonNull).mapToLong(Long::longValue).sum();
         Long maximumTotalDecodedResponseBytes = aggregateMaximumTotalDecodedResponseBytes(selected);
         LocalResponseCacheManager.Snapshot runtime = existingCacheSnapshot(registration);
+        CacheWorkSnapshot runtimeWork = existingCacheWorkSnapshot(registration);
         boolean metricsEnabled = properties.getObservability() != null
                 && properties.getObservability().isEnabled()
                 && properties.getObservability().getCache() != null
@@ -307,7 +309,9 @@ public class ReactiveHttpClientDiagnosticsProvider {
                 metricsEnabled,
                 List.copyOf(policySources),
                 List.copyOf(httpMethods),
-                semanticReadAcknowledged);
+                semanticReadAcknowledged,
+                runtimeWork != null ? runtimeWork : CacheWorkSnapshot.configured(
+                        CacheWorkPolicy.freeze(clientInterface, registration.beanName(), metadataCache, clientConfig)));
     }
 
     private static Long aggregateMaximumTotalDecodedResponseBytes(
@@ -335,6 +339,15 @@ public class ReactiveHttpClientDiagnosticsProvider {
         return singleton instanceof ReactiveHttpClientFactoryBean<?> factory
                 ? factory.responseCacheSnapshot()
                 : null;
+    }
+
+    private CacheWorkSnapshot existingCacheWorkSnapshot(ClientRegistration registration) {
+        if (!registration.starterFactory() || !beanFactory.containsSingleton(registration.beanName())) {
+            return null;
+        }
+        Object singleton = beanFactory.getSingleton(registration.beanName());
+        return singleton instanceof ReactiveHttpClientFactoryBean<?> factory
+                ? factory.responseCacheWorkSnapshot() : null;
     }
 
     private static EffectiveHttpClientContract.TimeoutPolicy representativeTimeout(List<EffectiveHttpClientContract> contracts) {
@@ -917,8 +930,19 @@ public class ReactiveHttpClientDiagnosticsProvider {
             boolean metricsEnabled,
             List<String> policySources,
             List<String> httpMethods,
-            Boolean semanticReadAcknowledged
+            Boolean semanticReadAcknowledged,
+            CacheWorkSnapshot work
     ) {
+        CacheSummary(String phase, int policyCount, Long ttlMs, Long refreshAfterMs, String singleFlight,
+                     long maximumSize, Long maximumTotalDecodedResponseBytes, Long retainedDecodedResponseBytes,
+                     Long entryCount, Long evictions, boolean metricsEnabled, List<String> policySources,
+                     List<String> httpMethods, Boolean semanticReadAcknowledged) {
+            this(phase, policyCount, ttlMs, refreshAfterMs, singleFlight, maximumSize,
+                    maximumTotalDecodedResponseBytes, retainedDecodedResponseBytes, entryCount, evictions,
+                    metricsEnabled, policySources, httpMethods, semanticReadAcknowledged,
+                    policySources == null ? null : new CacheWorkSnapshot(
+                            "absent", "absent", 0, null, null, null, null, null, null));
+        }
     }
 
     record PoolSummary(

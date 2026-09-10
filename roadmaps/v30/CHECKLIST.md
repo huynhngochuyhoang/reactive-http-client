@@ -849,52 +849,128 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 9 - Live Metrics and Terminal Diagnostics
 
-### [ ] 9.1 Freeze and implement bounded work telemetry
+### [x] 9.1 Freeze and implement bounded work telemetry
 
-- [ ] Define current/maximum caller, foreground-load, and refresh count meters
+- [x] Define current/maximum caller, foreground-load, and refresh count meters
       for policies selecting limits under existing explicit cache observability.
-- [ ] Define fixed local-rejection and refresh-skip reasons; preserve existing
+- [x] Define fixed local-rejection and refresh-skip reasons; preserve existing
       meter names/tag sets and terminal caller/load/refresh meanings.
-- [ ] Specify scopes and overlapping counts so operators cannot add callers,
+- [x] Specify scopes and overlapping counts so operators cannot add callers,
       flights, and loads as disjoint work or confuse loads with wire dispatch.
-- [ ] Test cache disabled, limits absent, cache metrics disabled, master
+- [x] Test cache disabled, limits absent, cache metrics disabled, master
       observability disabled, missing MeterRegistry, and enabled zero series.
-- [ ] Keep skips out of refresh terminal totals and rejection out of downstream
+- [x] Keep skips out of refresh terminal totals and rejection out of downstream
       request timers/health; do not export keys, request variants, or identities.
 
-### [ ] 9.2 Preserve terminal observer and tracing parity
+### [x] 9.2 Preserve terminal observer and tracing parity
 
-- [ ] Deliver one structural local-rejection event through enabled observer,
+- [x] Deliver one structural local-rejection event through enabled observer,
       lifecycle, exchange-log, and OTel surfaces, including compatibility APIs.
-- [ ] Preserve zero attempts/dispatch and cleared response evidence for local
+- [x] Preserve zero attempts/dispatch and cleared response evidence for local
       rejection without losing configuration-enabled cache outcomes when no
       MeterRegistry bean exists.
-- [ ] Keep shared-source evidence separate from waiter outcomes and hidden
+- [x] Keep shared-source evidence separate from waiter outcomes and hidden
       refresh diagnostics; do not create a detached refresh span.
-- [ ] Verify downstream health excludes all cache-served and local-rejection
+- [x] Verify downstream health excludes all cache-served and local-rejection
       outcomes without diluting real downstream failures.
 
-### [ ] 9.3 Extend diagnostics schema V1 additively
+### [x] 9.3 Extend diagnostics schema V1 additively
 
-- [ ] Export normalized work-limit selections and bounded runtime counts with
+- [x] Export normalized work-limit selections and bounded runtime counts with
       distinct absent, unknown, mixed-policy, and closed interpretations.
-- [ ] Preserve summary-only/replacement-factory nulls and inspect only already
+- [x] Preserve summary-only/replacement-factory nulls and inspect only already
       created cache owners; do not initialize lazy components to prove a limit.
-- [ ] Define per-policy facts or explicitly labeled aggregates without exposing
+- [x] Define per-policy facts or explicitly labeled aggregates without exposing
       prohibited key, tenant, request, or response material.
-- [ ] Validate counts against their configured bounds when known, list limits,
+- [x] Validate counts against their configured bounds when known, list limits,
       UTF-16 text bounds, and rendered UTF-8 byte bounds on map/JSON/Markdown paths.
 
-### [ ] 9.4 Verify metric ownership across live factories
+### [x] 9.4 Verify metric ownership across live factories
 
-- [ ] Coordinate owners sharing a registry and identical tags; define consistent
+- [x] Coordinate owners sharing a registry and identical tags; define consistent
       aggregation of current counts, maxima, and cumulative history.
-- [ ] Prove gauge suppliers survive GC and closing one owner leaves the other
+- [x] Prove gauge suppliers survive GC and closing one owner leaves the other
       live owners' meters accurate and registered.
-- [ ] Remove meters at the last owner; reject late registration/increments from
+- [x] Remove meters at the last owner; reject late registration/increments from
       closed owners and test context restart with the registry kept alive.
-- [ ] Record tests for unweighted and weighted policies and differing limits
+- [x] Record tests for unweighted and weighted policies and differing limits
       during overlapping factory replacement.
+
+**Priority 9 evidence (2026-09-10):**
+
+- Public `CacheWorkRejectedException` exposes only `CALLER_CAPACITY` and
+  `LOAD_CAPACITY`; additive cache outcomes and `CACHE_ADMISSION_ERROR` retain
+  zero attempts/dispatch and no request/response evidence. Cache outcomes remain
+  configuration-selected without a MeterRegistry, and compatibility observer
+  calls cannot dilute downstream health.
+- Six `cache.work.active/maximum.*` gauges and fixed
+  `cache.work.rejections` / `cache.refresh.skips` counters are separately
+  selected under cache observability. Policy scopes overlap; no source count
+  is presented as a wire-dispatch count. All existing cache meter names/tag
+  sets are retained, with shared-owner gauge aggregation, cumulative history,
+  GC-safe suppliers, last-owner removal, and closed-owner write exclusion.
+- Schema V1 adds nine `cacheWork*` limited-policy-only aggregate fields.
+  Storage snapshots retain their existing independent contract. Lazy owners
+  remain uninitialized/unknown, foreign/summary-only paths remain null, and
+  closed owners retain bounded outstanding reservations until external cleanup
+  terminates. Map/JSON/Markdown enforce count, list, UTF-16 and UTF-8 limits.
+- `CacheWorkTelemetryContractTest` (**14 cases**, including 30 deterministic
+  update/close race waves) covers Prometheus zero series, registry absence,
+  enabled/disabled selections, rejection parity, health, refresh skips,
+  mixed weighted/unweighted owners and overlapping differing caller maxima.
+  `CacheWorkDiagnosticsContractTest` adds **7 cases**; OTel adds **2**
+  structural rejection cases. Existing ownership, composition, retention,
+  provider, Actuator, metadata and documentation tests remain green.
+- Complete command:
+  `mvn -B -ntp -pl reactive-http-client-test,reactive-http-client-otel -am -l target/release-evidence/v30/priority9/complete-tests.log test`.
+  **1,672 tests: 1,550 starter, 66 test-helper, 56 OTel; zero
+  failures/errors/skips**, completed at `2026-09-09T21:13:20+07:00`.
+  Copied XML is under `target/release-evidence/v30/priority9/complete/`.
+- Focused command:
+  `mvn -B -ntp -pl reactive-http-client-starter -Dtest=CacheWorkTelemetryContractTest,CacheWorkDiagnosticsContractTest,LocalResponseCacheObservabilityTest,CacheWorkOwnershipContractTest,CacheCallerAdmissionContractTest,CacheLoadAdmissionContractTest,CacheRefreshAdmissionContractTest,CacheWorkCompositionContractTest,ResponseCacheRetentionOwnershipTest,CacheWorkPolicyEnforcementTest,ReactiveHttpClientDiagnosticsProviderTest -l target/release-evidence/v30/priority9/focused.log test`.
+  **260 cases**, zero failures/errors/skips, revalidated on 2026-09-10.
+  Two further sequential runs use `focused-repeat-2.log` and
+  `focused-repeat-3.log` in the same directory: **780 total executions**,
+  zero failures/errors/skips across all three runs.
+- Repetition exposed a redirect fixture race: two admitted callers did not
+  prove the waiter had attached to the flight before the response gate opened.
+  `CacheWorkCompositionContractTest` now waits for actual two-member flight
+  attachment. The failing run is retained as `redirect-attachment-before.log`;
+  the complete and three focused passing runs above all include this fix.
+- Toolchain: Maven `3.9.9`, GraalVM JDK `25.0.3`, Java target `21`,
+  Spring Boot `4.0.0`; reactor `4.3.0-SNAPSHOT`, published baseline
+  `4.2.0`. Base revision:
+  `00ac8459630d7ffc28fa914ab1ed89bb1a4a2bc2` plus the uncommitted source patch.
+  Logs, copied XML, patch and SHA-256 files are under
+  `target/release-evidence/v30/priority9/`; `git diff --check` passes.
+  This is not new assembled-consumer, native, benchmark, or release evidence;
+  those later V30 gates remain open.
+
+---
+
+### Priority 9 lifecycle follow-up (2026-09-10)
+
+- Revalidated against reachable base
+  `53a6e2a7ba894a56f7fe1a8031abe3309b29789f` plus this working tree.
+  Failed manager construction now closes its partial cache/meter ownership,
+  preserving other live owners and the original construction error.
+- Refresh invalidation before loader assembly records one `entry_unavailable`
+  skip, even after token/slot acquisition. It releases reservations and tokens
+  without a terminal refresh counter or duration; cancellation after loader
+  assembly starts retains terminal accounting. The once-only outcome guard
+  also covers removal callbacks racing subscription setup.
+- Seven new `CacheWorkTelemetryContractTest` cases reproduce both findings
+  before the fix (seven failures, no errors). Two cover repeated missing-Caffeine
+  creation with/without a live meter owner; five cover invalidation after token
+  creation, replacement, hard expiry, the final pre-loader check, and eviction
+  callbacks. Existing cancellation-during-assembly coverage remains passing.
+- Final complete regression: **1,679 tests** (**1,557** starter, **66** helper,
+  **56** OTel), zero failures/errors/skips, completed at
+  `2026-09-10T08:59:37+07:00`:
+  `mvn -B -ntp -pl reactive-http-client-test,reactive-http-client-otel -am -l target/release-evidence/v30/priority9/lifecycle-followup/complete-tests.log test`.
+  Reproduction, focused regression, copied XML, source patch and checksums are
+  retained under `target/release-evidence/v30/priority9/lifecycle-followup/`.
+  Earlier Priority 9 totals describe the preceding implementation.
 
 ---
 

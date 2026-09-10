@@ -72,7 +72,7 @@ class CacheCallerAdmissionContractTest {
             assertThat(f.active()).isZero();
             assertThat(f.manager.activeLoadsForTesting("work")).isEqualTo(1);
             StepVerifier.create(f.call(false, "replacement"))
-                    .expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+                    .expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             gate.close();
             retrying.get(10, TimeUnit.SECONDS);
             assertThat(f.manager.activeLoadsForTesting("work")).isZero();
@@ -115,10 +115,10 @@ class CacheCallerAdmissionContractTest {
             assertThat(cancellations).hasValue(0);
             int retryCount = retryAssemblies.get();
             StepVerifier.create(f.call(false, "saturated").retry(2))
-                    .expectError(CacheLoadAdmission.Rejected.class).verify(WAIT);
+                    .expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             assertThat(retryAssemblies).hasValue(retryCount);
             assertThat(f.dispatches).hasValue(1);
-            assertThat(f.events.stream().filter(e -> e.getError() instanceof CacheLoadAdmission.Rejected))
+            assertThat(f.events.stream().filter(e -> e.getError() instanceof io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException))
                     .hasSize(3).allSatisfy(e -> {
                         assertThat(e.getAttemptCount()).isZero();
                         assertThat(e.getRequestUrl()).isNull();
@@ -183,8 +183,8 @@ class CacheCallerAdmissionContractTest {
                             .put("tenant", new CountingList(reads, null))
                             .put(InboundHeadersWebFilter.INBOUND_HEADERS_CONTEXT_KEY,
                                     Map.of("X-Secret", List.of("not-retained")))))
-                    .expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
-            StepVerifier.create(cold).expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
+                    .expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
+            StepVerifier.create(cold).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             assertThat(reads).hasValue(0);
             assertThat(f.serializations).hasValue(serializers);
             assertThat(f.authCalls).hasValue(2);
@@ -216,7 +216,7 @@ class CacheCallerAdmissionContractTest {
             assertThat(f.manager.workloadSnapshotForTesting().coalescedWaiters()).isEqualTo(1);
             assertThat(f.active()).isEqualTo(2);
             StepVerifier.create(f.call(false, "shared"))
-                    .expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
+                    .expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             assertThat(f.dispatches).hasValue(1);
             waiter.cancel(true);
             assertThat(f.active()).isEqualTo(1);
@@ -230,7 +230,7 @@ class CacheCallerAdmissionContractTest {
             var hit2 = f.call(false, "shared").toFuture();
             int probes = f.probes.get();
             StepVerifier.create(f.call(false, "shared"))
-                    .expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
+                    .expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             assertThat(f.probes).hasValue(probes);
             assertThat(f.dispatches).hasValue(1);
             hit1.cancel(true);
@@ -327,7 +327,7 @@ class CacheCallerAdmissionContractTest {
             future.cancel(true);
             assertThat(f.active()).as("executing callback still owns admission").isEqualTo(1);
             StepVerifier.create(f.call(false, "replacement"))
-                    .expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
+                    .expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             gate.close();
             await(() -> f.active() == 0, "callback exit releases original reservation");
             assertThat(f.dispatches).hasValue(0);
@@ -406,7 +406,7 @@ class CacheCallerAdmissionContractTest {
                 if (enteredExchange) {
                     assertThat(admission.active("work")).isEqualTo(1);
                     assertThatThrownBy(() -> admission.acquire("work"))
-                            .isInstanceOf(CacheCallerAdmission.Rejected.class);
+                            .isInstanceOf(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class);
                     gate.close();
                     emission.get().get(10, TimeUnit.SECONDS);
                     assertThat(exchanges).hasValue(1);
@@ -555,7 +555,7 @@ class CacheCallerAdmissionContractTest {
                 int authCalls = f.authCalls.get();
                 int dispatches = f.dispatches.get();
                 StepVerifier.create(f.call(false, "replacement"))
-                        .expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
+                        .expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
                 assertThat(f.authCalls).hasValue(authCalls);
                 assertThat(f.dispatches).hasValue(dispatches);
                 gate.close();
@@ -637,7 +637,7 @@ class CacheCallerAdmissionContractTest {
             StepVerifier.create(f.call(false, "retry").retry(20)).expectError(AuthProviderException.class).verify(WAIT);
             assertThat(f.active()).isZero();
             assertThat(f.events).noneSatisfy(event -> assertThat(event.getError())
-                    .isInstanceOf(CacheCallerAdmission.Rejected.class));
+                    .isInstanceOf(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class));
             f.auth = () -> Mono.just(AuthContext.empty());
             f.response = () -> Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build());
             StepVerifier.create(f.call(false, "empty").repeat(20)).verifyComplete();
@@ -670,7 +670,7 @@ class CacheCallerAdmissionContractTest {
             f.auth = auth::asMono;
             var valid = f.call(post, "replacement").toFuture();
             assertThat(f.active()).isEqualTo(1);
-            StepVerifier.create(invalid).expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
+            StepVerifier.create(invalid).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             assertThat(f.active()).isEqualTo(1);
             auth.tryEmitValue(AuthContext.empty()).orThrow();
             assertThat(valid.get(10, TimeUnit.SECONDS)).isEqualTo("response");
@@ -701,7 +701,7 @@ class CacheCallerAdmissionContractTest {
             var second = cold.toFuture();
             await(() -> f.serializations.get() == 2, "both subscriptions entered serialization");
             assertThat(f.active()).isEqualTo(2);
-            StepVerifier.create(cold).expectError(CacheCallerAdmission.Rejected.class).verify(WAIT);
+            StepVerifier.create(cold).expectError(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class).verify(WAIT);
             assertThat(f.serializations).hasValue(2);
             assertThat(f.authCalls).hasValue(0);
             assertThat(f.probes).hasValue(0);
@@ -726,7 +726,7 @@ class CacheCallerAdmissionContractTest {
                     try {
                         start.await();
                         admitted.add(admission.acquire("work"));
-                    } catch (CacheCallerAdmission.Rejected expected) {
+                    } catch (io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException expected) {
                         rejected.incrementAndGet();
                     } catch (InterruptedException error) {
                         throw new AssertionError(error);
@@ -762,7 +762,7 @@ class CacheCallerAdmissionContractTest {
         CacheCallerAdmission admission = new CacheCallerAdmission(input);
         input.put("work", 10);
         var first = admission.acquire("work");
-        assertThatThrownBy(() -> admission.acquire("work")).isInstanceOf(CacheCallerAdmission.Rejected.class);
+        assertThatThrownBy(() -> admission.acquire("work")).isInstanceOf(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class);
         var other = new CacheCallerAdmission(input);
         other.acquire("work").complete();
         first.complete();
@@ -1029,21 +1029,21 @@ class CacheCallerAdmissionContractTest {
 
         void assertRejections(int count) {
             assertThat(events).hasSize(count).allSatisfy(event -> {
-                assertThat(event.getError()).isInstanceOf(CacheCallerAdmission.Rejected.class);
+                assertThat(event.getError()).isInstanceOf(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class);
                 assertThat(event.getAttemptCount()).isZero();
                 assertThat(event.getRequestUrl()).isNull();
                 assertThat(event.getStatusCode()).isNull();
                 assertThat(event.getFailureStage()).isNull();
             });
             assertThat(lifecycle).hasSize(count).allSatisfy(c -> {
-                assertThat(c.error()).isInstanceOf(CacheCallerAdmission.Rejected.class);
+                assertThat(c.error()).isInstanceOf(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class);
                 assertThat(c.attemptNumber()).isZero();
                 assertThat(c.requestBody()).isNull();
                 assertThat(c.headers()).isEmpty();
                 assertThat(c.requestUrl()).isNull();
             });
             assertThat(logger.records).hasSize(count).allSatisfy(c -> {
-                assertThat(c.error()).isInstanceOf(CacheCallerAdmission.Rejected.class);
+                assertThat(c.error()).isInstanceOf(io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.class);
                 assertThat(c.requestBody()).isNull();
                 assertThat(c.requestHeaders()).isEmpty();
                 assertThat(c.inboundHeaders()).isEmpty();

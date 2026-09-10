@@ -81,5 +81,8 @@ public enum ErrorCategory {
     /**
      * An unexpected or unclassified error occurred.
      */
-    UNKNOWN
+    UNKNOWN,
+
+    /** A selected local cache caller or foreground-load capacity was exhausted. */
+    CACHE_ADMISSION_ERROR
 }

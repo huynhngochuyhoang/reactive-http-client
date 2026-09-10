@@ -17,8 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without queueing or extending TTL. Reservations survive retries and entered
   synchronous callbacks until their owner terminates. Properties, basic
   effective-contract output, and AOT binding hints ship together; configuration
-  changes require factory recreation. Live admission telemetry and native
-  executable evidence remain later V30 gates.
+  changes require factory recreation. Native executable evidence remains a
+  later V30 gate.
+- **Live cache-work telemetry and structural rejection diagnostics.** Explicit
+  cache observability exports policy-scoped current/maximum caller, foreground
+  load, and refresh reservations, fixed local rejection and refresh-skip counts.
+  All cache meters coordinate overlapping owners and deregister at the last
+  close. Schema V1 adds limited-policy configuration/live aggregates without
+  initializing lazy owners. Public local rejection reasons, cache outcomes, and
+  `CACHE_ADMISSION_ERROR` reach terminal diagnostics but not downstream health;
+  outcomes remain available without a MeterRegistry.
 - **Cache work-limit composition evidence.** Gated and virtual-time contracts
   exercise real Resilience4j admission, per-caller deadlines, hidden auth replay,
   body-preserving redirects, refresh timeouts, and publication identity checks

@@ -1,6 +1,7 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -205,22 +206,31 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 Objects.requireNonNull(metrics, "metrics"),
                 cacheObservabilityEnabled,
                 clientName);
-        manager.configureWork(CacheWorkPolicy.freeze(clientInterface, clientName, metadataCache, clientConfig));
-        manager.validateWorkWith(CacheWorkPolicy.validator(manager.workSelection, clientInterface, metadataCache, clientConfig));
-        for (Method method : clientInterface.getMethods()) {
-            if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
-                continue;
+        try {
+            manager.configureWork(CacheWorkPolicy.freeze(clientInterface, clientName, metadataCache, clientConfig));
+            manager.validateWorkWith(CacheWorkPolicy.validator(manager.workSelection, clientInterface, metadataCache, clientConfig));
+            for (Method method : clientInterface.getMethods()) {
+                if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
+                    continue;
+                }
+                RequestPlan plan = RequestPlan.from(metadataCache.get(method), clientInterface);
+                EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.decide(
+                        plan, clientConfig, EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig));
+                if (decision.cacheable()) {
+                    EffectiveCachePolicy.Selection selection = decision.selection();
+                    manager.cache(selection, clientName);
+                    manager.metrics.registerApi(plan.apiName());
+                }
             }
-            RequestPlan plan = RequestPlan.from(metadataCache.get(method), clientInterface);
-            EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.decide(
-                    plan, clientConfig, EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig));
-            if (decision.cacheable()) {
-                EffectiveCachePolicy.Selection selection = decision.selection();
-                manager.cache(selection, clientName);
-                manager.metrics.registerApi(plan.apiName());
+            return manager;
+        } catch (RuntimeException | Error failure) {
+            try {
+                manager.close();
+            } catch (RuntimeException | Error cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
             }
+            throw failure;
         }
-        return manager;
     }
 
     static LocalResponseCacheManager testing(LongSupplier ticker) {
@@ -264,6 +274,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
                     selection.maximums(CacheWorkPolicy.Limits::maximumConcurrentLoads));
             Map<String, Integer> refreshes = selection.maximums(CacheWorkPolicy.Limits::maximumConcurrentRefreshes);
             refreshAdmission = refreshes.isEmpty() ? null : new CacheWorkAdmission(refreshes, RefreshCapacity::new);
+            selection.policies().forEach((name, limits) -> metrics.registerWork(
+                    name, limits, callerAdmission, loadAdmission, refreshAdmission));
         }
     }
 
@@ -371,9 +383,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
                         } catch (RuntimeException error) {
                             cache.finish(lookup.loadToken());
                             metrics.lookup(apiName, "miss");
-                            if (callerState != null) {
-                                callerState.markCacheServed();
-                            }
+                            recordWorkRejection(selection.policyName(), apiName, callerState, error);
                             return Mono.error(error);
                         }
                     }
@@ -428,9 +438,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
                     } catch (RuntimeException error) {
                         cache.finish(token);
                         metrics.lookup(apiName, "miss");
-                        if (callerState != null) {
-                            callerState.markCacheServed();
-                        }
+                        recordWorkRejection(selection.policyName(), apiName, callerState, error);
                         return Mono.error(error);
                     }
                     flight = new InFlightLoad(flightKey, cache, token, proposedLoadState, reservation);
@@ -503,21 +511,30 @@ final class LocalResponseCacheManager implements AutoCloseable {
             token = cache.beginRefresh(lookup.entryToken());
         }
         catch (IllegalStateException ignored) {
+            metrics.refreshSkipped(policyName, LocalResponseCacheMetrics.RefreshSkipReason.ENTRY_UNAVAILABLE);
             return;
         }
         if (token == null) {
+            metrics.refreshSkipped(policyName, LocalResponseCacheMetrics.RefreshSkipReason.ENTRY_UNAVAILABLE);
             return;
         }
 
         FlightKey refreshKey = new FlightKey(cache, key);
-        InFlightRefresh refresh = new InFlightRefresh(refreshKey, cache, token, refreshState, apiName);
+        InFlightRefresh refresh = new InFlightRefresh(refreshKey, cache, token, refreshState, apiName, policyName);
         boolean rejected;
+        LocalResponseCacheMetrics.RefreshSkipReason skip = LocalResponseCacheMetrics.RefreshSkipReason.ENTRY_UNAVAILABLE;
         synchronized (inFlightRefreshes) {
             rejected = closed.get() || inFlightRefreshes.containsKey(refreshKey);
+            if (!closed.get() && rejected) {
+                skip = LocalResponseCacheMetrics.RefreshSkipReason.ALREADY_REFRESHING;
+            }
             if (!rejected && refreshAdmission != null) {
                 try {
                     refresh.reservation = refreshAdmission.acquire(policyName);
-                } catch (RefreshCapacity | IllegalStateException ignored) {
+                } catch (RefreshCapacity ignored) {
+                    skip = LocalResponseCacheMetrics.RefreshSkipReason.CAPACITY;
+                    rejected = true;
+                } catch (IllegalStateException ignored) {
                     rejected = true;
                 }
             }
@@ -527,6 +544,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
         if (rejected) {
             cache.finishRefresh(token);
+            metrics.refreshSkipped(policyName, skip);
             return;
         }
         if (!cache.isRefreshCurrent(token)) {
@@ -558,6 +576,13 @@ final class LocalResponseCacheManager implements AutoCloseable {
             if (!refresh.cache.isRefreshCurrent(refresh.refreshToken)) {
                 cancelRefresh(refresh.key);
                 return Mono.empty();
+            }
+            synchronized (inFlightRefreshes) {
+                if (refresh.terminal) {
+                    return Mono.empty();
+                }
+                // Loader assembly starts owned work; invalidation before this boundary is only a skip.
+                refresh.sourceStarted = true;
             }
             return ((Mono<Object>) loader.apply(refresh.loadState))
                     .flatMap(value -> CacheWorkAdmission.preparing(owner, () -> {
@@ -628,13 +653,19 @@ final class LocalResponseCacheManager implements AutoCloseable {
 
     private void recordRefreshOnce(InFlightRefresh refresh,
                                    LocalResponseCacheMetrics.WorkOutcome outcome) {
+        boolean skipped;
         synchronized (inFlightRefreshes) {
             if (refresh.outcomeRecorded) {
                 return;
             }
             refresh.outcomeRecorded = true;
+            skipped = refresh.terminal && !refresh.sourceStarted;
         }
-        recordRefresh(refresh.apiName, outcome, refresh.startedAtNanos);
+        if (skipped) {
+            metrics.refreshSkipped(refresh.policyName, LocalResponseCacheMetrics.RefreshSkipReason.ENTRY_UNAVAILABLE);
+        } else {
+            recordRefresh(refresh.apiName, outcome, refresh.startedAtNanos);
+        }
     }
 
     private void finishRefresh(InFlightRefresh refresh) {
@@ -850,6 +881,22 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
     }
 
+    void recordWorkRejection(String policyName, String apiName, SubscriptionReportingState state,
+                             RuntimeException error) {
+        if (state != null) {
+            state.markCacheServed();
+        }
+        if (error instanceof CacheWorkRejectedException rejected) {
+            if (state != null) {
+                state.prepareInitialResolved(new RequestArgumentResolver.ResolvedArgs(
+                        Map.of(), Map.of(), Map.of(), null));
+            }
+            metrics.rejection(policyName, rejected.getReason());
+            cacheOutcome(state, apiName, rejected.getReason() == CacheWorkRejectedException.Reason.CALLER_CAPACITY
+                    ? HttpClientCacheOutcome.CALLER_REJECTED : HttpClientCacheOutcome.LOAD_REJECTED);
+        }
+    }
+
     private void cacheOutcome(SubscriptionReportingState state,
                               String apiName,
                               HttpClientCacheOutcome outcome) {
@@ -908,6 +955,21 @@ final class LocalResponseCacheManager implements AutoCloseable {
                     retainedBytesKnown ? retainedDecodedResponseBytes : null,
                     closed.get());
         }
+    }
+
+    synchronized CacheWorkSnapshot workSnapshot() {
+        if (!closed.get()) { workValidation.run(); }
+        if (workSelection == null) { return null; }
+        CacheWorkSnapshot configured = CacheWorkSnapshot.configured(workSelection);
+        long callers = 0, loads = 0, refreshes = 0;
+        for (String policy : workSelection.policies().keySet()) {
+            callers = Math.addExact(callers, callerAdmission.active(policy));
+            loads = Math.addExact(loads, loadAdmission.active(policy));
+            if (refreshAdmission != null) {
+                refreshes = Math.addExact(refreshes, refreshAdmission.active(policy));
+            }
+        }
+        return configured.live(closed.get(), callers, loads, refreshes);
     }
 
     boolean hasInFlightLoadWithMembersForTesting(int memberCount) {
@@ -1392,8 +1454,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
         private final LocalResponseCache.RefreshToken refreshToken;
         private final SubscriptionReportingState loadState;
         private final String apiName;
+        private final String policyName;
         private final long startedAtNanos = System.nanoTime();
         private Disposable sourceSubscription;
+        private boolean sourceStarted;
         private boolean terminal;
         private boolean outcomeRecorded;
         private CacheWorkAdmission.Reservation reservation;
@@ -1402,12 +1466,14 @@ final class LocalResponseCacheManager implements AutoCloseable {
                                 LocalResponseCache cache,
                                 LocalResponseCache.RefreshToken refreshToken,
                                 SubscriptionReportingState loadState,
-                                String apiName) {
+                                String apiName,
+                                String policyName) {
             this.key = key;
             this.cache = cache;
             this.refreshToken = refreshToken;
             this.loadState = loadState;
             this.apiName = apiName;
+            this.policyName = policyName;
         }
     }
 

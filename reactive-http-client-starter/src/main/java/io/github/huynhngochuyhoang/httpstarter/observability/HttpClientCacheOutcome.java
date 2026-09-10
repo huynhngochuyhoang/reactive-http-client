@@ -5,5 +5,7 @@ public enum HttpClientCacheOutcome {
     FRESH_HIT,
     MISS_LOADER,
     COALESCED_WAITER,
-    STALE_HIT
+    STALE_HIT,
+    CALLER_REJECTED,
+    LOAD_REJECTED
 }

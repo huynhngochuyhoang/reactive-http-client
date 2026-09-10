@@ -130,6 +130,28 @@ class OpenTelemetryHttpClientObserverTest {
         assertThat(clientError.getStatus()).isEqualTo(StatusData.error());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(
+            io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.Reason.class)
+    void localCacheRejectionsEmitOneStructuralSpanWithoutTransportEvidence(
+            io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.Reason reason) {
+        var error = new io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException(reason);
+        var outcome = reason == io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.Reason.CALLER_CAPACITY
+                ? HttpClientCacheOutcome.CALLER_REJECTED : HttpClientCacheOutcome.LOAD_REJECTED;
+        observer.recordCacheServed(new HttpClientObserverEvent("catalog-client", "catalog.search", "POST", "/search",
+                null, 1, error, ErrorCategory.CACHE_ADMISSION_ERROR, null, null,
+                0, -1, -1, null, null, null, Map.of(), outcome));
+        var span = onlySpan();
+        assertThat(exporter.getFinishedSpanItems()).hasSize(1);
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_CACHE_OUTCOME))
+                .isEqualTo(outcome.name());
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_ATTEMPT_COUNT)).isZero();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_HTTP_STATUS_CODE)).isNull();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_SERVER_ADDRESS)).isNull();
+        assertThat(span.getAttributes().toString()).contains("CACHE_ADMISSION_ERROR")
+                .doesNotContain("Authorization", "tenant", "cache-key");
+    }
+
     @Test
     void urlTemplateAndServerAttributesAreRecordedWhenOptedIn() {
         ReactiveHttpClientProperties.ObservabilityConfig config =

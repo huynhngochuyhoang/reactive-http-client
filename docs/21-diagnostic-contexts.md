@@ -166,6 +166,37 @@ it does not register an Actuator endpoint, controller, log line, or file writer.
 
 ### Diagnostics schema v1
 
+#### V30 work-count additions (4.3.0 candidate)
+
+Published 4.2.0 does not export these fields. Current schema V1 adds the following
+sanitized, **limited-policy-only aggregates**, independent of MeterRegistry:
+
+| Field | Interpretation |
+|---|---|
+| `cacheWorkSelection` | `absent`, `selected` (all cache-selected policies limited), or `mixed` (only some limited). |
+| `cacheWorkState` | `absent`, `uninitialized`, `open`, or `closed`. |
+| `cacheWorkLimitedPolicyCount` | Number of distinct selected policy names with limits, at most 16. |
+| `cacheWorkMaximumConcurrentCallers`, `cacheWorkMaximumConcurrentLoads` | Sum of validated limits, excluding unbounded policies. |
+| `cacheWorkMaximumConcurrentRefreshes` | Sum over limited policies selecting refresh, or null when none do. |
+| `cacheWorkActiveCallers`, `cacheWorkActiveLoads`, `cacheWorkActiveRefreshes` | Sampled reservations from already-created owners only. Counts are overlapping units, not wire requests. |
+
+Summary-only and foreign replacement factories emit null for every work fact.
+Known absent limits have `absent` selection/state, zero limited-policy count,
+and null maxima/current counts, not fabricated zero activity for unlimited work.
+Lazy owners expose known configuration with `uninitialized` state and null
+current counts; taking a snapshot never instantiates them. Mixed-policy totals
+say nothing about work in the unbounded policies. An open owner can report zero;
+a closed owner retains configured maxima and may report nonzero reservations
+until externally owned subscriptions or entered cleanup terminate. Closed
+gauges are absent from the registry even when this diagnostic count remains
+positive. Independently sampled dimensions need not describe one atomic instant.
+
+Map, JSON, and Markdown validate nonnegative counts against known maxima, at
+most 16 selected limited policies, the existing 16-item lists, 512 UTF-16-unit
+text bound, and 1 MiB rendered UTF-8 limit. Unknown values remain JSON null, never
+empty strings. No policy names, keys, targets, headers, bodies, or tenant/identity
+values are added to the work snapshot.
+
 JSON, map, and Markdown snapshots declare schema version `1`. Within each
 supported major line, schema changes are additive: existing fields keep their names, types, and
 meaning; a field is not removed, retyped, or reinterpreted in a minor release.

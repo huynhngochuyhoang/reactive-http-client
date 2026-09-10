@@ -68,6 +68,9 @@ public final class ErrorCategories {
         Throwable current = error;
         int depth = 0;
         while (current != null && depth < MAX_CAUSE_DEPTH) {
+            if (current instanceof CacheWorkRejectedException) {
+                return ErrorCategory.CACHE_ADMISSION_ERROR;
+            }
             if (current instanceof HttpClientException httpClientException) {
                 return httpClientException.getErrorCategory();
             }
