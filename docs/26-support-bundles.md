@@ -375,6 +375,9 @@ absent limits have `absent` selection/state, zero limited policies, and null
 bounds/counts. Uninitialized owners have known bounds but null counts. Open or
 closed owners have bounded counts, which can remain positive during externally
 owned cleanup after close. Mixed aggregates cover only limited policies.
+When `cachePolicyCount` is known, the limited-policy count cannot exceed it:
+`selected` requires equality, while `mixed` requires a positive strict subset.
+A null total remains unknown; it is not interpreted as zero.
 
 ```bash
 EXAMPLE_RHTTPCLIENTS_SCHEMA="/path/to/reviewed/rhttpclients-schema-v1.json"
@@ -451,6 +454,15 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
             or .cacheWorkState == "open" or .cacheWorkState == "closed")
           and ($policies | nonnegative_integer)
           and $policies <= 16
+          and (if .cachePolicyCount == null then true
+            else $policies <= .cachePolicyCount
+              and (if .cacheWorkSelection == "selected"
+                then $policies == .cachePolicyCount
+                elif .cacheWorkSelection == "mixed"
+                then $policies > 0 and $policies < .cachePolicyCount
+                else true
+                end)
+            end)
           and (($policies == 0) == (.cacheWorkSelection == "absent"))
           and (($policies == 0) == (.cacheWorkState == "absent"))
           and (($policies == 0) == (.cacheWorkMaximumConcurrentCallers == null))

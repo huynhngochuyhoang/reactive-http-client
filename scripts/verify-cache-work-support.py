@@ -263,7 +263,8 @@ class CaptureTests(unittest.TestCase):
                                   "cachePolicyCount", "cachePolicySources", "cacheHttpMethods"):
                         client[field] = None
                 elif state != "absent":
-                    client.update(cacheWorkSelection="mixed" if state == "mixed" else "selected",
+                    client.update(cachePolicyCount=2 if state == "mixed" else 1,
+                                  cacheWorkSelection="mixed" if state == "mixed" else "selected",
                                   cacheWorkState="open" if state == "mixed" else state,
                                   cacheWorkLimitedPolicyCount=1,
                                   cacheWorkMaximumConcurrentCallers=3, cacheWorkMaximumConcurrentLoads=2)
@@ -274,7 +275,7 @@ class CaptureTests(unittest.TestCase):
     def test_invalid_work_facts(self):
         doc = self.diagnostics()
         client = doc["clients"][0]
-        client.update(cacheWorkSelection="selected", cacheWorkState="open",
+        client.update(cachePolicyCount=1, cacheWorkSelection="selected", cacheWorkState="open",
                       cacheWorkLimitedPolicyCount=1, cacheWorkMaximumConcurrentCallers=3,
                       cacheWorkMaximumConcurrentLoads=2, cacheWorkMaximumConcurrentRefreshes=1,
                       cacheWorkActiveCallers=2, cacheWorkActiveLoads=1, cacheWorkActiveRefreshes=1)
@@ -295,6 +296,38 @@ class CaptureTests(unittest.TestCase):
             invalid["projectVersion"] = version
             del invalid["clients"][0]["cacheWorkActiveLoads"]
             self.assertIsNone(self.capture(invalid)[0])
+
+    def test_work_policy_count_matches_selected_cache_policies(self):
+        for selection, limited, total, valid in (
+                ("selected", 1, 0, False),
+                ("selected", 1, 1, True),
+                ("selected", 1, 2, False),
+                ("selected", 2, 1, False),
+                ("selected", 2, 2, True),
+                ("mixed", 1, 0, False),
+                ("mixed", 1, 1, False),
+                ("mixed", 1, 2, True),
+                ("mixed", 2, 1, False),
+                ("mixed", 2, 2, False),
+                ("mixed", 2, 3, True),
+                ("absent", 0, 0, True),
+                ("absent", 0, 2, True),
+                ("selected", 1, None, True),
+                ("mixed", 1, None, True),
+                ("absent", 0, None, True)):
+            with self.subTest(selection=selection, limited=limited, total=total):
+                doc = self.diagnostics()
+                client = doc["clients"][0]
+                client.update(cachePolicyCount=total, cacheWorkSelection=selection,
+                              cacheWorkLimitedPolicyCount=limited)
+                if limited:
+                    client.update(cacheWorkState="open",
+                                  cacheWorkMaximumConcurrentCallers=3, cacheWorkMaximumConcurrentLoads=2,
+                                  cacheWorkActiveCallers=1, cacheWorkActiveLoads=1)
+                if valid:
+                    self.assertEqual(self.capture(doc)[0], doc)
+                else:
+                    self.assertIsNone(self.capture(doc)[0])
 
     def test_existing_scalar_list_and_capacity_guards(self):
         for field, value in (
