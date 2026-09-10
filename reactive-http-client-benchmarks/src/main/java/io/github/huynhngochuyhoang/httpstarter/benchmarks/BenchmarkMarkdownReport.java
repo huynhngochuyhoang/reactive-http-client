@@ -92,7 +92,7 @@ final class BenchmarkMarkdownReport {
             String mode = text(node, "mode");
             JsonNode primary = node.path("primaryMetric");
             results.add(new BenchmarkResult(
-                    benchmarkName,
+                    benchmarkName + parameterSuffix(node),
                     classification(benchmarkName),
                     mode,
                     number(primary.path("score")),
@@ -247,11 +247,30 @@ final class BenchmarkMarkdownReport {
         markdown.append("- Do not promote smoke-only reports.\n");
     }
 
+    static String parameterSuffix(JsonNode result) {
+        Map<String, String> parameters = new java.util.TreeMap<>();
+        result.path("params").fields().forEachRemaining(entry ->
+                parameters.put(entry.getKey(), entry.getValue().asText()));
+        return parameters.isEmpty() ? "" : " params=" + OBJECT_MAPPER.valueToTree(parameters);
+    }
+
     static void validateClassification(String benchmarkName) {
         classification(benchmarkName);
     }
 
     private static Classification classification(String benchmarkName) {
+        if (benchmarkName.startsWith("cacheV30NoNetwork")) {
+            String scenario = benchmarkName.substring("cacheV30NoNetwork".length());
+            requireScenario(benchmarkName, scenario);
+            return new Classification("V30 no-network work admission", "Starter", scenario,
+                    false, true, sortPrefix("cache-v30-no-network", scenario));
+        }
+        if (benchmarkName.startsWith("cacheV30Loopback")) {
+            String scenario = benchmarkName.substring("cacheV30Loopback".length());
+            requireScenario(benchmarkName, scenario);
+            return new Classification("V30 cache work loopback workload", "Starter", scenario,
+                    false, true, sortPrefix("cache-v30-loopback", scenario));
+        }
         if (benchmarkName.startsWith("cacheV29NoNetwork")) {
             String scenario = benchmarkName.substring("cacheV29NoNetwork".length());
             requireScenario(benchmarkName, scenario);

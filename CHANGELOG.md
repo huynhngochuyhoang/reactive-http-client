@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Cache-work performance harness and ownership audit.** Production-proxy
+  scenarios cover selected-limit hits, misses, rejection, coalescing, refresh,
+  and reuse with cache telemetry off/on, plus isolated contended admission.
+  Reports preserve JMH parameter identities and comparable published 4.2.0
+  rows. Bounded smoke, allocation, and collection checks are separate from
+  clean-commit manual release measurements; no performance claim is made.
 - **Cache-work operations evidence.** V30 saturation/recovery recipes preserve
   target labels and foreground/refresh separation. A timestamped support fixture
   reconciles live owners, counters, storage and shutdown; tested capture filters

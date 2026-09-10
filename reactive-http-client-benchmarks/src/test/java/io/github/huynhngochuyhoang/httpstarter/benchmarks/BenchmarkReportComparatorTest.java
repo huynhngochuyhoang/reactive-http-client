@@ -18,6 +18,21 @@ class BenchmarkReportComparatorTest {
     Path tempDir;
 
     @Test
+    void keepsMeteredParameterRowsSeparate() throws Exception {
+        String row = result("cacheV30NoNetworkHit", "avgt", 1.0, "us/op", null, null, null, 32.0);
+        String unmetered = row.replace("\"mode\":", "\"params\": {\"metered\": \"false\"}, \"mode\":");
+        String metered = row.replace("\"mode\":", "\"params\": {\"metered\": \"true\"}, \"mode\":");
+        Path current = report("current.json", unmetered, metered);
+        Path baseline = report("baseline.json", unmetered);
+        Path output = tempDir.resolve("parameters.md");
+        assertThat(run(current, baseline, output)).isZero();
+        assertThat(Files.readString(output))
+                .contains("Matched benchmark/mode rows: **1**", "Current-only rows: **1**")
+                .contains("cacheV30NoNetworkHit params={\"metered\":\"false\"}")
+                .contains("cacheV30NoNetworkHit params={\"metered\":\"true\"}");
+    }
+
+    @Test
     void writesComparisonForMatchingRows() throws Exception {
         Path current = report("current.json",
                 result("clientSideOverheadStarterGetNoBody", "avgt", 12.0, "us/op", 11.0, 15.0, 18.0, 1200.0),

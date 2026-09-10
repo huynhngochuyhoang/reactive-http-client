@@ -112,6 +112,27 @@ class BenchmarkMarkdownReportTest {
     }
 
     @Test
+    void classifiesV30WorkRowsAndRejectsForeignOwners() throws Exception {
+        String report = renderReport(
+                result("io.github.huynhngochuyhoang.httpstarter.core.V30CacheWorkPerformanceBenchmark.cacheV30NoNetworkLoadRejection",
+                        "avgt", 3.0, "us/op"),
+                result("io.github.huynhngochuyhoang.httpstarter.core.V30CacheWorkPerformanceBenchmark.cacheV30LoopbackSingleFlightJoin",
+                        "avgt", 30.0, "us/op"));
+        assertThat(report)
+                .contains("| cacheV30NoNetworkLoadRejection | V30 no-network work admission |")
+                .contains("| cacheV30LoopbackSingleFlightJoin | V30 cache work loopback workload |");
+        String parameterized = result(
+                "io.github.huynhngochuyhoang.httpstarter.core.V30CacheWorkPerformanceBenchmark.cacheV30NoNetworkHit",
+                "avgt", 1.0, "us/op");
+        assertThat(renderReport(parameterized.replace("\"mode\":",
+                "\"params\": {\"metered\":\"true\"}, \"mode\":")))
+                .contains("cacheV30NoNetworkHit params={\"metered\":\"true\"}");
+        assertThatThrownBy(() -> BenchmarkFairnessContract.validate(java.util.List.of(
+                new BenchmarkFairnessContract.BenchmarkMethod("ForeignBenchmark", "cacheV30NoNetworkLoadRejection"))))
+                .hasMessageContaining("V30 fixture");
+    }
+
+    @Test
     void classifiesV29AccountingAndLoopbackRowsSeparately() throws Exception {
         String report = renderReport(
                 result("io.github.huynhngochuyhoang.httpstarter.core.V29WeightedCachePerformanceBenchmark.cacheV29NoNetworkWeightEviction",

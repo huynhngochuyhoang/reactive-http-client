@@ -327,6 +327,22 @@
                 <benchmark.result.dir>${project.build.directory}/benchmark-reports/published-starter-${benchmark.starter.version}</benchmark.result.dir>
                 <maven.javadoc.skip>true</maven.javadoc.skip>
             </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/V30CacheWork*Benchmark.java</exclude>
+                            </excludes>
+                            <testExcludes>
+                                <testExclude>**/V30CacheWorkPerformanceBenchmarkTest.java</testExclude>
+                            </testExcludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
         <profile>
             <id>benchmark-published-baseline-v29-source-exclusion</id>
@@ -337,9 +353,11 @@
                         <artifactId>maven-compiler-plugin</artifactId>
                         <configuration>
                             <excludes>
+                                <exclude>**/V30CacheWork*Benchmark.java</exclude>
                                 <exclude>**/V29WeightedCachePerformanceBenchmark.java</exclude>
                             </excludes>
                             <testExcludes>
+                                <testExclude>**/V30CacheWorkPerformanceBenchmarkTest.java</testExclude>
                                 <testExclude>**/V29WeightedCachePerformanceBenchmarkTest.java</testExclude>
                             </testExcludes>
                         </configuration>
@@ -356,10 +374,12 @@
                         <artifactId>maven-compiler-plugin</artifactId>
                         <configuration>
                             <excludes>
+                                <exclude>**/V30CacheWork*Benchmark.java</exclude>
                                 <exclude>**/V28SemanticReadCachePerformanceBenchmark.java</exclude>
                                 <exclude>**/V29WeightedCachePerformanceBenchmark.java</exclude>
                             </excludes>
                             <testExcludes>
+                                <testExclude>**/V30CacheWorkPerformanceBenchmarkTest.java</testExclude>
                                 <testExclude>**/V28SemanticReadCachePerformanceBenchmarkTest.java</testExclude>
                                 <testExclude>**/V29WeightedCachePerformanceBenchmarkTest.java</testExclude>
                             </testExcludes>
@@ -377,11 +397,13 @@
                         <artifactId>maven-compiler-plugin</artifactId>
                         <configuration>
                             <excludes combine.self="override">
+                                <exclude>**/V30CacheWork*Benchmark.java</exclude>
                                 <exclude>**/V27CachePerformanceBenchmark.java</exclude>
                                 <exclude>**/V28SemanticReadCachePerformanceBenchmark.java</exclude>
                                 <exclude>**/V29WeightedCachePerformanceBenchmark.java</exclude>
                             </excludes>
                             <testExcludes combine.self="override">
+                                <testExclude>**/V30CacheWorkPerformanceBenchmarkTest.java</testExclude>
                                 <testExclude>**/V28SemanticReadCachePerformanceBenchmarkTest.java</testExclude>
                                 <testExclude>**/V29WeightedCachePerformanceBenchmarkTest.java</testExclude>
                             </testExcludes>

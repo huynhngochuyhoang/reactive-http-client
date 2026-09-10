@@ -25,8 +25,8 @@ commit as completion evidence. Preserve partial reports when a command fails.
   telemetry, or operations evidence is treated as complete.
 - Priority 9 supplies the exported signals used by Priority 11. Internal test
   counters are not substitutes for an operator-visible signal.
-- Priority 12.3 provides manual release-benchmark commands and remains open
-  until the resulting reports have been reviewed.
+- Priority 12.3 requires manual release-benchmark execution and review of the
+  resulting reports before closure.
 - Public baselines stay on `4.2.0`; reactor fixtures stay on `4.3.0-SNAPSHOT`
   until Priority 13 selects a final cut. Publication and baseline movement are
   separate from implementation and require fresh Central verification.
@@ -1197,43 +1197,122 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 12 - Performance and Allocation Evidence
 
-### [ ] 12.1 Extend production-representative benchmarks
+### [x] 12.1 Extend production-representative benchmarks
 
-- [ ] Include cache-disabled invocation, existing policies without limits,
+- [x] Include cache-disabled invocation, existing policies without limits,
       selected-limit hits/misses, and weighted publication.
-- [ ] Add caller/load rejection, same-key join, refresh start/skip, release/reuse,
+- [x] Add caller/load rejection, same-key join, refresh start/skip, release/reuse,
       and contended admission rows with bounded workload dimensions.
-- [ ] Exercise production API names, caller/load reporting states, and metrics
+- [x] Exercise production API names, caller/load reporting states, and metrics
       selection in metered rows rather than convenience defaults.
-- [ ] Gate subscribers and server responses so a supposed waiter cannot become
+- [x] Gate subscribers and server responses so a supposed waiter cannot become
       a hit unnoticed; assert workload identity and terminal ownership counts.
-- [ ] Keep published `4.2.0` rows comparable; label genuinely new rows as lacking
+- [x] Keep published `4.2.0` rows comparable; label genuinely new rows as lacking
       a baseline instead of silently dropping required results.
 
-### [ ] 12.2 Separate allocation from retained ownership
+### [x] 12.2 Separate allocation from retained ownership
 
-- [ ] Inspect disabled/unselected paths for new state or work caused by the
+- [x] Inspect disabled/unselected paths for new state or work caused by the
       optional feature; record any justified overhead explicitly.
-- [ ] Measure transient reservation/rejection allocation separately from retained
+- [x] Measure transient reservation/rejection allocation separately from retained
       request/source graphs and cache entry occupancy.
-- [ ] Prove repeated saturation does not accumulate rejected owners or pending
-      tasks, and that admission uses no blocking waits or unbounded scans.
-- [ ] Record bounded JFR/retention evidence and explain measurement limits;
+- [x] Prove repeated saturation does not accumulate rejected owners or pending
+      tasks, and that admission uses no capacity waits or unbounded scans.
+      Synchronized counter access can contend; this is not a lock-free claim.
+- [x] Record bounded JFR/retention evidence and explain measurement limits;
       no byte/count estimate is promoted as exact process-memory sizing.
 
-### [ ] 12.3 Prepare and review manual release benchmarks
+### [x] 12.3 Prepare and review manual release benchmarks
 
-- [ ] Pass benchmark packaging, harness tests, and smoke/discovery coverage before
+- [x] Pass benchmark packaging, harness tests, and smoke/discovery coverage before
       providing release-run commands.
-- [ ] Supply exact clean-commit commands for current, fresh published `4.2.0`,
+- [x] Supply exact clean-commit commands for current, fresh published `4.2.0`,
       and comparison/report generation, with required profiles, output paths,
       machine/toolchain metadata, and expected scenario counts.
-- [ ] Hand release-quality execution to the user when requested and leave this
+- [x] Hand release-quality execution to the user when requested and leave this
       item open until both runs and comparison artifacts are available.
-- [ ] Review row coverage, gates, commit cleanliness, hashes, units, allocation,
+- [x] Review row coverage, gates, commit cleanliness, hashes, units, allocation,
       and comparability; a benchmark-path correction invalidates earlier numbers.
-- [ ] Record either supported versioned performance evidence or an explicit
+- [x] Record either supported versioned performance evidence or an explicit
       no-public-performance-claim disposition; smoke alone cannot complete it.
+
+### Implementation and bounded evidence
+
+- Implemented on 2026-09-11 against reachable base
+  `131a72481ea8ae4393a91ccae12e8695388d5a20` plus this working tree.
+  [Performance/allocation audit](PERFORMANCE-ALLOCATION-AUDIT.md) records scope,
+  fixture dimensions, disabled-path costs and ownership limits. No production
+  behavior or public API changes are made in this priority.
+- `V30CacheWorkPerformanceBenchmark` adds eleven real-proxy methods with
+  telemetry off/on; `V30CacheWorkAdmissionBenchmark` isolates four-thread
+  saturated acquisition. Eight unchanged shared methods retain the 4.2.0
+  comparison. Average-time and throughput coverage is **62 current rows**:
+  **16 matched / 46 current-only / zero baseline-only**. Parameter-aware
+  report keys prevent metrics-off/on rows from overwriting each other.
+- Current packaging/discovery and harness/report tests pass **27 cases**;
+  fresh published 4.2.0 packaging/discovery passes **23 cases**, excluding only
+  the V30 test class. The current and published smoke runs contain **62** and
+  **16** rows, and their comparison preserves the exact expected coverage.
+  Fresh Central-only artifact provenance passes. Logs, JSON, Markdown,
+  environment sidecars, copied test XML and shaded jars are retained under
+  `target/release-evidence/v30/priority12/`.
+- Documentation/configuration-metadata checks pass **101 cases** with zero
+  failures/errors/skips; reactor validation and diff checks pass. Command
+  records, the working-tree patch/source copies and SHA-256 inventory accompany
+  the reports rather than attributing these dirty-tree runs to a clean commit.
+- Seven short GC-profiler rows separate transient B/op from average time.
+  A bounded JFR run passes the four new harness cases; its allocation samples
+  are not exact object/retained-memory measurements. Repeated proxy saturation
+  makes **2,000 rejected calls per telemetry mode** while two callers retain
+  one source, and sampled rejected context objects collect before release.
+  The separately rerun ownership suite passes **25 cases**, including
+  reference-queue and bounded scheduler/task checks. Admission uses fixed
+  policy counters, not a capacity queue or an active-owner scan; immutable
+  selection validation still costs an interface-method traversal on invocation.
+- Exact release commands are in
+  [the benchmark guide](../../docs/22-benchmarks.md#v30-active-work-performance-and-allocation-audit):
+  `bash scripts/run-v30-benchmarks.sh current`, then `baseline`, then `compare`.
+  The wrapper requires one clean commit, fresh output/baseline directories,
+  successful runs, exact mode/parameter coverage, two forks, five warmups/
+  measurements, allocation metrics and Central provenance. It preserves root
+  evidence across module cleanup. Coverage-verifier self-tests pass three
+  cases, and the dirty-tree guard rejects this uncommitted checkout.
+- These initial dirty-tree checks establish harness and bounded ownership
+  evidence only. The clean manual runs and disposition below close 12.3.
+
+### Manual release evidence and disposition
+
+- **Priority 12 completed on 2026-09-11.** The user executed all three commands
+  at reachable clean commit `ad87b60fa4daa144b6a01fa258932747f4288284`.
+  Both runs exited zero and all four before/after worktree-status files are
+  empty. Current `4.3.0-SNAPSHOT` ran from `2026-09-10T19:39:04Z` to
+  `20:14:46Z`; published `4.2.0` ran from `20:15:28Z` to `20:34:39Z`.
+  Comparison completed at `20:35:08Z`. These are September 11 local runs
+  (UTC+07:00), separate from the earlier smoke/JFR evidence.
+- Revalidated **62 current / 16 baseline** rows, **16 matched / 46 current-only /
+  zero baseline-only**, both telemetry parameter values, units, GC allocation,
+  thread counts, two forks and five measured samples per fork. Each mode has
+  five warmups; shared cache-disabled iterations are ten seconds, V29/V30
+  iterations one second, identically configured for matching rows.
+- Machine/toolchain and dependency versions match: Intel i7-1165G7, eight
+  logical processors, Linux amd64, Maven `3.9.9`, GraalVM JDK `25.0.3`,
+  Boot `4.0.0`, WebFlux `7.0.1`, Reactor Netty `1.3.0`, Netty
+  `4.2.7.Final`, Jackson `3.0.2`, Micrometer `1.16.0` and OTel `1.55.0`.
+  Live CPU scaling and memory/swap readings differ; sustained host isolation
+  and thermal behavior are not proven by those snapshots.
+- All retained `release-sha256.txt` entries and Central starter POM/jar hashes
+  verify. Immutable JSON, environment sidecars, logs, coverage, shaded jars and
+  `benchmark-comparison.md` remain under `target/release-evidence/v30/priority12/`.
+  [The audit](PERFORMANCE-ALLOCATION-AUDIT.md#manual-release-review) records
+  durable report/jar hashes and the five affected method groups.
+- **No public performance claim.** The comparison contains **16 informational
+  review flags**, not a regression-free pass. Publisher creation is slower,
+  and several allocation rows increase; the audit preserves the deltas,
+  uncertainty and optional-path validation cost. All 46 new-only rows were
+  reviewed as feature workloads, not fabricated release-to-release ratios.
+  No report is promoted or numerical marketing wording added. This completes
+  evidence review, not native verification or V30 release approval; Priority
+  13 still requires final-cut evidence and disposition.
 
 ---
 
