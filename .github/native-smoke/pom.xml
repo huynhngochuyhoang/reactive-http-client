@@ -23,6 +23,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.github.huynhngochuyhoang</groupId>
             <artifactId>reactive-http-client-starter</artifactId>
             <version>${reactive-http-client.version}</version>

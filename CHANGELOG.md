@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Cache work-limit mock and consumer parity.** The V30 helper adds immutable
+  `cacheWorkSnapshot()` and ordinary-clock `withCacheObservability()` controls,
+  retaining cumulative test evidence after close without changing the published
+  `CacheSnapshot` constructor. Gated GET/semantic-POST consumer and AOT fixtures
+  cover saturation, single flight, refresh skips, reuse, overrides, and shutdown.
+  The native fixture includes independent caller deadlines; clean-commit native
+  executable evidence remains a separate gate.
 - **Optional per-policy cache work limits.** The V30 development line enforces
   explicit caller and foreground-load limits, plus a separate refresh limit
   when refresh is selected. Saturated foreground work fails before preparation
@@ -36,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   timeout default, replay permission, or public telemetry surface.
 
 ### Fixed
+- **Refresh shutdown outcome.** Record cancellation before the shutdown signal
+  can complete a pending refresh source, preserving once-only terminal history
+  in test helpers that retain evidence after production meters are removed.
 - **Cache work reservation cleanup under terminal races.** Cancellation now
   brackets upstream cleanup directly, so a simultaneous success or error cannot
   strand a foreground-load or refresh slot. Work-limit installation and the

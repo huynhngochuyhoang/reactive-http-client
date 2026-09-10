@@ -133,6 +133,32 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
                 snapshot.closed());
     }
 
+    /** Limited-policy aggregates and cumulative test evidence, available with either cache clock after close. */
+    public CacheWorkSnapshot cacheWorkSnapshot() {
+        requireCacheControl();
+        var work = cacheControl.workSnapshot();
+        return new CacheWorkSnapshot(work.selection(), work.state(), work.limitedPolicyCount(),
+                work.maximumCallers(), work.maximumLoads(), work.maximumRefreshes(),
+                work.activeCallers(), work.activeLoads(), work.activeRefreshes(),
+                work.callerCounts(), work.loadCounts(), work.rejectionCounts(), work.refreshSkipCounts(), work.closed());
+    }
+
+    /** Counts overlap and exclude unbounded policies; null means the dimension is not selected. */
+    public record CacheWorkSnapshot(String selection, String state, int limitedPolicyCount,
+                                    Long maximumCallers, Long maximumLoads, Long maximumRefreshes,
+                                    Long activeCallers, Long activeLoads, Long activeRefreshes,
+                                    Map<String, Map<String, Long>> callerCounts,
+                                    Map<String, Map<String, Long>> loadCounts,
+                                    Map<String, Map<String, Long>> rejectionCounts,
+                                    Map<String, Map<String, Long>> refreshSkipCounts, boolean closed) {
+        public CacheWorkSnapshot {
+            callerCounts = CacheSnapshot.deepCopy(callerCounts);
+            loadCounts = CacheSnapshot.deepCopy(loadCounts);
+            rejectionCounts = CacheSnapshot.deepCopy(rejectionCounts);
+            refreshSkipCounts = CacheSnapshot.deepCopy(refreshSkipCounts);
+        }
+    }
+
     /** Returns the number of in-process downstream loads recorded by this mock. */
     public int loadCount() {
         return exchanges.size();
@@ -156,9 +182,9 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
     }
 
     private void requireCacheControl() {
-        if (cacheTickerNanos == null || cacheControl == null) {
+        if (cacheControl == null) {
             throw new IllegalStateException(
-                    "Deterministic cache time was not enabled on this mock builder");
+                    "No response-cache policy is selected on this mock client");
         }
     }
 
@@ -406,6 +432,12 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
             return this;
         }
 
+        /** Captures cache terminal/rejection/skip evidence without changing the cache clock or selecting caching. */
+        public Builder<T> withCacheObservability() {
+            observabilityConfig.getCache().setEnabled(true);
+            return this;
+        }
+
         /** Defines one inert local-cache policy and enables deterministic cache time. */
         public Builder<T> cachePolicy(String policyName, Duration ttl, long maximumSize) {
             return cachePolicy(policyName, ttl, maximumSize, null);
@@ -542,112 +574,119 @@ public final class MockReactiveHttpClient<T> implements AutoCloseable {
             if (syntheticAuthProvider) {
                 clientConfig.setAuthProvider("mock-auth-provider");
             }
+            StaticApplicationContext appCtx = new StaticApplicationContext();
+            MockResponseCacheSupport.Control cacheControl = null;
+            boolean built = false;
             try {
                 methodMetadataCache.validateDeclarativeRequestParameters(clientInterface, clientName);
                 methodMetadataCache.validateDeclarativeUriTemplates(clientInterface, clientName, clientConfig.getApis());
                 methodMetadataCache.validateDeclarativeReturnTypes(clientInterface, clientName);
                 methodMetadataCache.validateDeclarativeCachePolicies(clientInterface, clientName, clientConfig);
-            }
-            catch (RuntimeException | Error failure) {
-                if (syntheticAuthProvider) {
-                    clientConfig.setAuthProvider(originalAuthProvider);
-                }
-                throw failure;
-            }
 
-            List<RecordedExchange> exchanges = new CopyOnWriteArrayList<>();
-            List<Matcher> liveMatchers = new CopyOnWriteArrayList<>(matchers);
-            AtomicReference<ClientResponse> fallbackRef = new AtomicReference<>(fallback);
+                List<RecordedExchange> exchanges = new CopyOnWriteArrayList<>();
+                List<Matcher> liveMatchers = new CopyOnWriteArrayList<>(matchers);
+                AtomicReference<ClientResponse> fallbackRef = new AtomicReference<>(fallback);
 
-            ExchangeFunction exchangeFunction = request -> Mono.deferContextual(contextView -> {
-                RequestContextSnapshot contextSnapshot = RequestContextSnapshot.capture(contextView);
-                MockClientHttpRequest materialized = new MockClientHttpRequest(
-                        request.method(), URI.create(request.url().toString()));
-                return request.writeTo(materialized, ExchangeStrategies.withDefaults())
-                        .then(Mono.fromCallable(() -> {
-                            RecordedExchange requestExchange = new RecordedExchange(
-                                    request.method(),
-                                    URI.create(request.url().toString()),
-                                    materialized,
-                                    contextSnapshot,
-                                    null);
-                            exchanges.add(requestExchange);
-                            ClientResponse response = fallbackRef.get();
-                            for (Matcher matcher : liveMatchers) {
-                                if (matcher.predicate.test(requestExchange)) {
-                                    response = matcher.handler.apply(requestExchange);
-                                    break;
+                ExchangeFunction exchangeFunction = request -> Mono.deferContextual(contextView -> {
+                    RequestContextSnapshot contextSnapshot = RequestContextSnapshot.capture(contextView);
+                    MockClientHttpRequest materialized = new MockClientHttpRequest(
+                            request.method(), URI.create(request.url().toString()));
+                    return request.writeTo(materialized, ExchangeStrategies.withDefaults())
+                            .then(Mono.fromCallable(() -> {
+                                RecordedExchange requestExchange = new RecordedExchange(
+                                        request.method(),
+                                        URI.create(request.url().toString()),
+                                        materialized,
+                                        contextSnapshot,
+                                        null);
+                                exchanges.add(requestExchange);
+                                ClientResponse response = fallbackRef.get();
+                                for (Matcher matcher : liveMatchers) {
+                                    if (matcher.predicate.test(requestExchange)) {
+                                        response = matcher.handler.apply(requestExchange);
+                                        break;
+                                    }
                                 }
+                                exchanges.set(exchanges.indexOf(requestExchange), new RecordedExchange(
+                                        request.method(),
+                                        URI.create(request.url().toString()),
+                                        materialized,
+                                        contextSnapshot,
+                                        response.statusCode()));
+                                return response;
+                            }));
+                });
+
+                WebClient.Builder webClientBuilder = WebClient.builder()
+                        .baseUrl(baseUrl)
+                        .exchangeFunction(exchangeFunction);
+                if (authProvider != null) {
+                    webClientBuilder.filter(new OutboundAuthFilter(clientName, authProvider));
+                }
+                WebClient webClient = webClientBuilder
+                        .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
+                        .build();
+
+                appCtx.getDefaultListableBeanFactory().setDependencyComparator(AnnotationAwareOrderComparator.INSTANCE);
+                int exchangeLoggerIndex = 0;
+                for (HttpExchangeLogger exchangeLogger : exchangeLoggers.values()) {
+                    appCtx.getBeanFactory().registerSingleton(
+                            "mockHttpExchangeLogger" + exchangeLoggerIndex++, exchangeLogger);
+                }
+                List<HttpClientCacheOutcome> cacheOutcomes = new CopyOnWriteArrayList<>();
+                appCtx.getBeanFactory().registerSingleton("mockCacheOutcomeObserver",
+                        (HttpClientObserver) event -> {
+                            if (event.getCacheOutcome() != null) {
+                                cacheOutcomes.add(event.getCacheOutcome());
                             }
-                            exchanges.set(exchanges.indexOf(requestExchange), new RecordedExchange(
-                                    request.method(),
-                                    URI.create(request.url().toString()),
-                                    materialized,
-                                    contextSnapshot,
-                                    response.statusCode()));
-                            return response;
-                        }));
-            });
+                        });
+                if (observer != null) {
+                    appCtx.getBeanFactory().registerSingleton("mockHttpClientObserver", observer);
+                }
+                for (int i = 0; i < lifecycleHooks.size(); i++) {
+                    appCtx.getBeanFactory().registerSingleton("mockReactiveHttpClientLifecycleHook" + i, lifecycleHooks.get(i));
+                }
+                appCtx.refresh();
+                methodMetadataCache.validateDeclarativeCacheCustomizations(
+                        appCtx, clientInterface, clientName, clientConfig);
 
-            WebClient.Builder webClientBuilder = WebClient.builder()
-                    .baseUrl(baseUrl)
-                    .exchangeFunction(exchangeFunction);
-            if (authProvider != null) {
-                webClientBuilder.filter(new OutboundAuthFilter(clientName, authProvider));
-            }
-            WebClient webClient = webClientBuilder
-                    .filter(ReactiveClientInvocationHandler.finalRequestObservationFilter())
-                    .build();
+                ReactiveHttpClientJsonCodec effectiveJsonCodec = jsonCodec;
+                if (authProvider != null) {
+                    if (effectiveJsonCodec == null) {
+                        effectiveJsonCodec = new MockJsonCodecFactory().create();
+                    }
+                }
 
-            StaticApplicationContext appCtx = new StaticApplicationContext();
-            appCtx.getDefaultListableBeanFactory().setDependencyComparator(AnnotationAwareOrderComparator.INSTANCE);
-            int exchangeLoggerIndex = 0;
-            for (HttpExchangeLogger exchangeLogger : exchangeLoggers.values()) {
-                appCtx.getBeanFactory().registerSingleton(
-                        "mockHttpExchangeLogger" + exchangeLoggerIndex++, exchangeLogger);
-            }
-            List<HttpClientCacheOutcome> cacheOutcomes = new CopyOnWriteArrayList<>();
-            appCtx.getBeanFactory().registerSingleton("mockCacheOutcomeObserver",
-                    (HttpClientObserver) event -> {
-                        if (event.getCacheOutcome() != null) {
-                            cacheOutcomes.add(event.getCacheOutcome());
-                        }
-                    });
-            if (observer != null) {
-                appCtx.getBeanFactory().registerSingleton("mockHttpClientObserver", observer);
-            }
-            for (int i = 0; i < lifecycleHooks.size(); i++) {
-                appCtx.getBeanFactory().registerSingleton("mockReactiveHttpClientLifecycleHook" + i, lifecycleHooks.get(i));
-            }
-            appCtx.refresh();
-            methodMetadataCache.validateDeclarativeCacheCustomizations(
-                    appCtx, clientInterface, clientName, clientConfig);
+                LongSupplier cacheTicker = cacheTickerNanos != null
+                        ? cacheTickerNanos::get
+                        : System::nanoTime;
+                MockResponseCacheSupport.Session cacheSession = MockResponseCacheSupport.create(
+                        webClient, methodMetadataCache, clientConfig, clientName, clientInterface,
+                        appCtx, resilienceOperatorApplier, effectiveJsonCodec, observabilityConfig,
+                        authProvider, baseUrl, cacheTicker);
+                ReactiveClientInvocationHandler handler = cacheSession.handler();
+                cacheControl = cacheSession.control();
 
-            ReactiveHttpClientJsonCodec effectiveJsonCodec = jsonCodec;
-            if (authProvider != null) {
-                if (effectiveJsonCodec == null) {
-                    effectiveJsonCodec = new MockJsonCodecFactory().create();
+                @SuppressWarnings("unchecked")
+                T proxy = (T) Proxy.newProxyInstance(
+                        clientInterface.getClassLoader(),
+                        new Class<?>[]{clientInterface},
+                        handler);
+
+                MockReactiveHttpClient<T> result = new MockReactiveHttpClient<>(proxy, exchanges, liveMatchers, fallbackRef,
+                        cacheControl, cacheTickerNanos, cacheOutcomes, appCtx);
+                built = true;
+                return result;
+            } finally {
+                if (!built) {
+                    try {
+                        if (cacheControl != null) { cacheControl.close(); }
+                    } finally {
+                        appCtx.close();
+                        if (syntheticAuthProvider) { clientConfig.setAuthProvider(originalAuthProvider); }
+                    }
                 }
             }
-
-            LongSupplier cacheTicker = cacheTickerNanos != null
-                    ? cacheTickerNanos::get
-                    : System::nanoTime;
-            MockResponseCacheSupport.Session cacheSession = MockResponseCacheSupport.create(
-                    webClient, methodMetadataCache, clientConfig, clientName, clientInterface,
-                    appCtx, resilienceOperatorApplier, effectiveJsonCodec, observabilityConfig,
-                    authProvider, baseUrl, cacheTicker);
-            ReactiveClientInvocationHandler handler = cacheSession.handler();
-            MockResponseCacheSupport.Control cacheControl = cacheSession.control();
-
-            @SuppressWarnings("unchecked")
-            T proxy = (T) Proxy.newProxyInstance(
-                    clientInterface.getClassLoader(),
-                    new Class<?>[]{clientInterface},
-                    handler);
-
-            return new MockReactiveHttpClient<>(proxy, exchanges, liveMatchers, fallbackRef,
-                    cacheControl, cacheTickerNanos, cacheOutcomes, appCtx);
         }
     }
 

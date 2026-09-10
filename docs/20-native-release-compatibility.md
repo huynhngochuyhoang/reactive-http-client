@@ -822,6 +822,15 @@ Supported Boot 4 native-image path:
 - Diagnostics snapshot version metadata from the packaged Maven
   `pom.properties` resource.
 
+The V30 / `4.3.0-SNAPSHOT` fixture additionally exercises selected GET/count-only
+and semantic POST/weighted work limits: gated caller/load saturation, same-key
+attachment, released-slot reuse, refresh-capacity skips, a later caller surviving
+the first caller's deadline, and cancellation on factory close. Every loopback
+request is counted, including unmatched routes; bounded quiet periods check for
+late dispatch. Request/acquire deadlines exceed the shutdown observation window.
+JVM and generated-AOT runs validate fixture behavior but are not native-executable
+evidence; the V30 checklist keeps that gate open until a clean-commit compile/run.
+
 The scheduled smoke installs the default Boot 4 reactor, compiles the fixture,
 and runs the generated executable. Native compilation is bounded to 6 GiB and
 four worker threads so the fixture remains usable on modest CI and developer
