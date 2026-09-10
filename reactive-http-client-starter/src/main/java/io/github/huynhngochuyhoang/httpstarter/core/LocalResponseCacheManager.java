@@ -206,22 +206,31 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 Objects.requireNonNull(metrics, "metrics"),
                 cacheObservabilityEnabled,
                 clientName);
-        manager.configureWork(CacheWorkPolicy.freeze(clientInterface, clientName, metadataCache, clientConfig));
-        manager.validateWorkWith(CacheWorkPolicy.validator(manager.workSelection, clientInterface, metadataCache, clientConfig));
-        for (Method method : clientInterface.getMethods()) {
-            if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
-                continue;
+        try {
+            manager.configureWork(CacheWorkPolicy.freeze(clientInterface, clientName, metadataCache, clientConfig));
+            manager.validateWorkWith(CacheWorkPolicy.validator(manager.workSelection, clientInterface, metadataCache, clientConfig));
+            for (Method method : clientInterface.getMethods()) {
+                if (method.isDefault() || !Modifier.isAbstract(method.getModifiers())) {
+                    continue;
+                }
+                RequestPlan plan = RequestPlan.from(metadataCache.get(method), clientInterface);
+                EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.decide(
+                        plan, clientConfig, EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig));
+                if (decision.cacheable()) {
+                    EffectiveCachePolicy.Selection selection = decision.selection();
+                    manager.cache(selection, clientName);
+                    manager.metrics.registerApi(plan.apiName());
+                }
             }
-            RequestPlan plan = RequestPlan.from(metadataCache.get(method), clientInterface);
-            EffectiveCachePolicy.Decision decision = EffectiveCachePolicy.decide(
-                    plan, clientConfig, EffectiveCachePolicy.effectiveHttpMethod(plan, clientConfig));
-            if (decision.cacheable()) {
-                EffectiveCachePolicy.Selection selection = decision.selection();
-                manager.cache(selection, clientName);
-                manager.metrics.registerApi(plan.apiName());
+            return manager;
+        } catch (RuntimeException | Error failure) {
+            try {
+                manager.close();
+            } catch (RuntimeException | Error cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
             }
+            throw failure;
         }
-        return manager;
     }
 
     static LocalResponseCacheManager testing(LongSupplier ticker) {
@@ -511,7 +520,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
         }
 
         FlightKey refreshKey = new FlightKey(cache, key);
-        InFlightRefresh refresh = new InFlightRefresh(refreshKey, cache, token, refreshState, apiName);
+        InFlightRefresh refresh = new InFlightRefresh(refreshKey, cache, token, refreshState, apiName, policyName);
         boolean rejected;
         LocalResponseCacheMetrics.RefreshSkipReason skip = LocalResponseCacheMetrics.RefreshSkipReason.ENTRY_UNAVAILABLE;
         synchronized (inFlightRefreshes) {
@@ -567,6 +576,13 @@ final class LocalResponseCacheManager implements AutoCloseable {
             if (!refresh.cache.isRefreshCurrent(refresh.refreshToken)) {
                 cancelRefresh(refresh.key);
                 return Mono.empty();
+            }
+            synchronized (inFlightRefreshes) {
+                if (refresh.terminal) {
+                    return Mono.empty();
+                }
+                // Loader assembly starts owned work; invalidation before this boundary is only a skip.
+                refresh.sourceStarted = true;
             }
             return ((Mono<Object>) loader.apply(refresh.loadState))
                     .flatMap(value -> CacheWorkAdmission.preparing(owner, () -> {
@@ -637,13 +653,19 @@ final class LocalResponseCacheManager implements AutoCloseable {
 
     private void recordRefreshOnce(InFlightRefresh refresh,
                                    LocalResponseCacheMetrics.WorkOutcome outcome) {
+        boolean skipped;
         synchronized (inFlightRefreshes) {
             if (refresh.outcomeRecorded) {
                 return;
             }
             refresh.outcomeRecorded = true;
+            skipped = refresh.terminal && !refresh.sourceStarted;
         }
-        recordRefresh(refresh.apiName, outcome, refresh.startedAtNanos);
+        if (skipped) {
+            metrics.refreshSkipped(refresh.policyName, LocalResponseCacheMetrics.RefreshSkipReason.ENTRY_UNAVAILABLE);
+        } else {
+            recordRefresh(refresh.apiName, outcome, refresh.startedAtNanos);
+        }
     }
 
     private void finishRefresh(InFlightRefresh refresh) {
@@ -1432,8 +1454,10 @@ final class LocalResponseCacheManager implements AutoCloseable {
         private final LocalResponseCache.RefreshToken refreshToken;
         private final SubscriptionReportingState loadState;
         private final String apiName;
+        private final String policyName;
         private final long startedAtNanos = System.nanoTime();
         private Disposable sourceSubscription;
+        private boolean sourceStarted;
         private boolean terminal;
         private boolean outcomeRecorded;
         private CacheWorkAdmission.Reservation reservation;
@@ -1442,12 +1466,14 @@ final class LocalResponseCacheManager implements AutoCloseable {
                                 LocalResponseCache cache,
                                 LocalResponseCache.RefreshToken refreshToken,
                                 SubscriptionReportingState loadState,
-                                String apiName) {
+                                String apiName,
+                                String policyName) {
             this.key = key;
             this.cache = cache;
             this.refreshToken = refreshToken;
             this.loadState = loadState;
             this.apiName = apiName;
+            this.policyName = policyName;
         }
     }
 

@@ -948,6 +948,32 @@ Priority 4 evidence (2026-09-08):
 
 ---
 
+### Priority 9 lifecycle follow-up (2026-09-10)
+
+- Revalidated against reachable base
+  `53a6e2a7ba894a56f7fe1a8031abe3309b29789f` plus this working tree.
+  Failed manager construction now closes its partial cache/meter ownership,
+  preserving other live owners and the original construction error.
+- Refresh invalidation before loader assembly records one `entry_unavailable`
+  skip, even after token/slot acquisition. It releases reservations and tokens
+  without a terminal refresh counter or duration; cancellation after loader
+  assembly starts retains terminal accounting. The once-only outcome guard
+  also covers removal callbacks racing subscription setup.
+- Seven new `CacheWorkTelemetryContractTest` cases reproduce both findings
+  before the fix (seven failures, no errors). Two cover repeated missing-Caffeine
+  creation with/without a live meter owner; five cover invalidation after token
+  creation, replacement, hard expiry, the final pre-loader check, and eviction
+  callbacks. Existing cancellation-during-assembly coverage remains passing.
+- Final complete regression: **1,679 tests** (**1,557** starter, **66** helper,
+  **56** OTel), zero failures/errors/skips, completed at
+  `2026-09-10T08:59:37+07:00`:
+  `mvn -B -ntp -pl reactive-http-client-test,reactive-http-client-otel -am -l target/release-evidence/v30/priority9/lifecycle-followup/complete-tests.log test`.
+  Reproduction, focused regression, copied XML, source patch and checksums are
+  retained under `target/release-evidence/v30/priority9/lifecycle-followup/`.
+  Earlier Priority 9 totals describe the preceding implementation.
+
+---
+
 ## Priority 10 - Mock, Consumer, AOT, and Native Parity
 
 ### [ ] 10.1 Extend deterministic mock ownership controls

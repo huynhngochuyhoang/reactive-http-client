@@ -205,7 +205,12 @@ source. A source can perform zero, one, or multiple wire dispatches. A refresh
 is independent of foreground capacity. Reservations remain active through
 entered synchronous cleanup, even after a downstream terminal signal.
 Skipped refreshes never increment terminal `refreshes` or duration; their
-caller stays `STALE_HIT`. Rejected callers increment `callers` with the new
+caller stays `STALE_HIT`. Invalidation or hard expiry before refresh loader
+assembly starts records one `entry_unavailable` skip, including after reserving
+a refresh slot. Cancellation after loader assembly begins remains a terminal
+refresh cancellation. Failed cache-manager construction releases its meter
+ownership without removing another live owner's registrations.
+Rejected callers increment `callers` with the new
 `CALLER_REJECTED` / `LOAD_REJECTED` outcomes when cache observability is selected,
 but neither is a lookup hit or a started load.
 

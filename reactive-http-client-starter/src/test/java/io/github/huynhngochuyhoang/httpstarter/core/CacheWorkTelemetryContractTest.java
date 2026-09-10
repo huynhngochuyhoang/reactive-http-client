@@ -40,6 +40,122 @@ class CacheWorkTelemetryContractTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    void failedCacheConstructionReleasesMetersWithoutAffectingLiveOwners(boolean liveOwner) {
+        ClassLoader withoutCaffeine = new ClassLoader(getClass().getClassLoader()) {
+            @Override protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                if (name.startsWith("com.github.benmanes.caffeine")) { throw new ClassNotFoundException(name); }
+                return super.loadClass(name, resolve);
+            }
+        };
+        var config = CacheWorkPolicyEnforcementTest.config(true);
+        var scheduler = VirtualTimeScheduler.create();
+        try (var registry = new Registry();
+             var existing = liveOwner ? new Fixture(registry, true, false, 3) : null) {
+            var metersBefore = List.copyOf(registry.getMeters());
+            for (int attempt = 0; attempt < 3; attempt++) {
+                try (var metrics = LocalResponseCacheMetrics.enabled(registry, "work")) {
+                    assertThatThrownBy(() -> LocalResponseCacheManager.createForClient(
+                            Client.class, "work", new MethodMetadataCache(), config, withoutCaffeine,
+                            () -> 0, scheduler, metrics, true))
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessageContaining("com.github.ben-manes.caffeine:caffeine");
+                    assertThat(registry.getMeters()).containsExactlyInAnyOrderElementsOf(metersBefore);
+                    if (liveOwner) { assertGauge(registry, ".work.maximum.callers", 3); }
+                    assertThat(metrics.enabled()).isFalse();
+                }
+            }
+            if (existing != null) {
+                assertThat(existing.client.get("one").block()).isEqualTo("value");
+                existing.close();
+                assertThat(registry.getMeters()).noneMatch(m -> m.getId().getName().startsWith(PREFIX));
+            }
+        } finally { scheduler.dispose(); }
+    }
+
+    enum PreStartInvalidation { AFTER_TOKEN, REPLACEMENT, DEADLINE, BEFORE_LOADER, EVICTION_CALLBACK }
+
+    @ParameterizedTest
+    @EnumSource(PreStartInvalidation.class)
+    @SuppressWarnings("unchecked")
+    void invalidationBeforeRefreshStartsIsOneSkipNotATerminal(PreStartInvalidation phase) throws Exception {
+        var config = CacheWorkPolicyEnforcementTest.config(true);
+        var clock = new AtomicLong();
+        var scheduler = VirtualTimeScheduler.create();
+        try (var registry = new Registry();
+             var manager = LocalResponseCacheManager.createForClient(
+                     Client.class, "work", new MethodMetadataCache(), config, getClass().getClassLoader(),
+                     clock::get, scheduler, LocalResponseCacheMetrics.enabled(registry, "work"), true)) {
+            var selection = new EffectiveCachePolicy.Selection(true, EffectiveCachePolicy.Source.CLIENT,
+                    "work", config.getCache().getPolicies().get("work"));
+            var key = CacheKeyContract.OpaqueKey.from(new byte[]{1});
+            assertThat(manager.getOrLoad(selection, key, () -> Mono.just("old")).block()).isEqualTo("old");
+            clock.set(Duration.ofSeconds(2).toNanos());
+            var field = LocalResponseCacheManager.class.getDeclaredField("caches");
+            field.setAccessible(true);
+            var caches = (Map<Object, LocalResponseCache>) field.get(manager);
+            var entry = caches.entrySet().iterator().next();
+            var cache = entry.getValue();
+            var checks = new AtomicInteger();
+            var triggered = new AtomicInteger();
+            // Intercept storage boundaries without adding production scheduling hooks.
+            entry.setValue((LocalResponseCache) Proxy.newProxyInstance(getClass().getClassLoader(),
+                    new Class<?>[]{LocalResponseCache.class}, (proxy, method, args) -> {
+                        if (method.getName().equals("beginRefresh")) {
+                            Object token = method.invoke(cache, args);
+                            assertThat(token).isNotNull();
+                            if (phase == PreStartInvalidation.AFTER_TOKEN) {
+                                triggered.incrementAndGet();
+                                cache.invalidateAll();
+                            } else if (phase == PreStartInvalidation.REPLACEMENT) {
+                                triggered.incrementAndGet();
+                                var replacement = cache.beginRefresh(cache.lookup(key).entryToken());
+                                cache.publishRefresh(replacement, "replacement");
+                                cache.finishRefresh(replacement);
+                            }
+                            return token;
+                        }
+                        if (method.getName().equals("hardExpiryRemainingNanos")
+                                && phase == PreStartInvalidation.DEADLINE) {
+                            triggered.incrementAndGet();
+                            clock.set(Duration.ofMillis(selection.policy().getTtlMs()).toNanos());
+                        }
+                        if (method.getName().equals("isRefreshCurrent")) {
+                            int check = checks.incrementAndGet();
+                            if (phase == PreStartInvalidation.BEFORE_LOADER && check == 2) {
+                                triggered.incrementAndGet();
+                                cache.invalidateAll();
+                            } else if (phase == PreStartInvalidation.EVICTION_CALLBACK && check == 1) {
+                                triggered.incrementAndGet();
+                                manager.evictAllForTesting();
+                            }
+                        }
+                        return method.invoke(cache, args);
+                    }));
+            var assemblies = new AtomicInteger();
+            var subscriptions = new AtomicInteger();
+            assertThat(manager.getOrLoad(selection, key, () -> {
+                assemblies.incrementAndGet();
+                return Mono.defer(() -> { subscriptions.incrementAndGet(); return Mono.just("unexpected"); });
+            }).block()).isEqualTo("old");
+            assertThat(triggered).hasValue(1);
+            assertThat(assemblies).hasValue(0);
+            assertThat(subscriptions).hasValue(0);
+            assertCounter(registry, ".refresh.skips", "reason", "entry_unavailable", 1);
+            assertThat(registry.find(PREFIX + ".refreshes").counters()).allSatisfy(c -> assertThat(c.count()).isZero());
+            assertThat(registry.find(PREFIX + ".refresh.duration").timers()).allSatisfy(t -> assertThat(t.count()).isZero());
+            assertGauge(registry, ".work.active.refreshes", 0);
+            assertThat(manager.workloadSnapshotForTesting().inFlightRefreshes()).isZero();
+            var generations = CaffeineLocalResponseCache.class.getDeclaredField("generations");
+            generations.setAccessible(true);
+            assertThat(((Map<?, ?>) generations.get(cache)).values()).allSatisfy(state ->
+                    assertThat(state).extracting("activeLoads", "activeRefreshes").containsExactly(0, 0));
+            cache.invalidateAll();
+            assertThat((Map<?, ?>) generations.get(cache)).isEmpty();
+        } finally { scheduler.dispose(); }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void limitedOwnersAggregateGaugesAndHistoryUntilLastClose(boolean weighted) {
         try (var registry = new Registry(); var first = new Fixture(registry, true, weighted, 2);
              var second = new Fixture(registry, true, weighted, 3)) {
