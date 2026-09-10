@@ -61,6 +61,12 @@
   <profile>
    <id>v30-current-parity</id>
    <activation><property><name>consumer.v30.parity</name><value>true</value></property></activation>
+   <dependencies>
+    <dependency>
+     <groupId>com.github.ben-manes.caffeine</groupId>
+     <artifactId>caffeine</artifactId>
+    </dependency>
+   </dependencies>
    <build><plugins><plugin>
     <groupId>org.codehaus.mojo</groupId><artifactId>build-helper-maven-plugin</artifactId><version>3.6.1</version>
     <executions><execution><id>add-v30-test-source</id><phase>generate-test-sources</phase>

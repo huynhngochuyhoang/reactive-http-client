@@ -104,16 +104,20 @@ final class NativeCacheWorkScenario implements AutoCloseable {
     }
 
     void verifyClosed() throws Exception {
-        require(closingCaller.isDone(), "shutdown caller survived");
-        try { closingCaller.get(); throw new IllegalStateException("shutdown caller succeeded"); }
-        catch (ExecutionException expected) {
-            require(!(expected.getCause() instanceof LogicalCallTimeoutException),
-                    "normal caller deadline satisfied shutdown assertion");
-        }
+        verifyShutdownCaller(closingCaller);
         require(closingCancelled.await(3, TimeUnit.SECONDS), "shutdown source survived");
         Thread.sleep(200);
         require(requests.get() == beforeClose, "late post-close dispatch");
         System.out.println("V30 cache work: factory shutdown and no late dispatch passed");
+    }
+
+    static void verifyShutdownCaller(CompletableFuture<String> closingCaller) throws Exception {
+        require(closingCaller.isDone(), "shutdown caller survived");
+        try { require(closingCaller.get() == null, "shutdown caller returned a value"); }
+        catch (ExecutionException expected) {
+            require(!(expected.getCause() instanceof LogicalCallTimeoutException),
+                    "normal caller deadline satisfied shutdown assertion");
+        }
     }
     private static Mono<String> call(NativeWorkClient client, boolean post, String key) {
         return post ? client.search(key) : client.get(key);

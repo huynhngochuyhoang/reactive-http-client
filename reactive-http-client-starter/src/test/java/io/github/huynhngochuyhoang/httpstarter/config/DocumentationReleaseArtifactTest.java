@@ -1933,6 +1933,18 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v30ConsumerProfileDeclaresItsOwnRuntimeCacheDependency() throws Exception {
+        var factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        var document = factory.newDocumentBuilder().parse(projectRoot().resolve(".github/boot4-consumer/pom.xml").toFile());
+        var xpath = javax.xml.xpath.XPathFactory.newInstance().newXPath();
+        assertThat((Double) xpath.evaluate("count(/project/profiles/profile[id='v30-current-parity']"
+                        + "/dependencies/dependency[groupId='com.github.ben-manes.caffeine' and artifactId='caffeine'"
+                        + " and (not(scope) or scope='compile' or scope='runtime') and not(optional='true')])",
+                document, javax.xml.xpath.XPathConstants.NUMBER)).isEqualTo(1.0);
+    }
+
+    @Test
     void post3AdoptionGuidanceUsesPublishedCoordinatesAndAuthoritativeCommands() throws IOException {
         Path root = projectRoot();
         String migration = Files.readString(root.resolve("docs/28-spring-boot-4-jackson-migration.md"));

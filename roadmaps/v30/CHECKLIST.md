@@ -1085,6 +1085,34 @@ Priority 4 evidence (2026-09-08):
 
 ---
 
+### Priority 10 parity follow-up (2026-09-10)
+
+- Revalidated against reachable base
+  `0f759d720e0a7151b1b1acaa38d983cdfa0ee0a5` plus this working tree.
+  The earlier complete-run totals describe the preceding revision.
+- The V30 consumer profile now declares Caffeine directly. Its standalone
+  `-Dconsumer.v30.parity=true -Dtest=Boot4CacheWorkConsumerTest clean test`
+  run passes **2 cases**, and the runtime dependency tree includes Caffeine
+  without activating V29. A parsed-POM regression checks that dependency's scope.
+- A deterministic close-between-snapshots test failed before the fix and passes
+  afterward. Selected work derives closure from its captured state; absent
+  work retains its separate manager-closure flag. Existing helper constructors,
+  observability, and cache ownership tests remain green.
+- Shutdown verification accepts an empty completion, still rejects a returned
+  value, pending caller, or logical-timeout completion, and retains server-side
+  cancellation and no-late-dispatch checks. Five fixture unit cases pass; the
+  empty-completion case failed before the fix. Ordinary JVM and regenerated
+  Spring AOT JVM smoke runs both pass. This is not native-executable evidence.
+- Focused regression: **118 tests** (**47 documentation, 71 helper**), zero
+  failures/errors/skips:
+  `mvn -B -ntp -pl reactive-http-client-test -am -Dtest=MockResponseCacheSupportTest,MockCacheWorkParityTest,MockReactiveHttpClientTest,Boot4MockReactiveHttpClientTest,DocumentationReleaseArtifactTest -Dsurefire.failIfNoSpecifiedTests=false test`.
+  Including the consumer and native-fixture unit cases gives **125 passing
+  JUnit cases**. Logs, copied XML, source patch and hashes are retained under
+  `target/release-evidence/v30/priority10/parity-follow-up/`.
+  The clean-commit native compile/run gate above remains open.
+
+---
+
 ## Priority 11 - Operations and Support-Bundle Evidence
 
 ### [ ] 11.1 Publish practical saturation and recovery guidance

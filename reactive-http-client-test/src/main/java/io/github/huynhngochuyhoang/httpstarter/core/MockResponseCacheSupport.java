@@ -115,11 +115,14 @@ public final class MockResponseCacheSupport {
 
         public WorkSnapshot workSnapshot() {
             CacheWorkSnapshot work = manager.workSnapshot();
+            // Absent work has no lifecycle state; selected work already captured closure.
+            boolean closed = work.limitedPolicyCount() == 0
+                    ? manager.snapshot().closed() : "closed".equals(work.state());
             return new WorkSnapshot(work.selection(), work.state(), work.limitedPolicyCount(),
                     work.maximumCallers(), work.maximumLoads(), work.maximumRefreshes(),
                     work.activeCallers(), work.activeLoads(), work.activeRefreshes(),
                     metrics.counts(metrics.callers), metrics.counts(metrics.loads),
-                    metrics.counts(metrics.rejections), metrics.counts(metrics.skips), manager.snapshot().closed());
+                    metrics.counts(metrics.rejections), metrics.counts(metrics.skips), closed);
         }
 
         @Override
