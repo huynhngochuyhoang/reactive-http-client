@@ -411,8 +411,11 @@ retained bytes or heap/RSS. The separate bounded JFR/weak-reference audit in
 checks rejected contexts, active source ownership, cleanup and scheduler queues.
 Samples and forced-GC tests are not exhaustive allocation accounting or a
 production-GC guarantee. A benchmark-path change invalidates earlier numbers.
-Priority 12.3 stays open until clean current/baseline runs and the comparison
-are reviewed; smoke or a dirty-tree JFR capture alone cannot close it.
+Priority 12.3 was reviewed on 2026-09-11 at clean harness commit
+`ad87b60fa4daa144b6a01fa258932747f4288284` with a
+**no-public-performance-claim** disposition. The audit retains regression
+flags and measurement limits. This does not approve the final release;
+changed benchmark/runtime paths require fresh runs, not relabeled evidence.
 
 Release-quality runs write JMH JSON under:
 

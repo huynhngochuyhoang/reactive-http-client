@@ -1,12 +1,14 @@
 # V30 Performance and Allocation Audit
 
-Status: harness and bounded allocation/ownership audit implemented; manual
-release-quality measurements and their review remain open (Priority 12.3).
-No public performance claim.
+Status: Priority 12 complete, including the manual release-run review on
+2026-09-11. **No public performance claim.** Regression flags remain recorded;
+evidence completion is not final release approval.
 
-Evidence date: 2026-09-11. Reachable source base:
-`131a72481ea8ae4393a91ccae12e8695388d5a20`, plus this working-tree patch, not a
-clean release benchmark commit. Reactor `4.3.0-SNAPSHOT`, published starter/API
+Initial bounded evidence date: 2026-09-11. Reachable source base:
+`131a72481ea8ae4393a91ccae12e8695388d5a20`, plus the retained implementation
+patch, not a clean release benchmark commit. Subsequent manual runs use clean
+`ad87b60fa4daa144b6a01fa258932747f4288284` as detailed below.
+Reactor `4.3.0-SNAPSHOT`, published starter/API
 baseline `4.2.0`, Boot `4.0.0`, Maven `3.9.9`, GraalVM JDK `25.0.3`, Java target
 `21`. Historical V1-V29 measurements are not rewritten or promoted.
 
@@ -157,9 +159,12 @@ See `commands.md` and logs for commands, `source.patch`/`source/` for the
 working-tree implementation, and `sha256.txt` for evidence hashes. Local
 evidence is not a substitute for a reachable clean release commit.
 
-## Manual completion gate
+## Manual release review
 
-After committing this reviewed tree, execute from the same idle Linux machine:
+The user executed these commands at clean reachable commit
+`ad87b60fa4daa144b6a01fa258932747f4288284`; review completed 2026-09-11.
+The commands remain the reproducible entry points; preserve existing evidence
+before rerunning because the wrapper refuses occupied output/repository paths.
 
 ~~~bash
 bash scripts/run-v30-benchmarks.sh current
@@ -176,7 +181,94 @@ provenance, report inputs and hashes. Review both environment sidecars and the
 comparison, including every regression flag and the 46 new-only rows. A source
 or benchmark-path correction requires rerunning both measurements.
 
-Priority 12.3 stays open until these artifacts are available and reviewed,
-with either a supported versioned result or an explicit
-**no-public-performance-claim** disposition. Smoke/JFR results do not close it.
-No native, consumer, API, publication or final V30 release gate is closed here.
+### Provenance and coverage
+
+- Current command window: `2026-09-10T19:39:04Z` to `20:14:46Z`.
+  Baseline: `20:15:28Z` to `20:34:39Z`. Comparison: `20:35:08Z`.
+  Both commands exited zero, with empty before/after worktree-status files;
+  both sidecars identify the same harness commit and `smokeOnly=false`.
+  The local calendar date is September 11 (UTC+07:00).
+- Revalidated all 62 current and 16 published rows: 16 matched, 46 current-only,
+  zero missing baseline rows. Each result has two forks with five measurement
+  samples each and five warmup iterations, expected units, finite positive
+  scores and GC B/op. Both telemetry values occur for every new proxy method.
+  Only the saturated primitive uses four threads; every other row uses one.
+  Cache-disabled iterations are ten seconds in both runs; V29/V30 use one.
+- Same Intel i7-1165G7/eight logical CPUs, Linux amd64/kernel, Maven `3.9.9`,
+  GraalVM JDK `25.0.3` and JVM tuning flags. Both use Boot `4.0.0`, WebFlux
+  `7.0.1`, Reactor Netty `1.3.0`, Netty `4.2.7.Final`, Jackson `3.0.2`,
+  Micrometer `1.16.0` and OTel `1.55.0`. Expected differences are the starter
+  artifact version and dependency repository paths.
+- These are same-stack release-profile runs, not proof of a permanently idle
+  or thermally controlled host. CPU scaling snapshots differ (61%/65%), both
+  show occupied swap, and free/available memory varies. No sustained pressure,
+  governor or background-work trace establishes the cause of that variation.
+  Wide confidence intervals in several new proxy/loopback rows further limit
+  precise latency and metrics-on/off claims.
+- Original `current/`, `baseline/`, `benchmark-comparison.md` and
+  `release-sha256.txt` remain unchanged. Their checksums and the fresh Central
+  starter artifact hashes verify. Existing coverage files intentionally retain
+  `release-quality-pending-review`, the verifier's pre-review machine output;
+  this signed-off narrative supplies the disposition without rewriting inputs.
+
+SHA-256 anchors, relative to `target/release-evidence/v30/priority12/`:
+
+| Artifact | SHA-256 |
+|---|---|
+| `current/release-jmh.json` | `9309483a12039a155af46b1e6dbe8bd5b57bce3cdf652bcb9294bf5a973dd24e` |
+| `baseline/release-jmh.json` | `8fcd4c9107b13b6b62e464d30ab663d9751b39e34f4c56f83a5b38c3253a9538` |
+| `benchmark-comparison.md` | `9f43d3030edca07dd0a7aed072a58a0d33474c0d9d67dadf677a6a4fd86909ba` |
+| `release-sha256.txt` | `16ff85ab138cee5d3fcd94de58ba6016830d0e5d1bfb9598cfa274d15a47ee0e` |
+| `current/benchmarks.jar` | `90798445b8ffbf58cb1dffaba304c4f3fb5a3b2a5f209a4fdb2058ffc1ee4dfa` |
+| `baseline/benchmarks.jar` | `0083642739955b520dcb7f2f08cca5e368eae746c98fd2c562aecbb947152652` |
+
+The published starter jar hash is
+`384ef7fc0361877aee94bfc71f184304b50da19f3e5875e273f163033d6b90de`;
+its POM hash is
+`d578ba1a083b5fd53224fe9569b72a43ceed56953a4a604a08569ebd962ee8ce`.
+`baseline/provenance/` retains the Central remote markers and checksum list.
+
+### Review flags and limits
+
+The comparator emits **16 informational flags across five method groups**.
+The following are internal evidence observations, not product latency claims.
+Values are baseline -> current, rounded from the unchanged JSON:
+
+| Shared method | Flagged observations | Disposition |
+|---|---|---|
+| Cache-disabled publisher creation | Average 0.414 -> 0.502 us/op (+21.23%); p50 also flagged. Throughput falls 23.65% even though the comparator labels it `ok`. | Preserve the startup-policy-check cost risk; no zero-overhead claim. |
+| V29 unweighted publisher creation | Average 0.027 -> 0.086 us/op (+214.76%); p50/p95/p99 flagged. Allocation 160.010 -> 224.030 B/op in average mode, 160.009 -> 280.032 B/op in throughput mode. | Regressed publisher-only path; distinct from subscription latency or network time. |
+| V29 weighted metrics-disabled publisher creation | Average 0.028 -> 0.082 us/op (+194.73%); p50/p95/p99 flagged. Allocation approximately 160 -> 224 B/op in both modes. | Absent work limits do not mean allocation-neutral invocation. |
+| V29 metered accounting publication | Throughput-mode allocation 3040.992 -> 4241.079 B/op (+39.46%). | Retain flag; average-mode allocation also rises but remains below the relative review trigger. This pair does not isolate the allocating component. |
+| V29 weighted hit | Throughput-mode allocation 516.093 -> 627.769 B/op (+21.64%). | Retain flag; average-mode allocation rises 2.47%, so do not generalize one mode's magnitude. |
+
+Source inspection identifies method-selection validation on invocation even
+when limits are absent. This is a plausible contributor to publisher-creation
+cost, not a causal allocation profile proving every delta. The full
+cache-disabled/unweighted/weighted subscription averages change by -2.26%,
++2.90% and +1.37% respectively in this pair; those results do not cancel the
+publisher-only regressions. A throughput `ok` label does not prove no decline.
+The comparator's p50/p95/p99 summarize JMH iteration scores, not per-request
+service-latency percentiles.
+
+All 46 new-only rows retain their two-mode/telemetry coverage and asserted
+workload identity. The eleven proxy methods measure scenario operations,
+including gates, preparation, seed/cancel/release and checks where applicable.
+The isolated rejection row is not a proxy or metrics pipeline; its approximately
+40 B/op is transient allocation per rejected acquisition in this JVM, not
+retained ownership or an exact portable object size. Large error bars in
+loopback, refresh and several miss/reuse rows preclude precise metrics-on/off
+overhead ratios. No 4.2.0 counterpart is invented for those rows.
+
+### Completion disposition
+
+**Priority 12 is complete with no public performance claim.** The benchmark
+pair is accepted as reviewed engineering evidence with explicit regressions
+and measurement limits, not as a regression-free performance certification.
+No promoted `docs/benchmark-report-4.3.0.md` or numerical release wording is
+created. Preserve these flags for Priority 13's scope decision; optimization
+or a numerical claim requires fresh profiling and comparable clean runs.
+The bounded retention checks remain independent evidence, not a conclusion
+drawn from B/op or RSS. No runtime, benchmark or public API code was changed
+while closing this review. Native, consumer, API, publication and final V30
+release gates remain separate.
