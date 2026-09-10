@@ -548,7 +548,8 @@ release from the old manager cannot free a new manager's slot or fill its cache.
 Capture cache meters before close. At the last metric owner, close removes them;
 an absent post-close series is not a zero-valued terminal counter or proof that
 all external callers stopped. In overlapping factories, remaining metric owners
-retain their registrations. Work-limit live gauges remain a later V30 gate.
+retain their registrations. Work-limit live gauges follow the same ownership
+rule; see [saturation and recovery](30-operations-troubleshooting.md#cache-work-saturation-v30-430-candidate).
 Reference-queue/weak-reference GC checks are test evidence only, not runtime GC
 behavior or an assertion that allocator/RSS usage must fall immediately.
 

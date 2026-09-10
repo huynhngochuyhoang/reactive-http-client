@@ -120,6 +120,10 @@ common terminal outcomes:
   policy-tagged cache signals, timestamped memory/cache/pool checkpoints, and
   lifecycle events. It contains only fake bounded client/API/policy names and no
   cache keys/values, request variants, identity values, or exception messages.
+- [Cache-work saturation and recovery](fixtures/support-bundle-cache-work.json)
+  is V30 / `4.3.0-SNAPSHOT` evidence, not a published `4.2.0` export. It aligns
+  live reservations, cumulative counter samples and pre-close deltas with
+  policy occupancy, pool state, and factory/meter lifecycle.
 
 These fixtures are illustrative sanitized records, not raw logger output. They
 contain fake client and path-template metadata only. Default support output must
@@ -362,7 +366,15 @@ the reported error rate must equal
 `errors / samples` within an absolute tolerance of `0.000000000001`. Its
 top-level status is derived from that selected client, not from unrelated clients
 in the aggregate health response. The sanitized projection preserves omission of
-`errorRate` when the selected client has zero samples:
+`errorRate` when the selected client has zero samples.
+
+The nine `cacheWork*` fields are required for V30 / `4.3.0-SNAPSHOT` and later
+responses. Published `4.1.x` and `4.2.x` may omit the entire group. A present
+group must be complete: summary-only/replacement clients can report all null;
+absent limits have `absent` selection/state, zero limited policies, and null
+bounds/counts. Uninitialized owners have known bounds but null counts. Open or
+closed owners have bounded counts, which can remain positive during externally
+owned cleanup after close. Mixed aggregates cover only limited policies.
 
 ```bash
 EXAMPLE_RHTTPCLIENTS_SCHEMA="/path/to/reviewed/rhttpclients-schema-v1.json"
@@ -386,7 +398,10 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
       "cacheRefreshAfterMs", "cacheMaximumSize",
       "cacheMaximumTotalDecodedResponseBytes",
       "cacheRetainedDecodedResponseBytes", "cacheEntryCount",
-      "cacheEvictions", "logicalCallTimeoutMs", "codecMaxInMemorySizeMb"
+      "cacheEvictions", "logicalCallTimeoutMs", "codecMaxInMemorySizeMb",
+      "cacheWorkLimitedPolicyCount", "cacheWorkMaximumConcurrentCallers",
+      "cacheWorkMaximumConcurrentLoads", "cacheWorkMaximumConcurrentRefreshes",
+      "cacheWorkActiveCallers", "cacheWorkActiveLoads", "cacheWorkActiveRefreshes"
     ] | index($field)) != null;
   def nullable_boolean($field):
     ([
@@ -406,12 +421,53 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
     ($version | type) == "string"
       and ($version | test("^4\\.1\\.[0-9]+$"));
   def optional_field($projectVersion; $field):
-    published_4_1($projectVersion)
+    (published_4_1($projectVersion)
       and ($field == "cacheMaximumTotalDecodedResponseBytes"
-        or $field == "cacheRetainedDecodedResponseBytes");
+        or $field == "cacheRetainedDecodedResponseBytes"))
+    or (($projectVersion | test("^4\\.[12]\\.[0-9]+$"))
+      and ($field | startswith("cacheWork")));
+  def work_fields:
+    ["cacheWorkSelection", "cacheWorkState", "cacheWorkLimitedPolicyCount",
+     "cacheWorkMaximumConcurrentCallers", "cacheWorkMaximumConcurrentLoads",
+     "cacheWorkMaximumConcurrentRefreshes", "cacheWorkActiveCallers",
+     "cacheWorkActiveLoads", "cacheWorkActiveRefreshes"];
+  def work_count($maximum; $active; $policies):
+    ($maximum == null
+      or ($maximum >= 1 and $maximum <= $policies * 1000000))
+    and ($active == null
+      or ($maximum != null and $active <= $maximum));
+  def valid_work:
+    . as $client
+    | [work_fields[] as $field | $client | has($field)] as $present
+    | if all($present[]; not) then true
+      elif (all($present[]) | not) then false
+      elif all(work_fields[]; $client[.] == null) then true
+      else
+        .cacheWorkLimitedPolicyCount as $policies
+        | (.cacheWorkState == "absent" or .cacheWorkState == "uninitialized") as $unavailable
+        | (.cacheWorkSelection == "absent" or .cacheWorkSelection == "selected"
+            or .cacheWorkSelection == "mixed")
+          and (.cacheWorkState == "absent" or .cacheWorkState == "uninitialized"
+            or .cacheWorkState == "open" or .cacheWorkState == "closed")
+          and ($policies | nonnegative_integer)
+          and $policies <= 16
+          and (($policies == 0) == (.cacheWorkSelection == "absent"))
+          and (($policies == 0) == (.cacheWorkState == "absent"))
+          and (($policies == 0) == (.cacheWorkMaximumConcurrentCallers == null))
+          and (($policies == 0) == (.cacheWorkMaximumConcurrentLoads == null))
+          and ($unavailable == (.cacheWorkActiveCallers == null))
+          and ($unavailable == (.cacheWorkActiveLoads == null))
+          and (($unavailable or .cacheWorkMaximumConcurrentRefreshes == null)
+            == (.cacheWorkActiveRefreshes == null))
+          and work_count(.cacheWorkMaximumConcurrentCallers; .cacheWorkActiveCallers; $policies)
+          and work_count(.cacheWorkMaximumConcurrentLoads; .cacheWorkActiveLoads; $policies)
+          and work_count(.cacheWorkMaximumConcurrentRefreshes; .cacheWorkActiveRefreshes; $policies)
+      end;
   def valid_leaf($field; $shape):
     ($shape | type) as $expected
-    | if $expected == "string" then
+    | if $field == "cacheWorkSelection" or $field == "cacheWorkState" then
+        type == "null" or (type == "string" and utf16_length <= 512)
+      elif $expected == "string" then
         (type == "string") and (utf16_length <= 512)
       elif $expected == "number" then
         nonnegative_integer
@@ -481,6 +537,7 @@ test "$(cat support-bundle/diagnostics/rhttpclients-curl-exit-status.txt)" = "0"
         and .endpointCount <= 10000
         and .inheritedEndpointCount <= .endpointCount
         and all(.clients[]; .inheritedEndpointCount <= .endpointCount)
+        and all(.clients[]; valid_work)
         and all(.clients[];
           if ((.cacheMaximumTotalDecodedResponseBytes | type) == "number"
               and (.cacheRetainedDecodedResponseBytes | type) == "number")
@@ -1025,6 +1082,72 @@ identities, internal addresses, and other sensitive application data. Do not put
 them in the reviewable support bundle. Capture them only through a separately
 approved, encrypted, access-controlled process with explicit retention and
 deletion ownership.
+
+### Cache-work capture (V30 4.3.0 candidate)
+
+Use [the work fixture](fixtures/support-bundle-cache-work.json) only on V30;
+published `4.2.0` does not export these work fields. Keep the existing bounded
+endpoint recipes and sanitizers above. The fixture is a reviewed structural
+example, not one endpoint response or a new automatically collected signal.
+
+Capture one bounded client/process/target and context ordinal, version, and
+API-to-policy mapping. Inventory each selected policy's TTL, entry/optional byte
+capacity, single flight, refresh-after/timeout, and caller/load/refresh maxima.
+Record observability/cache-metrics selection and registry availability separately:
+limits alone do not register meters. Policies without work or refresh have absent
+corresponding meters, not zero work. Use null for unavailable measurements,
+including unweighted byte accounting.
+
+Read the policy-tagged live counts/maxima and rejection/skip counters from the
+[documented meter names](08-observability.md#live-cache-work-v30-430-candidate).
+Keep lookup/caller/load/refresh counters by API, with the mapping beside them;
+do not relabel API counters as policy exports. Work counts overlap, and none
+measures a unique-key count or wire-dispatch rate.
+
+Take timestamped snapshots before traffic, during pressure, before a finite
+quiet window with new traffic stopped, and after that window **before close**.
+Retain both cumulative counter samples and their deltas only when the same
+registrations survive without reset. Record entry/byte occupancy and protocol:
+HTTP/1.1 needs total/idle/active connections and pending acquisitions; HTTP/2
+needs total/idle connections and active/pending streams. Scrapes are not atomic;
+retain sampling boundaries and investigate skew before asserting conservation.
+Use separately reviewed application/lifecycle evidence for caller terminals
+or cleanup ordering that no exported counter measures.
+
+Record factory start/close timestamps and bounded counts of registered work
+meters filtered to this client/policy in the shared registry. In this fixture,
+six work gauges, two rejection counters and three skip counters make eleven
+registrations; this is an inventory count, not a new starter meter. Last-owner
+close removes them. Capture a later checkpoint with null unavailable work/pool
+series and no post-close counter delta. Overlapping owners require recording
+each context boundary; a surviving registration can aggregate multiple owners.
+
+The example has two warm, 100-decoded-byte entries created after factory start,
+then one stored foreground success and one successful refresh replacement of
+the same size. No entry reaches TTL or capacity during the twelve-second
+capture. Thus the pre-close entries grow from two to three, bytes from 200 to
+300, and admitted publications increase by two, not one. Two other foreground
+sources fail/cancel; refresh has one success, failure, and cancellation.
+Six stale callers account for those three refresh starts and three skips.
+Two caller rejections never look up; one load rejection is a miss without a
+source. The samples at eight and ten seconds show cancellation terminals and
+live reservations returning to zero while meters are still registered.
+These are explicit illustrative workload facts, not identities that operators
+can infer for arbitrary concurrent traffic from terminal counters alone.
+
+Keep one affected caller's fixed cache outcome/rejection reason, error type,
+category, attempt/dispatch/status/stage and bounded duration. No keys, digests,
+payloads, headers, targets, identities, or arbitrary error text belong here.
+The shared privacy guards and this fixture's timing/accounting checks run with:
+
+```bash
+python3 scripts/verify-cache-work-support.py
+mvn -B -ntp -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test
+```
+
+The script requires Python 3 and jq and executes the copyable sanitizer block
+from this document in private temporary directories; it does not contact an
+application or download incident data.
 
 ## Performance Investigations
 

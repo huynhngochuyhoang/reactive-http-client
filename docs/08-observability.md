@@ -255,6 +255,72 @@ terminal through `HttpClientObserver.recordCacheServed(...)`.
 
 ---
 
+### Cache-work saturation recipes (V30)
+
+Use these only for the `4.3.0` candidate with explicitly selected work limits
+and cache telemetry. Each division keeps the complete matching scrape-target
+label set; do not aggregate pods before division. The optional outer
+`max by (client_name, cache_policy)` reports the worst per-target utilization,
+not a fleet sum. Within one target, overlapping owners still contribute sums.
+
+Caller, foreground-load, and refresh utilization, respectively:
+
+```promql
+reactive_http_client_cache_work_active_callers
+/
+reactive_http_client_cache_work_maximum_callers
+```
+
+```promql
+reactive_http_client_cache_work_active_loads
+/
+reactive_http_client_cache_work_maximum_loads
+```
+
+```promql
+reactive_http_client_cache_work_active_refreshes
+/
+reactive_http_client_cache_work_maximum_refreshes
+```
+
+Local rejection and refresh-skip histories, preserving target and reason labels:
+
+```promql
+increase(reactive_http_client_cache_work_rejections_total[5m])
+```
+
+```promql
+increase(reactive_http_client_cache_refresh_skips_total[5m])
+```
+
+Compare these with terminal foreground and refresh work separately:
+
+```promql
+increase(reactive_http_client_cache_loads_total[5m])
+```
+
+```promql
+increase(reactive_http_client_cache_refreshes_total[5m])
+```
+
+The last two series carry `api_name`, not `cache_policy`: retain a reviewed
+API-to-policy mapping before correlating them. A load rejection is a miss but
+not a started or terminal load; caller rejection never increments lookups.
+Caller outcome counters classify callers and are not completion counters.
+Source terminal totals can lag caller classifications, and neither counts
+wire dispatches. Skips never count as refresh terminals.
+
+A registered zero rejection/skip counter means no such events since registration;
+an absent series can mean disabled telemetry, no registry, unselected limits,
+refresh disabled, lazy/uninitialized ownership, or last-owner close. Do not
+coalesce absent series to zero. Confirm effective configuration and meter
+ownership, and do not interpret pre-registered zero refresh terminal series as
+proof that refresh is enabled. Sample counter boundaries before close/reset;
+Prometheus `increase` is scrape-extrapolated and will not exactly reconcile
+with application counter samples. Keep it for dashboards, not exact fixture
+arithmetic. See [saturation recovery](30-operations-troubleshooting.md#cache-work-saturation-v30-430-candidate)
+and the [bounded capture](26-support-bundles.md#cache-work-capture-v30-430-candidate).
+
 ## Observability configuration
 
 ```yaml

@@ -354,6 +354,45 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void cacheWorkOperationsFixtureUsesSharedPrivacyAndDocumentationGuards() throws IOException {
+        Path root = projectRoot();
+        Path path = root.resolve("docs/fixtures/support-bundle-cache-work.json");
+        assertThat(Files.size(path)).isLessThanOrEqualTo(1024 * 1024);
+        JsonNode fixture = OBJECT_MAPPER.readTree(Files.readString(path));
+        assertThat(sensitiveSupportFixtureFieldNames(fixture)).isEmpty();
+        assertThat(sensitiveSupportFixtureTextValues(fixture)).isEmpty();
+        assertThat(fixture.path("projectVersion").asText()).isEqualTo("4.3.0-SNAPSHOT");
+        for (String field : List.of("entryKey", "responseBody", "requestHeaders",
+                "accountId", "subject", "requestTarget")) {
+            JsonNode unsafe = OBJECT_MAPPER.valueToTree(Map.of("capture", fixture, field, "customer-123"));
+            assertThat(sensitiveSupportFixtureFieldNames(unsafe)).contains(field);
+        }
+        for (String value : List.of("PROPFIND /customers/123?debug HTTP/1.1",
+                "ftp://internal-host/resource", "file:///private/path",
+                "internal.example:443", "orders/42", "?debug", "*")) {
+            JsonNode unsafe = OBJECT_MAPPER.valueToTree(Map.of("capture", fixture, "sample", value));
+            assertThat(sensitiveSupportFixtureTextValues(unsafe)).contains(value);
+        }
+        assertThat(fixture.path("affectedCaller").path("errorCategory").asText())
+                .isEqualTo("CACHE_ADMISSION_ERROR");
+        assertThat(Files.readString(root.resolve("docs/26-support-bundles.md")))
+                .contains("fixtures/support-bundle-cache-work.json")
+                .contains("Published `4.1.x` and `4.2.x` may omit the entire group")
+                .contains("python3 scripts/verify-cache-work-support.py");
+        assertThat(Files.readString(root.resolve("docs/30-operations-troubleshooting.md")))
+                .contains("The starter neither queues nor automatically retries local overload")
+                .contains("There is no uncached fallback dispatch");
+        String observability = Files.readString(root.resolve("docs/08-observability.md"));
+        for (String dimension : List.of("callers", "loads", "refreshes")) {
+            assertThat(observability).contains(
+                    "reactive_http_client_cache_work_active_" + dimension + "\n/\n"
+                            + "reactive_http_client_cache_work_maximum_" + dimension);
+        }
+        assertThat(Files.readString(root.resolve(".github/workflows/ci.yml")))
+                .contains("python3 scripts/verify-cache-work-support.py");
+    }
+
+    @Test
     void responseCacheSupportFixtureGuardRejectsSensitiveFieldNames() throws IOException {
         JsonNode unsafeFixture = OBJECT_MAPPER.readTree("""
                 {

@@ -48,7 +48,65 @@ historical evidence.
 | OAuth2 refresh storm, token endpoint failure, or downstream 401 | Logical client name, sanitized auth mode, token endpoint status and safe headers, refresh/cooldown timing | [OAuth2 refresh](#oauth2-refresh) |
 | Unexpected stale value, miss storm, refresh failure, or cache capacity pressure | Effective cache phase/TTL/capacity, bounded hit/miss/load/refresh/eviction rates, process instance | [Response cache behavior (4.0.0+)](#response-cache-behavior-400) |
 | Pod memory grows after enabling response caching | Published/development version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (`4.2.0`+)](#cache-memory-triage-420) |
+| Local cache-work rejection or skipped refresh (V30 / `4.3.0` candidate only) | Selected work bounds, policy current/maximum gauges, fixed rejection/skip reasons, pre-close counter samples | [Cache-work saturation](#cache-work-saturation-v30-430-candidate) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
+
+## Cache-work saturation (V30 4.3.0 candidate)
+
+Published `4.2.0` has no work-limit settings, live work gauges, or local
+`CACHE_ADMISSION_ERROR`. Use this section only with the V30 candidate.
+
+| Bound | Scope and what it does not bound |
+|---|---|
+| `maximum-size`, TTL | Stored entries and their hard lifetime per policy name per factory; not active callers or request bytes. Refresh replaces an entry and restarts its TTL only on successful publication. |
+| `maximum-total-decoded-response-bytes` | Optional stored decoded-representation accounting per policy; not object-graph heap, prepared requests, direct memory, or RSS. |
+| `work.maximum-concurrent-callers` | All subscribed cache callers per policy/factory, before preparation, including warm hits and coalesced waiters. |
+| `work.maximum-concurrent-loads` | Independent misses/shared foreground sources, through retries, decode, publication and entered cleanup. Several callers can overlap one load. |
+| `work.maximum-concurrent-refreshes` | Hidden refresh sources, separate from foreground slots; requires refresh timing configuration. |
+| Pool connections/streams and pending-acquire timeout | Transport capacity/waiting, not cache callers; use the effective HTTP/1.1 connection or HTTP/2 stream signals. |
+| Explicit Resilience4j operators | Configured instance concurrency, rate, retry, and circuit admission at the business source; these may be shared across clients and are not local cache-work bounds. |
+
+Endpoint owners must size selected limits explicitly against load, service
+latency, response sizes, and application deadlines. These are process-local
+factory bounds, not heap/RSS guarantees or cluster-wide capacity. Overlapping
+factories have independent limits even when the registry sums their gauges.
+Do not add caller, load, and refresh gauges together as distinct requests.
+
+| Observed signal | Interpretation and recovery |
+|---|---|
+| `caller_capacity` rejection, possibly with a warm cache | No preparation, authorization, or lookup occurred. Reduce caller overlap; a hit is not exempt. |
+| `load_capacity` rejection after a miss | Preparation/auth/lookup occurred, but no business loader or resilience operator started. There is no uncached fallback dispatch. Existing flights can still accept waiters if caller capacity remains. |
+| Refresh `capacity` skip | Authorized stale value returned within hard TTL, without starting or queueing refresh. Foreground capacity is independent; shared pool/auth/operator resources may still contend. |
+| Refresh `already_refreshing` or `entry_unavailable` skip | An existing refresh won, or the entry was invalidated/expired before loader assembly. Not a terminal refresh cancellation or failure. |
+| Hard expiry | Stale serving stops. The next call follows ordinary caller and foreground-load admission; saturated capacity can now reject it. |
+| Active count persists after a caller terminal | A shared source may still have waiters, or entered synchronous cleanup may still be unwinding. Use live counts and a bounded quiet window, not a terminal-counter difference alone. |
+
+Configure finite `logical-call-timeout-ms` for each caller's preparation,
+auth, waiting, retries and response consumption. Request/transport timeouts
+remain source phase bounds, not substitutes for that deadline. A leader's
+timeout does not truncate an interested waiter's budget. Refresh has its own
+timeout bounded by hard expiry. Disabled deadlines can leave live slots occupied
+indefinitely, and cancellation cannot forcibly interrupt blocking application
+callbacks.
+
+The starter neither queues nor automatically retries local overload. An
+application may explicitly reject/degrade, or resubscribe later with bounded
+backoff, jitter, a total deadline, and reviewed replay/idempotency semantics.
+Do not use an immediate unbounded retry loop. Evicting entries does not reclaim
+foreground capacity. Changing limits requires factory recreation, not mutation.
+
+For rollout, enable cache telemetry separately, record the version, target and
+API-to-policy mapping, and compare foreground and refresh pressure independently
+using [work recipes](08-observability.md#cache-work-saturation-recipes-v30).
+Stop new traffic before close and take matching live/counter samples across a
+finite quiet interval. Then record close and a later ownership checkpoint.
+Counters are cumulative histories, not active-flight counts. Last-owner close
+removes cache meters, so absent post-close meters are not zero terminal deltas.
+Closed diagnostics can still expose independent caller-owned cleanup; do not
+infer that all application work ended from deregistration.
+Use the [cache-work support fixture](26-support-bundles.md#cache-work-capture-v30-430-candidate),
+and retain the existing [memory-domain triage](#cache-memory-triage-420) when
+the reported symptom is memory growth.
 
 ## Evidence boundary
 
