@@ -238,6 +238,10 @@ class CacheWorkLimitContractTest {
     @Test
     void configuredMetadataRemainsAuthoritativeForValidationAotAndDiagnostics() throws Exception {
         var config = config();
+        var work = new ReactiveHttpClientProperties.CacheWorkConfig();
+        work.setMaximumConcurrentCallers(3L);
+        work.setMaximumConcurrentLoads(2L);
+        config.getCache().getPolicies().get("method").setWork(work);
         var properties = new ReactiveHttpClientProperties();
         properties.setClients(Map.of("replacement-work", config));
         AtomicInteger reads = new AtomicInteger();
@@ -274,14 +278,14 @@ class CacheWorkLimitContractTest {
             beans.registerBeanDefinition(type.getSimpleName(), definition);
         }
         try {
-            var snapshot = freeze(Replacement.class, "replacement-work", replacement, config,
-                    Map.of("method", new Input(3L, 2L, null)));
+            var snapshot = CacheWorkPolicy.freeze(Replacement.class, "replacement-work", replacement, config);
             assertThat(snapshot.methods().get(Replacement.class.getMethod("load")).source())
                     .isEqualTo(EffectiveCachePolicy.Source.METHOD);
             var exported = EffectiveHttpClientContractExporter.export(Replacement.class, "replacement-work", config,
                     replacement).getFirst();
             assertThat(exported.cache().source()).isEqualTo("method");
             assertThat(exported.cache().maximumSize()).isEqualTo(10);
+            assertThat(exported.cache().work()).isEqualTo(new Limits(3, 2, null));
 
             int beforeAot = reads.get();
             assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor().processAheadOfTime(beans))
@@ -292,8 +296,18 @@ class CacheWorkLimitContractTest {
             assertThat(entry.cache().policyCount()).isEqualTo(1);
             assertThat(entry.cache().policySources()).containsExactly("method");
             assertThat(entry.cache().httpMethods()).containsExactly("GET");
+            assertThat(entry.cache().work().maximumCallers()).isEqualTo(3);
+            assertThat(entry.cache().work().maximumLoads()).isEqualTo(2);
+            assertThat(entry.cache().work().activeCallers()).isNull();
+            assertThat(entry.cache().work().state()).isEqualTo("uninitialized");
             assertThat(optionalCreations).hasValue(0);
             assertThat(beans.containsSingleton("replacementClient")).isFalse();
+            work.setMaximumConcurrentLoads(0L);
+            assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                    .processAheadOfTime(beans)).hasMessageContaining("maximum-concurrent-loads");
+            assertThatThrownBy(() -> EffectiveHttpClientContractExporter.export(
+                    Replacement.class, "replacement-work", config, replacement))
+                    .hasMessageContaining("maximum-concurrent-loads");
         }
         finally {
             beans.destroySingletons();

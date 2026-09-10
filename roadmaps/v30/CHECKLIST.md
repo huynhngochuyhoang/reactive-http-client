@@ -976,50 +976,112 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 10 - Mock, Consumer, AOT, and Native Parity
 
-### [ ] 10.1 Extend deterministic mock ownership controls
+### [x] 10.1 Extend deterministic mock ownership controls
 
-- [ ] Provide bounded admission/release snapshots and gates through supported
+- [x] Provide bounded admission/release snapshots and gates through supported
       test-helper APIs without exporting cache keys or production internals.
-- [ ] Cover real-time and deterministic-time mocks, published constructors,
+- [x] Cover real-time and deterministic-time mocks, published constructors,
       custom auth/appliers, and cleanup after failed builder validation.
-- [ ] Preserve cumulative terminal/rejection/skip evidence after close while
+- [x] Preserve cumulative terminal/rejection/skip evidence after close while
       distinguishing unavailable live state from active work still externally owned.
-- [ ] Verify unselected cache/work features do not require optional runtime
+- [x] Verify unselected cache/work features do not require optional runtime
       infrastructure or create a cache manager.
 
-### [ ] 10.2 Exercise assembled consumer parity
+### [x] 10.2 Exercise assembled consumer parity
 
-- [ ] Add consumer coverage for selected `GET` and semantic `POST`, count-only
+- [x] Add consumer coverage for selected `GET` and semantic `POST`, count-only
       and weighted storage, caller/load saturation, single flight, and refresh.
-- [ ] Retain a cache-disabled assembled consumer with no Caffeine on its classpath.
-- [ ] Verify existing `4.2.0` consumer/test-helper usage with no work limits;
+- [x] Retain a cache-disabled assembled consumer with no Caffeine on its classpath.
+- [x] Verify existing `4.2.0` consumer/test-helper usage with no work limits;
       keep current reactor evidence separate from the published baseline.
-- [ ] Preserve fresh per-stage Surefire/provenance artifacts on verifier failure
+- [x] Preserve fresh per-stage Surefire/provenance artifacts on verifier failure
       without copying stale reports from an unstarted later stage.
 
-### [ ] 10.3 Verify AOT and application overrides
+### [x] 10.3 Verify AOT and application overrides
 
-- [ ] Validate effective work policies with configured properties and replacement
+- [x] Validate effective work policies with configured properties and replacement
       metadata beans, including primary and factory-method registrations.
-- [ ] Keep foreign factory definitions outside starter-only grammar and retain
+- [x] Keep foreign factory definitions outside starter-only grammar and retain
       unknown lazy diagnostics without instantiation.
-- [ ] Add only required hints; do not traverse arbitrary request object graphs
+- [x] Add only required hints; do not traverse arbitrary request object graphs
       or introduce record/generic recursion for capacity accounting.
-- [ ] Exercise valid/invalid and selected/unselected policies through startup,
+- [x] Exercise valid/invalid and selected/unselected policies through startup,
       AOT, and generated effective-contract tests.
 
 ### [ ] 10.4 Record native and shutdown evidence
 
-- [ ] Extend smoke with gated caller/load saturation, refresh skip, released-slot
+- [x] Extend smoke with gated caller/load saturation, refresh skip, released-slot
       reuse, independent caller deadlines, and factory close.
-- [ ] Count every server request, including rejected/unmatched routes, and
+- [x] Count every server request, including rejected/unmatched routes, and
       synchronize no-dispatch assertions against delayed event-loop work.
 - [ ] Compile and run from one clean reachable commit after all fixture fixes;
       record Java/Boot/GraalVM versions, commands, binary SHA-256, and output.
-- [ ] Preserve the existing shutdown observation bound and do not let normal
+- [x] Preserve the existing shutdown observation bound and do not let normal
       request/acquire expiry satisfy disposal assertions.
-- [ ] Leave native completion open whenever the binary predates the tested
+- [x] Leave native completion open whenever the binary predates the tested
       fixture or runtime revision.
+
+
+**Priority 10 evidence (2026-09-10):**
+
+- `MockReactiveHttpClient.cacheWorkSnapshot()` adds limited-policy live/maximum
+  counts plus immutable cumulative caller/load/rejection/skip maps.
+  `withCacheObservability()` enables test evidence without selecting cache/work
+  or changing the clock. Existing `CacheSnapshot` constructors remain unchanged.
+  Supported response-body sinks and the waiter-count snapshot gate completion
+  on actual attachment, not elapsed time.
+- Five `MockCacheWorkParityTest` cases cover real/deterministic clocks,
+  count-only/weighted storage, selected custom auth and retry appliers, local
+  rejection, reuse, semantic POST refresh skipping, and failed builder cleanup.
+  Closed mocks preserve cumulative evidence and distinguish outstanding
+  independent caller-owned loads from released shared/refresh work.
+  No selected cache means no helper-owned cache manager.
+- The retained post-close refresh test exposed shutdown completion racing ahead
+  of cancellation accounting. Cancellation is now recorded once before the
+  shutdown signal can complete a pending refresh source.
+- Final complete regression:
+  `mvn -B -ntp -pl reactive-http-client-test,reactive-http-client-otel -am test`.
+  **1,688 tests: 1,561 starter, 71 helper, 56 OTel; zero failures/errors/skips.**
+  This includes valid/invalid selected/unselected AOT work policies, primary
+  programmatic and factory-method properties, replacement metadata with
+  effective-contract work limits, and foreign/lazy diagnostics exclusions.
+  No additional reflection hints or request-graph traversal were needed.
+- `scripts/verify-current-consumer.sh` passed with fresh repository
+  `target/current-reactor-repositories/consumer-4.3.0-SNAPSHOT/`:
+  **69 helper, 9 assembled consumer, and 1 no-Caffeine consumer cases**.
+  The current-only V30 profile adds GET/count-only and semantic POST/weighted
+  saturation, single flight, refresh skips, reuse, and meter removal.
+  Its production artifacts and consumer fixtures match the final implementation;
+  the later strengthened helper/AOT assertions are covered by the complete run.
+  Existing EXIT-trap, per-stage marker, stale-report and provenance safeguards
+  remain guarded by `DocumentationReleaseArtifactTest`.
+- `scripts/verify-published-consumer.sh 4.2.0` independently passed **4 cases**
+  using a fresh Central-only repository. Both verifiers record
+  `completedStage=evidence-verified`, `exitStatus=0`, hashes, classpaths,
+  effective POMs and Surefire reports in their separate current/published
+  evidence directories. Previous published evidence/repository were archived,
+  not reused as fresh results.
+- The final native fixture passed ordinary JVM startup and generated-AOT JVM
+  execution. It counts every loopback request, waits for waiter attachment,
+  checks no-dispatch quiet periods, exercises independent caller deadlines,
+  and rejects normal logical-timeout completion as shutdown evidence.
+  Factory close retains the existing five-second observation bound.
+  Reproduce with the verified target-local repository above:
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local=<absolute-repository> -f .github/native-smoke/pom.xml spring-boot:run`;
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local=<absolute-repository> -f .github/native-smoke/pom.xml -Pnative -DskipTests package`;
+  `java -Dspring.aot.enabled=true -jar .github/native-smoke/target/reactive-http-client-native-smoke-0.0.1-SNAPSHOT.jar`.
+- Source provenance: reachable base
+  `50c127b0a306cbb0b904b4146899190767303fef` plus the recorded working-tree patch.
+  Maven `3.9.9`, GraalVM JDK `25.0.3`, Java target `21`, Boot `4.0.0`;
+  reactor `4.3.0-SNAPSHOT`, published baseline `4.2.0`.
+  Logs, copied final XML, parsed totals, patch and hashes are under
+  `target/release-evidence/v30/priority10/`; `git diff --check` passes.
+- **Native completion remains open.** No native binary is attributed to this
+  dirty revision. After committing the final fixture/runtime tree, run the
+  clean-tree native commands in
+  [native compatibility](../../docs/20-native-release-compatibility.md),
+  and record that reachable commit, compiler/runtime output and executable
+  SHA-256 before checking the remaining 10.4 item.
 
 ---
 

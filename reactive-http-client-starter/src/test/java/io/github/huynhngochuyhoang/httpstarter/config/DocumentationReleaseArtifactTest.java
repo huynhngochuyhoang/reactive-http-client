@@ -1821,6 +1821,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("<id>v29-current-parity</id>")
                 .contains("<name>consumer.v29.parity</name>")
                 .contains("<source>src/v29-test/java</source>")
+                .contains("<id>v30-current-parity</id>")
+                .contains("<name>consumer.v30.parity</name>")
+                .contains("<source>src/v30-test/java</source>")
                 .contains("<groupId>com.github.ben-manes.caffeine</groupId>");
         assertThat(cacheDisabledPom)
                 .contains("<artifactId>reactive-http-client-starter</artifactId>")
@@ -1842,6 +1845,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("stage=\"consumer-tests\"\ncopy_consumer_reports")
                 .contains("copy_cache_disabled_reports()")
                 .contains("-Dconsumer.v29.parity=true")
+                .contains("-Dconsumer.v30.parity=true")
+                .contains("MockCacheWorkParityTest")
                 .contains("stage=\"cache-disabled-tests\"\ncopy_cache_disabled_reports")
                 .contains("cache-disabled-dependency-tree.txt")
                 .contains("cache-disabled-classpath.txt")
@@ -1878,6 +1883,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("exitStatus=$status")
                 .contains("published consumer resolved reactor output directories");
         assertThat(publishedConsumerScript).doesNotContain("consumer.v29.parity");
+        assertThat(publishedConsumerScript).doesNotContain("consumer.v30.parity");
+        assertThat(testHelperDocs).contains("cacheWorkSnapshot()", "withCacheObservability()",
+                "coalescedWaiterCount()", "V30 / 4.3.0-SNAPSHOT");
         assertThat(fixtureTest)
                 .contains("extends SharedOrders<OrderResponse>")
                 .contains("@ApiRef(\"configured\")")

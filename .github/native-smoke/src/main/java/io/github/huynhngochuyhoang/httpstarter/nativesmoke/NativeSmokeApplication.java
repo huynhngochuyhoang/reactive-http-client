@@ -51,7 +51,8 @@ public class NativeSmokeApplication {
     private static final String QUERY_MARKER = "native-query-body-marker";
     private static final ReusableMeterRegistry METER_REGISTRY = new ReusableMeterRegistry();
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
+        NativeCacheWorkScenario workScenario = new NativeCacheWorkScenario();
         AtomicReference<String> observedAuth = new AtomicReference<>();
         AtomicReference<String> observedAcceptEncoding = new AtomicReference<>();
         AtomicReference<String> observedQueryBody = new AtomicReference<>();
@@ -85,6 +86,7 @@ public class NativeSmokeApplication {
         application.setDefaultProperties(Map.of(
                 "reactive.http.clients.native-smoke.base-url",
                 "http://127.0.0.1:" + server.port(),
+                "reactive.http.clients.native-work.base-url", "http://127.0.0.1:" + workScenario.port(),
                 "spring.main.lazy-initialization", "true"));
         ConfigurableApplicationContext context = null;
         try {
@@ -93,7 +95,7 @@ public class NativeSmokeApplication {
                     context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class);
             Map<String, Object> lazyDiagnostics = diagnosticsEndpoint.diagnostics();
             require(lazyDiagnostics.get("clients") instanceof List<?> lazyClients
-                            && lazyClients.size() == 1
+                            && lazyClients.size() == 2
                             && lazyClients.get(0) instanceof Map<?, ?> lazyClient
                             && lazyClient.get("cacheEntryCount") == null
                             && lazyClient.get("cacheRetainedDecodedResponseBytes") == null,
@@ -223,6 +225,9 @@ public class NativeSmokeApplication {
                     "cacheRetainedDecodedResponseBytes", "cacheEntryCount",
                     "cacheEvictions", "cacheMetricsEnabled", "cachePolicySources",
                     "cacheHttpMethods", "cacheSemanticReadAcknowledged",
+                    "cacheWorkSelection", "cacheWorkState", "cacheWorkLimitedPolicyCount",
+                    "cacheWorkMaximumConcurrentCallers", "cacheWorkMaximumConcurrentLoads", "cacheWorkMaximumConcurrentRefreshes",
+                    "cacheWorkActiveCallers", "cacheWorkActiveLoads", "cacheWorkActiveRefreshes",
                     "timeoutSource", "timeoutMs", "logicalCallTimeoutMs", "compressionEnabled",
                     "codecMaxInMemorySizeMb", "resilienceConfigured", "retry", "rateLimiter",
                     "circuitBreaker", "bulkhead", "strictUnsafeRetryValidation",
@@ -237,12 +242,12 @@ public class NativeSmokeApplication {
                     "diagnostics schema version was not preserved");
             require(diagnostics.get("projectVersion") instanceof String,
                     "diagnostics project version type changed");
-            require(diagnostics.get("clientCount") instanceof Integer count && count == 1,
+            require(diagnostics.get("clientCount") instanceof Integer count && count == 2,
                     "diagnostics did not include the native client");
             require(diagnostics.get("endpointCount") instanceof Integer
                             && diagnostics.get("inheritedEndpointCount") instanceof Integer,
                     "diagnostics aggregate count types changed");
-            require(diagnostics.get("clients") instanceof List<?> clients && clients.size() == 1
+            require(diagnostics.get("clients") instanceof List<?> clients && clients.size() == 2
                             && clients.get(0) instanceof Map<?, ?>,
                     "diagnostics client collection shape changed");
             Map<?, ?> providerClient = (Map<?, ?>) ((List<?>) diagnostics.get("clients")).get(0);
@@ -344,6 +349,8 @@ public class NativeSmokeApplication {
                             .counter().count() == 2,
                     "native over-budget admission accounting was not recorded");
 
+            workScenario.run(context.getBean(NativeWorkClient.class), meterRegistry);
+
             NativeOrderResponse shutdownInitial =
                     client.getShutdownRefresh().block(Duration.ofSeconds(5));
             require(shutdownInitial != null && "shutdown-refresh-1".equals(shutdownInitial.message()),
@@ -364,11 +371,13 @@ public class NativeSmokeApplication {
             require(dispatchCount.get() == 20,
                     "native smoke observed an unexpected total dispatch count: " + dispatchCount.get());
 
+            workScenario.prepareClose(context.getBean(NativeWorkClient.class));
             long shutdownStarted = System.nanoTime();
             context.close();
             context = null;
             require(System.nanoTime() - shutdownStarted < Duration.ofSeconds(5).toNanos(),
                     "native factory shutdown exceeded the shared disposal deadline");
+            workScenario.verifyClosed();
             await(shutdownRefreshCancelled, "native shutdown did not cancel the hidden refresh");
             await(shutdownLoadCancelled, "native shutdown did not cancel the active miss");
             require(activeMiss.isDone() && queuedMiss.isDone(),
@@ -402,6 +411,7 @@ public class NativeSmokeApplication {
                 context.close();
             }
             server.disposeNow(Duration.ofSeconds(5));
+            workScenario.close();
             serverResources.disposeLater().block(Duration.ofSeconds(5));
             METER_REGISTRY.closePermanently();
         }
@@ -569,6 +579,10 @@ public class NativeSmokeApplication {
                                     .sendString(Mono.just("{\"code\":\"ok\",\"message\":\"retry-"
                                             + dispatch + "\"}"))
                                     .then();
+                        })
+                        .route(request -> true, (request, response) -> {
+                            dispatchCount.incrementAndGet();
+                            return response.status(404).send();
                         }))
                 .bindNow(Duration.ofSeconds(5));
     }

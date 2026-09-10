@@ -37,6 +37,40 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ReactiveHttpClientAotSmokeTest {
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"true,2,1,true", "true,0,1,false", "true,2,0,false", "false,0,0,true"})
+    void aotWorkSelectionUsesTheSameValidationAsStartup(boolean selected, long callers, long loads, boolean valid) {
+        try (var context = new AnnotationConfigApplicationContext()) {
+            var values = new java.util.HashMap<String, Object>();
+            String prefix = "reactive.http.clients.selected-cache-memory.cache.";
+            if (selected) { values.put(prefix + "policy", "work"); }
+            values.put(prefix + "policies.work.ttl-ms", "60000");
+            values.put(prefix + "policies.work.maximum-size", "10");
+            values.put(prefix + "policies.work.shared-response", "true");
+            values.put(prefix + "policies.work.work.maximum-concurrent-callers", callers);
+            values.put(prefix + "policies.work.work.maximum-concurrent-loads", loads);
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("work", values));
+            registerClientFactory(context, SelectedCacheMemoryAotClient.class);
+            var processor = new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment());
+            var config = org.springframework.boot.context.properties.bind.Binder.get(context.getEnvironment())
+                    .bind("reactive.http", org.springframework.boot.context.properties.bind.Bindable.of(ReactiveHttpClientProperties.class))
+                    .get().getClients().get("selected-cache-memory");
+            if (valid) {
+                var contribution = processor.processAheadOfTime(context.getDefaultListableBeanFactory());
+                contribution.applyTo(newGenerationContext(), null);
+                new MethodMetadataCache().validateDeclarativeCachePolicies(
+                        SelectedCacheMemoryAotClient.class, "selected-cache-memory", config);
+            } else {
+                assertThatThrownBy(() -> processor.processAheadOfTime(context.getDefaultListableBeanFactory()))
+                        .isInstanceOf(IllegalStateException.class).hasMessageContaining("work");
+                assertThatThrownBy(() -> new MethodMetadataCache().validateDeclarativeCachePolicies(
+                        SelectedCacheMemoryAotClient.class, "selected-cache-memory", config))
+                        .isInstanceOf(IllegalStateException.class).hasMessageContaining("work");
+            }
+            assertThat(context.getBeanFactory().containsSingleton(SelectedCacheMemoryAotClient.class.getName())).isFalse();
+        }
+    }
+
     @Test
     void runtimeHintsCoverAnnotationsAndConfigurationProperties() throws Exception {
         RuntimeHints hints = new RuntimeHints();
@@ -157,6 +191,11 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
                 method(FactoryMethodAotClient.class, "ping")))
                 .accepts(generationContext.getRuntimeHints());
+        context.getBean(ReactiveHttpClientProperties.class).getClients().get("factory-method-aot")
+                .getCache().getPolicies().get("selected").getWork().setMaximumConcurrentCallers(0L);
+        assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(context.getDefaultListableBeanFactory()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("maximum-concurrent-callers");
         context.close();
     }
 
@@ -484,6 +523,10 @@ class ReactiveHttpClientAotSmokeTest {
         ReactiveHttpClientProperties properties = new ReactiveHttpClientProperties();
         properties.setClients(Map.of("inherited-cache-aot", config));
         RootBeanDefinition customProperties = new RootBeanDefinition(ReactiveHttpClientProperties.class);
+        var work = new ReactiveHttpClientProperties.CacheWorkConfig();
+        work.setMaximumConcurrentCallers(2L);
+        work.setMaximumConcurrentLoads(1L);
+        policy.setWork(work);
         customProperties.setInstanceSupplier(() -> properties);
         customProperties.setPrimary(true);
         context.registerBeanDefinition("customReactiveHttpClientProperties", customProperties);
@@ -495,6 +538,10 @@ class ReactiveHttpClientAotSmokeTest {
         assertThat(contribution).isNotNull();
         assertThat(context.getBeanFactory().containsSingleton("customReactiveHttpClientProperties")).isTrue();
         assertThat(context.getBeanFactory().containsSingleton("defaultReactiveHttpClientProperties")).isFalse();
+        work.setMaximumConcurrentLoads(0L);
+        assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                .processAheadOfTime(context.getDefaultListableBeanFactory()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("maximum-concurrent-loads");
         context.close();
     }
 
@@ -669,6 +716,10 @@ class ReactiveHttpClientAotSmokeTest {
             policy.setTtlMs(1_000L);
             policy.setMaximumSize(100L);
             policy.setSharedResponse(true);
+            var work = new ReactiveHttpClientProperties.CacheWorkConfig();
+            work.setMaximumConcurrentCallers(2L);
+            work.setMaximumConcurrentLoads(1L);
+            policy.setWork(work);
             ReactiveHttpClientProperties.ClientConfig client =
                     new ReactiveHttpClientProperties.ClientConfig();
             client.getCache().getPolicies().put("selected", policy);

@@ -171,7 +171,7 @@ final class LocalResponseCacheManager implements AutoCloseable {
                 cacheObservabilityEnabled);
     }
 
-    private static boolean hasSelectedCachePolicy(
+    static boolean hasSelectedCachePolicy(
             Class<?> clientInterface,
             MethodMetadataCache metadataCache,
             ReactiveHttpClientProperties.ClientConfig clientConfig) {
@@ -1058,6 +1058,8 @@ final class LocalResponseCacheManager implements AutoCloseable {
             refreshes.forEach(refresh -> refresh.terminal = true);
             inFlightRefreshes.clear();
         }
+        // The shutdown signal completes takeUntilOther; record cancellation before that terminal wins.
+        refreshes.forEach(refresh -> recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.CANCELLATION));
         shutdown.tryEmitEmpty();
         for (InFlightLoad flight : flights) {
             if (!flight.sourceStarted) {
@@ -1072,7 +1074,6 @@ final class LocalResponseCacheManager implements AutoCloseable {
             flight.result.tryEmitEmpty();
         }
         for (InFlightRefresh refresh : refreshes) {
-            recordRefreshOnce(refresh, LocalResponseCacheMetrics.WorkOutcome.CANCELLATION);
             if (refresh.sourceSubscription != null) {
                 refresh.sourceSubscription.dispose();
             }
