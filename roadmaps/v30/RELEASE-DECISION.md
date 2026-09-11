@@ -1,5 +1,12 @@
 # V30 Release Review
 
+## Current Status
+
+**2026-09-11: `4.3.0` is published and V30 is completed.**
+[Post-publication closure](#post-publication-closure) supersedes the preparation
+gates below without changing their historical results. The current development
+version is `4.4.0-SNAPSHOT`; no next release scope is selected.
+
 ## Decision
 
 **2026-09-11: GO to the `4.3.0` release cut; publication is not claimed.**
@@ -218,3 +225,67 @@ The 16 benchmark review flags remain acknowledged, with no public performance
 claim. Native coverage is limited to the documented smoke scenarios, not every
 optional TLS/operator/exporter integration. The copied unsigned artifacts and
 snapshot native executable must not be relabeled as signed final-release proof.
+
+## Post-Publication Closure
+
+Verified on 2026-09-11 from clean tag `v4.3.0`, commit
+`acb33430e541be509bf550bc690d86f0efdb7e2c`. The
+[release](https://github.com/huynhngochuyhoang/reactive-http-client/releases/tag/v4.3.0)
+was published at `2026-09-11T13:39:28Z`. The
+[publish workflow](https://github.com/huynhngochuyhoang/reactive-http-client/actions/runs/34605561561)
+completed successfully at `2026-09-11T13:46:22Z`; its verify and publish jobs,
+including signed packaging, staged signatures/consumer and generation checks,
+all succeeded before Central deployment. The earlier local pinentry failure is
+not reclassified as a local success; the credentialed workflow supplies the
+successful signing evidence.
+
+Fresh `release-artifacts-4.3.0` and `consumer-4.3.0` Maven repositories verify
+all **13** release artifacts and **four** assembled-consumer tests respectively.
+No failures/errors/skips or reactor-output leakage occurred. POM and embedded
+versions, SHA-256 values and Maven Central remote markers are retained. Consumer
+provenance records the clean tag and `completedStage=evidence-verified`.
+
+Evidence root: `target/release-evidence/v30/priority13-4/`. Its
+`SHA256SUMS` inventory hash is
+`b813289eb9bc3128b8936988d071812ab7ae1c51b168626a643160b67cb24e7a`.
+The repository-wide tree diff between the local review commit `72280806` and
+the reachable squash-release tag is empty. Earlier source/report hashes and
+local pre-squash commit labels remain historical; the durable published source
+is tag `v4.3.0`, not a claim that those local commits are release ancestors.
+
+Priority 13.4 and all V30 completion criteria are closed. Baselines advance to
+verified `4.3.0`; the next reactor/fixture version is `4.4.0-SNAPSHOT`. Generated
+readiness describes that unselected development cycle, with no active roadmap
+and no planned final release. Future manual checks are not outstanding V30 work.
+The original benchmark review flags and no-public-performance-claim disposition
+are unchanged. No production runtime behavior is changed by this archive update.
+
+### Archive Validation
+
+The post-publication patch advances coordinates and baseline commands without
+changing production Java. Validation on GraalVM JDK `25.0.3`, Maven `3.9.9`,
+Java source target `21` and managed Spring Boot `4.0.0` passes:
+
+- Full reactor: **1,693 tests**, comprising 1,564 starter (including 49
+  documentation tests), 73 test-helper and 56 OTel tests; no failures/errors/skips.
+- Support-capture sanitizer and fixture checks: **nine**, all passing.
+- Binary/source/Javadoc generation checks for `4.4.0-SNAPSHOT`.
+- Strict source/binary API comparisons at root and starter-only scope against
+  `4.3.0`, using independent fresh Central repositories and verified provenance.
+- Current and published `4.3.0` benchmark discovery: **27 harness/report tests
+  per lane**, all passing, including V30 work-limit fixtures. This is harness
+  validation, not a replacement for Priority 12's manual performance evidence.
+
+Evidence roots and `SHA256SUMS` inventory hashes:
+
+- `target/release-evidence/v30/post-release-validation/`:
+  `8b94ee4e5c06da2e26cd3b6436b4d71b1c4f020b7a803991dbb935723b5ec92d`.
+- `target/release-evidence/v30/post-release-validation-final/`:
+  `366498ed3a0fd8dd1843b24d739e56d6cde67c8a747cebdb250e82730f47854e`.
+
+Both record base commit, uncommitted patch, status, commands, times and actual
+outputs. The initial helper exited after passing current discovery because it
+tried to copy performance reports that discovery does not generate; that
+collection failure remains recorded. The corrected final run passes and includes
+the readiness-generator regression assertions preserving distinct V29/V30 scope.
+This evidence describes the archive patch, not a new clean release commit.

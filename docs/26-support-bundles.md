@@ -10,7 +10,7 @@ secrets, or customer data by default.
 Start triage in [Operations Troubleshooting](30-operations-troubleshooting.md),
 then return here for the bounded artifacts requested by that decision path.
 
-The commands and endpoint names on this page target published starter `4.2.0`
+The commands and endpoint names on this page target published starter `4.3.0`
 on Boot 4. Boot 3.5 applications remain on `2.14.1`; use the
 [4.x migration guide](28-spring-boot-4-jackson-migration.md) before applying the
 Boot 4 health type or native-image instructions.
@@ -121,7 +121,7 @@ common terminal outcomes:
   lifecycle events. It contains only fake bounded client/API/policy names and no
   cache keys/values, request variants, identity values, or exception messages.
 - [Cache-work saturation and recovery](fixtures/support-bundle-cache-work.json)
-  is V30 / `4.3.0` evidence, not a published `4.2.0` export. It aligns
+  is published `4.3.0` evidence, not a `4.2.0` export. It aligns
   live reservations, cumulative counter samples and pre-close deltas with
   policy occupancy, pool state, and factory/meter lifecycle.
 
@@ -1095,7 +1095,7 @@ them in the reviewable support bundle. Capture them only through a separately
 approved, encrypted, access-controlled process with explicit retention and
 deletion ownership.
 
-### Cache-work capture (V30 4.3.0 candidate)
+### Cache-work capture (V30 4.3.0+)
 
 Use [the work fixture](fixtures/support-bundle-cache-work.json) only on V30;
 published `4.2.0` does not export these work fields. Keep the existing bounded
@@ -1111,7 +1111,7 @@ corresponding meters, not zero work. Use null for unavailable measurements,
 including unweighted byte accounting.
 
 Read the policy-tagged live counts/maxima and rejection/skip counters from the
-[documented meter names](08-observability.md#live-cache-work-v30-430-candidate).
+[documented meter names](08-observability.md#live-cache-work-v30-430).
 Keep lookup/caller/load/refresh counters by API, with the mapping beside them;
 do not relabel API counters as policy exports. Work counts overlap, and none
 measures a unique-key count or wire-dispatch rate.

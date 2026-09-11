@@ -181,7 +181,7 @@ remain shared; closing either factory removes only its contribution. The weighte
 meters are removed when the last owner closes, and a later recreation binds only
 to the replacement cache.
 
-### Live cache work (V30 4.3.0 candidate)
+### Live cache work (V30 4.3.0+)
 
 These additive meters are not available in published 4.2.0. They require both
 `reactive.http.observability.enabled=true` and
@@ -257,7 +257,7 @@ terminal through `HttpClientObserver.recordCacheServed(...)`.
 
 ### Cache-work saturation recipes (V30)
 
-Use these only for the `4.3.0` candidate with explicitly selected work limits
+Use these for published `4.3.0` or later with explicitly selected work limits
 and cache telemetry. Each division keeps the complete matching scrape-target
 label set; do not aggregate pods before division. The optional outer
 `max by (client_name, cache_policy)` reports the worst per-target utilization,
@@ -318,8 +318,8 @@ ownership, and do not interpret pre-registered zero refresh terminal series as
 proof that refresh is enabled. Sample counter boundaries before close/reset;
 Prometheus `increase` is scrape-extrapolated and will not exactly reconcile
 with application counter samples. Keep it for dashboards, not exact fixture
-arithmetic. See [saturation recovery](30-operations-troubleshooting.md#cache-work-saturation-v30-430-candidate)
-and the [bounded capture](26-support-bundles.md#cache-work-capture-v30-430-candidate).
+arithmetic. See [saturation recovery](30-operations-troubleshooting.md#cache-work-saturation-v30-430)
+and the [bounded capture](26-support-bundles.md#cache-work-capture-v30-430).
 
 ## Observability configuration
 

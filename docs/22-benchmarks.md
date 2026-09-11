@@ -1,7 +1,7 @@
 # Benchmarks
 
 The commands in [Commands](#commands) are authoritative for the current
-`4.3.0` release candidate and published `4.2.0` baseline. Versioned
+`4.4.0-SNAPSHOT` development line and published `4.3.0` baseline. Versioned
 scope sections preserve V12-V20 evidence and are historical unless explicitly
 identified as current.
 
@@ -69,15 +69,15 @@ three-surface comparison completeness without recording measurements:
 mvn -Pbenchmarks,benchmark-discovery -pl reactive-http-client-benchmarks -am clean verify
 ```
 
-Run the same current harness against published `4.2.0` on the managed Boot stack
+Run the same current harness against published `4.3.0` on the managed Boot stack
 to prove the baseline-compatible scenario set still compiles and is discoverable:
 
 ```bash
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-discovery-4.2.0 \
+  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-discovery-4.3.0 \
   -Pbenchmarks,benchmark-discovery,benchmark-published-baseline \
   -pl reactive-http-client-benchmarks clean verify \
-  -Dbenchmark.starter.version=4.2.0
+  -Dbenchmark.starter.version=4.3.0
 ```
 
 Run the quick harness smoke benchmark:
@@ -139,24 +139,24 @@ omitting `-am` so Maven resolves the published dependency instead of the current
 reactor module:
 
 ```bash
-test ! -e target/published-baseline-repositories/benchmark-4.2.0 && \
+test ! -e target/published-baseline-repositories/benchmark-4.3.0 && \
 mvn -s .mvn/maven-central-settings.xml \
-  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-4.2.0 \
+  -Dmaven.repo.local=target/published-baseline-repositories/benchmark-4.3.0 \
   -Pbenchmarks,benchmark-release,benchmark-published-baseline \
   -pl reactive-http-client-benchmarks clean verify \
-  -Dbenchmark.starter.version=4.2.0 -Dbenchmark.commit=4.2.0 && \
-scripts/verify-published-baseline-provenance.sh benchmark 4.2.0 \
-  target/release-evidence/published-baselines/benchmark-4.2.0 \
+  -Dbenchmark.starter.version=4.3.0 -Dbenchmark.commit=4.3.0 && \
+scripts/verify-published-baseline-provenance.sh benchmark 4.3.0 \
+  target/release-evidence/published-baselines/benchmark-4.3.0 \
   reactive-http-client-starter
 ```
 
 The example version must match the root `api.compatibility.baseline.version`
-(`4.2.0` for this development line). When that property changes for the next
+(`4.3.0` for this development line). When that property changes for the next
 development cycle, update this command and the `published-starter-<version>`
 report paths together.
-V20 used `2.14.1` for its cross-major evidence. After `4.0.0` publication, the
-normal benchmark baseline is `4.2.0`; the historical V20, V27, and V29 reports
-commands remain in the V20 checklist.
+V20 used `2.14.1` for its cross-major evidence. After `4.3.0` publication, the
+normal benchmark baseline is `4.3.0`; historical reports and commands remain
+in their matching roadmap checklists.
 
 The repository path must not exist before the run. The shared provenance verifier
 records the published starter POM and jar hashes plus their Maven Central remote
@@ -164,9 +164,9 @@ marker as target-only evidence. It also rejects any project artifact version oth
 than the selected baseline. Select another empty
 target-local path when retaining earlier evidence. The command uses the current
 benchmark harness and current managed Spring Boot BOM. Because published
-`4.2.0` contains V29, the current baseline command includes the weighted-cache
-rows. The published-baseline profile excludes only the new V30 work-limit
-fixtures; historical source-exclusion profiles remain for older baselines. Its report is written under
+`4.3.0` contains V29 and V30, the current baseline command includes weighted-cache
+and work-limit rows. The published-baseline profile excludes neither feature;
+historical source-exclusion profiles remain for older baselines. Its report is written under
 `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-<version>/`
 so it does not overwrite the current-workspace release report.
 For an exact historical release environment, check out the release tag and run
@@ -323,6 +323,9 @@ performance claim and a sanitized report is intentionally promoted.
 
 ### V30 active-work performance and allocation audit
 
+This section preserves the V30 release audit against published `4.2.0`.
+Use tag `v4.3.0` to reproduce its release-era harness and commands.
+
 V30 measures work-limit overhead separately from retained cache entries.
 The eight shared methods are the two GET cache-disabled invocation rows, the
 two V29 unweighted invocation rows, the two weighted metrics-disabled invocation
@@ -469,9 +472,9 @@ release notes:
 Benchmark evidence:
 - Promoted report: `docs/benchmark-report-<version>.md` after the release-quality report is generated and promoted
 - Current candidate command: `mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)`
-- Published baseline command: `test ! -e target/published-baseline-repositories/benchmark-4.2.0 && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/published-baseline-repositories/benchmark-4.2.0 -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=4.2.0 -Dbenchmark.commit=4.2.0 && scripts/verify-published-baseline-provenance.sh benchmark 4.2.0 target/release-evidence/published-baselines/benchmark-4.2.0 reactive-http-client-starter`
+- Published baseline command: `test ! -e target/published-baseline-repositories/benchmark-4.3.0 && mvn -s .mvn/maven-central-settings.xml -Dmaven.repo.local=target/published-baseline-repositories/benchmark-4.3.0 -Pbenchmarks,benchmark-release,benchmark-published-baseline -pl reactive-http-client-benchmarks clean verify -Dbenchmark.starter.version=4.3.0 -Dbenchmark.commit=4.3.0 && scripts/verify-published-baseline-provenance.sh benchmark 4.3.0 target/release-evidence/published-baselines/benchmark-4.3.0 reactive-http-client-starter`
 - Current candidate report: `reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.md`
-- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-4.2.0/release-jmh.md`
+- Published baseline report: `reactive-http-client-benchmarks/target/benchmark-reports/published-starter-4.3.0/release-jmh.md`
 - Scenarios cited: `Get No Body`, `Post Json`
 ```
 
@@ -525,7 +528,7 @@ Compare the paired JMH JSON reports with the target-only helper after both repor
 ```bash
 mvn -Pbenchmarks,benchmark-compare -pl reactive-http-client-benchmarks -am verify \
   -Dbenchmark.compare.current=reactive-http-client-benchmarks/target/benchmark-reports/release-jmh.json \
-  -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-4.2.0/release-jmh.json
+  -Dbenchmark.compare.baseline=reactive-http-client-benchmarks/target/benchmark-reports/published-starter-4.3.0/release-jmh.json
 ```
 
 The helper writes `reactive-http-client-benchmarks/target/benchmark-reports/benchmark-comparison.md` by default. The comparison includes each matching benchmark method and mode, current and baseline values, absolute and relative deltas, average time, p50, p95, p99, throughput, and allocation per operation when those metrics are present. Missing current or baseline rows are listed explicitly. V13 threshold crossings are marked as `review`, but the command exits successfully by default so normal CI does not become a benchmark gate. For local release review, add `-Dbenchmark.compare.fail-on-review=true` to return a non-zero exit when any row is marked `review`. Attach or paste the generated `benchmark-comparison.md` next to the promoted report link when release notes discuss current-vs-baseline movement.

@@ -18,7 +18,7 @@ The [checklist](CHECKLIST.md) records executed checks and remaining gates.
 The snapshot-only group is
 `reactive.http.clients.<client>.cache.policies.<policy>.work`.
 It is available on `4.3.0-SNAPSHOT`, not published `4.2.0`. See the
-[configuration fragment](../../docs/32-response-caching.md#v30-snapshot-optional-work-limits).
+[configuration fragment](../../docs/32-response-caching.md#optional-work-limits-430).
 The Priority 4 and 5 sections below describe their earlier internal-only
 delivery boundaries; Priority 6 completes the public enforcement gate.
 

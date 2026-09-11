@@ -18,9 +18,9 @@ fired is critical to avoiding hard-to-debug incidents.
 
 ---
 
-## Cache work admission (4.3.0 candidate)
+## Cache work admission (4.3.0+)
 
-[Optional cache work limits](32-response-caching.md#v30-snapshot-optional-work-limits)
+[Optional cache work limits](32-response-caching.md#optional-work-limits-430)
 bound active owners, not elapsed time. They do not enable a deadline or queue.
 The caller's logical-call budget starts before preparation and authorization;
 hits and coalesced waiters each retain their own budget. A shared load retains

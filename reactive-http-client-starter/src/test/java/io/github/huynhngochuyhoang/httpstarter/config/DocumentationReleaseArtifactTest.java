@@ -86,8 +86,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(index)
                 .contains("acceptance boxes preserve the proposal")
                 .contains("V2 predates the separate execution-checklist convention")
-                .contains("V1-V29 are completed release records. V30 is the only active")
-                .contains("execution roadmap; the additive `4.3.0` candidate is selected but unpublished.");
+                .contains("V1-V30 are completed release records. V30 was released as `4.3.0`.")
+                .contains("No V31 execution roadmap is active.");
 
         for (int version : versions) {
             Path directory = archive.resolve("v" + version);
@@ -107,11 +107,7 @@ class DocumentationReleaseArtifactTest {
                     .filter(line -> line.startsWith("> **Status:**"))
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("Missing V" + version + " roadmap status"));
-            if (version == 30) {
-                assertThat(roadmapStatus).isEqualTo("> **Status:** active");
-                assertThat(indexRow).endsWith(" | Active |");
-            }
-            else if (version == 19) {
+            if (version == 19) {
                 assertThat(roadmapStatus).containsIgnoringCase("no-go");
                 assertThat(indexRow).containsIgnoringCase("no-go");
             }
@@ -1695,6 +1691,9 @@ class DocumentationReleaseArtifactTest {
         var workCandidate = majorReleaseCandidate("4.3.0",
                 releaseVersionContract("4.3.0", "4.2.0", "## [4.3.0] - Unreleased\n"));
         assertThat(workCandidate).containsEntry("scopeStatus", "selected")
+                .containsEntry("scope", "optional per-factory per-policy cache caller, load and refresh admission")
+                .containsEntry("decisionDocument", "roadmaps/v30/RELEASE-DECISION.md")
+                .doesNotContainKeys("weightContractDecision", "weightUnit")
                 .containsEntry("published", false)
                 .containsEntry("benchmarkDisposition", "no-public-performance-claim")
                 .containsEntry("pendingWork", List.of("signed final-artifact preflight",
@@ -1702,6 +1701,13 @@ class DocumentationReleaseArtifactTest {
                         "Central artifact verification", "published assembled consumer"));
         assertThat(majorReleaseCandidate("4.3.0",
                 releaseVersionContract("4.3.0", "4.3.0", "## [4.3.0] - 2026-09-11\n")))
+                .containsEntry("decisionDocument", "roadmaps/v30/RELEASE-DECISION.md")
+                .doesNotContainKeys("weightContractDecision", "weightUnit")
+                .containsEntry("published", true).containsEntry("pendingWork", List.of());
+        assertThat(majorReleaseCandidate("4.2.0",
+                releaseVersionContract("4.2.0", "4.2.0", "## [4.2.0] - 2026-09-06\n")))
+                .containsEntry("decisionDocument", "roadmaps/v29/RETAINED-WEIGHT-DECISION.md")
+                .containsEntry("weightContractDecision", "go")
                 .containsEntry("published", true).containsEntry("pendingWork", List.of());
 
         assertThat(benchmarkEvidence("3.1.0-SNAPSHOT", "3.0.0", snapshot, false).get("promotedReport")).isNull();
@@ -1721,7 +1727,7 @@ class DocumentationReleaseArtifactTest {
         String reactorVersion = projectVersion(root.resolve("pom.xml"));
         String publishWorkflow = Files.readString(root.resolve(".github/workflows/publish-maven-central.yml"));
 
-        assertThat(reactorVersion).isEqualTo("4.3.0");
+        assertThat(reactorVersion).isEqualTo("4.4.0-SNAPSHOT");
         assertThat(projectVersion(root.resolve("reactive-http-client-starter/pom.xml"))).isEqualTo(reactorVersion);
         assertThat(projectVersion(root.resolve("reactive-http-client-test/pom.xml"))).isEqualTo(reactorVersion);
         assertThat(projectVersion(root.resolve("reactive-http-client-otel/pom.xml"))).isEqualTo(reactorVersion);
@@ -1771,9 +1777,9 @@ class DocumentationReleaseArtifactTest {
         String ciWorkflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
         JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
 
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("4.3.0");
-        assertThat(pomProperty(pomXml, "latest.published.version")).isEqualTo("4.2.0");
-        assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("4.2.0");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("4.4.0-SNAPSHOT");
+        assertThat(pomProperty(pomXml, "latest.published.version")).isEqualTo("4.3.0");
+        assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("4.3.0");
         assertThat(pomProperty(pomXml, "spring-boot.version")).isEqualTo("4.0.0");
         assertThat(pomProperty(pomXml, "resilience4j.version")).isEqualTo("2.4.0");
         assertThat(pomXml)
@@ -1781,11 +1787,11 @@ class DocumentationReleaseArtifactTest {
                 .contains("${project.groupId}:${project.artifactId}:${api.compatibility.baseline.version}:pom")
                 .contains("<transitive>false</transitive>");
         assertThat(readme)
-                .contains("<version>4.2.0</version>")
-                .doesNotContain("<version>4.3.0");
+                .contains("<version>4.3.0</version>")
+                .doesNotContain("<version>4.4.0");
         assertThat(quickStart)
-                .contains("<version>4.2.0</version>")
-                .doesNotContain("<version>4.3.0");
+                .contains("<version>4.3.0</version>")
+                .doesNotContain("<version>4.4.0");
         assertThat(releaseDocs)
                 .contains("The published and current `4.x` lines require Java 21")
                 .contains("### V20 default Spring Boot 4 reactor\n\n"
@@ -1794,8 +1800,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("reactor was cut as the `4.0.0` release candidate")
                 .contains("### Post-`4.0.0` release lane")
                 .contains("### Post-`4.1.0` release lane")
-                .contains("### Post-`4.2.0` development lane")
-                .contains("strictly against published `4.2.0`")
+                .contains("### Post-`4.3.0` development lane")
+                .contains("strictly against published `4.3.0`")
                 .contains("report-only `major-api-report` profile is additional classification")
                 .contains("Strict mode enables both japicmp binary- and source-incompatibility failures")
                 .contains("mvn -s .mvn/maven-central-settings.xml verify")
@@ -1811,35 +1817,35 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Papi-compatibility -DskipTests verify")
                 .contains("-Papi-compatibility,major-api-report -DskipTests verify")
                 .contains("strict japicmp failure remains an unresolved release blocker")
-                .contains("Latest published and API baseline: `4.2.0`")
+                .contains("Latest published and API baseline: `4.3.0`")
                 .contains("Released major: `4.0.0` from tag `v4.0.0`")
-                .contains("Current candidate: `4.3.0`; additive work-admission scope selected, unpublished.");
+                .contains("Current development: `4.4.0-SNAPSHOT`; no release scope selected.");
         assertThat(changelog)
-                .contains("## [4.2.0] - 2026-09-06")
-                .contains("`4.2.0` published release")
-                .contains("optional decoded-response representation-byte admission")
-                .contains("makes no numerical or comparative performance claim")
-                .doesNotContain("`4.2.0` release candidate (pending publication)");
+                .contains("## [4.3.0] - 2026-09-11")
+                .contains("`4.3.0` published release")
+                .contains("per-factory/per-policy cache caller, foreground-load and refresh")
+                .contains("performance claim is made")
+                .doesNotContain("`4.3.0` release candidate (pending publication)");
         assertThat(readme)
                 .contains("[Starter 3.x to 4.x Resilience Migration](docs/31-3x-to-4x-resilience-migration.md)");
         assertThat(ciWorkflow)
-                .contains("api-root-4.2.0")
-                .contains("api-starter-4.2.0")
-                .contains("- name: Compare starter API to 4.2.0 from a separate repository\n        if: always()")
+                .contains("api-root-4.3.0")
+                .contains("api-starter-4.3.0")
+                .contains("- name: Compare starter API to 4.3.0 from a separate repository\n        if: always()")
                 .contains("-Papi-compatibility -DskipTests verify")
                 .doesNotContain("api-major-report-3.6.0");
         assertThat(benchmarkDocs)
-                .contains("-Dbenchmark.starter.version=4.2.0")
-                .contains("-Dbenchmark.commit=4.2.0")
-                .contains("test ! -e target/published-baseline-repositories/benchmark-4.2.0 && \\\n"
+                .contains("-Dbenchmark.starter.version=4.3.0")
+                .contains("-Dbenchmark.commit=4.3.0")
+                .contains("test ! -e target/published-baseline-repositories/benchmark-4.3.0 && \\\n"
                         + "mvn -s .mvn/maven-central-settings.xml")
-                .contains("-Dmaven.repo.local=target/published-baseline-repositories/benchmark-4.2.0")
-                .contains("published-starter-4.2.0/release-jmh.md")
-                .contains("published-starter-4.2.0/release-jmh.json")
+                .contains("-Dmaven.repo.local=target/published-baseline-repositories/benchmark-4.3.0")
+                .contains("published-starter-4.3.0/release-jmh.md")
+                .contains("published-starter-4.3.0/release-jmh.json")
                 .doesNotContain("published-starter-2.14.1/release-jmh.json");
         assertThat(manifest.path("publishedBaselineArtifacts"))
                 .allSatisfy(artifact -> assertThat(artifact.path("resolutionCommand").asText())
-                        .isEqualTo("scripts/verify-published-release-artifacts.sh 4.2.0"));
+                        .isEqualTo("scripts/verify-published-release-artifacts.sh 4.3.0"));
     }
 
     @Test
@@ -1861,7 +1867,7 @@ class DocumentationReleaseArtifactTest {
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
 
         assertThat(fixturePom)
-                .contains("<reactive-http-client.version>4.3.0</reactive-http-client.version>")
+                .contains("<reactive-http-client.version>4.4.0-SNAPSHOT</reactive-http-client.version>")
                 .contains("<artifactId>reactive-http-client-starter</artifactId>")
                 .contains("<artifactId>reactive-http-client-test</artifactId>")
                 .contains("<artifactId>reactive-http-client-otel</artifactId>")
@@ -2013,8 +2019,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("reactive-http-client-test")
                 .contains("[Boot 4 assembled consumer fixture](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)")
                 .contains("[Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline)")
-                .contains("starter `4.2.0`")
-                .contains("current reactor is `4.3.0`")
+                .contains("starter `4.3.0`")
+                .contains("current reactor is `4.4.0-SNAPSHOT`")
                 .contains("orders-api.example.invalid")
                 .contains("identity.example.invalid")
                 .doesNotContain("orders.example.test")
@@ -2108,12 +2114,12 @@ class DocumentationReleaseArtifactTest {
                 .contains("propagatedTraceparent.get()).isEqualTo(TRACEPARENT)");
         assertThat(releaseDocs)
                 .contains("### Published Boot 4 consumer baseline")
-                .contains("scripts/verify-published-release-artifacts.sh 4.2.0")
-                .contains("scripts/verify-published-consumer.sh 4.2.0")
+                .contains("scripts/verify-published-release-artifacts.sh 4.3.0")
+                .contains("scripts/verify-published-consumer.sh 4.3.0")
                 .contains("published parent")
                 .contains("source and Javadoc jars")
-                .contains("target/release-evidence/published-consumer/published-4.2.0/")
-                .contains("target/release-evidence/published-baselines/release-artifacts-4.2.0/")
+                .contains("target/release-evidence/published-consumer/published-4.3.0/")
+                .contains("target/release-evidence/published-baselines/release-artifacts-4.3.0/")
                 .doesNotContain("scripts/verify-published-consumer.sh 3.0.0")
                 .contains("current-reactor lane");
     }
@@ -2125,11 +2131,11 @@ class DocumentationReleaseArtifactTest {
         String benchmarkDocs = Files.readString(root.resolve("docs/22-benchmarks.md"));
         String currentBaselineProfile = benchmarkPom.substring(
                 benchmarkPom.indexOf("<id>benchmark-published-baseline</id>"),
-                benchmarkPom.indexOf("<id>benchmark-published-baseline-v29-source-exclusion</id>"));
+                benchmarkPom.indexOf("<id>benchmark-published-baseline-v30-source-exclusion</id>"));
         int currentBaselineCommandStart = benchmarkDocs.indexOf(
-                "target/published-baseline-repositories/benchmark-4.2.0 &&");
+                "target/published-baseline-repositories/benchmark-4.3.0 &&");
         String currentBaselineCommand = benchmarkDocs.substring(currentBaselineCommandStart,
-                benchmarkDocs.indexOf("scripts/verify-published-baseline-provenance.sh benchmark 4.2.0",
+                benchmarkDocs.indexOf("scripts/verify-published-baseline-provenance.sh benchmark 4.3.0",
                         currentBaselineCommandStart));
 
         String codecFactory = Files.readString(root.resolve(
@@ -2145,8 +2151,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("<id>benchmark-published-baseline-v28-source-exclusion</id>")
                 .doesNotContain("<id>boot4-spike</id>");
         assertThat(currentBaselineProfile)
-                .contains("<exclude>**/V30CacheWork*Benchmark.java</exclude>")
-                .contains("<testExclude>**/V30CacheWorkPerformanceBenchmarkTest.java</testExclude>")
+                .doesNotContain("<exclude>", "<testExclude>")
                 .doesNotContain("V29WeightedCachePerformanceBenchmark.java",
                         "V29WeightedCachePerformanceBenchmarkTest.java")
                 .doesNotContain("V28SemanticReadCachePerformanceBenchmark.java",
@@ -2155,7 +2160,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Pbenchmarks,benchmark-release,benchmark-published-baseline")
                 .doesNotContain("benchmark-published-baseline-v29-source-exclusion",
                         "benchmark-published-baseline-v28-source-exclusion");
-        for (String legacy : List.of("v27", "v28", "v29")) {
+        for (String legacy : List.of("v27", "v28", "v29", "v30")) {
             int start = benchmarkPom.indexOf("<id>benchmark-published-baseline-" + legacy + "-source-exclusion</id>");
             assertThat(benchmarkPom.substring(start, benchmarkPom.indexOf("</profile>", start)))
                     .contains("<exclude>**/V30CacheWork*Benchmark.java</exclude>")
@@ -2200,7 +2205,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("<breakBuildOnSourceIncompatibleModifications>${api.compatibility.break-on-source-incompatible}</breakBuildOnSourceIncompatibleModifications>")
                 .contains("<api.compatibility.ignore-missing-classes>true</api.compatibility.ignore-missing-classes>");
         assertThat(workflow)
-                .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-root-4.2.0")
+                .contains("-Dmaven.repo.local=target/published-baseline-repositories/api-root-4.3.0")
                 .contains("-Papi-compatibility -DskipTests verify")
                 .contains("bash scripts/verify-published-baseline-fixtures.sh")
                 .doesNotContain("api-major-report-3.6.0", "bash scripts/verify-v27-major-api-delta.sh");
@@ -2231,7 +2236,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("<reactive-http-client.version>2.14.1</reactive-http-client.version>")
                 .contains("[2.14.1 to 3.0.0 API Report](api-report-2.14.1-to-3.0.0.md)")
                 .contains("<version>4.0.0</version>")
-                .contains("<reactive-http-client.version>4.2.0</reactive-http-client.version>")
+                .contains("<reactive-http-client.version>4.3.0</reactive-http-client.version>")
                 .contains("org.springframework.boot.webclient.WebClientCustomizer")
                 .contains("org.springframework.boot.health.contributor")
                 .contains("tools.jackson.databind.ObjectMapper")
@@ -2253,7 +2258,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("## Verify the migration")
                 .contains("[Boot 4 assembled consumer fixture](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)")
                 .contains("[Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline)")
-                .contains("The latter is the adoption check for starter `4.2.0`")
+                .contains("The latter is the adoption check for starter `4.3.0`")
                 .contains("requires no\nconfiguration-metadata entry or reflection hint");
         assertThat(report)
                 .contains("published 2.14.1", "Frozen baseline surface")
@@ -2515,7 +2520,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("The V29 values are decoded response representation bytes")
                 .contains("`maximum-size` is still an entry count");
         assertThat(examples)
-                .contains("This weighted example targets published `4.2.0` and the current `4.3.0`")
+                .contains("This weighted example targets published `4.2.0` and later, including `4.3.0`")
                 .contains("Published `4.1.x` consumers must omit")
                 .contains("not exact Java heap, direct memory, process RSS, or container memory");
         assertThat(releaseCompatibility)
@@ -2547,7 +2552,7 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String examples = Files.readString(root.resolve("docs/examples/effective-configuration.md"));
         String section = markdownSection(examples,
-                "## Optional Cache Work Admission (4.3.0 candidate)", "## Explicit Local Response Cache");
+                "## Optional Cache Work Admission (4.3.0+)", "## Explicit Local Response Cache");
         Matcher yaml = Pattern.compile("```yaml\\n(.*?)```", Pattern.DOTALL).matcher(section);
         assertThat(yaml.find()).isTrue();
         var loader = new org.springframework.beans.factory.config.YamlPropertiesFactoryBean();
@@ -2792,10 +2797,10 @@ class DocumentationReleaseArtifactTest {
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`")
                 .contains("Create a dedicated maintenance branch from that tag")
                 .contains("do not compile Boot 3 adapters into the `3.x` artifacts");
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("4.3.0");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("4.4.0-SNAPSHOT");
         assertThat(pomXml)
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
-                .contains("<api.compatibility.baseline.version>4.2.0</api.compatibility.baseline.version>");
+                .contains("<api.compatibility.baseline.version>4.3.0</api.compatibility.baseline.version>");
     }
 
     @Test
@@ -2920,7 +2925,7 @@ class DocumentationReleaseArtifactTest {
         String settings = Files.readString(root.resolve(".mvn/maven-central-settings.xml"));
 
         assertThat(pomXml)
-                .contains("<version>4.3.0</version>")
+                .contains("<version>4.4.0-SNAPSHOT</version>")
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .doesNotContain("<id>boot4-spike</id>")
                 .doesNotContain("<maven.deploy.skip>true</maven.deploy.skip>")
@@ -3034,7 +3039,7 @@ class DocumentationReleaseArtifactTest {
                 "native factory shutdown exceeded the shared disposal deadline",
                 "same-tag native meter did not observe the replacement cache");
         assertThat(nativePom).contains(
-                "<reactive-http-client.version>4.3.0</reactive-http-client.version>",
+                "<reactive-http-client.version>4.4.0-SNAPSHOT</reactive-http-client.version>",
                 "-J-Xmx6g",
                 "-H:NumberOfThreads=4",
                 "-H:+SharedArenaSupport");
@@ -3055,7 +3060,7 @@ class DocumentationReleaseArtifactTest {
                 "Weighted cache admission",
                 "same-tag factory/context recreation",
                 "6 GiB",
-                "-Dreactive-http-client.version=4.3.0 native:compile",
+                "-Dreactive-http-client.version=4.4.0-SNAPSHOT native:compile",
                 "native-smoke-provenance");
     }
 
@@ -3534,10 +3539,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(manifest.normalize()).startsWith(root.resolve("target"));
         assertThat(benchmarkEvidenceSnippet.normalize()).startsWith(root.resolve("target"));
         assertThat(generated.path("projectVersion").asText()).isEqualTo(projectVersion(root.resolve("pom.xml")));
-        assertThat(generated.path("releaseState").asText()).isEqualTo("release-candidate");
-        assertThat(generated.path("developmentVersion").isNull()).isTrue();
-        assertThat(generated.path("latestPublishedConsumerVersion").asText()).isEqualTo("4.2.0");
-        assertThat(generated.path("plannedFinalVersion").asText()).isEqualTo("4.3.0");
+        assertThat(generated.path("releaseState").asText()).isEqualTo("snapshot-development");
+        assertThat(generated.path("developmentVersion").asText()).isEqualTo("4.4.0-SNAPSHOT");
+        assertThat(generated.path("latestPublishedConsumerVersion").asText()).isEqualTo("4.3.0");
+        assertThat(generated.path("plannedFinalVersion").isNull()).isTrue();
         assertThat(generated.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(pomProperty(pomXml, "api.compatibility.baseline.version"));
         assertThat(generated.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
@@ -3546,18 +3551,18 @@ class DocumentationReleaseArtifactTest {
         assertThat(readiness.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
         assertThat(readiness.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
-        assertThat(readiness.path("activeRoadmap").asText()).isEqualTo("v30");
-        assertThat(readiness.path("releaseLane").asText()).isEqualTo("additive-minor");
-        assertThat(readiness.path("releaseCandidate").path("version").asText()).isEqualTo("4.3.0");
-        assertThat(readiness.path("releaseCandidate").path("status").asText()).isEqualTo("pending-publication");
+        assertThat(readiness.path("activeRoadmap").isNull()).isTrue();
+        assertThat(readiness.path("releaseLane").asText()).isEqualTo("unselected");
+        assertThat(readiness.path("releaseCandidate").path("version").asText()).isEqualTo("4.4.0");
+        assertThat(readiness.path("releaseCandidate").path("status").asText()).isEqualTo("deferred");
         assertThat(readiness.path("releaseCandidate").path("published").asBoolean()).isFalse();
-        assertThat(readiness.path("releaseCandidate").path("scopeStatus").asText()).isEqualTo("selected");
+        assertThat(readiness.path("releaseCandidate").path("scopeStatus").asText()).isEqualTo("unselected");
         assertThat(readiness.path("releaseCandidate").path("weightContractDecision").isMissingNode()).isTrue();
         assertThat(readiness.path("releaseCandidate").path("migrationReport").isMissingNode()).isTrue();
         assertThat(readiness.path("releaseCandidate").path("pendingWork"))
                 .extracting(JsonNode::asText)
-                .containsExactly("signed final-artifact preflight", "reviewed clean final commit/tag",
-                        "publication", "Central artifact verification", "published assembled consumer");
+                .containsExactly("release scope", "API compatibility", "assembled consumers", "benchmarks",
+                        "AOT", "native image", "publication");
         assertThat(readiness.path("generatedTestEvidence").path("status").asText()).isEqualTo("pass");
         assertThat(readiness.path("manualReleaseEvidence").path("status").asText()).isEqualTo("pending");
         List<String> pendingReleaseCommands = streamText(readiness.path("manualReleaseEvidence").path("pendingCommands"));
@@ -3567,9 +3572,9 @@ class DocumentationReleaseArtifactTest {
                         .contains("verify-published-baseline-provenance.sh"));
         assertThat(pendingReleaseCommands)
                 .filteredOn(command -> command.contains("verify-published-release-artifacts.sh"))
-                .containsExactly("scripts/verify-published-release-artifacts.sh 4.2.0");
+                .containsExactly("scripts/verify-published-release-artifacts.sh 4.3.0");
         assertThat(pendingReleaseCommands)
-                .contains("scripts/verify-published-consumer.sh 4.2.0");
+                .contains("scripts/verify-published-consumer.sh 4.3.0");
         assertThat(pendingReleaseCommands)
                 .anySatisfy(command -> assertThat(command)
                         .contains("benchmark-release")
@@ -3596,18 +3601,18 @@ class DocumentationReleaseArtifactTest {
                 .extracting(JsonNode::asText)
                 .hasSize(4)
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
-                .anySatisfy(command -> assertThat(command).contains("api-root-4.2.0"))
-                .anySatisfy(command -> assertThat(command).contains("api-starter-4.2.0"));
+                .anySatisfy(command -> assertThat(command).contains("api-root-4.3.0"))
+                .anySatisfy(command -> assertThat(command).contains("api-starter-4.3.0"));
         assertThat(readiness.path("manualConsumerEvidence").path("status").asText()).isEqualTo("pending");
         assertThat(streamText(readiness.path("manualConsumerEvidence").path("pendingCommands")))
-                .containsExactly("scripts/verify-published-consumer.sh 4.2.0");
+                .containsExactly("scripts/verify-published-consumer.sh 4.3.0");
         assertThat(readiness.path("manualNativeEvidence").path("status").asText()).isEqualTo("pending");
         assertThat(streamText(readiness.path("manualNativeEvidence").path("pendingCommands")))
                 .singleElement()
                 .satisfies(command -> assertThat(command)
                         .contains("native:compile", "reactive-http-client-native-smoke"));
         assertThat(readiness.path("manualPublicationEvidence").path("status").asText())
-                .isEqualTo("pending");
+                .isEqualTo("deferred-until-release-cut");
         assertThat(readiness.path("manualPublicationEvidence").path("workflow").asText())
                 .isEqualTo(".github/workflows/publish-maven-central.yml");
         assertThat(streamText(readiness.path("manualPublicationEvidence").path("preflightCommands")))
@@ -3617,7 +3622,7 @@ class DocumentationReleaseArtifactTest {
                         .doesNotContain(" -B ", "--batch-mode"));
         assertThat(readiness.path("promotedBenchmarkReport").path("path").isNull()).isTrue();
         assertThat(readiness.path("promotedBenchmarkReport").path("status").asText())
-                .isEqualTo("not-required-no-public-claim");
+                .isEqualTo("deferred-until-release-cut");
         assertThat(readiness.path("configurationReference").path("status").asText()).isEqualTo("current");
         assertThat(readiness.path("markdownLinks").path("status").asText()).isEqualTo("pass");
         assertThat(readiness.path("staleBenchmarkReportLinks").path("status").asText()).isEqualTo("pass");
@@ -3627,9 +3632,9 @@ class DocumentationReleaseArtifactTest {
 
         JsonNode releasePrepChecklist = generated.path("releasePrepChecklist");
         assertThat(releasePrepChecklist.path("status").asText()).isEqualTo("pending");
-        assertThat(releasePrepChecklist.path("releaseState").asText()).isEqualTo("release-candidate");
-        assertThat(releasePrepChecklist.path("latestPublishedConsumerVersion").asText()).isEqualTo("4.2.0");
-        assertThat(releasePrepChecklist.path("plannedFinalVersion").asText()).isEqualTo("4.3.0");
+        assertThat(releasePrepChecklist.path("releaseState").asText()).isEqualTo("snapshot-development");
+        assertThat(releasePrepChecklist.path("latestPublishedConsumerVersion").asText()).isEqualTo("4.3.0");
+        assertThat(releasePrepChecklist.path("plannedFinalVersion").isNull()).isTrue();
         assertThat(releasePrepChecklist.path("projectVersion").asText()).isEqualTo(generated.path("projectVersion").asText());
         assertThat(releasePrepChecklist.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
@@ -3665,26 +3670,26 @@ class DocumentationReleaseArtifactTest {
         assertThat(releasePrepItems.get("version-snippets").path("expectedVersion").asText())
                 .isEqualTo(expectedConsumerVersion);
         assertThat(releasePrepItems.get("major-candidate").path("status").asText())
-                .isEqualTo("pending-publication");
-        assertThat(releasePrepItems.get("major-candidate").path("version").asText()).isEqualTo("4.3.0");
+                .isEqualTo("deferred");
+        assertThat(releasePrepItems.get("major-candidate").path("version").asText()).isEqualTo("4.4.0");
         assertThat(releasePrepItems.get("major-candidate").path("published").asBoolean()).isFalse();
-        assertThat(releasePrepItems.get("major-candidate").path("scopeStatus").asText()).isEqualTo("selected");
+        assertThat(releasePrepItems.get("major-candidate").path("scopeStatus").asText()).isEqualTo("unselected");
         assertThat(releasePrepItems.get("major-candidate").path("weightContractDecision").isMissingNode()).isTrue();
         assertThat(streamText(releasePrepItems.get("published-baseline-artifacts").path("commands")))
-                .containsExactly("scripts/verify-published-release-artifacts.sh 4.2.0");
+                .containsExactly("scripts/verify-published-release-artifacts.sh 4.3.0");
         assertThat(streamText(releasePrepItems.get("api-compatibility").path("commands")))
                 .hasSize(4)
                 .contains("bash scripts/verify-api-compatibility-fixtures.sh", "bash scripts/verify-published-baseline-fixtures.sh")
-                .anySatisfy(command -> assertThat(command).contains("api-root-4.2.0"))
-                .anySatisfy(command -> assertThat(command).contains("api-starter-4.2.0"));
+                .anySatisfy(command -> assertThat(command).contains("api-root-4.3.0"))
+                .anySatisfy(command -> assertThat(command).contains("api-starter-4.3.0"));
         assertThat(streamText(releasePrepItems.get("published-consumer").path("commands")))
-                .containsExactly("scripts/verify-published-consumer.sh 4.2.0");
+                .containsExactly("scripts/verify-published-consumer.sh 4.3.0");
         assertThat(streamText(releasePrepItems.get("native-evidence").path("commands")))
                 .singleElement()
                 .satisfies(command -> assertThat(command)
                         .contains("native:compile", "reactive-http-client-native-smoke"));
         assertThat(releasePrepItems.get("publication-readiness").path("status").asText())
-                .isEqualTo("pending");
+                .isEqualTo("deferred-until-release-cut");
         assertThat(streamText(releasePrepItems.get("publication-readiness").path("preflightCommands")))
                 .singleElement()
                 .satisfies(command -> assertThat(command)
@@ -3696,7 +3701,7 @@ class DocumentationReleaseArtifactTest {
                         generated.path("benchmarkEvidence").path("publishedStarterCommand").asText());
         assertThat(releasePrepItems.get("promoted-benchmark-report").path("path").isNull()).isTrue();
         assertThat(releasePrepItems.get("promoted-benchmark-report").path("status").asText())
-                .isEqualTo("not-required-no-public-claim");
+                .isEqualTo("deferred-until-release-cut");
         assertThat(releasePrepItems.get("generated-docs-and-links").path("status").asText()).isEqualTo("pass");
         assertThat(releasePrepItems.get("generated-docs-and-links").path("configurationReference").asText())
                 .isEqualTo("current");
@@ -3761,15 +3766,15 @@ class DocumentationReleaseArtifactTest {
                 .hasSize(12)
                 .contains(
                         "mvn test",
-                        "scripts/verify-published-consumer.sh 4.2.0",
+                        "scripts/verify-published-consumer.sh 4.3.0",
                         "bash scripts/verify-api-compatibility-fixtures.sh",
                         "bash scripts/verify-published-baseline-fixtures.sh",
                         "git diff --check",
                         "mvn -Pbenchmarks -pl reactive-http-client-benchmarks -am package",
                         "mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
                         "mvn -Pbenchmarks,benchmark-release -pl reactive-http-client-benchmarks -am verify -Dbenchmark.commit=$(git rev-parse --short HEAD)")
-                .anySatisfy(command -> assertThat(command).contains("api-root-4.2.0"))
-                .anySatisfy(command -> assertThat(command).contains("api-starter-4.2.0"));
+                .anySatisfy(command -> assertThat(command).contains("api-root-4.3.0"))
+                .anySatisfy(command -> assertThat(command).contains("api-starter-4.3.0"));
         JsonNode benchmarkEvidence = generated.path("benchmarkEvidence");
         assertThat(benchmarkEvidence.path("manualOrProfileGated").asBoolean()).isTrue();
         assertThat(benchmarkEvidence.path("currentWorkspaceCommand").asText())
@@ -4422,8 +4427,8 @@ class DocumentationReleaseArtifactTest {
         readiness.put("projectVersion", projectVersion);
         readiness.put("apiCompatibilityBaselineVersion", baselineVersion);
         readiness.put("apiCompatibilityBaselineMatchesProjectVersion", projectVersion.equals(baselineVersion));
-        readiness.put("activeRoadmap", "v30");
-        readiness.put("releaseLane", "additive-minor");
+        readiness.put("activeRoadmap", null);
+        readiness.put("releaseLane", "unselected");
         readiness.put("releaseCandidate", majorReleaseCandidate(projectVersion, versionContract));
         readiness.put("generatedTestEvidence", readinessStatus("pass",
                 "Generated by DocumentationReleaseArtifactTest in target/release-evidence/."));
@@ -4487,6 +4492,7 @@ class DocumentationReleaseArtifactTest {
         candidate.put("version", candidateVersion);
         candidate.put("status", status);
         candidate.put("published", "post-publication".equals(versionContract.releaseState()));
+        candidate.put("scopeStatus", "unselected");
         if ("4.3.0".equals(candidateVersion)) {
             candidate.put("scopeStatus", "selected");
             candidate.put("scope", "optional per-factory per-policy cache caller, load and refresh admission");

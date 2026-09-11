@@ -7,7 +7,7 @@ logs, or application metrics.
 
 ## Current release scope
 
-Current consumer instructions apply to published starter `4.2.0` on Spring Boot
+Current consumer instructions apply to published starter `4.3.0` on Spring Boot
 4. The repository may contain a newer snapshot while the next release is being
 prepared. Use the published coordinates from the [Quick Start](01-quick-start.md)
 for applications and reserve snapshot commands for the explicitly labeled
@@ -48,13 +48,13 @@ historical evidence.
 | OAuth2 refresh storm, token endpoint failure, or downstream 401 | Logical client name, sanitized auth mode, token endpoint status and safe headers, refresh/cooldown timing | [OAuth2 refresh](#oauth2-refresh) |
 | Unexpected stale value, miss storm, refresh failure, or cache capacity pressure | Effective cache phase/TTL/capacity, bounded hit/miss/load/refresh/eviction rates, process instance | [Response cache behavior (4.0.0+)](#response-cache-behavior-400) |
 | Pod memory grows after enabling response caching | Published/development version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (`4.2.0`+)](#cache-memory-triage-420) |
-| Local cache-work rejection or skipped refresh (V30 / `4.3.0` candidate only) | Selected work bounds, policy current/maximum gauges, fixed rejection/skip reasons, pre-close counter samples | [Cache-work saturation](#cache-work-saturation-v30-430-candidate) |
+| Local cache-work rejection or skipped refresh (V30 / `4.3.0`+) | Selected work bounds, policy current/maximum gauges, fixed rejection/skip reasons, pre-close counter samples | [Cache-work saturation](#cache-work-saturation-v30-430) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
 
-## Cache-work saturation (V30 4.3.0 candidate)
+## Cache-work saturation (V30 4.3.0+)
 
 Published `4.2.0` has no work-limit settings, live work gauges, or local
-`CACHE_ADMISSION_ERROR`. Use this section only with the V30 candidate.
+`CACHE_ADMISSION_ERROR`. Use this section with published `4.3.0` or later.
 
 | Bound | Scope and what it does not bound |
 |---|---|
@@ -104,7 +104,7 @@ Counters are cumulative histories, not active-flight counts. Last-owner close
 removes cache meters, so absent post-close meters are not zero terminal deltas.
 Closed diagnostics can still expose independent caller-owned cleanup; do not
 infer that all application work ended from deregistration.
-Use the [cache-work support fixture](26-support-bundles.md#cache-work-capture-v30-430-candidate),
+Use the [cache-work support fixture](26-support-bundles.md#cache-work-capture-v30-430),
 and retain the existing [memory-domain triage](#cache-memory-triage-420) when
 the reported symptom is memory growth.
 
