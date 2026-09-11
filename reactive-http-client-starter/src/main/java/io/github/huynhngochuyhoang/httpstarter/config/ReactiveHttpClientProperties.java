@@ -802,6 +802,11 @@ public class ReactiveHttpClientProperties {
         private Long refreshAfterMs;
         /** Maximum refresh duration in milliseconds. Required when refresh is selected. */
         private Long refreshTimeoutMs;
+        /** Optional, complete caller/load/refresh ownership bounds for this named policy. */
+        private CacheWorkConfig work;
+
+        public CacheWorkConfig getWork() { return work; }
+        public void setWork(CacheWorkConfig work) { this.work = work; }
 
         public Long getTtlMs() { return ttlMs; }
         public void setTtlMs(Long ttlMs) { this.ttlMs = ttlMs; }
@@ -849,6 +854,19 @@ public class ReactiveHttpClientProperties {
         public void setRefreshTimeoutMs(Long refreshTimeoutMs) { this.refreshTimeoutMs = refreshTimeoutMs; }
 
         public boolean isRefreshEnabled() { return refreshAfterMs != null || refreshTimeoutMs != null; }
+    }
+
+    public static class CacheWorkConfig {
+        private Long maximumConcurrentCallers;
+        private Long maximumConcurrentLoads;
+        private Long maximumConcurrentRefreshes;
+
+        public Long getMaximumConcurrentCallers() { return maximumConcurrentCallers; }
+        public void setMaximumConcurrentCallers(Long value) { maximumConcurrentCallers = value; }
+        public Long getMaximumConcurrentLoads() { return maximumConcurrentLoads; }
+        public void setMaximumConcurrentLoads(Long value) { maximumConcurrentLoads = value; }
+        public Long getMaximumConcurrentRefreshes() { return maximumConcurrentRefreshes; }
+        public void setMaximumConcurrentRefreshes(Long value) { maximumConcurrentRefreshes = value; }
     }
 
     // ---- resilience sub-config ----

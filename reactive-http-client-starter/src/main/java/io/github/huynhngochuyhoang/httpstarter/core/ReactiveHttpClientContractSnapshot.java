@@ -190,7 +190,13 @@ public final class ReactiveHttpClientContractSnapshot {
                 + ",sharedResponse=" + cache.sharedResponse()
                 + ",singleFlight=" + cache.singleFlight()
                 + ",refreshAfter=" + cache.refreshAfterMs() + "ms"
-                + ",refreshTimeout=" + cache.refreshTimeoutMs() + "ms";
+                + ",refreshTimeout=" + cache.refreshTimeoutMs() + "ms"
+                + (cache.work() != null
+                        ? ",workCallers=" + cache.work().maximumConcurrentCallers()
+                        + ",workLoads=" + cache.work().maximumConcurrentLoads()
+                        + ",workRefreshes=" + (cache.work().maximumConcurrentRefreshes() != null
+                                ? cache.work().maximumConcurrentRefreshes() : "disabled")
+                        : "");
     }
 
     private static String variantNames(List<String> names) {

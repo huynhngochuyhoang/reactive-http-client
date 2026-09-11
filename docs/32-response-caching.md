@@ -424,6 +424,135 @@ DTOs; callers that mutate a cached object must copy it on their side. A cached
 `ResponseEntity` is rebuilt only to retain the bounded safe header subset; its
 body retains the decoded object identity.
 
+## V30 snapshot: optional work limits
+
+The following policy fragment is supported by the `4.3.0` release
+candidate, not published `4.2.0`. Add it only to an already selected, eligible policy;
+the dependency, key-isolation, and customization-safety requirements above still
+apply.
+
+```yaml
+work:
+  maximum-concurrent-callers: 64
+  maximum-concurrent-loads: 16
+  maximum-concurrent-refreshes: 4
+```
+
+Every selected limit is an integer in `[1, 1000000]`. Caller and load limits are
+required together. Include the refresh limit only when `refresh-after-ms` and
+`refresh-timeout-ms` are already configured; it is required in that case and
+forbidden otherwise. An absent work group, or three null leaves, selects no
+limit. Unused policy definitions remain inert. Nothing here enables caching,
+single flight, refresh, resilience, metrics, a queue, or a foreground timeout.
+
+Counts are independent per policy name and client factory, shared by all APIs
+selecting that name. Callers reserve before argument/context preparation,
+serialization, auth and lookup, including hits and coalesced waiters. A new
+independent miss or shared source requires one load reservation through retries,
+decode and publication; an existing flight's waiters do not reserve more load
+capacity. An admitted source can outlive its initiating caller.
+
+Refresh reserves separately before hidden preparation. A saturated trigger
+returns the authorized, still-valid stale value, retaining no queued trigger
+and leaving value, weight, age and hard expiry unchanged. It is not a terminal
+refresh load. Later access may try again. Refresh retains the earlier of its
+existing timeout and hard expiry. Refresh saturation does not consume
+foreground capacity, although configured shared connection pools, auth services,
+and resilience operators can still contend.
+
+Cancellation/timeout cannot release a reservation while an entered synchronous
+starter callback is still unwinding. Independent caller-owned loads may outlive
+factory close, but cannot publish afterward; their capacity ends at their own
+terminal boundary. Arbitrary application tasks outside those callbacks remain
+application-owned. Limits bound simultaneous ownership, not memory bytes or
+unbounded work duration.
+
+Limits and selected-policy mappings are frozen at construction. Detected
+mutation fails subsequent invocation/subscription or live snapshot inspection;
+recreate the factory to change the selection. Basic per-method contract output
+includes the normalized bounds. V30 Priority 9 adds the public
+`CacheWorkRejectedException` reasons `CALLER_CAPACITY` / `LOAD_CAPACITY`,
+`CALLER_REJECTED` / `LOAD_REJECTED` cache outcomes, and
+`CACHE_ADMISSION_ERROR`. Enabled terminal surfaces report zero attempts and
+no dispatch or request/response evidence; these calls do not enter downstream
+request timers or health samples. [Work telemetry](08-observability.md#live-cache-work-v30-430-candidate)
+is separately selected under cache observability and never inferred from refresh
+terminal counters. [Diagnostics](21-diagnostic-contexts.md#v30-work-count-additions-430-candidate)
+add limited-policy-only maxima/current counts, preserving unknown lazy state
+without requiring metrics or instantiating an owner.
+
+### Composition and deadlines with work limits
+
+Work limits leave the explicitly selected operator order unchanged: Bulkhead,
+CircuitBreaker, RateLimiter, Retry, then the request attempt on subscription.
+A rejected caller never prepares or authorizes a request. A foreground load
+rejection happens after per-caller preparation/auth/lookup, but before the
+business loader's operators subscribe; it consumes no business guard permit,
+Retry attempt, or circuit sample. Auth/token-service work has its own transport
+and resilience configuration. A real guard rejection after local admission
+releases the caller and load reservations with zero business attempts/dispatch.
+
+One load reservation spans Retry backoff, the subsequent attempts, and hidden
+auth/redirect dispatches. Cache capacity grants no retry permission, unsafe-method
+acknowledgement, or body repeatability. A semantic-read POST still needs the
+existing explicit retry/idempotency contract. A `401` replay consumes refreshed
+auth, and a later outer Retry resolves current credentials rather than reusing
+the initial pre-lookup credential. Auth-visible prepared bytes remain isolated
+from outbound bytes. Changed finalized WebClient request identity prevents
+publication under the old lookup key. Transparent connector redirects retain
+the original WebClient URL in terminal diagnostics; this is not a redirect-hop
+audit or a count of wire requests.
+
+Every caller, including a hit or waiter, retains its own logical-call budget.
+An early waiter timeout releases that caller only. The first caller's timeout
+also leaves a shared source and its load slot alive while another caller remains;
+waiters do not inherit the source's URL, response headers, status, or attempt
+count. The last detachment cancels shared work. Native `request-timeout-ms`
+remains inside the source and a response read timeout terminates all its callers.
+Hidden refresh uses the same auth/operator pipeline with its own refresh slot
+and the earlier of refresh timeout and hard expiry, not a stale caller's deadline.
+
+Set a finite `logical-call-timeout-ms` for the complete foreground preparation,
+auth, resilience admission wait, Retry delays, and response consumption budget. Configure
+the native request/transport timeouts for the phases described in
+[Timeouts](04-timeouts.md); a response-read timeout alone is not an end-to-end
+deadline. Without applicable timeouts or cancellation, a hung admitted source
+continues occupying capacity indefinitely. Limits reject excess work; they do
+not age out live ownership. A successful response that bypasses byte storage
+still releases work capacity normally. Prepared request arguments may remain in
+lifecycle/exchange-log records when dispatch facts are absent; do not interpret
+those headers (for example, an idempotency key) as proof of a wire request.
+
+### Cancellation, eviction, and factory ownership
+
+On the V30 development line, a reservation remains occupied while an entered
+synchronous preparation or cancellation callback unwinds, even if a terminal
+signal has already been delivered. Racing success/error and cancellation release
+each reservation once. Cancellation must not make capacity reusable while its
+cleanup is still running. Application callbacks must cooperate with cancellation;
+the starter cannot forcibly interrupt arbitrary blocking application code.
+
+Explicit eviction clears stored values and invalidates outstanding publication
+tokens. It cancels registered refreshes, but does not end an interested foreground
+load or release its slot. Such a load may return its result to callers without
+storing it. Eviction is not a way to reclaim capacity from active callers.
+
+Factory close stops new reservations and cache creation, clears entries, and
+cancels registered flights and refreshes. Independent loads remain caller-owned:
+closing the cache manager invalidates their publication rights but does not claim
+they have terminated. They retain their slots until completion, error, timeout,
+or caller cancellation; separately owned transport disposal may also terminate
+them. A replacement factory has independent reservations and storage, so a late
+release from the old manager cannot free a new manager's slot or fill its cache.
+
+Capture cache meters before close. At the last metric owner, close removes them;
+an absent post-close series is not a zero-valued terminal counter or proof that
+all external callers stopped. In overlapping factories, remaining metric owners
+retain their registrations. Work-limit live gauges follow the same ownership
+rule; see [saturation and recovery](30-operations-troubleshooting.md#cache-work-saturation-v30-430-candidate).
+Reference-queue/weak-reference GC checks are test evidence only, not runtime GC
+behavior or an assertion that allocator/RSS usage must fall immediately.
+
 ## Phase-four observability
 
 Cache telemetry is independent from cache selection and defaults off. Enable it

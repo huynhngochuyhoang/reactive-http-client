@@ -1,7 +1,7 @@
 # Native Image and Release Compatibility
 
-Sections without a version label describe the current `4.3.0-SNAPSHOT`
-development line. Sections labeled V18, V19, V20, V27, or V29 preserve release-era
+Sections without a version label describe the current `4.3.0`
+release candidate. Sections labeled V18, V19, V20, V27, or V29 preserve release-era
 evidence and are not current commands. Use the command in the first applicable
 current section; historical sections remain for provenance only.
 
@@ -173,9 +173,11 @@ against `4.1.0`.
 
 After Maven Central verification, public consumer, strict API, assembled
 consumer, and benchmark baselines moved to published `4.2.0`. Reactor-only
-coordinates use `4.3.0-SNAPSHOT`. [V30](../roadmaps/v30/ROADMAP.md) is the active
+coordinates use `4.3.0`. [V30](../roadmaps/v30/ROADMAP.md) is the active
 execution roadmap with an [adopted checklist](../roadmaps/v30/CHECKLIST.md);
-its final release scope remains unselected.
+its additive work-admission scope is selected, but publication is pending.
+The [V30 release review](../roadmaps/v30/RELEASE-DECISION.md) separates clean
+implementation evidence from final-artifact signing and publication.
 Normal CI compares the root and starter-module public APIs strictly
 against `4.2.0`.
 
@@ -196,6 +198,13 @@ mvn -s .mvn/maven-central-settings.xml clean -Prelease -DskipTests verify
 bash scripts/verify-generation-packaging.sh
 bash scripts/verify-publishable-artifacts.sh
 ```
+
+For local passphrase prompts, set `export GPG_TTY="$(tty)"` and omit Maven
+`-B`/`--batch-mode`. With GPG plugin `3.2.4`, non-interactive mode without
+a supplied passphrase uses `--pinentry-mode error`; `No pinentry` can therefore
+mean prompting was prohibited, not that pinentry is missing. CI retains batch
+mode and supplies its signing secret through the configured environment.
+Never put a passphrase in a command-line argument or support evidence.
 
 The staging guard writes only target-local evidence under
 `target/release-evidence/v20-priority5/`. It generates effective POMs for the
@@ -381,7 +390,7 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `4.3.0-SNAPSHOT` development line compares
+from the current reactor version. The `4.3.0` release candidate compares
 strictly against published `4.2.0`:
 
 ```bash
@@ -574,6 +583,31 @@ public, `@hidden` cross-package bridge inside the optional test-helper artifact;
 it is excluded deliberately and is not an application or test extension point.
 No starter public signature exposes Caffeine or one of these internal cache
 types.
+
+### V30 additive surface freeze
+
+The selected `4.3.0` scope is optional per-factory, per-policy cache work
+admission. Published `4.2.0` policies select no work limits when the new group
+is absent. Storage TTL, entry and decoded-response-byte bounds remain separate.
+See the [release decision](../roadmaps/v30/RELEASE-DECISION.md) for evidence,
+benchmark qualifications, and pending publication gates.
+
+| Supported addition | Compatibility boundary |
+|---|---|
+| Configuration: `CachePolicyConfig.getWork()` / `setWork(CacheWorkConfig)` and `ReactiveHttpClientProperties.CacheWorkConfig` | Additive mutable binding model with a no-arg constructor and three nullable `Long` getter/setter pairs. Selected values normalize to integers in `[1, 1000000]`; caller/load are required together and refresh is required only with selected refresh. |
+| Exception: `CacheWorkRejectedException`, its constructor, `getReason()`, and nested `Reason` | Fixed `CALLER_CAPACITY` / `LOAD_CAPACITY` local errors, not downstream or storage-admission failures. |
+| Enums: `ErrorCategory.CACHE_ADMISSION_ERROR` and `HttpClientCacheOutcome.CALLER_REJECTED` / `LOAD_REJECTED` | Additive enum values. Consumers of serialized categories/outcomes must tolerate new values; existing Java constructors remain available. |
+| Helper: `MockReactiveHttpClient.cacheWorkSnapshot()`, nested `CacheWorkSnapshot`, and `Builder.withCacheObservability()` | Additive immutable work view and explicit telemetry selection. Published `CacheSnapshot` components and constructors are unchanged. |
+| Effective-contract rendering and diagnostics schema V1 | Additive normalized work bounds and limited-policy live aggregates; unknown/lazy facts remain null. No public diagnostics record constructor is changed. |
+| Cache work gauges, rejection and refresh-skip counters | Existing tags remain unchanged; new fixed-cardinality meters require selected work and explicit cache observability. No request, key, or identity labels. |
+
+The existing `ReactiveHttpClientProperties*`, exception, observability, test,
+and contract/diagnostics include patterns cover these Java additions. Strict
+source and binary failures remain enabled, including nested types and enums.
+`CacheWorkPolicy`, `CacheWorkAdmission`, `CacheCallerAdmission`, and internal
+work snapshots are not public extension points. No public signature exposes
+Caffeine or a reservation implementation. Property changes require factory
+recreation, not mutation of a live frozen policy.
 
 ### Constructor and mutable model policy
 
@@ -822,6 +856,17 @@ Supported Boot 4 native-image path:
 - Diagnostics snapshot version metadata from the packaged Maven
   `pom.properties` resource.
 
+The V30 / `4.3.0` fixture additionally exercises selected GET/count-only
+and semantic POST/weighted work limits: gated caller/load saturation, same-key
+attachment, released-slot reuse, refresh-capacity skips, a later caller surviving
+the first caller's deadline, and cancellation on factory close. Every loopback
+request is counted, including unmatched routes; bounded quiet periods check for
+late dispatch. Request/acquire deadlines exceed the shutdown observation window.
+JVM and generated-AOT runs validate fixture behavior but are not native-executable
+evidence. The [V30 native gate](../roadmaps/v30/CHECKLIST.md#native-gate-closure-2026-09-11)
+records the clean-commit compile/run, exact snapshot coordinates and binary hash;
+the final candidate's packaging remains separately identified in its release review.
+
 The scheduled smoke installs the default Boot 4 reactor, compiles the fixture,
 and runs the generated executable. Native compilation is bounded to 6 GiB and
 four worker threads so the fixture remains usable on modest CI and developer
@@ -836,7 +881,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=4.3.0-SNAPSHOT native:compile
+  -Dreactive-http-client.version=4.3.0 native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
@@ -898,9 +943,14 @@ latest published consumer version and reports benchmark promotion and Maven
 Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
-V29 is published and archived at `4.2.0`. During the post-release
-`4.3.0-SNAPSHOT` cycle, candidate status is `deferred`, `published=false`, and
-release scope remains unselected until a later roadmap explicitly activates it.
+V29 is published and archived at `4.2.0`. V30 selects the additive-minor
+`4.3.0` candidate with status `pending-publication`, `published=false`, and
+`plannedFinalVersion=4.3.0`. The candidate lists signed final-artifact preflight,
+the reviewed clean final commit/tag, publication, Central verification and the
+published assembled consumer as pending. The manual command list remains a
+conservative rerun list; a test-generated manifest does not certify those runs.
+The [release decision](../roadmaps/v30/RELEASE-DECISION.md) links their actual
+provenance and the no-public-performance-claim benchmark disposition.
 
 The root `latest.published.version` property owns public consumer snippets;
 `api.compatibility.baseline.version` remains an independent compatibility policy.
@@ -1000,7 +1050,7 @@ test/runtime dependencies; its classpath must contain no Caffeine artifact. It r
 reactor `target/classes` leakage in either application and records separate mock,
 weighted/current-consumer, and cache-disabled test reports, both consumer classpaths,
 dependency trees and effective POMs, project artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-4.3.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
+`target/release-evidence/current-consumer/current-4.3.0/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
 test stage. An `EXIT` trap repeats that filtered copy before preserving the original
 verifier status, including when any test stage fails.
 It also records the last completed stage and exit status when a later

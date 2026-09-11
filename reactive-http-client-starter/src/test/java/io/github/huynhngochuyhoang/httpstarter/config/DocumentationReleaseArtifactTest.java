@@ -87,7 +87,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("acceptance boxes preserve the proposal")
                 .contains("V2 predates the separate execution-checklist convention")
                 .contains("V1-V29 are completed release records. V30 is the only active")
-                .contains("execution roadmap; its checklist is adopted and final release scope is unselected.");
+                .contains("execution roadmap; the additive `4.3.0` candidate is selected but unpublished.");
 
         for (int version : versions) {
             Path directory = archive.resolve("v" + version);
@@ -351,6 +351,45 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContainIgnoringCase("credential")
                 .doesNotContainIgnoringCase("tenant")
                 .doesNotContain("http://", "https://");
+    }
+
+    @Test
+    void cacheWorkOperationsFixtureUsesSharedPrivacyAndDocumentationGuards() throws IOException {
+        Path root = projectRoot();
+        Path path = root.resolve("docs/fixtures/support-bundle-cache-work.json");
+        assertThat(Files.size(path)).isLessThanOrEqualTo(1024 * 1024);
+        JsonNode fixture = OBJECT_MAPPER.readTree(Files.readString(path));
+        assertThat(sensitiveSupportFixtureFieldNames(fixture)).isEmpty();
+        assertThat(sensitiveSupportFixtureTextValues(fixture)).isEmpty();
+        assertThat(fixture.path("projectVersion").asText()).isEqualTo("4.3.0");
+        for (String field : List.of("entryKey", "responseBody", "requestHeaders",
+                "accountId", "subject", "requestTarget")) {
+            JsonNode unsafe = OBJECT_MAPPER.valueToTree(Map.of("capture", fixture, field, "customer-123"));
+            assertThat(sensitiveSupportFixtureFieldNames(unsafe)).contains(field);
+        }
+        for (String value : List.of("PROPFIND /customers/123?debug HTTP/1.1",
+                "ftp://internal-host/resource", "file:///private/path",
+                "internal.example:443", "orders/42", "?debug", "*")) {
+            JsonNode unsafe = OBJECT_MAPPER.valueToTree(Map.of("capture", fixture, "sample", value));
+            assertThat(sensitiveSupportFixtureTextValues(unsafe)).contains(value);
+        }
+        assertThat(fixture.path("affectedCaller").path("errorCategory").asText())
+                .isEqualTo("CACHE_ADMISSION_ERROR");
+        assertThat(Files.readString(root.resolve("docs/26-support-bundles.md")))
+                .contains("fixtures/support-bundle-cache-work.json")
+                .contains("Published `4.1.x` and `4.2.x` may omit the entire group")
+                .contains("python3 scripts/verify-cache-work-support.py");
+        assertThat(Files.readString(root.resolve("docs/30-operations-troubleshooting.md")))
+                .contains("The starter neither queues nor automatically retries local overload")
+                .contains("There is no uncached fallback dispatch");
+        String observability = Files.readString(root.resolve("docs/08-observability.md"));
+        for (String dimension : List.of("callers", "loads", "refreshes")) {
+            assertThat(observability).contains(
+                    "reactive_http_client_cache_work_active_" + dimension + "\n/\n"
+                            + "reactive_http_client_cache_work_maximum_" + dimension);
+        }
+        assertThat(Files.readString(root.resolve(".github/workflows/ci.yml")))
+                .contains("python3 scripts/verify-cache-work-support.py");
     }
 
     @Test
@@ -1653,6 +1692,18 @@ class DocumentationReleaseArtifactTest {
                 .containsEntry("published", true)
                 .containsEntry("pendingWork", List.of());
 
+        var workCandidate = majorReleaseCandidate("4.3.0",
+                releaseVersionContract("4.3.0", "4.2.0", "## [4.3.0] - Unreleased\n"));
+        assertThat(workCandidate).containsEntry("scopeStatus", "selected")
+                .containsEntry("published", false)
+                .containsEntry("benchmarkDisposition", "no-public-performance-claim")
+                .containsEntry("pendingWork", List.of("signed final-artifact preflight",
+                        "reviewed clean final commit/tag", "publication",
+                        "Central artifact verification", "published assembled consumer"));
+        assertThat(majorReleaseCandidate("4.3.0",
+                releaseVersionContract("4.3.0", "4.3.0", "## [4.3.0] - 2026-09-11\n")))
+                .containsEntry("published", true).containsEntry("pendingWork", List.of());
+
         assertThat(benchmarkEvidence("3.1.0-SNAPSHOT", "3.0.0", snapshot, false).get("promotedReport")).isNull();
         // A non-snapshot release without the report on disk stays deferred/pending.
         assertThat(benchmarkEvidence("3.1.0", "3.0.0", candidate, false).get("promotedReport")).isNull();
@@ -1670,7 +1721,7 @@ class DocumentationReleaseArtifactTest {
         String reactorVersion = projectVersion(root.resolve("pom.xml"));
         String publishWorkflow = Files.readString(root.resolve(".github/workflows/publish-maven-central.yml"));
 
-        assertThat(reactorVersion).isEqualTo("4.3.0-SNAPSHOT");
+        assertThat(reactorVersion).isEqualTo("4.3.0");
         assertThat(projectVersion(root.resolve("reactive-http-client-starter/pom.xml"))).isEqualTo(reactorVersion);
         assertThat(projectVersion(root.resolve("reactive-http-client-test/pom.xml"))).isEqualTo(reactorVersion);
         assertThat(projectVersion(root.resolve("reactive-http-client-otel/pom.xml"))).isEqualTo(reactorVersion);
@@ -1720,7 +1771,7 @@ class DocumentationReleaseArtifactTest {
         String ciWorkflow = Files.readString(root.resolve(".github/workflows/ci.yml"));
         JsonNode manifest = OBJECT_MAPPER.valueToTree(releaseEvidenceManifest(root.resolve("pom.xml")));
 
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("4.3.0-SNAPSHOT");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("4.3.0");
         assertThat(pomProperty(pomXml, "latest.published.version")).isEqualTo("4.2.0");
         assertThat(pomProperty(pomXml, "api.compatibility.baseline.version")).isEqualTo("4.2.0");
         assertThat(pomProperty(pomXml, "spring-boot.version")).isEqualTo("4.0.0");
@@ -1762,7 +1813,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("strict japicmp failure remains an unresolved release blocker")
                 .contains("Latest published and API baseline: `4.2.0`")
                 .contains("Released major: `4.0.0` from tag `v4.0.0`")
-                .contains("Current development line: `4.3.0-SNAPSHOT`; no release scope is selected.");
+                .contains("Current candidate: `4.3.0`; additive work-admission scope selected, unpublished.");
         assertThat(changelog)
                 .contains("## [4.2.0] - 2026-09-06")
                 .contains("`4.2.0` published release")
@@ -1810,7 +1861,7 @@ class DocumentationReleaseArtifactTest {
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
 
         assertThat(fixturePom)
-                .contains("<reactive-http-client.version>4.3.0-SNAPSHOT</reactive-http-client.version>")
+                .contains("<reactive-http-client.version>4.3.0</reactive-http-client.version>")
                 .contains("<artifactId>reactive-http-client-starter</artifactId>")
                 .contains("<artifactId>reactive-http-client-test</artifactId>")
                 .contains("<artifactId>reactive-http-client-otel</artifactId>")
@@ -1821,6 +1872,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("<id>v29-current-parity</id>")
                 .contains("<name>consumer.v29.parity</name>")
                 .contains("<source>src/v29-test/java</source>")
+                .contains("<id>v30-current-parity</id>")
+                .contains("<name>consumer.v30.parity</name>")
+                .contains("<source>src/v30-test/java</source>")
                 .contains("<groupId>com.github.ben-manes.caffeine</groupId>");
         assertThat(cacheDisabledPom)
                 .contains("<artifactId>reactive-http-client-starter</artifactId>")
@@ -1842,6 +1896,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("stage=\"consumer-tests\"\ncopy_consumer_reports")
                 .contains("copy_cache_disabled_reports()")
                 .contains("-Dconsumer.v29.parity=true")
+                .contains("-Dconsumer.v30.parity=true")
+                .contains("MockCacheWorkParityTest")
                 .contains("stage=\"cache-disabled-tests\"\ncopy_cache_disabled_reports")
                 .contains("cache-disabled-dependency-tree.txt")
                 .contains("cache-disabled-classpath.txt")
@@ -1878,6 +1934,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("exitStatus=$status")
                 .contains("published consumer resolved reactor output directories");
         assertThat(publishedConsumerScript).doesNotContain("consumer.v29.parity");
+        assertThat(publishedConsumerScript).doesNotContain("consumer.v30.parity");
+        assertThat(testHelperDocs).contains("cacheWorkSnapshot()", "withCacheObservability()",
+                "coalescedWaiterCount()", "V30 / 4.3.0");
         assertThat(fixtureTest)
                 .contains("extends SharedOrders<OrderResponse>")
                 .contains("@ApiRef(\"configured\")")
@@ -1925,6 +1984,18 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v30ConsumerProfileDeclaresItsOwnRuntimeCacheDependency() throws Exception {
+        var factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        var document = factory.newDocumentBuilder().parse(projectRoot().resolve(".github/boot4-consumer/pom.xml").toFile());
+        var xpath = javax.xml.xpath.XPathFactory.newInstance().newXPath();
+        assertThat((Double) xpath.evaluate("count(/project/profiles/profile[id='v30-current-parity']"
+                        + "/dependencies/dependency[groupId='com.github.ben-manes.caffeine' and artifactId='caffeine'"
+                        + " and (not(scope) or scope='compile' or scope='runtime') and not(optional='true')])",
+                document, javax.xml.xpath.XPathConstants.NUMBER)).isEqualTo(1.0);
+    }
+
+    @Test
     void post3AdoptionGuidanceUsesPublishedCoordinatesAndAuthoritativeCommands() throws IOException {
         Path root = projectRoot();
         String migration = Files.readString(root.resolve("docs/28-spring-boot-4-jackson-migration.md"));
@@ -1943,7 +2014,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("[Boot 4 assembled consumer fixture](20-native-release-compatibility.md#boot-4-assembled-consumer-fixture)")
                 .contains("[Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline)")
                 .contains("starter `4.2.0`")
-                .contains("current reactor is `4.3.0-SNAPSHOT`")
+                .contains("current reactor is `4.3.0`")
                 .contains("orders-api.example.invalid")
                 .contains("identity.example.invalid")
                 .doesNotContain("orders.example.test")
@@ -2074,6 +2145,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("<id>benchmark-published-baseline-v28-source-exclusion</id>")
                 .doesNotContain("<id>boot4-spike</id>");
         assertThat(currentBaselineProfile)
+                .contains("<exclude>**/V30CacheWork*Benchmark.java</exclude>")
+                .contains("<testExclude>**/V30CacheWorkPerformanceBenchmarkTest.java</testExclude>")
                 .doesNotContain("V29WeightedCachePerformanceBenchmark.java",
                         "V29WeightedCachePerformanceBenchmarkTest.java")
                 .doesNotContain("V28SemanticReadCachePerformanceBenchmark.java",
@@ -2082,6 +2155,12 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Pbenchmarks,benchmark-release,benchmark-published-baseline")
                 .doesNotContain("benchmark-published-baseline-v29-source-exclusion",
                         "benchmark-published-baseline-v28-source-exclusion");
+        for (String legacy : List.of("v27", "v28", "v29")) {
+            int start = benchmarkPom.indexOf("<id>benchmark-published-baseline-" + legacy + "-source-exclusion</id>");
+            assertThat(benchmarkPom.substring(start, benchmarkPom.indexOf("</profile>", start)))
+                    .contains("<exclude>**/V30CacheWork*Benchmark.java</exclude>")
+                    .contains("<testExclude>**/V30CacheWorkPerformanceBenchmarkTest.java</testExclude>");
+        }
         assertThat(codecFactory)
                 .contains("ReactiveHttpClientJsonCodec")
                 .contains("tools.jackson.databind.ObjectMapper")
@@ -2436,7 +2515,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("The V29 values are decoded response representation bytes")
                 .contains("`maximum-size` is still an entry count");
         assertThat(examples)
-                .contains("This weighted example targets published `4.2.0` and the current `4.3.0-SNAPSHOT`")
+                .contains("This weighted example targets published `4.2.0` and the current `4.3.0`")
                 .contains("Published `4.1.x` consumers must omit")
                 .contains("not exact Java heap, direct memory, process RSS, or container memory");
         assertThat(releaseCompatibility)
@@ -2461,6 +2540,57 @@ class DocumentationReleaseArtifactTest {
                 .contains("Optional per-policy aggregate limit in decoded response representation bytes")
                 .contains("`maximum-size` continues to count entries")
                 .contains("not exact Java heap, direct memory, process RSS, or container memory");
+    }
+
+    @Test
+    void v30WorkExampleStartsWithTheFrozenPublicContract() throws Exception {
+        Path root = projectRoot();
+        String examples = Files.readString(root.resolve("docs/examples/effective-configuration.md"));
+        String section = markdownSection(examples,
+                "## Optional Cache Work Admission (4.3.0 candidate)", "## Explicit Local Response Cache");
+        Matcher yaml = Pattern.compile("```yaml\\n(.*?)```", Pattern.DOTALL).matcher(section);
+        assertThat(yaml.find()).isTrue();
+        var loader = new org.springframework.beans.factory.config.YamlPropertiesFactoryBean();
+        loader.setResources(new org.springframework.core.io.ByteArrayResource(
+                yaml.group(1).getBytes(StandardCharsets.UTF_8)));
+        Map<String, Object> values = new LinkedHashMap<>();
+        Objects.requireNonNull(loader.getObject()).forEach((key, value) -> values.put(key.toString(), value));
+        var properties = new org.springframework.boot.context.properties.bind.Binder(
+                new org.springframework.boot.context.properties.source.MapConfigurationPropertySource(values))
+                .bind("reactive.http", org.springframework.boot.context.properties.bind.Bindable
+                        .of(ReactiveHttpClientProperties.class)).get();
+        var policy = properties.getClients().get("catalog-api").getCache().getPolicies().get("catalog-read");
+        assertThat(policy.getWork().getMaximumConcurrentCallers()).isEqualTo(64L);
+        assertThat(policy.getWork().getMaximumConcurrentLoads()).isEqualTo(16L);
+        assertThat(policy.getWork().getMaximumConcurrentRefreshes()).isEqualTo(4L);
+        assertThat(policy.getVaryByHeaders()).containsExactly("Idempotency-Key");
+        try (var context = new org.springframework.context.support.GenericApplicationContext()) {
+            context.registerBean(ReactiveHttpClientProperties.class, () -> properties);
+            context.refresh();
+            var factory = new io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean<WorkExampleClient>();
+            factory.setType(WorkExampleClient.class);
+            factory.setApplicationContext(context);
+            try {
+                assertThat(factory.getObject()).isInstanceOf(WorkExampleClient.class);
+            } finally {
+                factory.destroy();
+            }
+        }
+        String release = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        assertThat(release).contains("### V30 additive surface freeze",
+                "CacheWorkConfig", "CacheWorkRejectedException", "CacheWorkSnapshot",
+                "CALLER_REJECTED", "LOAD_REJECTED", "CACHE_ADMISSION_ERROR");
+        for (String guide : List.of("04-timeouts.md", "07-resilience4j.md",
+                "31-3x-to-4x-resilience-migration.md")) {
+            assertThat(Files.readString(root.resolve("docs/" + guide)))
+                    .contains("4.3.0", "4.2.0", "work");
+        }
+    }
+
+    @io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient(name = "catalog-api")
+    interface WorkExampleClient {
+        @io.github.huynhngochuyhoang.httpstarter.annotation.GET("/catalog")
+        reactor.core.publisher.Mono<String> get();
     }
 
     @Test
@@ -2662,7 +2792,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("immutable Boot 3.5 maintenance reconstruction point remains `v2.14.1`")
                 .contains("Create a dedicated maintenance branch from that tag")
                 .contains("do not compile Boot 3 adapters into the `3.x` artifacts");
-        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("4.3.0-SNAPSHOT");
+        assertThat(projectVersion(root.resolve("pom.xml"))).isEqualTo("4.3.0");
         assertThat(pomXml)
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .contains("<api.compatibility.baseline.version>4.2.0</api.compatibility.baseline.version>");
@@ -2790,7 +2920,7 @@ class DocumentationReleaseArtifactTest {
         String settings = Files.readString(root.resolve(".mvn/maven-central-settings.xml"));
 
         assertThat(pomXml)
-                .contains("<version>4.3.0-SNAPSHOT</version>")
+                .contains("<version>4.3.0</version>")
                 .contains("<spring-boot.version>4.0.0</spring-boot.version>")
                 .doesNotContain("<id>boot4-spike</id>")
                 .doesNotContain("<maven.deploy.skip>true</maven.deploy.skip>")
@@ -2904,7 +3034,7 @@ class DocumentationReleaseArtifactTest {
                 "native factory shutdown exceeded the shared disposal deadline",
                 "same-tag native meter did not observe the replacement cache");
         assertThat(nativePom).contains(
-                "<reactive-http-client.version>4.3.0-SNAPSHOT</reactive-http-client.version>",
+                "<reactive-http-client.version>4.3.0</reactive-http-client.version>",
                 "-J-Xmx6g",
                 "-H:NumberOfThreads=4",
                 "-H:+SharedArenaSupport");
@@ -2925,7 +3055,7 @@ class DocumentationReleaseArtifactTest {
                 "Weighted cache admission",
                 "same-tag factory/context recreation",
                 "6 GiB",
-                "-Dreactive-http-client.version=4.3.0-SNAPSHOT native:compile",
+                "-Dreactive-http-client.version=4.3.0 native:compile",
                 "native-smoke-provenance");
     }
 
@@ -3404,10 +3534,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(manifest.normalize()).startsWith(root.resolve("target"));
         assertThat(benchmarkEvidenceSnippet.normalize()).startsWith(root.resolve("target"));
         assertThat(generated.path("projectVersion").asText()).isEqualTo(projectVersion(root.resolve("pom.xml")));
-        assertThat(generated.path("releaseState").asText()).isEqualTo("snapshot-development");
-        assertThat(generated.path("developmentVersion").asText()).isEqualTo("4.3.0-SNAPSHOT");
+        assertThat(generated.path("releaseState").asText()).isEqualTo("release-candidate");
+        assertThat(generated.path("developmentVersion").isNull()).isTrue();
         assertThat(generated.path("latestPublishedConsumerVersion").asText()).isEqualTo("4.2.0");
-        assertThat(generated.path("plannedFinalVersion").isNull()).isTrue();
+        assertThat(generated.path("plannedFinalVersion").asText()).isEqualTo("4.3.0");
         assertThat(generated.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(pomProperty(pomXml, "api.compatibility.baseline.version"));
         assertThat(generated.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
@@ -3417,17 +3547,17 @@ class DocumentationReleaseArtifactTest {
                 .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
         assertThat(readiness.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
         assertThat(readiness.path("activeRoadmap").asText()).isEqualTo("v30");
-        assertThat(readiness.path("releaseLane").asText()).isEqualTo("unselected");
+        assertThat(readiness.path("releaseLane").asText()).isEqualTo("additive-minor");
         assertThat(readiness.path("releaseCandidate").path("version").asText()).isEqualTo("4.3.0");
-        assertThat(readiness.path("releaseCandidate").path("status").asText()).isEqualTo("deferred");
+        assertThat(readiness.path("releaseCandidate").path("status").asText()).isEqualTo("pending-publication");
         assertThat(readiness.path("releaseCandidate").path("published").asBoolean()).isFalse();
-        assertThat(readiness.path("releaseCandidate").path("scopeStatus").isMissingNode()).isTrue();
+        assertThat(readiness.path("releaseCandidate").path("scopeStatus").asText()).isEqualTo("selected");
         assertThat(readiness.path("releaseCandidate").path("weightContractDecision").isMissingNode()).isTrue();
         assertThat(readiness.path("releaseCandidate").path("migrationReport").isMissingNode()).isTrue();
         assertThat(readiness.path("releaseCandidate").path("pendingWork"))
                 .extracting(JsonNode::asText)
-                .containsExactly("release scope", "API compatibility", "assembled consumers", "benchmarks",
-                        "AOT", "native image", "publication");
+                .containsExactly("signed final-artifact preflight", "reviewed clean final commit/tag",
+                        "publication", "Central artifact verification", "published assembled consumer");
         assertThat(readiness.path("generatedTestEvidence").path("status").asText()).isEqualTo("pass");
         assertThat(readiness.path("manualReleaseEvidence").path("status").asText()).isEqualTo("pending");
         List<String> pendingReleaseCommands = streamText(readiness.path("manualReleaseEvidence").path("pendingCommands"));
@@ -3477,16 +3607,17 @@ class DocumentationReleaseArtifactTest {
                 .satisfies(command -> assertThat(command)
                         .contains("native:compile", "reactive-http-client-native-smoke"));
         assertThat(readiness.path("manualPublicationEvidence").path("status").asText())
-                .isEqualTo("deferred-until-release-cut");
+                .isEqualTo("pending");
         assertThat(readiness.path("manualPublicationEvidence").path("workflow").asText())
                 .isEqualTo(".github/workflows/publish-maven-central.yml");
         assertThat(streamText(readiness.path("manualPublicationEvidence").path("preflightCommands")))
                 .singleElement()
                 .satisfies(command -> assertThat(command)
-                        .contains("verify-publishable-artifacts.sh", "verify-generation-packaging.sh"));
+                        .contains("verify-publishable-artifacts.sh", "verify-generation-packaging.sh")
+                        .doesNotContain(" -B ", "--batch-mode"));
         assertThat(readiness.path("promotedBenchmarkReport").path("path").isNull()).isTrue();
         assertThat(readiness.path("promotedBenchmarkReport").path("status").asText())
-                .isEqualTo("deferred-until-release-cut");
+                .isEqualTo("not-required-no-public-claim");
         assertThat(readiness.path("configurationReference").path("status").asText()).isEqualTo("current");
         assertThat(readiness.path("markdownLinks").path("status").asText()).isEqualTo("pass");
         assertThat(readiness.path("staleBenchmarkReportLinks").path("status").asText()).isEqualTo("pass");
@@ -3496,9 +3627,9 @@ class DocumentationReleaseArtifactTest {
 
         JsonNode releasePrepChecklist = generated.path("releasePrepChecklist");
         assertThat(releasePrepChecklist.path("status").asText()).isEqualTo("pending");
-        assertThat(releasePrepChecklist.path("releaseState").asText()).isEqualTo("snapshot-development");
+        assertThat(releasePrepChecklist.path("releaseState").asText()).isEqualTo("release-candidate");
         assertThat(releasePrepChecklist.path("latestPublishedConsumerVersion").asText()).isEqualTo("4.2.0");
-        assertThat(releasePrepChecklist.path("plannedFinalVersion").isNull()).isTrue();
+        assertThat(releasePrepChecklist.path("plannedFinalVersion").asText()).isEqualTo("4.3.0");
         assertThat(releasePrepChecklist.path("projectVersion").asText()).isEqualTo(generated.path("projectVersion").asText());
         assertThat(releasePrepChecklist.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
@@ -3534,10 +3665,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(releasePrepItems.get("version-snippets").path("expectedVersion").asText())
                 .isEqualTo(expectedConsumerVersion);
         assertThat(releasePrepItems.get("major-candidate").path("status").asText())
-                .isEqualTo("deferred");
+                .isEqualTo("pending-publication");
         assertThat(releasePrepItems.get("major-candidate").path("version").asText()).isEqualTo("4.3.0");
         assertThat(releasePrepItems.get("major-candidate").path("published").asBoolean()).isFalse();
-        assertThat(releasePrepItems.get("major-candidate").path("scopeStatus").isMissingNode()).isTrue();
+        assertThat(releasePrepItems.get("major-candidate").path("scopeStatus").asText()).isEqualTo("selected");
         assertThat(releasePrepItems.get("major-candidate").path("weightContractDecision").isMissingNode()).isTrue();
         assertThat(streamText(releasePrepItems.get("published-baseline-artifacts").path("commands")))
                 .containsExactly("scripts/verify-published-release-artifacts.sh 4.2.0");
@@ -3553,18 +3684,19 @@ class DocumentationReleaseArtifactTest {
                 .satisfies(command -> assertThat(command)
                         .contains("native:compile", "reactive-http-client-native-smoke"));
         assertThat(releasePrepItems.get("publication-readiness").path("status").asText())
-                .isEqualTo("deferred-until-release-cut");
+                .isEqualTo("pending");
         assertThat(streamText(releasePrepItems.get("publication-readiness").path("preflightCommands")))
                 .singleElement()
                 .satisfies(command -> assertThat(command)
-                        .contains("verify-publishable-artifacts.sh", "verify-generation-packaging.sh"));
+                        .contains("verify-publishable-artifacts.sh", "verify-generation-packaging.sh")
+                        .doesNotContain(" -B ", "--batch-mode"));
         assertThat(streamText(releasePrepItems.get("benchmark-evidence").path("commands")))
                 .contains("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
                         generated.path("benchmarkEvidence").path("currentWorkspaceCommand").asText(),
                         generated.path("benchmarkEvidence").path("publishedStarterCommand").asText());
         assertThat(releasePrepItems.get("promoted-benchmark-report").path("path").isNull()).isTrue();
         assertThat(releasePrepItems.get("promoted-benchmark-report").path("status").asText())
-                .isEqualTo("deferred-until-release-cut");
+                .isEqualTo("not-required-no-public-claim");
         assertThat(releasePrepItems.get("generated-docs-and-links").path("status").asText()).isEqualTo("pass");
         assertThat(releasePrepItems.get("generated-docs-and-links").path("configurationReference").asText())
                 .isEqualTo("current");
@@ -4202,10 +4334,11 @@ class DocumentationReleaseArtifactTest {
                                 + "-Pnative -Dreactive-http-client.version=" + projectVersion + " native:compile && "
                                 + ".github/native-smoke/target/reactive-http-client-native-smoke",
                         "pending", "Run the supported native-image smoke before release."),
-                check("mvn -B -ntp clean -Prelease -DskipTests verify && "
+                check("mvn -ntp clean -Prelease -DskipTests verify && "
                                 + "bash scripts/verify-publishable-artifacts.sh && "
                                 + "bash scripts/verify-generation-packaging.sh",
-                        "pending", "Run publication preflight from the final release candidate."));
+                        "pending", "Run publication preflight interactively from the final release candidate; "
+                                + "batch mode requires non-interactive signing credentials."));
         Map<String, Object> readiness = releaseReadiness(pom.getParent(), projectVersion, baselineVersion,
                 versionContract, benchmarkEvidence, publishedBaselineArtifacts, checks);
         manifest.put("readiness", readiness);
@@ -4290,7 +4423,7 @@ class DocumentationReleaseArtifactTest {
         readiness.put("apiCompatibilityBaselineVersion", baselineVersion);
         readiness.put("apiCompatibilityBaselineMatchesProjectVersion", projectVersion.equals(baselineVersion));
         readiness.put("activeRoadmap", "v30");
-        readiness.put("releaseLane", "unselected");
+        readiness.put("releaseLane", "additive-minor");
         readiness.put("releaseCandidate", majorReleaseCandidate(projectVersion, versionContract));
         readiness.put("generatedTestEvidence", readinessStatus("pass",
                 "Generated by DocumentationReleaseArtifactTest in target/release-evidence/."));
@@ -4346,10 +4479,20 @@ class DocumentationReleaseArtifactTest {
             default -> throw new IllegalStateException(
                     "Unsupported release state: " + versionContract.releaseState());
         };
+        if ("4.3.0".equals(candidateVersion) && !"post-publication".equals(versionContract.releaseState())) {
+            pendingWork = List.of("signed final-artifact preflight", "reviewed clean final commit/tag",
+                    "publication", "Central artifact verification", "published assembled consumer");
+        }
         LinkedHashMap<String, Object> candidate = new LinkedHashMap<>();
         candidate.put("version", candidateVersion);
         candidate.put("status", status);
         candidate.put("published", "post-publication".equals(versionContract.releaseState()));
+        if ("4.3.0".equals(candidateVersion)) {
+            candidate.put("scopeStatus", "selected");
+            candidate.put("scope", "optional per-factory per-policy cache caller, load and refresh admission");
+            candidate.put("decisionDocument", "roadmaps/v30/RELEASE-DECISION.md");
+            candidate.put("benchmarkDisposition", "no-public-performance-claim");
+        }
         if ("4.1.0".equals(candidateVersion)) {
             candidate.put("scopeStatus", "selected");
             candidate.put("scope", "additive method-specific semantic-read response caching");

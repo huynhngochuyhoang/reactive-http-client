@@ -96,6 +96,55 @@ cache manager in deterministic and ordinary-time modes. These assertions
 do not prove socket cancellation, pool reuse, transport backpressure, or native
 resource cleanup.
 
+### Cache work controls (V30 / 4.3.0)
+
+`cacheWorkSnapshot()` adds an immutable view without changing the published
+`CacheSnapshot` constructor. Configure work limits in the supplied `ClientConfig`;
+the helper does not select limits automatically. `withCacheObservability()`
+captures caller/load outcomes, rejections, and refresh skips with the ordinary
+clock. `withDeterministicCacheTime()` also selects this evidence collection, but
+only changes cache time, not logical-call deadlines or scheduler time.
+
+Current and maximum counts aggregate **limited policies only**; caller, load,
+and refresh scopes overlap and must not be added. Null means that dimension is
+unselected, not zero. `selection` distinguishes `absent`, `selected`, and `mixed`;
+`state` is `open`, `closed`, or `absent`. An unselected cache allocates no manager
+and snapshot/control methods reject access. A cache without work limits still
+has storage controls, but its work counts are unavailable.
+
+Use a response-body gate through the existing `respondToPath` API to keep a load
+pending, and inspect `cacheSnapshot().coalescedWaiterCount()` before releasing it.
+For example, with a selected single-flight policy allowing two callers and one
+load:
+
+```java
+Sinks.One<String> body = Sinks.one();
+mock.respondToPath("/catalog/42", exchange -> ClientResponse.create(HttpStatus.OK)
+        .header("Content-Type", "text/plain")
+        .body(body.asMono().<DataBuffer>map(value -> DefaultDataBufferFactory.sharedInstance
+                .wrap(value.getBytes(StandardCharsets.UTF_8))).flux()).build());
+var leader = mock.proxy().get("42").toFuture();
+var waiter = mock.proxy().get("42").toFuture();
+assertThat(mock.cacheSnapshot().coalescedWaiterCount()).isEqualTo(1);
+assertThat(mock.cacheWorkSnapshot().activeCallers()).isEqualTo(2);
+assertThat(mock.cacheWorkSnapshot().activeLoads()).isEqualTo(1);
+body.tryEmitValue("ready").orThrow();
+assertThat(leader.get(5, TimeUnit.SECONDS)).isEqualTo("ready");
+assertThat(waiter.get(5, TimeUnit.SECONDS)).isEqualTo("ready");
+assertThat(mock.cacheWorkSnapshot().activeLoads()).isZero();
+```
+
+With asynchronous preparation, await waiter attachment with a bounded test wait
+before opening the gate; two subscribed callers alone do not prove attachment.
+The snapshot exposes no key or request values. Caller/load history is grouped by
+API; rejection/skip history is grouped by policy with fixed outcome names.
+These test-only cumulative maps survive `close()`, unlike production meters,
+which deregister. An independent non-single-flight load remains caller-owned:
+after close its reservation can remain positive until that caller terminates,
+but it cannot repopulate the cache. Shared loads and refreshes are cancelled on
+close. Failed builder validation closes the partial owner/context and restores
+the temporary auth marker on the caller-supplied configuration.
+
 ### Basic setup
 
 ```java

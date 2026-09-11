@@ -84,6 +84,12 @@ final class BenchmarkFairnessContract {
                         + method.name() + "] must be owned by the V29 weighted-cache fixture");
             }
             if (!method.name().startsWith(CLIENT_SIDE_PREFIX)) {
+                if (method.name().startsWith("cacheV30")
+                        && !Set.of("io.github.huynhngochuyhoang.httpstarter.core.V30CacheWorkPerformanceBenchmark",
+                        "io.github.huynhngochuyhoang.httpstarter.core.V30CacheWorkAdmissionBenchmark")
+                        .contains(method.owner())) {
+                    throw new IllegalStateException("V30 work benchmark must be owned by its V30 fixture");
+                }
                 continue;
             }
 

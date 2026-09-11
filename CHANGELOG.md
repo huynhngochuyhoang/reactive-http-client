@@ -9,6 +9,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.0] - Unreleased
+
+- **`4.3.0` release candidate (pending publication).** Additive, explicitly
+  selected per-factory/per-policy cache caller, foreground-load and refresh
+  admission. Omitted limits preserve published `4.2.0` behavior. Work ownership
+  counts are separate from stored entries/decoded bytes and are not heap, RSS,
+  cluster capacity, or duration guarantees. No numerical or comparative
+  performance claim is made. See the
+  [qualified benchmark review](roadmaps/v30/PERFORMANCE-ALLOCATION-AUDIT.md).
+
+### Added
+- **Cache-work performance harness and ownership audit.** Production-proxy
+  scenarios cover selected-limit hits, misses, rejection, coalescing, refresh,
+  and reuse with cache telemetry off/on, plus isolated contended admission.
+  Reports preserve JMH parameter identities and comparable published 4.2.0
+  rows. Bounded smoke, allocation, and collection checks are separate from
+  clean-commit manual release measurements; no performance claim is made.
+- **Cache-work operations evidence.** V30 saturation/recovery recipes preserve
+  target labels and foreground/refresh separation. A timestamped support fixture
+  reconciles live owners, counters, storage and shutdown; tested capture filters
+  preserve published 4.2.0 compatibility and unknown work facts.
+- **Cache work-limit mock and consumer parity.** The V30 helper adds immutable
+  `cacheWorkSnapshot()` and ordinary-clock `withCacheObservability()` controls,
+  retaining cumulative test evidence after close without changing the published
+  `CacheSnapshot` constructor. Gated GET/semantic-POST consumer and AOT fixtures
+  cover saturation, single flight, refresh skips, reuse, overrides, and shutdown.
+  The native fixture includes independent caller deadlines; clean-commit native
+  executable evidence remains a separate gate.
+- **Optional per-policy cache work limits.** The V30 development line enforces
+  explicit caller and foreground-load limits, plus a separate refresh limit
+  when refresh is selected. Saturated foreground work fails before preparation
+  or loader assembly; saturated refresh returns the authorized stale value
+  without queueing or extending TTL. Reservations survive retries and entered
+  synchronous callbacks until their owner terminates. Properties, basic
+  effective-contract output, and AOT binding hints ship together; configuration
+  changes require factory recreation. Native executable evidence remains a
+  later V30 gate.
+- **Live cache-work telemetry and structural rejection diagnostics.** Explicit
+  cache observability exports policy-scoped current/maximum caller, foreground
+  load, and refresh reservations, fixed local rejection and refresh-skip counts.
+  All cache meters coordinate overlapping owners and deregister at the last
+  close. Schema V1 adds limited-policy configuration/live aggregates without
+  initializing lazy owners. Public local rejection reasons, cache outcomes, and
+  `CACHE_ADMISSION_ERROR` reach terminal diagnostics but not downstream health;
+  outcomes remain available without a MeterRegistry.
+- **Cache work-limit composition evidence.** Gated and virtual-time contracts
+  exercise real Resilience4j admission, per-caller deadlines, hidden auth replay,
+  body-preserving redirects, refresh timeouts, and publication identity checks
+  with selected limits. Local rejection stays outside the business operators;
+  source capacity remains owned through retries and independent caller departure.
+  This adds regression coverage and operations guidance, not another operator,
+  timeout default, replay permission, or public telemetry surface.
+
+### Fixed
+- **Refresh shutdown outcome.** Record cancellation before the shutdown signal
+  can complete a pending refresh source, preserving once-only terminal history
+  in test helpers that retain evidence after production meters are removed.
+- **Cache work reservation cleanup under terminal races.** Cancellation now
+  brackets upstream cleanup directly, so a simultaneous success or error cannot
+  strand a foreground-load or refresh slot. Work-limit installation and the
+  start of manager shutdown share a lifecycle lock. Contention, eviction,
+  collection, and factory-replacement tests preserve independent caller-owned
+  loads and prevent invalidated work from repopulating storage.
+
 ## [4.2.0] - 2026-09-06
 
 - **`4.2.0` published release.** This additive minor
@@ -1806,7 +1870,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.2.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.3.0...HEAD
+[4.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.6.0...v4.0.0

@@ -141,14 +141,14 @@ final class EffectiveHttpClientContractExporter {
                 timeoutPolicy(plan, effectiveApi, clientConfig),
                 clientConfig.getLogicalCallTimeoutMs(),
                 resiliencePolicy(resiliencePolicy),
-                cachePolicy(cacheDecision),
+                cachePolicy(cacheDecision, validateDeclarativeReturnTypes),
                 clientConfig.isFollowRedirects() ? "follow" : "manual",
                 authMode(clientConfig),
                 plan.bodyRepeatability());
     }
 
     private static EffectiveHttpClientContract.CachePolicy cachePolicy(
-            EffectiveCachePolicy.Decision decision) {
+            EffectiveCachePolicy.Decision decision, boolean starterOwned) {
         EffectiveCachePolicy.Selection selection = decision.selection();
         ReactiveHttpClientProperties.CachePolicyConfig policy = selection.policy();
         CacheKeyContract.NormalizedVariants variants = CacheKeyContract.normalizedVariants(policy);
@@ -166,7 +166,8 @@ final class EffectiveHttpClientContractExporter {
                 variants.sharedResponse(),
                 policy != null && policy.isSingleFlight(),
                 policy != null && policy.getRefreshAfterMs() != null ? policy.getRefreshAfterMs() : 0,
-                policy != null && policy.getRefreshTimeoutMs() != null ? policy.getRefreshTimeoutMs() : 0);
+                policy != null && policy.getRefreshTimeoutMs() != null ? policy.getRefreshTimeoutMs() : 0,
+                starterOwned && selection.enabled() ? CacheWorkPolicy.normalize(policy) : null);
     }
 
     private static String authMode(ReactiveHttpClientProperties.ClientConfig clientConfig) {

@@ -53,15 +53,15 @@ class DeclarativeCachePolicyTest {
         assertThat(policies.get("inherited")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         true, "client", false, 1_000L, 100L, null,
-                        List.of(), List.of("idempotency-key"), List.of(), List.of(), false, false, 0, 0));
+                        List.of(), List.of("idempotency-key"), List.of(), List.of(), false, false, 0, 0, null));
         assertThat(policies.get("overridden")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         true, "method", false, 2_000L, 200L, null,
-                        List.of(), List.of("idempotency-key"), List.of(), List.of(), false, false, 0, 0));
+                        List.of(), List.of("idempotency-key"), List.of(), List.of(), false, false, 0, 0, null));
         assertThat(policies.get("excluded")).isEqualTo(
                 new EffectiveHttpClientContract.CachePolicy(
                         false, "method-disabled", false, 0L, 0L, null,
-                        List.of(), List.of(), List.of(), List.of(), false, false, 0, 0));
+                        List.of(), List.of(), List.of(), List.of(), false, false, 0, 0, null));
     }
 
     @Test
@@ -85,7 +85,7 @@ class DeclarativeCachePolicyTest {
         assertThat(contract.cache()).isEqualTo(new EffectiveHttpClientContract.CachePolicy(
                 true, "client", false, 1_000L, 100L, 67_108_864L,
                 List.of("tenant"), List.of("x-tenant"), List.of("locale", "region"),
-                List.of("x-caller", "x-session"), true, true, 400, 250));
+                List.of("x-caller", "x-session"), true, true, 400, 250, null));
     }
 
     @Test

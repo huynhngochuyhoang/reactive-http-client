@@ -126,6 +126,44 @@ class MockReactiveHttpClientTest {
     record SemanticQuery(String term) {
     }
 
+    @Test
+    void mockWorkLimitsAreEnforcedWithAndWithoutDeterministicTime() {
+        for (boolean deterministic : new boolean[]{false, true}) {
+            var config = cacheConfig(true, null, 10);
+            var work = new ReactiveHttpClientProperties.CacheWorkConfig();
+            work.setMaximumConcurrentCallers(2L);
+            work.setMaximumConcurrentLoads(1L);
+            config.getCache().getPolicies().get("local").setWork(work);
+            Sinks.One<DataBuffer> body = Sinks.one();
+            var builder = MockReactiveHttpClient.forClient(CacheMockClient.class).clientConfig(config)
+                    .respondTo(HttpMethod.GET, "/cache/one", exchange ->
+                            ClientResponse.create(org.springframework.http.HttpStatus.OK)
+                                    .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                                    .body(body.asMono().flux()).build());
+            if (deterministic) { builder.withDeterministicCacheTime(); }
+            try (var mock = builder.build()) {
+                var leader = mock.proxy().get("one").toFuture();
+                var waiter = mock.proxy().get("one").toFuture();
+                StepVerifier.create(mock.proxy().get("two"))
+                        .expectErrorMessage("Response cache caller capacity exhausted").verify();
+                leader.cancel(true);
+                StepVerifier.create(mock.proxy().get("two"))
+                        .expectErrorMessage("Response cache foreground load capacity exhausted").verify();
+                assertThat(mock.loadCount("/cache/one")).isEqualTo(1);
+                assertThat(mock.loadCount("/cache/two")).isZero();
+                body.tryEmitValue(new DefaultDataBufferFactory().wrap("value".getBytes(StandardCharsets.UTF_8)))
+                        .orThrow();
+                assertThat(waiter.join()).isEqualTo("value");
+                assertThat(mock.proxy().get("one").block()).isEqualTo("value");
+                work.setMaximumConcurrentCallers(3L);
+                assertThatThrownBy(() -> mock.proxy().get("one")).hasMessageContaining("changed after startup");
+            }
+            work.setMaximumConcurrentLoads(null);
+            assertThatThrownBy(() -> MockReactiveHttpClient.forClient(CacheMockClient.class)
+                    .clientConfig(config).build()).hasMessageContaining("maximum-concurrent-loads");
+        }
+    }
+
     @ReactiveHttpClient(name = "semantic-auth-mock")
     interface SemanticAuthCacheMockClient {
         @POST("/partitioned-query")

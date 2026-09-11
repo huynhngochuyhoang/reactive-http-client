@@ -43,7 +43,8 @@ public final class MockResponseCacheSupport {
                 && observabilityConfig.getCache() != null
                 && observabilityConfig.getCache().isEnabled();
         RecordingMetrics metrics = new RecordingMetrics(cacheObservabilityEnabled);
-        LocalResponseCacheManager manager = LocalResponseCacheManager.createForClient(
+        LocalResponseCacheManager manager = LocalResponseCacheManager.hasSelectedCachePolicy(
+                clientInterface, metadataCache, clientConfig) ? LocalResponseCacheManager.createForClient(
                 clientInterface,
                 clientName,
                 metadataCache,
@@ -52,23 +53,28 @@ public final class MockResponseCacheSupport {
                 ticker,
                 Schedulers.parallel(),
                 metrics,
-                cacheObservabilityEnabled);
-        ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
-                webClient,
-                metadataCache,
-                new RequestArgumentResolver(),
-                new DefaultErrorDecoder(),
-                clientConfig,
-                clientName,
-                clientInterface,
-                applicationContext,
-                resilienceOperatorApplier,
-                jsonCodec,
-                observabilityConfig,
-                manager,
-                authProvider,
-                baseUrl);
-        return new Session(handler, new Control(manager, metrics));
+                cacheObservabilityEnabled) : null;
+        try {
+            ReactiveClientInvocationHandler handler = new ReactiveClientInvocationHandler(
+                    webClient,
+                    metadataCache,
+                    new RequestArgumentResolver(),
+                    new DefaultErrorDecoder(),
+                    clientConfig,
+                    clientName,
+                    clientInterface,
+                    applicationContext,
+                    resilienceOperatorApplier,
+                    jsonCodec,
+                    observabilityConfig,
+                    manager,
+                    authProvider,
+                    baseUrl);
+            return new Session(handler, manager != null ? new Control(manager, metrics) : null);
+        } catch (RuntimeException | Error failure) {
+            if (manager != null) { manager.close(); }
+            throw failure;
+        }
     }
 
     public record Session(ReactiveClientInvocationHandler handler, Control control) {
@@ -107,6 +113,18 @@ public final class MockResponseCacheSupport {
                     cache.closed());
         }
 
+        public WorkSnapshot workSnapshot() {
+            CacheWorkSnapshot work = manager.workSnapshot();
+            // Absent work has no lifecycle state; selected work already captured closure.
+            boolean closed = work.limitedPolicyCount() == 0
+                    ? manager.snapshot().closed() : "closed".equals(work.state());
+            return new WorkSnapshot(work.selection(), work.state(), work.limitedPolicyCount(),
+                    work.maximumCallers(), work.maximumLoads(), work.maximumRefreshes(),
+                    work.activeCallers(), work.activeLoads(), work.activeRefreshes(),
+                    metrics.counts(metrics.callers), metrics.counts(metrics.loads),
+                    metrics.counts(metrics.rejections), metrics.counts(metrics.skips), closed);
+        }
+
         @Override
         public void close() {
             manager.close();
@@ -126,11 +144,23 @@ public final class MockResponseCacheSupport {
             boolean closed) {
     }
 
+    public record WorkSnapshot(String selection, String state, int limitedPolicyCount,
+                               Long maximumCallers, Long maximumLoads, Long maximumRefreshes,
+                               Long activeCallers, Long activeLoads, Long activeRefreshes,
+                               Map<String, Map<String, Long>> callerCounts,
+                               Map<String, Map<String, Long>> loadCounts,
+                               Map<String, Map<String, Long>> rejectionCounts,
+                               Map<String, Map<String, Long>> refreshSkipCounts, boolean closed) { }
+
     private static final class RecordingMetrics extends LocalResponseCacheMetrics {
         private final boolean enabled;
         private final Map<String, Map<String, LongAdder>> admissions = new ConcurrentHashMap<>();
         private final Map<String, Map<String, LongAdder>> evictions = new ConcurrentHashMap<>();
         private final Map<String, Map<String, LongAdder>> refreshes = new ConcurrentHashMap<>();
+        private final Map<String, Map<String, LongAdder>> callers = new ConcurrentHashMap<>();
+        private final Map<String, Map<String, LongAdder>> loads = new ConcurrentHashMap<>();
+        private final Map<String, Map<String, LongAdder>> rejections = new ConcurrentHashMap<>();
+        private final Map<String, Map<String, LongAdder>> skips = new ConcurrentHashMap<>();
         private final LongAdder evictionCount = new LongAdder();
 
         private RecordingMetrics(boolean enabled) {
@@ -144,8 +174,19 @@ public final class MockResponseCacheSupport {
         @Override void coalesced(String apiName) { }
         @Override void stale(String apiName) { }
         @Override void caller(String apiName,
-                              io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome outcome) { }
-        @Override void load(String apiName, WorkOutcome outcome, long durationNanos) { }
+                              io.github.huynhngochuyhoang.httpstarter.observability.HttpClientCacheOutcome outcome) {
+            if (enabled) { increment(callers, apiName, outcome.name()); }
+        }
+        @Override void load(String apiName, WorkOutcome outcome, long durationNanos) {
+            if (enabled) { increment(loads, apiName, outcome.tagValue()); }
+        }
+        @Override void rejection(String policyName,
+                                io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException.Reason reason) {
+            if (enabled) { increment(rejections, policyName, reason.name().toLowerCase(java.util.Locale.ROOT)); }
+        }
+        @Override void refreshSkipped(String policyName, RefreshSkipReason reason) {
+            if (enabled) { increment(skips, policyName, reason.tagValue()); }
+        }
 
         @Override
         void refresh(String apiName, WorkOutcome outcome, long durationNanos) {

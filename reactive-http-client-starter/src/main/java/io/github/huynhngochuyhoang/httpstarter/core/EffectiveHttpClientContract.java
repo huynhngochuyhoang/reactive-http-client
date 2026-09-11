@@ -45,6 +45,7 @@ record EffectiveHttpClientContract(
                        boolean sharedResponse,
                        boolean singleFlight,
                        long refreshAfterMs,
-                       long refreshTimeoutMs) {
+                       long refreshTimeoutMs,
+                       CacheWorkPolicy.Limits work) {
     }
 }

@@ -1,0 +1,452 @@
+{
+  "schemaVersion": 1,
+  "projectVersion": "4.3.0",
+  "captureScope": "cache-work",
+  "clientName": "example-client",
+  "processInstance": "process-1",
+  "target": {
+    "job": "example-app",
+    "instance": "instance-1",
+    "pod": "pod-1"
+  },
+  "window": {
+    "startedAt": "2026-09-10T00:00:00Z",
+    "endedAt": "2026-09-10T00:00:12Z",
+    "durationSeconds": 12
+  },
+  "counterWindow": {
+    "startedAt": "2026-09-10T00:00:00Z",
+    "endedAt": "2026-09-10T00:00:10Z",
+    "durationSeconds": 10,
+    "resetObserved": false
+  },
+  "quietWindow": {
+    "startedAt": "2026-09-10T00:00:08Z",
+    "endedAt": "2026-09-10T00:00:10Z",
+    "durationSeconds": 2
+  },
+  "configuration": {
+    "observabilityEnabled": true,
+    "cacheMetricsEnabled": true,
+    "meterRegistryAvailable": true,
+    "apiPolicies": {
+      "catalog.search": "catalog-read"
+    },
+    "policies": {
+      "catalog-read": {
+        "source": "method",
+        "ttlMs": 60000,
+        "refreshAfterMs": 5000,
+        "refreshTimeoutMs": 3000,
+        "maximumEntries": 10,
+        "maximumTotalDecodedResponseBytes": 1000,
+        "singleFlight": true,
+        "maximumConcurrentCallers": 3,
+        "maximumConcurrentLoads": 2,
+        "maximumConcurrentRefreshes": 1
+      }
+    },
+    "pool": {
+      "protocol": "HTTP/2",
+      "maximumConnections": 2,
+      "maximumConcurrentStreams": 10,
+      "metricsEnabled": true
+    },
+    "logicalCallTimeoutMs": 10000,
+    "requestTimeoutMs": 10000,
+    "resilience": {
+      "retry": "disabled",
+      "rateLimiter": "disabled",
+      "circuitBreaker": "disabled",
+      "bulkhead": "disabled"
+    }
+  },
+  "checkpoints": [
+    {
+      "phase": "before-traffic",
+      "capturedAt": "2026-09-10T00:00:00Z",
+      "contextOrdinal": "context-1",
+      "factoryState": "open",
+      "workMeterRegistrations": 11,
+      "policies": {
+        "catalog-read": {
+          "entries": 2,
+          "retainedDecodedResponseBytes": 200,
+          "activeCallers": 0,
+          "activeLoads": 0,
+          "activeRefreshes": 0
+        }
+      },
+      "pool": {
+        "totalConnections": 1,
+        "idleConnections": 1,
+        "activeStreams": 0,
+        "pendingStreams": 0
+      },
+      "apiCounters": {
+        "catalog.search": {
+          "lookups": {
+            "hit": 0,
+            "miss": 2
+          },
+          "callers": {
+            "FRESH_HIT": 0,
+            "STALE_HIT": 0,
+            "MISS_LOADER": 2,
+            "COALESCED_WAITER": 0,
+            "CALLER_REJECTED": 0,
+            "LOAD_REJECTED": 0
+          },
+          "loads": {
+            "success": 2,
+            "failure": 0,
+            "cancellation": 0
+          },
+          "refreshes": {
+            "success": 0,
+            "failure": 0,
+            "cancellation": 0
+          }
+        }
+      },
+      "policyCounters": {
+        "catalog-read": {
+          "admissions": {
+            "admitted": 2,
+            "bypassed_unknown_size": 0,
+            "bypassed_over_budget": 0,
+            "bypassed_capacity": 0
+          },
+          "evictions": {
+            "size": 0,
+            "ttl": 0,
+            "weight": 0
+          },
+          "rejections": {
+            "caller_capacity": 0,
+            "load_capacity": 0
+          },
+          "refreshSkips": {
+            "capacity": 0,
+            "already_refreshing": 0,
+            "entry_unavailable": 0
+          }
+        }
+      }
+    },
+    {
+      "phase": "saturated",
+      "capturedAt": "2026-09-10T00:00:05Z",
+      "contextOrdinal": "context-1",
+      "factoryState": "open",
+      "workMeterRegistrations": 11,
+      "policies": {
+        "catalog-read": {
+          "entries": 2,
+          "retainedDecodedResponseBytes": 200,
+          "activeCallers": 3,
+          "activeLoads": 2,
+          "activeRefreshes": 1
+        }
+      },
+      "pool": {
+        "totalConnections": 2,
+        "idleConnections": 0,
+        "activeStreams": 3,
+        "pendingStreams": 0
+      },
+      "apiCounters": {
+        "catalog.search": {
+          "lookups": {
+            "hit": 8,
+            "miss": 6
+          },
+          "callers": {
+            "FRESH_HIT": 4,
+            "STALE_HIT": 4,
+            "MISS_LOADER": 4,
+            "COALESCED_WAITER": 1,
+            "CALLER_REJECTED": 2,
+            "LOAD_REJECTED": 1
+          },
+          "loads": {
+            "success": 2,
+            "failure": 0,
+            "cancellation": 0
+          },
+          "refreshes": {
+            "success": 0,
+            "failure": 0,
+            "cancellation": 0
+          }
+        }
+      },
+      "policyCounters": {
+        "catalog-read": {
+          "admissions": {
+            "admitted": 2,
+            "bypassed_unknown_size": 0,
+            "bypassed_over_budget": 0,
+            "bypassed_capacity": 0
+          },
+          "evictions": {
+            "size": 0,
+            "ttl": 0,
+            "weight": 0
+          },
+          "rejections": {
+            "caller_capacity": 2,
+            "load_capacity": 1
+          },
+          "refreshSkips": {
+            "capacity": 1,
+            "already_refreshing": 2,
+            "entry_unavailable": 0
+          }
+        }
+      }
+    },
+    {
+      "phase": "before-quiet",
+      "capturedAt": "2026-09-10T00:00:08Z",
+      "contextOrdinal": "context-1",
+      "factoryState": "open",
+      "workMeterRegistrations": 11,
+      "policies": {
+        "catalog-read": {
+          "entries": 3,
+          "retainedDecodedResponseBytes": 300,
+          "activeCallers": 1,
+          "activeLoads": 1,
+          "activeRefreshes": 1
+        }
+      },
+      "pool": {
+        "totalConnections": 2,
+        "idleConnections": 0,
+        "activeStreams": 2,
+        "pendingStreams": 0
+      },
+      "apiCounters": {
+        "catalog.search": {
+          "lookups": {
+            "hit": 10,
+            "miss": 7
+          },
+          "callers": {
+            "FRESH_HIT": 4,
+            "STALE_HIT": 6,
+            "MISS_LOADER": 5,
+            "COALESCED_WAITER": 1,
+            "CALLER_REJECTED": 2,
+            "LOAD_REJECTED": 1
+          },
+          "loads": {
+            "success": 3,
+            "failure": 1,
+            "cancellation": 0
+          },
+          "refreshes": {
+            "success": 1,
+            "failure": 1,
+            "cancellation": 0
+          }
+        }
+      },
+      "policyCounters": {
+        "catalog-read": {
+          "admissions": {
+            "admitted": 4,
+            "bypassed_unknown_size": 0,
+            "bypassed_over_budget": 0,
+            "bypassed_capacity": 0
+          },
+          "evictions": {
+            "size": 0,
+            "ttl": 0,
+            "weight": 0
+          },
+          "rejections": {
+            "caller_capacity": 2,
+            "load_capacity": 1
+          },
+          "refreshSkips": {
+            "capacity": 1,
+            "already_refreshing": 2,
+            "entry_unavailable": 0
+          }
+        }
+      }
+    },
+    {
+      "phase": "recovered-before-close",
+      "capturedAt": "2026-09-10T00:00:10Z",
+      "contextOrdinal": "context-1",
+      "factoryState": "open",
+      "workMeterRegistrations": 11,
+      "policies": {
+        "catalog-read": {
+          "entries": 3,
+          "retainedDecodedResponseBytes": 300,
+          "activeCallers": 0,
+          "activeLoads": 0,
+          "activeRefreshes": 0
+        }
+      },
+      "pool": {
+        "totalConnections": 2,
+        "idleConnections": 2,
+        "activeStreams": 0,
+        "pendingStreams": 0
+      },
+      "apiCounters": {
+        "catalog.search": {
+          "lookups": {
+            "hit": 10,
+            "miss": 7
+          },
+          "callers": {
+            "FRESH_HIT": 4,
+            "STALE_HIT": 6,
+            "MISS_LOADER": 5,
+            "COALESCED_WAITER": 1,
+            "CALLER_REJECTED": 2,
+            "LOAD_REJECTED": 1
+          },
+          "loads": {
+            "success": 3,
+            "failure": 1,
+            "cancellation": 1
+          },
+          "refreshes": {
+            "success": 1,
+            "failure": 1,
+            "cancellation": 1
+          }
+        }
+      },
+      "policyCounters": {
+        "catalog-read": {
+          "admissions": {
+            "admitted": 4,
+            "bypassed_unknown_size": 0,
+            "bypassed_over_budget": 0,
+            "bypassed_capacity": 0
+          },
+          "evictions": {
+            "size": 0,
+            "ttl": 0,
+            "weight": 0
+          },
+          "rejections": {
+            "caller_capacity": 2,
+            "load_capacity": 1
+          },
+          "refreshSkips": {
+            "capacity": 1,
+            "already_refreshing": 2,
+            "entry_unavailable": 0
+          }
+        }
+      }
+    },
+    {
+      "phase": "after-close",
+      "capturedAt": "2026-09-10T00:00:12Z",
+      "contextOrdinal": "context-1",
+      "factoryState": "closed",
+      "workMeterRegistrations": 0,
+      "policies": {
+        "catalog-read": {
+          "entries": 0,
+          "retainedDecodedResponseBytes": 0,
+          "activeCallers": null,
+          "activeLoads": null,
+          "activeRefreshes": null
+        }
+      },
+      "pool": null,
+      "apiCounters": null,
+      "policyCounters": null
+    }
+  ],
+  "deltas": {
+    "api": {
+      "catalog.search": {
+        "lookups": {
+          "hit": 10,
+          "miss": 5
+        },
+        "callers": {
+          "FRESH_HIT": 4,
+          "STALE_HIT": 6,
+          "MISS_LOADER": 3,
+          "COALESCED_WAITER": 1,
+          "CALLER_REJECTED": 2,
+          "LOAD_REJECTED": 1
+        },
+        "loads": {
+          "success": 1,
+          "failure": 1,
+          "cancellation": 1
+        },
+        "refreshes": {
+          "success": 1,
+          "failure": 1,
+          "cancellation": 1
+        }
+      }
+    },
+    "policies": {
+      "catalog-read": {
+        "admissions": {
+          "admitted": 2,
+          "bypassed_unknown_size": 0,
+          "bypassed_over_budget": 0,
+          "bypassed_capacity": 0
+        },
+        "evictions": {
+          "size": 0,
+          "ttl": 0,
+          "weight": 0
+        },
+        "rejections": {
+          "caller_capacity": 2,
+          "load_capacity": 1
+        },
+        "refreshSkips": {
+          "capacity": 1,
+          "already_refreshing": 2,
+          "entry_unavailable": 0
+        }
+      }
+    }
+  },
+  "affectedCaller": {
+    "capturedAt": "2026-09-10T00:00:05Z",
+    "clientName": "example-client",
+    "apiName": "catalog.search",
+    "cacheOutcome": "CALLER_REJECTED",
+    "errorType": "CacheWorkRejectedException",
+    "errorCategory": "CACHE_ADMISSION_ERROR",
+    "reason": "CALLER_CAPACITY",
+    "failureStage": null,
+    "statusCode": null,
+    "subscriptionAttemptCount": 0,
+    "requestDispatched": false,
+    "cancelled": false,
+    "durationMs": 1
+  },
+  "lifecycle": [
+    {
+      "type": "factory-start",
+      "capturedAt": "2026-09-09T23:59:58Z",
+      "contextOrdinal": "context-1"
+    },
+    {
+      "type": "factory-close",
+      "capturedAt": "2026-09-10T00:00:11Z",
+      "contextOrdinal": "context-1"
+    }
+  ]
+}

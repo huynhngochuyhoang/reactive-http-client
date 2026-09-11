@@ -5,7 +5,7 @@
 > historical evidence, not commands for the current reactor.
 
 This guide migrates published Spring Boot 3.5 starter 2.x applications to the
-Spring Boot 4 starter 4.x line. The current reactor is `4.3.0-SNAPSHOT`; use
+Spring Boot 4 starter 4.x line. The current reactor is `4.3.0`; use
 published `4.2.0` when consuming it from a release repository.
 
 Annotations, exception categories, lifecycle hooks, observers, retry and
@@ -390,7 +390,7 @@ for reactor and release-candidate changes. To verify released public coordinates
 fresh Maven Central repository, use
 [Published Boot 4 consumer baseline](20-native-release-compatibility.md#published-boot-4-consumer-baseline).
 The latter is the adoption check for starter `4.2.0`; it does not consume
-reactor classes or unpublished `4.3.0-SNAPSHOT` artifacts.
+reactor classes or unpublished `4.3.0` artifacts.
 
 ## Migration checklist
 
