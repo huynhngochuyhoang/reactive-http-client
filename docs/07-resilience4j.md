@@ -2,6 +2,17 @@
 
 The starter provides opt-in Resilience4j support per client: retry, rate limiter, circuit breaker, and bulkhead. Individual methods can override the client-level instance names.
 
+## Cache work composition (4.3.0 candidate)
+
+[Cache work admission](32-response-caching.md#composition-and-deadlines-with-work-limits)
+does not select any resilience operator. Local caller/load rejection occurs
+outside the business operator pipeline: zero attempts, no transport dispatch,
+no business permit or circuit sample. One admitted load reservation spans all
+configured retries, auth replays, and redirects. Refresh uses the ordinary
+auth/operator pipeline with separate refresh capacity. None of these limits
+grants unsafe-method retry or replay permission. Published `4.2.0` behavior is
+unchanged when the work group is omitted.
+
 ---
 
 ## Dependencies

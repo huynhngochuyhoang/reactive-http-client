@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.0] - Unreleased
+
+- **`4.3.0` release candidate (pending publication).** Additive, explicitly
+  selected per-factory/per-policy cache caller, foreground-load and refresh
+  admission. Omitted limits preserve published `4.2.0` behavior. Work ownership
+  counts are separate from stored entries/decoded bytes and are not heap, RSS,
+  cluster capacity, or duration guarantees. No numerical or comparative
+  performance claim is made. See the
+  [qualified benchmark review](roadmaps/v30/PERFORMANCE-ALLOCATION-AUDIT.md).
+
 ### Added
 - **Cache-work performance harness and ownership audit.** Production-proxy
   scenarios cover selected-limit hits, misses, rejection, coalescing, refresh,
@@ -1860,7 +1870,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.2.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.3.0...HEAD
+[4.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v3.6.0...v4.0.0

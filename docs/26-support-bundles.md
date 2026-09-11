@@ -121,7 +121,7 @@ common terminal outcomes:
   lifecycle events. It contains only fake bounded client/API/policy names and no
   cache keys/values, request variants, identity values, or exception messages.
 - [Cache-work saturation and recovery](fixtures/support-bundle-cache-work.json)
-  is V30 / `4.3.0-SNAPSHOT` evidence, not a published `4.2.0` export. It aligns
+  is V30 / `4.3.0` evidence, not a published `4.2.0` export. It aligns
   live reservations, cumulative counter samples and pre-close deltas with
   policy occupancy, pool state, and factory/meter lifecycle.
 
@@ -368,7 +368,7 @@ top-level status is derived from that selected client, not from unrelated client
 in the aggregate health response. The sanitized projection preserves omission of
 `errorRate` when the selected client has zero samples.
 
-The nine `cacheWork*` fields are required for V30 / `4.3.0-SNAPSHOT` and later
+The nine `cacheWork*` fields are required for V30 / `4.3.0` and later
 responses. Published `4.1.x` and `4.2.x` may omit the entire group. A present
 group must be complete: summary-only/replacement clients can report all null;
 absent limits have `absent` selection/state, zero limited policies, and null

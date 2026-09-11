@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "projectVersion": "4.3.0-SNAPSHOT",
+  "projectVersion": "4.3.0",
   "captureScope": "cache-work",
   "clientName": "example-client",
   "processInstance": "process-1",

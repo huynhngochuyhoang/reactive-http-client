@@ -46,7 +46,7 @@ def difference(before, after):
 
 
 def validate_fixture(f):
-    assert f["schemaVersion"] == 1 and f["projectVersion"] == "4.3.0-SNAPSHOT"
+    assert f["schemaVersion"] == 1 and f["projectVersion"] == "4.3.0"
     assert f["captureScope"] == "cache-work"
     for name in [f["clientName"], f["processInstance"], *f["target"].values()]:
         assert isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", name)
@@ -227,7 +227,7 @@ class CaptureTests(unittest.TestCase):
     @staticmethod
     def diagnostics():
         result = json.loads(SCHEMA.read_text())
-        result["projectVersion"] = "4.3.0-SNAPSHOT"
+        result["projectVersion"] = "4.3.0"
         return result
 
     @staticmethod
@@ -248,7 +248,7 @@ class CaptureTests(unittest.TestCase):
                 del doc["clients"][0]["cacheMaximumTotalDecodedResponseBytes"]
                 del doc["clients"][0]["cacheRetainedDecodedResponseBytes"]
             self.assertEqual(self.capture(doc)[0], doc)
-        doc["projectVersion"] = "4.3.0-SNAPSHOT"
+        doc["projectVersion"] = "4.3.0"
         self.assertIsNone(self.capture(doc)[0])
 
     def test_work_unknown_absent_lazy_open_closed_mixed(self):
@@ -291,7 +291,7 @@ class CaptureTests(unittest.TestCase):
                 invalid = copy.deepcopy(doc)
                 invalid["clients"][0][field] = value
                 self.assertIsNone(self.capture(invalid)[0])
-        for version in ("4.2.0", "4.3.0-SNAPSHOT"):
+        for version in ("4.2.0", "4.3.0"):
             invalid = copy.deepcopy(doc)
             invalid["projectVersion"] = version
             del invalid["clients"][0]["cacheWorkActiveLoads"]
