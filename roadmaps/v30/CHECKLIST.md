@@ -1412,34 +1412,52 @@ Evidence assembled 2026-09-11:
   `published=false`, baseline `4.2.0`, signing, clean final commit/tag,
   publication, Central and published-consumer gates. Initial incomplete-JDK
   and 3 GiB native-compiler failures are retained alongside passing retries.
-  Signing failed locally and remains a separate 13.3 blocker, not hidden by
-  unsigned artifact or test success.
+  Signing failed locally; its original hold is superseded by the scope decision
+  below, which retains signed preflight as a 13.4 publication gate. Unsigned
+  artifact or test success is not a signing pass.
 
-### [ ] 13.3 Select release scope and candidate version
+### [x] 13.3 Select release scope and candidate version
 
 - [x] Record one explicit go/no-go decision with date, reviewed commit, scope,
       benchmark disposition, and remaining risk.
 - [x] Select `4.3.0` only for the enforced additive opt-in work-bound contract;
       otherwise document a compatible patch scope or a no-go with deferred items.
-- [ ] On go, prepare version-matched final artifacts and rerun release packaging,
-      generation, signing, and readiness checks before publication.
+- [x] On go, prepare version-matched candidate artifacts and rerun release
+      packaging, generation, and readiness checks; assign credentialed signing
+      and signed staged-consumer preflight to the mandatory 13.4 publication gate.
 - [x] Keep public/API/consumer/benchmark baselines on `4.2.0` until the new
       published artifacts have passed Central verification.
 
-Decision recorded 2026-09-11: **NO-GO for publication pending signed preflight
-and the reviewed clean final commit/tag**. The additive `4.3.0` scope is
-selected, version-matched artifacts are prepared and checks pass as recorded
-above, but `mvn -Prelease -DskipTests verify` fails with
-`gpg: signing failed: No pinentry`. The signed staged-consumer check therefore
-has not run. The [release review](RELEASE-DECISION.md#publication-boundary)
-provides the remaining terminal commands; 13.3 remains open until this gate
-passes. No signing credentials, tag, publication or final clean commit are
-invented. All 13.4 items remain open.
+Decision updated 2026-09-11, following the user's release-boundary decision:
+**GO to the `4.3.0` release cut; publication is not claimed.** As in V29,
+scope approval is separate from the credentialed signing/publication gate.
+The enforced additive opt-in work-bound contract, prepared final coordinates,
+compatibility evidence, and no-public-performance-claim disposition support the
+minor release; a patch-only scope would omit the reviewed additive surface.
+
+- Reviewed clean release-preparation commit:
+  `2d688b034ce47388da897fcaa8db4bdd30f88d38`, empty before/after worktree
+  status and **49 passing readiness tests**. This documentation/verification
+  follow-up must also be reviewed and committed before the final tag.
+- The local signing attempt failed with `No pinentry`; signed staged-consumer
+  verification has not run locally. This failure and its diagnosis remain in
+  the [release review](RELEASE-DECISION.md#clean-commit-follow-up) and
+  `target/release-evidence/v30/priority13-3-2d688b03/`, not converted to a pass.
+  Local prompt troubleshooting is not a prerequisite for this scope decision.
+- Credentialed signing, signature verification, staged consumption and
+  generation packaging remain mandatory before deployment. The existing
+  `publish-maven-central.yml` workflow enforces that order; no skip, failure
+  suppression, or unsigned publication path is introduced.
+- Generated readiness retains `pending-publication`, `published=false`,
+  signed preflight and final commit/tag in its pending work. Public/API/
+  consumer/benchmark baselines remain `4.2.0`. No tag, publication or roadmap
+  archive is claimed; all 13.4 items remain open.
 
 ### [ ] 13.4 Publish, verify, and archive V30
 
-- [ ] Publish only from the reviewed clean final commit/tag with successful
-      signing and package evidence.
+- [ ] Build and sign from the reviewed clean final commit/tag; verify signatures,
+      the staged assembled consumer and generation packaging before publication.
+      Retain credentialed workflow evidence; the 13.3 scope GO is not a signing pass.
 - [ ] Resolve all parent/module POM/JAR/source/Javadoc artifacts from fresh
       Central-only repositories and verify hashes, remote markers, and versions.
 - [ ] Run a published assembled consumer before moving public snippets and

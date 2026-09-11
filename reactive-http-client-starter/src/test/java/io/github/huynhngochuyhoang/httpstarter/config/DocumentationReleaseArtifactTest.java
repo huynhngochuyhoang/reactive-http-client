@@ -3613,7 +3613,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(streamText(readiness.path("manualPublicationEvidence").path("preflightCommands")))
                 .singleElement()
                 .satisfies(command -> assertThat(command)
-                        .contains("verify-publishable-artifacts.sh", "verify-generation-packaging.sh"));
+                        .contains("verify-publishable-artifacts.sh", "verify-generation-packaging.sh")
+                        .doesNotContain(" -B ", "--batch-mode"));
         assertThat(readiness.path("promotedBenchmarkReport").path("path").isNull()).isTrue();
         assertThat(readiness.path("promotedBenchmarkReport").path("status").asText())
                 .isEqualTo("not-required-no-public-claim");
@@ -3687,7 +3688,8 @@ class DocumentationReleaseArtifactTest {
         assertThat(streamText(releasePrepItems.get("publication-readiness").path("preflightCommands")))
                 .singleElement()
                 .satisfies(command -> assertThat(command)
-                        .contains("verify-publishable-artifacts.sh", "verify-generation-packaging.sh"));
+                        .contains("verify-publishable-artifacts.sh", "verify-generation-packaging.sh")
+                        .doesNotContain(" -B ", "--batch-mode"));
         assertThat(streamText(releasePrepItems.get("benchmark-evidence").path("commands")))
                 .contains("mvn -Pbenchmarks,benchmark-smoke -pl reactive-http-client-benchmarks -am verify",
                         generated.path("benchmarkEvidence").path("currentWorkspaceCommand").asText(),
@@ -4332,10 +4334,11 @@ class DocumentationReleaseArtifactTest {
                                 + "-Pnative -Dreactive-http-client.version=" + projectVersion + " native:compile && "
                                 + ".github/native-smoke/target/reactive-http-client-native-smoke",
                         "pending", "Run the supported native-image smoke before release."),
-                check("mvn -B -ntp clean -Prelease -DskipTests verify && "
+                check("mvn -ntp clean -Prelease -DskipTests verify && "
                                 + "bash scripts/verify-publishable-artifacts.sh && "
                                 + "bash scripts/verify-generation-packaging.sh",
-                        "pending", "Run publication preflight from the final release candidate."));
+                        "pending", "Run publication preflight interactively from the final release candidate; "
+                                + "batch mode requires non-interactive signing credentials."));
         Map<String, Object> readiness = releaseReadiness(pom.getParent(), projectVersion, baselineVersion,
                 versionContract, benchmarkEvidence, publishedBaselineArtifacts, checks);
         manifest.put("readiness", readiness);

@@ -2,13 +2,20 @@
 
 ## Decision
 
-**2026-09-11: NO-GO for publication until signed preflight and the reviewed
-clean final commit/tag are available.** The supported scope is selected as the
-additive `4.3.0` candidate, not deferred implementation and not a published
-release. Runtime, compatibility, consumer, native and candidate checks below
-pass. Local signing fails with `gpg: signing failed: No pinentry`. The failed
-attempt is retained; unsigned packaging is not substituted for a signing pass.
-Checklist 13.3's signing item and all of 13.4 remain open.
+**2026-09-11: GO to the `4.3.0` release cut; publication is not claimed.**
+At the user's direction, this supersedes the local-signing scope hold and follows
+the [V29 release boundary](../v29/CHECKLIST.md#x-134-select-release-scope-and-close-v29):
+scope approval can precede credentialed workflow signing. The enforced additive
+opt-in work limits and reviewed evidence justify the minor release, not a
+patch-only scope. Checklist 13.3 is complete; all of 13.4 remains open.
+
+Reviewed clean release-preparation commit:
+`2d688b034ce47388da897fcaa8db4bdd30f88d38`. The final tag must include the
+reviewed documentation/verification follow-up as well. Runtime, compatibility,
+consumer, native and candidate checks below pass. Local signing failed with
+`No pinentry`; that failure is retained. This GO is not a signing pass or
+permission to upload unsigned artifacts. Successful signing, staged-consumer
+verification and generation packaging remain mandatory before deployment.
 
 ## Scope
 
@@ -28,8 +35,9 @@ Clean source under review: `d911226e478769f084bc46702587e004187c18d1`,
 with reactor `4.3.0-SNAPSHOT`. A separate local clone remained clean before
 and after verification. The `4.3.0` candidate is that source plus the
 version/documentation/verification patch; it changes no production Java.
-It is explicitly uncommitted, not evidence attributed to a nonexistent final
-release commit.
+Those candidate runs were explicitly uncommitted, not evidence attributed to
+a nonexistent final release commit. The clean-commit follow-up below records
+the subsequent committed review without relabeling the earlier evidence.
 
 Evidence root: `target/release-evidence/v30/priority13/`. Each command has
 timestamps, exit status and output; copied XML, API reports, dependency trees,
@@ -131,22 +139,75 @@ SHA-256 values, relative to the evidence root:
 
 Priority 12's original report hashes and `release-sha256.txt` remain unchanged.
 
+## Clean-Commit Follow-Up
+
+On 2026-09-11, reviewed clean release-preparation commit
+`2d688b034ce47388da897fcaa8db4bdd30f88d38` with final coordinates `4.3.0`.
+There are no production Java changes relative to the previously reviewed
+`d911226e` runtime. Before/after status files are empty. The clean-source
+readiness rerun passes **49 tests**, zero failures/errors/skips.
+
+Retried `mvn -B -ntp -s .mvn/maven-central-settings.xml -Prelease -DskipTests verify`
+in a terminal session with `GPG_TTY` set. Signing still exits nonzero with
+`gpg: signing failed: No pinentry`; no signed artifact was produced and the
+signed staged-consumer check was not run. Committing resolves the source-state
+gate, not this external signing failure. That retry changed no key/agent
+configuration. A subsequent local repair explicitly selected the installed
+terminal pinentry backend and reloaded the agent. A non-secret confirmation
+test proves the agent can launch it. Inspection of the installed GPG plugin
+`3.2.4` identifies the actual blocker: Maven `-B` sets non-interactive mode,
+which selects `--pinentry-mode error` without supplied signing credentials.
+The local command and readiness generator now omit `-B`; CI keeps its
+credentialed batch-mode command. Signing must succeed before publication, either
+locally or in the credentialed workflow; interactive local signing is not a
+scope-selection prerequisite. Prompt configuration validation is not signing
+evidence.
+
+Separate evidence:
+`target/release-evidence/v30/priority13-3-2d688b03/` contains the clean commit,
+toolchain, commands, timestamps, signing output/exit status, readiness JSON/XML
+and inventories. SHA-256 of `sha256.txt`:
+`560cb2728aa49ed3fa2d514219d378bfe6fd6c3b44e3f561680582dddde3f58a`;
+SHA-256 of `readiness-sha256.txt`:
+`6eb86b25b928c1f8f513cf39cf87c81ba11e0bd47bc10605bff690d77b0e8be2`.
+Earlier evidence remains unchanged. The subsequent user-approved scope GO closes
+13.3 and assigns signed preflight to 13.4 alongside publication, tagging and
+archive actions. The generated readiness list still names those pending gates.
+
+The documentation/verification follow-up is recorded separately under
+`target/release-evidence/v30/priority13-3-scope-go-final/`, with the base commit,
+uncommitted source patch, command, test XML, readiness manifest and SHA-256
+inventory. It does not relabel the clean-commit evidence as validation of this
+later patch. The initial broken-link check is retained under
+`target/release-evidence/v30/priority13-3-scope-go/`.
+
 ## Publication Boundary
 
-No publication or tag was created. After reviewing/committing the final tree,
-run the signing preflight from a terminal with the intended release key and
-working pinentry, then the local signed-artifact consumer and generation guards:
+No publication or tag was created. The release-preparation source is committed;
+review and commit this follow-up before tagging. The existing
+`.github/workflows/publish-maven-central.yml` rejects a mismatched tag and then
+builds/signs, verifies staged signatures and consumption, and checks generation
+packaging before its Central deployment step. It supplies the configured release
+credentials; that successful run must provide the 13.4 signing evidence. The
+local failure does not justify skipping any of those steps.
+
+An optional local preflight uses the intended release key and working pinentry:
 
 ```bash
-mvn -B -ntp -s .mvn/maven-central-settings.xml -Prelease -DskipTests verify
+export GPG_TTY="$(tty)"
+mvn -ntp -s .mvn/maven-central-settings.xml -Prelease -DskipTests verify
 bash scripts/verify-publishable-artifacts.sh 4.3.0
 bash scripts/verify-generation-packaging.sh 4.3.0
 ```
 
 Preserve this evidence before any root `clean` or repeated verifier run.
+The local signing command intentionally omits batch mode so the agent may
+prompt for the key passphrase. Do not pass the passphrase on the command line.
 These commands package and locally stage artifacts; they do not publish to
-Central. A successful signed preflight and reviewed clean commit/tag are
-required to lift this hold. After publication, 13.4 must independently verify
+Central. Successful signed preflight, locally or in the workflow, is required
+before deployment; publish only the reviewed clean final commit/tag through
+13.4. After publication,
+13.4 must independently verify
 all 13 artifacts from fresh Central-only repositories and run the published
 assembled consumer before moving baselines or archiving V30.
 

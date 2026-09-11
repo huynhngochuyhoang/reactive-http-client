@@ -199,6 +199,13 @@ bash scripts/verify-generation-packaging.sh
 bash scripts/verify-publishable-artifacts.sh
 ```
 
+For local passphrase prompts, set `export GPG_TTY="$(tty)"` and omit Maven
+`-B`/`--batch-mode`. With GPG plugin `3.2.4`, non-interactive mode without
+a supplied passphrase uses `--pinentry-mode error`; `No pinentry` can therefore
+mean prompting was prohibited, not that pinentry is missing. CI retains batch
+mode and supplies its signing secret through the configured environment.
+Never put a passphrase in a command-line argument or support evidence.
+
 The staging guard writes only target-local evidence under
 `target/release-evidence/v20-priority5/`. It generates effective POMs for the
 parent, three publishable modules, and benchmarks; deploys the parent, binary,
