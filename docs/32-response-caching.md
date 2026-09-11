@@ -426,8 +426,8 @@ body retains the decoded object identity.
 
 ## V30 snapshot: optional work limits
 
-The following policy fragment is supported by the `4.3.0-SNAPSHOT` development
-line, not published `4.2.0`. Add it only to an already selected, eligible policy;
+The following policy fragment is supported by the `4.3.0` release
+candidate, not published `4.2.0`. Add it only to an already selected, eligible policy;
 the dependency, key-isolation, and customization-safety requirements above still
 apply.
 

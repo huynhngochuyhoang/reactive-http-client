@@ -96,7 +96,7 @@ cache manager in deterministic and ordinary-time modes. These assertions
 do not prove socket cancellation, pool reuse, transport backpressure, or native
 resource cleanup.
 
-### Cache work controls (V30 / 4.3.0-SNAPSHOT)
+### Cache work controls (V30 / 4.3.0)
 
 `cacheWorkSnapshot()` adds an immutable view without changing the published
 `CacheSnapshot` constructor. Configure work limits in the supplied `ClientConfig`;

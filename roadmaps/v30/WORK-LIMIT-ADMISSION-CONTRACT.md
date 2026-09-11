@@ -5,7 +5,7 @@
 > caller/load/refresh configuration with enforcement, basic contract output,
 > and AOT binding hints. Priority 9 additionally delivers public rejection
 > types/outcomes, live work telemetry, and schema-V1 aggregates; native
-> executable evidence remains Priority 11.
+> executable evidence is tracked in Priorities 10.4 and 13.2.
 
 Recorded on 2026-09-08 against reachable baseline
 `44502219b071a73a37cc0ff7301eafb3d3a68caf` and the current

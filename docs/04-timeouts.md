@@ -18,6 +18,21 @@ fired is critical to avoiding hard-to-debug incidents.
 
 ---
 
+## Cache work admission (4.3.0 candidate)
+
+[Optional cache work limits](32-response-caching.md#v30-snapshot-optional-work-limits)
+bound active owners, not elapsed time. They do not enable a deadline or queue.
+The caller's logical-call budget starts before preparation and authorization;
+hits and coalesced waiters each retain their own budget. A shared load retains
+its reservation while another caller is interested after the first caller times
+out. Request timeouts remain inside that source. Hidden refresh uses its own
+reservation and the earlier of refresh timeout and hard expiry.
+
+Cancellation cannot free an entered synchronous cleanup frame before it
+unwinds. A hung source without an applicable deadline can occupy capacity
+indefinitely; excess work is rejected, not queued or automatically retried.
+These additions are not available in published `4.2.0`.
+
 ## Precedence rules
 
 1. `@TimeoutMs(ms)` on the method takes highest precedence.

@@ -27,8 +27,8 @@ commit as completion evidence. Preserve partial reports when a command fails.
   counters are not substitutes for an operator-visible signal.
 - Priority 12.3 requires manual release-benchmark execution and review of the
   resulting reports before closure.
-- Public baselines stay on `4.2.0`; reactor fixtures stay on `4.3.0-SNAPSHOT`
-  until Priority 13 selects a final cut. Publication and baseline movement are
+- Public baselines stay on `4.2.0`; Priority 13 prepares the `4.3.0` candidate.
+  Publication and baseline movement are
   separate from implementation and require fresh Central verification.
 
 ## Required Invariants
@@ -1008,13 +1008,13 @@ Priority 4 evidence (2026-09-08):
 - [x] Exercise valid/invalid and selected/unselected policies through startup,
       AOT, and generated effective-contract tests.
 
-### [ ] 10.4 Record native and shutdown evidence
+### [x] 10.4 Record native and shutdown evidence
 
 - [x] Extend smoke with gated caller/load saturation, refresh skip, released-slot
       reuse, independent caller deadlines, and factory close.
 - [x] Count every server request, including rejected/unmatched routes, and
       synchronize no-dispatch assertions against delayed event-loop work.
-- [ ] Compile and run from one clean reachable commit after all fixture fixes;
+- [x] Compile and run from one clean reachable commit after all fixture fixes;
       record Java/Boot/GraalVM versions, commands, binary SHA-256, and output.
 - [x] Preserve the existing shutdown observation bound and do not let normal
       request/acquire expiry satisfy disposal assertions.
@@ -1112,6 +1112,25 @@ Priority 4 evidence (2026-09-08):
   The clean-commit native compile/run gate above remains open.
 
 ---
+
+### Native gate closure (2026-09-11)
+
+- Compiled and executed the complete fixture from clean reachable commit
+  `d911226e478769f084bc46702587e004187c18d1`, after all runtime/fixture
+  corrections. The binary is for `4.3.0-SNAPSHOT`, not a relabeled final
+  artifact; Priority 13 separately records the final-coordinate packaging.
+- Maven `3.9.9`, GraalVM JDK/native-image `25.0.3`, Java target `21`,
+  Boot `4.0.0`, Linux amd64. After installing this clean reactor, ran
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -f .github/native-smoke/pom.xml -Pnative '-DbuildArgs=-H:+SharedArenaSupport,-J-Xmx4g,--parallelism=2' native:compile`,
+  then the copied executable. Both exit zero. Output confirms GET/POST
+  capacity, refresh skip, slot reuse, independent deadlines, factory shutdown
+  and no late dispatch.
+- Executable SHA-256:
+  `84177bc6d5def1a607fee3678675541a86b02ced4bbbbc6411c3db6facb5101b`.
+  Commands, timestamps, output, toolchain, source state and binary are retained
+  under `target/release-evidence/v30/priority13/recovery/native-compile/`
+  and `native-run/`. The earlier 3 GiB compiler heap failure remains in
+  `priority13/clean/native-compile/`; it is not reported as a passing run.
 
 ## Priority 11 - Operations and Support-Bundle Evidence
 
@@ -1318,43 +1337,104 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 13 - Public API, Documentation, and Release Go/No-Go
 
-### [ ] 13.1 Freeze the supported surface and guidance
+### [x] 13.1 Freeze the supported surface and guidance
 
-- [ ] Freeze additive properties, local-admission error/outcome, mock helpers,
+- [x] Freeze additive properties, local-admission error/outcome, mock helpers,
       effective contracts, diagnostics, and metric schemas after enforcement.
-- [ ] Update metadata/reference generation, caching, observability, timeouts,
+- [x] Update metadata/reference generation, caching, observability, timeouts,
       resilience, test-helper, native, operations, support, and migration guides
       with one vocabulary and copyable startup-valid examples.
-- [ ] Preserve published `4.2.0` defaults and existing source/binary contracts;
+- [x] Preserve published `4.2.0` defaults and existing source/binary contracts;
       any incompatible change requires explicit deferral or a revised release lane.
-- [ ] Remove placeholder/unenforced public settings and keep the new capacity
+- [x] Remove placeholder/unenforced public settings and keep the new capacity
       behavior explicitly selected and distinguishable from storage admission.
 
-### [ ] 13.2 Assemble immutable release evidence
+Surface freeze verified 2026-09-11:
 
-- [ ] Pass the complete reactor, package/generation guards, supported dependency
+- The [public surface table](../../docs/20-native-release-compatibility.md#v30-additive-surface-freeze)
+  freezes properties, exception/reasons, category/outcomes, helper methods and
+  record components, rendered contracts, schema V1 and fixed metric dimensions.
+  Existing compatibility include patterns cover every Java addition; reservation
+  and cache engines remain internal. Strict root and starter-only comparisons
+  from clean `d911226e478769f084bc46702587e004187c18d1` pass against independent
+  fresh Central `4.2.0` repositories with additive rows only.
+- Timeout, resilience, migration and complete configuration guidance use the
+  same caller/source/refresh ownership contract. Existing caching, telemetry,
+  diagnostics, helper, native, operations and support guides retain selection,
+  unknown-state, no-queue and shutdown boundaries. No runtime default or public
+  setting was added in this freeze.
+- Candidate documentation/metadata verification passes **102 cases**
+  (49 documentation, 35 properties, 18 metadata), zero failures/errors/skips.
+  The new test binds the exact copyable YAML and constructs/destroys its client;
+  metadata/reference, links, placeholders and fixture guards pass. Logs are
+  retained in `target/release-evidence/v30/priority13/`.
+
+### [x] 13.2 Assemble immutable release evidence
+
+- [x] Pass the complete reactor, package/generation guards, supported dependency
       matrix, strict root/module API checks, current/published consumers,
       AOT/native, shutdown, and documentation contracts from a reviewed clean commit.
-- [ ] Preserve source- and binary-incompatibility failures and isolated report
+- [x] Preserve source- and binary-incompatibility failures and isolated report
       provenance for each supported matrix row; keep evidence after failures.
-- [ ] Include Priority 12's reviewed benchmark disposition and rerun smoke on the
+- [x] Include Priority 12's reviewed benchmark disposition and rerun smoke on the
       final source; do not relabel stale/manual evidence as current.
-- [ ] Record commands, actual totals, toolchains, clean-tree state, hashes,
+- [x] Record commands, actual totals, toolchains, clean-tree state, hashes,
       Central markers, reachable commits, remaining risks, and evidence paths.
-- [ ] Verify generated readiness names unresolved release steps without claiming
+- [x] Verify generated readiness names unresolved release steps without claiming
       publication; target-only evidence remains uncommitted unless a sanitized
       version-matched report is deliberately promoted.
 
+Evidence assembled 2026-09-11:
+
+- [Release review](RELEASE-DECISION.md) records commands, totals, toolchains,
+  source/version distinctions, remaining risks and SHA-256 integrity anchors.
+  Evidence stays under `target/release-evidence/v30/priority13/`.
+- Clean reachable `d911226e478769f084bc46702587e004187c18d1`:
+  **1,692 reactor cases**, zero failures/errors/skips; each complete Java 21
+  Boot `4.0.0`/`4.1.0` row repeats those cases plus **three consumer cases**.
+  Strict root/starter-only and per-row API comparisons pass in independent
+  fresh Central repositories. Source-only/binary negative guards, generation
+  and optional-integration guards pass. Native compile/run closes 10.4.
+- Clean current-consumer evidence has **69 helper, nine consumer and one
+  no-Caffeine cases**; independent published `4.2.0` consumer has **four**.
+  Fresh Central verification covers all **13** published artifacts.
+- Candidate `4.3.0` is separately identified as the release-preparation
+  patch, not a fictitious clean final commit. Full reactor passes **1,693**
+  (1,564 starter, 73 helper, 56 OTel); current consumer repeats **69/9/1**.
+  Both strict API checks, AOT packaging (**five fixture cases**), generated-AOT
+  execution, unsigned release packaging and generation pass.
+- Clean and final-coordinate smoke each contain **62 rows / 20 methods**.
+  The final unrestricted benchmark test run passes **all 27 harness/report
+  cases**, retained separately under `priority13/final-validation/`.
+  Priority 12's manual reports/hashes and **16 review flags** remain unchanged;
+  no numerical or comparative performance claim is promoted.
+- Readiness regeneration passes **49 documentation cases** and retains
+  `published=false`, baseline `4.2.0`, signing, clean final commit/tag,
+  publication, Central and published-consumer gates. Initial incomplete-JDK
+  and 3 GiB native-compiler failures are retained alongside passing retries.
+  Signing failed locally and remains a separate 13.3 blocker, not hidden by
+  unsigned artifact or test success.
+
 ### [ ] 13.3 Select release scope and candidate version
 
-- [ ] Record one explicit go/no-go decision with date, reviewed commit, scope,
+- [x] Record one explicit go/no-go decision with date, reviewed commit, scope,
       benchmark disposition, and remaining risk.
-- [ ] Select `4.3.0` only for the enforced additive opt-in work-bound contract;
+- [x] Select `4.3.0` only for the enforced additive opt-in work-bound contract;
       otherwise document a compatible patch scope or a no-go with deferred items.
 - [ ] On go, prepare version-matched final artifacts and rerun release packaging,
       generation, signing, and readiness checks before publication.
-- [ ] Keep public/API/consumer/benchmark baselines on `4.2.0` until the new
+- [x] Keep public/API/consumer/benchmark baselines on `4.2.0` until the new
       published artifacts have passed Central verification.
+
+Decision recorded 2026-09-11: **NO-GO for publication pending signed preflight
+and the reviewed clean final commit/tag**. The additive `4.3.0` scope is
+selected, version-matched artifacts are prepared and checks pass as recorded
+above, but `mvn -Prelease -DskipTests verify` fails with
+`gpg: signing failed: No pinentry`. The signed staged-consumer check therefore
+has not run. The [release review](RELEASE-DECISION.md#publication-boundary)
+provides the remaining terminal commands; 13.3 remains open until this gate
+passes. No signing credentials, tag, publication or final clean commit are
+invented. All 13.4 items remain open.
 
 ### [ ] 13.4 Publish, verify, and archive V30
 

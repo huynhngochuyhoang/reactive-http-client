@@ -127,10 +127,54 @@ reactive:
           strict-unsafe-retry-validation: true
 ```
 
+## Optional Cache Work Admission (4.3.0 candidate)
+
+This is a complete starter-property example for an unauthenticated client with
+only eligible GET endpoints and no applicable WebClient customization beans.
+First add the optional [Caffeine dependency](../32-response-caching.md#explicit-selection).
+Inventory Boot/per-client customizers and replacement builders; classify each
+applicable bean as `SAFE` under `cache.customizations` only after reviewing its
+[cache safety](../32-response-caching.md#customization-safety). A real auth or
+tenant-dependent endpoint also needs its explicit identity variants. The work
+group does not relax those requirements or authorize non-GET caching.
+
+```yaml
+reactive:
+  http:
+    clients:
+      catalog-api:
+        base-url: https://catalog-api.example.invalid
+        logical-call-timeout-ms: 7000
+        cache:
+          policy: catalog-read
+          policies:
+            catalog-read:
+              ttl-ms: 60000
+              maximum-size: 10000
+              single-flight: true
+              refresh-after-ms: 30000
+              refresh-timeout-ms: 5000
+              vary-by-headers:
+                - Idempotency-Key
+              work:
+                maximum-concurrent-callers: 64
+                maximum-concurrent-loads: 16
+                maximum-concurrent-refreshes: 4
+    observability:
+      enabled: true
+      cache:
+        enabled: true
+```
+
+Without refresh, remove both refresh timing settings and the refresh work limit;
+retain the caller/load pair. Omit the entire work group for published `4.2.0`
+behavior. Counts are overlapping ownership units, not entry/byte limits, request
+rates, or a process-memory budget. See [saturation recovery](../30-operations-troubleshooting.md#cache-work-saturation-v30-430-candidate).
+
 ## Explicit Local Response Cache
 
 This weighted example targets published `4.2.0` and the current
-`4.3.0-SNAPSHOT` development line. It selects one bounded local policy
+`4.3.0` release candidate. It selects one bounded local policy
 explicitly. Published `4.1.x` consumers must
 omit `maximum-total-decoded-response-bytes`; TTL, entry-count `maximum-size`,
 single flight, refresh, and cache telemetry remain available there. The V29

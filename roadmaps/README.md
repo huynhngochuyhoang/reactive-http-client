@@ -9,7 +9,7 @@ is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V29 are completed release records. V30 is the only active
-execution roadmap; its checklist is adopted and final release scope is unselected.
+execution roadmap; the additive `4.3.0` candidate is selected but unpublished.
 
 Deferred design work that is not part of an active execution roadmap is kept
 under [`proposals/`](proposals/). These proposals do not add release gates until

@@ -2,10 +2,10 @@
 
 > **Status:** active
 > **Theme:** bounded active cache work and overload visibility
-> **Candidate release direction:** `4.3.0`, subject to an additive opt-in contract
+> **Candidate release:** `4.3.0`, additive opt-in work admission; unpublished
 > **Starting development line:** `4.3.0-SNAPSHOT`
 > **Published/API baseline:** `4.2.0`
-> **Execution:** [checklist adopted](CHECKLIST.md); final release scope not yet selected
+> **Execution:** [checklist adopted](CHECKLIST.md); [scope selected](RELEASE-DECISION.md), publication pending
 
 ## Starting State
 
