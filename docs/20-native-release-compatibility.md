@@ -181,8 +181,10 @@ commands, local signing failure and subsequent successful publication.
 After fresh Maven Central artifact and assembled-consumer verification, public
 consumer, strict API and benchmark baselines are published `4.3.0`.
 Reactor-only coordinates use `4.4.0-SNAPSHOT`. [V30](../roadmaps/v30/ROADMAP.md)
-and its [checklist](../roadmaps/v30/CHECKLIST.md) are completed release records;
-no next execution roadmap or release scope is selected.
+and its [checklist](../roadmaps/v30/CHECKLIST.md) are completed release records.
+[V31](../roadmaps/v31/ROADMAP.md) is the active execution roadmap with an
+[adopted checklist](../roadmaps/v31/CHECKLIST.md); implementation and evidence
+remain pending, and no release scope is selected.
 
 ### Publishable module staging
 
@@ -947,8 +949,9 @@ Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
 V30 is published and archived at `4.3.0`. The current reactor is
-`4.4.0-SNAPSHOT`, with no active roadmap, no selected release scope and no
-`plannedFinalVersion`. Generated readiness marks the prospective next version
+`4.4.0-SNAPSHOT`, with active roadmap `v31`, no selected release scope and no
+`plannedFinalVersion`. Checklist adoption does not complete implementation.
+Generated readiness marks the prospective next version
 as deferred and leaves future manual checks pending; it does not reopen V30.
 The [release decision](../roadmaps/v30/RELEASE-DECISION.md) records actual V30
 publication provenance and the no-public-performance-claim benchmark disposition.
