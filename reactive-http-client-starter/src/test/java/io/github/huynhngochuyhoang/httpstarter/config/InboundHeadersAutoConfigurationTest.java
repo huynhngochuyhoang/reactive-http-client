@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
+import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -58,6 +61,29 @@ class InboundHeadersAutoConfigurationTest {
                     assertThat(context).hasSingleBean(WebClient.Builder.class);
                     assertThat(context).doesNotHaveBean(InboundHeadersWebFilter.class);
                 });
+    }
+
+    @Test
+    void servletApplicationWithWebClientDoesNotRegisterReactiveCaptureBridge() {
+        new WebApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(ReactiveHttpClientAutoConfiguration.class))
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getServletContext()).isNotNull();
+                    assertThat(context).hasSingleBean(WebClient.Builder.class);
+                    assertThat(context).doesNotHaveBean(InboundHeadersWebFilter.class);
+                    assertThat(context.getBeansOfType(jakarta.servlet.Filter.class)).isEmpty();
+                    assertThat(context.getBeansOfType(WebFilter.class)).isEmpty();
+                });
+    }
+
+    @Test
+    void captureDoesNotDeclareAnOrderOverApplicationSecurityFilters() throws Exception {
+        assertThat(Ordered.class.isAssignableFrom(InboundHeadersWebFilter.class)).isFalse();
+        assertThat(InboundHeadersWebFilter.class.getAnnotation(Order.class)).isNull();
+        assertThat(ReactiveHttpClientAutoConfiguration.class
+                .getMethod("inboundHeadersWebFilter", ReactiveHttpClientProperties.class)
+                .getAnnotation(Order.class)).isNull();
     }
 
     @Test
