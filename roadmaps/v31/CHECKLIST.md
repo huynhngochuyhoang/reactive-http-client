@@ -8,7 +8,7 @@
 Companion to [`ROADMAP.md`](ROADMAP.md). Execute priorities in order unless a
 confirmed correctness or release blocker requires reordering. Checklist adoption
 starts execution planning; it does not complete Priority 1, implement a helper,
-or select a release. All implementation and evidence items below remain open.
+or select a release. Completion and evidence are recorded under each priority.
 
 Check an item only after its implementation, verification and disposition are
 recorded under that priority. Keep generated evidence under
@@ -56,72 +56,161 @@ pre-squash hash must not stand in for a reachable reviewed revision.
 
 ## Priority 1 - Post-`4.3.0` Baseline and V31 Scope Integrity
 
-### [ ] 1.1 Align published and development lanes
+### [x] 1.1 Align published and development lanes
 
-- [ ] Verify root/modules, benchmark, native and current-consumer coordinates
+- [x] Verify root/modules, benchmark, native and current-consumer coordinates
       remain `4.4.0-SNAPSHOT`; do not bump them merely to adopt execution.
-- [ ] Keep README/quick-start coordinates, `latest.published.version`, strict
+- [x] Keep README/quick-start coordinates, `latest.published.version`, strict
       API, published consumer and benchmark baselines at `4.3.0`.
-- [ ] Verify the current published-baseline benchmark profile includes V30
+- [x] Verify the current published-baseline benchmark profile includes V30
       work-limit rows; preserve explicitly selected historical exclusions.
-- [ ] Preserve V1-V30 completed records and V30 release/tag/native/performance
+- [x] Preserve V1-V30 completed records and V30 release/tag/native/performance
       provenance. The adopted V27 resilience proposal is not new V31 scope.
 
-### [ ] 1.2 Reprove the published baseline
+### [x] 1.2 Reprove the published baseline
 
-- [ ] Resolve all 13 parent/module POM, binary, source and Javadoc artifacts from
+- [x] Resolve all 13 parent/module POM, binary, source and Javadoc artifacts from
       a previously absent Central-only repository; record versions, hashes and
       remote repository markers.
-- [ ] Run the published `4.3.0` assembled consumer without reactor-output leakage;
+- [x] Run the published `4.3.0` assembled consumer without reactor-output leakage;
       retain effective POM, dependency tree, classpath, actual totals and provenance.
-- [ ] Run independent strict root and starter-module source/binary comparisons
+- [x] Run independent strict root and starter-module source/binary comparisons
       against fresh `4.3.0` repositories.
-- [ ] Run API/published-baseline negative fixtures for self-comparison,
+- [x] Run API/published-baseline negative fixtures for self-comparison,
       contamination, missing attachments and inconsistent declared versions.
 
-### [ ] 1.3 Verify adopted execution state
+### [x] 1.3 Verify adopted execution state
 
-- [ ] Verify V31 is the sole active roadmap with this linked checklist and exact
+- [x] Verify V31 is the sole active roadmap with this linked checklist and exact
       active-status matching; retain all V1-V30 completion checks.
-- [ ] Regenerate readiness with active roadmap `v31`, release lane `unselected`,
+- [x] Regenerate readiness with active roadmap `v31`, release lane `unselected`,
       snapshot development, no planned final release and an unpublished deferred
       candidate. Adoption must not imply completed implementation.
-- [ ] Run Maven validation, `DocumentationReleaseArtifactTest` and
+- [x] Run Maven validation, `DocumentationReleaseArtifactTest` and
       `git diff --check`; record actual commands and results for this priority.
+
+Evidence executed on 2026-09-12 from clean commit
+`2d51de60368e6715921ce8752b8e32132b884b18`, before this checklist-only
+completion update:
+
+- Root/module, benchmark, native-smoke and current-consumer coordinates remain
+  `4.4.0-SNAPSHOT`. Public snippets plus published/API/consumer/benchmark
+  baselines remain `4.3.0`. The current published-baseline benchmark profile has
+  no source exclusions and includes V30 work-limit rows; V27-V30 exclusions
+  remain confined to explicitly named historical profiles. V1-V30 completion
+  and V30 release evidence remain unchanged.
+- `scripts/verify-published-release-artifacts.sh 4.3.0` resolved all 13 required
+  parent/module POM, binary, source and Javadoc artifacts from a previously
+  absent Central-only repository. Declared POM and embedded JAR versions,
+  SHA-256 values and four module remote-marker records passed. Evidence is under
+  `target/release-evidence/v31/priority1/published-baseline/`.
+- `scripts/verify-published-consumer.sh 4.3.0` passed 4 tests with zero failures,
+  errors or skips using published artifacts only. Effective POMs, dependency
+  tree, classpath, Surefire XML, seven artifact hashes and clean-source
+  provenance are under `target/release-evidence/v31/priority1/published-consumer/`.
+  No reactor output directory was present on the consumer classpath.
+- Independent root and starter-only
+  `-Papi-compatibility -DskipTests verify` builds passed with source and binary
+  incompatibility failures enabled. Fresh repositories
+  `v31-priority1-api-root-4.3.0` and
+  `v31-priority1-api-starter-4.3.0` produced seven and two baseline artifact
+  hashes respectively, with Central remote markers retained under this
+  priority's `api-root/` and `api-starter/` evidence directories.
+- `bash scripts/verify-published-baseline-fixtures.sh` rejected local
+  contamination, root/module self-comparison, missing source/Javadoc attachments,
+  mismatched parent/project POM versions and mismatched embedded JAR versions.
+  `bash scripts/verify-api-compatibility-fixtures.sh` accepted additive and
+  defaulted-annotation changes while rejecting source-only checked exceptions,
+  removed constructors, nested methods and enum constants. Fixture outputs are
+  retained under `baseline-fixtures/` and `api-fixtures/`.
+- Generated readiness records development `4.4.0-SNAPSHOT`, published/API
+  baseline `4.3.0`, active roadmap `v31`, release lane `unselected`, no planned
+  final release, and a deferred unpublished `4.4.0` candidate with unselected
+  scope. The generated manifest and benchmark snippet are under `readiness/`.
+- `mvn -B -ntp -s .mvn/maven-central-settings.xml validate` passed all four
+  reactor modules. The same settings with
+  `-pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`
+  passed 49 tests with zero failures, errors or skips. `git diff --check` passed.
+  Toolchain: Maven `3.9.9`, GraalVM JDK `25.0.3`, Java `21` compilation target
+  and Spring Boot `4.0.0`.
+- Exact commands, stage exit statuses, logs, test reports, toolchain, generated
+  readiness and clean-source provenance are under
+  `target/release-evidence/v31/priority1/`. Existing post-publication `4.3.0`
+  artifact and consumer evidence was preserved under
+  `target/v31-priority1-previous-state/` and was not reused by these fresh runs.
 
 ## Priority 2 - Inbound Header and Context Characterization
 
-### [ ] 2.1 Reproduce the named-lookup failure independently of a mesh
+### [x] 2.1 Reproduce the named-lookup failure independently of a mesh
 
-- [ ] Use fake bounded headers with mixed, lower and upper case; record that the
+- [x] Use fake bounded headers with mixed, lower and upper case; record that the
       Reactor key and matching captured entry exist while exact `Map.get` misses.
-- [ ] Distinguish the absent map entry that makes `getFirst()` dereference null
+- [x] Distinguish the absent map entry that makes `getFirst()` dereference null
       from an empty list, empty string, redacted value and malformed JSON.
-- [ ] Reproduce against server `HttpHeaders`, ordered application maps and
+- [x] Reproduce against server `HttpHeaders`, ordered application maps and
       capture/restore snapshots; do not infer pre-proxy spelling from the map.
-- [ ] Keep production behavior unchanged while these baseline cases are recorded.
+- [x] Keep production behavior unchanged while these baseline cases are recorded.
 
-### [ ] 2.2 Characterize independent missing-value causes
+### [x] 2.2 Characterize independent missing-value causes
 
-- [ ] Test absent context key, outside-allow-list names, denied selected fields,
+- [x] Test absent context key, outside-allow-list names, denied selected fields,
       empty lists, empty strings, multiple values and differently cased aliases.
-- [ ] Compare an ordinary composed subscription with an independent sink or
+- [x] Compare an ordinary composed subscription with an independent sink or
       callback subscription, with and without explicit snapshot restoration.
-- [ ] Characterize raw malformed values under the public context key separately
+- [x] Characterize raw malformed values under the public context key separately
       from well-formed absence; record the actual failing boundary.
-- [ ] Record WebFilter registration, replacement and capture order relevant to
+- [x] Record WebFilter registration, replacement and capture order relevant to
       the reproduction without changing security-filter ordering.
 
-### [ ] 2.3 Classify the evidence and narrow production work
+### [x] 2.3 Classify the evidence and narrow production work
 
-- [ ] Record each observation as verified defect, documented caller misuse,
+- [x] Record each observation as verified defect, documented caller misuse,
       additive usability gap or unverified deployment hypothesis.
-- [ ] Inventory existing tests/docs that intentionally preserve spelling,
+- [x] Inventory existing tests/docs that intentionally preserve spelling,
       string keys, immutable values and restore precedence.
-- [ ] Require a focused reproducer and compatibility review for any correction
+- [x] Require a focused reproducer and compatibility review for any correction
       beyond the additive named-access API.
-- [ ] Record whether direct protocol tests suffice or a normalizing intermediary/
+- [x] Record whether direct protocol tests suffice or a normalizing intermediary/
       manual mesh scenario is needed; do not claim Istio caused an unobserved change.
+
+Evidence recorded on 2026-09-12 against base commit
+`2d51de60368e6715921ce8752b8e32132b884b18` with the new tests and documentation
+in a dirty working tree. The existing Priority 1 completion edits were retained.
+
+- [Characterization and disposition](INBOUND-HEADER-CHARACTERIZATION.md) records
+  the failure matrix, registration/order boundary, compatibility inventory and
+  scope decision. Exact spelling can miss despite a present selected entry;
+  null dereference, empty-list access and application parsing failures have
+  separate reproducers. This confirms an additive lookup usability gap without
+  establishing a production defect or a cause in the reported Istio deployment.
+- `InboundHeaderContextCharacterizationTest`: 18 cases passed for lower/mixed/
+  upper spelling, empty/absent/redacted/repeated values, malformed raw context,
+  defensive snapshot restoration and both request-mutation orders.
+  `InboundHeaderHandoffCharacterizationTest`: 6 cases passed for reads after
+  composed scheduler switches and independent sink subscriptions with/without
+  worker headers and explicit restore. `InboundHeadersAutoConfigurationTest`:
+  4 cases passed for bound selection, reactive registration, non-web absence,
+  replacement capture behavior and an unrelated filter.
+- The focused three-suite command passed 28 tests. The combined regression
+  command also included `InboundHeadersWebFilterTest`, `RequestContextSnapshotTest`,
+  `RequestContextContributorTest`, `CorrelationIdWebFilterTest`,
+  `CorrelationIdPropagationTest`, `ReactiveHttpClientAutoConfigurationTest`,
+  `Boot4AutoConfigurationTest` and `DocumentationReleaseArtifactTest` and passed
+  144 tests total, including 49 documentation tests. All runs had zero failures,
+  errors or skips. Both use
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter`
+  with the recorded `-Dtest` suite lists and `test` goal.
+- Production sources, public defaults and V1-V30 records are unchanged.
+  Priority 3 retains the additive scope and requires focused reproduction plus
+  compatibility review for any further correction. Direct HTTP/1.1 and HTTP/2
+  verification is assigned to Priority 4; an intermediary is currently
+  unnecessary, and manual mesh behavior remains unverified.
+- Commands, logs, fresh Surefire XML, source copies/SHA-256 values, dirty-source
+  provenance and generated readiness are under
+  `target/release-evidence/v31/priority2/`. Toolchain: Maven `3.9.9`, GraalVM JDK
+  `25.0.3`, Java `21` compilation target and Spring Boot `4.0.0`.
+  `git diff --check` passed; the existing development, baseline and unselected
+  release state remain in effect.
 
 ## Priority 3 - Case-Insensitive Header Access Contract
 
