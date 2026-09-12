@@ -133,6 +133,59 @@ Matching is case-insensitive. Captured snapshots preserve the original inbound h
 
 ---
 
+## Named inbound header access (4.4.0 development)
+
+The additive `4.4.0-SNAPSHOT` APIs below are not available in published `4.3.0`:
+
+| Method | Return type |
+|---|---|
+| `RequestContext.inboundHeaderValues(ContextView context, String name)` | `List<String>` |
+| `RequestContext.inboundHeader(ContextView context, String name)` | `Optional<String>` |
+
+Both read only the captured `inboundHeaders` context value. Names are nonempty
+ASCII HTTP field-name tokens and match independently of the default locale.
+Underscores and hyphens remain distinct. The bulk `inboundHeaders(ctx)` accessor
+still exposes captured spelling and exact map-key lookup.
+
+| Captured state | `inboundHeaderValues` | `inboundHeader` |
+|---|---|---|
+| Missing key/name or matching empty lists | Immutable empty list | Empty optional |
+| Exactly one value, including `""` or `[REDACTED]` | Value unchanged | Present value unchanged |
+| Multiple values, including equal duplicates | All values unchanged | `IllegalStateException` (ambiguous) |
+| Case aliases in the map | Concatenate in map-iteration then list order | Same total-value multiplicity rule |
+
+There is no exact-case preference, deduplication, comma joining/splitting,
+trimming, value normalization, parsing, or fallback credential source. Arbitrary
+maps may expose an unstable iteration order; the helpers cannot recover wire
+order that the map has lost. All-values results are defensive immutable copies.
+
+Null context/name arguments throw `NullPointerException`. Invalid lookup tokens
+throw `IllegalArgumentException`. Malformed stored input throws
+`IllegalStateException`: the context value must be a map, every key must be a
+valid field-name string, every value must be a non-null list, and every list
+element must be a non-null string. Validation includes unrelated entries, even
+when the requested name is absent or already has multiple values. Errors use
+fixed structural messages, never header names, values or object descriptions.
+
+Applications decide whether absence, an empty string, a redacted marker, or a
+schema violation is acceptable. For example, inside `Mono.deferContextual`:
+
+```java
+String value = RequestContext.inboundHeader(ctx, "X-Fixture-Data")
+        .orElseThrow(() -> new IllegalArgumentException("Required fixture header is absent"));
+// Application-owned: enforce a size/schema limit before parsing value.
+```
+
+Manual `withInboundHeaders`, raw context writes, and custom contributors do not
+run ingress allow/deny filtering or authenticate their values. The new readers
+do not sanitize or mutate those inputs. A raw application map can remain mutable
+even though a returned values list is immutable. The filter, defensive writer,
+snapshot record constructors, public string-key aliases, and restore precedence
+are unchanged: present snapshot fields replace target values; absent fields do
+not clear them.
+
+---
+
 ## Async boundaries and sinks
 
 Reactor `Context` is scoped to a subscription chain. Values captured by

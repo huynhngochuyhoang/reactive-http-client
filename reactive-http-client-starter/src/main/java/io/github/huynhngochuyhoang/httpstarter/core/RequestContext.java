@@ -146,6 +146,96 @@ public final class RequestContext {
     }
 
     /**
+     * Reads all captured values matching an ASCII case-insensitive header name.
+     *
+     * <p>Returns a defensive immutable list, empty for absence or matching empty
+     * lists. Case aliases are combined in map iteration and per-entry list order,
+     * without exact-case preference, deduplication or value transformation.
+     * The entire stored map is validated, including nonmatching entries.
+     *
+     * <p>Reads only the context snapshot; manual context writes are not filtered,
+     * authenticated or made immutable by this reader. The legacy bulk accessor
+     * and capture/restore semantics are unchanged.
+     *
+     * @param context the current subscriber context
+     * @param name a nonempty ASCII HTTP field-name token
+     * @return all matching values, unchanged and in exposed order
+     * @throws NullPointerException if context or name is null
+     * @throws IllegalArgumentException if name is not a valid field-name token
+     * @throws IllegalStateException if the stored value is not a map with valid
+     *         field-name string keys and non-null lists of non-null strings
+     * @since 4.4.0
+     */
+    public static List<String> inboundHeaderValues(ContextView context, String name) {
+        Objects.requireNonNull(context, "context must not be null");
+        Objects.requireNonNull(name, "name must not be null");
+        if (!isHeaderNameToken(name)) {
+            throw new IllegalArgumentException("name must be a nonempty ASCII HTTP field-name token");
+        }
+        Object stored = context.getOrDefault(INBOUND_HEADERS_CONTEXT_KEY, Map.of());
+        if (!(stored instanceof Map<?, ?> headers)) {
+            throw new IllegalStateException("Inbound header context value must be a map");
+        }
+        List<String> matches = new ArrayList<>();
+        for (Map.Entry<?, ?> entry : headers.entrySet()) {
+            if (!(entry.getKey() instanceof String headerName) || !isHeaderNameToken(headerName)) {
+                throw new IllegalStateException("Inbound header map contains an invalid field name");
+            }
+            if (!(entry.getValue() instanceof List<?> values)) {
+                throw new IllegalStateException("Inbound header values must be a list");
+            }
+            // Both names are validated ASCII tokens, so Unicode aliases cannot match.
+            boolean matching = name.equalsIgnoreCase(headerName);
+            for (Object value : values) {
+                if (!(value instanceof String text)) {
+                    throw new IllegalStateException("Inbound header list elements must be strings");
+                }
+                if (matching) {
+                    matches.add(text);
+                }
+            }
+        }
+        return List.copyOf(matches);
+    }
+
+    /**
+     * Reads exactly one captured value using {@link #inboundHeaderValues} semantics.
+     * Absence and matching empty lists return an empty optional; a single empty
+     * string or redacted marker remains present. Required-value validation,
+     * authentication and parsing remain application responsibilities.
+     *
+     * @param context the current subscriber context
+     * @param name a nonempty ASCII HTTP field-name token
+     * @return the sole matching value, if any
+     * @throws NullPointerException if context or name is null
+     * @throws IllegalArgumentException if name is not a valid field-name token
+     * @throws IllegalStateException if the stored map is malformed or more than
+     *         one value matches, including equal duplicates across case aliases
+     * @since 4.4.0
+     */
+    public static Optional<String> inboundHeader(ContextView context, String name) {
+        List<String> values = inboundHeaderValues(context, name);
+        if (values.size() > 1) {
+            throw new IllegalStateException("Inbound header has multiple values");
+        }
+        return values.isEmpty() ? Optional.empty() : Optional.of(values.getFirst());
+    }
+
+    private static boolean isHeaderNameToken(String name) {
+        if (name.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char ch = name.charAt(i);
+            if (!(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z'
+                    || ch >= '0' && ch <= '9' || "!#$%&'*+-.^_`|~".indexOf(ch) >= 0)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Reads the outbound idempotency key from the Reactor context.
      */
     public static Optional<String> idempotencyKey(ContextView context) {
