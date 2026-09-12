@@ -1,6 +1,8 @@
 package io.github.huynhngochuyhoang.httpstarter.otel;
 
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.core.RequestContext;
+import io.github.huynhngochuyhoang.httpstarter.core.RequestContextSnapshot;
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.exception.ErrorCategory;
 import io.github.huynhngochuyhoang.httpstarter.observability.CompositeHttpClientObserver;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import reactor.core.publisher.Mono;
 
 import java.net.UnknownHostException;
 import java.time.Instant;
@@ -102,6 +105,30 @@ class OpenTelemetryHttpClientObserverTest {
                 .doesNotContain("cache-key")
                 .doesNotContain("tenant-value")
                 .doesNotContain("Authorization");
+    }
+
+    @ParameterizedTest
+    @EnumSource(HttpClientCacheOutcome.class)
+    void namedInboundLookupDoesNotAddHeaderMaterialToTerminalSpanAttributes(HttpClientCacheOutcome outcome) {
+        var captured = new RequestContextSnapshot("private-correlation",
+                Map.of("x-private-scope", List.of("private-value"), "authorization", List.of("[REDACTED]")));
+        Mono.deferContextual(ctx -> {
+            String scope = RequestContext.inboundHeader(ctx, "X-Private-Scope").orElseThrow();
+            assertThat(RequestContext.inboundHeader(ctx, "X-Absent")).isEmpty();
+            observer.record(new HttpClientObserverEvent(
+                    "context-client", "read", "GET", "/read", null, 2L, null, null, null, null,
+                    0, HttpClientObserverEvent.UNKNOWN_SIZE, HttpClientObserverEvent.UNKNOWN_SIZE,
+                    null, null, null, Map.of("X-Private-Scope", scope, "X-Correlation-Id",
+                    RequestContext.correlationId(ctx).orElseThrow()), outcome));
+            return Mono.empty();
+        }).contextWrite(captured::writeTo).block();
+
+        SpanData span = onlySpan();
+        assertThat(span.getAttributes().get(OpenTelemetryHttpClientObserver.ATTR_CACHE_OUTCOME)).isEqualTo(outcome.name());
+        assertThat(span.getAttributes().asMap().keySet()).allSatisfy(key -> assertThat(key.getKey()).isIn(
+                "rhttp.client.name", "rhttp.api.name", "http.request.method", "rhttp.attempt.count", "rhttp.cache.outcome"));
+        assertThat(span.toString()).doesNotContain("x-private-scope", "X-Private-Scope", "private-value",
+                "private-correlation", "authorization", "[REDACTED]", "X-Absent");
     }
 
     @Test
