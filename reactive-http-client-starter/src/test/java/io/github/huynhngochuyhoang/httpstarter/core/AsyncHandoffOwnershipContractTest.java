@@ -45,7 +45,7 @@ class AsyncHandoffOwnershipContractTest {
 
     @ParameterizedTest
     @EnumSource(Terminal.class)
-    void terminalHandoffReleasesStarterStateWhileApplicationRecordsRemainExternalOwners(Terminal terminal) throws Exception {
+    void terminalHandoffAcknowledgesCleanupBeforeApplicationOwnersAreCleared(Terminal terminal) throws Exception {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         try (Fixture fixture = new Fixture()) {
             Ownership ownership = exerciseTerminal(fixture, terminal, queue);
@@ -53,12 +53,15 @@ class AsyncHandoffOwnershipContractTest {
             assertThat(ownership.snapshot().get()).isSameAs(ownership.envelopes().getFirst());
             assertThat(ownership.header().get()).isNotNull();
             ownership.envelopes().clear();
-            awaitCollected(queue, List.of(ownership.snapshot()));
+            assertThat(ownership.envelopes()).isEmpty();
             // A user logger deliberately retains its terminal record, not the snapshot wrapper or live context.
             assertThat(ownership.header().get()).isSameAs(
                     fixture.records.logs.getFirst().inboundHeaders().get("x-fixture").getFirst());
             fixture.records.clear();
-            awaitCollected(queue, List.of(ownership.header()));
+            assertThat(fixture.records.starts).isEmpty();
+            assertThat(fixture.records.terminals).isEmpty();
+            assertThat(fixture.records.observers).isEmpty();
+            assertThat(fixture.records.logs).isEmpty();
             assertThat(fixture.context.isActive()).isTrue();
             assertThat(fixture.executor.isShutdown()).isFalse();
             Reference.reachabilityFence(fixture.client);
@@ -94,10 +97,9 @@ class AsyncHandoffOwnershipContractTest {
     }
 
     @Test
-    void retainedSnapshotCopiesHeadersWithoutOwningLiveExchangeRequestOrArbitraryContext() throws Exception {
+    void retainedSnapshotCopiesHeadersAndRestoresOnlySupportedFields() {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         CopyOwnership ownership = captureMutableSource(queue);
-        awaitCollected(queue, ownership.sourceObjects());
         RequestContextSnapshot snapshot = ownership.envelopes().getFirst();
         assertThat(snapshot.inboundHeaders()).containsExactlyEntriesOf(Map.of("x-fixture", List.of("before")));
         assertThat(RequestContext.inboundHeader(snapshot.writeTo(Context.empty()), "X-Fixture")).contains("before");
@@ -106,6 +108,35 @@ class AsyncHandoffOwnershipContractTest {
         assertThatThrownBy(() -> snapshot.inboundHeaders().get("x-fixture").add("changed"))
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThat(RequestContext.idempotencyKey(snapshot.writeTo(Context.empty()))).isEmpty();
+        assertThat(snapshot.writeTo(Context.empty()).stream().map(Map.Entry::getKey).toList())
+                .containsExactlyInAnyOrder(RequestContext.CORRELATION_ID_CONTEXT_KEY, RequestContext.INBOUND_HEADERS_CONTEXT_KEY);
+        Reference.reachabilityFence(ownership.envelopes());
+        ownership.envelopes().clear();
+    }
+
+    // Called only by the opt-in, controlled-JVM reachability lane, never by normal @Test methods.
+    static void probeTerminalReachability(Terminal terminal) throws Exception {
+        ReferenceQueue<Object> queue = new ReferenceQueue<>();
+        try (Fixture fixture = new Fixture()) {
+            Ownership ownership = exerciseTerminal(fixture, terminal, queue);
+            ownership.envelopes().clear();
+            AsyncHandoffReachabilityIT.awaitCollected(queue, List.of(ownership.snapshot()));
+            assertThat(ownership.header().get()).isSameAs(
+                    fixture.records.logs.getFirst().inboundHeaders().get("x-fixture").getFirst());
+            fixture.records.clear();
+            AsyncHandoffReachabilityIT.awaitCollected(queue, List.of(ownership.header()));
+            assertThat(fixture.context.isActive()).isTrue();
+            assertThat(fixture.executor.isShutdown()).isFalse();
+            Reference.reachabilityFence(fixture.client);
+        }
+    }
+
+    static void probeSourceReachability() throws InterruptedException {
+        ReferenceQueue<Object> queue = new ReferenceQueue<>();
+        CopyOwnership ownership = captureMutableSource(queue);
+        AsyncHandoffReachabilityIT.awaitCollected(queue, ownership.sourceObjects());
+        assertThat(ownership.envelopes().getFirst().inboundHeaders())
+                .containsExactlyEntriesOf(Map.of("x-fixture", List.of("before")));
         Reference.reachabilityFence(ownership.envelopes());
         ownership.envelopes().clear();
     }
@@ -197,24 +228,11 @@ class AsyncHandoffOwnershipContractTest {
         return new CopyOwnership(new ArrayList<>(List.of(snapshot)), references);
     }
 
-    private static void awaitCollected(ReferenceQueue<Object> queue, List<WeakReference<Object>> references) throws InterruptedException {
-        // Diagnostic GC retries prove reachability after explicit release, not an RSS or collection-latency SLA.
-        for (int attempt = 0; attempt < 100; attempt++) {
-            if (references.stream().allMatch(reference -> reference.get() == null)) {
-                while (queue.poll() != null) { /* drain diagnostic references */ }
-                return;
-            }
-            System.gc();
-            queue.remove(100);
-        }
-        assertThat(references).allSatisfy(reference -> assertThat(reference.get()).isNull());
-    }
-
     private static ClientResponse ok() {
         return ClientResponse.create(HttpStatus.OK).header(HttpHeaders.CONTENT_TYPE, "text/plain").body("ok").build();
     }
 
-    private enum Terminal { COMPLETE, ERROR, TIMEOUT, CANCEL }
+    enum Terminal { COMPLETE, ERROR, TIMEOUT, CANCEL }
 
     private record Ownership(List<RequestContextSnapshot> envelopes, WeakReference<Object> snapshot,
                              WeakReference<Object> header) {

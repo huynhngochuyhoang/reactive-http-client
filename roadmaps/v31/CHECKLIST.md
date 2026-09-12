@@ -397,15 +397,17 @@ documentation in this dirty working tree.
 
 - [x] Exercise completion, error, timeout and cancellation around handoff and
       starter-owned callbacks; prove cleanup with controlled lifecycle evidence.
-- [x] Use weak references/reference queues where justified to distinguish
-      starter-owned retention from application queues or retained records.
+- [x] Use weak references/reference queues in a controlled JVM lane where
+      justified to distinguish starter-owned retention from external owners;
+      ordinary unit tests must not depend on the collector accepting `System.gc()`.
 - [x] Close executors/subscriptions created by tests and record released owners;
       avoid exact GC deadlines or claims that RSS must immediately fall.
 - [x] Require separate evidence and a scoped fix for any retention defect found.
 
 Evidence recorded on 2026-09-12 against reachable base commit
 `89b8785e724562b40c23e55453e165bc57443abb` plus the tests and documentation in
-this dirty working tree.
+the original implementation working tree. These are pre-review results; the
+GC portability and teardown-race corrections are recorded in the follow-up below.
 
 - [Async handoff and ownership report](ASYNC-HANDOFF-OWNERSHIP.md) maps the
   subscription, restore, precedence and retention cases to explicit owners.
@@ -444,6 +446,32 @@ this dirty working tree.
   A final `DocumentationReleaseArtifactTest` run after this completion update
   passed 49 tests. Production Java, public APIs, dependencies, Java `21` target,
   `4.4.0-SNAPSHOT`/`4.3.0` versions, V1-V30 evidence and release state are unchanged.
+
+Review follow-up on 2026-09-12, base
+`0ffaf2e7d94c16214b38baa7cbf5f32663d7d890` plus the current test/profile/docs diff:
+
+- Removed collection-dependent assertions from the normal handoff tests.
+  Lifecycle acknowledgements, subscriber release, defensive copies and explicit
+  application-owner clearing remain asserted there. Five reachability probes
+  now run only through `-Pv31-handoff-reachability`, outside default Surefire
+  discovery, in a forked Serial-GC JVM with explicit GC enabled and a 128 MiB
+  maximum heap. The lane verifies those effective preconditions before probing.
+- The overlapping-envelope case deliberately pauses sink cancellation, observes
+  the still-attached subscriber, releases cancellation and waits for the
+  sink-side terminal acknowledgement before checking zero subscribers. It no
+  longer treats the result future's completion as proof of upstream teardown.
+- The final regression passed **288 tests** with `-XX:+DisableExplicitGC`.
+  Five single-CPU focused reruns passed **100 executions** with explicit GC
+  disabled; the non-collecting Epsilon JVM passed all **20 focused tests**.
+  The controlled reachability lane passed **five probes**. A deliberately
+  invalid direct probe invocation with explicit GC disabled failed its
+  configuration precondition as expected, before any collection wait.
+- Commands, fresh per-run XML, logs, source hashes and dirty-source provenance
+  are under `target/release-evidence/v31/priority5/review-fixes/`. All positive
+  runs had zero failures/errors/skips; the expected negative run is preserved
+  separately. Source-checksum and whitespace checks passed. The completion/docs
+  update was then checked by **49 passing documentation tests**. Production
+  behavior, artifact versions and published baselines are unchanged.
 
 ## Priority 6 - Cache, Auth, Retry, and Terminal-State Composition
 

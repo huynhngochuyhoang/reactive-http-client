@@ -6,6 +6,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -112,10 +113,27 @@ class ExplicitAsyncHandoffContractTest {
         int count = 12;
         try (Worker worker = new Worker()) {
             CountDownLatch attached = new CountDownLatch(count);
+            CountDownLatch cancellationEntered = new CountDownLatch(1);
+            CountDownLatch allowCancellation = new CountDownLatch(1);
+            CompletableFuture<SignalType> queueReleased = new CompletableFuture<>();
+            AtomicInteger queueTerminals = new AtomicInteger();
             List<Envelope> envelopes = new ArrayList<>();
             List<Integer> completed = Collections.synchronizedList(new ArrayList<>());
             Sinks.Many<Envelope> queue = Sinks.many().unicast().onBackpressureBuffer();
-            CompletableFuture<List<Observation>> consumed = queue.asFlux().publishOn(worker.scheduler)
+            CompletableFuture<List<Observation>> consumed = queue.asFlux()
+                    .doFinally(signal -> {
+                        queueTerminals.incrementAndGet();
+                        queueReleased.complete(signal);
+                    })
+                    .doOnCancel(() -> {
+                        cancellationEntered.countDown();
+                        try {
+                            assertThat(allowCancellation.await(10, TimeUnit.SECONDS)).isTrue();
+                        } catch (InterruptedException error) {
+                            Thread.currentThread().interrupt();
+                            throw new AssertionError("Interrupted while gating sink cancellation", error);
+                        }
+                    }).publishOn(worker.scheduler)
                     .flatMap(envelope -> Mono.deferContextual(ctx -> {
                         Observation before = Observation.read(ctx);
                         return envelope.release().asMono().publishOn(worker.scheduler).then(read())
@@ -146,12 +164,20 @@ class ExplicitAsyncHandoffContractTest {
                     envelopes.get(i).release().tryEmitEmpty().orThrow();
                     envelopes.get(i).observed().get(10, TimeUnit.SECONDS);
                 }
+                assertThat(cancellationEntered.await(10, TimeUnit.SECONDS)).isTrue();
+                assertThat(queueReleased).isNotDone();
+                assertThat(queue.currentSubscriberCount()).isEqualTo(1);
+                allowCancellation.countDown();
                 assertThat(consumed.get(10, TimeUnit.SECONDS)).hasSize(count);
+                // Downstream completion is not an acknowledgement of upstream cancellation.
+                assertThat(queueReleased.get(10, TimeUnit.SECONDS)).isEqualTo(SignalType.CANCEL);
+                assertThat(queueTerminals).hasValue(1);
                 assertThat(completed).containsExactly(11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
                 assertThat(queue.currentSubscriberCount()).isZero();
                 assertThat(read().subscribeOn(worker.scheduler).block(TIMEOUT))
                         .isEqualTo(Observation.read(Context.empty()));
             } finally {
+                allowCancellation.countDown();
                 consumed.cancel(true);
                 queue.tryEmitComplete();
                 envelopes.clear();

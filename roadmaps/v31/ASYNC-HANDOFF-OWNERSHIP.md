@@ -2,8 +2,8 @@
 
 ## Scope and disposition
 
-Recorded on 2026-09-12 against reachable base commit
-`89b8785e724562b40c23e55453e165bc57443abb` plus the tests and documentation in
+Updated on 2026-09-12 against reachable base commit
+`0ffaf2e7d94c16214b38baa7cbf5f32663d7d890` plus the test fixes and documentation in
 this dirty working tree. Reactor `4.4.0-SNAPSHOT`; published/API baseline
 `4.3.0`. This is scoped contract/retention evidence, not clean-commit native,
 performance or release evidence.
@@ -33,6 +33,10 @@ without discarding the whole worker context. It admits all twelve envelope
 consumers before releasing any gate; no sleep or server latency determines
 attachment. Every post-gate read is scheduled on the same named worker.
 Independent sink/executor tests intentionally start separate subscriptions.
+The queue cancellation is also gated: the test observes the still-attached
+subscriber while cancellation is held, releases it, then waits for the
+sink-side `doFinally(CANCEL)` acknowledgement before asserting zero subscribers.
+The result future completing does not establish upstream cleanup completion.
 
 A snapshot is captured inside `deferContextual`, never eagerly when assembling
 the cold publisher. Request-context isolation is not an authorization policy or
@@ -50,11 +54,17 @@ has seven executed cases:
   and explicit cancellation after source attachment. Each asserts one start,
   one terminal hook, one observer event and one exchange log, attempt count,
   header snapshot, shared terminal error and terminal classification.
-- One copy case retains the snapshot while releasing the original mutable
-  header map/list, mock exchange, request, source Reactor context and arbitrary
-  context map; all six original objects become weakly unreachable. Later
-  source mutation cannot change the snapshot or named read, and map/list
-  mutation through the snapshot is rejected.
+- One copy case proves later source mutation cannot change the snapshot or named
+  read, map/list mutation through the snapshot is rejected, and restore exposes
+  only correlation and inbound headers. This assertion does not require GC.
+
+The normal suite verifies terminal acknowledgements, subscriber release and
+explicit clearing of application-owned lists/records. It makes no assertion
+that an unreachable object must already have been collected. Actual
+reachability checks are in the five-case
+[AsyncHandoffReachabilityIT](../../reactive-http-client-starter/src/test/java/io/github/huynhngochuyhoang/httpstarter/core/AsyncHandoffReachabilityIT.java),
+which is outside default Surefire discovery and runs only in the controlled
+lane below.
 
 The proxy fixture uses the real invocation handler, correlation and final-request
 observation filters, a live Spring application context and a gated synthetic
@@ -78,6 +88,9 @@ cancellation.
 
 ### Ownership checkpoints
 
+The collection observations in this table belong to the opt-in reachability
+lane, not the regular unit-test acceptance criteria.
+
 | Owner | While retained | After explicit release |
 |---|---|---|
 | Application envelope list | Snapshot wrapper and header value remain reachable | Wrapper becomes collectible even while proxy/context remain live |
@@ -86,26 +99,52 @@ cancellation.
 | Original exchange/request/context/maps | Not part of the snapshot | Collectible while the copied snapshot is still retained |
 | Fixture executors/subscriptions | Explicit test owners | Pending subscriptions cancelled in finally; schedulers disposed, executors shut down and termination acknowledged; application contexts and unused cache manager closed |
 
-Weak references/reference queues are diagnostic reachability checks with bounded
-GC retries, not an absolute collection deadline, process-memory measurement or
-RSS-reduction SLA. The fixture uses synthetic bounded strings, and retains no
+The controlled lane forks a JVM with Serial GC, explicit GC enabled and a
+128 MiB maximum heap. A precondition verifies the effective collector, explicit
+GC flag and heap bound; incompatible overrides fail the lane as a configuration
+error. The five probes reuse the terminal/copy fixtures while the proxy and
+context remain alive. Weak references/reference queues and bounded GC retries
+are diagnostic evidence under that collector, not a portable GC guarantee,
+process-memory measurement or RSS-reduction SLA. The fixture uses synthetic bounded strings, and retains no
 live production exchange or arbitrary context in new helper state. Queues,
 custom contributors and user logger/observer implementations remain responsible
 for the objects they choose to retain.
 
 ## Verification
 
-The final focused command passed 20 cases, zero failures/errors/skips:
+Normal suite, including a JVM that ignores explicit GC requests:
 
 ```bash
 mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter \
-  -Dtest=ExplicitAsyncHandoffContractTest,AsyncHandoffOwnershipContractTest test
+  -Dtest=ExplicitAsyncHandoffContractTest,AsyncHandoffOwnershipContractTest \
+  -DargLine=-XX:+DisableExplicitGC test
 ```
 
-The combined regression passed 288 tests, including 49 documentation tests,
+Controlled reachability lane (do not override its fork, collector or heap settings):
+
+```bash
+mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter \
+  -Pv31-handoff-reachability test
+```
+
+Current follow-up evidence is under
+`target/release-evidence/v31/priority5/review-fixes/`, with commands, logs, fresh
+Surefire XML and exact dirty-source provenance; results are recorded in the
+Priority 5 review follow-up in [CHECKLIST.md](CHECKLIST.md).
+
+The corrected regression passed 288 tests with explicit GC disabled. Five
+one-CPU focused reruns passed 100 executions with the same GC restriction;
+all 20 focused cases also passed under Epsilon (no collection). The controlled
+lane passed all five probes. A direct probe invocation with Serial GC but
+explicit GC disabled was rejected at its precondition, as expected, not treated
+as a retention defect. Final documentation checks passed 49 tests.
+
+The original pre-review combined regression passed 288 tests, including 49 documentation tests,
 with zero failures/errors/skips. Five separate focused runs passed all 20 cases
 each (100 executions). Completion and final documentation verification are
-recorded under Priority 5 of [CHECKLIST.md](CHECKLIST.md).
+recorded under Priority 5 of [CHECKLIST.md](CHECKLIST.md). Those historical runs
+do not prove the pre-fix tests portable: ordinary GC could ignore the request,
+and the immediate subscriber-count check could race with cancellation on CI.
 Exact commands, fresh Surefire XML, source
 copies/hashes, toolchain and dirty-source provenance are retained under
 `target/release-evidence/v31/priority5/`.
