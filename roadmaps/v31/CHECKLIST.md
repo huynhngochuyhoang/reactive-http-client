@@ -292,36 +292,82 @@ working tree; full source revision and SHA-256 copies are retained locally.
 
 ## Priority 4 - WebFlux, Protocol, and Filter Boundaries
 
-### [ ] 4.1 Prove actual inbound wire behavior
+### [x] 4.1 Prove actual inbound wire behavior
 
-- [ ] Exercise real loopback WebFlux requests over HTTP/1.1 and HTTP/2 using fake
+- [x] Exercise real loopback WebFlux requests over HTTP/1.1 and HTTP/2 using fake
       bounded fields; assert negotiated protocol and actual captured field names.
-- [ ] Test lowercase names on both protocols and mixed-case HTTP/1.1 input;
+- [x] Test lowercase names on both protocols and mixed-case HTTP/1.1 input;
       do not send invalid uppercase HTTP/2 field names to prove normal behavior.
-- [ ] Compare exact bulk-map access and new named access for the same request,
+- [x] Compare exact bulk-map access and new named access for the same request,
       including repeated values and a required-but-missing field.
-- [ ] Add a deterministic normalizing intermediary only if direct protocol
+- [x] Add a deterministic normalizing intermediary only if direct protocol
       evidence leaves a necessary boundary uncovered; use gates, not setup sleeps.
 
-### [ ] 4.2 Preserve filter and registration semantics
+### [x] 4.2 Preserve filter and registration semantics
 
-- [ ] Test case-insensitive allow/deny matching, redaction precedence and
+- [x] Test case-insensitive allow/deny matching, redaction precedence and
       outside-allow-list omission without widening existing defaults.
-- [ ] Test request mutation before and after capture; snapshots reflect only the
+- [x] Test request mutation before and after capture; snapshots reflect only the
       request visible to the capture filter and remain immutable afterward.
-- [ ] Verify default and replacement WebFilter registrations without reordering
+- [x] Verify default and replacement WebFilter registrations without reordering
       application security filters or adding automatic outbound forwarding.
-- [ ] Cover the documented WebFlux application boundary; confirm a WebClient in
+- [x] Cover the documented WebFlux application boundary; confirm a WebClient in
       an MVC application alone does not imply an inbound servlet capture bridge.
 
-### [ ] 4.3 Record protocol versus deployment evidence
+### [x] 4.3 Record protocol versus deployment evidence
 
-- [ ] Document tested client/server protocol hops and fixture versions; a
+- [x] Document tested client/server protocol hops and fixture versions; a
       simulated intermediary is not a certification of an Istio deployment.
-- [ ] For needed manual mesh reproduction, provide bounded commands and required
+- [x] For needed manual mesh reproduction, provide bounded commands and required
       version/protocol facts, with no exported header values or identity material.
-- [ ] Record manual evidence as verified, unverified, or not required with
+- [x] Record manual evidence as verified, unverified, or not required with
       rationale. Never turn unavailable cluster access into a passing mesh claim.
+
+Evidence recorded on 2026-09-12 against base commit
+`e33148dc92d97e97ac7c72a43299de3c2e6e159d` plus the tests, test dependency and
+documentation in this dirty working tree.
+
+- [Inbound wire and filter boundary report](INBOUND-WIRE-BOUNDARIES.md) records
+  the protocol/name matrix, direct-versus-deployment disposition, ownership and
+  fixture versions. `InboundHeadersWireContractTest` passed 24 cases: lowercase
+  and mixed-case HTTP/1.1, lowercase prior-knowledge H2C and lowercase TLS H2,
+  each with selected/default filtering, both mutation orders, replacement
+  capture and no automatic inbound-header forwarding to a real starter client.
+- Every wire case asserts the protocol on both ends, H2 stream-channel identity
+  where applicable, TLS ALPN `h2` for encrypted H2, and one inbound dispatch.
+  Actual captured names, differently cased exact-map misses, named access,
+  repeated/equal values, empty strings, required-field absence, redaction and
+  exclusion are checked on the same request. Mutable request maps/lists cannot
+  retroactively change captured or restored values.
+- `InboundHeadersAutoConfigurationTest` passed six cases, including reactive
+  default/replacement registration, unrelated filters, non-web context and
+  servlet context with WebClient but no ingress bridge. It also checks that
+  the capture type/bean method declares no explicit order. Jakarta Servlet
+  `6.1.0` is added only in test scope, confirmed by `dependency:tree`.
+  Production Java sources, public APIs, defaults and security-filter order are
+  unchanged. Correlation propagation remains a separate outbound behavior.
+- The completed focused command passed 30 tests (24 wire + 6 registration).
+  The combined regression passed 209 tests with no failures, errors or skips,
+  including all 39 named-access tests, the existing context/filter/configuration
+  suites and 49 documentation tests. An independent wire rerun with
+  `-DargLine=-Djava.net.preferIPv6Addresses=true` passed all 24 cases.
+  Requests, assertion acknowledgements, server binding and owned-resource
+  cleanup are bounded; no sleep determines a test outcome.
+- Normalizing intermediary and manual mesh commands are **not required** for
+  this priority: direct protocol evidence covers the chosen contract. The
+  Istio/Envoy deployment hypothesis remains **unverified**, with bounded
+  structural follow-up facts documented in the report, not a passing mesh claim.
+- Exact commands, fresh Surefire XML for each final run, logs, source copies/
+  SHA-256 values, dirty-source provenance, dependency versions and generated
+  readiness are under `target/release-evidence/v31/priority4/`. An intermediate
+  no-forwarding fixture failure and its synthetic-input correction are retained,
+  not reported as production evidence. Maven `3.9.9`, GraalVM JDK `25.0.3`,
+  Java `21` target, Spring Boot `4.0.0`, Framework `7.0.1`, Reactor Core
+  `3.8.0`, Reactor Netty `1.3.0` and Netty `4.2.7.Final` were used.
+  `git diff --check` and source-copy checksum verification passed. After this
+  completion update, `DocumentationReleaseArtifactTest` passed again (49 tests).
+  V1-V30 evidence, reactor/baseline versions and unselected release state remain
+  unchanged.
 
 ## Priority 5 - Explicit Async Handoff and Caller Isolation
 

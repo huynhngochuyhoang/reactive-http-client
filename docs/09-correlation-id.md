@@ -10,7 +10,10 @@ The starter automatically captures an inbound `X-Correlation-Id` header from eac
 2. **Outbound exchange filter** reads the correlation ID from the Reactor context on every outbound call. If not found in the context, it falls back to the configured MDC keys in order (useful for Brave/Sleuth integrations). The validated value is injected as an `X-Correlation-Id` request header.
 3. **`InboundHeadersWebFilter`** additionally captures a filtered snapshot of all inbound request headers into the Reactor context so they can appear in exchange log output.
 
-Both filters are auto-registered when Spring WebFlux is present on the classpath. No explicit bean declaration is required.
+Both filters are auto-registered in a reactive web application when their filter
+types have not been replaced by application beans. WebFlux/WebClient on the
+classpath alone does not register inbound capture in a servlet/MVC or non-web
+application; the starter does not provide a servlet-to-Reactor ingress bridge.
 
 ---
 
@@ -130,6 +133,36 @@ reactive:
 | Default deny-list | `authorization`, `cookie`, `set-cookie`, `proxy-authorization`, `x-api-key` |
 
 Matching is case-insensitive. Captured snapshots preserve the original inbound header casing, while denied values are replaced with `[REDACTED]` before the snapshot is stored. The stored snapshot is an immutable defensive copy, so later request-header mutation cannot change what loggers or async handoff code observe. Sensitive headers are never stored or logged by default.
+
+---
+
+### WebFlux, protocol and filter boundaries
+
+The snapshot preserves the names exposed by the WebFlux request at capture time,
+not necessarily the spelling originally sent before a proxy or protocol change.
+The V31 loopback tests observed lowercase HTTP/2 names and both lowercase and
+mixed-case HTTP/1.1 names. On the same request, Spring `HttpHeaders.getFirst`
+can find a field while exact `Map.get` using another spelling returns null.
+That difference does not establish that the Reactor context was lost.
+
+Capture has no explicit `Ordered`/`@Order` contract over application security
+filters. A request mutation before capture is included; a mutation after capture
+does not change the defensive snapshot. Do not reorder authentication/security
+filters to recover a missing field without reviewing the application's order.
+A replacement `InboundHeadersWebFilter` controls capture; an unrelated
+`WebFilter` does not suppress default registration.
+
+Capturing or reading inbound fields does not forward them to outbound clients.
+Correlation-ID propagation is a separate filter. Allow-list/deny-list matching
+does not authorize values: an outside-allow-list field is omitted even if denied,
+and a selected denied field remains `[REDACTED]`, not the original credential.
+
+See the [V31 wire evidence](../roadmaps/v31/INBOUND-WIRE-BOUNDARIES.md) for actual
+HTTP/1.1, cleartext HTTP/2 and TLS HTTP/2 protocol assertions. No normalizing
+intermediary was needed for that contract. These tests do not identify which hop,
+if any, changed names in a particular Istio/Envoy deployment; that diagnosis
+requires deployment-specific evidence. The named readers below are versioned
+separately from these existing capture/registration semantics.
 
 ---
 
