@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Case-insensitive inbound header readers.** `RequestContext.inboundHeaderValues`
+  returns immutable values across case aliases; `RequestContext.inboundHeader`
+  returns an optional single value and rejects ambiguity, including equal
+  duplicates. The additive readers validate ASCII names and raw map structure
+  with value-free errors. Legacy bulk lookup, captured spelling, filtering and
+  snapshot restoration are unchanged; required-value checks and parsing remain
+  caller-owned.
+
 ## [4.3.0] - 2026-09-11
 
 - **`4.3.0` published release.** Additive, explicitly

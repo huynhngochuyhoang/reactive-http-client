@@ -214,45 +214,81 @@ in a dirty working tree. The existing Priority 1 completion edits were retained.
 
 ## Priority 3 - Case-Insensitive Header Access Contract
 
-### [ ] 3.1 Freeze the additive surface before implementation
+### [x] 3.1 Freeze the additive surface before implementation
 
-- [ ] Choose final method names/signatures for immutable all-values and optional
+- [x] Choose final method names/signatures for immutable all-values and optional
       single-value access on `RequestContext`; prefer existing local APIs.
-- [ ] Specify absence, empty-list, empty-string, redaction and ambiguity behavior
+- [x] Specify absence, empty-list, empty-string, redaction and ambiguity behavior
       exactly as the roadmap table, including duplicate equal values.
-- [ ] Specify ASCII field-name token validation, locale-independent matching,
+- [x] Specify ASCII field-name token validation, locale-independent matching,
       null arguments and bounded structural misuse errors with no raw value text.
-- [ ] Define malformed map/key/list/element validation, including entries outside
+- [x] Define malformed map/key/list/element validation, including entries outside
       the requested name, so malformed input cannot accidentally become absence.
-- [ ] Preserve existing bulk map, key aliases, snapshot record components/
+- [x] Preserve existing bulk map, key aliases, snapshot record components/
       constructors and merge behavior. Do not introduce a global normalized map.
 
-### [ ] 3.2 Implement and test named access
+### [x] 3.2 Implement and test named access
 
-- [ ] Read only the captured context snapshot; do not access the exchange, MDC,
+- [x] Read only the captured context snapshot; do not access the exchange, MDC,
       live request, auth provider or alternative credentials.
-- [ ] Collect all case-insensitive matches in map-iteration and per-entry value
+- [x] Collect all case-insensitive matches in map-iteration and per-entry value
       order without exact-case preference, deduplication, joining or splitting.
-- [ ] Return empty values/optional for absence; retain a present empty string and
+- [x] Return empty values/optional for absence; retain a present empty string and
       fail single-value lookup when more than one value exists across aliases.
-- [ ] Preserve case and bytes of values; reject invalid names without underscore/
+- [x] Preserve case and bytes of values; reject invalid names without underscore/
       hyphen substitution, Unicode case folding or locale-dependent matching.
-- [ ] Return defensive immutable values; test mutation of source maps/lists after
+- [x] Return defensive immutable values; test mutation of source maps/lists after
       capture and attempted mutation of returned collections.
-- [ ] Test wrong context types and malformed raw maps/lists with bounded
+- [x] Test wrong context types and malformed raw maps/lists with bounded
       structural errors; never stringify arbitrary application values for errors.
 
-### [ ] 3.3 Lock compatibility and application responsibility
+### [x] 3.3 Lock compatibility and application responsibility
 
-- [ ] Preserve legacy exact-key behavior for captured spellings and public string
+- [x] Preserve legacy exact-key behavior for captured spellings and public string
       aliases; test against the existing snapshot and contributor contracts.
-- [ ] Cover reordered aliases/values, equal duplicates, unusual legal token
+- [x] Cover reordered aliases/values, equal duplicates, unusual legal token
       characters, invalid names and a non-English default locale with restoration.
-- [ ] Demonstrate required-header validation and parsing as application-owned
+- [x] Demonstrate required-header validation and parsing as application-owned
       decisions; no default identity, automatic JSON codec or silent first-value
       selection is introduced.
-- [ ] Verify manual context writes are not falsely described as globally
+- [x] Verify manual context writes are not falsely described as globally
       sanitized, immutable or authenticated simply because a reader helper exists.
+
+Evidence recorded on 2026-09-12 against base commit
+`6525f67c` with the additive implementation, tests and documentation in a dirty
+working tree; full source revision and SHA-256 copies are retained locally.
+
+- The [named-access contract](../../docs/09-correlation-id.md#named-inbound-header-access-440-development)
+  freezes `inboundHeaderValues(ContextView, String): List<String>` and
+  `inboundHeader(ContextView, String): Optional<String>`. The first returns
+  immutable ordered values; the second rejects all multiplicity, including equal
+  duplicates. Fixed structural errors distinguish invalid arguments, malformed
+  input and ambiguity without including application names, values or descriptions.
+- `RequestContextHeaderAccessTest` passed 39 cases covering all ASCII token
+  characters/separators, Unicode rejection, Turkish locale with restoration,
+  alias/value reordering, empty/redacted/repeated values, raw malformed
+  map/key/list/element types (including unrelated and late entries), immutable
+  results, source mutation, legacy key/snapshot/contributor behavior and
+  application-owned required-header checks and JSON parsing. The initial red
+  compile failed because the two methods did not yet exist; implementation then
+  passed the focused suite. No production capture or restore path changed.
+- The final combined context/filter/configuration/documentation regression
+  command passed 183 tests with zero failures, errors or skips, including the
+  39 named-access cases, the 28 Priority 2 characterization cases and 49
+  `DocumentationReleaseArtifactTest` cases. Exact `-Dtest` arguments, settings,
+  logs and fresh Surefire XML are under
+  `target/release-evidence/v31/priority3/regression/`.
+- Independent strict root and starter-only `-Papi-compatibility -DskipTests verify`
+  builds passed against published `4.3.0`, reusing Priority 1's isolated Central
+  baseline repositories with artifact hashes and remote markers revalidated.
+  Japicmp reports exactly two new public methods on `RequestContext`, with no
+  removed/changed public signatures; other modules have no public API delta.
+- Source copies/hashes, dirty-tree diff, commands, toolchain, API reports and
+  generated readiness are retained under this priority's evidence directory.
+  Maven `3.9.9`, GraalVM JDK `25.0.3`, Java `21` target and Spring Boot
+  `4.0.0` were used. `git diff --check` passed. After this completion update,
+  the documentation suite was rerun (49 passing tests). Versions, published
+  baselines, unselected release state and V1-V30 evidence remain unchanged.
 
 ## Priority 4 - WebFlux, Protocol, and Filter Boundaries
 
