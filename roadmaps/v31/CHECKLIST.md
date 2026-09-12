@@ -371,37 +371,79 @@ documentation in this dirty working tree.
 
 ## Priority 5 - Explicit Async Handoff and Caller Isolation
 
-### [ ] 5.1 Cover composed and independent subscriptions
+### [x] 5.1 Cover composed and independent subscriptions
 
-- [ ] Test `deferContextual`, `publishOn`, `subscribeOn` and nested composed
+- [x] Test `deferContextual`, `publishOn`, `subscribeOn` and nested composed
       publishers with context read at subscription time.
-- [ ] Show independent sink/executor subscribers do not acquire the emitter's
+- [x] Show independent sink/executor subscribers do not acquire the emitter's
       context automatically, then demonstrate explicit snapshot handoff.
-- [ ] Use concurrent fake request envelopes and gates to verify a shared worker
+- [x] Use concurrent fake request envelopes and gates to verify a shared worker
       does not reuse another caller's headers or correlation ID.
-- [ ] Repeat subscriptions to the same cold publisher with distinct contexts;
+- [x] Repeat subscriptions to the same cold publisher with distinct contexts;
       no eager method-invocation snapshot may override subscription-local values.
 
-### [ ] 5.2 Preserve capture/restore and contributor contracts
+### [x] 5.2 Preserve capture/restore and contributor contracts
 
-- [ ] Verify present snapshot fields replace target values while missing fields
+- [x] Verify present snapshot fields replace target values while missing fields
       leave target values intact; demonstrate isolated targets when reusing workers.
-- [ ] Preserve contributor order by order/key and existing correlation/idempotency
+- [x] Preserve contributor order by order/key and existing correlation/idempotency
       precedence, including explicit outbound-header precedence.
-- [ ] Keep snapshots limited to correlation ID and inbound headers; idempotency
+- [x] Keep snapshots limited to correlation ID and inbound headers; idempotency
       or custom context needs explicit application handling, not automatic capture.
-- [ ] Test immutable copies without retaining live exchanges, request objects or
+- [x] Test immutable copies without retaining live exchanges, request objects or
       arbitrary context maps in new helper state.
 
-### [ ] 5.3 Verify terminal release and external ownership
+### [x] 5.3 Verify terminal release and external ownership
 
-- [ ] Exercise completion, error, timeout and cancellation around handoff and
+- [x] Exercise completion, error, timeout and cancellation around handoff and
       starter-owned callbacks; prove cleanup with controlled lifecycle evidence.
-- [ ] Use weak references/reference queues where justified to distinguish
+- [x] Use weak references/reference queues where justified to distinguish
       starter-owned retention from application queues or retained records.
-- [ ] Close executors/subscriptions created by tests and record released owners;
+- [x] Close executors/subscriptions created by tests and record released owners;
       avoid exact GC deadlines or claims that RSS must immediately fall.
-- [ ] Require separate evidence and a scoped fix for any retention defect found.
+- [x] Require separate evidence and a scoped fix for any retention defect found.
+
+Evidence recorded on 2026-09-12 against reachable base commit
+`89b8785e724562b40c23e55453e165bc57443abb` plus the tests and documentation in
+this dirty working tree.
+
+- [Async handoff and ownership report](ASYNC-HANDOFF-OWNERSHIP.md) maps the
+  subscription, restore, precedence and retention cases to explicit owners.
+  `ExplicitAsyncHandoffContractTest` passed 13 cases covering nested composed
+  scheduler switches, repeated subscriptions, independent sink/executor
+  subscriptions, all partial snapshot combinations and contributor order/key
+  ties. Twelve overlapping gated envelopes complete in reverse order on one
+  shared worker without cross-caller header/correlation reuse; empty envelopes
+  stay empty when restored into isolated inner targets.
+- `AsyncHandoffOwnershipContractTest` passed seven cases: two outbound-header
+  precedence cases, four terminal paths and one defensive-copy ownership case.
+  Completion, error, application timeout and cancellation each produce exactly
+  one lifecycle terminal, observer event and exchange log. Source/caller terminal
+  acknowledgements and zero remaining sink subscribers establish cleanup.
+  The application timeout is deliberately an inner starter cancellation, not
+  a new logical-call-timeout attribution. Final-request observation uses the
+  same filter as the factory; this gated WebClient fixture makes no wire claim.
+- Weak-reference checks run while the proxy, application context and worker
+  remain alive. Removing an application envelope releases its snapshot wrapper;
+  a retained user log still owns its header String until that record is cleared.
+  Original request/exchange/context/map/list objects are collectible while the
+  copied snapshot remains retained. No retention defect was found, so there is
+  no runtime correction or new helper-owned state. GC retries are diagnostic
+  reachability evidence, not exact collection timing or an RSS guarantee.
+- The combined regression passed **288 tests**, with zero failures, errors or
+  skips, including context/filter/wire/configuration suites, idempotency and
+  correlation precedence, lifecycle/diagnostics/reporting, logical-call timeout
+  and 49 documentation tests. Five independent focused reruns passed all 20
+  new cases each (**100 executions**); executors, schedulers, pending
+  subscriptions, contexts and the unused fixture cache manager are closed.
+- Exact commands, fresh per-run Surefire XML, source copies/SHA-256 values,
+  generated readiness, Maven `3.9.9` / GraalVM JDK `25.0.3` toolchain and
+  dirty-source provenance are under `target/release-evidence/v31/priority5/`.
+  Two intermediate fixture failures are retained separately and explained in
+  the report. `git diff --check` and source-copy checksum verification passed.
+  A final `DocumentationReleaseArtifactTest` run after this completion update
+  passed 49 tests. Production Java, public APIs, dependencies, Java `21` target,
+  `4.4.0-SNAPSHOT`/`4.3.0` versions, V1-V30 evidence and release state are unchanged.
 
 ## Priority 6 - Cache, Auth, Retry, and Terminal-State Composition
 
