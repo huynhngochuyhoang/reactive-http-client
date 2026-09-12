@@ -65,7 +65,7 @@ if [[ "$MODE" == current ]]; then
     -Dbenchmark.result.dir="$OUTPUT" > "$OUTPUT/run.log" 2>&1
 else
   mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local="$REPOSITORY" \
-    -Pbenchmarks,benchmark-release,benchmark-published-baseline \
+    -Pbenchmarks,benchmark-release,benchmark-published-baseline,benchmark-published-baseline-v30-source-exclusion \
     -pl reactive-http-client-benchmarks clean verify -DskipTests \
     -Dbenchmark.starter.version=4.2.0 -Dbenchmark.commit="$COMMIT" \
     -Dbenchmark.include="$PUBLISHED" -Dbenchmark.result.dir="$OUTPUT" > "$OUTPUT/run.log" 2>&1

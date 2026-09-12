@@ -1,5 +1,8 @@
 # Reactive HTTP Client - Roadmap V30 Execution Checklist
 
+> **Status:** completed; released as `4.3.0` on 2026-09-11.
+> **Closure:** [verified publication evidence](RELEASE-DECISION.md#post-publication-closure).
+
 Companion to [`ROADMAP.md`](ROADMAP.md). Execute priorities in order unless a
 confirmed correctness or release blocker requires reordering. Check an item only
 after implementation and verification evidence is recorded under its priority.
@@ -1183,7 +1186,7 @@ Priority 4 evidence (2026-09-08):
   `ed0867f3ccddbd0c3e538fb6edcd04aa36d76f5c` plus this working tree.
   This priority changes documentation, fixtures and verification only; it
   neither changes production behavior nor completes the pending native gate.
-- [Operations](../../docs/30-operations-troubleshooting.md#cache-work-saturation-v30-430-candidate)
+- [Operations](../../docs/30-operations-troubleshooting.md#cache-work-saturation-v30-430)
   distinguishes entry/byte/caller/load/refresh/pool/operator scopes, warm-hit
   rejection, no fallback/queue/local retry, deadlines, explicit caller recovery,
   hard expiry and close. [Recipes](../../docs/08-observability.md#cache-work-saturation-recipes-v30)
@@ -1337,6 +1340,9 @@ Priority 4 evidence (2026-09-08):
 
 ## Priority 13 - Public API, Documentation, and Release Go/No-Go
 
+Completed on 2026-09-11. Preparation records below retain their original
+pre-publication state; the 13.4 closure supersedes those pending gates.
+
 ### [x] 13.1 Freeze the supported surface and guidance
 
 - [x] Freeze additive properties, local-admission error/outcome, mock helpers,
@@ -1453,34 +1459,68 @@ minor release; a patch-only scope would omit the reviewed additive surface.
   consumer/benchmark baselines remain `4.2.0`. No tag, publication or roadmap
   archive is claimed; all 13.4 items remain open.
 
-### [ ] 13.4 Publish, verify, and archive V30
+### [x] 13.4 Publish, verify, and archive V30
 
-- [ ] Build and sign from the reviewed clean final commit/tag; verify signatures,
+- [x] Build and sign from the reviewed clean final commit/tag; verify signatures,
       the staged assembled consumer and generation packaging before publication.
       Retain credentialed workflow evidence; the 13.3 scope GO is not a signing pass.
-- [ ] Resolve all parent/module POM/JAR/source/Javadoc artifacts from fresh
+- [x] Resolve all parent/module POM/JAR/source/Javadoc artifacts from fresh
       Central-only repositories and verify hashes, remote markers, and versions.
-- [ ] Run a published assembled consumer before moving public snippets and
+- [x] Run a published assembled consumer before moving public snippets and
       API/consumer/benchmark baselines to the verified release.
-- [ ] Archive V30, update exact roadmap/readiness status, and select the next
+- [x] Archive V30, update exact roadmap/readiness status, and select the next
       snapshot only after publication evidence; on no-go, record the disposition
       without marking an unpublished version released.
+
+Publication and archive closure verified 2026-09-11:
+
+- Tag `v4.3.0` resolves to reachable release commit
+  `acb33430e541be509bf550bc690d86f0efdb7e2c`. The signed
+  [publish workflow](https://github.com/huynhngochuyhoang/reactive-http-client/actions/runs/34605561561)
+  succeeded, including reactor verification, tag/version validation, signing,
+  staged signatures/consumer, generation packaging and Central deployment.
+- Fresh Central-only repositories resolved all **13** parent/module POM, binary,
+  source and Javadoc artifacts. Version, embedded version, hash and remote-marker
+  checks passed. The independent published consumer passed **four tests**, with
+  no failures/errors/skips and no reactor classpath leakage; its provenance is
+  clean at the release tag and `completedStage=evidence-verified`.
+- Release/workflow metadata, commands, toolchain, logs, reports, provenance and
+  checksums are retained in `target/release-evidence/v30/priority13-4/`.
+  The [release review](RELEASE-DECISION.md#post-publication-closure) records the
+  inventory hash and reconciles the squash tag with earlier local evidence.
+- Only after these checks, public/API/consumer/benchmark baselines moved to
+  `4.3.0`, and reactor/fixture coordinates to `4.4.0-SNAPSHOT`. V30 is archived;
+  no next execution roadmap or final release scope is selected. The benchmark
+  profile now includes published V30 rows; explicit historical exclusions keep
+  the original `4.2.0` comparison reproducible. No performance claim is promoted.
+- Post-release archive validation passes **1,693 reactor cases** (1,564 starter,
+  73 helper, 56 OTel, including **49 documentation cases**), **nine** support
+  capture checks, generation packaging, and separate strict root/starter-only
+  API comparisons against fresh Central `4.3.0` repositories. Current and
+  published benchmark discovery each pass **27 harness/report cases**, including
+  V30 work-limit fixtures; these are not new performance measurements.
+- Archive-patch commands, actual reports and checksums are retained under
+  `target/release-evidence/v30/post-release-validation/` and
+  `target/release-evidence/v30/post-release-validation-final/`. The initial
+  helper's failed attempt to copy nonexistent discovery performance reports is
+  retained separately from the passing corrected run. These uncommitted archive
+  checks do not replace the clean-tag publication or original native evidence.
 
 ---
 
 ## Completion Criteria
 
-- [ ] Active-work characterization explains the protected owners without claiming
+- [x] Active-work characterization explains the protected owners without claiming
       that stored bytes or process RSS prove a complete memory bound.
-- [ ] Selected caller/load/refresh limits are enforced before their owned work;
+- [x] Selected caller/load/refresh limits are enforced before their owned work;
       APIs share policy capacity and omitted limits preserve published behavior.
-- [ ] Saturation causes one local foreground error or a non-queued refresh skip,
+- [x] Saturation causes one local foreground error or a non-queued refresh skip,
       with no hidden dispatch, stale owner, or TTL extension.
-- [ ] Cancellation, deadlines, retries, auth, redirects, eviction, and shutdown
+- [x] Cancellation, deadlines, retries, auth, redirects, eviction, and shutdown
       preserve one release per owner and independent caller/source lifetimes.
-- [ ] Metrics, terminal diagnostics, health, and support evidence are bounded,
+- [x] Metrics, terminal diagnostics, health, and support evidence are bounded,
       truthful, explicitly selected, and free of request/response/key/identity data.
-- [ ] Mock, consumer, source/binary API, AOT/native, lifecycle, performance, and
+- [x] Mock, consumer, source/binary API, AOT/native, lifecycle, performance, and
       documentation evidence covers the final reviewed source.
-- [ ] A go/no-go decision is recorded and the selected publication/archive path
+- [x] A go/no-go decision is recorded and the selected publication/archive path
       is complete; a no-go leaves no misleading public configuration behind.

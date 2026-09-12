@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.3.0] - Unreleased
+## [4.3.0] - 2026-09-11
 
-- **`4.3.0` release candidate (pending publication).** Additive, explicitly
+- **`4.3.0` published release.** Additive, explicitly
   selected per-factory/per-policy cache caller, foreground-load and refresh
   admission. Omitted limits preserve published `4.2.0` behavior. Work ownership
   counts are separate from stored entries/decoded bytes and are not heap, RSS,
@@ -36,16 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CacheSnapshot` constructor. Gated GET/semantic-POST consumer and AOT fixtures
   cover saturation, single flight, refresh skips, reuse, overrides, and shutdown.
   The native fixture includes independent caller deadlines; clean-commit native
-  executable evidence remains a separate gate.
-- **Optional per-policy cache work limits.** The V30 development line enforces
+  executable evidence is recorded in the V30 release review.
+- **Optional per-policy cache work limits.** The `4.3.0` release enforces
   explicit caller and foreground-load limits, plus a separate refresh limit
   when refresh is selected. Saturated foreground work fails before preparation
   or loader assembly; saturated refresh returns the authorized stale value
   without queueing or extending TTL. Reservations survive retries and entered
   synchronous callbacks until their owner terminates. Properties, basic
   effective-contract output, and AOT binding hints ship together; configuration
-  changes require factory recreation. Native executable evidence remains a
-  later V30 gate.
+  changes require factory recreation. Native executable evidence is recorded in
+  the V30 release review.
 - **Live cache-work telemetry and structural rejection diagnostics.** Explicit
   cache observability exports policy-scoped current/maximum caller, foreground
   load, and refresh reservations, fixed local rejection and refresh-skip counts.

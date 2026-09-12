@@ -11,7 +11,7 @@ operator composition order, retry-method eligibility, or master-gate meaning.
 
 ## Post-4.2 adoption: optional work admission
 
-The `4.3.0` candidate does not change the 4.0 resilience migration. Existing
+Published `4.3.0` does not change the 4.0 resilience migration. Existing
 `4.2.0` cache policies keep their behavior without a `work` group. To adopt
 work limits, size caller and foreground-load counts per factory/policy; add a
 separate refresh count only for an already refresh-enabled policy. Nothing
@@ -20,8 +20,8 @@ implicitly enables caching, refresh, metrics, or a resilience operator.
 Handle `CacheWorkRejectedException` as local capacity rejection, not a network
 failure. Published APIs remain source/binary compatible; exhaustive external
 category/outcome handling must allow the new fixed local values. Recreate the
-factory to change frozen limits. See the [configuration example](examples/effective-configuration.md#optional-cache-work-admission-430-candidate),
-[timeout ownership](04-timeouts.md#cache-work-admission-430-candidate), and
+factory to change frozen limits. See the [configuration example](examples/effective-configuration.md#optional-cache-work-admission-430),
+[timeout ownership](04-timeouts.md#cache-work-admission-430), and
 [release decision](../roadmaps/v30/RELEASE-DECISION.md). No numerical performance
 claim accompanies this adoption.
 
@@ -213,9 +213,9 @@ implicitly accepted consequence of the major version.
 ## Release state
 
 - Released major: `4.0.0` from tag `v4.0.0`.
-- Latest published and API baseline: `4.2.0`.
-- Public README and quick-start coordinates: `4.2.0`.
-- Current candidate: `4.3.0`; additive work-admission scope selected, unpublished.
+- Latest published and API baseline: `4.3.0`.
+- Public README and quick-start coordinates: `4.3.0`.
+- Current development: `4.4.0-SNAPSHOT`; no release scope selected.
 
 ## Post-`4.1.0` cache compatibility
 

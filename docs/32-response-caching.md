@@ -424,10 +424,10 @@ DTOs; callers that mutate a cached object must copy it on their side. A cached
 `ResponseEntity` is rebuilt only to retain the bounded safe header subset; its
 body retains the decoded object identity.
 
-## V30 snapshot: optional work limits
+## Optional work limits (4.3.0+)
 
-The following policy fragment is supported by the `4.3.0` release
-candidate, not published `4.2.0`. Add it only to an already selected, eligible policy;
+The following policy fragment is supported by published `4.3.0` and later,
+not `4.2.0`. Add it only to an already selected, eligible policy;
 the dependency, key-isolation, and customization-safety requirements above still
 apply.
 
@@ -475,9 +475,9 @@ includes the normalized bounds. V30 Priority 9 adds the public
 `CALLER_REJECTED` / `LOAD_REJECTED` cache outcomes, and
 `CACHE_ADMISSION_ERROR`. Enabled terminal surfaces report zero attempts and
 no dispatch or request/response evidence; these calls do not enter downstream
-request timers or health samples. [Work telemetry](08-observability.md#live-cache-work-v30-430-candidate)
+request timers or health samples. [Work telemetry](08-observability.md#live-cache-work-v30-430)
 is separately selected under cache observability and never inferred from refresh
-terminal counters. [Diagnostics](21-diagnostic-contexts.md#v30-work-count-additions-430-candidate)
+terminal counters. [Diagnostics](21-diagnostic-contexts.md#v30-work-count-additions-430)
 add limited-policy-only maxima/current counts, preserving unknown lazy state
 without requiring metrics or instantiating an owner.
 
@@ -549,7 +549,7 @@ Capture cache meters before close. At the last metric owner, close removes them;
 an absent post-close series is not a zero-valued terminal counter or proof that
 all external callers stopped. In overlapping factories, remaining metric owners
 retain their registrations. Work-limit live gauges follow the same ownership
-rule; see [saturation and recovery](30-operations-troubleshooting.md#cache-work-saturation-v30-430-candidate).
+rule; see [saturation and recovery](30-operations-troubleshooting.md#cache-work-saturation-v30-430).
 Reference-queue/weak-reference GC checks are test evidence only, not runtime GC
 behavior or an assertion that allocator/RSS usage must fall immediately.
 

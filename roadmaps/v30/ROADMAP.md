@@ -1,11 +1,15 @@
 # Reactive HTTP Client - Roadmap V30
 
-> **Status:** active
+> **Status:** completed; released as `4.3.0` on 2026-09-11
 > **Theme:** bounded active cache work and overload visibility
-> **Candidate release:** `4.3.0`, additive opt-in work admission; unpublished
+> **Released:** `4.3.0`, additive opt-in work admission
 > **Starting development line:** `4.3.0-SNAPSHOT`
-> **Published/API baseline:** `4.2.0`
-> **Execution:** [checklist adopted](CHECKLIST.md); [scope selected](RELEASE-DECISION.md), publication pending
+> **Release-era published/API baseline:** `4.2.0`
+> **Execution:** [completed checklist](CHECKLIST.md); [publication verified](RELEASE-DECISION.md#post-publication-closure)
+
+This archived roadmap preserves the original proposal below. Post-publication
+baselines are `4.3.0`; development continues at `4.4.0-SNAPSHOT` with no next
+execution roadmap selected.
 
 ## Starting State
 

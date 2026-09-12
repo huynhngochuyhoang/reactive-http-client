@@ -2,7 +2,7 @@
 
 The starter provides opt-in Resilience4j support per client: retry, rate limiter, circuit breaker, and bulkhead. Individual methods can override the client-level instance names.
 
-## Cache work composition (4.3.0 candidate)
+## Cache work composition (4.3.0+)
 
 [Cache work admission](32-response-caching.md#composition-and-deadlines-with-work-limits)
 does not select any resilience operator. Local caller/load rejection occurs

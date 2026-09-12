@@ -166,7 +166,7 @@ it does not register an Actuator endpoint, controller, log line, or file writer.
 
 ### Diagnostics schema v1
 
-#### V30 work-count additions (4.3.0 candidate)
+#### V30 work-count additions (4.3.0+)
 
 Published 4.2.0 does not export these fields. Current schema V1 adds the following
 sanitized, **limited-policy-only aggregates**, independent of MeterRegistry:

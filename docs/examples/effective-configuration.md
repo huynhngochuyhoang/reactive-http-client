@@ -127,7 +127,7 @@ reactive:
           strict-unsafe-retry-validation: true
 ```
 
-## Optional Cache Work Admission (4.3.0 candidate)
+## Optional Cache Work Admission (4.3.0+)
 
 This is a complete starter-property example for an unauthenticated client with
 only eligible GET endpoints and no applicable WebClient customization beans.
@@ -169,12 +169,11 @@ reactive:
 Without refresh, remove both refresh timing settings and the refresh work limit;
 retain the caller/load pair. Omit the entire work group for published `4.2.0`
 behavior. Counts are overlapping ownership units, not entry/byte limits, request
-rates, or a process-memory budget. See [saturation recovery](../30-operations-troubleshooting.md#cache-work-saturation-v30-430-candidate).
+rates, or a process-memory budget. See [saturation recovery](../30-operations-troubleshooting.md#cache-work-saturation-v30-430).
 
 ## Explicit Local Response Cache
 
-This weighted example targets published `4.2.0` and the current
-`4.3.0` release candidate. It selects one bounded local policy
+This weighted example targets published `4.2.0` and later, including `4.3.0`. It selects one bounded local policy
 explicitly. Published `4.1.x` consumers must
 omit `maximum-total-decoded-response-bytes`; TTL, entry-count `maximum-size`,
 single flight, refresh, and cache telemetry remain available there. The V29
