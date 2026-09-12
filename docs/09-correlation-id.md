@@ -252,6 +252,39 @@ filtered inbound header snapshot. Empty contexts produce an empty snapshot, and
 restoring an empty snapshot is a no-op. The snapshot remains independent of any
 specific sink, queue, or broker library.
 
+Composed `publishOn`, `subscribeOn` and nested publishers do not by themselves
+lose Reactor context. Read or capture inside `deferContextual` at subscription
+time, not when constructing a cold publisher. An executor callback that creates
+an independent subscription needs an explicit envelope just like a sink consumer.
+
+For a reused worker, restore into an isolated per-envelope target: absent
+snapshot fields do **not** erase values already in that target. Keep worker-wide
+context free of caller-specific values, or deliberately remove those keys on the
+inner subscription before restoration:
+
+```java
+downstreamClient.send(envelope.payload())
+        .contextWrite(ctx -> envelope.context().writeTo(ctx
+                .delete(RequestContext.CORRELATION_ID_CONTEXT_KEY)
+                .delete(RequestContext.INBOUND_HEADERS_CONTEXT_KEY)
+                .delete(RequestContext.IDEMPOTENCY_KEY_CONTEXT_KEY)));
+```
+
+This example intentionally drops any worker idempotency key. Carry an application
+idempotency value separately when needed, and define the same isolation rule for
+application-specific context keys. Do not clear the entire Reactor context or
+silently copy it into an envelope. Contributor capture/restore sorts by `order`,
+then `key`; the default contributors still cover only correlation and headers.
+Explicit outbound correlation/idempotency headers retain their precedence.
+
+Finishing or cancelling a call does not empty application queues or retained
+observer/logger records. Bound their lifetime and release them explicitly.
+A timeout outside the starter cancels the inner call; it is not the starter's
+logical-call-timeout classification. The [V31 handoff ownership report](../roadmaps/v31/ASYNC-HANDOFF-OWNERSHIP.md)
+records gated concurrency and terminal/reference-release evidence, without an
+immediate GC or RSS-reduction guarantee. These snapshot semantics also apply to
+published `4.3.0`; the named header readers above are candidate-only additions.
+
 ### Event envelope guidance
 
 For durable queues or long-lived broker messages, prefer explicit low-cardinality fields over a full inbound header snapshot:
