@@ -475,38 +475,80 @@ Review follow-up on 2026-09-12, base
 
 ## Priority 6 - Cache, Auth, Retry, and Terminal-State Composition
 
-### [ ] 6.1 Keep caller contexts separate from shared work
+### [x] 6.1 Keep caller contexts separate from shared work
 
-- [ ] Exercise uncached calls and fresh/stale hits with distinct caller snapshots;
+- [x] Exercise uncached calls and fresh/stale hits with distinct caller snapshots;
       per-call authorization still runs where required.
-- [ ] Gate same-key leader/waiter attachment and detach the first caller by
+- [x] Gate same-key leader/waiter attachment and detach the first caller by
       cancellation and timeout; retain independent waiter terminal context.
-- [ ] Cover hidden refresh and shared-load continuation without transferring
+- [x] Cover hidden refresh and shared-load continuation without transferring
       another caller's headers into a visible terminal record.
-- [ ] Use explicitly partitioned auth/header variants and final request identity
+- [x] Use explicitly partitioned auth/header variants and final request identity
       checks; reading a header must not implicitly make it trusted or a cache key.
 
-### [ ] 6.2 Preserve retry/replay and deadline behavior
+### [x] 6.2 Preserve retry/replay and deadline behavior
 
-- [ ] Cover selected Retry, auth invalidation/replay, redirects and logical-call
+- [x] Cover selected Retry, auth invalidation/replay, redirects and logical-call
       deadlines without altering published selection, ordering or dispatch counts.
-- [ ] Verify prepared arguments, correlation/idempotency precedence and final
+- [x] Verify prepared arguments, correlation/idempotency precedence and final
       attempt evidence remain consistent through resubscription.
-- [ ] Test auth rejection on a warm cache and identity changes after replay;
+- [x] Test auth rejection on a warm cache and identity changes after replay;
       named lookup must not bypass validation or cache isolation.
-- [ ] Use deterministic subscriptions, source gates and terminal acknowledgements;
+- [x] Use deterministic subscriptions, source gates and terminal acknowledgements;
       immediate local disposal alone is not proof of transport cleanup.
 
-### [ ] 6.3 Protect reporting and admission cleanup
+### [x] 6.3 Protect reporting and admission cleanup
 
-- [ ] Test malformed raw context with observer, lifecycle and exchange logging
+- [x] Test malformed raw context with observer, lifecycle and exchange logging
       enabled, both with and without selected cache-work admission.
-- [ ] Prove capacity is released exactly once after setup/error/cancellation and
+- [x] Prove capacity is released exactly once after setup/error/cancellation and
       no deferred continuation dispatches after a terminal rejection.
-- [ ] Count terminal callbacks rather than overwriting a last-event reference;
+- [x] Count terminal callbacks rather than overwriting a last-event reference;
       assert final error, cancellation, attempts, URL/status/header evidence.
-- [ ] Preserve redaction and absence in existing terminal surfaces; no header
+- [x] Preserve redaction and absence in existing terminal surfaces; no header
       values/names enter new metric tags, span attributes or support snapshots.
+
+Evidence executed on 2026-09-12 from reachable base
+`7b1344b42abd10d8331bdf5da80575a8d3c948fb` plus the recorded working-tree
+test/docs changes. See [CONTEXT-COMPOSITION.md](CONTEXT-COMPOSITION.md) for
+the boundary matrix and deliberately unchanged behavior.
+
+- Added **22 starter composition cases** and **six OTel attribute cases**.
+  Gated leader/waiter cancellation and deadlines preserve separate snapshots;
+  subsequent retries and hidden refresh do not append visible terminal records
+  to a completed caller. Explicit tenant/idempotency variants and successful
+  final-request revalidation prevent reuse under a changed auth identity.
+- Repeated cold subscriptions exercise explicit/restored correlation and
+  idempotency precedence through real selected Retry plus 401 replay. The
+  loopback redirect records two wire requests and no replay for the fresh hit.
+  A subscribed response-body deadline retains RESPONSE_BODY evidence and
+  acknowledges source cancellation.
+- Warm-cache denial, absent/redacted/ambiguous/malformed header inputs and
+  invalid auth headers fail without dispatch. Delayed auth cannot continue after
+  cancellation/deadline. Existing preparation-frame, admission and shutdown
+  regressions retain their exact-once capacity checks.
+- Reporting-setup compatibility is explicit: a non-Map raw `inboundHeaders`
+  value still fails before source subscription and produces **zero** terminal
+  records, not a synthetic record. Retrying that setup failure does not strand
+  capacity. Errors inside the reporting boundary produce exactly one record on
+  each enabled observer/lifecycle/log surface.
+- The combined **32-class starter regression passed 545 tests**, including
+  default logging, diagnostics/support fixtures, wire capture and context
+  helpers. Five isolated single-CPU runs with
+  `-DargLine="-XX:+DisableExplicitGC -XX:ActiveProcessorCount=1"` passed
+  **110 additional composition executions**. The four selected OTel suites
+  passed **56 tests**, including all six new outcome/privacy cases.
+  All these runs had zero failures, errors or skips.
+- Maven `3.9.9`, GraalVM JDK `25.0.3`, Java target `21`; settings
+  `.mvn/maven-central-settings.xml`. Exact commands, fresh per-run Surefire XML,
+  source copies/SHA-256, logs and dirty-tree provenance are under
+  `target/release-evidence/v31/priority6/verification/`. Checksums and
+  `git diff --check` passed. Earlier fixture failures are retained separately
+  in `first-tests.log`/`first-tests.xml`; the initial compile assertion mismatch
+  was corrected before that run. These are not production regressions.
+- No production/API/configuration/schema/dependency/version change was needed.
+  Published `4.3.0`, development `4.4.0-SNAPSHOT`, later priorities and archived
+  roadmap evidence remain unchanged; this is not manual Istio/native evidence.
 
 ## Priority 7 - Mock, Assembled-Consumer, AOT, and Native Parity
 
