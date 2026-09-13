@@ -3,6 +3,8 @@ package io.github.huynhngochuyhoang.httpstarter.nativesmoke;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
+import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsSnapshot;
@@ -91,6 +93,7 @@ public class NativeSmokeApplication {
         ConfigurableApplicationContext context = null;
         try {
             context = application.run(args);
+            NativeInboundContextScenario.run(context.getBean(InboundHeadersWebFilter.class));
             ReactiveHttpClientDiagnosticsEndpoint diagnosticsEndpoint =
                     context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class);
             Map<String, Object> lazyDiagnostics = diagnosticsEndpoint.diagnostics();
@@ -420,6 +423,13 @@ public class NativeSmokeApplication {
     @Bean(destroyMethod = "")
     MeterRegistry meterRegistry() {
         return METER_REGISTRY;
+    }
+
+    @Bean
+    InboundHeadersWebFilter nativeInboundCapture() {
+        var config = new ReactiveHttpClientProperties.InboundHeadersConfig();
+        config.setAllowList(Set.of("x-scope", "x-empty", "x-many", "authorization"));
+        return new InboundHeadersWebFilter(config);
     }
 
     @Bean

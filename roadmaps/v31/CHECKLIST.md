@@ -552,35 +552,92 @@ the boundary matrix and deliberately unchanged behavior.
 
 ## Priority 7 - Mock, Assembled-Consumer, AOT, and Native Parity
 
-### [ ] 7.1 Align mock access without silently changing assertions
+### [x] 7.1 Align mock access without silently changing assertions
 
-- [ ] Test lowercase, mixed-case, absent, empty, duplicate and redacted captured
+- [x] Test lowercase, mixed-case, absent, empty, duplicate and redacted captured
       values through mock recordings and the new public helpers.
-- [ ] Preserve existing exact-spelling assertion behavior, or add explicitly named
+- [x] Preserve existing exact-spelling assertion behavior, or add explicitly named
       alternatives with tests and documentation rather than silently reinterpreting it.
-- [ ] Cover context snapshots/handoff, repeat subscriptions and closure with both
+- [x] Cover context snapshots/handoff, repeat subscriptions and closure with both
       deterministic controls and the normal mock construction path.
 
-### [ ] 7.2 Verify assembled-consumer and optional-integration parity
+### [x] 7.2 Verify assembled-consumer and optional-integration parity
 
-- [ ] Add current-consumer cases for lowercase inbound capture, optional/all-values
+- [x] Add current-consumer cases for lowercase inbound capture, optional/all-values
       access, ambiguity, explicit handoff and required-header failure.
-- [ ] Verify assembled artifacts, effective POM, dependency tree and no reactor
+- [x] Verify assembled artifacts, effective POM, dependency tree and no reactor
       classpath leakage; preserve reports even when a stage fails.
-- [ ] Keep published `4.3.0` consumer sources independent of candidate-only APIs.
-- [ ] Preserve replacement beans, cache-disabled/no-Caffeine consumption and
+- [x] Keep published `4.3.0` consumer sources independent of candidate-only APIs.
+- [x] Preserve replacement beans, cache-disabled/no-Caffeine consumption and
       optional OTel absence; introduce no mandatory helper dependency.
 
-### [ ] 7.3 Reprove AOT and native behavior on the final fixture
+### [x] 7.3 Reprove AOT and native behavior on the final fixture
 
-- [ ] Exercise the new public access from a real application context in JVM/AOT
+- [x] Exercise the new public access from a real application context in JVM/AOT
       and native smoke, including capture and explicit restoration.
-- [ ] Preserve configured replacement metadata/properties/filter beans and avoid
+- [x] Preserve configured replacement metadata/properties/filter beans and avoid
       reflective header-DTO scanning or unrelated runtime hints.
-- [ ] Run clean-commit native compile and executable, recording toolchain, exact
+- [x] Run clean-commit native compile and executable, recording toolchain, exact
       fixture commit, command, executable hash, output and test disposition.
-- [ ] Rerun after relevant fixture/runtime changes; do not close with a pre-fix
+- [x] Rerun after relevant fixture/runtime changes; do not close with a pre-fix
       binary. Keep unsupported optional integration coverage explicitly bounded.
+
+Priority 7 implementation evidence (2026-09-12):
+
+- [Parity evidence](PARITY-EVIDENCE.md) records the
+  starting revision `cd75725dae3cab2b8b39d46672820180991d561f` plus the dirty
+  fixture/test/documentation changes. No production behavior, public API,
+  dependency baseline, version or runtime hint changed.
+- Five new mock cases retain exact-spelling assertions and cover the named
+  helpers, real filter capture, explicit restoration, repeated cold subscriptions
+  and cancellation/close under both normal and deterministic cache construction.
+- `scripts/verify-current-consumer.sh` passed from a fresh target-local repository:
+  **74 mock tests, 11 assembled full-consumer tests, and 3 minimal-consumer tests**.
+  Both consumer classpaths use assembled JARs. The minimal fixture has no
+  Caffeine, OTel or test-helper artifact. Effective POMs, trees, classpaths,
+  installed artifact hashes and `completedStage=evidence-verified`, `exitStatus=0`
+  are retained under `target/release-evidence/current-consumer/current-4.4.0-SNAPSHOT/`.
+  Candidate sources are selected only by `consumer.v31.parity=true`; published
+  `4.3.0` sources/selection remain independent.
+- The targeted reactor regression passed **227 tests** (153 starter, including
+  27 AOT and 49 documentation cases, plus 74 mock tests). Native-fixture JVM
+  tests passed **6 cases**. All these runs had zero failures, errors or skips.
+- The packaged JVM application and regenerated Spring AOT JVM application both
+  exited zero, emitted `V31 inbound context: capture=3 restored=2 rejected=1;
+  parity passed`, and passed the existing cache/resilience/shutdown smoke.
+  This checks the final native fixture on the JVM; it is not native-image evidence.
+- Maven `3.9.9`, GraalVM JDK `25.0.3`, Java target `21`, Boot `4.0.0`; exact
+  commands, per-stage logs/exit status, fresh Surefire XML and source evidence
+  are under `target/release-evidence/v31/priority7/`. The two early compile
+  fixture errors are retained separately from passing verification.
+
+Priority 7 native completion (2026-09-13):
+
+- Clean fixture commit `f9b94fd207e6c5af1fc36ee047fd2c491a6c0e30`, tree
+  `da53a49e0bb646fa0709dced7e69a7626b154607`, remained unchanged through artifact
+  installation, native compile and executable verification. These completion
+  notes were added only after that clean run.
+- Maven `3.9.9`, GraalVM/native-image `25.0.3`, Java target `21`, Boot `4.0.0`,
+  Linux x86-64-v3 and GCC `13.3.0`. Maven used
+  `MAVEN_OPTS='-Xmx512m -XX:ActiveProcessorCount=2'`; native compilation used
+  `-H:+SharedArenaSupport,-J-Xmx4g,--parallelism=2` with
+  `-Pnative clean native:compile`. Reactor installation skipped tests and
+  Javadocs; the native build reran **6 JVM fixture tests**, all passing with
+  zero failures, errors or skips, and regenerated Spring AOT output.
+- Native compilation exited zero (Maven elapsed 8m18s). The new executable
+  exited zero under a 180-second process bound and emitted
+  `V31 inbound context: capture=3 restored=2 rejected=1; parity passed`.
+  Existing cache/resilience/shutdown and context-recreation checks passed too.
+- Executable SHA-256:
+  `c074e8f5bc3a340f9a8d982136fcc5b752a74c1bf9952c7156e26bd9be1fa5ed`.
+  Fixture source checksums and the executable checksum were revalidated after
+  execution. Commands, logs, test XML, toolchain, clean-state provenance and
+  source archive are in `target/release-evidence/v31/priority7/native-clean/`;
+  final provenance is `completedStage=evidence-verified`, `exitStatus=0`.
+- The memory preflight wait was stopped at the user's request before launching
+  the compiler; its evidence is retained separately. The native compile/run
+  needed no source fix or retry. This closes Priority 7 only, not later release
+  gates or unsupported Istio, MVC, application header-DTO or native OTel coverage.
 
 ## Priority 8 - Documentation and Operations Guidance
 

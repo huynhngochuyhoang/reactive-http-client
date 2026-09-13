@@ -664,6 +664,26 @@ RecordedExchangeAssertions.assertThat(mock.lastExchange())
 
 The assertions read the filtered snapshot captured from Reactor context. They do not inspect raw inbound HTTP requests, so denied headers should be asserted as absent or redacted according to the configured snapshot behavior.
 
+Captured inbound assertion names (`hasInboundHeader`, `hasInboundHeaderValues`,
+`hasRedactedInboundHeader`, `doesNotHaveInboundHeader`) retain **exact spelling**
+semantics, including on the `4.4.0-SNAPSHOT` candidate. They are not HTTP-style
+case-insensitive lookups. Candidate-only named access can be tested separately:
+
+```java
+var restored = mock.lastExchange().requestContextSnapshot().writeTo(Context.empty());
+assertThat(RequestContext.inboundHeader(restored, "X-Scope")).contains("test-scope");
+assertThat(RequestContext.inboundHeaderValues(restored, "X-Many"))
+        .containsExactly("one", "two");
+```
+
+These two named helpers are not available in published `4.3.0`. Single-value
+access returns an empty `Optional` for absence, preserves an empty string, and
+rejects multiple values even when equal. A redaction marker remains data, not
+an authenticated identity. Recordings intentionally remain available after mock
+close for assertions; retaining a recording retains its snapshot. Both ordinary
+and deterministic cache mocks close their owned single-flight work, but neither automatically
+restores a recording into a new subscription or forwards captured headers.
+
 ---
 
 ## `ErrorCategoryAssertions`
