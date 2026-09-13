@@ -2742,12 +2742,15 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void v27SupportedMatrixIsResolvedAndReproducible() throws IOException {
+    void v27SupportedMatrixIsResolvedAndReproducible() throws Exception {
         Path root = projectRoot();
         String releaseDocs = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
         String consumerPom = Files.readString(root.resolve(".github/boot4-consumer/pom.xml"));
         String verifier = Files.readString(root.resolve("scripts/verify-supported-matrix.sh"));
         String workflow = Files.readString(root.resolve(".github/workflows/supported-matrix.yml"));
+        String reactorVersion = projectVersion(root.resolve("pom.xml"));
+        String baselineVersion = pomProperty(Files.readString(root.resolve("pom.xml")),
+                "api.compatibility.baseline.version");
 
         assertThat(releaseDocs)
                 .contains("### V23 resolved supported matrix")
@@ -2766,6 +2769,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("<artifactId>spring-boot-dependencies</artifactId>")
                 .contains("<version>${spring-boot.version}</version>");
         assertThat(verifier)
+                .contains("[[ \"$PROJECT_VERSION\" == \"" + reactorVersion + "\" ]]")
+                .contains("[[ \"$BASELINE_VERSION\" == \"" + baselineVersion + "\" ]]")
                 .contains("ROWS=(4.0.0 4.1.0)")
                 .contains("Java 21 is required for the supported minimum")
                 .contains("clean install")
