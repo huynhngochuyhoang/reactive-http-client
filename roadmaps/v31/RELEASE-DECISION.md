@@ -1,5 +1,12 @@
 # V31 Release Review
 
+## Current Status
+
+**2026-09-13: `4.4.0` is published and V31 is completed.**
+[Post-publication closure](#post-publication-closure) supersedes the preparation
+gates below without rewriting their historical results. The next development
+coordinate is `4.5.0-SNAPSHOT`; no next release scope or roadmap is selected.
+
 ## Decision
 
 **2026-09-13: GO for the `4.4.0` additive release candidate; publication pending.**
@@ -147,3 +154,77 @@ evidence is bounded to the tested fixtures. Smoke measurements make no latency,
 allocation, retained-memory or deployment-performance guarantee. Successful
 credentialed signing, staged consumption, the reviewed clean final commit/tag,
 publication and fresh Central verification are mandatory before 10.4 closes.
+
+## Post-Publication Closure
+
+Verified on 2026-09-13 against tag `v4.4.0`, commit
+`9d7d38da9b501bf429d76035425e6a137b7c1333`. The
+[release](https://github.com/huynhngochuyhoang/reactive-http-client/releases/tag/v4.4.0)
+was published at `2026-09-13T13:31:48Z`. The
+[publish workflow](https://github.com/huynhngochuyhoang/reactive-http-client/actions/runs/34760095506)
+finished successfully at `2026-09-13T13:35:36Z`. Both jobs and every required
+step passed: reactor verification, tag/version assertion, signed release build,
+staged signature and consumer verification, generation packaging, and Central
+deployment. The workflow supplies signing evidence; no local signing or
+republishing was performed during closure.
+
+Fresh Central-only `release-artifacts-4.4.0` and `consumer-4.4.0` repositories
+verified all **13** release artifacts and **four** assembled baseline consumer
+tests. A subsequent full-profile published-consumer run passed **11** tests,
+including V31 named readers and explicit context handoff. All tests have zero
+failures, errors and skips. Provenance records `completedStage=evidence-verified`
+and a clean fixture revision `902308a88cbb4c134e931339583cbc0948b3df42`;
+only the architecture proposal and index link differ from the release tag.
+POM/embedded versions, artifact hashes, Central remote markers, dependency trees,
+effective POMs and assembled classpaths are retained; no reactor-output leakage
+was found.
+
+Evidence root: `target/release-evidence/v31/priority10-4/`. Public release/run/job
+JSON, stage commands and outputs, clean/dirty source provenance, test XML, source
+archives and copied artifact evidence are covered by its relative `SHA256SUMS`
+inventory. Preserve it outside `target/` before a root clean. Earlier Priority
+10.1-10.3 inventories and original native/benchmark records remain unchanged;
+publication does not turn snapshot-native or smoke evidence into new final-binary
+or release-quality performance measurements.
+
+All Priority 10 and V31 completion criteria are closed. Published/API/consumer/
+benchmark baselines are `4.4.0`; the next reactor/current-fixture coordinate is
+`4.5.0-SNAPSHOT`. Generated readiness describes an unselected development cycle
+with no active roadmap and no planned final release. Its pending manual commands
+belong to future preparation, not unfinished V31 work. The
+[architecture review](../proposals/POST_4_4_ARCHITECTURE_REVIEW.md) remains an
+unadopted proposal. No production Java or public behavior changes in this archive
+update, and the no-public-performance-claim disposition is unchanged.
+
+### Archive Validation
+
+The uncommitted archive patch was verified on 2026-09-13 with Maven 3.9.9 and
+Oracle JDK 21.0.8. Commands, fresh Surefire XML and source diffs are recorded in
+the evidence root's `stages/` directories; results below have zero failures,
+errors and skips.
+
+| Check | Result |
+|---|---|
+| Unsigned development reactor, `-Prelease -Dgpg.skip=true install` | 1,877 tests: 1,737 starter, 78 helper, 62 OTel |
+| Strict root and independent starter API lanes against 4.4.0 | Both passed binary/source checks with separate fresh Central repositories |
+| Current assembled consumer | 74 mock, 11 full consumer and three cache-disabled cases |
+| Generation packaging | Passed for 4.5.0-SNAPSHOT |
+| Current and published-4.4.0 benchmark discovery | 34 harness tests in each lane, including V31 named-reader and snapshot rows |
+| Archive documentation and inbound-context contracts | 86 tests: 50 release-artifact and 36 inbound-context documentation cases |
+| Support-capture verifier | Nine tests passed |
+| Matrix-script syntax and `git diff --check` | Passed |
+
+The initial archive documentation run exposed two stale assertions; its failed
+output remains in `stages/archive-docs/`, and the corrected 86-case run is
+`stages/archive-docs-final/`. The final documentation rerun and checksum audit
+are retained as `stages/closure-docs/` and `audit.json`. Generated readiness was
+checked for the 4.4.0 baseline, 4.5.0-SNAPSHOT development coordinate and null
+active roadmap/planned final version. Native compilation and the full dependency
+matrix were not rerun for this version/documentation-only archive patch; their
+earlier evidence remains unchanged. Benchmark discovery is not measurement.
+
+The copied 13-artifact inventory, `published-artifacts-sha256.txt`, has SHA-256
+`93320f57d0de442bd3e23859060571a39111524dc020e9e4ec7f2e9e70ef56b7`.
+The closure audit checks those hashes, published-source/tag equality, clean
+published-consumer provenance, all recorded counts and the absence of production,
+historical-roadmap or architecture-proposal edits before sealing `SHA256SUMS`.

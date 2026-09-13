@@ -1,11 +1,13 @@
 # Reactive HTTP Client - Roadmap V31 Execution Checklist
 
-> **Status:** active
-> **Published/API baseline:** `4.3.0`
-> **Release candidate:** `4.4.0` (not published)
+> **Status:** completed and released as `4.4.0`
+> **Implementation baseline:** `4.3.0`; post-publication baseline: `4.4.0`
+> **Release:** `4.4.0` (published 2026-09-13)
 > **Release scope:** additive inbound-header access; [release review](RELEASE-DECISION.md)
 
-Companion to [`ROADMAP.md`](ROADMAP.md). Execute priorities in order unless a
+Completed companion to [`ROADMAP.md`](ROADMAP.md). The instructions and baseline
+below preserve the execution contract; Priority 10.4 records verified publication
+and the transition to `4.5.0-SNAPSHOT`. Execute priorities in order unless a
 confirmed correctness or release blocker requires reordering. Checklist adoption
 starts execution planning; it does not complete Priority 1, implement a helper,
 or select a release. Completion and evidence are recorded under each priority.
@@ -34,7 +36,8 @@ pre-squash hash must not stand in for a reachable reviewed revision.
   configuration needs separate justification and review; it is not implied here.
 - Priority 9 distinguishes harness smoke, allocation/retention evidence and
   release-quality comparison. Keep manual commands available for the user.
-- Public/API/consumer/benchmark baselines stay at `4.3.0`. Priority 10 selects
+- During implementation, public/API/consumer/benchmark baselines stay at `4.3.0`
+  until Priority 10.4 verifies publication. Priority 10 selects
   minor, patch, documentation-only or no-go scope; signing, publication and fresh
   Central verification are separate gates.
 
@@ -258,7 +261,7 @@ Evidence recorded on 2026-09-12 against base commit
 `6525f67c` with the additive implementation, tests and documentation in a dirty
 working tree; full source revision and SHA-256 copies are retained locally.
 
-- The [named-access contract](../../docs/09-correlation-id.md#named-inbound-header-access-440-candidate)
+- The [named-access contract](../../docs/09-correlation-id.md#named-inbound-header-access-440)
   freezes `inboundHeaderValues(ContextView, String): List<String>` and
   `inboundHeader(ContextView, String): Optional<String>`. The first returns
   immutable ordered values; the second rejects all multiplicity, including equal
@@ -829,27 +832,54 @@ reviewed clean final commit/tag, publication, Central verification and published
 assembled consumption. No signing attempt, tag or deployment occurred. Commit
 and review this preparation patch before the still-open 10.4 release workflow.
 
-### [ ] 10.4 Publish, verify, and archive V31
+### [x] 10.4 Publish, verify, and archive V31
 
-- [ ] Build/sign the reviewed clean final commit/tag; verify signatures, staged
+- [x] Build/sign the reviewed clean final commit/tag; verify signatures, staged
       assembled consumption and generation packaging before deployment.
-- [ ] Preserve credentialed signing/publication evidence; a scope GO or unsigned
+- [x] Preserve credentialed signing/publication evidence; a scope GO or unsigned
       local build is not a signing pass.
-- [ ] After publication, verify all parent/module attachments and an assembled
+- [x] After publication, verify all parent/module attachments and an assembled
       consumer from fresh Central-only repositories before moving baselines.
-- [ ] Archive V31 and select the next development coordinate only after verified
+- [x] Archive V31 and select the next development coordinate only after verified
       publication; if the chosen path is no-go/no-publication, record that exact
       disposition instead of claiming an unpublished version was released.
 
+Priority 10.4 completion (2026-09-13): **published and verified**.
+
+- Release tag `v4.4.0` points to reachable commit
+  `9d7d38da9b501bf429d76035425e6a137b7c1333`. The public release was
+  published at `2026-09-13T13:31:48Z`; credentialed
+  [workflow 34760095506](https://github.com/huynhngochuyhoang/reactive-http-client/actions/runs/34760095506)
+  finished successfully at `2026-09-13T13:35:36Z`. Verify, signed packaging,
+  staged signatures/consumer, generation packaging and deployment all passed.
+  This is workflow signing evidence, not a claimed local signing run.
+- Fresh Central-only repositories verified all **13** parent/module POM,
+  binary, source and Javadoc artifacts and **four** published baseline consumer
+  cases. A separate full-profile run against the published JARs passed **11**
+  consumer cases, including V31 named access and explicit handoff.
+- Consumer provenance records clean fixture commit
+  `902308a88cbb4c134e931339583cbc0948b3df42`, whose only differences from
+  the release tag are the architecture proposal and its index link.
+  Effective POMs, trees, classpaths, hashes and Central markers prove assembled
+  consumption without reactor output leakage.
+- Evidence is retained under `target/release-evidence/v31/priority10-4/`;
+  [post-publication closure](RELEASE-DECISION.md#post-publication-closure)
+  records the inventory and archive validation. Earlier candidate, native and
+  benchmark evidence retains its original provenance and limitations.
+- Published/API/consumer/benchmark baselines advance to `4.4.0`; the reactor
+  and current fixtures advance to `4.5.0-SNAPSHOT`. V31 is archived with no
+  active execution roadmap or selected next release. The architecture review
+  remains a proposal, not adopted V32 work.
+
 ## Completion Criteria
 
-- [ ] Evidence distinguishes case mismatch, filtering/redaction and genuine
+- [x] Evidence distinguishes case mismatch, filtering/redaction and genuine
       context-boundary loss without an unsupported mesh diagnosis.
-- [ ] Named access handles absence, multiplicity and malformed input while legacy
+- [x] Named access handles absence, multiplicity and malformed input while legacy
       map spelling, string aliases and snapshot restoration remain compatible.
-- [ ] Filtering, handoff, auth/cache isolation and terminal cleanup remain correct
+- [x] Filtering, handoff, auth/cache isolation and terminal cleanup remain correct
       through the tested protocol and feature-composition paths.
-- [ ] Mock, consumer, compatibility, AOT/native, lifecycle and documentation checks
+- [x] Mock, consumer, compatibility, AOT/native, lifecycle and documentation checks
       cover final delivered code; performance claims match reviewed evidence.
-- [ ] A release or no-go disposition is recorded and the corresponding archive
+- [x] A release or no-go disposition is recorded and the corresponding archive
       path is complete, with no unimplemented public contract represented as shipped.

@@ -668,8 +668,8 @@ The assertions read the filtered snapshot captured from Reactor context. They do
 
 Captured inbound assertion names (`hasInboundHeader`, `hasInboundHeaderValues`,
 `hasRedactedInboundHeader`, `doesNotHaveInboundHeader`) retain **exact spelling**
-semantics, including on the `4.4.0` candidate. They are not HTTP-style
-case-insensitive lookups. Candidate-only named access can be tested separately:
+semantics, including in published `4.4.0`. They are not HTTP-style
+case-insensitive lookups. Named access available since `4.4.0` can be tested separately:
 
 ```java
 var restored = mock.lastExchange().requestContextSnapshot().writeTo(Context.empty());
